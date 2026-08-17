@@ -15,8 +15,8 @@ mod static_transition;
 
 pub(super) use static_transition::build_static_continuation_fusion_plan;
 pub(in crate::cranelift_backend) use static_transition::{
-    BodyEmissionDisposition, FusionClaimRefusal, FusionComposedEdge, FusionCompositionLayer,
-    FusionOwnedBody, FusionOwnedOuterRealization, FusionRegionClaim, FusionRegionClaimLedger,
+    FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
+    FusionRegionClaimLedger,
 };
 /// `D2f` — the fused region's identity and its joined view, in PRODUCTION.
 ///
@@ -63,22 +63,20 @@ pub(super) use static_transition::{
 // carrier producers. Namespace re-export only.
 pub(super) use static_transition::{
     AggregateOccurrenceId, FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape,
-    PlannedAggregateChild, PlannedAggregateOwnership, PlannedAggregateView,
-    PlannedReferentLifetime,
+    PlannedAggregateOwnership, PlannedReferentLifetime,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot,
-    SynthesizedAggregateStep, SynthesizedDynamicSet,
 };
 // `RT-DECL-CLOSURE-PORT` `D7` — the host-effect semantic-seat authority, read
 // by the effect emitter. Namespace re-export only.
 pub(super) use static_transition::{
-    host_effect_seat_contract_of, EffectSeatAvail, EffectSeatNeed, EffectSeatOperation,
-    EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat, CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
+    host_effect_seat_contract_of, EffectSeatNeed, EffectSeatOperation, EffectSeatPhase,
+    EffectSeatSlot, PlannedEffectSeat, CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
 #[cfg(test)]
 pub(super) use static_transition::{set_effect_seat_plan_mutation, EffectSeatPlanMutation};
 pub(super) use static_transition::{
     ContinuationCallIdentity, ContinuationCallView, ContinuationContextId,
-    ContinuationConsumingOccurrence, ContinuationContextView, ContinuationEmissionOwner,
+    ContinuationConsumingOccurrence, ContinuationEmissionOwner,
     ContinuationInputView, RequiredConsumerProjection,
     ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
     // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — the closed coordinate sum reaches
@@ -87,7 +85,6 @@ pub(super) use static_transition::{
     ContinuationAvailabilityViews, ContinuationEnvironmentClaim, ContinuationFrameIdentity,
     ContinuationSourceCoordinate,
     ContinuationSourceSlotAuthority,
-    ContinuationFrameRequirement,
     ContinuationSpecializationId,
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout reaches
     // lowering's test targets so its control can compare the authority against
@@ -102,10 +99,7 @@ pub(super) use static_transition::{
     // `RT-CONTSRC-PRODUCER-LOCAL` `D7a` — the planner-issued composed worker
     // view, reached from a computational frame's own coordinates. Namespace
     // re-export only: no wrapper, no derivation, no second authority.
-    ComposedWorkerRouteEligibility, ComposedWorkerView, ContinuationWorkerCaptureProvenance,
-    ContinuationWorkerCaptureSource,
-    // `D7a2` — the raw-target requirement and its reconciliation gate.
-    ComposedCallTarget,
+    ComposedWorkerRouteEligibility,
 };
 // `RT-CONTSRC-PRODUCER-LOCAL` `D7a2` reconciliation controls. ⛔ `#[cfg(test)]`
 // on the RE-EXPORT as well as on the items: an ungated re-export of a
@@ -126,8 +120,7 @@ pub(super) use static_transition::{
 // checking `-p ken-runtime` separately from `--profile test`.
 #[cfg(test)]
 pub(in crate::cranelift_backend) use static_transition::{
-    d3b_publish_without_finalization, d3b_refinalize, d4b_arm_admission, d4b_take_admission,
-    D3bFinalizationPerturbation, D4bVerdict,
+    d3b_publish_without_finalization, d3b_refinalize, D3bFinalizationPerturbation,
 };
 #[cfg(test)]
 pub(super) use static_transition::with_last_io_error_role_omitted;
@@ -147,9 +140,8 @@ pub(super) use static_transition::{
 // construct the plane nor reach the pre-emission validator to bypass it.
 pub(super) use static_transition::{
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
-    AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition, EmittableUnit,
-    expected_capture_slot,
-    EmittableCallKind, PredeclaredFunctionId,
+    AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
+    expected_capture_slot, EmittableCallKind, PredeclaredFunctionId,
 };
 
 pub(super) fn native_join_plan_for_program(

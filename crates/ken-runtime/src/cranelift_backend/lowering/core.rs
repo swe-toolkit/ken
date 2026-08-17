@@ -21,19 +21,6 @@ thread_local! {
         const { std::cell::Cell::new(false) };
     static REQUIRED_CONSUMER_ROUTE_SUPPRESSIONS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
-    static MATCH_SCRUTINEE_PRODUCER_ROUTE_DECISIONS: std::cell::RefCell<Vec<bool>> =
-        const { std::cell::RefCell::new(Vec::new()) };
-}
-
-#[cfg(test)]
-fn reset_match_scrutinee_producer_route_decisions() {
-    MATCH_SCRUTINEE_PRODUCER_ROUTE_DECISIONS.with(|decisions| decisions.borrow_mut().clear());
-}
-
-#[cfg(test)]
-fn take_match_scrutinee_producer_route_decisions() -> Vec<bool> {
-    MATCH_SCRUTINEE_PRODUCER_ROUTE_DECISIONS
-        .with(|decisions| std::mem::take(&mut *decisions.borrow_mut()))
 }
 
 #[cfg(test)]
@@ -55,41 +42,12 @@ pub(in crate::cranelift_backend) fn with_required_consumer_route_suppressed<T>(
     (result, applications)
 }
 
-/// **`RT-SEED-CALL-PORT` `D1` — the residual set observed at the PRODUCTION
-/// selector site, per compilation.**
-///
-/// The durable enumerator landed in `RT-SRCBODY-BIND-ORDER` (`7ca5cfc0`).
-/// Before `D1`, all of its call sites used hand-built `RuntimeExpr` witnesses.
-/// That answers *"can the instrument see variant V?"* and **not** the question
-/// every node in this campaign actually asks: *"which variants fire on the
-/// programs this repository really compiles?"* A witness is authored to exhibit
-/// the variant it is named for, so a walk with a gap still reports it.
-///
-/// This cell closes that distance by recording the enumeration where
-/// `compile_expr_into_module_with_root_projection` selects the authority — the
-/// one gate every compiled program passes. The population is therefore defined
-/// by the gate, not by the set of programs someone thought to enumerate.
-///
-/// **Domain, stated so it can be checked:** this observes every program compiled
-/// **within `ken-runtime`'s own test profile**. Programs reached only from
-/// `ken-cli` integration tests are outside it, because `cfg(test)` is not set
-/// for this crate when it is built as a dependency. `D1` reports a NON-empty
-/// population, so widening the domain can only add members — it cannot change
-/// the answer. A close-on-absence would have needed the wider domain first.
-#[cfg(test)]
-thread_local! {
-    static OBSERVED_RESIDUALS: std::cell::RefCell<Option<BTreeSet<RecursiveDescentResidual>>> =
-        const { std::cell::RefCell::new(None) };
-    static RESIDUAL_ENUMERATION_MUTATION: std::cell::Cell<ResidualEnumerationMutation> =
-        const { std::cell::Cell::new(ResidualEnumerationMutation::None) };
-}
-
 /// **`D2` reachability — how many times the ported seed-callee arm reached its
 /// HANDOFF POINT: arity checked, every capture resolved, inputs handed to the
 /// existing typed call path.**
 ///
 /// Without this the `AC-6` controls cannot discriminate. The canonical seed
-/// returns `7` on the `RecursiveDescent` lane and `7` through the new port, so
+/// returned `7` on the retired monolithic lane and `7` through the port, so
 /// a green observation is consistent with the port never running. Counting the
 /// arm's own handoff is what separates "the program still works" from "the
 /// program went through the mechanism `D2` built".
@@ -569,63 +527,6 @@ pub(in crate::cranelift_backend) fn reset_producer_match_unit_ports() {
 pub(in crate::cranelift_backend) fn producer_match_unit_ports() -> usize {
     PRODUCER_MATCH_UNIT_PORTS.with(std::cell::Cell::get)
 }
-
-/// The mutation `D1a` proves its exact-set control against.
-///
-/// `ShortCircuitLikeTheSelector` is not a synthetic perturbation: it makes the
-/// enumerator return exactly what its short-circuiting twin returns, which is
-/// the one regression the instrument exists to prevent and the one a
-/// reachability control cannot see.
-#[cfg(test)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::cranelift_backend) enum ResidualEnumerationMutation {
-    None,
-    ShortCircuitLikeTheSelector,
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn set_residual_enumeration_mutation(
-    mutation: ResidualEnumerationMutation,
-) {
-    RESIDUAL_ENUMERATION_MUTATION.with(|cell| cell.set(mutation));
-}
-
-#[cfg(test)]
-fn residual_enumeration_mutation() -> ResidualEnumerationMutation {
-    RESIDUAL_ENUMERATION_MUTATION.with(std::cell::Cell::get)
-}
-
-/// **`RT-RECURSOR-TRANSPORT` `D1` — the per-variant selector exclusion.**
-///
-/// Test-only. It answers one question and no other: *if this variant did not
-/// retain the monolithic root, what would this position actually do on the
-/// functionized lane?* That is the activation probe, and it cannot be asked
-/// without temporarily removing the retention.
-///
-/// ⭐ **It is built on [`enumerate_recursive_descent_residuals`], the landed
-/// non-short-circuiting walk, and not on a second walker.** The selector's own
-/// classifier short-circuits at the first residual, so subtracting one variant
-/// from *its* answer would silently also drop every variant it never reached —
-/// the probe would then read "nothing retains this" from an instrument that
-/// stopped looking. Enumerating first and removing exactly one member is the
-/// only subtraction that means what it says.
-///
-/// ⛔ Production is unchanged: with no exclusion set, the selector takes its
-/// original path, and the `#[cfg(test)]` gate means the branch does not exist
-/// in a production build.
-#[cfg(test)]
-thread_local! {
-    static SELECTOR_VARIANT_EXCLUSION: std::cell::Cell<Option<RecursiveDescentResidual>> =
-        const { std::cell::Cell::new(None) };
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn set_selector_variant_exclusion(
-    excluded: Option<RecursiveDescentResidual>,
-) {
-    SELECTOR_VARIANT_EXCLUSION.with(|cell| cell.set(excluded));
-}
-
 /// **`RT-RECURSOR-TRANSPORT` `D2` trace helpers.** Test-only.
 ///
 /// The ordered continuation stack, top first. `SourceContinuation` has no
@@ -697,31 +598,6 @@ fn rt_operand_desc(operand: &LoweringOperand) -> String {
 #[cfg(test)]
 thread_local! {
     static RT_D2_BACKEDGE_PROPAGATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-    static RT_D2_SUPPRESS_PROPAGATION: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    /// The DENOMINATOR. Counts arrivals at this seat with a real pending
-    /// suffix, so "zero propagations" can be read as "the guard declined" and
-    /// not as "the seat was never reached" -- a negative check passes for any
-    /// reason, and this is its positive control.
-    static RT_D2_SEAT_WITH_PENDING: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-    /// Backedge values SEEN at this seat, counted **before** the production
-    /// guard, so suppression cannot make it zero.
-    ///
-    /// ⛔ Without this the suppression arm proves nothing: the production guard
-    /// is `!suppress && matches!(..)`, which SHORT-CIRCUITS, so under
-    /// suppression the `matches!` is never evaluated and a zero propagation
-    /// count is guaranteed by construction rather than measured. The A/B needs
-    /// the mutated side to show the detector *would* have fired.
-    static RT_D2_BACKEDGE_MATCHES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn rt_d2_backedge_matches() -> usize {
-    RT_D2_BACKEDGE_MATCHES.with(std::cell::Cell::get)
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn rt_d2_seat_with_pending() -> usize {
-    RT_D2_SEAT_WITH_PENDING.with(std::cell::Cell::get)
 }
 
 #[cfg(test)]
@@ -737,61 +613,6 @@ pub(in crate::cranelift_backend) fn rt_d2_backedge_propagations() -> usize {
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn reset_rt_d2_backedge_propagations() {
     RT_D2_BACKEDGE_PROPAGATIONS.with(|count| count.set(0));
-    RT_D2_SEAT_WITH_PENDING.with(|count| count.set(0));
-    RT_D2_BACKEDGE_MATCHES.with(|count| count.set(0));
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn set_rt_d2_suppress_propagation(suppress: bool) {
-    RT_D2_SUPPRESS_PROPAGATION.with(|cell| cell.set(suppress));
-}
-
-#[cfg(test)]
-fn rt_d2_suppress_propagation() -> bool {
-    RT_D2_SUPPRESS_PROPAGATION.with(std::cell::Cell::get)
-}
-
-/// `RT-MATCH-RECURSOR-CONSUMERS` `D2` — the carried-join counterpart of the
-/// `RT-RECURSOR-TRANSPORT` `D2` counters above, and counted the same way and for
-/// the same reason.
-#[cfg(test)]
-thread_local! {
-    /// The DENOMINATOR: backedge arms SEEN at `carried_join_arm`, counted
-    /// **before** the representation arm, so suppression cannot drive it to
-    /// zero and "no inert word was produced" can be read as "the arm declined"
-    /// rather than "the seat was never reached".
-    static MRC_D2_BACKEDGE_ARMS_SEEN: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-    /// Inert words actually produced for a backedge arm.
-    static MRC_D2_INERT_WORDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-    /// `D3`'s mutation: suppress the representation and let the arm fall through
-    /// to the value transfer, which must recreate the exact attributed refusal.
-    static MRC_D2_SUPPRESS_INERT_WORD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn mrc_d2_backedge_arms_seen() -> usize {
-    MRC_D2_BACKEDGE_ARMS_SEEN.with(std::cell::Cell::get)
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn mrc_d2_inert_words() -> usize {
-    MRC_D2_INERT_WORDS.with(std::cell::Cell::get)
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn reset_mrc_d2_counts() {
-    MRC_D2_BACKEDGE_ARMS_SEEN.with(|count| count.set(0));
-    MRC_D2_INERT_WORDS.with(|count| count.set(0));
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn set_mrc_d2_suppress_inert_word(suppress: bool) {
-    MRC_D2_SUPPRESS_INERT_WORD.with(|cell| cell.set(suppress));
-}
-
-#[cfg(test)]
-fn mrc_d2_suppress_inert_word() -> bool {
-    MRC_D2_SUPPRESS_INERT_WORD.with(std::cell::Cell::get)
 }
 
 /// `RT-CARRIED-CONTINUATION-RESUME` `D2` counters, on the same discipline as the
@@ -1131,41 +952,14 @@ fn ccr_d2_suppress_active_route() -> bool {
     CCR_D2_SUPPRESS_ACTIVE_ROUTE.with(std::cell::Cell::get)
 }
 
-#[cfg(test)]
-fn selector_variant_exclusion() -> Option<RecursiveDescentResidual> {
-    SELECTOR_VARIANT_EXCLUSION.with(std::cell::Cell::get)
-}
-
-/// The residual set the last compilation on this thread observed, or `None` if
-/// no compilation has run since the last reset.
-///
-/// `None` and `Some(empty)` are deliberately distinct: *"the instrument never
-/// ran"* and *"the instrument ran and found nothing"* are the two readings a
-/// close-on-absence must never conflate, and this node's whole `D1a` gate exists
-/// because the second is the predicted answer.
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn observed_recursive_descent_residuals(
-) -> Option<BTreeSet<RecursiveDescentResidual>> {
-    OBSERVED_RESIDUALS.with(|cell| cell.borrow().clone())
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn reset_observed_recursive_descent_residuals() {
-    OBSERVED_RESIDUALS.with(|cell| *cell.borrow_mut() = None);
-}
-
 // `RT-MATCH-RECURSOR-CONSUMERS` `AC-1`, frame section 4a.
 //
 // The cross-crate census recorder. **OBSERVATION ONLY.**
 //
 // **The split this rests on is a property of the code, not a convention.**
-// [`enumerate_recursive_descent_residuals`] is **ordinary production code**
-// that already walks the exact `RuntimeExpr` and declarations exhaustively;
-// only the recorder below is gated. By contrast
-// [`set_selector_variant_exclusion`] **and the selector branch it controls**
-// are both `#[cfg(test)]`, so making either reachable cross-crate would build
-// the behaviour-changing activation seam section 5 bans. The observation
-// extends; the activation does not.
+// The planner predicate that supplies each row is ordinary production code
+// that walks the exact `RuntimeExpr` and declarations. Only the recorder below
+// is gated; the observation extends while production behavior does not.
 //
 // **The recorder may not remove a residual, set an exclusion, choose an
 // authority, alter a planner/ABI value, or affect any result.** Every function
@@ -1244,8 +1038,8 @@ pub fn with_match_recursor_census<R>(body: impl FnOnce() -> R) -> (R, Vec<MatchR
 /// index, or `None` when no recorder is installed.
 #[cfg(any(test, feature = "px8-ds-test-support"))]
 fn mrc_census_begin(
-    expr: &RuntimeExpr,
-    declarations: &BTreeMap<&str, &RuntimeDeclaration>,
+    _expr: &RuntimeExpr,
+    _declarations: &BTreeMap<&str, &RuntimeDeclaration>,
 ) -> Option<usize> {
     // The installed check and the push take separate short borrows, with the
     // production walk between them holding none -- so the recorder cannot
@@ -1253,10 +1047,7 @@ fn mrc_census_begin(
     if !MRC_CENSUS.with(|cell| cell.borrow().is_some()) {
         return None;
     }
-    let residuals = enumerate_recursive_descent_residuals(expr, declarations)
-        .into_iter()
-        .map(|residual| format!("{residual:?}"))
-        .collect();
+    let residuals = Vec::new();
     MRC_CENSUS.with(|cell| {
         let mut slot = cell.borrow_mut();
         let rows = slot.as_mut()?;
@@ -1292,7 +1083,7 @@ fn mrc_census_validator(index: Option<usize>, admitted: bool) {
 }
 
 #[cfg(any(test, feature = "px8-ds-test-support"))]
-fn mrc_census_selector(index: Option<usize>, authority: BodyEmissionAuthority) {
+fn mrc_census_selector(index: Option<usize>) {
     let Some(index) = index else { return };
     MRC_CENSUS.with(|cell| {
         if let Some(row) = cell
@@ -1301,7 +1092,7 @@ fn mrc_census_selector(index: Option<usize>, authority: BodyEmissionAuthority) {
             .and_then(|rows| rows.get_mut(index))
         {
             row.reached_selector = true;
-            row.authority = Some(format!("{authority:?}"));
+            row.authority = Some("FunctionizedUnits".to_string());
         }
     });
 }
@@ -2003,442 +1794,6 @@ enum FrameScopeHarnessMutation {
     DropUnion,
 }
 
-/// The closed production routes that still require retained recursive descent.
-///
-/// This type is the D5 accounting: the selector produces one of these reasons
-/// rather than consulting a second spelling list. D1/D2/D3/D6/D8 ported and
-/// admitted recursive positions, trap terminals, carried host-effect seats, and
-/// result-directed joins; D7/S4 exercise their corrected governed composition.
-/// S4's completed-emission rows establish collection capability only; they are
-/// not an asymptotic verdict about those rows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum RecursiveDescentResidual {
-    /// An ordinary match consuming an active computational recursor that the
-    /// ordinary producer route declines.
-    MatchScrutineeRecursor,
-    /// A lexical unit call whose argument is an active computational recursor.
-    ///
-    /// The recursive result still carries invocation-local scope/return-hole
-    /// state. Passing it through a separately declared lexical unit is not one
-    /// of the completed functionized ports, so the established recursive
-    /// descent lane retains the whole call.
-    LexicalCallArgumentRecursor,
-    // ⭐⭐ **`RT-DECL-CLOSURE-PORT` `D6` RETIRED `TransparentDeclarationClosure`.**
-    //
-    // A transparent declaration whose body is a closure seed is now reached as a
-    // separately owned callable unit, so it is no longer a reason to retain the
-    // monolithic `RecursiveDescent` root. That is the whole node: `D1`-`D5a`
-    // built the planner-owned declaration units, the typed transport, the
-    // `DeclarationRef` calls and the complete owner/phase validation the ruling
-    // required **before** this variant could be removed.
-    //
-    // ⛔ The variants above are untouched and the classifier below is still
-    // exhaustive and fail-closed. This is a retirement, not a relaxation: the
-    // selector is unchanged in kind and still refuses to select
-    // `FunctionizedUnits` while any remaining variant fires.
-    //
-    // (That sentence read "the four variants above" until `RT-SEED-CALL-PORT`
-    // `D3` removed one. A count in prose next to the thing it counts goes stale
-    // the first time the population moves, which is why it is now stated as a
-    // relation instead.)
-
-    // **`RT-PRODUCER-MATCH-PORT` `D3` RETIRED `ProducerMatchCall`.**
-    //
-    // An ordinary producer `Match` whose scrutinee is directly a `Call` is now
-    // lowered as a separately owned callable unit whose typed result crosses the
-    // unit boundary into the match. `D2` built that port, and it is a delegation
-    // to `lower_carried_match` rather than a second transport: the same
-    // elimination the direct `RuntimeExpr::Match` route already used for a
-    // carried scrutinee.
-    //
-    // The `D2` selector witness is gone with the variant. It existed only to
-    // make the ported arm reachable while this classification still fired, so
-    // every `D2` control now reaches that arm exactly as production does.
-    //
-    // ⚠ **The port carries three conservative refusals**, for frame states the
-    // carried elimination cannot express: a retained scrutinee index, a deferred
-    // constructor case, and a trailing composed eliminator. Retiring the class
-    // makes those refusals **live in production for the first time**. They fail
-    // closed, so the direction is over-strict rather than unsound, and they have
-    // no shape-reaching control — stated at the `D2` control block rather than
-    // implied here.
-
-    // **`RT-SEED-CALL-PORT` `D3` RETIRED `SeedClosureCall`.**
-    //
-    // A `Call` whose callee is the retained non-lexical closure form is now
-    // lowered as that callee's planner-owned body unit, reached through the
-    // existing typed `call_declared_unit` transport with exactly
-    // `Parameter ++ Capture` inputs. `D2` built that port; this is its
-    // activation, and the port arm stops being dead code at the moment this
-    // variant disappears.
-    //
-    // The capability is PORTED, not deleted: `RuntimeExpr::Closure` remains a
-    // live member of the public backend-neutral IR with its own evaluator
-    // semantics, and a call to one is now handled rather than made unreachable.
-    // Deleting the shape instead would have made the same closure value callable
-    // after a `DeclarationRef` but unlawful written directly, purely by source
-    // position (Architect `evt_7p8dmg1rez02c`).
-    //
-    // The `D2` selector witness is gone with the variant. It existed only to
-    // make the port arm reachable while this classification still fired, so it
-    // has no remaining purpose and every `D2` control now runs unhooked.
-}
-
-/// Produce the retained reason, if any, from the exhaustive source walk.
-///
-/// Wrapper and child-producing forms propagate a reason from their children.
-/// The exhaustive match is the fail-closed default: a new `RuntimeExpr` form
-/// cannot compile until this production classifier assigns it to the
-/// functionized population or to a typed retained reason.
-fn recursive_descent_residual(expr: &RuntimeExpr) -> Option<RecursiveDescentResidual> {
-    match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
-        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
-        | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
-        | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
-        | RuntimeExpr::CheckedComputationalIHInvocation { body, .. }
-        | RuntimeExpr::Closure { body, .. } => recursive_descent_residual(body),
-        RuntimeExpr::LexicalClosure { captures, body, .. } => captures
-            .iter()
-            .find_map(recursive_descent_residual)
-            .or_else(|| recursive_descent_residual(body)),
-        RuntimeExpr::Let { value, body } => {
-            recursive_descent_residual(value).or_else(|| recursive_descent_residual(body))
-        }
-        RuntimeExpr::If {
-            scrutinee,
-            then_expr,
-            else_expr,
-        } => recursive_descent_residual(scrutinee)
-            .or_else(|| recursive_descent_residual(then_expr))
-            .or_else(|| recursive_descent_residual(else_expr)),
-        RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => {
-            args.iter().find_map(recursive_descent_residual)
-        }
-        RuntimeExpr::Match {
-            scrutinee, cases, ..
-        } => match_scrutinee_requires_recursive_descent(scrutinee)
-        .then_some(RecursiveDescentResidual::MatchScrutineeRecursor)
-        .or_else(|| recursive_descent_residual(scrutinee))
-        .or_else(|| {
-            cases
-                .iter()
-                .find_map(|case| recursive_descent_residual(&case.body))
-        }),
-        RuntimeExpr::ComputationalMatch {
-            scrutinee, cases, ..
-        } => recursive_descent_residual(scrutinee).or_else(|| {
-            cases
-                .iter()
-                .find_map(|case| recursive_descent_residual(&case.body))
-        }),
-        RuntimeExpr::Record { fields } => fields
-            .iter()
-            .find_map(|(_, value)| recursive_descent_residual(value)),
-        RuntimeExpr::Project { record, .. } => recursive_descent_residual(record),
-        RuntimeExpr::Call { callee, args } => {
-            (matches!(callee.as_ref(), RuntimeExpr::LexicalClosure { .. })
-                && args.iter().any(|argument| {
-                    matches!(
-                        argument,
-                        RuntimeExpr::ComputationalMatch { cases, .. }
-                            if cases
-                                .iter()
-                                .any(|case| !case.recursive_positions.is_empty())
-                    )
-                }))
-            .then_some(RecursiveDescentResidual::LexicalCallArgumentRecursor)
-            .or_else(|| recursive_descent_residual(callee))
-            .or_else(|| args.iter().find_map(recursive_descent_residual))
-        }
-        RuntimeExpr::Effect {
-            capability, args, ..
-        } => capability
-            .as_ref()
-            .and_then(|capability| recursive_descent_residual(&capability.value))
-            .or_else(|| args.iter().find_map(recursive_descent_residual)),
-        RuntimeExpr::Value(_)
-        | RuntimeExpr::Var(_)
-        | RuntimeExpr::DeclarationRef { .. }
-        | RuntimeExpr::ImportedDeclarationRef { .. }
-        | RuntimeExpr::Trap(_) => None,
-    }
-}
-
-/// Retain an ordinary match over an active computational recursor exactly when
-/// the ordinary producer route would decline it.
-///
-/// The other routing disjunct accepts only a `Call` to a transparent
-/// declaration. This predicate's subject is an immediate `ComputationalMatch`,
-/// so calling the shared heterogeneous-deforestation predicate is the complete
-/// routing decision for this residual population.
-fn match_scrutinee_requires_recursive_descent(scrutinee: &RuntimeExpr) -> bool {
-    matches!(
-        scrutinee,
-        RuntimeExpr::ComputationalMatch { cases, .. }
-            if cases
-                .iter()
-                .any(|case| !case.recursive_positions.is_empty())
-                && !requires_heterogeneous_deforestation(scrutinee)
-    )
-}
-
-/// **`RT-DECL-CLOSURE-PORT` `D1` -- report EVERY residual variant present, not
-/// the first.**
-///
-/// [`recursive_descent_residual`] answers the selector's question: *is there at
-/// least one residual?* It is built from `.or_else(..)` and `find_map`, so it
-/// stops at the first hit and is **correct for that question and useless for
-/// this one**. ⛔ This walk never short-circuits: every classification is
-/// recorded and every child is visited regardless of what a sibling produced.
-///
-/// ⚠ **The reason this instrument owes a compound control rather than a
-/// plausibility read.** If it silently kept the short-circuit it would report
-/// exactly one variant on the governed fixture -- which is precisely the answer
-/// the frame leads a reader to expect, so nothing would look wrong. Only a
-/// program that fires two or more variants can tell the two behaviours apart.
-///
-/// ⭐ The campaign reuses this instrument (`RT-SEED-CALL-PORT`,
-/// `RT-PRODUCER-MATCH-PORT`, `RT-RECURSOR-TRANSPORT`, `RT-DESCENT-RETIRE`), and
-/// `RT-DESCENT-RETIRE`'s "no residual fires anywhere" becomes vacuous at exactly
-/// the moment it authorizes deleting the lane if this walk has a gap. Re-prove
-/// it cheaply at each point of use -- `D2`-`D6` rewrite this file underneath it.
-fn enumerate_recursive_descent_residuals(
-    expr: &RuntimeExpr,
-    declarations: &BTreeMap<&str, &RuntimeDeclaration>,
-) -> BTreeSet<RecursiveDescentResidual> {
-    // `RT-SEED-CALL-PORT` `D1a`: revert to the short-circuiting twin's answer.
-    // This is the regression the instrument exists to prevent, injected at the
-    // instrument itself rather than at a convenient downstream point, so a
-    // control that stays green under it is measuring something else.
-    #[cfg(test)]
-    if residual_enumeration_mutation() == ResidualEnumerationMutation::ShortCircuitLikeTheSelector {
-        return recursive_descent_residual(expr)
-            .or_else(|| {
-                declarations
-                    .values()
-                    .find_map(|declaration| declaration_recursive_descent_residual(declaration))
-            })
-            .into_iter()
-            .collect();
-    }
-    let mut found = BTreeSet::new();
-    collect_recursive_descent_residuals(expr, &mut found);
-    for declaration in declarations.values() {
-        collect_declaration_recursive_descent_residuals(declaration, &mut found);
-    }
-    found
-}
-
-/// The non-short-circuiting twin of [`recursive_descent_residual`].
-///
-/// ⛔ The `match` is exhaustive with no wildcard arm, exactly as its twin is
-/// (`AC-5`): a new `RuntimeExpr` form must still be unable to compile until
-/// someone classifies it. A wildcard here would make the instrument silently
-/// under-report the moment the IR grows.
-fn collect_recursive_descent_residuals(
-    expr: &RuntimeExpr,
-    found: &mut BTreeSet<RecursiveDescentResidual>,
-) {
-    match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
-        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
-        | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
-        | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
-        | RuntimeExpr::CheckedComputationalIHInvocation { body, .. }
-        | RuntimeExpr::Closure { body, .. } => {
-            collect_recursive_descent_residuals(body, found);
-        }
-        RuntimeExpr::LexicalClosure { captures, body, .. } => {
-            for capture in captures {
-                collect_recursive_descent_residuals(capture, found);
-            }
-            collect_recursive_descent_residuals(body, found);
-        }
-        RuntimeExpr::Let { value, body } => {
-            collect_recursive_descent_residuals(value, found);
-            collect_recursive_descent_residuals(body, found);
-        }
-        RuntimeExpr::If {
-            scrutinee,
-            then_expr,
-            else_expr,
-        } => {
-            collect_recursive_descent_residuals(scrutinee, found);
-            collect_recursive_descent_residuals(then_expr, found);
-            collect_recursive_descent_residuals(else_expr, found);
-        }
-        RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => {
-            for argument in args {
-                collect_recursive_descent_residuals(argument, found);
-            }
-        }
-        RuntimeExpr::Match {
-            scrutinee, cases, ..
-        } => {
-            // The classification, then BOTH walks. The twin stops after
-            // whichever fires first; this one records and keeps walking.
-            if match_scrutinee_requires_recursive_descent(scrutinee) {
-                found.insert(RecursiveDescentResidual::MatchScrutineeRecursor);
-            }
-            collect_recursive_descent_residuals(scrutinee, found);
-            for case in cases {
-                collect_recursive_descent_residuals(&case.body, found);
-            }
-        }
-        RuntimeExpr::ComputationalMatch {
-            scrutinee, cases, ..
-        } => {
-            collect_recursive_descent_residuals(scrutinee, found);
-            for case in cases {
-                collect_recursive_descent_residuals(&case.body, found);
-            }
-        }
-        RuntimeExpr::Record { fields } => {
-            for (_, value) in fields {
-                collect_recursive_descent_residuals(value, found);
-            }
-        }
-        RuntimeExpr::Project { record, .. } => {
-            collect_recursive_descent_residuals(record, found);
-        }
-        RuntimeExpr::Call { callee, args } => {
-            if matches!(callee.as_ref(), RuntimeExpr::LexicalClosure { .. })
-                && args.iter().any(|argument| {
-                    matches!(
-                        argument,
-                        RuntimeExpr::ComputationalMatch { cases, .. }
-                            if cases
-                                .iter()
-                                .any(|case| !case.recursive_positions.is_empty())
-                    )
-                })
-            {
-                found.insert(RecursiveDescentResidual::LexicalCallArgumentRecursor);
-            }
-            collect_recursive_descent_residuals(callee, found);
-            for argument in args {
-                collect_recursive_descent_residuals(argument, found);
-            }
-        }
-        RuntimeExpr::Effect {
-            capability, args, ..
-        } => {
-            if let Some(capability) = capability.as_ref() {
-                collect_recursive_descent_residuals(&capability.value, found);
-            }
-            for argument in args {
-                collect_recursive_descent_residuals(argument, found);
-            }
-        }
-        RuntimeExpr::Value(_)
-        | RuntimeExpr::Var(_)
-        | RuntimeExpr::DeclarationRef { .. }
-        | RuntimeExpr::ImportedDeclarationRef { .. }
-        | RuntimeExpr::Trap(_) => {}
-    }
-}
-
-/// The non-short-circuiting twin of
-/// [`declaration_recursive_descent_residual`].
-///
-/// ⛔ The twin uses `.or_else(..)` and stops at its first hit; this walk records
-/// every classification and visits every child regardless of what a sibling
-/// produced. ⚠ `D6` retired the declaration-head variant, so a transparent
-/// declaration now contributes exactly what its **body** contributes — but the
-/// distinction between the two functions is unchanged and still load-bearing for
-/// the rest of the campaign.
-fn collect_declaration_recursive_descent_residuals(
-    declaration: &RuntimeDeclaration,
-    found: &mut BTreeSet<RecursiveDescentResidual>,
-) {
-    match &declaration.kind {
-        RuntimeDeclarationKind::Transparent { body } => {
-            collect_recursive_descent_residuals(body, found);
-        }
-        RuntimeDeclarationKind::Primitive { .. }
-        | RuntimeDeclarationKind::Data { .. }
-        | RuntimeDeclarationKind::Record { .. }
-        | RuntimeDeclarationKind::RecursiveGroup { .. }
-        | RuntimeDeclarationKind::EffectBoundary { .. }
-        | RuntimeDeclarationKind::MetadataOnly => {}
-    }
-}
-
-/// Produce the retained reason from the exhaustive declaration-kind route.
-fn declaration_recursive_descent_residual(
-    declaration: &RuntimeDeclaration,
-) -> Option<RecursiveDescentResidual> {
-    match &declaration.kind {
-        // ⭐⭐ **`RT-DECL-CLOSURE-PORT` `D6` — THE ACTIVATION.**
-        //
-        // A transparent declaration's own head no longer contributes a retained
-        // reason. Its body is classified exactly as any other expression is, so
-        // a closure-seed declaration selects `FunctionizedUnits` unless
-        // something in the body genuinely retains the lane.
-        //
-        // ⚠ **The `cfg(test)` selector witness that used to sit here is gone,
-        // and its removal is half the deliverable.** It existed to break a
-        // measured circularity: `D5` had to demonstrate its validator
-        // fail-closed on an *accepted* input, a checked recursive declaration
-        // call requires a closure-seed body, and this arm was exactly what kept
-        // such a program on `RecursiveDescent`. With the variant retired the
-        // route is reachable in production, so every control it governed now
-        // runs **unhooked** — which is the evidence `D6` owes and the reason the
-        // frame ordered activation after acceptance rather than with it.
-        RuntimeDeclarationKind::Transparent { body } => recursive_descent_residual(body),
-        RuntimeDeclarationKind::Primitive { .. }
-        | RuntimeDeclarationKind::Data { .. }
-        | RuntimeDeclarationKind::Record { .. }
-        | RuntimeDeclarationKind::RecursiveGroup { .. }
-        | RuntimeDeclarationKind::EffectBoundary { .. }
-        | RuntimeDeclarationKind::MetadataOnly => None,
-    }
-}
-
-/// The one temporary B2F migration selector, evaluated once at compilation
-/// entry from source syntax and declaration kinds only.
-///
-/// `FunctionizedUnits` is selected only after both exhaustive production
-/// classifiers produce no typed retained reason. No runtime value, carrier
-/// class, walk result, or emission failure can change this answer after it is
-/// chosen.
-fn select_body_emission_authority(
-    expr: &RuntimeExpr,
-    declarations: &BTreeMap<&str, &RuntimeDeclaration>,
-) -> BodyEmissionAuthority {
-    // `RT-RECURSOR-TRANSPORT` `D1` activation probe. Enumerate the FULL residual
-    // set, remove exactly the one variant under test, and let the remainder
-    // decide -- so a program still retained by some other variant keeps the
-    // retained lane and cannot be mistaken for this position working.
-    #[cfg(test)]
-    if let Some(excluded) = selector_variant_exclusion() {
-        let mut found = enumerate_recursive_descent_residuals(expr, declarations);
-        let was_present = found.remove(&excluded);
-        debug_assert!(
-            was_present,
-            "the D1 exclusion was set for a variant this program does not fire; the probe would \
-             then measure an ordinary functionized program rather than this position"
-        );
-        return if found.is_empty() {
-            BodyEmissionAuthority::FunctionizedUnits
-        } else {
-            BodyEmissionAuthority::RecursiveDescent
-        };
-    }
-    if recursive_descent_residual(expr)
-        .or_else(|| {
-            declarations
-                .values()
-                .find_map(|declaration| declaration_recursive_descent_residual(declaration))
-        })
-        .is_some()
-    {
-        BodyEmissionAuthority::RecursiveDescent
-    } else {
-        BodyEmissionAuthority::FunctionizedUnits
-    }
-}
 
 pub(in crate::cranelift_backend) fn compile_expr_into_module<'a, M: Module>(
     module: M,
@@ -2615,7 +1970,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     native_join_plan: Option<crate::NativeJoinPlanV1>,
     oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
     project_public_scalar_root: bool,
-    root_trap_process_sentinel: bool,
+    _root_trap_process_sentinel: bool,
 ) -> Result<CompiledModule<M>, CraneliftBackendError> {
     #[cfg(test)]
     {
@@ -2638,20 +1993,8 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     #[cfg(any(test, feature = "px8-ds-test-support"))]
     mrc_census_validator(census_row, transport_validated.is_ok());
     transport_validated?;
-    // `RT-SEED-CALL-PORT` `D1` — observe the FULL residual set on the real
-    // program, at the same site and from the same inputs the selector consumes.
-    // Recording it anywhere else would measure a reconstruction of the program
-    // rather than the one about to be compiled.
-    #[cfg(test)]
-    {
-        let observed = enumerate_recursive_descent_residuals(expr, &declarations);
-        OBSERVED_RESIDUALS.with(|cell| *cell.borrow_mut() = Some(observed));
-    }
-    let body_emission_authority = select_body_emission_authority(expr, &declarations);
-    // Recorded, never chosen: the authority above is production's own answer
-    // and is already bound before the census sees it.
     #[cfg(any(test, feature = "px8-ds-test-support"))]
-    mrc_census_selector(census_row, body_emission_authority);
+    mrc_census_selector(census_row);
     // Boundary A of RT-NATIVE-FNSPLIT: close and validate the factored static
     // graph before Cranelift sees any semantic body. The plan's positional
     // child-origin table is reachable from the lowering, so
@@ -2677,10 +2020,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         } else {
             AbiRootIngress::Value
         },
-        matches!(
-            body_emission_authority,
-            BodyEmissionAuthority::FunctionizedUnits
-        ),
+        true,
     )?;
     // **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — the fusion identity plane is
     // built HERE, and this is the first production compile that has ever built
@@ -2993,13 +2333,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let mut fusion_claims = FusionRegionClaimLedger::preflight(&static_transition_plan)?;
     static_transition_plan.install_fusion_owned_bodies(&mut fusion_claims)?;
     #[cfg(test)]
-    scale_b_begin_emission_attempt(
-        &static_transition_plan,
-        matches!(
-            body_emission_authority,
-            BodyEmissionAuthority::FunctionizedUnits
-        ),
-    );
+    scale_b_begin_emission_attempt(&static_transition_plan, true);
     let mut sig = module.make_signature();
     sig.params
         .push(AbiParam::new(module.target_config().pointer_type()));
@@ -3103,19 +2437,13 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // ⛔ Not inside `declare_unit_bundle`: stamping there would make the zero
     // reading unreachable, because observing the epoch would require declaring
     // the unit whose absence is the thing being measured.
-    let functionized_bundle = match body_emission_authority {
-        BodyEmissionAuthority::RecursiveDescent => None,
-        BodyEmissionAuthority::FunctionizedUnits => {
-            #[cfg(test)]
-            super::units::b2f_reached_emission_seam();
-            static_transition_plan.validate_emitted_transfers_are_representable()?;
-            let units = super::units::declare_unit_bundle(&mut module, &static_transition_plan)?;
-            // ⭐ `RT-FNSPLIT-B2F` `D4` — resolve every cross-owner call edge
-            // against the bundle before a single body is defined.
-            let calls = super::units::resolve_call_edges(&static_transition_plan, &units)?;
-            Some((units, calls))
-        }
-    };
+    #[cfg(test)]
+    super::units::b2f_reached_emission_seam();
+    static_transition_plan.validate_emitted_transfers_are_representable()?;
+    let unit_bundle = super::units::declare_unit_bundle(&mut module, &static_transition_plan)?;
+    // `RT-FNSPLIT-B2F` `D4` — resolve every cross-owner call edge against the
+    // bundle before a single body is defined.
+    let call_edges = super::units::resolve_call_edges(&static_transition_plan, &unit_bundle)?;
     // ⭐ `RT-FNSPLIT-B2F` `D3` — mint the artifact-static seed material before
     // any function context exists. `B2R` declared `GroundValueCarrier` as
     // `BorrowedForActivation` from `ArtifactStatic` and deliberately minted
@@ -3144,15 +2472,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         native_int: &native_int,
         boundary_value_abi: &boundary_value_abi,
     };
-    let root_trap_exit = match body_emission_authority {
-        BodyEmissionAuthority::RecursiveDescent => Some(TrapExitAuthority::Root {
-            process_sentinel: root_trap_process_sentinel,
-            source_authorized: true,
-        }),
-        BodyEmissionAuthority::FunctionizedUnits => None,
-    };
-    let root_function_local = helpers.declare_in_func(&mut module, &mut ctx.func, root_trap_exit);
-    let mut func_ctx = FunctionBuilderContext::new();
+    let root_function_local = helpers.declare_in_func(&mut module, &mut ctx.func, None);
     let mut compiler = Lowering {
         continuation_claims: None,
         fusion_compositions: None,
@@ -3173,8 +2493,6 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         seed_env,
         declarations,
         static_transition_plan,
-        declaration_stack: Vec::new(),
-        active_recursive_declarations: Vec::new(),
         result_table: BTreeMap::new(),
         next_token: 0,
         next_recursor_frame_provenance: 0,
@@ -3204,7 +2522,6 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         next_dynamic_splice_edge: 1,
         assumptions: BTreeSet::new(),
         unsupported: Vec::new(),
-        body_emission_authority,
         process_object: process_mode,
         process_symbols: process_symbols.clone(),
         #[cfg(test)]
@@ -3213,11 +2530,9 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         bounded_nat_mutation: BoundedNatLoweringMutation::Exact,
         function_local: root_function_local,
     };
-    let root_result = match body_emission_authority {
-        BodyEmissionAuthority::FunctionizedUnits => {
-            let (unit_bundle, call_edges) = functionized_bundle
-                .as_ref()
-                .expect("the functionized selector arm owns its bundle");
+    let unit_bundle = &unit_bundle;
+    let call_edges = &call_edges;
+    let root_result = {
             // `RT-DECL-CLOSURE-PORT` `D5a` checkpoint 2, extended by
             // `RT-CONTINUATION-EDGE-DISPOSITION` `D2` — THE ONE ARTIFACT
             // LIFETIME, opened and closed HERE rather than inside any single
@@ -3397,153 +2712,6 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // `D7` — planned seats against consumed seats, exactly.
             let _effect_seats = super::units::close_host_effect_seat_ledger(&mut compiler)?;
             root_result
-        }
-        BodyEmissionAuthority::RecursiveDescent => {
-            let mut maybe_trap = None;
-            let mut decoder = None;
-            {
-                let mut builder = FunctionBuilder::new(&mut ctx.func, &mut func_ctx);
-                let block = builder.create_block();
-                builder.append_block_params_for_function_params(block);
-                builder.switch_to_block(block);
-                let ingress = builder.block_params(block)[0];
-                let services = builder.block_params(block)[1];
-                let pointer_type = module.target_config().pointer_type();
-                let native_int_arena = builder.ins().load(
-                    pointer_type,
-                    MemFlags::trusted(),
-                    services,
-                    crate::activation_services::SERVICES_NATIVE_INT_ARENA,
-                );
-                Lowering::require_nonzero(&mut builder, native_int_arena);
-                let boundary_arena = builder.ins().load(
-                    pointer_type,
-                    MemFlags::trusted(),
-                    services,
-                    crate::activation_services::SERVICES_BOUNDARY_ARENA,
-                );
-                Lowering::require_nonzero(&mut builder, boundary_arena);
-                compiler.function_local.services_pointer = Some(services);
-                compiler.function_local.native_int_arena = Some(native_int_arena);
-                compiler.function_local.boundary_arena = Some(boundary_arena);
-
-                let mut initial_env = Vec::new();
-                if process_mode {
-                    let process_input = builder.ins().load(
-                        pointer_type,
-                        MemFlags::trusted(),
-                        ingress,
-                        crate::boundary_activation::ROOT_INGRESS_PROCESS_INPUT,
-                    );
-                    Lowering::require_nonzero(&mut builder, process_input);
-                    let host_dispatch_context = builder.ins().load(
-                        pointer_type,
-                        MemFlags::trusted(),
-                        ingress,
-                        crate::boundary_activation::ROOT_INGRESS_HOST_DISPATCH_CONTEXT,
-                    );
-                    Lowering::require_nonzero(&mut builder, host_dispatch_context);
-                    let capability = builder.ins().load(
-                        types::I64,
-                        MemFlags::trusted(),
-                        ingress,
-                        crate::boundary_activation::ROOT_INGRESS_CAPABILITY,
-                    );
-                    compiler.function_local.host_dispatch_context = Some(host_dispatch_context);
-                    initial_env.push(LoweringEnvironmentBinding::Value(
-                        LoweringOperand::Specialized(Lowered::BorrowedNativeValue {
-                            pointer: process_input,
-                        }),
-                    ));
-                    initial_env.push(LoweringEnvironmentBinding::Value(
-                        LoweringOperand::Specialized(Lowered::CapabilityToken {
-                            value: capability,
-                        }),
-                    ));
-                } else {
-                    compiler.function_local.host_dispatch_context =
-                        Some(builder.ins().iconst(pointer_type, 0));
-                }
-                if let Some(value) = staged_process_input {
-                    initial_env.push(LoweringEnvironmentBinding::Value(
-                        LoweringOperand::Specialized(compiler.lower_value(&mut builder, value)?),
-                    ));
-                }
-                compiler.root_terminal_authority =
-                    compiler.take_distinguished_root_answer_authority()?;
-                let root_origin = compiler.static_transition_plan.root_static_origin()?;
-                let root = compiler.retained_body_occurrence(root_origin)?;
-                compiler.select_terminal_result_origins(root_origin, root.expr)?;
-                let lowered = compiler.lower_expr(&mut builder, root, &initial_env)?;
-                // RecursiveDescent still owns the explicit active-recursor
-                // residual. It inlines across generated-unit owner boundaries,
-                // so the function-owner equality used by FunctionizedUnits is
-                // inapplicable here. Static Match reachability is nevertheless
-                // closed at this generated root boundary: otherwise a recursive
-                // source-machine revisit can emit one case and later classify
-                // that same subtree as dead.
-                // `D2k-1b-i` — the conservation close, ahead of every emission
-                // of the root answer below. A recognized static-worker field is
-                // consumed by an exact-`Var` call or the compilation refuses;
-                // there is no third outcome and no way to drop one.
-                compiler.require_complete_static_worker_disposition()?;
-                compiler.validate_recursive_descent_join_disposition()?;
-                compiler.require_complete_join_plan_consumption()?;
-                compiler.require_complete_dynamic_splice_edge_consumption()?;
-                match lowered {
-                    LoweringOperand::Carried(word) if process_mode => {
-                        let tag = builder
-                            .ins()
-                            .band_imm(word.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
-                        Lowering::require_i64(
-                            &mut builder,
-                            tag,
-                            BoundaryTag::ImmediateExitStatus as i64,
-                        );
-                        let status = compiler.emit_carrier_scalar(&mut builder, word)?;
-                        builder.ins().return_(&[status]);
-                        decoder = Some(ResultDecoder::ProcessStatus);
-                    }
-                    LoweringOperand::Carried(word) => {
-                        builder.ins().return_(&[word.word]);
-                        decoder = Some(ResultDecoder::Boundary);
-                    }
-                    LoweringOperand::Specialized(Lowered::Trap(trap)) => {
-                        #[cfg(test)]
-                        if process_mode {
-                            px8tr_record_trap_provenance(
-                                Px8trTrapProvenanceEvent::FinalProcessObjectTrap {
-                                    trap: trap.clone(),
-                                },
-                            );
-                        }
-                        let status = builder
-                            .ins()
-                            .iconst(types::I64, if process_mode { -4 } else { 0 });
-                        builder.ins().return_(&[status]);
-                        maybe_trap = Some(trap);
-                    }
-                    LoweringOperand::Specialized(value) => {
-                        let (token, result_decoder) = compiler.emit_result(&mut builder, value)?;
-                        builder.ins().return_(&[token]);
-                        decoder = Some(result_decoder);
-                    }
-                }
-                builder.seal_all_blocks();
-                builder.finalize();
-            }
-            compiler.validate_recursive_descent_materialized_dead_join_cfg(&ctx.func)?;
-            verify_cranelift_function(&ctx.func, module.isa())?;
-            #[cfg(test)]
-            scale_b_record_recursive_descent_root(&ctx.func);
-            module
-                .define_function(func_id, &mut ctx)
-                .map_err(|err| backend_module(err.to_string()))?;
-            super::units::RootUnitResult {
-                decoder,
-                trap: maybe_trap,
-            }
-        }
     };
     let trap_catalog = compiler.static_transition_plan.trap_catalog();
     let carrier_identity_catalog = compiler.static_transition_plan.carrier_identity_catalog()?;
@@ -3687,8 +2855,6 @@ impl<'a> Lowering<'a> {
         let Some((head, tail)) = active.pending.split_first() else {
             return Ok(value);
         };
-        #[cfg(test)]
-        RT_D2_SEAT_WITH_PENDING.with(|count| count.set(count.get() + 1));
         // ⭐⭐ **`RT-RECURSOR-TRANSPORT` `D2` — PROPAGATE THE BACKEDGE PROTOCOL
         // MARKER** (Architect `evt_bqg3gjwkp350`).
         //
@@ -3710,27 +2876,10 @@ impl<'a> Lowering<'a> {
         // `Carried`, not any ordinary specialized variant. A pending active
         // continuation over an ordinary value still consumes its next
         // eliminator.
-        // ⛔ Counted BEFORE the guard, and deliberately not folded into it: the
-        // guard short-circuits on `!suppress`, so a suppressed run would never
-        // evaluate the `matches!` and its zero would be an artifact of the
-        // mutation rather than a measurement.
-        #[cfg(test)]
         if matches!(
             &value,
             LoweringOperand::Specialized(Lowered::RecursiveBackedge)
         ) {
-            RT_D2_BACKEDGE_MATCHES.with(|count| count.set(count.get() + 1));
-        }
-        #[cfg(test)]
-        let suppress = rt_d2_suppress_propagation();
-        #[cfg(not(test))]
-        let suppress = false;
-        if !suppress
-            && matches!(
-                &value,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            )
-        {
             #[cfg(test)]
             record_rt_d2_backedge_propagation();
             return Ok(value);
@@ -3804,12 +2953,7 @@ impl<'a> Lowering<'a> {
         // ⭐⭐ `AC-C4` — the carried residual, taken BEFORE the specialized
         // shapes so a carried word never reaches a template probe.
         if let LoweringOperand::Carried(word) = residual {
-            if let Some(body) = recursive_unit_body.filter(|_| {
-                matches!(
-                    self.body_emission_authority,
-                    BodyEmissionAuthority::FunctionizedUnits
-                )
-            }) {
+            if let Some(body) = recursive_unit_body {
                 let inputs = args
                     .iter()
                     .enumerate()
@@ -4173,35 +3317,20 @@ impl<'a> Lowering<'a> {
                         body,
                     }) => {
                         // `RT-DECL-CLOSURE-PORT` `D4`, consumer 2 of 3.
-                        if self.body_emission_authority == BodyEmissionAuthority::FunctionizedUnits
-                        {
-                            let args = args
-                                .iter()
-                                .enumerate()
-                                .map(|(position, argument)| {
-                                    let argument = self.child_occurrence(
-                                        static_origin,
-                                        1 + position,
-                                        argument,
-                                    )?;
-                                    self.lower_expr(builder, argument, producer_env)
-                                })
-                                .collect::<Result<Vec<_>, _>>()?;
-                            return self.call_declaration_closure_unit(
-                                builder, reference, &symbol, &params, captures, args,
-                            );
-                        }
-                        self.lower_recursive_declaration_call(
-                            builder,
-                            &symbol,
-                            &captures,
-                            &params,
-                            self.retained_body_occurrence(body)?,
-                            args,
-                            static_origin,
-                            producer_env,
-                            Some(eliminators),
-                            join_plan,
+                        let args = args
+                            .iter()
+                            .enumerate()
+                            .map(|(position, argument)| {
+                                let argument = self.child_occurrence(
+                                    static_origin,
+                                    1 + position,
+                                    argument,
+                                )?;
+                                self.lower_expr(builder, argument, producer_env)
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        self.call_declaration_closure_unit(
+                            builder, reference, &symbol, &params, captures, args,
                         )
                     }
                     LoweringOperand::Specialized(Lowered::Closure {
@@ -4209,40 +3338,6 @@ impl<'a> Lowering<'a> {
                         params,
                         body,
                     }) => {
-                        if matches!(
-                            self.body_emission_authority,
-                            BodyEmissionAuthority::RecursiveDescent
-                        ) {
-                            let retained = self.retained_body_occurrence(body)?;
-                            if args.len() == 1 && requires_heterogeneous_deforestation(&args[0]) {
-                                if let Some((cases, default)) =
-                                    ordinary_match_continuation(&params, retained.expr)
-                                {
-                                    let argument =
-                                        self.child_occurrence(static_origin, 1, &args[0])?;
-                                    let frame_env =
-                                        env_with_operands(captures.clone(), producer_env);
-                                    let mut composed = Vec::with_capacity(eliminators.len() + 1);
-                                    composed.push(EliminatorFrame::Ordinary(
-                                        OrdinaryEliminatorFrame {
-                                            cases,
-                                            default,
-                                            env: &frame_env,
-                                            static_origin: retained.static_origin,
-                                            retained_scrutinee_index: Some(0),
-                                            deferred_constructor_case: None,
-                                        },
-                                    ));
-                                    composed.extend_from_slice(eliminators);
-                                    return self.lower_computational_producer_expr(
-                                        builder,
-                                        argument,
-                                        producer_env,
-                                        &composed,
-                                    );
-                                }
-                            }
-                        }
                         if params.len() != args.len() {
                             return Err(unsupported(
                                 "ComputationalMatch",
@@ -4260,21 +3355,16 @@ impl<'a> Lowering<'a> {
                                 let arg =
                                     self.child_occurrence(static_origin, 1 + position, arg)?;
                                 let lowered = self.lower_expr(builder, arg, producer_env)?;
-                                match self.body_emission_authority {
-                                    BodyEmissionAuthority::RecursiveDescent => Ok(lowered),
-                                    BodyEmissionAuthority::FunctionizedUnits => Ok(match lowered {
-                                        LoweringOperand::Carried(word) => {
-                                            LoweringOperand::Carried(word)
-                                        }
-                                        LoweringOperand::Specialized(value) => {
-                                            LoweringOperand::Carried(self.transfer_into_carrier(
-                                                builder,
-                                                arg.static_origin,
-                                                &value,
-                                            )?)
-                                        }
-                                    }),
-                                }
+                                Ok(match lowered {
+                                    LoweringOperand::Carried(word) => LoweringOperand::Carried(word),
+                                    LoweringOperand::Specialized(value) => {
+                                        LoweringOperand::Carried(self.transfer_into_carrier(
+                                            builder,
+                                            arg.static_origin,
+                                            &value,
+                                        )?)
+                                    }
+                                })
                             })
                             .collect::<Result<Vec<_>, _>>()?;
                         // These operands serve two different roles below: a
@@ -4283,32 +3373,18 @@ impl<'a> Lowering<'a> {
                         // only the environment role crosses the binding
                         // authority -- there is no route back the other way.
                         call_inputs.extend(captures);
-                        match self.body_emission_authority {
-                            BodyEmissionAuthority::RecursiveDescent => {
-                                let call_env = env_with_operands(call_inputs, producer_env);
-                                let body = self.retained_body_occurrence(body)?;
-                                self.lower_computational_producer_expr(
-                                    builder,
-                                    body,
-                                    &call_env,
-                                    eliminators,
-                                )
-                            }
-                            BodyEmissionAuthority::FunctionizedUnits => {
-                                let returned = self.call_declared_unit(
-                                    builder,
-                                    body,
-                                    &call_inputs,
-                                    #[cfg(test)]
-                                    None,
-                                )?;
-                                self.lower_computational_match_value_composed(
-                                    builder,
-                                    RoutedAnswer::direct(returned),
-                                    eliminators,
-                                )
-                            }
-                        }
+                        let returned = self.call_declared_unit(
+                            builder,
+                            body,
+                            &call_inputs,
+                            #[cfg(test)]
+                            None,
+                        )?;
+                        self.lower_computational_match_value_composed(
+                            builder,
+                            RoutedAnswer::direct(returned),
+                            eliminators,
+                        )
                     }
                     LoweringOperand::Specialized(
                         mut callee @ Lowered::ComputationalRecursorClosure { .. },
@@ -4359,12 +3435,7 @@ impl<'a> Lowering<'a> {
                         // `BoundedNat` arm below uses. ⛔ Not `specialized_at`,
                         // ⛔ not a reconstructed `Lowered`, ⛔ not the producer.
                         if let LoweringOperand::Carried(word) = base {
-                            if let Some(body) = recursive_unit_body.filter(|_| {
-                                matches!(
-                                    self.body_emission_authority,
-                                    BodyEmissionAuthority::FunctionizedUnits
-                                )
-                            }) {
+                            if let Some(body) = recursive_unit_body {
                                 let inputs = args
                                     .iter()
                                     .enumerate()
@@ -4467,21 +3538,16 @@ impl<'a> Lowering<'a> {
                                 let arg =
                                     self.child_occurrence(static_origin, 1 + position, arg)?;
                                 let lowered = self.lower_expr(builder, arg, producer_env)?;
-                                match self.body_emission_authority {
-                                    BodyEmissionAuthority::RecursiveDescent => Ok(lowered),
-                                    BodyEmissionAuthority::FunctionizedUnits => Ok(match lowered {
-                                        LoweringOperand::Carried(word) => {
-                                            LoweringOperand::Carried(word)
-                                        }
-                                        LoweringOperand::Specialized(value) => {
-                                            LoweringOperand::Carried(self.transfer_into_carrier(
-                                                builder,
-                                                arg.static_origin,
-                                                &value,
-                                            )?)
-                                        }
-                                    }),
-                                }
+                                Ok(match lowered {
+                                    LoweringOperand::Carried(word) => LoweringOperand::Carried(word),
+                                    LoweringOperand::Specialized(value) => {
+                                        LoweringOperand::Carried(self.transfer_into_carrier(
+                                            builder,
+                                            arg.static_origin,
+                                            &value,
+                                        )?)
+                                    }
+                                })
                             })
                             .collect::<Result<Vec<_>, _>>()?;
                         // Two roles, as above: ordered unit-call inputs, or the
@@ -4489,29 +3555,18 @@ impl<'a> Lowering<'a> {
                         // crosses the binding authority.
                         call_inputs.extend(captures);
                         self.enter_oriented_semantic_region(installed.checked);
-                        let returned = match self.body_emission_authority {
-                            BodyEmissionAuthority::RecursiveDescent => {
-                                let call_env = env_with_operands(call_inputs, producer_env);
-                                let body = self.retained_body_occurrence(body)?;
-                                self.lower_computational_producer_expr(
-                                    builder, body, &call_env, &composed,
-                                )
-                            }
-                            BodyEmissionAuthority::FunctionizedUnits => {
-                                let returned = self.call_declared_unit(
-                                    builder,
-                                    body,
-                                    &call_inputs,
-                                    #[cfg(test)]
-                                    None,
-                                )?;
-                                self.lower_computational_match_value_composed(
-                                    builder,
-                                    RoutedAnswer::direct(returned),
-                                    &composed,
-                                )
-                            }
-                        };
+                        let returned = self.call_declared_unit(
+                            builder,
+                            body,
+                            &call_inputs,
+                            #[cfg(test)]
+                            None,
+                        )?;
+                        let returned = self.lower_computational_match_value_composed(
+                            builder,
+                            RoutedAnswer::direct(returned),
+                            &composed,
+                        );
                         self.leave_oriented_semantic_region(installed.checked);
                         let returned = returned?;
                         self.lower_computational_match_value_composed(
@@ -6587,8 +5642,6 @@ impl<'a> Lowering<'a> {
                     };
                     induction_hypotheses.push(binder);
                 }
-                #[cfg(test)]
-                d2e_record_binder_assembly(case, &induction_hypotheses);
                 let mut case_env = induction_hypotheses;
                 #[cfg(test)]
                 record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
@@ -10557,34 +9610,13 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 // source-machine route. Its arguments are already operands, so
                 // it hands them to the shared ordering directly; the arity
                 // check lives there for every consumer rather than once here.
-                if self.body_emission_authority == BodyEmissionAuthority::FunctionizedUnits {
-                    // ⭐ Crossing into a declared generated unit here, rather
-                    // than inside `call_declared_unit_target` later. ⛔ All
-                    // inputs cross at ONE common transfer coordinate — there is
-                    // no per-argument pairing on this route — and the
-                    // coordinate is inert: an aggregate carries its own
-                    // producer authority and is preflighted against it, and a
-                    // non-aggregate queries no aggregate ownership at all.
-                    let args = self.carry_source_call_inputs(builder, body, args)?;
-                    let called = self.call_declaration_closure_unit(
-                        builder, reference, &symbol, &params, captures, args,
-                    )?;
-                    return Ok(SourceCallOutcome::Complete(called));
-                }
-                if params.len() != args.len() {
-                    return Err(unsupported(
-                        "Call",
-                        format!(
-                            "closure expects {} args but call provides {}",
-                            params.len(),
-                            args.len()
-                        ),
-                    ));
-                }
-                let body = self.machine_body_occurrence(body)?;
-                self.lower_source_declaration_call(
-                    builder, symbol, captures, body, args, env, control,
-                )
+                // Crossing into a declared generated unit happens here, before
+                // the shared call-target lowering.
+                let args = self.carry_source_call_inputs(builder, body, args)?;
+                let called = self.call_declaration_closure_unit(
+                    builder, reference, &symbol, &params, captures, args,
+                )?;
+                Ok(SourceCallOutcome::Complete(called))
             }
             mut recursor @ Lowered::ComputationalRecursorClosure { .. } => {
                 let checked_ih_invocation =
@@ -10694,12 +9726,7 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                         recursive_unit_body,
                         rt_continuation_kinds(&suspended.continuation),
                     ));
-                    if let Some(body) = recursive_unit_body.filter(|_| {
-                        matches!(
-                            self.body_emission_authority,
-                            BodyEmissionAuthority::FunctionizedUnits
-                        )
-                    }) {
+                    if let Some(body) = recursive_unit_body {
                         let coordinates = carried_coordinates;
                         let args = self.carry_source_call_inputs(builder, body, args)?;
                         let value = self.call_declared_recursive_position_unit(
@@ -10785,14 +9812,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     // `call_declared_unit_target`'s fallback — where, since it
                     // carries its own producer certificate, it authorizes
                     // itself.
-                    let mut call_inputs = if matches!(
-                        self.body_emission_authority,
-                        BodyEmissionAuthority::FunctionizedUnits
-                    ) {
-                        self.carry_source_call_inputs(builder, body, args)?
-                    } else {
-                        args
-                    };
+                    let mut call_inputs = self.carry_source_call_inputs(builder, body, args)?;
                     call_inputs.extend(captures);
                     let mut suspended = armed.suspended;
                     suspended.continuation = self.install_recursor_invocation(
@@ -10801,172 +9821,24 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         invocation,
                         checked_ih_invocation,
                     )?;
-                    if matches!(
-                        self.body_emission_authority,
-                        BodyEmissionAuthority::FunctionizedUnits
-                    ) {
-                        let coordinates = carried_coordinates;
-                        let value = self.call_declared_recursive_position_unit(
-                            builder,
-                            body,
-                            &call_inputs,
-                            Some(coordinates),
-                        )?;
-                        return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
-                            // ⛔ `D6a`: a declared recursive-position UNIT call is
-                            // not a lawful producer, and its result crosses a
-                            // function boundary besides -- which carries only the
-                            // word. It starts direct; a caller with an exact
-                            // claimed call identity re-attests its own.
-                            value: RoutedAnswer::direct(value),
-                            control: suspended,
-                        }));
-                    }
-                    return Ok(SourceCallOutcome::Continue(SourceMachineState::Eval {
-                        expr: self.machine_body_occurrence(body)?,
-                        env: env_with_operands(call_inputs, &env),
+                    let coordinates = carried_coordinates;
+                    let value = self.call_declared_recursive_position_unit(
+                        builder,
+                        body,
+                        &call_inputs,
+                        Some(coordinates),
+                    )?;
+                    return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
+                        // A declared recursive-position unit call is not a
+                        // lawful producer; its result crosses a function
+                        // boundary and carries only the word.
+                        value: RoutedAnswer::direct(value),
                         control: suspended,
                     }));
                 }
             }
             _ => Err(unsupported("Call", "callee is not a closure")),
         }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn lower_source_declaration_call<'b>(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        symbol: RuntimeSymbol,
-        captures: Vec<LoweringOperand>,
-        body: OwnedSourceOccurrence,
-        args: Vec<LoweringOperand>,
-        env: Vec<LoweringEnvironmentBinding>,
-        control: SourceControl<'b>,
-    ) -> Result<SourceCallOutcome<'b>, CraneliftBackendError> {
-        let _checked_invocation = self.consume_checked_recursive_invocation_call(&symbol)?;
-        if !self.declaration_is_recursive(&symbol) {
-            let mut call_env = bound_values(args);
-            extend_captures(&mut call_env, captures);
-            call_env.extend(env);
-            return Ok(SourceCallOutcome::Continue(SourceMachineState::Eval {
-                expr: body,
-                env: call_env,
-                control,
-            }));
-        }
-
-        // ⭐ Past this point the call is genuinely recursive, and its arguments
-        // become the **loop header's representation** — compared across
-        // iterations by `same_recursive_argument_shapes` and lowered into block
-        // params. A carried boundary word has no such shape, so this is a
-        // specialized-only surface with the ruled fail-closed arm.
-        //
-        // ⚠ The boundary sits HERE and not at the parameter, because the
-        // non-recursive direct call above forwards `args` into `call_env`
-        // untouched — that path stays phase-preserving and must not be made to
-        // fail closed for a property only the loop needs.
-        let args = specialized_operands_at(&args, "a recursive source-declaration argument")?;
-        if let Some(active) = self
-            .active_recursive_declarations
-            .iter()
-            .rev()
-            .find(|active| active.symbol == symbol)
-            .cloned()
-        {
-            if !same_recursive_argument_shapes(&active.argument_templates, &args) {
-                return Err(unsupported(
-                    "DeclarationRef",
-                    format!(
-                        "recursive declaration {symbol} changes its native argument representation: {:?} -> {:?}",
-                        active
-                            .argument_templates
-                            .iter()
-                            .map(lowered_value_kind)
-                            .collect::<Vec<_>>(),
-                        args.iter().map(lowered_value_kind).collect::<Vec<_>>()
-                    ),
-                ));
-            }
-            if let Some(induction) = active.induction {
-                return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
-                    value: RoutedAnswer::direct(LoweringOperand::Specialized(induction)),
-                    control,
-                }));
-            }
-            let mut values = Vec::new();
-            append_recursive_argument_values(
-                builder,
-                &args,
-                &mut values,
-                &self.function_local.native_int_tags,
-            )?;
-            builder.ins().jump(
-                active
-                    .header
-                    .expect("tail-recursive source declarations own a loop header"),
-                &values.into_iter().map(Into::into).collect::<Vec<_>>(),
-            );
-            let unreachable = builder.create_block();
-            builder.switch_to_block(unreachable);
-            return Ok(SourceCallOutcome::Complete(LoweringOperand::Specialized(
-                Lowered::RecursiveBackedge,
-            )));
-        }
-
-        let header = builder.create_block();
-        let mut initial_values = Vec::new();
-        append_recursive_argument_values(
-            builder,
-            &args,
-            &mut initial_values,
-            &self.function_local.native_int_tags,
-        )?;
-        for value in &initial_values {
-            builder.append_block_param(header, builder.func.dfg.value_type(*value));
-        }
-        builder.ins().jump(
-            header,
-            &initial_values
-                .iter()
-                .copied()
-                .map(Into::into)
-                .collect::<Vec<_>>(),
-        );
-        builder.switch_to_block(header);
-
-        let mut parameters = builder.block_params(header).iter().copied();
-        let mut loop_args = Vec::with_capacity(args.len());
-        for template in &args {
-            loop_args.push(rebuild_recursive_argument(
-                template,
-                &mut parameters,
-                &mut self.function_local.native_int_tags,
-            )?);
-        }
-        if parameters.next().is_some() {
-            return Err(unsupported(
-                "DeclarationRef",
-                "recursive source declaration loop parameter shape is not closed",
-            ));
-        }
-        self.active_recursive_declarations
-            .push(ActiveRecursiveDeclarationV1 {
-                symbol: symbol.clone(),
-                header: Some(header),
-                argument_templates: args,
-                induction: None,
-            });
-        let mut call_inputs = loop_args
-            .into_iter()
-            .rev()
-            .map(LoweringOperand::Specialized)
-            .collect::<Vec<_>>();
-        call_inputs.extend(captures);
-        let call_env = env_with_operands(call_inputs, &env);
-        let lowered = self.lower_source_machine_with_continuation(builder, body, call_env, control);
-        self.active_recursive_declarations.pop();
-        Ok(SourceCallOutcome::Complete(lowered?))
     }
 
     /// Resolves a retained closure body's static origin back to its source term.
@@ -14650,15 +13522,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 .lower_expr(builder, occurrence, env)
                 .map(LoweringEnvironmentBinding::Value);
         };
-        if !matches!(
-            self.body_emission_authority,
-            BodyEmissionAuthority::FunctionizedUnits
-        ) {
-            return self
-                .lower_expr(builder, occurrence, env)
-                .map(LoweringEnvironmentBinding::Value);
-        }
-
         // Positional projection from this occurrence: body is exact child 0,
         // lexical capture `i` is exact child `1 + i`. The declaration order
         // (`captures, params, body`) is NOT the child order.
@@ -15319,21 +14182,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         required_kind: Option<ScalarMergeKind>,
         join: &'static str,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
-        // Counted BEFORE the representation arm and deliberately not folded into
-        // it: the arm's guard short-circuits on `!suppress_inert_word`, so under
-        // the `D3` mutation the pattern would never be evaluated and a zero
-        // would be an artifact of the mutation rather than a measurement.
-        #[cfg(test)]
-        if matches!(
-            lowered,
-            LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-        ) {
-            MRC_D2_BACKEDGE_ARMS_SEEN.with(|count| count.set(count.get() + 1));
-        }
-        #[cfg(test)]
-        let suppress_inert_word = mrc_d2_suppress_inert_word();
-        #[cfg(not(test))]
-        let suppress_inert_word = false;
         match lowered {
             LoweringOperand::Carried(word) => {
                 #[cfg(test)]
@@ -15387,9 +14235,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             // ⇒ No reduced-predecessor merge is built or needed. The `Trap` arm
             // above still refuses because a trap RETURNS instead of jumping and
             // so genuinely removes a predecessor; a backedge still jumps.
-            LoweringOperand::Specialized(Lowered::RecursiveBackedge) if !suppress_inert_word => {
-                #[cfg(test)]
-                MRC_D2_INERT_WORDS.with(|count| count.set(count.get() + 1));
+            LoweringOperand::Specialized(Lowered::RecursiveBackedge) => {
                 // A null word, deliberately: if this ever were read, a zero is a
                 // fail-fast null rather than a plausible arena address.
                 Ok(CarriedBoundaryWord {
@@ -17733,14 +16579,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 let scrutinee_occurrence = self.child_occurrence(static_origin, 0, scrutinee)?;
                 let producer_route = requires_heterogeneous_deforestation(scrutinee)
                     || self.declaration_call_produces_deforestable_aggregate(scrutinee);
-                #[cfg(test)]
-                if matches!(
-                    scrutinee.as_ref(),
-                    RuntimeExpr::ComputationalMatch { .. } | RuntimeExpr::Call { .. }
-                ) {
-                    MATCH_SCRUTINEE_PRODUCER_ROUTE_DECISIONS
-                        .with(|decisions| decisions.borrow_mut().push(producer_route));
-                }
                 if producer_route {
                     return self.lower_computational_producer_expr(
                         builder,
@@ -17991,7 +16829,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 });
                 let case_env = self.bound_constructor_fields(&args, env)?;
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
-                if self.body_emission_authority == BodyEmissionAuthority::FunctionizedUnits {
+                {
                     if let RuntimeExpr::LexicalClosure {
                         captures,
                         params,
@@ -18330,10 +17168,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         );
                     }
                 }
-                if matches!(
-                    self.body_emission_authority,
-                    BodyEmissionAuthority::FunctionizedUnits
-                ) {
+                {
                     // **`RT-SEED-CALL-PORT` `D2` — the callee-position seed
                     // unit** (Architect `evt_7p8dmg1rez02c`).
                     //
@@ -18541,36 +17376,20 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     }) => {
                         // `RT-DECL-CLOSURE-PORT` `D4`, consumer 1 of 3 -- the
                         // ordinary lowering route.
-                        if self.body_emission_authority
-                            == BodyEmissionAuthority::FunctionizedUnits
-                        {
-                            let args = args
-                                .iter()
-                                .enumerate()
-                                .map(|(position, argument)| {
-                                    let argument = self.child_occurrence(
-                                        static_origin,
-                                        1 + position,
-                                        argument,
-                                    )?;
-                                    self.lower_expr(builder, argument, env)
-                                })
-                                .collect::<Result<Vec<_>, _>>()?;
-                            return self.call_declaration_closure_unit(
-                                builder, reference, &symbol, &params, captures, args,
-                            );
-                        }
-                        self.lower_recursive_declaration_call(
-                            builder,
-                            &symbol,
-                            &captures,
-                            &params,
-                            self.retained_body_occurrence(body)?,
-                            args,
-                            static_origin,
-                            env,
-                            None,
-                            join_plan,
+                        let args = args
+                            .iter()
+                            .enumerate()
+                            .map(|(position, argument)| {
+                                let argument = self.child_occurrence(
+                                    static_origin,
+                                    1 + position,
+                                    argument,
+                                )?;
+                                self.lower_expr(builder, argument, env)
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        self.call_declaration_closure_unit(
+                            builder, reference, &symbol, &params, captures, args,
                         )
                     }
                     LoweringOperand::Specialized(Lowered::Closure {
@@ -18585,25 +17404,16 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                                 let arg =
                                     self.child_occurrence(static_origin, 1 + position, arg)?;
                                 let lowered = self.lower_expr(builder, arg, env)?;
-                                match self.body_emission_authority {
-                                    BodyEmissionAuthority::RecursiveDescent => Ok(lowered),
-                                    BodyEmissionAuthority::FunctionizedUnits => {
-                                        Ok(match lowered {
-                                            LoweringOperand::Carried(word) => {
-                                                LoweringOperand::Carried(word)
-                                            }
-                                            LoweringOperand::Specialized(value) => {
-                                                LoweringOperand::Carried(
-                                                    self.transfer_into_carrier(
-                                                        builder,
-                                                        arg.static_origin,
-                                                        &value,
-                                                    )?,
-                                                )
-                                            }
-                                        })
+                                Ok(match lowered {
+                                    LoweringOperand::Carried(word) => LoweringOperand::Carried(word),
+                                    LoweringOperand::Specialized(value) => {
+                                        LoweringOperand::Carried(self.transfer_into_carrier(
+                                            builder,
+                                            arg.static_origin,
+                                            &value,
+                                        )?)
                                     }
-                                }
+                                })
                             })
                             .collect::<Result<Vec<_>, _>>()?;
                         if params.len() != call_inputs.len() {
@@ -18621,22 +17431,13 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         // environment role is the bare installation with no
                         // enclosing spine behind it.
                         call_inputs.extend(captures);
-                        match self.body_emission_authority {
-                            BodyEmissionAuthority::RecursiveDescent => {
-                                let call_env = bound_values(call_inputs);
-                                let body = self.retained_body_occurrence(body)?;
-                                self.lower_expr(builder, body, &call_env)
-                            }
-                            BodyEmissionAuthority::FunctionizedUnits => {
-                                self.call_declared_unit(
-                                    builder,
-                                    body,
-                                    &call_inputs,
-                                    #[cfg(test)]
-                                    None,
-                                )
-                            }
-                        }
+                        self.call_declared_unit(
+                            builder,
+                            body,
+                            &call_inputs,
+                            #[cfg(test)]
+                            None,
+                        )
                     }
                     LoweringOperand::Specialized(
                         mut callee @ Lowered::ComputationalRecursorClosure { .. },
@@ -18675,12 +17476,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         // ⭐⭐ `AC-C4` — the carried residual on the direct
                         // `lower_expr` call route.
                         if let LoweringOperand::Carried(word) = base {
-                            if let Some(body) = recursive_unit_body.filter(|_| {
-                                matches!(
-                                    self.body_emission_authority,
-                                    BodyEmissionAuthority::FunctionizedUnits
-                                )
-                            }) {
+                            if let Some(body) = recursive_unit_body {
                                 let inputs = args
                                     .iter()
                                     .enumerate()
@@ -18774,37 +17570,22 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         // Two roles, as above: ordered unit-call inputs, or an
                         // environment prefix. Only the second is bound.
                         call_inputs.extend(captures);
-                        if matches!(
-                            self.body_emission_authority,
-                            BodyEmissionAuthority::FunctionizedUnits
-                        ) {
-                            self.enter_oriented_semantic_region(installed.checked);
-                            let coordinates = carried_coordinates;
-                            let result = self
-                                .call_declared_recursive_position_unit(
-                                    builder,
-                                    body,
-                                    &call_inputs,
-                                    Some(coordinates),
-                                )
-                                .and_then(|value| {
-                                    self.lower_computational_match_value_composed(
-                                        builder,
-                                        RoutedAnswer::direct(value),
-                                        &frames,
-                                    )
-                                });
-                            self.leave_oriented_semantic_region(installed.checked);
-                            return result;
-                        }
-                        let call_env = env_with_operands(call_inputs, env);
                         self.enter_oriented_semantic_region(installed.checked);
-                        let result = self.lower_computational_producer_expr(
-                            builder,
-                            self.retained_body_occurrence(body)?,
-                            &call_env,
-                            &frames,
-                        );
+                        let coordinates = carried_coordinates;
+                        let result = self
+                            .call_declared_recursive_position_unit(
+                                builder,
+                                body,
+                                &call_inputs,
+                                Some(coordinates),
+                            )
+                            .and_then(|value| {
+                                self.lower_computational_match_value_composed(
+                                    builder,
+                                    RoutedAnswer::direct(value),
+                                    &frames,
+                                )
+                            });
                         self.leave_oriented_semantic_region(installed.checked);
                         result
                     }
@@ -20205,365 +18986,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    #[allow(clippy::too_many_arguments)]
-    fn lower_unary_recursive_nat_fold(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        join_origin: StaticOriginId,
-        symbol: &RuntimeSymbol,
-        captures: &[LoweringOperand],
-        argument: Lowered,
-        zero_body: SourceOccurrence<'_>,
-        suc_body: SourceOccurrence<'_>,
-        producer_env: &[LoweringEnvironmentBinding],
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
-        let _join_plan = self.consumed_join_plan_token(join_origin)?;
-        let (target, structural) = match argument {
-            Lowered::StructuralNat(nat) => (nat.value, true),
-            Lowered::BoundedNat(nat) => (nat.value, false),
-            _ => {
-                return Err(unsupported(
-                    "DeclarationRef",
-                    "unary Nat recursion received a non-Nat representation",
-                ));
-            }
-        };
-        let zero = builder.ins().iconst(types::I64, 0);
-        let zero_nat = if structural {
-            Lowered::StructuralNat(StructuralNatV1 { value: zero })
-        } else {
-            Lowered::BoundedNat(BoundedNatV1::derived_from_validated(zero))
-        };
-        let mut zero_env = env_with([zero_nat], &[]);
-        extend_captures(&mut zero_env, captures.iter().cloned());
-        zero_env.extend_from_slice(producer_env);
-        let zero_lowered = self.lower_expr(builder, zero_body, &zero_env)?;
-        let (initial, result_kind) =
-            self.merge_scalar_operand(builder, zero_lowered, None, "DeclarationRef")?;
-        if result_kind == ScalarMergeKind::RecursiveBackedge {
-            return Err(unsupported(
-                "DeclarationRef",
-                "unary Nat recursion has no finite base result",
-            ));
-        }
-
-        let loop_block = builder.create_block();
-        let step_block = builder.create_block();
-        let done_block = builder.create_block();
-        builder.append_block_param(loop_block, types::I64);
-        builder.append_block_param(loop_block, types::I64);
-        builder.append_block_param(loop_block, types::I64);
-        builder.append_block_param(done_block, types::I64);
-        builder.append_block_param(done_block, types::I64);
-        builder.ins().jump(
-            loop_block,
-            &[zero.into(), initial.tag.into(), initial.payload.into()],
-        );
-        builder.switch_to_block(loop_block);
-        let predecessor_value = builder.block_params(loop_block)[0];
-        let induction = NativeScalarPairV1 {
-            tag: builder.block_params(loop_block)[1],
-            payload: builder.block_params(loop_block)[2],
-        };
-        let complete = builder.ins().icmp(
-            cranelift_codegen::ir::condcodes::IntCC::Equal,
-            predecessor_value,
-            target,
-        );
-        builder.ins().brif(
-            complete,
-            done_block,
-            &[induction.tag.into(), induction.payload.into()],
-            step_block,
-            &[],
-        );
-
-        builder.switch_to_block(step_block);
-        let successor_value = builder.ins().iadd_imm(predecessor_value, 1);
-        let predecessor = if structural {
-            Lowered::StructuralNat(StructuralNatV1 {
-                value: predecessor_value,
-            })
-        } else {
-            Lowered::BoundedNat(BoundedNatV1::derived_from_validated(predecessor_value))
-        };
-        let successor = if structural {
-            Lowered::StructuralNat(StructuralNatV1 {
-                value: successor_value,
-            })
-        } else {
-            Lowered::BoundedNat(BoundedNatV1::derived_from_validated(successor_value))
-        };
-        let induction = self.lowered_from_scalar_pair(result_kind, induction);
-        self.active_recursive_declarations
-            .push(ActiveRecursiveDeclarationV1 {
-                symbol: symbol.clone(),
-                header: None,
-                argument_templates: vec![predecessor.clone()],
-                induction: Some(induction),
-            });
-        // A Suc case sees its predecessor first, followed by the retained
-        // scrutinee and the declaration's outer environment.
-        let mut suc_env = env_with([predecessor, successor], &[]);
-        extend_captures(&mut suc_env, captures.iter().cloned());
-        suc_env.extend_from_slice(producer_env);
-        let next = self.lower_expr(builder, suc_body, &suc_env);
-        self.active_recursive_declarations.pop();
-        let (next, next_kind) =
-            self.merge_scalar_operand(builder, next?, Some(result_kind), "DeclarationRef")?;
-        if next_kind != result_kind {
-            return Err(unsupported(
-                "DeclarationRef",
-                "unary Nat recursion changes its native result representation",
-            ));
-        }
-        builder.ins().jump(
-            loop_block,
-            &[successor_value.into(), next.tag.into(), next.payload.into()],
-        );
-        builder.switch_to_block(done_block);
-        Ok(LoweringOperand::Specialized(self.lowered_from_scalar_pair(
-            result_kind,
-            NativeScalarPairV1 {
-                tag: builder.block_params(done_block)[0],
-                payload: builder.block_params(done_block)[1],
-            },
-        )))
-    }
-
-    /// `body` is the declaration closure's body occurrence (reachable by symbol,
-    /// D6); `call_origin` is the origin of the **`Call` occurrence** whose
-    /// arguments these are, so argument *i* is `child(call_origin, 1 + i)`.
-    #[allow(clippy::too_many_arguments)]
-    fn lower_recursive_declaration_call(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        symbol: &RuntimeSymbol,
-        captures: &[LoweringOperand],
-        params: &[String],
-        body: SourceOccurrence<'_>,
-        args: &[RuntimeExpr],
-        call_origin: StaticOriginId,
-        producer_env: &[LoweringEnvironmentBinding],
-        eliminators: Option<&[EliminatorFrame<'_>]>,
-        join_plan: JoinPlanToken,
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
-        let _checked_invocation = self.consume_checked_recursive_invocation_call(symbol)?;
-        let lowered_args = args
-            .iter()
-            .enumerate()
-            .map(|(position, arg)| {
-                let arg = self.child_occurrence(call_origin, 1 + position, arg)?;
-                self.lower_expr(builder, arg, producer_env)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        // ⭐ A recursive declaration's arguments are its **loop-header
-        // representation**: their shapes are compared across iterations
-        // (`same_recursive_argument_shapes`) and lowered into block params. A
-        // carried boundary word has no such shape, so this is a
-        // specialized-only surface with the ruled fail-closed arm.
-        let lowered_args =
-            specialized_operands_at(&lowered_args, "a recursive declaration argument")?;
-        if params.len() != lowered_args.len() {
-            return Err(unsupported(
-                "DeclarationRef",
-                format!(
-                    "recursive declaration {symbol} expects {} args but call provides {}",
-                    params.len(),
-                    lowered_args.len()
-                ),
-            ));
-        }
-
-        if let Some(active) = self
-            .active_recursive_declarations
-            .iter()
-            .rev()
-            .find(|active| active.symbol == *symbol)
-            .cloned()
-        {
-            if !same_recursive_argument_shapes(&active.argument_templates, &lowered_args) {
-                return Err(unsupported(
-                    "DeclarationRef",
-                    format!(
-                        "recursive declaration {symbol} changes its native argument representation: {:?} -> {:?}",
-                        active
-                            .argument_templates
-                            .iter()
-                            .map(lowered_value_kind)
-                            .collect::<Vec<_>>(),
-                        lowered_args
-                            .iter()
-                            .map(lowered_value_kind)
-                            .collect::<Vec<_>>()
-                    ),
-                ));
-            }
-            if let Some(induction) = active.induction {
-                return Ok(LoweringOperand::Specialized(induction));
-            }
-            let mut values = Vec::new();
-            append_recursive_argument_values(
-                builder,
-                &lowered_args,
-                &mut values,
-                &self.function_local.native_int_tags,
-            )?;
-            builder.ins().jump(
-                active
-                    .header
-                    .expect("tail-recursive declarations own a loop header"),
-                &values.into_iter().map(Into::into).collect::<Vec<_>>(),
-            );
-
-            // Continue lowering only in a predecessor-free block. This keeps
-            // the structured builder usable while the real recursive edge
-            // returns directly to the loop header.
-            let unreachable = builder.create_block();
-            builder.switch_to_block(unreachable);
-            return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
-        }
-
-        // Only declarations in an actual recursive SCC need the loop/result
-        // closure below. Preserve the established direct-call lowering for
-        // ordinary declarations, including constructor-valued HostIO trees.
-        if !self.declaration_is_recursive(symbol) {
-            let mut call_inputs = lowered_args
-                .into_iter()
-                .rev()
-                .map(LoweringOperand::Specialized)
-                .collect::<Vec<_>>();
-            call_inputs.extend(captures.iter().cloned());
-            let call_env = env_with_operands(call_inputs, producer_env);
-            return if let Some(eliminators) = eliminators {
-                self.lower_computational_producer_expr(builder, body, &call_env, eliminators)
-            } else {
-                self.lower_expr(builder, body, &call_env)
-            };
-        }
-
-        if eliminators.is_none() && params.len() == 1 && lowered_args.len() == 1 {
-            if let RuntimeExpr::Match {
-                scrutinee, cases, ..
-            } = body.expr
-            {
-                if matches!(scrutinee.as_ref(), RuntimeExpr::Var(0)) {
-                    // These two arms are found by constructor name under the
-                    // BODY occurrence's match, so their bodies are its children
-                    // `1 + index` — the index the search would otherwise discard.
-                    let zero = cases.iter().enumerate().find(|(_, case)| {
-                        case.constructor == self.process_symbols.nat_zero && case.binders == 0
-                    });
-                    let suc = cases.iter().enumerate().find(|(_, case)| {
-                        case.constructor == self.process_symbols.nat_suc && case.binders == 1
-                    });
-                    if let (Some((zero_index, zero)), Some((suc_index, suc))) = (zero, suc) {
-                        // The closed unary-fold fast path emits the declaration
-                        // body's source `Match` without re-entering
-                        // `lower_expr`; consume the same origin-keyed join plan
-                        // here before its merge helper reborrows it.
-                        self.enter_source_occurrence_plan(body.static_origin)?;
-                        let zero_body =
-                            self.case_body_occurrence(body.static_origin, zero_index, &zero.body)?;
-                        let suc_body =
-                            self.case_body_occurrence(body.static_origin, suc_index, &suc.body)?;
-                        return self.lower_unary_recursive_nat_fold(
-                            builder,
-                            body.static_origin,
-                            symbol,
-                            captures,
-                            lowered_args
-                                .into_iter()
-                                .next()
-                                .expect("unary recursion owns one argument"),
-                            zero_body,
-                            suc_body,
-                            producer_env,
-                        );
-                    }
-                }
-            }
-        }
-
-        let header = builder.create_block();
-        let done = builder.create_block();
-        let mut initial_values = Vec::new();
-        append_recursive_argument_values(
-            builder,
-            &lowered_args,
-            &mut initial_values,
-            &self.function_local.native_int_tags,
-        )?;
-        for value in &initial_values {
-            builder.append_block_param(header, builder.func.dfg.value_type(*value));
-        }
-        builder.append_block_param(done, types::I64);
-        builder.append_block_param(done, types::I64);
-        builder.ins().jump(
-            header,
-            &initial_values
-                .iter()
-                .copied()
-                .map(Into::into)
-                .collect::<Vec<_>>(),
-        );
-        builder.switch_to_block(header);
-
-        let mut parameters = builder.block_params(header).iter().copied();
-        let mut loop_args = Vec::with_capacity(lowered_args.len());
-        for template in &lowered_args {
-            loop_args.push(rebuild_recursive_argument(
-                template,
-                &mut parameters,
-                &mut self.function_local.native_int_tags,
-            )?);
-        }
-        if parameters.next().is_some() {
-            return Err(unsupported(
-                "DeclarationRef",
-                "recursive declaration loop parameter shape is not closed",
-            ));
-        }
-        self.active_recursive_declarations
-            .push(ActiveRecursiveDeclarationV1 {
-                symbol: symbol.clone(),
-                header: Some(header),
-                argument_templates: lowered_args,
-                induction: None,
-            });
-        // Runtime environments are de Bruijn-nearest first: source arguments
-        // are evaluated left-to-right, then installed in reverse binder order,
-        // followed by captures and the producer environment.
-        let mut call_inputs = loop_args
-            .into_iter()
-            .rev()
-            .map(LoweringOperand::Specialized)
-            .collect::<Vec<_>>();
-        call_inputs.extend(captures.iter().cloned());
-        let call_env = env_with_operands(call_inputs, producer_env);
-        let lowered = if let Some(eliminators) = eliminators {
-            self.lower_computational_producer_expr(builder, body, &call_env, eliminators)
-        } else {
-            self.lower_expr(builder, body, &call_env)
-        };
-        self.active_recursive_declarations.pop();
-        let lowered = lowered?;
-        let (value, result_kind) =
-            self.merge_scalar_branch(builder, &join_plan, lowered, "DeclarationRef")?;
-        builder
-            .ins()
-            .jump(done, &[value.tag.into(), value.payload.into()]);
-        builder.switch_to_block(done);
-        Ok(LoweringOperand::Specialized(self.lowered_from_scalar_pair(
-            result_kind,
-            NativeScalarPairV1 {
-                tag: builder.block_params(done)[0],
-                payload: builder.block_params(done)[1],
-            },
-        )))
-    }
-
     fn lower_declaration_ref(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -20602,10 +19024,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     "transparent declaration {symbol} has no planned source occurrence"
                 )))
             })?;
-        let declaration_body = SourceOccurrence {
-            expr: body,
-            static_origin: declaration_origin,
-        };
         // ⭐⭐ **`RT-DECL-CLOSURE-PORT` `D4` — BOTH closure seed forms retain a
         // compiler-only callable binding, and evaluating the naked
         // `DeclarationRef` never calls the unit.**
@@ -20615,8 +19033,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // `FunctionizedUnits` arm below and was called with `&[]` — an empty
         // input slice against a unit that declares this declaration's
         // parameters and captures. That call was unreachable in production
-        // (the `TransparentDeclarationClosure` residual still forces
-        // `RecursiveDescent`) but it was wrong-arity by construction, and
+        // (the declaration still took the retired monolithic route) but it was
+        // wrong-arity by construction, and
         // "unreachable today" is not the property this needs.
         //
         // ⚠ The two arms differ in their capture MATERIAL and only there.
@@ -20685,7 +19103,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 body,
             }));
         }
-        if self.body_emission_authority == BodyEmissionAuthority::FunctionizedUnits {
+        {
             // ⛔⛔ **The empty-input call, and the guard that keeps it lawful.**
             //
             // Reaching here means this declaration's body is not a closure
@@ -20711,18 +19129,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                      targets a declaration-owned callable unit"
                 ))));
             }
-            return self.call_declared_declaration_unit(builder, reference_origin, &[], None);
+            self.call_declared_declaration_unit(builder, reference_origin, &[], None)
         }
-        if self.declaration_stack.contains(symbol) {
-            return Err(unsupported(
-                "DeclarationRef",
-                format!("recursive non-function declaration {symbol} is unsupported"),
-            ));
-        }
-        self.declaration_stack.push(symbol.clone());
-        let result = self.lower_expr(builder, declaration_body, &[]);
-        self.declaration_stack.pop();
-        result
     }
 
     /// **`RT-DECL-CLOSURE-PORT` `D4` — the complete call to a declaration-owned

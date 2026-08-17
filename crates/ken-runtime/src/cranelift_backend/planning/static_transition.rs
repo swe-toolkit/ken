@@ -3333,9 +3333,9 @@ fn result_phase_environment_for_owner(
         .iter()
         .filter(|slot| matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture))
         .map(|slot| {
-            // The ABI plane remains validated while RecursiveDescent is
-            // selected, but it is inert there. Its slots therefore cannot
-            // impose carrier storage on the retained lowering authority.
+            // The ABI plane remained validated but inert on the retired
+            // monolithic route. Its slots therefore could not impose carrier
+            // storage on that route.
             if !functionized_units {
                 return ResultPhaseSummary::SPECIALIZED;
             }
@@ -29954,12 +29954,12 @@ mod tests {
         }
     }
 
-    /// MEASURED: the same closed ABI-parameter fixture is `CarrierWord` under
-    /// FunctionizedUnits and `NativeScalarPair` under RecursiveDescent,
-    /// independently of arm order.
+    /// MEASURED before retirement: the same closed ABI-parameter fixture was
+    /// `CarrierWord` under functionized emission and `NativeScalarPair` under
+    /// the monolithic route, independently of arm order.
     ///
     /// CLAIMED: the validated but inert ABI plane cannot impose carrier
-    /// storage on the retained RecursiveDescent lowering authority.
+    /// storage on the then-retained monolithic lowering authority.
     ///
     /// GAP: this pins the planner boundary and the native/interpreter parity
     /// suite pins the resulting public observations; it does not compare every

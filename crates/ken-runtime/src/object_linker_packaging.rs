@@ -3030,7 +3030,7 @@ mod tests {
         assert_eq!(trapped.status.code(), Some(1));
         assert!(String::from_utf8_lossy(&trapped.stderr).contains("explicit entry trap"));
 
-        // This producer Match is the retained RecursiveDescent sibling. Its
+        // This producer Match is the retired monolithic-lane sibling. Its
         // runtime-reached default takes the root-only `-4` process sentinel.
         let retained_root_trap = run(
             "px4-retained-root-trap",

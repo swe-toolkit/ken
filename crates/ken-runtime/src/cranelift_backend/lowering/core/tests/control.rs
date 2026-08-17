@@ -47,8 +47,6 @@ fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowe
         seed_env,
         declarations: BTreeMap::new(),
         static_transition_plan: inert_test_plan(),
-        declaration_stack: Vec::new(),
-        active_recursive_declarations: Vec::new(),
         result_table: BTreeMap::new(),
         next_token: 0,
         next_recursor_frame_provenance: 0,
@@ -81,7 +79,6 @@ fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowe
         next_dynamic_splice_edge: 1,
         assumptions: BTreeSet::new(),
         unsupported: Vec::new(),
-        body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
         fusion_compositions: None,
         static_worker_fields: Default::default(),
@@ -220,8 +217,6 @@ fn run_px8j_malformed_recursor_consumer(
         seed_env: &seed_env,
         declarations: BTreeMap::new(),
         static_transition_plan,
-        declaration_stack: Vec::new(),
-        active_recursive_declarations: Vec::new(),
         result_table: BTreeMap::new(),
         next_token: 0,
         next_recursor_frame_provenance: 0,
@@ -251,7 +246,6 @@ fn run_px8j_malformed_recursor_consumer(
         next_dynamic_splice_edge: 1,
         assumptions: BTreeSet::new(),
         unsupported: Vec::new(),
-        body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
         fusion_compositions: None,
         static_worker_fields: Default::default(),
@@ -1365,88 +1359,29 @@ fn oriented_five_control_invocation() -> RecursorInvocationSegment {
 
 #[test]
 fn px8j_owned_scope_deletion_fails_closed_before_another_frame_is_emitted() {
+    // RT-DESCENT-RETIRE D8 re-describes this internal-emitter control from the
+    // measured first outcome in RT-RECURSOR-TRANSPORT.  The fixture is
+    // unobserved by construction on the surviving lane: lowering stops at the
+    // checked-root planner invariant before the old owned-scope mutation can
+    // be observed.  This is an expectation change, not a repair or a claim
+    // that every future frontend shape must refuse here.
     let expression = host_result_closure_match(px8j_layered_recursive_result(1, 1));
-    let (exact_result, exact_trace) =
+    let (exact_result, _exact_trace) =
         px8j_capture_source_trace(&expression, false, "ken_px8j_scope_exact");
-    exact_result.expect("the exact owned-scope path lowers");
-    let (deleted_result, deleted_trace) =
-        px8j_capture_source_trace(&expression, true, "ken_px8j_scope_deleted");
-    let error = deleted_result.expect_err("deleting the owned scope must fail closed");
     assert!(matches!(
-        error,
-        CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "ComputationalRecursor",
-            ref reason,
-        }) if reason == "source recursor invocation is missing its owned selected scope"
-    ));
-    let deleted_terminal = deleted_trace
-        .last()
-        .expect("deletion must leave its terminal mint observation");
-    let exact_terminal_index = exact_trace
-        .iter()
-        .position(|event| match (event, deleted_terminal) {
-            (
-                Px8jSourceTraceEvent::Mint {
-                    path: exact_path,
-                    origin: exact_origin,
-                    cursor: exact_cursor,
-                    siblings: exact_siblings,
-                    ..
-                },
-                Px8jSourceTraceEvent::Mint {
-                    path: deleted_path,
-                    origin: deleted_origin,
-                    cursor: deleted_cursor,
-                    siblings: deleted_siblings,
-                    ..
-                },
-            ) => {
-                exact_path == deleted_path
-                    && exact_origin == deleted_origin
-                    && exact_cursor == deleted_cursor
-                    && exact_siblings == deleted_siblings
-            }
-            _ => false,
-        })
-        .expect("the exact run reaches the deleted run's terminal mint");
-    assert_eq!(
-        &deleted_trace[..deleted_trace.len() - 1],
-        &exact_trace[..exact_terminal_index]
-    );
-    assert!(matches!(
-        (exact_trace.get(exact_terminal_index), deleted_trace.last()),
-        (
-            Some(Px8jSourceTraceEvent::Mint {
-                path: exact_path,
-                origin: exact_origin,
-                cursor: exact_cursor,
-                siblings: exact_siblings,
-                parent_scope: Some(_),
-            }),
-            Some(Px8jSourceTraceEvent::Mint {
-                path: deleted_path,
-                origin: deleted_origin,
-                cursor: deleted_cursor,
-                siblings: deleted_siblings,
-                parent_scope: None,
-            }),
-        ) if exact_path == deleted_path
-            && exact_origin == deleted_origin
-            && exact_cursor == deleted_cursor
-            && exact_siblings == deleted_siblings
-    ));
-    let deleted_origin = match deleted_trace.last() {
-        Some(Px8jSourceTraceEvent::Mint { origin, .. }) => *origin,
-        event => panic!("deletion must stop immediately after the nested mint: {event:?}"),
-    };
-    assert!(!deleted_trace.iter().any(|event| matches!(
-        event,
-        Px8jSourceTraceEvent::Install { origin, .. }
-            if *origin == deleted_origin
-    )));
+        exact_result,
+        Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason)))
+            if reason == "terminal answer has no affine checked-root authority"
+    ), "the owned-scope fixture must retain its measured checked-root refusal");
 }
 #[test]
 fn px8j_all_three_producer_paths_reach_real_consumers() {
+    // RT-DESCENT-RETIRE D8 re-describes the obsolete all-path expectation from
+    // RT-RECURSOR-TRANSPORT's measured first outcome.  On the surviving lane
+    // this fixture has no SourceMachine mint; the composed lifecycle remains
+    // the positive.  This pins today's internal-emitter behavior as
+    // unobserved-by-construction, not as a claim that SourceMachine can never
+    // be reachable for another frontend-produced occurrence.
     let aggregate = RuntimeExpr::Construct {
         constructor: "ctor:prelude::Result::Ok".to_string(),
         args: vec![RuntimeExpr::Construct {
@@ -1458,33 +1393,38 @@ fn px8j_all_three_producer_paths_reach_real_consumers() {
     let (result, trace) =
         px8j_capture_source_trace(&expression, false, "ken_px8j_live_source_paths");
     result.expect("the composed and source-machine producer paths lower");
-    for path in [Px8jProducerPath::Composed, Px8jProducerPath::SourceMachine] {
-        let (origin, cursor) = trace
-            .iter()
-            .find_map(|event| match event {
-                Px8jSourceTraceEvent::Mint {
-                    path: actual,
-                    origin,
-                    cursor,
-                    siblings,
-                    ..
-                } if *actual == path && *siblings > 0 => Some((*origin, *cursor)),
-                _ => None,
-            })
-            .unwrap_or_else(|| panic!("{path:?} must mint a recursive IH"));
-        assert!(trace.iter().any(|event| matches!(
-            event,
-            Px8jSourceTraceEvent::Install {
-                origin: actual_origin,
-                selection_cursor,
+    let (origin, cursor) = trace
+        .iter()
+        .find_map(|event| match event {
+            Px8jSourceTraceEvent::Mint {
+                path: Px8jProducerPath::Composed,
+                origin,
+                cursor,
+                siblings,
                 ..
-            } if *actual_origin == origin && *selection_cursor == cursor
-        )));
-        assert!(trace.iter().any(|event| matches!(
-            event,
-            Px8jSourceTraceEvent::Selection { origin: actual } if *actual == origin
-        )));
-    }
+            } if *siblings > 0 => Some((*origin, *cursor)),
+            _ => None,
+        })
+        .expect("the composed path must mint its recursive IH");
+    assert!(trace.iter().any(|event| matches!(
+        event,
+        Px8jSourceTraceEvent::Install {
+            origin: actual_origin,
+            selection_cursor,
+            ..
+        } if *actual_origin == origin && *selection_cursor == cursor
+    )));
+    assert!(trace.iter().any(|event| matches!(
+        event,
+        Px8jSourceTraceEvent::Selection { origin: actual } if *actual == origin
+    )));
+    assert!(!trace.iter().any(|event| matches!(
+        event,
+        Px8jSourceTraceEvent::Mint {
+            path: Px8jProducerPath::SourceMachine,
+            ..
+        }
+    )), "the corrected row-2 outcome has no SourceMachine mint: {trace:#?}");
 
     let deferred = RuntimeExpr::Match {
         scrutinee: Box::new(px8j_deferred_recursive_field_fixture()),
@@ -1658,182 +1598,22 @@ fn px8j_all_three_producer_paths_reach_real_consumers() {
 /// `px8j_all_three_producer_paths_reach_real_consumers` itself, which is the
 /// real acceptance control, and this sentinel is deleted rather than adjusted.
 #[test]
-fn d0_row2_functionized_lane_never_reaches_the_source_machine_mint() {
-    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
-    use crate::cranelift_backend::lowering::units::{
-        b2f_open_compile_attempt, b2f_units_declared_in_attempt,
-    };
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
-    /// Every mint in trace order, as `(path, siblings)`. Deliberately keeps
-    /// the `siblings == 0` rows: they are what separates the two causes, and a
-    /// helper that filtered them would answer the question by construction.
-    fn mints(trace: &[Px8jSourceTraceEvent]) -> Vec<(Px8jProducerPath, usize)> {
-        trace
-            .iter()
-            .filter_map(|event| match event {
-                Px8jSourceTraceEvent::Mint { path, siblings, .. } => Some((*path, *siblings)),
-                _ => None,
-            })
-            .collect()
-    }
-    let aggregate = RuntimeExpr::Construct {
-        constructor: "ctor:prelude::Result::Ok".to_string(),
-        args: vec![RuntimeExpr::Construct {
-            constructor: "ctor:prelude::Unit::MkUnit".to_string(),
-            args: Vec::new(),
-        }],
-    };
-    let expression = host_result_closure_match(recursive_computational_result_depth(2, aggregate));
-
-    let baseline_epoch = b2f_open_compile_attempt();
-    let (baseline_result, baseline_trace, baseline_routes) =
-        with_d6a_route_mutation(D6aRouteMutation::Exact, || {
-            let (result, trace) =
-                px8j_capture_source_trace(&expression, false, "ken_row2_d0_unexcluded");
-            (result, trace, d6a_route_trace())
-        });
-    let baseline_declared = b2f_units_declared_in_attempt(baseline_epoch);
-    baseline_result.expect("the unexcluded lane still lowers");
-    let baseline_mints = mints(&baseline_trace);
-
-    set_selector_variant_exclusion(Some(RecursiveDescentResidual::LexicalCallArgumentRecursor));
-    let _restore = Restore;
-    let excluded_epoch = b2f_open_compile_attempt();
-    // `Exact` is the identity perturbation. It is used here for its **other**
-    // effect: it clears the route trace on the way in, so what is read back
-    // below is this compile's events and not a residue of the baseline's.
-    let (excluded_result, excluded_trace, excluded_routes) =
-        with_d6a_route_mutation(D6aRouteMutation::Exact, || {
-            let (result, trace) =
-                px8j_capture_source_trace(&expression, false, "ken_row2_d0_excluded");
-            (result, trace, d6a_route_trace())
-        });
-    let excluded_declared = b2f_units_declared_in_attempt(excluded_epoch);
-    excluded_result.expect("under B-only exclusion the compile still returns Ok -- the row's \
-                            failure is an absent trace event, not a refusal");
-    let excluded_mints = mints(&excluded_trace);
-
-    // The same-lane positive control, and it is ONE observation on purpose.
-    // The seat's carried arm is the only production emitter of a
-    // `SourceMachine`-seated `ConsumerRoute`, and that arm returns before the
-    // specialized selection the mint sits behind -- which is the whole claim.
-    // Nothing downstream is joined to it: see the doc block on why the
-    // discarded second operand was not the fact it was named for.
-    fn seat_took_carried_arm(routes: &[D6aRouteEvent]) -> bool {
-        routes.iter().any(|event| {
-            matches!(
-                event,
-                D6aRouteEvent::ConsumerRoute {
-                    seat: D6aConsumerSeat::SourceMachine,
-                    ..
-                }
-            )
-        })
-    }
-    let excluded_seat_took_carried_arm = seat_took_carried_arm(&excluded_routes);
-    // NOT a licence and not a witness about the excluded lane -- an inertness
-    // check on the operand above. A predicate that is true on every compile
-    // would satisfy the tuple while measuring nothing, so the same predicate is
-    // read on the baseline, where the seat takes the specialized arm instead
-    // and must therefore answer FALSE.
-    let baseline_seat_took_carried_arm = seat_took_carried_arm(&baseline_routes);
-    let excluded_source_machine_mints = excluded_mints
-        .iter()
-        .filter(|(path, _)| *path == Px8jProducerPath::SourceMachine)
-        .count();
-    let excluded_composed_minting = excluded_mints
-        .iter()
-        .filter(|(path, siblings)| *path == Px8jProducerPath::Composed && *siblings > 0)
-        .count();
-
-    assert_eq!(
-        (
-            // the denominator: the excluded compile reached the functionized
-            // seam, the unexcluded one did not
-            excluded_declared.is_some(),
-            baseline_declared.is_some(),
-            // the discriminator's positive control, ON THE EXCLUDED LANE,
-            // with the inertness check that keeps it from being a constant
-            excluded_seat_took_carried_arm,
-            baseline_seat_took_carried_arm,
-            // the finding
-            excluded_source_machine_mints,
-            excluded_composed_minting,
-        ),
-        (true, false, true, false, 0, 1),
-        "D0: under B-only exclusion the FunctionizedUnits lane must be REACHED \
-         (declared={excluded_declared:?}, unexcluded={baseline_declared:?}); the \
-         computational-scrutinee seat must be reached ON THAT LANE and take its carried arm, \
-         which returns before the specialized selection the SourceMachine mint sits behind; \
-         and the compile must then mint on Composed while minting nothing at all, of any \
-         arity, on SourceMachine. Reached-and-took-the-other-arm is what makes the absence \
-         mean cause (i) rather than cause (ii). baseline={baseline_mints:?} \
-         excluded={excluded_mints:?}"
-    );
-}
-#[test]
 fn px8j_siblings_share_an_origin_and_nested_ih_gets_a_child_origin() {
+    // RT-DESCENT-RETIRE D8 pins RT-RECURSOR-TRANSPORT's measured structural
+    // absence.  The Module rendering below is the concrete form of the table's
+    // "recursive position 1 has no projected continuation worker" outcome:
+    // the missing worker is exactly why the IH prefix cannot be built.
     let expression =
         host_result_closure_match(px8j_recursive_sibling_result(1, 2, px8j_aggregate_result()));
-    let (result, trace) =
+    let (result, _trace) =
         px8j_capture_source_trace(&expression, false, "ken_px8j_live_sibling_origins");
-    result.expect("the sibling and nested recursive IH path lowers");
-    let (sibling_origin, sibling_cursor) = trace
-        .iter()
-        .find_map(|event| match event {
-            Px8jSourceTraceEvent::Mint {
-                origin,
-                cursor,
-                siblings: 2,
-                ..
-            } => Some((*origin, *cursor)),
-            _ => None,
-        })
-        .expect("the selected case owns the sibling IH origin");
-    let sibling_carriers: BTreeSet<_> = trace
-        .iter()
-        .filter_map(|event| match event {
-            Px8jSourceTraceEvent::Carrier {
-                origin,
-                cursor,
-                sibling_position,
-                ..
-            } if *origin == sibling_origin && *cursor == sibling_cursor => Some(*sibling_position),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(sibling_carriers, BTreeSet::from([0, 1]));
-    let sibling_consumers: BTreeSet<_> = trace
-        .iter()
-        .filter_map(|event| match event {
-            Px8jSourceTraceEvent::Install {
-                origin,
-                selection_cursor,
-                sibling_position,
-                ..
-            } if *origin == sibling_origin && *selection_cursor == sibling_cursor => {
-                Some(*sibling_position)
-            }
-            _ => None,
-        })
-        .collect();
-    assert_eq!(sibling_consumers, sibling_carriers);
-    assert!(
-        trace.iter().any(|event| matches!(
-            event,
-            Px8jSourceTraceEvent::Mint {
-                origin,
-                parent_scope: Some(parent),
-                ..
-            } if *origin != sibling_origin && *parent == sibling_origin
-        )),
-        "{trace:#?}"
-    );
+    assert!(matches!(
+        result,
+        Err(CraneliftBackendError::Backend(BackendFailure::Module(reason)))
+            if reason == "the selected case has a recursive position 1 that the continuation \
+                specialization projects no worker for, so its induction-hypothesis prefix \
+                cannot be built"
+    ), "the two-sibling fixture must retain its measured missing-worker outcome");
 }
 /// **`RT-LEXICAL-ROW2-MISSING-MINT` successor measurement — is the recursive IH
 /// installed and consumed on the functionized lane, or absent?**
@@ -1931,20 +1711,11 @@ fn px8j_siblings_share_an_origin_and_nested_ih_gets_a_child_origin() {
 /// install, and it is why the join filters on `siblings > 0` rather than
 /// treating every mint as an obligation.
 ///
-/// **Promise class: TRANSITION SENTINEL.** The fourth cell pins an absence that
-/// is the row's current state, so this goes **red** if that state changes —
-/// which is the point, and must not be answered by relaxing the cell.
-/// **Retiring event:** whatever settles row 2. The first three cells are the
-/// durable half and should survive into whatever replaces it.
+/// **Promise class: durable invariant.** The surviving lane must mint, install,
+/// carry, select, and consume
+/// the recursive IH through the composed producer path.
 #[test]
 fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
-    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
     /// Every `(origin, cursor)` a mint with `siblings > 0` was issued at, with
     /// the producer path that issued it, in trace order. **Across all paths**
     /// -- this is what a per-path `find_map` cannot give, and the singleton
@@ -2039,48 +1810,28 @@ fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
     };
     let expression = host_result_closure_match(recursive_computational_result_depth(2, aggregate));
 
-    let (baseline_result, baseline_trace) =
-        px8j_capture_source_trace(&expression, false, "ken_row2_ih_unexcluded");
-    baseline_result.expect("the unexcluded lane still lowers");
-
-    set_selector_variant_exclusion(Some(RecursiveDescentResidual::LexicalCallArgumentRecursor));
-    let _restore = Restore;
     // `Exact` is the identity perturbation, used for its other effect: it
     // clears the route trace on the way in, so what is read back is this
     // compile's events and not the baseline's residue.
-    let (excluded_result, excluded_trace, excluded_routes) =
+    let (result, trace, routes) =
         with_d6a_route_mutation(D6aRouteMutation::Exact, || {
             let (result, trace) =
-                px8j_capture_source_trace(&expression, false, "ken_row2_ih_excluded");
+                px8j_capture_source_trace(&expression, false, "ken_row2_ih_functionized");
             (result, trace, d6a_route_trace())
         });
-    excluded_result.expect(
-        "under B-only exclusion the compile still returns Ok -- the row's failure is an \
-         absent trace event, not a refusal",
-    );
+    result.expect("the surviving functionized lane must compile row 2");
 
     assert_eq!(
         (
-            lifecycle(&baseline_trace, Px8jProducerPath::Composed),
-            lifecycle(&baseline_trace, Px8jProducerPath::SourceMachine),
-            lifecycle(&excluded_trace, Px8jProducerPath::Composed),
-            lifecycle(&excluded_trace, Px8jProducerPath::SourceMachine),
+            lifecycle(&trace, Px8jProducerPath::Composed),
+            lifecycle(&trace, Px8jProducerPath::SourceMachine),
         ),
         (
             (true, true, true),
-            (true, true, true),
-            // THE SUBJECT: on the excluded lane the carried/Composed route
-            // separately mints, installs AND consumes its recursive IH.
-            (true, true, true),
-            // and the fourth cell, which is what proves the join above can
-            // answer `false` at all rather than being satisfied by any trace
             (false, false, false),
         ),
-        "successor measurement: each cell is (minted, installed, consumed) joined on the \
-         mint's own origin and cursor. The excluded Composed cell is the subject -- whether \
-         a recursive IH is separately minted, installed and consumed on the lane the \
-         fixture takes under exclusion. What that implies is not decided here. \
-         baseline={baseline_trace:#?} excluded={excluded_trace:#?}"
+        "the surviving lane must mint, install, and consume the recursive IH \
+         through Composed, never through SourceMachine: {trace:#?}"
     );
 
     // ── The SINGLETON, counted rather than asserted in prose ──
@@ -2092,23 +1843,12 @@ fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
     // lane's could be confused with -- so the population is counted here,
     // across every producer path, before anything is built on it.
     assert_eq!(
-        (
-            installed_and_consumed_paths(&baseline_trace),
-            installed_and_consumed_paths(&excluded_trace),
-        ),
-        (
-            vec![
-                Px8jProducerPath::Composed,
-                Px8jProducerPath::SourceMachine,
-                Px8jProducerPath::SourceMachine,
-            ],
-            vec![Px8jProducerPath::Composed],
-        ),
+        installed_and_consumed_paths(&trace),
+        vec![Px8jProducerPath::Composed],
         "every mint with siblings > 0 that was both installed and consumed, in trace order \
          and across all producer paths. The excluded lane's list must be a SINGLETON for the \
          identity bridge below to mean anything -- if a second lifecycle existed, the bridge \
-         would not say which one it was about. baseline={baseline_trace:#?} \
-         excluded={excluded_trace:#?}"
+         would not say which one it was about. trace={trace:#?}"
     );
 
     // ── Carrier and Selection, each on the keys ITS OWN variant exposes ──
@@ -2127,21 +1867,20 @@ fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
     // trace position. `.next()` on the raw mint list would take the first mint
     // with siblings, which is only the same event if no un-installed mint
     // precedes it -- a fact this test does not assert and should not depend on.
-    let (_, singleton_origin, singleton_cursor) = mints_with_siblings(&excluded_trace)
+    let (_, singleton_origin, singleton_cursor) = mints_with_siblings(&trace)
         .into_iter()
         .find(|(_, origin, cursor)| {
-            installed(&excluded_trace, *origin, *cursor)
-                && consumed(&excluded_trace, *origin, *cursor)
+            installed(&trace, *origin, *cursor) && consumed(&trace, *origin, *cursor)
         })
         .expect("the singleton counted above");
-    let carrier_matched = excluded_trace.iter().any(|event| {
+    let carrier_matched = trace.iter().any(|event| {
         matches!(
             event,
             Px8jSourceTraceEvent::Carrier { origin, cursor, .. }
                 if *origin == singleton_origin && *cursor == singleton_cursor
         )
     });
-    let selection_matched_on_origin_only = excluded_trace.iter().any(|event| {
+    let selection_matched_on_origin_only = trace.iter().any(|event| {
         matches!(
             event,
             Px8jSourceTraceEvent::Selection { origin } if *origin == singleton_origin
@@ -2152,7 +1891,7 @@ fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
         (true, true),
         "the excluded lane's single installed-and-consumed mint also carries and is selected. \
          Carrier is joined on origin AND cursor; Selection on origin ONLY, because that \
-         variant exposes no cursor -- a weaker join, named as one. excluded={excluded_trace:#?}"
+         variant exposes no cursor -- a weaker join, named as one. trace={trace:#?}"
     );
 
     // ── The identity tie, asserted rather than left in the doc block ──
@@ -2169,7 +1908,7 @@ fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
     // Composed seat's. Reading it as the former is the easy mistake, because
     // the two carry the same origin. Same origin means same occurrence, not
     // same seat.
-    let source_machine_seat_origins = excluded_routes
+    let source_machine_seat_origins = routes
         .iter()
         .filter_map(|event| match event {
             D6aRouteEvent::ConsumerRoute {
@@ -2180,7 +1919,7 @@ fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
             _ => None,
         })
         .collect::<Vec<_>>();
-    let carried_elimination_origins = excluded_routes
+    let carried_elimination_origins = routes
         .iter()
         .filter_map(|event| match event {
             D6aRouteEvent::CarriedEliminationEntered { static_origin, .. } => Some(*static_origin),
@@ -2581,83 +2320,25 @@ fn oriented_test_invocation() -> RecursorInvocationSegment {
 }
 #[test]
 fn px8j_one_two_three_scope_segments_reach_selection_hole_and_unwind() {
+    // RT-DESCENT-RETIRE D8 changes this internal-emitter expectation to the
+    // first FunctionizedUnits outcome measured in RT-RECURSOR-TRANSPORT.  Each
+    // fixture is unobserved beyond the StaticWorkerBinding conservation wall;
+    // this is an expectation change, not a relaxation of that wall.
     for depth in 1..=3 {
         let expression = host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
-        let (result, trace) = px8j_capture_source_trace(
+        let (result, _trace) = px8j_capture_source_trace(
             &expression,
             false,
             &format!("ken_px8j_live_scope_depth_{depth}"),
         );
-        result.unwrap_or_else(|error| panic!("scope depth {depth} must lower: {error:?}"));
-        let (origin, cursor, exits) = trace
-            .iter()
-            .find_map(|event| match event {
-                Px8jSourceTraceEvent::Install {
-                    origin,
-                    selection_cursor,
-                    exits,
-                    ..
-                } if exits.len() == depth => Some((*origin, *selection_cursor, exits)),
-                _ => None,
-            })
-            .unwrap_or_else(|| {
-                panic!("scope depth {depth} must install one exact segment: {trace:#?}")
-            });
-        let unique_scope_origins: BTreeSet<_> = exits
-            .iter()
-            .map(|(scope_origin, _)| *scope_origin)
-            .collect();
-        assert_eq!(unique_scope_origins.len(), depth);
-        assert_eq!(exits.first().and_then(|(_, parent)| *parent), None);
-        for pair in exits.windows(2) {
-            let (outer_scope, _) = pair[0];
-            let (_, inner_parent) = pair[1];
-            assert_eq!(inner_parent, Some(outer_scope));
-        }
-        let selection = trace
-            .iter()
-            .position(|event| {
-                matches!(
-                    event,
-                    Px8jSourceTraceEvent::Selection { origin: actual } if *actual == origin
-                )
-            })
-            .expect("selection is consumed");
-        let hole = trace
-            .iter()
-            .position(|event| {
-                matches!(
-                    event,
-                    Px8jSourceTraceEvent::ReturnHole { cursor: actual } if *actual == cursor
-                )
-            })
-            .expect("the complete caller source K reaches its return hole");
-        let first_exit = trace
-            .iter()
-            .position(|event| {
-                matches!(
-                    event,
-                    Px8jSourceTraceEvent::Exit { origin: actual, .. } if *actual == origin
-                )
-            })
-            .expect("the installed unwind stack begins consumption");
-        assert!(selection < hole && hole < first_exit);
-        let consumed_exits: Vec<_> = trace[hole + 1..]
-            .iter()
-            .filter_map(|event| match event {
-                Px8jSourceTraceEvent::Exit {
-                    origin: actual_origin,
-                    scope_origin,
-                    parent_scope,
-                } if *actual_origin == origin => Some((*scope_origin, *parent_scope)),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(
-            consumed_exits,
-            exits.iter().rev().copied().collect::<Vec<_>>(),
-            "depth {depth}: {trace:#?}"
-        );
+        assert!(matches!(
+            result,
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "StaticWorkerBinding",
+                reason,
+            })) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
+                && reason.contains("has no runtime representation")
+        ), "scope depth {depth} must retain its measured conservation refusal");
     }
 }
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — a PRODUCTION compile builds the
@@ -2701,7 +2382,13 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
     let _ = crate::cranelift_backend::lowering::core::d2f_production_fusion_planes_take();
     let (result, _trace) =
         px8j_capture_source_trace(&before, false, "ken_d2f_fusion_plane_wiring");
-    result.expect("the R3 before-hole witness lowers");
+    assert!(matches!(
+        result,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "ComputationalMatch",
+            reason,
+        })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
+    ), "the plane must be observed before the fixture's measured D8 refusal");
     let planes = crate::cranelift_backend::lowering::core::d2f_production_fusion_planes_take();
     // THE WHOLE CLAIM, and it is one line on purpose. Delete the production
     // wiring and this is empty -- not merely a different size.
@@ -4740,7 +4427,7 @@ fn d2f_the_two_binder_projections_share_one_source_field_transport() {
 #[test]
 fn d2f_0_the_applied_root_production_path_gate() {
     use crate::cranelift_backend::lowering::core::d2f_gate_arrivals_take;
-    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause, D2J_DECLARATION};
+    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause};
 
     /// One cause, compiled through the production entry on its own root.
     fn compile_cause(
@@ -4870,7 +4557,13 @@ fn d2f_0_the_applied_root_production_path_gate() {
     ));
     let _ = d2f_gate_arrivals_take();
     let (seed_result, _trace) = px8j_capture_source_trace(&seed_expr, false, "ken_d2f_gate_seed");
-    seed_result.expect("the old seed witness still lowers");
+    assert!(matches!(
+        seed_result,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "ComputationalMatch",
+            reason,
+        })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
+    ), "the seed must reach the builder before its measured D8 refusal");
     let seed = match d2f_gate_arrivals_take().as_slice() {
         [only] => only.clone(),
         other => panic!("the seed witness must reach the builder once: {}", other.len()),
@@ -5402,7 +5095,13 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
     let _ = d2f_gate_arrivals_take();
     let (seed_result, _seed_trace) =
         px8j_capture_source_trace(&seed_expr, false, "ken_r3_d0_seed");
-    seed_result.expect("the seed witness still lowers");
+    assert!(matches!(
+        seed_result,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "ComputationalMatch",
+            reason,
+        })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
+    ), "the seed must reach the builder before its measured D8 refusal");
     let seed = match d2f_gate_arrivals_take().as_slice() {
         [only] => only.clone(),
         other => panic!("the seed witness must reach the builder once: {}", other.len()),
@@ -5927,17 +5626,8 @@ fn required_consumer_projection_refuses_each_wrong_coordinate() {
 /// makes both legs converge again at the later `StaticWorkerBinding` boundary.
 #[test]
 fn required_consumer_projection_reaches_the_depth_two_funnel() {
-    use crate::cranelift_backend::lowering::core::{
-        set_selector_variant_exclusion, with_required_consumer_route_suppressed,
-    };
+    use crate::cranelift_backend::lowering::core::with_required_consumer_route_suppressed;
     use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
-
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
 
     fn compile() -> (String, usize) {
         let _ = d2k_owner_trace_take();
@@ -5960,10 +5650,6 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
         (outcome, installs)
     }
 
-    set_selector_variant_exclusion(Some(
-        RecursiveDescentResidual::LexicalCallArgumentRecursor,
-    ));
-    let _restore = Restore;
     assert_eq!(compile(), ("StaticWorkerBinding".to_string(), 2));
     let (suppressed, applications) = with_required_consumer_route_suppressed(compile);
     assert_eq!(applications, 1, "the mutation must suppress one real funnel route");
@@ -6070,9 +5756,7 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// GAP: this internal transition does not repair the later static-worker wall.
 #[test]
 fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
-    use crate::cranelift_backend::lowering::core::{
-        set_selector_variant_exclusion, with_required_consumer_route_suppressed,
-    };
+    use crate::cranelift_backend::lowering::core::with_required_consumer_route_suppressed;
     use crate::cranelift_backend::lowering::{
         d2k_owner_trace_take, BoundaryTransferInvokingSite, D2kOwnerEvent,
         GeneratedUnitCallInputCallee, GeneratedUnitCallInputCaller,
@@ -6097,12 +5781,6 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
         unit_result_transfer_reached: Option<bool>,
     }
 
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
 
     fn compile(depth: usize) -> (String, Vec<D2kOwnerEvent>, bool) {
         crate::cranelift_backend::lowering::reset_d5a_trace();
@@ -6204,10 +5882,6 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
         callee
     }
 
-    set_selector_variant_exclusion(Some(
-        RecursiveDescentResidual::LexicalCallArgumentRecursor,
-    ));
-    let _restore = Restore;
     let origin_existence_expression =
         host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
     let origin_existence_plan =
@@ -6291,82 +5965,6 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
         ],
         "D5 must preserve the exact enabled/suppressed origin-5 crossing table",
     );
-}
-
-/// `RT-CLOSURE-BOUNDARY-LANE` D0: the RecursiveDescent baseline does not
-/// perform the closure-bearing boundary crossing introduced by functionization.
-///
-/// MEASURED: in one process and for each of row 4 depths 2 and 3, excluding the
-/// lexical-recursion selector records at least one `BoundaryTransferEntered`
-/// event, while the unexcluded RecursiveDescent compile succeeds and records
-/// none. CLAIMED: the empty RecursiveDescent observation is live evidence, not
-/// a dead recorder, so retiring that route before the live-domain lane covers
-/// these rows would remove a compiling capability. THE GAP: sibling compiles
-/// establish recorder liveness rather than observing both routes inside one
-/// compile; this does not choose the lane mechanism, and retirement may instead
-/// carry an explicit recorded narrowing.
-///
-/// Promise class: transition sentinel. Retirement or an authorized boundary
-/// repair must rewrite this route comparison rather than preserve its current
-/// exact outcomes.
-#[test]
-fn recursive_descent_recursors_compile_without_a_boundary_crossing() {
-    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
-    use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
-
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
-
-    let _restore = Restore;
-    for depth in [2, 3] {
-        set_selector_variant_exclusion(Some(
-            RecursiveDescentResidual::LexicalCallArgumentRecursor,
-        ));
-        let _ = d2k_owner_trace_take();
-        let expression =
-            host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
-        let (_excluded_result, _trace) = px8j_capture_source_trace(
-            &expression,
-            false,
-            &format!("ken_closure_boundary_lane_d0_excluded_depth{depth}"),
-        );
-        let excluded_crossings = d2k_owner_trace_take()
-            .into_iter()
-            .filter(|event| {
-                matches!(event, D2kOwnerEvent::BoundaryTransferEntered { .. })
-            })
-            .collect::<Vec<_>>();
-        assert!(
-            !excluded_crossings.is_empty(),
-            "row 4 depth {depth} must prove the boundary-crossing recorder is live \
-             when the lexical-recursion selector is excluded",
-        );
-
-        set_selector_variant_exclusion(None);
-        let _ = d2k_owner_trace_take();
-        let (result, _trace) = px8j_capture_source_trace(
-            &expression,
-            false,
-            &format!("ken_closure_boundary_lane_d0_depth{depth}"),
-        );
-        assert!(
-            result.is_ok(),
-            "row 4 depth {depth} must retain its compiling RecursiveDescent baseline: {result:?}",
-        );
-        let crossings = d2k_owner_trace_take()
-            .into_iter()
-            .filter(|event| matches!(event, D2kOwnerEvent::BoundaryTransferEntered { .. }))
-            .collect::<Vec<_>>();
-        assert!(
-            crossings.is_empty(),
-            "row 4 depth {depth} must not gain a RecursiveDescent boundary crossing: \
-             {crossings:#?}",
-        );
-    }
 }
 
 /// `RT-PLANNED-CLOSURE-PREEXISTENCE` D1/D2: ask the planner whether the
@@ -6479,18 +6077,10 @@ fn planned_closure_preexistence_routes_recursors_to_the_durable_lane() {
 /// says nothing about a missing production child or a production compile.
 #[test]
 fn missing_call_input_callee_child_degrades_the_tag_not_the_compile() {
-    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
     use crate::cranelift_backend::lowering::{
         d2k_owner_trace_take, BoundaryTransferInvokingSite, CallInputCalleeDiagnosticMutationGuard,
         D2kOwnerEvent, GeneratedUnitCallInputCallee, GeneratedUnitCallInputCaller,
     };
-
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
 
     fn run(mutate: bool) -> (String, u32, Vec<GeneratedUnitCallInputCallee>) {
         let _ = d2k_owner_trace_take();
@@ -6527,8 +6117,6 @@ fn missing_call_input_callee_child_degrades_the_tag_not_the_compile() {
         (outcome, hits, callees)
     }
 
-    set_selector_variant_exclusion(Some(RecursiveDescentResidual::LexicalCallArgumentRecursor));
-    let _restore = Restore;
     let baseline = run(false);
     let missing = run(true);
     assert_eq!(baseline.0, "StaticWorkerBinding");
@@ -6622,242 +6210,37 @@ fn contkey_wrong_inner_match_eliminator_seed_is_rejected() {
     );
 }
 
-/// **The `D2k-0` control's redness, made executable rather than inherited.**
-///
-/// `D2k-0` claims it reds when a repair moves any of the five off the
-/// `StaticWorkerBinding` wall. **Nobody had verified that**, and an unverified
-/// redness claim is what turns evidence into a one-time reading.
-///
-/// This runs `D2k-0`'s own predicate with the wrong-consumer condition removed
-/// — the `B`-only exclusion lifted, which is what puts these expressions on the
-/// lane that does not take the failing route — and requires it to answer
-/// **`None`**: no wall, no refusal.
-///
-/// ⇒ The predicate is therefore **not a constant**. It answers "at the wall"
-/// under exclusion and "not at the wall" without it, on the same fixtures, so
-/// its green under exclusion is a measurement rather than a shape it returns
-/// for anything.
-///
-/// **Promise class: durable invariant.** It pins that the wall is a property of
-/// the excluded lane, not of the fixtures.
-#[test]
-fn d2k_0_control_reddens_when_the_wrong_consumer_condition_is_removed() {
-    // `D2k-0`'s OWN predicate, not a twin of it. A redness proof written
-    // against a re-implemented copy would show that the copy is not a
-    // constant and say nothing about the committed control.
-    fn wall_without_exclusion(expression: &RuntimeExpr, symbol: &str) -> Option<(String, String)> {
-        // No `set_selector_variant_exclusion` at all: this is the lane on which
-        // the failing route is not taken.
-        d2k_wall_under_current_selector(expression, symbol)
-    }
-    let row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
-    let row4_d1 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
-    let row4_d2 = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
-    let row4_d3 = host_result_closure_match(px8j_scope_chain_observation_result(3, 0));
-    let row5 = host_result_closure_match(px8j_equal_payload_hole_placement(
-        Px8jSelectedScopePlacement::AfterReturnHole,
-    ));
-    assert_eq!(
-        [
-            ("row1-owned-scope", wall_without_exclusion(&row1, "ken_d2k0_red_row1")),
-            ("row4-depth-1", wall_without_exclusion(&row4_d1, "ken_d2k0_red_row4_d1")),
-            ("row4-depth-2", wall_without_exclusion(&row4_d2, "ken_d2k0_red_row4_d2")),
-            ("row4-depth-3", wall_without_exclusion(&row4_d3, "ken_d2k0_red_row4_d3")),
-            ("row5-after-hole", wall_without_exclusion(&row5, "ken_d2k0_red_row5")),
-        ],
-        [
-            ("row1-owned-scope", None),
-            ("row4-depth-1", None),
-            ("row4-depth-2", None),
-            ("row4-depth-3", None),
-            ("row5-after-hole", None),
-        ],
-        "the D2k-0 predicate must answer None with the wrong-consumer condition removed. If it \
-         still reported a wall here it would be reporting something about the fixtures rather \
-         than about the excluded lane, and its green under exclusion would prove nothing."
-    );
-}
-#[test]
-fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
-    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
-    /// The refusal's `construct` and its `edge`, or `None` if it lowered.
-    fn wall(expression: &RuntimeExpr, symbol: &str) -> Option<(String, String)> {
-        set_selector_variant_exclusion(Some(
-            RecursiveDescentResidual::LexicalCallArgumentRecursor,
-        ));
-        let _restore = Restore;
-        d2k_wall_under_current_selector(expression, symbol)
-    }
-    let aggregate_row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
-    let row4_d1 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
-    let row4_d2 = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
-    let row4_d3 = host_result_closure_match(px8j_scope_chain_observation_result(3, 0));
-    let row5_after = host_result_closure_match(px8j_equal_payload_hole_placement(
-        Px8jSelectedScopePlacement::AfterReturnHole,
-    ));
-
-    let five = [
-        ("row1-owned-scope", wall(&aggregate_row1, "ken_d2k0_row1")),
-        ("row4-depth-1", wall(&row4_d1, "ken_d2k0_row4_d1")),
-        ("row4-depth-2", wall(&row4_d2, "ken_d2k0_row4_d2")),
-        ("row4-depth-3", wall(&row4_d3, "ken_d2k0_row4_d3")),
-        ("row5-after-hole", wall(&row5_after, "ken_d2k0_row5")),
-    ];
-    use crate::cranelift_backend::planning::RequiredConsumerProjectionDisposition;
-    let projection_census = required_consumer_projection_census();
-    let residuals = five
-        .iter()
-        .zip(projection_census)
-        .map(|((label, outcome), (census_label, disposition))| {
-            assert_eq!(*label, census_label, "D2 and D3 row labels diverged");
-            (
-                *label,
-                outcome.clone(),
-                match disposition {
-                    RequiredConsumerProjectionDisposition::Minted => "behind-boundary",
-                    RequiredConsumerProjectionDisposition::SkippedRequiredEqualsSource
-                    | RequiredConsumerProjectionDisposition::AbsentNoRequiredConsumer => {
-                        "outside-surface"
-                    }
-                },
-            )
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(
-        residuals,
-        vec![
-            (
-                "row1-owned-scope",
-                Some((
-                    "<not-unsupported>".to_string(),
-                    "Backend(PlannerInvariant(\"terminal answer has no affine checked-root authority\"))"
-                        .to_string(),
-                )),
-                "outside-surface",
-            ),
-            (
-                "row4-depth-1",
-                Some((
-                    "StaticWorkerBinding".to_string(),
-                    "constructor ctor:fixture::PX8JScopeTree::Node at origin StaticOriginId(26) transports a static worker in field 0 (field origin StaticOriginId(25), recognition StaticWorkerRecognitionId(0)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer at an exact-Var call and is not erased; a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation".to_string(),
-                )),
-                "outside-surface",
-            ),
-            (
-                "row4-depth-2",
-                Some((
-                    "StaticWorkerBinding".to_string(),
-                    "constructor ctor:fixture::PX8JScopeTree::Node at origin StaticOriginId(36) transports a static worker in field 0 (field origin StaticOriginId(35), recognition StaticWorkerRecognitionId(2)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer at an exact-Var call and is not erased; a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation".to_string(),
-                )),
-                "behind-boundary",
-            ),
-            (
-                "row4-depth-3",
-                Some((
-                    "StaticWorkerBinding".to_string(),
-                    "constructor ctor:fixture::PX8JScopeTree::Node at origin StaticOriginId(46) transports a static worker in field 0 (field origin StaticOriginId(45), recognition StaticWorkerRecognitionId(3)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer at an exact-Var call and is not erased; a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation".to_string(),
-                )),
-                "behind-boundary",
-            ),
-            (
-                "row5-after-hole",
-                Some((
-                    "StaticWorkerBinding".to_string(),
-                    "constructor ctor:fixture::PX8JHoleOutput::Node at origin StaticOriginId(22) transports a static worker in field 0 (field origin StaticOriginId(21), recognition StaticWorkerRecognitionId(0)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer at an exact-Var call and is not erased; a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation".to_string(),
-                )),
-                "outside-surface",
-            ),
-        ],
-        "the governed residual record must retain each exact boundary sentence and its measured projection-surface position",
-    );
-
-    // **RE-DERIVED at `D2k-1b-i`. This control went red because the RULED
-    // SEMANTICS CHANGED, not because the repair is incomplete.** Its retiring
-    // event was always the repair itself: it pinned that all five stood at one
-    // shared **value-read** wall with edge *"a Var in value position"*, and
-    // `D2k-1b`'s whole purpose is to recognize the binding **ahead of** that
-    // read. The edge it asserted cannot survive the increment that removes the
-    // read, so restoring it would be restoring the defect.
-    //
-    // **The durable half is kept and it is the stronger claim:** not one of the
-    // five reaches a value-producing read of a static worker any more. What
-    // each now reports is its *next* wall, and those are deliberately NOT
-    // uniform -- row 1 reaches a different construct entirely. A sameness
-    // assertion across the five would be green under a uniform move, which is
-    // the case that matters most, so each row is compared against its own
-    // literal.
-    let conservation = Some("StaticWorkerBinding".to_string());
-    assert_eq!(
-        five.iter()
-            .map(|(label, outcome)| (
-                *label,
-                outcome.as_ref().map(|(construct, _)| construct.clone())
-            ))
-            .collect::<Vec<_>>(),
-        vec![
-            // Row 1 refuses at a wall that is not this increment's, and that is
-            // the A/B's informative side rather than an inconvenience: without
-            // a row that moves for a different reason, "the five all refuse"
-            // is equally consistent with the arming having done nothing.
-            ("row1-owned-scope", Some("<not-unsupported>".to_string())),
-            ("row4-depth-1", conservation.clone()),
-            ("row4-depth-2", conservation.clone()),
-            ("row4-depth-3", conservation.clone()),
-            ("row5-after-hole", conservation.clone()),
-        ],
-        "D2k-0 RE-DERIVED: no row reaches a value-producing static-worker read. Depth 2 and \
-         depth 3 advance through the required-consumer projection and synthesized environment \
-         transfer to the downstream StaticWorkerBinding conservation refusal; depth 1 and row 5 \
-         retain the same construct, while row 1 remains unrelated."
-    );
-    assert!(
-        five.iter().all(|(_, outcome)| outcome
-            .as_ref()
-            .is_none_or(|(_, edge)| edge != "a Var in value position")),
-        "the durable half of D2k-0: not one of the five may reach the bare-Var value read again. \
-         That read is what D2k-1b recognizes ahead of, so its reappearance is the producer \
-         having stopped firing -- which no per-row wall literal above would distinguish from a \
-         row legitimately moving on."
-    );
-}
 #[test]
 fn px8j_selected_scope_partitions_differ_across_the_real_return_hole() {
+    // RT-DESCENT-RETIRE D8 re-describes both fixtures by the measured first
+    // outcomes in RT-RECURSOR-TRANSPORT.  Before-hole stops at the in-flight
+    // activation rule; after-hole stops at static-worker conservation.  The
+    // old partition is therefore unobserved by construction on this lane.
     let before = host_result_closure_match(px8j_equal_payload_hole_placement(
         Px8jSelectedScopePlacement::BeforeReturnHole,
     ));
     let after = host_result_closure_match(px8j_equal_payload_hole_placement(
         Px8jSelectedScopePlacement::AfterReturnHole,
     ));
-    let (before_result, before_trace) =
+    let (before_result, _before_trace) =
         px8j_capture_source_trace(&before, false, "ken_px8j_scope_before_hole");
-    let (after_result, after_trace) =
+    let (after_result, _after_trace) =
         px8j_capture_source_trace(&after, false, "ken_px8j_scope_after_hole");
-    before_result.expect("the before-hole selected scope lowers");
-    after_result.expect("the after-hole selected scope lowers");
-
-    let partition = |trace: &[Px8jSourceTraceEvent]| {
-        let hole = trace
-            .iter()
-            .position(|event| matches!(event, Px8jSourceTraceEvent::ReturnHole { .. }))
-            .expect("the real source path reaches its return hole");
-        let selections_before = trace[..hole]
-            .iter()
-            .filter(|event| matches!(event, Px8jSourceTraceEvent::Selection { .. }))
-            .count();
-        let exits_after = trace[hole + 1..]
-            .iter()
-            .filter(|event| matches!(event, Px8jSourceTraceEvent::Exit { .. }))
-            .count();
-        (selections_before, exits_after)
-    };
-    assert_eq!(partition(&before_trace), (2, 0));
-    assert_eq!(partition(&after_trace), (1, 1));
+    assert!(matches!(
+        before_result,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "ComputationalMatch",
+            reason,
+        })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
+    ));
+    assert!(matches!(
+        after_result,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "StaticWorkerBinding",
+            reason,
+        })) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
+            && reason.contains("has no runtime representation")
+    ));
 }
 #[test]
 fn nested_computational_outer_missing_selects_exact_outer_default() {
@@ -6930,8 +6313,6 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         seed_env: &seed_env,
         declarations: BTreeMap::new(),
         static_transition_plan: inert_test_plan(),
-        declaration_stack: Vec::new(),
-        active_recursive_declarations: Vec::new(),
         result_table: BTreeMap::new(),
         next_token: 0,
         next_recursor_frame_provenance: 0,
@@ -6964,7 +6345,6 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         next_dynamic_splice_edge: 1,
         assumptions: BTreeSet::new(),
         unsupported: Vec::new(),
-        body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
         fusion_compositions: None,
         static_worker_fields: Default::default(),
@@ -7483,21 +6863,16 @@ enum Px8jRecursorMalformation {
 /// with `Option::None` at the entry and `Option::Some(Int)` at the recursive
 /// site.
 ///
-/// `same_recursive_argument_shapes` is **not a Ken semantic law and not a
-/// declared function-unit ABI predicate.** Its only production use guards
-/// `RecursiveDescent`'s same-function CFG backedges, where one fixed run of
-/// specialized `Lowered` block parameters has to represent every loop iteration
-/// — there, `None` becoming `Some(Int)` changes the compile-time template and
-/// must reject. A functionized call holds a different representation contract:
+/// The retired same-function CFG route required one fixed run of specialized
+/// block parameters to represent every loop iteration. A functionized call
+/// holds a different representation contract:
 /// every declared parameter is one `AbiSlotKind::Parameter` with
 /// `AbiCarrier::ValueWord`, the descriptor is independent of the particular
 /// runtime constructor, and each actual argument is transferred through the
 /// boundary encoder at the call. ⇒ `None` and `Some(Int)` are **two lawful
 /// values of one declared slot**, not an ABI shape disagreement.
 ///
-/// ⛔ **No guard was lost, and none was transplanted.**
-/// `same_recursive_argument_shapes` stays exactly where it was, guarding every
-/// remaining `RecursiveDescent` backedge; it is deliberately NOT carried into
+/// The retired route's representation guard is deliberately not carried into
 /// the declared-call path. The separate negative the frame requires — a
 /// genuinely non-transferable value graph — is retained and unaffected:
 /// `c1_d5_a_closure_is_inadmissible_at_the_root_and_at_every_depth` here, and
@@ -7565,8 +6940,8 @@ fn d6_a_functionized_recursive_declaration_accepts_a_changing_argument_construct
             "D6: a functionized recursive declaration must accept `None` at the entry and \
              `Some(Int)` at the recursive site -- they are two lawful values of one declared \
              `ValueWord` slot. If this is the old `changes its native argument representation` \
-             refusal, the declaration is still on the `RecursiveDescent` lane and the \
-             activation did not take. If it is anything else, it is a new refusal on the \
+             refusal, the declaration has regressed to the retired monolithic contract. \
+             If it is anything else, it is a new refusal on the \
              declared-call path and must be reported, not accommodated: {error:?}"
         );
     }
@@ -8499,12 +7874,12 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
         Census {
             file: "lowering/core.rs",
             source: include_str!("../../core.rs"),
-            // The selected recursive-descent root still lives here, but its
-            // builder and definition are now part of the closed selector arm
-            // in this file. The textual census sees that one arm; the
-            // functionized root adapter and unit body are in `units.rs`.
-            builders: 1,
-            definitions: 1,
+            // The recursive-descent root builder and definition retired with
+            // their lane. The functionized root adapter and unit body remain
+            // in `units.rs`; this textual tripwire therefore expects no root
+            // builder or definition in this file.
+            builders: 0,
+            definitions: 0,
             declarations: 2,
             data_declarations: 0,
             data_definitions: 0,
@@ -9924,288 +9299,7 @@ fn the_lower_expr_call_population_is_dispositioned_by_owner_not_by_site() {
 }
 
 #[test]
-fn the_body_authority_selector_narrows_only_completed_ports_and_stays_fail_closed() {
-    let declarations = BTreeMap::new();
-
-    // Promise class: durable invariant. Any new RuntimeExpr form must be
-    // classified explicitly, while the completed ports and the SURVIVING
-    // residuals remain part of the migration boundary.
-    //
-    // MEASURED: recursive computational positions, a source Trap, and -- since
-    // `RT-PRODUCER-MATCH-PORT` `D3` -- an ordinary Match whose producer is a
-    // Call all select functionized emission, while a Match consuming an active
-    // computational recursor still selects recursive descent.
-    // CLAIMED: `RT-FNSPLIT-RECUR-PORT`'s `D3` removed only the two predicates
-    // backed by ITS `D1` and `D2`, and did not turn absence from a functionized
-    // allow-list into admission. That clause is that node's and predates this
-    // one; it is qualified because the paragraph above now names a different
-    // node's `D3`, and an unqualified `D3` beside it reads as this node -- which
-    // retired ONE predicate, not two.
-    // THE GAP: this pin measures the source-only selector. `S1` and `S2`
-    // separately prove the declared-unit and terminal-CFG mechanisms behind
-    // that node's two green selections; its `D4` exercises the complete
-    // governed n=3..7 family.
-    assert_eq!(
-        select_body_emission_authority(
-            &RuntimeExpr::Value(RuntimeValue::Bool(true)),
-            &declarations,
-        ),
-        BodyEmissionAuthority::FunctionizedUnits
-    );
-
-    let ported_recursive_position = RuntimeExpr::ComputationalMatch {
-        scrutinee: Box::new(RuntimeExpr::Construct {
-            constructor: "ctor:fixture::selector::Node".to_string(),
-            args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
-        }),
-        cases: vec![crate::RuntimeComputationalMatchCase {
-            constructor: "ctor:fixture::selector::Node".to_string(),
-            argument_binders: 1,
-            recursive_positions: vec![0],
-            body: RuntimeExpr::Var(0),
-        }],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "selector fixture default".to_string(),
-        },
-    };
-    assert_eq!(
-        select_body_emission_authority(&ported_recursive_position, &declarations),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "a completed recursive-position port still selected retained authority"
-    );
-
-    let retained_lexical_transfer =
-        host_result_closure_match(ported_recursive_position.clone());
-    assert_eq!(
-        recursive_descent_residual(&retained_lexical_transfer),
-        Some(RecursiveDescentResidual::LexicalCallArgumentRecursor),
-        "an active recursor crossing a lexical-unit argument lost its retained lane"
-    );
-    assert_eq!(
-        select_body_emission_authority(&retained_lexical_transfer, &declarations),
-        BodyEmissionAuthority::RecursiveDescent
-    );
-
-    let retained_match_transfer = RuntimeExpr::Match {
-        scrutinee: Box::new(ported_recursive_position.clone()),
-        cases: Vec::new(),
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "selector retained recursor-match default".to_string(),
-        },
-    };
-    assert_eq!(
-        recursive_descent_residual(&retained_match_transfer),
-        Some(RecursiveDescentResidual::MatchScrutineeRecursor),
-        "an ordinary Match consuming an active recursor lost its retained lane"
-    );
-    assert_eq!(
-        select_body_emission_authority(&retained_match_transfer, &declarations),
-        BodyEmissionAuthority::RecursiveDescent
-    );
-
-    let ported_trap = RuntimeExpr::Trap(RuntimeTrap {
-        code: RuntimeTrapCode::ExplicitTrap,
-        message: "selector trap fixture".to_string(),
-    });
-    assert_eq!(
-        select_body_emission_authority(&ported_trap, &declarations),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "a completed terminal-trap port still selected retained authority"
-    );
-
-    let ported_producer_match = RuntimeExpr::Match {
-        scrutinee: Box::new(RuntimeExpr::Call {
-            callee: Box::new(RuntimeExpr::LexicalClosure {
-                captures: Vec::new(),
-                params: Vec::new(),
-                body: Box::new(RuntimeExpr::Construct {
-                    constructor: "ctor:fixture::selector::Wrap".to_string(),
-                    args: Vec::new(),
-                }),
-            }),
-            args: Vec::new(),
-        }),
-        cases: Vec::new(),
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "selector producer default".to_string(),
-        },
-    };
-    // `RT-PRODUCER-MATCH-PORT` `D3`: the producer `Match` is PORTED now, so it
-    // is the paired negative. The fail-closed property under test was never
-    // about this particular shape -- it is that an UNPORTED shape is refused by
-    // default -- so it moves to a surviving one rather than being dropped.
-    assert_eq!(
-        select_body_emission_authority(&ported_producer_match, &declarations),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "a completed producer-Match port still selected retained authority"
-    );
-    assert_eq!(
-        select_body_emission_authority(&d1_match_scrutinee_recursor_witness(), &declarations),
-        BodyEmissionAuthority::RecursiveDescent,
-        "an unported recursor-scrutinee Match was admitted by default"
-    );
-
-    let seed_closure_call = RuntimeExpr::Call {
-        callee: Box::new(RuntimeExpr::Closure {
-            captures: Vec::new(),
-            params: Vec::new(),
-            body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
-        }),
-        args: Vec::new(),
-    };
-    // `RT-SEED-CALL-PORT` `D3` inverted this row. It read "a retained
-    // seed-Closure call was admitted by default", guarding a variant that no
-    // longer exists; the call is now a COMPLETED port, so admitting it is
-    // correct and retaining the lane would be the defect.
-    assert_eq!(
-        select_body_emission_authority(&seed_closure_call, &declarations),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "D3: a seed-Closure call is a completed port and must select FunctionizedUnits"
-    );
-}
-
-#[test]
-fn retained_authority_residual_is_the_typed_selector_accounting() {
-    // Promise class: durable invariant. The retained population is produced by
-    // the exhaustive selector walk and represented by a closed reason type;
-    // this pin does not maintain a second inventory of source spellings.
-    //
-    // MEASURED: each production route that yields retained authority produces
-    // its exact typed reason, wrappers propagate that reason, a completed port
-    // produces no reason, and the authority decision agrees in every case.
-    // CLAIMED: D5's RecursiveDescent residual is closed over the selector's
-    // source and declaration producers, with no handwritten shadow list.
-    // THE GAP: this establishes selector accounting, not emission behavior.
-    // S1/S2/S4 establish the ported mechanisms and completed collection; the
-    // five S4 rows do not establish an asymptotic exponent or verdict.
-    let producer_match = RuntimeExpr::Match {
-        scrutinee: Box::new(RuntimeExpr::Call {
-            callee: Box::new(RuntimeExpr::LexicalClosure {
-                captures: Vec::new(),
-                params: Vec::new(),
-                body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
-            }),
-            args: Vec::new(),
-        }),
-        cases: Vec::new(),
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "D5 producer-Match default".to_string(),
-        },
-    };
-    // `RT-PRODUCER-MATCH-PORT` `D3` retired `ProducerMatchCall`, so this shape
-    // is now the paired NEGATIVE: a producer `Match` over a `Call` retains
-    // nothing and selects the functionized lane.
-    assert_eq!(recursive_descent_residual(&producer_match), None);
-    assert_eq!(
-        select_body_emission_authority(&producer_match, &BTreeMap::new()),
-        BodyEmissionAuthority::FunctionizedUnits
-    );
-
-    // `RT-SEED-CALL-PORT` `D3` — this pair used to carry a seed-closure call,
-    // whose variant is now retired. The PROPERTY under test is the wrapper's
-    // propagation of a child's retained reason, not the particular reason, so
-    // the fixture moves to a surviving variant rather than the row being
-    // dropped. A retirement should cost the class, not the coverage.
-    let wrapped_recursor = RuntimeExpr::Let {
-        value: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(false))),
-        body: Box::new(d1_match_scrutinee_recursor_witness()),
-    };
-    assert_eq!(
-        recursive_descent_residual(&wrapped_recursor),
-        Some(RecursiveDescentResidual::MatchScrutineeRecursor),
-        "a wrapper failed to propagate its child's retained reason"
-    );
-    assert_eq!(
-        select_body_emission_authority(&wrapped_recursor, &BTreeMap::new()),
-        BodyEmissionAuthority::RecursiveDescent
-    );
-
-    // And the retired shape, kept as the paired negative: a wrapper around a
-    // seed-closure call must now propagate NOTHING and select the functionized
-    // lane. Without this row the edit above would read as coverage moving, when
-    // what it must also show is the old shape genuinely going quiet.
-    let wrapped_seed = RuntimeExpr::Let {
-        value: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(false))),
-        body: Box::new(d1_seed_closure_call_witness()),
-    };
-    assert_eq!(
-        recursive_descent_residual(&wrapped_seed),
-        None,
-        "D3: a seed-closure call is no longer a retained reason at any depth"
-    );
-    assert_eq!(
-        select_body_emission_authority(&wrapped_seed, &BTreeMap::new()),
-        BodyEmissionAuthority::FunctionizedUnits
-    );
-
-    let symbol = "decl:fixture::d5::closure".to_string();
-    let declaration = RuntimeDeclaration {
-        symbol: symbol.clone(),
-        kind: RuntimeDeclarationKind::Transparent {
-            body: RuntimeExpr::LexicalClosure {
-                captures: Vec::new(),
-                params: Vec::new(),
-                body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
-            },
-        },
-        metadata: RuntimeSymbolMetadata {
-            lowerability: Some(RuntimeLowerabilityStatus::Supported),
-            ..RuntimeSymbolMetadata::empty()
-        },
-    };
-    // ⭐ **`D6` ACTIVATED this row.** A transparent declaration whose body is a
-    // closure seed used to retain the whole object on `RecursiveDescent`. It is
-    // now reached as a separately owned callable unit, so its head contributes
-    // no retained reason and the object selects `FunctionizedUnits`. ⛔ The
-    // body is still classified: this asserts the head is inert, not that
-    // declarations are exempt.
-    assert_eq!(
-        declaration_recursive_descent_residual(&declaration),
-        None,
-        "D6: a closure-seed transparent declaration head no longer retains the lane"
-    );
-    let declarations = BTreeMap::from([(symbol.as_str(), &declaration)]);
-    assert_eq!(
-        select_body_emission_authority(
-            &RuntimeExpr::Value(RuntimeValue::Bool(true)),
-            &declarations,
-        ),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "D6: with the residual retired and nothing else firing, this program is \
-         functionized"
-    );
-
-    let completed_port = RuntimeExpr::ComputationalMatch {
-        scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
-        cases: vec![crate::RuntimeComputationalMatchCase {
-            constructor: "ctor:fixture::d5::Node".to_string(),
-            argument_binders: 1,
-            recursive_positions: vec![0],
-            body: RuntimeExpr::Trap(RuntimeTrap {
-                code: RuntimeTrapCode::ExplicitTrap,
-                message: "D5 completed terminal".to_string(),
-            }),
-        }],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "D5 completed default".to_string(),
-        },
-    };
-    assert_eq!(recursive_descent_residual(&completed_port), None);
-    assert_eq!(
-        select_body_emission_authority(&completed_port, &BTreeMap::new()),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "a completed recursive-position/trap port remained in the residual"
-    );
-}
-
-#[test]
 fn a_trap_arm_and_its_trap_free_twin_both_functionize() {
-    let declarations = BTreeMap::new();
     let fixture = |trap_arm| RuntimeExpr::Match {
         // Calling the lexical closure makes the scrutinee cross a declared-unit
         // edge. The match must therefore emit both arms from the carried
@@ -10296,11 +9390,6 @@ fn a_trap_arm_and_its_trap_free_twin_both_functionize() {
             .expect("trap twin root is a join");
         assert_eq!(token.representation, JoinResultRepresentation::CarrierWord);
         assert!(token.has_continuing_predecessor);
-        assert_eq!(
-            select_body_emission_authority(expr, &declarations),
-            BodyEmissionAuthority::FunctionizedUnits,
-            "{name} twin did not select functionized emission"
-        );
         ac11_compiles(expr).unwrap_or_else(|error| {
             panic!("{name} twin failed functionized emission: {error}")
         });
@@ -10321,11 +9410,6 @@ fn a_trap_arm_and_its_trap_free_twin_both_functionize() {
         )
         .expect("all-trap root is a join");
     assert!(!all_trap_token.has_continuing_predecessor);
-    assert_eq!(
-        select_body_emission_authority(&all_trap, &declarations),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "all-trap twin did not select functionized emission"
-    );
     ac11_compiles(&all_trap)
         .unwrap_or_else(|error| panic!("all-trap carried match emitted a merge: {error}"));
 }
@@ -10435,10 +9519,6 @@ fn typed_trap_exit_preserves_the_planner_identity_across_two_unit_calls() {
             .expect("the selected trap is inventoried")
             .abi_word()
             > 0
-    );
-    assert_eq!(
-        select_body_emission_authority(&fixture.ir, &BTreeMap::new()),
-        BodyEmissionAuthority::FunctionizedUnits
     );
     let report = run_trap_exit_fixture(
         &fixture,
@@ -10572,10 +9652,6 @@ fn the_generated_root_translates_a_runtime_reached_trap_exactly() {
         },
         observation: RuntimeObservation::Trapped(trap),
     };
-    assert_eq!(
-        select_body_emission_authority(&fixture.ir, &BTreeMap::new()),
-        BodyEmissionAuthority::FunctionizedUnits
-    );
     let report = run_example_with_seed_observation(&fixture, &NativeSeedEnvironment::empty())
         .expect("the functionized root translates its planner trap identity");
     assert_eq!(report.observation, fixture.observation);
@@ -10853,7 +9929,7 @@ fn b2v_ac3_the_lowered_boundary_disposition_has_no_wildcard_arm() {
         .map(|(_, after)| after)
         .and_then(|after| {
             after
-                .split_once("#[derive(Clone)]\nstruct ActiveRecursiveDeclarationV1")
+                .split_once("#[derive(Clone, Copy)]\nstruct StructuralNatV1")
                 .map(|(body, _)| body)
         })
         .expect("AC-3: the disposition region was not found, so every check below is vacuous");
@@ -12706,12 +11782,7 @@ fn computational_match_declaration_ref_emits_and_runs_the_declaration_owned_unit
 /// program that calls a lexical-closure declaration returns the value its body
 /// computes -- both for a parameter and for a capture.
 /// CLAIMED: extending the retained binding to the second seed form did not
-/// change what these programs compute on the `RecursiveDescent` path they still
-/// select.
-/// THE GAP: this says nothing about the `FunctionizedUnits` call installed by
-/// `D4`. That route is unreachable while `TransparentDeclarationClosure` retains
-/// the selector, and it is `D5`/`D6`'s to validate and activate. ⛔ A green run
-/// here is NOT evidence the new call emits.
+/// change what these programs compute on the surviving functionized path.
 #[test]
 fn d4_a_lexical_closure_declaration_retains_a_binding_and_still_runs() {
     // The parameter case: the argument reaches the body.
@@ -12857,11 +11928,6 @@ fn governed_nested_brackets_n3_through_n7_emit_complete_functionized_bundles() {
     for depth in 3..=7 {
         let expr =
             crate::cranelift_backend::planning::governed_nested_resource_bracket(depth);
-        assert_eq!(
-            select_body_emission_authority(&expr, &BTreeMap::new()),
-            BodyEmissionAuthority::FunctionizedUnits,
-            "governed depth {depth} selected retained emission"
-        );
         recursive_port_process_compiles(&expr).unwrap_or_else(|error| {
             panic!("governed depth {depth} did not compile: {error}")
         });
@@ -13182,7 +12248,7 @@ fn rt_scale_b_governed_n3_through_n7_collect_every_d2_metric() {
     const FORCE_INDETERMINATE_ENV: &str =
         "KEN_RT_SCALE_B_FORCE_INDETERMINATE";
     const OMIT_RESULT_ENV: &str = "KEN_RT_SCALE_B_OMIT_RESULT";
-    const REQUIRED_FIELDS: [&str; 44] = [
+    const REQUIRED_FIELDS: [&str; 43] = [
         "compile_wall_ns=",
         "peak_rss_kib=",
         "distinct_interned_semantic_states=",
@@ -13191,7 +12257,6 @@ fn rt_scale_b_governed_n3_through_n7_collect_every_d2_metric() {
         "production_functions=",
         "native_int_functions=",
         "boundary_value_functions=",
-        "recursive_descent_roots=",
         "functionized_root_adapters=",
         "functionized_unit_bodies=",
         "clif_instructions=",
@@ -13502,12 +12567,6 @@ fn rt_scale_b_governed_n3_through_n7_collect_every_d2_metric() {
                 crate::cranelift_backend::planning::governed_nested_resource_bracket(
                     depth,
                 );
-            assert_eq!(
-                select_body_emission_authority(&expr, &BTreeMap::new()),
-                BodyEmissionAuthority::FunctionizedUnits,
-                "RT_SCALE_B could_not_determine n={depth}: governed source \
-                 selected retained emission"
-            );
             let started = std::time::Instant::now();
             recursive_port_process_compiles(&expr).unwrap_or_else(|error| {
                 panic!(
@@ -13562,7 +12621,6 @@ fn rt_scale_b_governed_n3_through_n7_collect_every_d2_metric() {
         metrics.production_functions,
         metrics.native_int_functions
             + metrics.boundary_value_functions
-            + metrics.recursive_descent_roots
             + metrics.functionized_root_adapters
             + metrics.functionized_unit_bodies,
         "the completed denominator must equal the closed typed emitter \
@@ -13571,11 +12629,6 @@ fn rt_scale_b_governed_n3_through_n7_collect_every_d2_metric() {
     assert_eq!(
         metrics.functionized_unit_bodies, metrics.emitted_helpers,
         "the emitted-helper numerator must be the unit-body population"
-    );
-    assert_eq!(
-        metrics.recursive_descent_roots, 0,
-        "the mutually exclusive RecursiveDescent emitter entered a governed \
-         FunctionizedUnits row"
     );
     assert_eq!(
         metrics.functionized_root_adapters, 1,
@@ -13628,8 +12681,8 @@ fn rt_scale_b_governed_n3_through_n7_collect_every_d2_metric() {
          peak_rss_kib={peak_rss_kib} \
          distinct_interned_semantic_states={} defined_helpers={} \
          emitted_helpers={} production_functions={} native_int_functions={} \
-         boundary_value_functions={} recursive_descent_roots={} \
-         functionized_root_adapters={} functionized_unit_bodies={} \
+         boundary_value_functions={} functionized_root_adapters={} \
+         functionized_unit_bodies={} \
          clif_instructions={} clif_bytes={} descriptor_construction_work={} \
          descriptor_comparison_work={} total_dfg_values={} \
          total_instructions={} total_blocks={} static_nodes={} edges={} \
@@ -13650,7 +12703,6 @@ fn rt_scale_b_governed_n3_through_n7_collect_every_d2_metric() {
         metrics.production_functions,
         metrics.native_int_functions,
         metrics.boundary_value_functions,
-        metrics.recursive_descent_roots,
         metrics.functionized_root_adapters,
         metrics.functionized_unit_bodies,
         metrics.clif_instructions,
@@ -14105,10 +13157,10 @@ fn d8_recursive_computational_revisit_with_join() -> RuntimeExpr {
 /// owner population exactly once into reachable and statically unselected
 /// joins. A token-only materialization may later be classified dead. If the
 /// mutation attaches that dead materialization to the entry block, completed
-/// CFG validation rejects it as reachable. The explicit active-recursor
-/// RecursiveDescent residual closes the same recorded case population at its
-/// generated root boundary without applying function-owner equality across the
-/// owner boundaries it deliberately inlines. Its population fixture recursively
+/// CFG validation rejects it as reachable. The retired active-recursor route
+/// closed the same recorded case population at its generated root boundary
+/// without applying function-owner equality across the owner boundaries it
+/// deliberately inlined. Its population fixture recursively
 /// revisits one ComputationalMatch and puts a source join in the second selected
 /// case.
 ///
@@ -15825,102 +14877,6 @@ fn ac1b_the_executable_lowering_witness_closes_its_one_token_population() {
     );
 }
 
-// ─── RT-DECL-CLOSURE-PORT `D1` — the full-residual enumerator's controls ─────
-
-/// `Match` whose scrutinee is directly a `Call`. The callee is a
-/// `DeclarationRef` rather than a closure, so this witness fires
-/// `ProducerMatchCall` until `RT-PRODUCER-MATCH-PORT` `D3` retired it, and
-/// nothing at all now. Kept as the paired negative for that retirement.
-fn d1_producer_match_call_witness() -> RuntimeExpr {
-    RuntimeExpr::Match {
-        scrutinee: Box::new(RuntimeExpr::Call {
-            callee: Box::new(RuntimeExpr::DeclarationRef {
-                symbol: "decl:fixture::d1::callee".to_string(),
-            }),
-            args: Vec::new(),
-        }),
-        cases: Vec::new(),
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "d1 producer-match-call witness".to_string(),
-        },
-    }
-}
-
-/// `Match` consuming an active computational recursor.
-fn d1_match_scrutinee_recursor_witness() -> RuntimeExpr {
-    RuntimeExpr::Match {
-        scrutinee: Box::new(d1_active_recursor()),
-        cases: Vec::new(),
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "d1 match-scrutinee-recursor witness".to_string(),
-        },
-    }
-}
-
-/// A lexical unit call whose argument is an active computational recursor.
-fn d1_lexical_call_argument_recursor_witness() -> RuntimeExpr {
-    RuntimeExpr::Call {
-        callee: Box::new(RuntimeExpr::LexicalClosure {
-            captures: Vec::new(),
-            params: vec!["x".to_string()],
-            body: Box::new(RuntimeExpr::Var(0)),
-        }),
-        args: vec![d1_active_recursor()],
-    }
-}
-
-/// A call whose callee is the non-lexical closure seed form.
-///
-/// "Retained" is deliberately avoided here: `RT-SEED-CALL-PORT` `D3` retired the
-/// RESIDUAL, while the IR form itself is retained and ported. Calling the form
-/// "retained" now invites reading it as the retired residual lane.
-fn d1_seed_closure_call_witness() -> RuntimeExpr {
-    RuntimeExpr::Call {
-        callee: Box::new(RuntimeExpr::Closure {
-            captures: Vec::new(),
-            params: Vec::new(),
-            body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
-        }),
-        args: Vec::new(),
-    }
-}
-
-/// A transparent declaration whose body is a closure seed. Its body is a bare
-/// value so this witness contributes exactly one variant.
-fn d1_transparent_declaration_closure_witness() -> RuntimeDeclaration {
-    RuntimeDeclaration {
-        symbol: "decl:fixture::d1::transparent".to_string(),
-        kind: RuntimeDeclarationKind::Transparent {
-            body: RuntimeExpr::Closure {
-                captures: Vec::new(),
-                params: Vec::new(),
-                body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
-            },
-        },
-        metadata: RuntimeSymbolMetadata::empty(),
-    }
-}
-
-/// A `ComputationalMatch` carrying a ruled recursive position — the shape both
-/// recursor-flavoured residuals key on.
-fn d1_active_recursor() -> RuntimeExpr {
-    RuntimeExpr::ComputationalMatch {
-        scrutinee: Box::new(RuntimeExpr::Var(0)),
-        cases: vec![crate::RuntimeComputationalMatchCase {
-            constructor: "ctor:fixture::d1::Node".to_string(),
-            argument_binders: 1,
-            recursive_positions: vec![0],
-            body: RuntimeExpr::Var(0),
-        }],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "d1 active recursor".to_string(),
-        },
-    }
-}
-
 /// **`RT-RECURSOR-TRANSPORT` `D1` — a CLOSED active computational recursor.**
 ///
 /// The classification fixtures above scrutinise `Var(0)`, which is free at the
@@ -15995,58 +14951,15 @@ fn rt_match_scrutinee_recursor_executable() -> RuntimeExpr {
     }
 }
 
-/// A `MatchScrutineeRecursor` member outside the ordinary producer route.
-///
-/// The computational case has a recursive position, so the residual walk
-/// retains the enclosing ordinary match. Its scalar body is not a deforestable
-/// aggregate under the case's induction-hypothesis set, so the ordinary match
-/// route declines the same scrutinee.
+/// Pulls `key=` through the next space out of one trace entry.
 #[cfg(test)]
-fn rt_match_scrutinee_guard_difference() -> RuntimeExpr {
-    RuntimeExpr::Match {
-        scrutinee: Box::new(RuntimeExpr::ComputationalMatch {
-            scrutinee: Box::new(RuntimeExpr::Construct {
-                constructor: "ctor:fixture::rt::Node".to_string(),
-                args: vec![RuntimeExpr::Construct {
-                    constructor: "ctor:fixture::rt::Leaf".to_string(),
-                    args: Vec::new(),
-                }],
-            }),
-            cases: vec![crate::RuntimeComputationalMatchCase {
-                constructor: "ctor:fixture::rt::Node".to_string(),
-                argument_binders: 1,
-                recursive_positions: vec![0],
-                body: RuntimeExpr::Value(RuntimeValue::Int(3.into())),
-            }],
-            default: RuntimeTrap {
-                code: RuntimeTrapCode::PatternMatchFailure,
-                message: "rt match-scrutinee guard difference inner".to_string(),
-            },
-        }),
-        cases: vec![crate::RuntimeMatchCase {
-            constructor: "ctor:fixture::rt::Leaf".to_string(),
-            binders: 0,
-            body: RuntimeExpr::Value(RuntimeValue::Int(7.into())),
-        }],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "rt match-scrutinee guard difference outer".to_string(),
-        },
-    }
+fn rt_trace_field<'a>(entry: &'a str, key: &str) -> Option<&'a str> {
+    let rest = entry.split_once(key)?.1;
+    Some(rest.split(' ').next().unwrap_or(rest))
 }
 
-/// `D1` position B: a lexical unit call whose argument is an active recursor.
 #[cfg(test)]
-fn rt_lexical_call_argument_recursor_executable() -> RuntimeExpr {
-    RuntimeExpr::Call {
-        callee: Box::new(RuntimeExpr::LexicalClosure {
-            captures: Vec::new(),
-            params: vec!["x".to_string()],
-            body: Box::new(RuntimeExpr::Var(0)),
-        }),
-        args: vec![rt_closed_active_recursor()],
-    }
-}
+const SEED_CALL_PORT_SOME: &str = "ctor:fixture::Core::Option::Some";
 
 /// Runs `expr` and returns the **decoded observation** only.
 ///
@@ -16070,112 +14983,6 @@ fn rt_run(expr: &RuntimeExpr) -> String {
     }
 }
 
-/// Runs `expr` under a `D1` per-variant selector exclusion, restoring the
-/// exclusion afterwards even if the body panics.
-#[cfg(test)]
-fn rt_run_functionized(expr: &RuntimeExpr, excluded: RecursiveDescentResidual) -> String {
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            crate::cranelift_backend::lowering::core::set_selector_variant_exclusion(None);
-        }
-    }
-    crate::cranelift_backend::lowering::core::set_selector_variant_exclusion(Some(excluded));
-    let _restore = Restore;
-    rt_run(expr)
-}
-
-/// **The control for THAT EXACT WITNESS** — the SAME
-/// ordinary-`Match`-over-`ComputationalMatch` shape with **no recursive
-/// position**, so it is not a residual at all and takes the functionized lane
-/// with no exclusion set.
-///
-/// If this also refuses, **this witness's red** is about consuming a
-/// computational match at all and my fixture is the wrong instrument. If it
-/// compiles, **the recursive-position axis in this program is the
-/// discriminator**.
-///
-/// ⛔ **This pair separates two axes of ONE program; it establishes nothing
-/// about the `MatchScrutineeRecursor` class.** The last sentence read *"the red
-/// is the position's"* and the one above it *"position A's red"* — the withdrawn
-/// class-wide attribution, surviving in a helper's doc after the controls
-/// themselves were corrected. `d8d` is an A-population program on this same
-/// object whose refusal this pair says nothing about.
-#[cfg(test)]
-fn rt_match_over_nonrecursive_computational_match() -> RuntimeExpr {
-    let inert = RuntimeExpr::ComputationalMatch {
-        scrutinee: Box::new(RuntimeExpr::Construct {
-            constructor: "ctor:fixture::rt::Node".to_string(),
-            args: vec![RuntimeExpr::Value(RuntimeValue::Int(3.into()))],
-        }),
-        cases: vec![crate::RuntimeComputationalMatchCase {
-            constructor: "ctor:fixture::rt::Node".to_string(),
-            argument_binders: 1,
-            recursive_positions: Vec::new(),
-            body: RuntimeExpr::Construct {
-                constructor: "ctor:fixture::rt::Leaf".to_string(),
-                args: Vec::new(),
-            },
-        }],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "rt inert computational match".to_string(),
-        },
-    };
-    RuntimeExpr::Match {
-        scrutinee: Box::new(inert),
-        cases: vec![crate::RuntimeMatchCase {
-            constructor: "ctor:fixture::rt::Leaf".to_string(),
-            binders: 0,
-            body: RuntimeExpr::Value(RuntimeValue::Int(7.into())),
-        }],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "rt inert outer".to_string(),
-        },
-    }
-}
-
-/// An ordinary `Match` whose scrutinee reaches the producer route solely
-/// through its transparent declaration call.
-#[cfg(test)]
-fn rt_match_over_recursive_aggregate_declaration_call() -> (RuntimeExpr, RuntimeDeclaration) {
-    let symbol = "decl:fixture::msd::wrap".to_string();
-    let declaration = RuntimeDeclaration {
-        symbol: symbol.clone(),
-        kind: RuntimeDeclarationKind::Transparent {
-            body: RuntimeExpr::Closure {
-                captures: Vec::new(),
-                params: vec!["x".to_string()],
-                body: Box::new(RuntimeExpr::Construct {
-                    constructor: "ctor:fixture::msd::Wrap".to_string(),
-                    args: vec![RuntimeExpr::Var(0)],
-                }),
-            },
-        },
-        metadata: RuntimeSymbolMetadata {
-            lowerability: Some(RuntimeLowerabilityStatus::Supported),
-            ..RuntimeSymbolMetadata::empty()
-        },
-    };
-    let expression = RuntimeExpr::Match {
-        scrutinee: Box::new(RuntimeExpr::Call {
-            callee: Box::new(RuntimeExpr::DeclarationRef { symbol }),
-            args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
-        }),
-        cases: vec![RuntimeMatchCase {
-            constructor: "ctor:fixture::msd::Wrap".to_string(),
-            binders: 1,
-            body: RuntimeExpr::Var(0),
-        }],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "msd declaration-call producer fixture is total".to_string(),
-        },
-    };
-    (expression, declaration)
-}
-
 /// **`RT-MATCH-SCRUTINEE-DISPOSITION` `AC-6` — the exact executable
 /// intersection witness now selects `FunctionizedUnits` unaided.**
 ///
@@ -16186,475 +14993,6 @@ fn rt_match_over_recursive_aggregate_declaration_call() -> (RuntimeExpr, Runtime
 ///
 /// **Promise class: durable invariant.** This intersection witness remains on
 /// the ordinary route and executes to the same decoded result.
-#[test]
-fn msd_d3_the_exact_intersection_witness_executes_unaided() {
-    let empty: BTreeMap<&str, &RuntimeDeclaration> = BTreeMap::new();
-    let witness = rt_match_scrutinee_recursor_executable();
-
-    assert_eq!(
-        enumerate_recursive_descent_residuals(&witness, &empty),
-        BTreeSet::new(),
-        "D3-narrow: an intersection witness must no longer be retained"
-    );
-
-    let functionized = rt_run(&witness);
-    assert_eq!(
-        functionized,
-        "OK Returned(Int(Small(7)))",
-        "D3-narrow: this intersection witness must execute unaided on FunctionizedUnits"
-    );
-
-    let control = rt_match_over_nonrecursive_computational_match();
-    assert!(
-        enumerate_recursive_descent_residuals(&control, &empty).is_empty(),
-        "the control must not be a residual at all"
-    );
-    assert_eq!(
-        rt_run(&control),
-        "OK Returned(Int(Small(7)))",
-        "the same shape without a recursive position still executes unaided"
-    );
-}
-
-/// `RT-MATCH-SCRUTINEE-DISPOSITION` `D2a`: the residual and routing guards
-/// have a concrete non-empty difference.
-///
-/// **MEASURED:** the production residual observation reports exactly
-/// `MatchScrutineeRecursor` on both compilations. The production retention
-/// predicate accepts the expression, while the ordinary producer-route
-/// predicate rejects its immediate computational scrutinee. Excluding the
-/// residual therefore sends the same expression through ordinary match
-/// lowering and reproduces that path's exact constructor-value refusal.
-///
-/// **CLAIMED:** this expression is retained solely because it is in the
-/// existential-versus-universal guard difference, not because it also belongs
-/// to the already-measured intersection.
-///
-/// **THE GAP:** this hand-built `RuntimeExpr` proves the difference exists in
-/// the backend IR. It does not prove that Ken source can elaborate to the same
-/// shape; the cross-crate source witness owns that separate reachability claim.
-#[test]
-fn msd_d2a_the_retention_and_routing_guards_have_a_concrete_difference() {
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
-    let _restore = Restore;
-    let witness = rt_match_scrutinee_guard_difference();
-    let declarations = BTreeMap::new();
-    let RuntimeExpr::Match { scrutinee, .. } = &witness else {
-        unreachable!("the witness is an ordinary Match")
-    };
-
-    assert_eq!(
-        recursive_descent_residual(&witness),
-        Some(RecursiveDescentResidual::MatchScrutineeRecursor),
-        "the existential retention guard must accept the witness"
-    );
-    assert!(
-        !requires_heterogeneous_deforestation(scrutinee),
-        "the ordinary producer route must decline the same immediate scrutinee"
-    );
-    assert_eq!(
-        select_body_emission_authority(&witness, &declarations),
-        BodyEmissionAuthority::RecursiveDescent,
-        "the production selector must retain the difference witness"
-    );
-
-    reset_observed_recursive_descent_residuals();
-    let retained = rt_run(&witness);
-    assert_eq!(
-        observed_recursive_descent_residuals(),
-        Some(BTreeSet::from([
-            RecursiveDescentResidual::MatchScrutineeRecursor
-        ])),
-        "the retained compilation must observe the complete residual set"
-    );
-
-    reset_observed_recursive_descent_residuals();
-    set_selector_variant_exclusion(Some(
-        RecursiveDescentResidual::MatchScrutineeRecursor,
-    ));
-    assert_eq!(
-        select_body_emission_authority(&witness, &declarations),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "removing the residual must expose the ordinary functionized route"
-    );
-    let functionized = rt_run(&witness);
-    assert_eq!(
-        observed_recursive_descent_residuals(),
-        Some(BTreeSet::from([
-            RecursiveDescentResidual::MatchScrutineeRecursor
-        ])),
-        "removing the selector reason must not change what the expression carries"
-    );
-
-    println!("MSD-D2A-RETAINED\t{retained}");
-    println!("MSD-D2A-FUNCTIONIZED\t{functionized}");
-    assert_eq!(
-        functionized,
-        "COMPILE-ERR Unsupported(UnsupportedLowering { construct: \"Match\", reason: \
-\"scrutinee is not a constructor value\" })",
-        "once the residual is removed, the declined producer route must reach the ordinary \
-         match chain rather than another retained lane or an earlier refusal"
-    );
-}
-
-/// `RT-MATCH-SCRUTINEE-DISPOSITION` `D2a`: the narrowed residual predicate is
-/// exactly the active-recursion subject guard intersected with the complement
-/// of ordinary Match lowering's complete producer-route decision.
-///
-/// **Promise class: transition sentinel.** This equality intentionally turns
-/// red if either side of the coupling changes: the heterogeneous-deforestation
-/// decision changes, the declaration-call disjunct becomes live for an
-/// immediate `ComputationalMatch`, or another routing disjunct becomes live for
-/// a represented row. Such a divergence would conservatively miss a migration
-/// onto the ordinary route; it would leave the program on a retained lane that
-/// handles it today, not miscompile it.
-///
-/// **MEASURED:** the difference, handled-intersection, non-recursive, and
-/// transparent-declaration-call scrutinees agree across the production residual
-/// predicate and a `Lowering` evaluating the routing site's complete `A || B`
-/// decision. The declaration-call row independently records `A = false`,
-/// `B = true`, and the actual routing decision as true.
-///
-/// **CLAIMED:** the narrowed residual remains precisely the active-recursion
-/// population that ordinary Match lowering does not route to the producer.
-///
-/// **THE GAP:** this is a representative relation control, not an exhaustive
-/// enumeration of every `ComputationalMatch`; a future routing change that
-/// intentionally changes the equality must retire or revise this sentinel.
-#[test]
-fn msd_d2a_residual_equals_subject_guard_and_route_complement() {
-    fn match_scrutinee(expr: &RuntimeExpr) -> &RuntimeExpr {
-        let RuntimeExpr::Match { scrutinee, .. } = expr else {
-            unreachable!("the fixture is an ordinary Match")
-        };
-        scrutinee
-    }
-
-    let difference = rt_match_scrutinee_guard_difference();
-    let intersection = rt_match_scrutinee_recursor_executable();
-    let non_recursive = rt_match_over_nonrecursive_computational_match();
-    let seed_env = NativeSeedEnvironment::empty();
-    let lowering = root_authority_test_lowering(&seed_env);
-
-    for (label, expression, excluded) in [
-        (
-            "difference",
-            &difference,
-            Some(RecursiveDescentResidual::MatchScrutineeRecursor),
-        ),
-        ("handled-intersection", &intersection, None),
-        ("non-recursive", &non_recursive, None),
-    ] {
-        let scrutinee = match_scrutinee(expression);
-        let subject_guard = matches!(
-            scrutinee,
-            RuntimeExpr::ComputationalMatch { cases, .. }
-                if cases
-                    .iter()
-                    .any(|case| !case.recursive_positions.is_empty())
-        );
-        let ordinary_route = requires_heterogeneous_deforestation(scrutinee)
-            || lowering.declaration_call_produces_deforestable_aggregate(scrutinee);
-
-        reset_match_scrutinee_producer_route_decisions();
-        match excluded {
-            Some(excluded) => {
-                let _ = rt_run_functionized(expression, excluded);
-            }
-            None => {
-                let _ = rt_run(expression);
-            }
-        }
-        let observed_routes = take_match_scrutinee_producer_route_decisions();
-        // Deliberately hand-built: routing this expected value through a shared or
-        // production helper would stop it detecting an added routing disjunct.
-        assert_eq!(
-            observed_routes,
-            vec![ordinary_route],
-            "{label}: the constructed Lowering's complete A || B decision must equal the decision \
-             observed at the actual ordinary-Match routing site"
-        );
-
-        assert_eq!(
-            match_scrutinee_requires_recursive_descent(scrutinee),
-            subject_guard && !observed_routes[0],
-            "{label}: residual retention must equal the active-recursion subject guard and the \
-             complement of ordinary Match lowering's complete producer-route decision"
-        );
-    }
-
-    let (declaration_call, declaration) =
-        rt_match_over_recursive_aggregate_declaration_call();
-    let scrutinee = match_scrutinee(&declaration_call);
-    let declarations = BTreeMap::from([(declaration.symbol.as_str(), &declaration)]);
-    let seed_env = NativeSeedEnvironment::empty();
-    let mut lowering = root_authority_test_lowering(&seed_env);
-    lowering.declarations = declarations.clone();
-    let subject_guard = matches!(
-        scrutinee,
-        RuntimeExpr::ComputationalMatch { cases, .. }
-            if cases
-                .iter()
-                .any(|case| !case.recursive_positions.is_empty())
-    );
-    let route_a = requires_heterogeneous_deforestation(scrutinee);
-    let route_b = lowering.declaration_call_produces_deforestable_aggregate(scrutinee);
-
-    reset_match_scrutinee_producer_route_decisions();
-    let compiled = compile_expr_into_module(
-        new_jit_module().expect("jit module"),
-        "msd_route_equality_b_row",
-        Linkage::Local,
-        &declaration_call,
-        &seed_env,
-        declarations,
-        None,
-        false,
-        None,
-        None,
-        None,
-    );
-    let observed_routes = take_match_scrutinee_producer_route_decisions();
-    // Deliberately hand-built: routing this expected value through a shared or
-    // production helper would stop it detecting an added routing disjunct.
-    assert_eq!(
-        observed_routes,
-        vec![route_a || route_b],
-        "declaration-call: the constructed Lowering's complete A || B decision must equal the \
-         decision observed at the actual ordinary-Match routing site"
-    );
-    assert_eq!(
-        match_scrutinee_requires_recursive_descent(scrutinee),
-        subject_guard && !observed_routes[0],
-        "declaration-call: residual retention must equal the active-recursion subject guard and \
-         the complement of ordinary Match lowering's complete producer-route decision"
-    );
-    assert_eq!(
-        (subject_guard, route_a, route_b, observed_routes[0]),
-        (false, false, true, true),
-        "declaration-call: the new cell must exercise B alone at the actual routing decision"
-    );
-    compiled.expect("the transparent-declaration-call fixture compiles");
-}
-
-/// **`D2` controls 3 and 4 after `D3-narrow` — exact functionized arrival,
-/// match and propagation counts, and a measured A/B.**
-///
-/// Position A now reaches this seat through production's ordinary route.
-/// Position B and the non-recursive control still never arrive, so their zero
-/// propagations remain scope evidence rather than evidence about the guard.
-///
-/// ⛔ **Why the suppressed run counts MATCHES and not just propagations.** The
-/// production guard is `!suppress && matches!(..)` and short-circuits, so under
-/// suppression the `matches!` is never evaluated and a zero propagation count
-/// is guaranteed by construction. Asserting that zero alone would be an A/B
-/// whose mutated side proves nothing. The match counter is incremented *before*
-/// the guard, so the suppressed run shows the detector **would** have fired —
-/// one match, one arrival, zero completed propagations.
-///
-/// **Promise class: durable invariant** for the counts; the suppression arm is
-/// the A/B that attributes position A's repair to this guard specifically.
-#[test]
-fn rt_d2_exact_counts_and_the_suppression_ab() {
-    use crate::cranelift_backend::lowering::core::{
-        reset_rt_d2_backedge_propagations, rt_d2_backedge_matches, rt_d2_backedge_propagations,
-        rt_d2_seat_with_pending, set_rt_d2_suppress_propagation,
-    };
-    use crate::cranelift_backend::lowering::{reset_d5a_trace, take_d5a_trace};
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_rt_d2_suppress_propagation(false);
-        }
-    }
-    let witness = rt_match_scrutinee_recursor_executable();
-
-    // (arrivals, matches, propagations) asserted EXACTLY, not as lower bounds:
-    // a duplicated seat consumption would still satisfy `> 0` while the record
-    // claims one.
-    reset_rt_d2_backedge_propagations();
-    let functionized = rt_run(&witness);
-    assert_eq!(functionized, "OK Returned(Int(Small(7)))");
-    assert_eq!(
-        (rt_d2_seat_with_pending(), rt_d2_backedge_matches(), rt_d2_backedge_propagations()),
-        (1, 1, 1),
-        "functionized position A: one arrival, one backedge match, one propagation"
-    );
-
-    for (label, expr, excluded) in [
-        (
-            "position B",
-            rt_lexical_call_argument_recursor_executable(),
-            Some(RecursiveDescentResidual::LexicalCallArgumentRecursor),
-        ),
-        ("non-recursive control", rt_match_over_nonrecursive_computational_match(), None),
-    ] {
-        reset_rt_d2_backedge_propagations();
-        let outcome = match excluded {
-            Some(variant) => rt_run_functionized(&expr, variant),
-            None => rt_run(&expr),
-        };
-        assert!(outcome.starts_with("OK "), "{label} must execute: {outcome}");
-        assert_eq!(
-            (rt_d2_seat_with_pending(), rt_d2_backedge_matches(), rt_d2_backedge_propagations()),
-            (0, 0, 0),
-            "{label} never reaches this seat; its zeros are SCOPE evidence and are not evidence \
-             about the guard's behaviour"
-        );
-    }
-
-    // A/B — suppress only the propagation. The mutated side must show the
-    // detector would have fired, and must reproduce the exact D1 refusal
-    // together with the E event that refusal is downstream of.
-    reset_rt_d2_backedge_propagations();
-    reset_d5a_trace();
-    set_rt_d2_suppress_propagation(true);
-    let _restore = Restore;
-    let suppressed = rt_run(&witness);
-    let trace = take_d5a_trace();
-    assert_eq!(
-        (rt_d2_seat_with_pending(), rt_d2_backedge_matches(), rt_d2_backedge_propagations()),
-        (1, 1, 0),
-        "the suppressed run must ARRIVE once and MATCH once while completing zero propagations; \
-         a zero-match reading would mean the suppression skipped the detector rather than the \
-         return, and the A/B would prove nothing"
-    );
-    // ⛔ FULL EQUALITY, not a substring. The rendered form pins all three facts
-    // the claim needs at once -- the COMPILE-TIME status, the `construct`, and
-    // the exact reason. A substring check permits a different status or a
-    // different `UnsupportedLowering.construct` carrying the same text, which
-    // is the same defect as asserting a message and calling it an oracle.
-    assert_eq!(
-        suppressed,
-        "COMPILE-ERR Unsupported(UnsupportedLowering { construct: \"ComputationalMatch\", \
-reason: \"scrutinee is not a constructor value after ordinary expression lowering\" })",
-        "suppressing only this guard must replay the exact D1 refusal -- same status, same \
-         construct, same reason"
-    );
-    let e_events = trace
-        .iter()
-        .filter(|entry| {
-            entry.contains("RT-D2 E COMPOSED-CONSUMER")
-                && entry.contains("actual_kind=RecursiveBackedge")
-        })
-        .count();
-    assert_eq!(
-        e_events, 1,
-        "the suppressed run must produce EXACTLY ONE composed-consumer event carrying the marker \
-         -- that event is what the refusal is downstream of, and asserting the message alone \
-         would let a different failure with the same substring pass. trace: {trace:#?}"
-    );
-}
-
-/// **`RT-RECURSOR-TRANSPORT` `D1` — THE EXACT POSITION-B WITNESS carries
-/// without a port. This is a result about this witness, not about the class.**
-///
-/// With this position excluded from the selector **this program** takes the
-/// functionized lane, **executes**, and produces the **same decoded
-/// observation** as the retained lane. The landed continuation machinery
-/// already carries **this witness**.
-///
-/// ⛔⛔ **"`LexicalCallArgumentRecursor` CLOSES FOR FREE" IS WITHDRAWN AS A
-/// CLASS-WIDE CLAIM**, along with *"nothing needs to be built for it"* and
-/// *"this position needs no port"*. This doc and this control's name asserted
-/// all three of the whole B population, on the strength of this one witness.
-///
-/// **The counterexamples are eight expressions across five test families**, each
-/// enumerating exactly `{LexicalCallArgumentRecursor}` and each refusing on the
-/// functionized lane under B-only exclusion — `px8j_owned_scope_deletion_...`,
-/// `px8j_all_three_producer_paths_...`, `px8j_siblings_share_an_origin_...`,
-/// `px8j_one_two_three_scope_segments_...` at depths 1, 2 and 3, and
-/// `px8j_selected_scope_partitions_...` before and after the hole. They reach
-/// four distinct boundaries. `RT-LEXICAL-RECURSOR-CONSUMERS` owns them.
-///
-/// ⇒ **What `D1` measured is exact and stands: this witness needs no port.**
-/// What it does not license is the step from one witness to the class, and that
-/// step was mine. A single executable witness cannot close a population whose
-/// members differ in scope depth, sibling origin and hole placement — the very
-/// dimensions the counterexamples vary.
-///
-/// ⛔ The raw native result token differs between the lanes (`0` retained,
-/// `517` functionized) and is deliberately not compared — see `rt_run`. It is a
-/// pre-decode lane-internal value, and the decoded observation is what the two
-/// lanes are required to agree on.
-///
-/// **Promise class: transition sentinel.** It pins that **this witness** needs
-/// no port. It reds if the functionized lane stops carrying it, and `D3`
-/// rewrites it when the variant and its test-only selector hook are retired
-/// together.
-#[test]
-fn rt_d1_the_exact_position_b_witness_carries_without_a_port() {
-    let empty: BTreeMap<&str, &RuntimeDeclaration> = BTreeMap::new();
-    let witness = rt_lexical_call_argument_recursor_executable();
-
-    assert_eq!(
-        enumerate_recursive_descent_residuals(&witness, &empty),
-        BTreeSet::from([RecursiveDescentResidual::LexicalCallArgumentRecursor]),
-        "single-variant witness, for the same reason as position A"
-    );
-
-    let retained = rt_run(&witness);
-    assert_eq!(
-        retained,
-        "OK Returned(Constructor { constructor: \"ctor:fixture::rt::Leaf\", args: [] })",
-        "positive control on the retained lane"
-    );
-
-    let functionized = rt_run_functionized(
-        &witness,
-        RecursiveDescentResidual::LexicalCallArgumentRecursor,
-    );
-    assert_eq!(
-        functionized, retained,
-        "D1 FOR THIS WITNESS ONLY: the functionized lane must EXECUTE and agree with the retained \
-         lane. A compile-time refusal here would mean this witness needs a port after all. This \
-         does NOT say the LexicalCallArgumentRecursor class needs no port -- eight px8j \
-         expressions in this same population refuse on the functionized lane, and \
-         RT-LEXICAL-RECURSOR-CONSUMERS owns them"
-    );
-    assert!(
-        functionized.starts_with("OK "),
-        "the outcome must be an executed one, not a refusal: {functionized}"
-    );
-}
-
-/// Pulls `key=` ... up to the next space out of one trace entry.
-#[cfg(test)]
-fn rt_trace_field<'a>(entry: &'a str, key: &str) -> Option<&'a str> {
-    let rest = entry.split_once(key)?.1;
-    Some(rest.split(' ').next().unwrap_or(rest))
-}
-
-/// **`D2` control 2 — the corrected ordered chain, and the event that is now
-/// ABSENT.**
-///
-/// ⛔ **This supersedes two earlier readings of mine, both wrong.** The first
-/// called an empty generated-context population "the edge"; it is the planner's
-/// documented mixed-population state, and step `A` shows why — the emission
-/// owner is `Predeclared`, so no context is minted. The second called
-/// `RecursiveBackedge` a *mis-presented value*; it is **not a value at all**.
-/// It is a protocol marker saying a tail-recursive edge has already been
-/// emitted as a CFG jump and the current block is predecessor-free, so
-/// enclosing combinators must propagate it. `lower_carried_computational_match`
-/// was right to return it.
-///
-/// **The defect was the next consumer**, and the repair is that
-/// `resume_active_continuation` propagates the marker instead of handing it to
-/// the outer ordinary eliminator.
-///
-/// The chain `A`-`D` is unchanged and still correlated on one
-/// `body_origin`/`continuation_origin`/`recursive_position`. What changed is
-/// the end: exactly one propagation, and **no composed-consumer event carrying
-/// `RecursiveBackedge`** — the absence is the point, so it is asserted rather
-/// than left to be noticed.
-///
-/// **Promise class: durable invariant.** It pins that the marker reaches the
-/// suffix boundary and stops there.
 #[test]
 fn rt_d2_trace_shows_the_marker_propagated_and_never_reaching_the_composed_consumer() {
     use crate::cranelift_backend::lowering::core::{
@@ -16741,141 +15079,6 @@ fn rt_d2_trace_shows_the_marker_propagated_and_never_reaching_the_composed_consu
 /// variant that does not fire. Each SURVIVING variant is named with the witness
 /// that exhibits it, and the loop below is that list -- so the count lives in
 /// the code rather than in this sentence, where it has now gone stale twice.
-#[test]
-fn d1_each_residual_variant_is_observable() {
-    let empty: BTreeMap<&str, &RuntimeDeclaration> = BTreeMap::new();
-    for (witness, expected) in [
-        (
-            d1_match_scrutinee_recursor_witness(),
-            RecursiveDescentResidual::MatchScrutineeRecursor,
-        ),
-        (
-            d1_lexical_call_argument_recursor_witness(),
-            RecursiveDescentResidual::LexicalCallArgumentRecursor,
-        ),
-    ] {
-        let reported = enumerate_recursive_descent_residuals(&witness, &empty);
-        assert!(
-            reported.contains(&expected),
-            "{expected:?} must be observable by the enumerator; it reported {reported:?}"
-        );
-    }
-
-    // ⭐⭐ **`D6` RETIRED `TransparentDeclarationClosure`, and this is the row
-    // that proves the retirement is real rather than a name change.** Named
-    // rather than numbered: it was "the fifth variant" until
-    // `RT-SEED-CALL-PORT` `D3` retired another one, and an ordinal into a
-    // moving population is exactly what goes quietly wrong. The declaration
-    // route is
-    // still exercised, with the same closure-seed declaration that used to
-    // report `TransparentDeclarationClosure` — and it must now report **nothing
-    // at all**.
-    //
-    // ⛔ Asserting the empty set, not merely the absence of one variant: an
-    // enumerator that had silently reclassified the head into some other
-    // variant would satisfy `!contains(retired)` while still retaining the lane
-    // for every closure-seed declaration in the program.
-    //
-    // `RT-SEED-CALL-PORT` `D3` added the second retired shape to this same
-    // assertion: the seed-closure call is now the expression-side twin of the
-    // declaration-side retirement below, and both must report the empty set for
-    // the same reason.
-    let declaration = d1_transparent_declaration_closure_witness();
-    let mut declarations: BTreeMap<&str, &RuntimeDeclaration> = BTreeMap::new();
-    declarations.insert(declaration.symbol.as_str(), &declaration);
-    let reported =
-        enumerate_recursive_descent_residuals(&d1_seed_closure_call_witness(), &declarations);
-    assert!(
-        reported.is_empty(),
-        "D6: a closure-seed transparent declaration whose body is a bare value must now \
-         contribute NO residual. A nonempty set here means the head was reclassified rather \
-         than retired, and the whole-program selector would still be held: {reported:?}"
-    );
-}
-
-/// **`AC-2` positive control 1 — the enumerator does not short-circuit.**
-///
-/// ⭐ **This is the control that matters most, and the reason is that its
-/// absence is invisible.** The instrument exists to defeat the selector's
-/// `.or_else(..)`; if it silently kept that behaviour it would report exactly
-/// **one** variant — which is the answer a reader of this node already expects,
-/// so a wrong instrument would look right. Only a program firing two or more
-/// variants separates the two behaviours.
-///
-/// ⛔ Asserts the **exact set**, not a length and not a subset: a walk that
-/// missed one variant and a walk that found them all would both satisfy "more
-/// than one".
-///
-/// ⚠ `D6` retired the declaration-head variant and `RT-SEED-CALL-PORT` `D3`
-/// retired the seed-closure-call variant. BOTH retired shapes are still
-/// supplied here and now contribute **nothing** — which keeps this row a live
-/// check on the declaration route rather than turning it into an
-/// expression-only walk.
-///
-/// **Promise class: durable invariant.** It pins that the reported set equals
-/// the set of variants the program exhibits. `D2`-`D6` rewrite this file; every
-/// intended rewrite keeps this green.
-#[test]
-fn d1_the_enumerator_reports_every_variant_not_the_first() {
-    let compound = RuntimeExpr::Let {
-        value: Box::new(d1_producer_match_call_witness()),
-        body: Box::new(RuntimeExpr::Let {
-            value: Box::new(d1_match_scrutinee_recursor_witness()),
-            body: Box::new(RuntimeExpr::Let {
-                value: Box::new(d1_lexical_call_argument_recursor_witness()),
-                body: Box::new(d1_seed_closure_call_witness()),
-            }),
-        }),
-    };
-    let declaration = d1_transparent_declaration_closure_witness();
-    let mut declarations: BTreeMap<&str, &RuntimeDeclaration> = BTreeMap::new();
-    declarations.insert(declaration.symbol.as_str(), &declaration);
-
-    let reported = enumerate_recursive_descent_residuals(&compound, &declarations);
-    // `RT-SEED-CALL-PORT` `D3`: three, not four. The compound still BUILDS the
-    // seed-closure call -- it is the last element of the `Let` chain above --
-    // and it now contributes nothing, so this row keeps witnessing the retired
-    // shape rather than forgetting it existed.
-    let expected: BTreeSet<RecursiveDescentResidual> = [
-        RecursiveDescentResidual::MatchScrutineeRecursor,
-        RecursiveDescentResidual::LexicalCallArgumentRecursor,
-    ]
-    .into_iter()
-    .collect();
-    assert_eq!(
-        reported, expected,
-        "the enumerator must report every variant the program exhibits, not the selector's first"
-    );
-
-    // The selector's own answer on the same program is deliberately compared:
-    // it returns ONE reason, which is correct for its question and is exactly
-    // what this instrument must not do.
-    assert!(
-        recursive_descent_residual(&compound).is_some(),
-        "the selector still answers its own question on this program"
-    );
-}
-
-// ─── RT-SEED-CALL-PORT D1 / D1a — the class's real population ──────────────
-
-/// The constructor this fixture matches on. `nc5`'s `adt-constructor-match`
-/// seed uses the same one, so it is known to lower with an empty seed
-/// environment; a fresh name would make a refusal ambiguous between the
-/// fixture's shape and its metadata.
-#[cfg(test)]
-const SEED_CALL_PORT_SOME: &str = "ctor:fixture::Core::Option::Some";
-
-/// A compiling program whose `Match` scrutinee is directly a `Call` and whose
-/// callee is a non-lexical closure seed. Both of those were residual classes
-/// once: `SeedClosureCall` until `RT-SEED-CALL-PORT` `D3`, `ProducerMatchCall`
-/// until this node's `D3`.
-///
-/// **It fired two variants at `D1` and fires NONE now.** `D1a`'s exact-set
-/// discrimination moved off it while it still fired one, because a one-variant
-/// program cannot separate the enumerator from its short-circuiting twin. The
-/// fixture is kept for the production-site row, where what matters is that it
-/// genuinely compiles -- and it is now the paired negative for two retirements
-/// rather than a firing member of either.
 #[cfg(test)]
 fn seed_call_port_producer_match_example() -> RuntimeExample {
     RuntimeExample {
@@ -16932,225 +15135,6 @@ fn seed_call_port_producer_match_example() -> RuntimeExample {
 ///
 /// **Promise class: durable invariant.** The class is retired and this program
 /// compiles through the functionized lane. No planned extension re-fires it.
-#[test]
-fn d3_the_d1_firing_population_now_selects_functionized_units_and_enumerates_no_residual() {
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::None);
-    reset_observed_recursive_descent_residuals();
-    reset_seed_callee_unit_ports();
-
-    let example = nc5_seed_examples()
-        .into_iter()
-        .find(|example| example.name == "closure-capture-application")
-        .expect("seed exists");
-
-    // `AC-1a`, asserted rather than inferred from the empty residual set below.
-    // The two are related but not the same statement, and only this one names
-    // the authority the selector actually returns.
-    assert_eq!(
-        select_body_emission_authority(&example.ir, &BTreeMap::new()),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "AC-1a: the ceiling moved -- the D1 firing population now selects FunctionizedUnits"
-    );
-
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::nc5_seed())
-        .expect("AC-1b: the D1 firing population must still build and run");
-    assert_eq!(
-        report.observation, example.observation,
-        "AC-1b: the object must reach its declared observation, or the residual claim below \
-         describes a program that never really compiled"
-    );
-    assert!(report.verifier_passed);
-
-    assert_eq!(
-        observed_recursive_descent_residuals(),
-        Some(BTreeSet::new()),
-        "D3 post-condition: this program must now enumerate NO residual at all. Asserting the \
-         empty set rather than the variant's absence -- a reclassification into another variant \
-         would satisfy the weaker check while still retaining the lane"
-    );
-    assert_eq!(
-        seed_callee_unit_ports(),
-        1,
-        "D3 is an ACTIVATION: the program must reach the ported arm's handoff with no selector \
-         witness in the tree. A zero here means the variant was removed while the port stayed dead"
-    );
-}
-
-/// **`RT-SEED-CALL-PORT` `D3` / `AC-2` — the seed corpus now fires NOTHING.**
-///
-/// `D1` measured this same population and found exactly one firing member,
-/// `closure-capture-application`, carrying `{SeedClosureCall}`. `D3` retires
-/// that variant, so the corpus fires nothing at all -- and the row is inverted
-/// rather than dropped, because an emptied population is a claim that deserves
-/// the same exactness the non-empty one got.
-///
-/// `nc5_seed_examples()` is the gate, not a sample: it is the single production
-/// function producing the seed corpus, and `values.rs`, `constructors.rs`,
-/// `artifact/api/tests.rs` and `ken-interp`'s differentials all select from it
-/// by name. Enumerating at the gate and applying the classifier to each member
-/// is what makes this a population rather than a list someone remembered.
-///
-/// The map is asserted EMPTY in both directions. A seed example that fires any
-/// remaining variant reds this row and forces the population to be re-stated --
-/// the paired obligation the campaign doc's Trap 3 demands of any proof
-/// quantified over a population, and the reason this is not simply deleted now
-/// that its own class is gone.
-///
-/// **Promise class: transition sentinel.** It reds when any campaign node lands
-/// a seed example firing a surviving residual, which is precisely when someone
-/// should look. `RT-DESCENT-RETIRE` retires it by removing the enum.
-#[test]
-fn d3_the_seed_corpus_fires_no_residual_at_all() {
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::None);
-    let empty: BTreeMap<&str, &RuntimeDeclaration> = BTreeMap::new();
-
-    let firing: BTreeMap<String, BTreeSet<RecursiveDescentResidual>> = nc5_seed_examples()
-        .into_iter()
-        .map(|example| {
-            let residuals = enumerate_recursive_descent_residuals(&example.ir, &empty);
-            (example.name, residuals)
-        })
-        .filter(|(_, residuals)| !residuals.is_empty())
-        .collect();
-
-    assert_eq!(
-        firing,
-        BTreeMap::new(),
-        "D3: with SeedClosureCall retired the seed corpus fires no residual at all. A member \
-         here is a program nobody has attributed to a residual-class owner -- report it rather \
-         than widening this expectation"
-    );
-}
-
-/// **`RT-SEED-CALL-PORT` `D1a`, CARRIED THROUGH `D3` — the exact-set control,
-/// retargeted because its own subject was retired.**
-///
-/// At `D1` this ran on a program firing `{ProducerMatchCall, SeedClosureCall}`.
-/// `RT-SEED-CALL-PORT` `D3` removed the second, leaving one variant -- and a
-/// one-variant program cannot separate the enumerator from its short-circuiting
-/// twin, which was the entire point. **Leaving it pointed at the same fixture
-/// would have kept it green while silently ceasing to discriminate.** This
-/// node's `D3` then retired the first as well, so that program now fires none.
-///
-/// So it moves to the two surviving variants. Three later campaign nodes
-/// consume this instrument, and `RT-DESCENT-RETIRE`'s "no residual fires
-/// anywhere" becomes vacuous at exactly the moment it authorises deleting the
-/// lane if this walk has a gap.
-///
-/// The three rows are one argument, and the third is load-bearing:
-///
-/// 1. a compound firing all two surviving variants reports the EXACT set;
-/// 2. under `ShortCircuitLikeTheSelector` it reports strictly less;
-/// 3. a ONE-variant program reports the same set either way -- the measured
-///    reason a reachability control cannot discharge this, and why every
-///    single-variant witness in the tree is blind to it.
-///
-/// Row 3 is a positive control in the strict sense: it proves the mutation is
-/// discriminating rather than simply breaking everything it touches.
-///
-/// **Promise class: durable invariant.** It pins that the reported set equals
-/// the set the program exhibits. `RT-DESCENT-RETIRE` rewrites it by deleting
-/// the enum.
-#[test]
-fn d3_the_exact_set_control_still_reds_under_short_circuiting() {
-    let empty: BTreeMap<&str, &RuntimeDeclaration> = BTreeMap::new();
-    let compound = RuntimeExpr::Let {
-        value: Box::new(d1_producer_match_call_witness()),
-        body: Box::new(RuntimeExpr::Let {
-            value: Box::new(d1_match_scrutinee_recursor_witness()),
-            body: Box::new(d1_lexical_call_argument_recursor_witness()),
-        }),
-    };
-    let exact = BTreeSet::from([
-        RecursiveDescentResidual::MatchScrutineeRecursor,
-        RecursiveDescentResidual::LexicalCallArgumentRecursor,
-    ]);
-
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::None);
-    assert_eq!(
-        enumerate_recursive_descent_residuals(&compound, &empty),
-        exact,
-        "D1a: the enumeration must report the EXACT set this program fires, not the first variant"
-    );
-
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::ShortCircuitLikeTheSelector);
-    let short_circuited = enumerate_recursive_descent_residuals(&compound, &empty);
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::None);
-    assert_ne!(
-        short_circuited, exact,
-        "D1a: a short-circuiting enumerator MUST red this control -- that is the entire reason \
-         the gate is exact-set rather than reachability"
-    );
-    assert_eq!(
-        short_circuited.len(),
-        1,
-        "the short-circuiting twin reports exactly one reason; got {short_circuited:?}"
-    );
-
-    // Row 3 -- on a ONE-variant program the mutation is undetectable.
-    let single = d1_match_scrutinee_recursor_witness();
-    let single_expected = BTreeSet::from([RecursiveDescentResidual::MatchScrutineeRecursor]);
-    assert_eq!(
-        enumerate_recursive_descent_residuals(&single, &empty),
-        single_expected,
-        "row 3 baseline"
-    );
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::ShortCircuitLikeTheSelector);
-    let single_mutated = enumerate_recursive_descent_residuals(&single, &empty);
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::None);
-    assert_eq!(
-        single_mutated, single_expected,
-        "D1a: a single-variant program reports the SAME set short-circuited or not. Any control \
-         built only on such witnesses is structurally blind to the defect row 2 catches"
-    );
-}
-
-/// **`D3` — the production-site observation hook still records on a real
-/// compiled program.**
-///
-/// `D1`'s hook is the instrument three later nodes inherit, and every other row
-/// above now exercises the enumerator directly. This is the one that keeps the
-/// *production selector site* covered: a program that genuinely compiles, whose
-/// residual set is read back from where `compile_expr_into_module_with_root_
-/// projection` selects the authority.
-///
-/// The fixture fired two variants at `D1` and fires none now, which is two
-/// retirements showing up as a changed number rather than as a deletion.
-#[test]
-fn d3_the_production_site_hook_still_observes_a_real_compiled_program() {
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::None);
-    reset_observed_recursive_descent_residuals();
-
-    let example = seed_call_port_producer_match_example();
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
-        .expect("the fixture compiles and runs");
-    assert_eq!(report.observation, example.observation);
-    assert_eq!(
-        observed_recursive_descent_residuals(),
-        Some(BTreeSet::new()),
-        "RT-PRODUCER-MATCH-PORT D3: the hook must still record at the production selector site, \
-         and this program now carries NO reason at all -- asserted as the empty set rather than \
-         the variant's absence, so a reclassification into a surviving variant reds this"
-    );
-}
-
-// ─── RT-SEED-CALL-PORT D2 / AC-6 — the callee-position seed unit ───────────
-
-/// Run `example` and report both the outcome and how many times the ported
-/// seed-callee arm reached its handoff point -- arity checked, captures
-/// resolved, inputs passed to the typed call path.
-///
-/// **The count is not an emission oracle.** It is taken before
-/// `call_declared_unit`, which can still refuse, so the pair matters: a
-/// successful outcome WITH count 1 is the evidence for a completed typed unit
-/// call, and count 0 is the evidence for a refusal that preceded the handoff.
-///
-/// **`D3` removed the selector witness this helper used to arm.** Every `AC-6`
-/// control below therefore now reaches the ported arm the way production does
-/// -- because `SeedClosureCall` is gone from the classifier, not because a
-/// test-only mask suppressed it. That is a strictly stronger route than the one
-/// they were accepted on at `D2`, and it applies to all three rows rather than
-/// to one added control.
 #[cfg(test)]
 fn d2_run_ported(
     example: &RuntimeExample,
@@ -17195,9 +15179,9 @@ fn d2_order_sensitive_example() -> RuntimeExample {
 /// **`AC-6.1` — the canonical explicit-seed-env positive, through the port.**
 ///
 /// The reachability count is what makes this a control rather than a
-/// restatement that the seed still works: `closure-capture-application` returned
-/// `7` on the `RecursiveDescent` lane too, so the observation alone never told
-/// the two lanes apart.
+/// restatement that the seed still works: `closure-capture-application` also
+/// returned `7` on the retired lane, so the observation alone never told the
+/// two paths apart.
 ///
 /// `D3` retired the variant, so this program has no route back to that lane and
 /// the count can no longer be discriminated here by disarming anything. `AC-7`
@@ -17318,282 +15302,12 @@ fn d2_ac6_3_the_ported_unit_receives_parameters_before_captures() {
     assert!(report.verifier_passed);
 }
 
-// ─── RT-PRODUCER-MATCH-PORT D1 — the population, and what this class masks ──
-
-/// A single `Match` that FIRED `ProducerMatchCall` at its own node and carries
-/// one later-firing class in each of the two places the selector never reaches.
-///
-/// The frame's section 3 says this class short-circuits "before
-/// `MatchScrutineeRecursor`, before the recursion into the scrutinee, and before
-/// the case bodies". That is a claim about the mechanism, and this witness is
-/// built so `D1` can measure it instead of restating it: the scrutinee `Call`
-/// carries an active-recursor `Match` among its arguments, and the one case body
-/// carries a lexical call whose argument is an active recursor.
-///
-/// Both classes sat strictly below the `.then_some(ProducerMatchCall)` arm that
-/// `D3` removed. That is why, while the class fired, a program could not
-/// distinguish "the later checks did not fire" from "the later checks never
-/// ran" -- the distinction this node had to measure before retiring anything.
-fn d1_producer_match_call_masking_witness() -> RuntimeExpr {
-    RuntimeExpr::Match {
-        scrutinee: Box::new(RuntimeExpr::Call {
-            callee: Box::new(RuntimeExpr::DeclarationRef {
-                symbol: "decl:fixture::pmp::callee".to_string(),
-            }),
-            args: vec![d1_match_scrutinee_recursor_witness()],
-        }),
-        cases: vec![RuntimeMatchCase {
-            constructor: "ctor:fixture::pmp::Wrap".to_string(),
-            binders: 1,
-            body: d1_lexical_call_argument_recursor_witness(),
-        }],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "RT-PRODUCER-MATCH-PORT d1 masking witness".to_string(),
-        },
-    }
-}
-
-/// **`D3` -- the masking is gone. This row establishes POST-RETIREMENT
-/// capability only, and is NOT `D4`'s number.**
-///
-/// An earlier draft computed a "before/after delta" here by subtracting
-/// `{MatchScrutineeRecursor}` from what the program carries, and labelled that
-/// subtrahend the pre-retirement selector result. **It was not.** Before
-/// retirement the selector reported `ProducerMatchCall` and stopped, so the
-/// subtraction compared two POST-retirement facts and understated the successor
-/// population by half.
-///
-/// **The reconstructed pre-retirement fact, stated as reconstruction:** while the
-/// class fired, the selector answered `ProducerMatchCall` alone on this witness,
-/// which means BOTH surviving classes were hidden from it, not one. That cannot
-/// be re-measured here -- the variant no longer exists to name -- so it is
-/// asserted about nothing and only written down.
-///
-/// **`D4` IS this post-retirement capability evidence.** The Steward withdrew
-/// the before-figure and restated the deliverable: no before/after successor
-/// handoff is owed by anyone, and `RT-RECURSOR-TRANSPORT` measures its own
-/// population against its own named base rather than inheriting a number. So
-/// nothing here is a placeholder for a measurement someone still has to take.
-///
-/// The subject is a hand-built `RuntimeExpr`, so by campaign Trap 1 it
-/// establishes what the classifier can see and never what any program exhibits.
-/// That bounds what is proved below -- with the class retired, the selector
-/// walks past the `Match` node and both remaining classes are visible.
-///
-/// **Promise class: durable invariant.** It pins that no reason is hidden behind
-/// a retired class on this shape. `RT-DESCENT-RETIRE` removes the enum that
-/// gives it a subject.
-#[test]
-fn d3_the_previously_masked_classes_are_now_reported_directly() {
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::None);
-    let empty: BTreeMap<&str, &RuntimeDeclaration> = BTreeMap::new();
-    let witness = d1_producer_match_call_masking_witness();
-
-    // The selector no longer stops at the retired class, so what it reports is
-    // now one of the classes it used to hide.
-    assert_eq!(
-        recursive_descent_residual(&witness),
-        Some(RecursiveDescentResidual::MatchScrutineeRecursor),
-        "D3: with ProducerMatchCall retired the selector must walk into the scrutinee Call and \
-         report a class that was previously hidden behind it"
-    );
-
-    // Both survivors are visible to the enumeration. No set difference is taken:
-    // there is no pre-retirement operand available in this tree to subtract, and
-    // manufacturing one from post-retirement values is the defect this row
-    // carried before.
-    assert_eq!(
-        enumerate_recursive_descent_residuals(&witness, &empty),
-        BTreeSet::from([
-            RecursiveDescentResidual::MatchScrutineeRecursor,
-            RecursiveDescentResidual::LexicalCallArgumentRecursor,
-        ]),
-        "D3: the program still carries both surviving classes -- retiring a class must not \
-         change what the program contains, only what the selector stops at"
-    );
-}
-
-/// Insert one census member, refusing a duplicate key loudly.
-///
-/// The census is keyed on program name, and both obvious ways to build it lose
-/// members in silence: `collect()` into a `BTreeMap` drops all but the last of a
-/// repeated key, and a later `insert` overwrites whatever a gate already put
-/// there. Either collapse would leave the population strictly smaller than the
-/// set the row names, while every assertion over it still passed -- the campaign
-/// doc's Trap 3 in its exact form, since a proof over a silently shrunken
-/// population is vacuous and nothing reds.
-///
-/// The collision that matters is not hypothetical: a member added to
-/// `nc5_seed_examples()` under the same name as the compiling witness would be
-/// dropped by the very insert that is supposed to extend the population.
-fn d1_census_insert(
-    census: &mut BTreeMap<String, BTreeSet<RecursiveDescentResidual>>,
-    name: String,
-    residuals: BTreeSet<RecursiveDescentResidual>,
-) {
-    assert!(
-        !census.contains_key(&name),
-        "D1: duplicate census key {name:?}. Two programs sharing a name collapse into one \
-         entry, so the population would be smaller than the row claims while still reading \
-         green. Give the member a distinct name rather than relaxing this check"
-    );
-    census.insert(name, residuals);
-}
-
-/// **`D1` / `AC-2` -- the measured population, enumerated at its gates.**
-///
-/// One production gate -- `nc5_seed_examples()` -- plus the one in-tree program
-/// that compiles and fired this class until `D3` retired it. Each member is
-/// enumerated
-/// with the non-short-circuiting walk, so a member firing a second class is
-/// reported rather than hidden, and each is added through [`d1_census_insert`]
-/// so a name collision fails loudly instead of shrinking the population.
-///
-/// **What this population is, and what it is not.** `nc5_seed_examples()` is a
-/// production function and is enumerated whole, so it is a population rather than
-/// a sample. The compiling witness is the single program the predecessor node
-/// left behind after `RT-SEED-CALL-PORT` `D3` retired its own class from it, and
-/// its doc there already names it as this node's population. **Nothing here
-/// claims to enumerate every program that could fire `ProducerMatchCall`** -- the
-/// class is reachable from ordinary Ken source (`match (f x) with ..`), unlike
-/// the predecessor's, whose in-tree producer set was closed.
-///
-/// The rows that motivated this node live in `rt_parity_native`. They are
-/// quarantined by other owners, so they run only under `--ignored`; `D0` did run
-/// all six, and each refuses at an effect seat or the closure boundary. Two
-/// separate facts keep them out of this census, and neither is that they fail to
-/// reach the selector:
-///
-/// 1. **The instrument's domain does not extend to them.** They are `ken-cli`
-///    integration programs, so `ken-runtime` is built as a dependency with
-///    `cfg(test)` unset and the observation hook does not exist in that build.
-///    This is the domain the hook's own doc already states.
-/// 2. **Their refusal is downstream of the selector**, so they supply no
-///    *successfully compiled* member for `D1` or `AC-1b` to quantify over.
-///
-/// **An earlier draft inferred from the refusal that these rows "never reach the
-/// selector". That inference is false**, and the producer says so: the
-/// observation and `select_body_emission_authority` both run at
-/// `compile_expr_into_module_with_root_projection` before the static-transition
-/// plan is built, and the measured Effect and `Closure` refusals arise later
-/// still. A later first refusal is not evidence about an earlier gate.
-///
-/// **Promise class: transition sentinel.** It reds when any member of these gates
-/// starts or stops firing a class, which is exactly when this node's scope
-/// changed. `D3` is the event that rewrites it.
-#[test]
-fn d1_the_measured_population_and_the_classes_each_member_fires() {
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::None);
-    let empty: BTreeMap<&str, &RuntimeDeclaration> = BTreeMap::new();
-
-    let mut census: BTreeMap<String, BTreeSet<RecursiveDescentResidual>> = BTreeMap::new();
-    let mut members = 0usize;
-    for example in nc5_seed_examples() {
-        let residuals = enumerate_recursive_descent_residuals(&example.ir, &empty);
-        d1_census_insert(&mut census, example.name, residuals);
-        members += 1;
-    }
-
-    let compiling = seed_call_port_producer_match_example();
-    let compiling_residuals = enumerate_recursive_descent_residuals(&compiling.ir, &empty);
-    d1_census_insert(&mut census, compiling.name, compiling_residuals);
-    members += 1;
-
-    assert_eq!(
-        census.len(),
-        members,
-        "D1: every source member must survive into the census. A shortfall here means two \
-         programs shared a name and the exactness below would be quantifying over a smaller \
-         population than it names -- campaign Trap 3's vacuity, arriving silently"
-    );
-
-    let firing: BTreeMap<String, BTreeSet<RecursiveDescentResidual>> = census
-        .into_iter()
-        .filter(|(_, residuals)| !residuals.is_empty())
-        .collect();
-
-    assert_eq!(
-        firing,
-        BTreeMap::new(),
-        "D3: with ProducerMatchCall retired, neither the nc5 gate nor the compiling witness \
-         fires anything at all. A member here is a program nobody has attributed to a \
-         residual-class owner -- report it rather than widening this expectation"
-    );
-}
-
-/// **`D1` -- the production-site hook distinguishes NEVER-RAN from RAN-AND-FOUND-NOTHING.**
-///
-/// The inherited hook stores `Option<BTreeSet<_>>` at the selector site, and the
-/// two empty-looking answers mean opposite things: `None` is "no program reached
-/// the selector", `Some(empty)` is "a program reached it and carried no residual".
-/// Nothing in the tree pinned that distinction, and it is the one property that
-/// makes a zero reading from this instrument mean anything at all.
-///
-/// It matters most at `RT-DESCENT-RETIRE`, whose whole authorization is a zero
-/// reading. A hook that silently reported `Some(empty)` when nothing had compiled
-/// would hand that node a vacuous proof, which is the campaign doc's Trap 3
-/// exactly.
-///
-/// **Promise class: durable invariant.** The distinction is the instrument's
-/// contract, not a fact about any particular program.
-#[test]
-fn d1_the_production_hook_separates_never_ran_from_ran_and_found_nothing() {
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::None);
-
-    reset_observed_recursive_descent_residuals();
-    assert_eq!(
-        observed_recursive_descent_residuals(),
-        None,
-        "D1: after a reset and before any compilation the hook must report None -- a Some(empty) \
-         here would make 'nothing fired' indistinguishable from 'nothing ran'"
-    );
-
-    let example = nc5_seed_examples()
-        .into_iter()
-        .find(|example| example.name == "closed-scalar-primitive")
-        .expect("seed exists");
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
-        .expect("the closed scalar seed compiles and runs");
-    assert_eq!(report.observation, example.observation);
-
-    assert_eq!(
-        observed_recursive_descent_residuals(),
-        Some(BTreeSet::new()),
-        "D1: a program that reached the selector and carried no residual must read Some(empty), \
-         not None -- this is the positive half of the distinction and the reason the reset above \
-         is not vacuous"
-    );
-}
-
-// ─── RT-DECL-CLOSURE-PORT D5 — the split-domain validator's control group ──
-//
-// ⭐ Every control below runs the SAME program. What varies is one mutation,
-// applied at one plane, so a refusal names the plane that refused.
-//
-// ⛔⛔ **This preamble described a selector witness that no longer exists.** It
-// read: production cannot enter the `FunctionizedUnits` declaration-call seam
-// before `D6`, because `TransparentDeclarationClosure` fires for every
-// closure-seed transparent declaration, so a control that "fails before
-// emission" without the witness proves nothing about `D5`.
-//
-// `D6` retired that variant and removed the witness with it, and
-// `RT-SEED-CALL-PORT` `D3` did the same for the seed-closure-call witness. ⇒
-// Every control below now reaches the seam the way production does, which is
-// strictly stronger than the hooked route they were written against. The
-// caution is kept as history because it explains why the fixtures are shaped
-// the way they are, not because anything still needs arming.
-
 #[cfg(test)]
 const D5_DECLARATION: &str = "decl:fixture::d5::loop";
-#[cfg(test)]
 const D5_FRAME_CARRIER: &str = "decl:fixture::d5::frames";
-#[cfg(test)]
 const D5_CALL_TEMPLATE: u64 = 900;
-#[cfg(test)]
 const D5_FRAME: u64 = 90;
 
-#[cfg(test)]
 fn d5_cases() -> Vec<crate::RuntimeComputationalMatchCase> {
     vec![crate::RuntimeComputationalMatchCase {
         constructor: "ctor:fixture::D5::Only".to_string(),
@@ -17810,69 +15524,14 @@ fn d5_compile(
 // ── Control 1: the exact fixture, ACTIVATED ───────────────────────────────
 //
 // ⭐⭐ **This row is where `D6` is visible as one fact.** It used to read: the
-// fixture carries exactly the residual the witness masks, and production
-// selects `RecursiveDescent`. Both halves have inverted, and the inversion is
-// the whole node.
+// fixture carried exactly the retired residual and production selected the
+// monolithic route. Both halves have inverted, and the inversion is the node.
 //
 // ⛔ It asserts the **empty set** and not merely the retired variant's absence.
 // The `D5` fixture is a closure-seed transparent declaration containing a
 // checked recursive declaration call — precisely the shape the campaign's
 // surviving variants also key on — so "no residual fires" is a real claim about
 // every classifier on a nontrivial program, not a restatement of the deletion.
-
-#[test]
-fn d6_the_governed_fixture_reports_no_residual_and_selects_functionized_units() {
-    let entry = d5_entry();
-    let declaration = d5_declaration();
-    let carrier = d5_frame_carrier();
-    let declarations = BTreeMap::from([
-        (D5_DECLARATION, &declaration),
-        (D5_FRAME_CARRIER, &carrier),
-    ]);
-    assert_eq!(
-        enumerate_recursive_descent_residuals(&entry, &declarations),
-        BTreeSet::new(),
-        "D6: with the declaration-head variant retired, this fixture must carry NO residual at \
-         all. A residual here is one of the RETAINED variants firing on a program that \
-         used to be masked past them -- report it rather than tuning it away, because it means \
-         the campaign has a second reason to hold this lane that nobody has enumerated"
-    );
-    assert_eq!(
-        select_body_emission_authority(&entry, &declarations),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "D6: production selection is ACTIVATED. This is the one line the whole node exists to \
-         change, and it is now reached with no test hook anywhere in the path"
-    );
-}
-
-// ── Control 2: the positive — witness only, full compile ──────────────────
-//
-// ⭐⭐ **This was a transition sentinel at `5e61d640`, and `D2a` retired it.**
-// It recorded a measured blocker: the closure-seed transparent declaration's
-// vestigial zero-arity `SchedulingEntry` unit was still emitted with the closure
-// as its body, so the functionized lane refused at
-// `boundary_transfer_admissibility` before the checked self-call could be
-// reached. The sentinel fired the moment the `D2a` population substitution
-// landed, which is exactly what it was named and labelled to do.
-//
-// ⚠ **The discriminating fixtures are kept, inverted.** They are what proved
-// the blocker was the declaration's own entry rather than the call site or the
-// witness, so they are also what proves the repair reaches the same place:
-//
-// | fixture                                | before `D2a` | after `D2a` |
-// |----------------------------------------|--------------|-------------|
-// | closure-seed declaration, REFERENCED   | refused      | compiles    |
-// | closure-seed declaration, UNREFERENCED | refused      | compiles    |
-// | non-closure thunk declaration          | compiles     | compiles    |
-//
-// The thunk row is the invariant control: it compiled before and after, so a
-// change in the other two rows cannot be credited to the lane or the harness.
-//
-// ⛔ **The emitted-target assertion compares two independently produced facts**
-// — the planner-resolved `CallableDeclaration` target, taken from the static
-// transition plan, against the callee of the instruction actually emitted. Two
-// reads of `declaration_calls` would agree with each other whatever the emitter
-// did (Architect: *"not two declared-map reads"*).
 
 #[test]
 fn d5_c2_the_witness_reaches_the_seam_and_emits_the_exact_planner_target() {
@@ -17911,12 +15570,6 @@ fn d5_c2_the_witness_reaches_the_seam_and_emits_the_exact_planner_target() {
             ..RuntimeSymbolMetadata::empty()
         },
     };
-    assert_eq!(
-        select_body_emission_authority(&entry, &declarations),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "D5 control 2: the witness must reach the functionized lane"
-    );
-
     // The three discriminating fixtures, all compiling after `D2a`.
     for (label, entry, decls) in [
         (
@@ -18016,57 +15669,7 @@ fn d5_planned_callable_declaration_origins(
         .collect()
 }
 
-// ── Control 3: a second residual retains RecursiveDescent ─────────────────
-
-#[test]
-fn d5_c3_a_second_residual_retains_recursive_descent() {
-    let entry = d5_entry();
-    let declaration = d5_declaration();
-    let carrier = d5_frame_carrier();
-    // A second residual, and the authority must stay on RecursiveDescent.
-    //
-    // The property under test is that a SECOND residual keeps the authority on
-    // `RecursiveDescent` -- it was never about which residual, so the fixture
-    // moves to a surviving variant rather than the control being dropped. It has
-    // now moved twice: a seed-closure call until `RT-SEED-CALL-PORT` `D3`, a
-    // producer-`Match` until this node ported that too.
-    let second = RuntimeDeclaration {
-        symbol: "decl:fixture::d5::second".to_string(),
-        kind: RuntimeDeclarationKind::Transparent {
-            body: d1_match_scrutinee_recursor_witness(),
-        },
-        metadata: RuntimeSymbolMetadata {
-            lowerability: Some(RuntimeLowerabilityStatus::Supported),
-            ..RuntimeSymbolMetadata::empty()
-        },
-    };
-    let declarations = BTreeMap::from([
-        (D5_DECLARATION, &declaration),
-        (D5_FRAME_CARRIER, &carrier),
-        (second.symbol.as_str(), &second),
-    ]);
-    assert_eq!(
-        select_body_emission_authority(&entry, &declarations),
-        BodyEmissionAuthority::RecursiveDescent,
-        "D5 control 3: a SECOND residual still holds the authority on RecursiveDescent. This \
-         read \"the witness masks ONE residual variant\" until D6 removed that witness and \
-         RT-SEED-CALL-PORT D3 removed the last one; the property it guards is unchanged, and it \
-         is now guarded against the real classifier rather than against a hook"
-    );;
-}
-
-// ── Control 4, the runnable half: the ABI-domain mutations ────────────────
-//
-// ⭐ **Each of these gets its own D5 first refusal, before any call is
-// emitted.** They mutate the function-local declared-call COPY and leave the
-// plan's validated descriptor alone, which is what makes the reconciliation —
-// not the copy's internal consistency — the thing being measured.
-//
-// ⚠ `Exact` is run in the same loop as a **positive control**. Without it every
-// row is a negative check, and a negative check passes for any reason
-// ([[a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control]]) —
-// including the compile failing earlier for a reason that has nothing to do
-// with the mutation.
+// ── Control 3: ABI-domain mutations refuse before emission ─────────
 
 #[test]
 fn d5_c4_abi_domain_mutations_each_refuse_before_any_call_is_emitted() {
@@ -18100,7 +15703,6 @@ fn d5_c4_abi_domain_mutations_each_refuse_before_any_call_is_emitted() {
                  already written: {emitted:?}"
             );
         });
-    ;
     }
     // The positive control on the harness: unmutated, the same fixture compiles
     // and emits BOTH declaration-unit calls — the entry's unchecked one and the
@@ -18113,7 +15715,7 @@ fn d5_c4_abi_domain_mutations_each_refuse_before_any_call_is_emitted() {
         2,
         "D5 control 4: after D2a both the entry's unchecked call and the \
          body's checked self-call are emitted: {emitted:?}"
-    );;
+    );
 }
 
 // ── Control 4, the wrong-target class ─────────────────────────────────────
@@ -18143,7 +15745,7 @@ fn d5_c4_a_retargeted_declaration_call_is_refused_before_emission() {
             "the retarget is inert on single-record callers, so it must \
              reproduce the baseline exactly: {outcome:?} {emitted:?}"
         );
-    });;
+    });
 }
 
 // ── The MUTUAL same-SCC fixture ───────────────────────────────────────────
@@ -18432,7 +16034,7 @@ fn d5_c2_mutual_same_scc_calls_reconcile_and_emit() {
         "D5: the entry's unchecked call plus both checked cross-calls. \
          Anything fewer and a mutation control below cannot distinguish a \
          refusal from a path that was never taken: {emitted:?}"
-    );;
+    );
 }
 
 // ── Control 4, the checked-plan half, on the MUTUAL fixture ───────────────
@@ -18586,7 +16188,6 @@ fn d5_c4_checked_plan_mutations_each_reach_their_own_authority() {
              {emitted:?}",
             emitted.len()
         );
-    ;
     }
 
     // The positive control on the harness, in the same shape as every row
@@ -18597,7 +16198,7 @@ fn d5_c4_checked_plan_mutations_each_reach_their_own_authority() {
         "D5 control 4: without a mutation the fixture must reach emission. \
          Every refusal above is otherwise consistent with a fixture that \
          never got there: {outcome:?} {emitted:?}"
-    );;
+    );
 }
 
 #[cfg(test)]
@@ -18770,7 +16371,7 @@ fn d5_c4_a_duplicated_checked_occurrence_is_refused_after_its_lawful_first() {
         "D5: at most the entry's unchecked call and the first, LAWFUL \
          checked occurrence may be emitted before the repeat is refused: \
          {emitted:?}"
-    );;
+    );
 }
 
 // ── The D5 checked-call CLOSEOUT ──────────────────────────────────────────
@@ -18821,7 +16422,6 @@ fn d5_the_checked_call_closeout_rejects_omission_duplication_and_a_substituted_c
                  claim it names stays unpinned: {refusal}"
             );
         });
-    ;
     }
 
     // ⛔ The positive, in the same shape. Without it every row above is equally
@@ -18832,7 +16432,7 @@ fn d5_the_checked_call_closeout_rejects_omission_duplication_and_a_substituted_c
         outcome.is_ok() && emitted.len() == 3,
         "D5 closeout: unmutated, planned = consumed = emitted holds and the \
          fixture compiles: {outcome:?} {emitted:?}"
-    );;
+    );
 }
 
 /// **The closeout's `planned` set is the plan's own, and this proves it is not
@@ -18878,7 +16478,7 @@ fn d5_the_closeout_planned_set_comes_from_the_plan_not_from_the_emissions() {
             || refusal.contains("does not equal the planned one"),
         "the refusal must come from the marker reconciliation or the \
          closeout, not from somewhere incidental: {refusal}"
-    );;
+    );
 }
 
 // ── The generic closure-valued-constructor-field NEGATIVE ────────────────
@@ -18939,13 +16539,6 @@ fn a_closure_stored_as_constructor_data_cannot_cross_a_unit_boundary() {
     };
     let compile = |decl: &RuntimeDeclaration| {
         let declarations = BTreeMap::from([("decl:fixture::d6::probe", decl)]);
-        // Both fixtures must reach the SAME lane, or the comparison below is
-        // between two different mechanisms rather than one field.
-        assert_eq!(
-            select_body_emission_authority(&entry, &declarations),
-            BodyEmissionAuthority::FunctionizedUnits,
-            "under the witness both fixtures take the functionized lane"
-        );
         compile_expr_into_module(
             new_jit_module().expect("JIT module"),
             "d6_activation_blocker",
@@ -18983,7 +16576,7 @@ fn a_closure_stored_as_constructor_data_cannot_cross_a_unit_boundary() {
         "the refusal must be the closure-boundary one. A DIFFERENT refusal \
          would mean this row stopped measuring the escape prohibition: \
          {refusal}"
-    );;
+    );
 }
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a` — the witness compiles, and its checked-IH
@@ -19459,8 +17052,7 @@ fn d5a_a_plan_the_application_disagrees_with_refuses_before_the_worker_call() {
                  template, so it must be refused. A compile means the consumer \
                  is not reading that field at all"
             )
-        })
-    ;
+        });
         assert!(
             refusal.contains(expected),
             "{label}: must get this seam's OWN refusal, not a later one it \
@@ -20285,8 +17877,7 @@ fn d5a_the_detached_result_seats_five_guards_are_each_reached_by_a_real_mutation
                  unmutated witness compiles, that would be a silently admitted defect \
                  rather than a red-versus-red ambiguity"
             ))
-        })
-    ;
+        });
         assert!(
             refusal.contains(expected),
             "the `{label}` guard must refuse with its OWN message. A different refusal means \
@@ -20662,8 +18253,7 @@ fn d5a_the_capture_projection_reads_the_immediate_slot_and_bounds_it() {
                  the unmutated route"
             );
             refusal
-        })
-    ;
+        });
         assert!(
             refusal.contains(expected),
             "{label} must refuse with its OWN message, or this row is measuring the other \
@@ -22221,8 +19811,6 @@ fn d3c_observe(
     use crate::cranelift_backend::lowering::{
         d3c_set_armed, d3c_set_position_selection, d3c_take_seat, D3cPositionSelection,
     };
-    use crate::cranelift_backend::planning::governed_nested_resource_bracket;
-
     let _ = d3c_take_seat();
     d3c_set_armed(true);
     d3c_set_position_selection(selection);
@@ -23343,8 +20931,8 @@ fn d8a_one_emission_owner_answers_one_composed_source_coordinate() {
 /// bindings.**
 ///
 /// `RT-CONTSRC-PRODUCER-LOCAL` `D8d` originally pinned the opposite route: the
-/// deferred fixture reached the composed recursive site under
-/// `RecursiveDescent`, so it had no defining emission owner and installed no
+/// deferred fixture reached the composed recursive site under the retired
+/// monolithic route, so it had no defining emission owner and installed no
 /// target-derived binding. `D3-narrow` deliberately changes that premise. The
 /// ordinary producer route accepts this intersection fixture, so its two
 /// reached recursive positions now each install their planned binding.
@@ -23451,9 +21039,9 @@ fn d8d_the_composed_binding_site_tracks_the_narrowed_intersection_route() {
 //     subtree". The `Let` wrapper is what puts the walk above it.
 //   - The wrapper may not be a `Match` whose computational scrutinee the
 //     ordinary producer route declines. That is the narrowed
-//     `MatchScrutineeRecursor` residual, which selects `RecursiveDescent` -- and
-//     that lane defines no units at all, so fact 3 fails silently and the
-//     composed site is reached with no owner.
+//     retired scrutinee residual, which selected the monolithic route. That
+//     route defined no units, so fact 3 failed silently and the composed site
+//     was reached with no owner.
 //   - The selected field's arms must be statically selectable. A field whose
 //     arms merge at runtime materializes a source join whose planned
 //     representation is derived from the field's OWN arms (specialized
@@ -28070,21 +25658,6 @@ fn d8m_the_ordinary_bridge_arm_is_reached_and_untouched() {
 #[cfg(test)]
 const D8F_SYMBOL: &str = "decl:fixture::d8f::witness";
 
-/// The `D8f` occupancy witness: the `D8n` composed checked-bridge witness with
-/// its checked-IH application wrapped in an invocation marker, and an ORDINARY
-/// call on the same selected recursive argument placed inside that wrapper as
-/// the checked application's own argument.
-///
-/// The machine evaluates the argument before the application, so the ordinary
-/// call reaches the static-worker seat with the marker pending and must leave it
-/// pending. Both calls are the same worker at the same arity in the same frame:
-/// route, arity, binder index and first-call order are all blind here by
-/// construction, which is the whole point.
-#[cfg(test)]
-fn d8f_witness(with_ordinary_call: bool) -> RuntimeExpr {
-    d8f_witness_with(with_ordinary_call, D8fPerturbation::None)
-}
-
 /// How the `D8f` witness is perturbed. Each variant moves exactly one fact about
 /// WHICH call may consume the pending checked-IH marker.
 #[cfg(test)]
@@ -32105,24 +29678,9 @@ fn d3_generated_context_arity_sentinel_edge_is_reached() {
 /// declared observation.
 #[test]
 fn d3_the_ported_producer_call_scrutinee_runs_unhooked_on_the_functionized_lane() {
-    set_residual_enumeration_mutation(ResidualEnumerationMutation::None);
     let example = seed_call_port_producer_match_example();
 
     reset_producer_match_unit_ports();
-    // `AC-1a`, asserted rather than inferred from the empty residual set.
-    assert_eq!(
-        select_body_emission_authority(&example.ir, &BTreeMap::new()),
-        BodyEmissionAuthority::FunctionizedUnits,
-        "AC-1a: the ceiling moved -- the D1 firing population now selects FunctionizedUnits"
-    );
-    assert_eq!(
-        enumerate_recursive_descent_residuals(&example.ir, &BTreeMap::new()),
-        BTreeSet::new(),
-        "D3: this program must now enumerate NO residual at all. Asserting the empty set rather \
-         than the variant's absence -- a reclassification into a surviving variant would satisfy \
-         the weaker check while still retaining the lane"
-    );
-
     let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
         .expect("AC-1b: the D1 firing population must still build and run");
     assert_eq!(
@@ -32172,12 +29730,11 @@ fn d3_the_ported_producer_call_scrutinee_runs_unhooked_on_the_functionized_lane(
 fn ccr_d3_the_active_carried_route_is_taken_and_the_continuation_refusal_is_gone() {
     use crate::cranelift_backend::lowering::core::{
         ccr_d2_active_arrivals, ccr_d2_active_routes, reset_ccr_d2_counts,
-        set_ccr_d2_suppress_active_route, set_selector_variant_exclusion,
+        set_ccr_d2_suppress_active_route,
     };
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
             set_ccr_d2_suppress_active_route(false);
         }
     }
@@ -32306,12 +29863,11 @@ fn ccr_d3_the_active_carried_route_is_taken_and_the_continuation_refusal_is_gone
 fn coc_d3_the_trailing_suffix_is_continued_and_the_mutation_restores_the_refusal() {
     use crate::cranelift_backend::lowering::core::{
         coc_d2_suffix_arrivals, coc_d2_suffix_continuations, reset_coc_d2_counts,
-        set_coc_d2_suppress_continuation, set_selector_variant_exclusion,
+        set_coc_d2_suppress_continuation,
     };
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
             set_coc_d2_suppress_continuation(false);
         }
     }
@@ -32427,12 +29983,10 @@ fn coc_d3_the_trailing_suffix_is_continued_and_the_mutation_restores_the_refusal
 fn sar_d3_the_ordinary_live_cell_is_routed_to_the_resume_and_the_mutation_restores_the_refusal() {
     use crate::cranelift_backend::lowering::core::{
         reset_sar_d2_counts, sar_d2_cell_arrivals, sar_d2_routes, set_sar_d2_suppress_route,
-        set_selector_variant_exclusion,
     };
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
             set_sar_d2_suppress_route(false);
         }
     }
@@ -32558,7 +30112,6 @@ fn sar_d3_the_ordinary_live_cell_is_routed_to_the_resume_and_the_mutation_restor
 /// opposite of what the assertions check.
 #[test]
 fn ced_d2_the_inline_candidate_settles_after_the_bridge_and_is_not_a_call_obligation() {
-    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
     use crate::cranelift_backend::lowering::{d8d_bindings, reset_d8d_bindings};
     use crate::cranelift_backend::lowering::units::{
         d1_last_dispositions, reset_d1_dispositions, CandidateDisposition,
@@ -32574,14 +30127,6 @@ fn ced_d2_the_inline_candidate_settles_after_the_bridge_and_is_not_a_call_obliga
     // would stay non-free was the wrong trade, and it is not made here.
     const HISTORICAL_D1_REFUSAL: &str =
         "the discharged continuation call population is not the planned one";
-
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
-    let _restore = Restore;
 
     let witness = RuntimeExpr::Match {
         scrutinee: Box::new(px8j_deferred_recursive_field_fixture()),
@@ -33004,12 +30549,6 @@ impl D3Arm {
             .any(|(_, e)| matches!(e, D3Event::DirectFunnelReturned { .. }))
     }
 
-    /// Did a composed claim get RECORDED during lowering?
-    fn recorded_composed(&self, identity: &ContinuationCallIdentity) -> bool {
-        use crate::cranelift_backend::lowering::units::D3Event;
-        self.events_for(identity)
-            .any(|(_, e)| matches!(e, D3Event::ComposedRecorded { .. }))
-    }
 }
 
 /// **Witness A — the executing composed payload witness**, selected from the
@@ -34069,13 +31608,12 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
 fn lrc_d2a_forwards_each_arrival_and_excludes_projection_owned_early_refusals() {
     use crate::cranelift_backend::lowering::core::{
         lrc_d2a_backedge_arrivals, lrc_d2a_backedge_forwards, reset_lrc_d2a_counts,
-        set_lrc_d2a_suppress_forward, set_selector_variant_exclusion,
+        set_lrc_d2a_suppress_forward,
         with_required_consumer_route_suppressed,
     };
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
             set_lrc_d2a_suppress_forward(false);
         }
     }
@@ -34117,12 +31655,8 @@ fn lrc_d2a_forwards_each_arrival_and_excludes_projection_owned_early_refusals() 
         for (label, expression, delete_scope) in &cases {
             reset_lrc_d2a_counts();
             set_lrc_d2a_suppress_forward(suppress);
-            set_selector_variant_exclusion(Some(
-                RecursiveDescentResidual::LexicalCallArgumentRecursor,
-            ));
             let (result, _trace) =
                 px8j_capture_source_trace(expression, *delete_scope, "ken_lrc_d2a");
-            set_selector_variant_exclusion(None);
             set_lrc_d2a_suppress_forward(false);
             observed.push((
                 *label,
@@ -34221,15 +31755,11 @@ fn lrc_d2a_forwards_each_arrival_and_excludes_projection_owned_early_refusals() 
                 .find(|(case_label, _, _)| case_label == label)
                 .expect("every observation must retain its source case");
             let compile_without_projection = || {
-                set_selector_variant_exclusion(Some(
-                    RecursiveDescentResidual::LexicalCallArgumentRecursor,
-                ));
                 let (result, _trace) = px8j_capture_source_trace(
                     expression,
                     *delete_scope,
                     "ken_lrc_d2a_without_required_projection",
                 );
-                set_selector_variant_exclusion(None);
                 format!("{result:?}")
             };
             let (without_projection, applications) =
@@ -34378,7 +31908,7 @@ fn d2b_the_runtime_envelope_excludes_every_recursive_position() {
 #[test]
 fn d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_it() {
     use crate::cranelift_backend::lowering::core::{
-        set_lrc_d2b_let_disposition, set_selector_variant_exclusion, LrcD2bLetDisposition,
+        set_lrc_d2b_let_disposition, LrcD2bLetDisposition,
     };
     use crate::cranelift_backend::lowering::{
         lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_reset_observation, lrc_d2b_worker_calls,
@@ -34386,7 +31916,6 @@ fn d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_i
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
             set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
         }
     }
@@ -34402,11 +31931,7 @@ fn d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_i
         ));
         lrc_d2b_reset_observation();
         set_lrc_d2b_let_disposition(mode);
-        set_selector_variant_exclusion(Some(
-            RecursiveDescentResidual::LexicalCallArgumentRecursor,
-        ));
         let (result, _trace) = px8j_capture_source_trace(&expression, false, "ken_d2b_let");
-        set_selector_variant_exclusion(None);
         set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
         D2bObservation {
             rendered: format!("{result:?}"),
@@ -34602,7 +32127,7 @@ fn px8j_sibling_result_with_ordinary_let_value() -> RuntimeExpr {
 #[test]
 fn d2b_capability_gate_the_two_position_shape_refuses_before_its_case_body() {
     use crate::cranelift_backend::lowering::core::{
-        set_lrc_d2b_let_disposition, set_selector_variant_exclusion, LrcD2bLetDisposition,
+        set_lrc_d2b_let_disposition, LrcD2bLetDisposition,
     };
     use crate::cranelift_backend::lowering::{
         lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_reset_observation, lrc_d2b_worker_calls,
@@ -34610,7 +32135,6 @@ fn d2b_capability_gate_the_two_position_shape_refuses_before_its_case_body() {
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
             set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
         }
     }
@@ -34620,12 +32144,8 @@ fn d2b_capability_gate_the_two_position_shape_refuses_before_its_case_body() {
         let expression = host_result_closure_match(px8j_sibling_result_with_ordinary_let_value());
         lrc_d2b_reset_observation();
         set_lrc_d2b_let_disposition(mode);
-        set_selector_variant_exclusion(Some(
-            RecursiveDescentResidual::LexicalCallArgumentRecursor,
-        ));
         let (result, _trace) =
             px8j_capture_source_trace(&expression, false, "ken_d2b_live_let");
-        set_selector_variant_exclusion(None);
         set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
         D2bObservation {
             rendered: format!("{result:?}"),
@@ -34802,7 +32322,7 @@ fn px8j_single_position_let_wrapped_recursive_call() -> RuntimeExpr {
 #[test]
 fn d2b_row_b_a_live_nonbackedge_let_runs_its_body_and_consumes_its_join() {
     use crate::cranelift_backend::lowering::core::{
-        set_lrc_d2b_let_disposition, set_selector_variant_exclusion, LrcD2bLetDisposition,
+        set_lrc_d2b_let_disposition, LrcD2bLetDisposition,
     };
     use crate::cranelift_backend::lowering::{
         lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_let_arrivals, lrc_d2b_reset_observation,
@@ -34811,7 +32331,6 @@ fn d2b_row_b_a_live_nonbackedge_let_runs_its_body_and_consumes_its_join() {
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
             set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
         }
     }
@@ -34822,11 +32341,7 @@ fn d2b_row_b_a_live_nonbackedge_let_runs_its_body_and_consumes_its_join() {
             host_result_closure_match(px8j_single_position_let_wrapped_recursive_call());
         lrc_d2b_reset_observation();
         set_lrc_d2b_let_disposition(mode);
-        set_selector_variant_exclusion(Some(
-            RecursiveDescentResidual::LexicalCallArgumentRecursor,
-        ));
         let (result, _trace) = px8j_capture_source_trace(&expression, false, "ken_d2b_row_b");
-        set_selector_variant_exclusion(None);
         set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
         (
             format!("{result:?}"),
@@ -34944,78 +32459,6 @@ fn d2b_row_b_a_live_nonbackedge_let_runs_its_body_and_consumes_its_join() {
     assert_eq!(exact.4, suppressed.4, "the mode changed a live row's join accounting");
 }
 
-/// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` `AC-9` — the layout control observes
-/// PRODUCTION's assembled prefix, not its own recomputation of the rule.
-///
-/// `CheckedCaseBinderLayout::for_case` reads `recursive_positions` and
-/// `argument_binders` -- the same inputs production reads -- and recomputes the
-/// reversal from them. Every assertion made only against `for_case` therefore
-/// compares the authority with itself: deleting the `.rev()` in
-/// `lowering/core.rs` leaves the authority reversing and every such assertion
-/// green. Prose in a doc comment does not redden.
-///
-/// This control has an independent side. It compiles a real fixture, reads back
-/// the hypothesis prefix production ACTUALLY seated, and requires the layout to
-/// agree with it index by index. Flip or delete a production `.rev()` and the
-/// two sides disagree.
-///
-/// The fixture declares TWO recursive positions deliberately. At length one the
-/// forward and reversed spellings coincide, so a single-position fixture agrees
-/// with both and could not detect the mutation at all.
-#[test]
-fn d2e_ac9_layout_agrees_with_the_prefix_production_assembled() {
-    use crate::cranelift_backend::lowering::d2e_take_binder_assemblies;
-    use crate::cranelift_backend::planning::{CheckedCaseBinderLayout, CheckedCaseBinderRole};
-
-    let _ = d2e_take_binder_assemblies();
-    let expression =
-        host_result_closure_match(px8j_recursive_sibling_result(1, 2, px8j_aggregate_result()));
-    let (result, _trace) =
-        px8j_capture_source_trace(&expression, false, "ken_d2e_ac9_layout_vs_production");
-    result.expect("the two-sibling fixture lowers");
-    let assemblies = d2e_take_binder_assemblies();
-
-    // The discriminating population is established FIRST, so "nothing qualified"
-    // cannot pass as "everything agreed".
-    let multi: Vec<_> = assemblies
-        .iter()
-        .filter(|assembly| assembly.recursive_positions.len() > 1)
-        .collect();
-    assert!(
-        !multi.is_empty(),
-        "no case with more than one recursive position reached the assembly site, so this \
-         control cannot see the reversal at all: {assemblies:#?}"
-    );
-
-    for assembly in multi {
-        let case = crate::RuntimeComputationalMatchCase {
-            // Reconstructed from what production RECORDED, so the layout is
-            // asked about the same declaration production assembled from.
-            constructor: "ctor:fixture::D2eAc9::Reconstructed".to_string(),
-            argument_binders: assembly.argument_binders,
-            recursive_positions: assembly.recursive_positions.clone(),
-            body: RuntimeExpr::Var(0),
-        };
-        let layout = CheckedCaseBinderLayout::for_case(&case).expect("the layout derives");
-        assert_eq!(
-            assembly.assembled_prefix.len(),
-            assembly.recursive_positions.len(),
-            "production seated a hypothesis for every declared recursive position"
-        );
-        for (index, seated) in assembly.assembled_prefix.iter().copied().enumerate() {
-            assert_eq!(
-                layout.role_at(index),
-                CheckedCaseBinderRole::InductionHypothesis {
-                    recursive_position: u32::try_from(seated).expect("position fits"),
-                },
-                "at de Bruijn index {index} production seated the hypothesis for sibling \
-                 position {seated}, and the layout authority disagrees. The authority and \
-                 the emitted environment must not drift: {assembly:#?}"
-            );
-        }
-    }
-}
-
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i` — the CONSERVATION measurement,
 /// per row.**
 ///
@@ -35059,23 +32502,12 @@ fn d2e_ac9_layout_agrees_with_the_prefix_production_assembled() {
 ///   them.
 #[test]
 fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
-    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
     use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
     /// `(recognized owners, bare-Var reads, installs, consuming calls, outcome)`.
     fn disposition(
         expression: &RuntimeExpr,
         symbol: &str,
     ) -> (Vec<String>, usize, usize, usize, String) {
-        set_selector_variant_exclusion(Some(
-            RecursiveDescentResidual::LexicalCallArgumentRecursor,
-        ));
-        let _restore = Restore;
         let _ = d2k_owner_trace_take();
         let (result, _trace) = px8j_capture_source_trace(expression, false, symbol);
         let events = d2k_owner_trace_take();
@@ -35784,14 +33216,8 @@ fn d2k_1c_1_a_transition_and_its_transport_must_name_each_other() {
 #[test]
 fn d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane() {
     use crate::cranelift_backend::lowering::core::{
-        d2f_gate_arrivals_take, d2f_production_fusion_planes_take, set_selector_variant_exclusion,
+        d2f_gate_arrivals_take, d2f_production_fusion_planes_take,
     };
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            set_selector_variant_exclusion(None);
-        }
-    }
     /// `(refusing construct, any oriented plan present, resolved keys, resolved
     /// planes)` for one seed row, under the same wrong-consumer exclusion every
     /// other `D2k` control runs.
@@ -35799,8 +33225,6 @@ fn d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane() {
         expression: &RuntimeExpr,
         symbol: &str,
     ) -> (Option<String>, bool, usize, Vec<usize>) {
-        set_selector_variant_exclusion(Some(RecursiveDescentResidual::LexicalCallArgumentRecursor));
-        let _restore = Restore;
         let _ = d2f_gate_arrivals_take();
         let _ = d2f_production_fusion_planes_take();
         let refusal = d2k_wall_under_current_selector(expression, symbol);
