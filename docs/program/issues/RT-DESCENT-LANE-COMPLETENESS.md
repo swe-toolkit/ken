@@ -1,7 +1,7 @@
 ---
 id: RT-DESCENT-LANE-COMPLETENESS
 title: "Is the functionized lane a complete replacement for RecursiveDescent, or has it been carrying only the ported subset? D2c refused NINE programs the retiring lane compiles, across FOUR independent constructs -- a pattern, not a missing case, so this is a lane-completeness question and not a port"
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -263,8 +263,11 @@ the input and declining the ownership call was the right boundary.
   pin is measured against.
 - **No Runtime implementation is authorized by this node.** It measures and
   adjudicates; it deletes and ports nothing.
-- **[[RT-DESCENT-RETIRE]]'s `D3`-`D8` stay gated**, and **no `D6` re-home is
-  lawful** while this node is open.
+- **[[RT-DESCENT-RETIRE]]'s `D3`-`D8` stay gated.** The bar on a `D6` re-home
+  was originally written as *"while this node is open"*. **That is no longer the
+  right key** — this node is now `closed` and the bar has not lifted. **It is
+  keyed on [[RT-REFUSAL-PINS-REHOMED]] LANDING A PIN**, which is where `AC-9`'s
+  remaining half went. See the closing ledger below.
 - **Two shortcuts are foreclosed** — *"fixture-only so it doesn't count"* and
   *"`RecursiveDescent` compiled it, so port it."* Both are argued in the frame,
   section 6; neither may be assumed from the error text.
@@ -368,3 +371,51 @@ recursive traversal over a binary tree fails in the elaborator at checked
 computational-IH body preparation. **Routed to the Architect** — it is a
 capability question about the native path, independent of whether the retiring
 lane is ever deleted.
+
+## CLOSED 2026-08-17. Resolved by record. The discharge ledger is below.
+
+**Every deliverable is delivered and every open question is answered.** The flip
+condition this node set for itself — *"when `D1` and `D5` are both answered and
+recorded"* — is met, and `closed` is the accurate terminal state for a node that
+authorizes no implementation.
+
+| deliverable | state |
+|---|---|
+| `D1` — four soundness verdicts | **IN.** Architect `evt_5cxzxp4b6q31v`. Two correct semantics, two missing ports |
+| `D2` — source-reachability record | **IN.** Nine tests, five renderings, zero source-reachable |
+| `D3` — merged-claim errata | **NEGATIVE**, corroborated independently by the Architect |
+| `D4` — helper-evidence correction | **IN**, and repaired separately at [[RT-TRACE-HELPER-ABORTED-COMPILE-EVIDENCE]] (`merged`) |
+| `D5` — census and probe | **IN.** Census decisive; probe undetermined, and the difference is recorded above |
+
+**The Architect's two follow-up questions are both discharged**
+(`evt_7msgce14888x4`): Q1's dependency is recorded at both ends, load-bearing on
+[[LANG-CHECKED-IH-BODY-VIEW-CAUSE]]; Q2 is filed as that node, queued.
+
+### AC-9 IS NOT DISCHARGED BY THIS CLOSURE, AND THAT IS DELIBERATE
+
+**Constructs 3 and 4 are discharged here** — recorded obligations with named
+owners, `AC-12`, at [[RT-FNUNIT-MULTI-WORKER-CONTINUATION]] and
+[[RT-FNUNIT-CHECKED-ROOT-AUTHORITY-ROUTING]].
+
+**Constructs 1 and 2 are NOT.** A correct-semantics verdict owes an
+asserted-refusal pin, the only existing one rides the enum `D3` deletes
+(`AC-11`), and the replacement is in flight at [[RT-REFUSAL-PINS-REHOMED]].
+
+**Closing this node does not weaken that gate**, because
+[[RT-DESCENT-RETIRE]]'s `depends_on` names **both** nodes independently —
+verified in its frontmatter, not inferred. `D6` cannot proceed on this node's
+closure alone.
+
+> #### THE ONE WAY THAT GATE COULD OPEN WRONGLY. Read it before closing the pin node.
+>
+> **`closed` satisfies a dependency** — `scripts/check-issue-schema.sh:189`,
+> *"closed means resolved-without-landing, so there is nothing left to wait
+> for."*
+>
+> ⇒ **If [[RT-REFUSAL-PINS-REHOMED]] hard-stops under its own `AC-8` and is then
+> closed, the retirement's dependency is satisfied with constructs 1 and 2 still
+> unpinned** — `AC-9`'s exact defect, arriving through the dependency mechanism
+> instead of through an increment. **A hard stop there is a legitimate outcome
+> and it is NOT a discharge.** It routes to the Steward and the Architect for an
+> explicit ruling on whether `D6` may proceed unpinned. **The mirror of this
+> paragraph is on [[RT-DESCENT-RETIRE]], where `D6` actually lives.**

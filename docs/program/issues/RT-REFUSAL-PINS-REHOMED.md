@@ -62,6 +62,20 @@ one where it does not.
 question, not its assumption.** If it is not, that is a genuine hard stop with a
 named blocker, and it is a real result.
 
+## IF THIS NODE HARD-STOPS, CLOSING IT IS NOT A DISCHARGE
+
+`AC-8` makes a hard stop a legitimate outcome — the finding is the product. **But
+closing this node on a hard stop satisfies [[RT-DESCENT-RETIRE]]'s `depends_on`
+anyway**, because `scripts/check-issue-schema.sh:189` treats `closed` as
+*resolved-without-landing*. Constructs 1 and 2 would then be unpinned with the
+retirement's gate reading green — **`AC-9`'s exact defect, arriving through the
+dependency mechanism rather than through an increment.**
+
+⇒ **A hard-stop closure routes to the Steward and the Architect for an explicit
+ruling on whether `D6` may run unpinned.** It is not a decision this node's
+closure makes by itself. The mirror is on [[RT-DESCENT-RETIRE]], at the `D6`
+block where the reader who runs the deletion will be.
+
 ## Standing
 
 - **`D2c` `036e8ee916844fb91a4f42f2a2b04ebaea0dde2f` is untouched, unpublished
