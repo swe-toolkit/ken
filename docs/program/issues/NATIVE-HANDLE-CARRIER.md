@@ -150,7 +150,7 @@ repair all unmeasured, correctly:
 
 | if plain `Match` is | then the port is | owner |
 |---|---|---|
-| the correct shape, and `resolve_recursive_unit_body` has no arm for it | a missing arm in the lowerer | runtime, new capability, small cut |
+| the correct shape, and `recursive_position_unit_body` has no arm for it | a missing arm in the lowerer | runtime, new capability, small cut |
 | itself the symptom of an upstream production that should have emitted `ComputationalMatch` | upstream of the lowerer | whoever owns that production |
 
 Same deliverable text, different node, different team. **The node is not cut
