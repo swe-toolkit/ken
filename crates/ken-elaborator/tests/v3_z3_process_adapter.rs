@@ -1,6 +1,8 @@
 #![cfg(feature = "z3-process")]
 
-use std::{fs, os::unix::fs::PermissionsExt, path::Path, time::Duration};
+use std::{
+    fs, io::ErrorKind, os::unix::fs::PermissionsExt, path::Path, process::Command, time::Duration,
+};
 
 use ken_elaborator::{
     attempt_d_with_z3_process, attempt_obligation,
@@ -171,6 +173,15 @@ fn identical_input_and_candidate_have_deterministic_verdict() {
 /// about throughput or expanding the translated goal population.
 #[test]
 fn installed_z3_round_trip_reaches_kernel_checked_refutation() {
+    match Command::new("z3").arg("-version").output() {
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            eprintln!("skipping installed-Z3 round trip: z3 is absent from PATH");
+            return;
+        }
+        Err(error) => panic!("failed to probe installed z3: {error}"),
+        Ok(output) => assert!(output.status.success(), "installed z3 probe failed"),
+    }
+
     let mut elab = ElabEnv::new().expect("numeric environment");
     let obligation = equality(&mut elab);
     let before = elab.env.trusted_base().len();

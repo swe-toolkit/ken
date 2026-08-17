@@ -399,7 +399,6 @@ jobs:
       - native-write-partition
       - native-buffer
       - native-rt-parity
-      - z3-process-adapter
       - z3-emission-control
       - ignored-row-sweep
     # `always()` so this reports a definite conclusion even when a job fails
@@ -413,14 +412,12 @@ jobs:
           write='${{ needs.native-write-partition.result }}'
           buffer='${{ needs.native-buffer.result }}'
           rt_parity='${{ needs.native-rt-parity.result }}'
-          z3_adapter='${{ needs.z3-process-adapter.result }}'
           z3_emission='${{ needs.z3-emission-control.result }}'
           ignored_sweep='${{ needs.ignored-row-sweep.result }}'
           echo "test-shard matrix:      $shards"
           echo "native-write-partition: $write"
           echo "native-buffer:          $buffer"
           echo "native-rt-parity:       $rt_parity"
-          echo "z3-process-adapter:     $z3_adapter"
           echo "z3-emission-control:    $z3_emission"
           echo "ignored-row-sweep:      $ignored_sweep"
           failed=0
@@ -428,7 +425,6 @@ jobs:
                       "native-write-partition:$write" \
                       "native-buffer:$buffer" \
                       "native-rt-parity:$rt_parity" \
-                      "z3-process-adapter:$z3_adapter" \
                       "z3-emission-control:$z3_emission" \
                       "ignored-row-sweep:$ignored_sweep"; do
             name="${pair%:*}"; result="${pair##*:}"
