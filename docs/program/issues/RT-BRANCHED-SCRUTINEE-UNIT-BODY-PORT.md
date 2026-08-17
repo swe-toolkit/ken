@@ -1,7 +1,7 @@
 ---
 id: RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT
 title: "Port the recursive-unit-body resolution through a branched scrutinee -- recursive_position_unit_body returns None whenever the scrutinee is a plain Match rather than a literal Construct, so a carried child whose owning form branches has no declared body unit and every consumer falls back to refusal"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,49 @@ blocks: [PX8-F-CAP-41]
 github: null
 origin: "NATIVE-HANDLE-CARRIER residual. Route measured evt_4tqpqn2gpcsx6; Steward's two corrections to how that result reads evt_9jds3whs094h; scrutinee variant measured at the preserved exact 3d23f1182 by runtime-leader evt_2fzzxf778smjj (reported evt_42nvqwvj71mjb); plain-Match origin discriminator selecting the local-lowerer arm evt_5zknkg76cn3w5 (reported evt_1sp1jg2gsvh9h). Steward-filed per COORDINATION section 2."
 ---
+
+> # `merged` 2026-08-17 — BOTH DELIVERABLES LANDED, ALL FIVE ACs DISCHARGED
+>
+> | deliverable | squash | shape |
+> |---|---|---|
+> | `D1` — the witness | `5bac56000` | 3 paths, full green CI |
+> | `D2` — the port plus the AC-4 census recut | `ca639b5ef` | 3 paths, `+111/-35` |
+>
+> **`D2` merged from `232d8b16c19f8780469f66881c78a0f9b1218442`** under
+> `dec_4e4gmwjk1v3ae`, **amended in place** from `21ffc99ac` to that SHA (QA
+> `evt_4rjf018wz99v9`, Architect `evt_4p76kn1wg15sn` / `evt_59ca87t8kmpm8`).
+> Steward M6: all three paths blob-identical on `main`, squash reproduces
+> `+111/-35`.
+>
+> `AC-1`/`AC-2` are `D1`'s. `AC-3` is discharged in its **amended** form —
+> `entered >= 1` AND `route1 == 0` from an entry-pushing recorder, not a bare
+> `route1 == 0`; the Architect's resolution records one resolver entry, zero
+> route-1 returns, and the advancing constructor-arity refusal. `AC-4` is the
+> arm-disagreement control. `AC-5` is green in CI on PR #2581.
+>
+> ### `D2` FAILED CI ONCE, AND THE CAUSE WAS ITS OWN `AC-4` CONTROL
+>
+> `21ffc99ac` was approved and red on test shard 3/4:
+> `identifier_census_caveat_tracks_inline_cfg_test_region_count` pins the exact
+> count of inline `#[cfg(test)]` regions in `core.rs`. `main` carried **322**;
+> `AC-4`'s added `mod branched_scrutinee_unit_body_port_tests` made **323**.
+>
+> **The pin fired as designed** — its own comment says to re-derive when the
+> count moves. The `+6/-4` repair moves both 322 sites and **re-grounds the
+> claim above them**: the added module tests declared-body-unit agreement and
+> contains no `lower_expr`, so the retired census's call population does not
+> move. Measured independently by the implementer, QA, the Architect and the
+> Steward.
+>
+> **QA caught a vacuous pass in the handback:** the short `--exact` filter
+> reported as evidence **selects zero unit tests**, so it prints green while
+> running nothing. QA re-ran the pin fully qualified — 1 passed, 0 failed. Same
+> family as `V3-Z3-EMISSION-CONTROL`'s blind discharge instrument.
+>
+> ⇒ **Carry into any frame whose AC lands an inline test module in `core.rs`:
+> that file's region count is pinned, and the deliverable will red CI.** Name the
+> pin and its re-derivation in the frame; it costs one sentence there and a full
+> publish round trip when omitted.
 
 > # THE MEASURED POPULATION DOES NOT SURVIVE THE PARENT'S RECUT
 >
