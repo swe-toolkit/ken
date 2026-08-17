@@ -1,7 +1,7 @@
 ---
 id: RT-BACKEND-PRIMITIVE-LOWERING-SPLIT
 title: "Move the primitive-lowering family to its own module — the first production slice of the backend split, and the architectural release point for NATIVE-HANDLE-CARRIER"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
