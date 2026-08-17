@@ -373,12 +373,18 @@ enum EffectSeatDispatchMutation {
     /// The same injection for outcome `2` — a word that never denoted a
     /// viewable byte span.
     ForceByteSpanOutcomeNotASpan,
+    /// Replace a projected site-bound operand after its source witness has
+    /// been captured. The reconciliation must reject the substitution rather
+    /// than lending the original operand's owner proof to the replacement.
+    SubstituteSiteOperandValue,
 }
 
 #[cfg(test)]
 thread_local! {
     static EFFECT_SEAT_DISPATCH_MUTATION: std::cell::Cell<EffectSeatDispatchMutation> =
         const { std::cell::Cell::new(EffectSeatDispatchMutation::Exact) };
+    static SITE_OPERAND_SUBSTITUTION_HITS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
 }
 
 #[cfg(test)]
@@ -386,11 +392,17 @@ pub(in crate::cranelift_backend) fn set_effect_seat_dispatch_mutation(
     mutation: EffectSeatDispatchMutation,
 ) {
     EFFECT_SEAT_DISPATCH_MUTATION.with(|cell| cell.set(mutation));
+    SITE_OPERAND_SUBSTITUTION_HITS.with(|cell| cell.set(0));
 }
 
 #[cfg(test)]
 fn effect_seat_dispatch_mutation() -> EffectSeatDispatchMutation {
     EFFECT_SEAT_DISPATCH_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+fn site_operand_substitution_hits() -> usize {
+    SITE_OPERAND_SUBSTITUTION_HITS.with(std::cell::Cell::get)
 }
 
 #[cfg(test)]
@@ -3128,7 +3140,8 @@ impl ConstructorField {
     ///
     /// **The match is exhaustive with no wildcard**, so a future third field
     /// kind is a compile error at this accessor rather than a silent escape
-    /// through it.
+    /// through it. The returned `Lowered` may contain runtime SSA values;
+    /// "specialized" names the field form, not compile-time-known content.
     fn specialized_at(&self, edge: &str) -> Result<&Lowered, CraneliftBackendError> {
         match self {
             ConstructorField::Specialized(value) => Ok(value),
@@ -3138,7 +3151,9 @@ impl ConstructorField {
 
     /// The owned ordinary field behind this kind, or a refusal naming the
     /// reader. The by-value twin of [`ConstructorField::specialized_at`], for
-    /// readers that consume the template rather than borrow it.
+    /// readers that consume the lowered payload rather than borrow it. A
+    /// `Lowered` payload may contain runtime SSA values; "specialized" names
+    /// the field form, not compile-time-known content.
     fn into_specialized_at(self, edge: &str) -> Result<Lowered, CraneliftBackendError> {
         match self {
             ConstructorField::Specialized(value) => Ok(value),
@@ -9621,7 +9636,26 @@ impl<'a> Lowering<'a> {
             },
             _ => observed,
         };
-        let admits = record.avail.admits(observed);
+        // A planned `SiteOperand(index)` is a second, exact consumer of the
+        // same source operand. Its carried route is the emitted-helper
+        // projection in `site_operand_argument`, not a widening of this seat's
+        // direct `Avail` partition. Derive that exception from the planner's
+        // existing recipe relation so an operation with no declared
+        // site-bound child retains the ordinary `Need ⊆ Avail` refusal.
+        let carried_site_operand = observed == EffectSeatPhase::CarriedWord
+            && record.need == EffectSeatNeed::BytesPointerLength
+            && self
+                .static_transition_plan
+                .host_effect_site_operand_slots(effect_origin)?
+                .contains(&slot);
+        let route = if record.avail.admits(observed) {
+            EffectSeatClaimRoute::Direct
+        } else if carried_site_operand {
+            EffectSeatClaimRoute::SiteOperandProjection
+        } else {
+            EffectSeatClaimRoute::Direct
+        };
+        let admits = route != EffectSeatClaimRoute::Direct || record.avail.admits(observed);
         // `AC-2` — withdraw exactly what `D5` granted, at the membership test
         // itself, so the refusal below is the PRODUCTION refusal rather than a
         // manufactured lookalike. Only the byte-span need and only the carried
@@ -9647,7 +9681,7 @@ impl<'a> Lowering<'a> {
         let Some(ledger) = self.host_effect_seats.as_mut() else {
             return Ok(record);
         };
-        ledger.claim(group, record, observed)?;
+        ledger.claim(group, record, observed, route)?;
         Ok(record)
     }
 
@@ -12976,6 +13010,19 @@ use effect_seat_group::EffectSeatGroupId;
 struct ClaimedEffectSeat {
     record: PlannedEffectSeat,
     observed: EffectSeatPhase,
+    route: EffectSeatClaimRoute,
+}
+
+/// Why one observed phase is admissible at a claimed seat.
+///
+/// `SiteOperandProjection` is deliberately separate from `Avail`: the direct
+/// operation consumer remains specialized-only, while the compiler-authored
+/// result tree names an exact second use whose carried word is projected by an
+/// emitted helper.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EffectSeatClaimRoute {
+    Direct,
+    SiteOperandProjection,
 }
 
 /// One compiler-side lowering VISIT to one effect occurrence.
@@ -13106,6 +13153,7 @@ impl EffectSeatLedger {
         group: EffectSeatGroupId,
         record: PlannedEffectSeat,
         observed: EffectSeatPhase,
+        route: EffectSeatClaimRoute,
     ) -> Result<(), CraneliftBackendError> {
         // ⛔ The contract, recomputed from the record's own operation and slot
         // and nothing else, before the record is admitted to a group. This is
@@ -13118,12 +13166,24 @@ impl EffectSeatLedger {
                  to {recomputed:?}, so its recorded contract is not the one its key names"
             )));
         }
-        // ⛔ `observed ∈ Avail`, proved at the claim, of the operand in hand.
-        if !record.avail.admits(observed) {
+        // ⛔ The direct route proves `observed ∈ Avail`. The sole second
+        // route is a carried byte-span value at a planner-declared
+        // `SiteOperand`; its exact recipe membership was proved by the caller.
+        // Keeping the two routes distinct prevents the exception from
+        // widening every consumer of the seat.
+        let admissible = match route {
+            EffectSeatClaimRoute::Direct => record.avail.admits(observed),
+            EffectSeatClaimRoute::SiteOperandProjection => {
+                observed == EffectSeatPhase::CarriedWord
+                    && record.need == EffectSeatNeed::BytesPointerLength
+                    && matches!(record.slot, EffectSeatSlot::Argument(_))
+            }
+        };
+        if !admissible {
             return Err(backend_module(format!(
-                "host effect seat ledger: {:?} seat {:?} of {:?} was observed as {observed:?}, \
-                 which its planned availability does not admit",
-                record.effect_origin, record.slot, record.operation
+                "host effect seat ledger: {:?} seat {:?} of {:?} was observed as {observed:?} \
+                 through {route:?}, which its planned contract does not admit",
+                record.effect_origin, record.slot, record.operation,
             )));
         }
         let open = self.open_group_mut(group)?;
@@ -13140,8 +13200,14 @@ impl EffectSeatLedger {
                 record.slot, open.effect_origin
             )));
         }
-        if let Some(previous) = open.claims.insert(record.slot, ClaimedEffectSeat { record, observed })
-        {
+        if let Some(previous) = open.claims.insert(
+            record.slot,
+            ClaimedEffectSeat {
+                record,
+                observed,
+                route,
+            },
+        ) {
             return Err(backend_module(format!(
                 "host effect seat ledger: {:?} of {:?} is claimed twice in one visit (first as \
                  {previous:?})",
@@ -13470,7 +13536,7 @@ thread_local! {
 /// ⛔ Private to synthesized construction. Not a `Lowered` variant, not a
 /// runtime tag, and nothing downstream sees it: the provenance is consumed by
 /// the reconciliation and discarded, and the ordinary `Lowered` child is what
-/// reaches the template.
+/// reaches the ordinary constructor field.
 enum SynthesizedArgument {
     /// A scalar the emitter materialized, for a `Scalar` node.
     Scalar(Lowered),
@@ -13488,6 +13554,22 @@ enum SynthesizedArgument {
         seat: StaticOriginId,
         index: u32,
         value: Lowered,
+        source: SiteOperandSource,
+    },
+}
+
+/// The phase-bearing source that authorized a site-bound projection.
+///
+/// A carried projection necessarily creates fresh CLIF values, so
+/// reconciliation cannot re-run the helper and compare SSA identities: a
+/// second call would produce a second pair. Instead the projection records the
+/// exact carried word plus the witness minted by the first call. The claimed
+/// seat is re-read during reconciliation and must still hold that word.
+enum SiteOperandSource {
+    Specialized,
+    Carried {
+        word: cranelift_codegen::ir::Value,
+        projected: SiteOperandWitness,
     },
 }
 
@@ -13554,7 +13636,7 @@ impl<'a> Lowering<'a> {
     /// accepting a value — so the emitter states *which operand* it means and
     /// cannot hand over a substitute by mistake.
     ///
-    /// ⛔ **The sole template projection, and it is driven by an exact declared
+    /// ⛔ **The sole site-operand projection, driven by an exact declared
     /// `SiteOperand(index)` use.** It used to read a dense `Vec<Lowered>` that
     /// the caller built by demanding a specialized template for *every*
     /// argument the operation has. That vector was the prohibited pre-operation
@@ -13563,16 +13645,66 @@ impl<'a> Lowering<'a> {
     /// `BufferAllocate`'s capacity — which no synthesized node uses — was
     /// re-read as a template here after its own arm had already consumed it,
     /// and a carried capacity was refused by a consumer that never wanted it.
-    /// Demanding the template only at the seat a declared child names is what
-    /// makes the projection exact-use-driven rather than dense.
+    /// Projecting only the seat a declared child names is what makes the route
+    /// exact-use-driven rather than dense. A specialized operand is cloned
+    /// opaquely; a carried byte-span operand is observed through the emitted
+    /// helper and becomes a runtime-valued `Lowered::ResponseBytes`.
     fn site_operand_argument(
-        &self,
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
         seat: StaticOriginId,
         index: u32,
         seats: &ClaimedEffectSeats<'_>,
     ) -> Result<SynthesizedArgument, CraneliftBackendError> {
-        let value = seats.specialized(EffectSeatSlot::Argument(index))?.clone();
-        Ok(SynthesizedArgument::SiteOperand { seat, index, value })
+        let (record, operand) = seats.operand(EffectSeatSlot::Argument(index))?;
+        let (mut value, source) = match operand {
+            LoweringOperand::Specialized(value) => (value.clone(), SiteOperandSource::Specialized),
+            LoweringOperand::Carried(word) => {
+                let (pointer, len, outcome) =
+                    self.observe_carried_bytes_span(builder, record, *word)?;
+                let valid = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    outcome,
+                    0,
+                );
+                let pointer_type = builder.func.dfg.value_type(pointer);
+                let value = Lowered::ResponseBytes(SafeByteSpan::masked_at_producer(
+                    builder,
+                    pointer_type,
+                    pointer,
+                    len,
+                    valid,
+                ));
+                let projected = site_operand_witness(&value).ok_or_else(|| {
+                    unsupported(
+                        "Effect",
+                        "the carried site-operand projection produced no value witness",
+                    )
+                })?;
+                (
+                    value,
+                    SiteOperandSource::Carried {
+                        word: word.word,
+                        projected,
+                    },
+                )
+            }
+        };
+        #[cfg(test)]
+        if effect_seat_dispatch_mutation() == EffectSeatDispatchMutation::SubstituteSiteOperandValue
+        {
+            SITE_OPERAND_SUBSTITUTION_HITS.with(|cell| cell.set(cell.get() + 1));
+            value = Lowered::Int {
+                value: builder.ins().iconst(types::I64, 0),
+                known: Some(0),
+            };
+        }
+        Ok(SynthesizedArgument::SiteOperand {
+            seat,
+            index,
+            value,
+            source,
+        })
     }
 
     fn synthesized_fixed_identity(
@@ -13869,22 +14001,44 @@ impl<'a> Lowering<'a> {
                 // below rather than a projection error about the seat the
                 // emitter did not name.
                 //
-                // ⛔ A declared `SiteOperand` whose claimed operand is CARRIED
-                // refuses at that exact seat, propagated from `specialized`. It
-                // does not reconstruct a template, widen the carrier, borrow a
-                // sibling, or fall back — reconciliation needs a compile-time
-                // witness, and there is none.
+                // ⛔ A carried `SiteOperand` is admitted only through the
+                // emitted byte-span helper. Reconciliation re-reads the exact
+                // claimed seat and requires both its carried word and the
+                // projected runtime-value witness to remain unchanged. It does
+                // not reconstruct a template, widen the carrier, borrow a
+                // sibling, or fall back.
                 (
                     SynthesizedAggregateNode::SiteOperand(declared_index),
-                    SynthesizedArgument::SiteOperand { seat: bound, index, value },
+                    SynthesizedArgument::SiteOperand {
+                        seat: bound,
+                        index,
+                        value,
+                        source,
+                    },
                 ) => {
                     if *bound != seat || index != declared_index {
                         false
                     } else {
-                        let projected =
-                            seats.specialized(EffectSeatSlot::Argument(*declared_index))?;
-                        site_operand_witness(value).is_some()
-                            && site_operand_witness(value) == site_operand_witness(projected)
+                        let (_, operand) =
+                            seats.operand(EffectSeatSlot::Argument(*declared_index))?;
+                        match (source, operand) {
+                            (
+                                SiteOperandSource::Specialized,
+                                LoweringOperand::Specialized(projected),
+                            ) => {
+                                site_operand_witness(value).is_some()
+                                    && site_operand_witness(value)
+                                        == site_operand_witness(projected)
+                            }
+                            (
+                                SiteOperandSource::Carried { word, projected },
+                                LoweringOperand::Carried(actual),
+                            ) => {
+                                *word == actual.word
+                                    && site_operand_witness(value).as_ref() == Some(projected)
+                            }
+                            _ => false,
+                        }
                     }
                 }
                 // ⛔ `Absent` marks a host-result arm that builds no aggregate,

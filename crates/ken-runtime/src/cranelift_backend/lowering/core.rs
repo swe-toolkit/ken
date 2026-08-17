@@ -18502,13 +18502,15 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     Vec::new(),
                     &seats,
                 )?;
+                let path_argument =
+                    self.site_operand_argument(builder, static_origin, 0, &seats)?;
                 let path = self.synthesized_constructor(
                     static_origin,
                     &error_root.field(1),
                     SynthesizedFixedConstructorRole::OptionSome,
                     self.process_symbols.option_some.clone(),
                     // The seat's operand 0 — projected, not passed.
-                    vec![self.site_operand_argument(static_origin, 0, &seats)?],
+                    vec![path_argument],
                     &seats,
                 )?;
                 let io_error = generic_io_error(self, builder, payload_int, &error_root.field(2))?;
@@ -18867,7 +18869,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         "FsReadAt buffer operand is not a resource",
                     ));
                 };
-                let span_origin = *span_origin;
+                let span_argument =
+                    self.site_operand_argument(builder, static_origin, 2, &seats)?;
                 let span = self.synthesized_constructor(
                     static_origin,
                     &ok_root.alternative(1).field(0),
@@ -18877,7 +18880,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         // The seat's operand 2 — the buffer this span is bound
                         // to (`PX8-SPAN-PROV`), projected from the operand list
                         // rather than rebuilt from its destructured payload.
-                        self.site_operand_argument(static_origin, 2, &seats)?,
+                        span_argument,
                         SynthesizedArgument::Scalar(reply_start_int),
                         SynthesizedArgument::Scalar(Lowered::BoundedNat(count)),
                     ],

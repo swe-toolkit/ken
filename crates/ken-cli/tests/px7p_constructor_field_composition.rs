@@ -248,7 +248,9 @@ fn ignored_field_twin_remains_green() {
 // one still refuses, so do not read the file as uniformly failing.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsReadFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+// RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
+// FileError SiteOperand(0) could not project its carried word. D5 byte-span
+// observation was not the blocker; D2 supplies the exact emitted-helper port.
 fn dynamic_carrier_producer_payload_reaches_linked_process_exit() {
     let dir = output_dir("dynamic-carrier-producer");
     let output = ken_cli::build_native_program(

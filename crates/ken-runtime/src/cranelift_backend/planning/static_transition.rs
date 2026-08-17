@@ -4615,6 +4615,35 @@ impl SynthesizedHostResultTree {
     }
 }
 
+/// Collect the site-bound operand ordinals named anywhere under one
+/// compiler-synthesized result node.
+///
+/// This walks the same closed recipe that plans aggregate children. It is not
+/// a second operation table: adding or removing a `SiteOperand` in the recipe
+/// changes both the planned child relation and this population together.
+fn collect_site_operand_ordinals(node: SynthesizedAggregateNode, ordinals: &mut BTreeSet<u32>) {
+    match node {
+        SynthesizedAggregateNode::Fixed { children, .. } => {
+            for child in children {
+                collect_site_operand_ordinals(*child, ordinals);
+            }
+        }
+        SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::Alternatives(alternatives)) => {
+            for alternative in alternatives {
+                collect_site_operand_ordinals(*alternative, ordinals);
+            }
+        }
+        // The closed IOError alternatives contain only scalar payloads. They
+        // cannot introduce a site operand behind this dynamic node.
+        SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::IoErrors)
+        | SynthesizedAggregateNode::Scalar { .. }
+        | SynthesizedAggregateNode::Absent => {}
+        SynthesizedAggregateNode::SiteOperand(index) => {
+            ordinals.insert(index);
+        }
+    }
+}
+
 /// What a path walk arrived at.
 ///
 /// The `IOError` alternatives are not nodes in the static tree — they are
@@ -5400,12 +5429,12 @@ fn host_effect_seat_contract(
         // PROVED carried, per seat: `D5` measured a carried word reaching each
         // of these and the observer consuming it. Neither is site-bound.
         (Op::ConsoleWrite, 1) | (Op::FsWriteFile, 2) => Some(carried_bytes),
-        // LEFT SPECIALIZED_ONLY, and NOT because the observer fails them —
-        // `D5` measured it succeeding at all four. Each is the `SiteOperand(0)`
-        // of its operation's synthesized `FileError`, so the same seat is read a
-        // SECOND time as a compile-time `Lowered` template. Supplying one from a
-        // boundary word is the `Carried -> Lowered` inverse this node bans.
-        // Flipping them makes the refusal later and less legible, not absent.
+        // LEFT SPECIALIZED_ONLY for the direct operation consumer, and NOT
+        // because the observer fails them — `D5` measured it succeeding at all
+        // four. Each operation's synthesized `FileError` separately declares
+        // `SiteOperand(0)`. `RT-SITEOP-CARRIED-WITNESS` projects that exact
+        // second use through the emitted byte-span helper without widening the
+        // seat-wide `Avail` relation.
         (Op::FsReadFile, 0) | (Op::FsWriteFile, 0) | (Op::FsChangeMode, 0) | (Op::FsOpen, 0) => {
             Some(bytes)
         }
@@ -14515,6 +14544,25 @@ impl<'src> StaticTransitionPlan<'src> {
             .filter(|record| record.effect_origin == effect_origin)
             .map(|record| record.slot)
             .collect()
+    }
+
+    /// The exact argument slots that the operation's planned synthesized
+    /// result tree consumes as site-bound operands.
+    ///
+    /// This is deliberately occurrence-keyed even though the recipe is chosen
+    /// by operation: the emitter asks about the effect occurrence it is
+    /// lowering, and a non-effect coordinate must refuse rather than borrow an
+    /// operation from elsewhere.
+    pub(in crate::cranelift_backend) fn host_effect_site_operand_slots(
+        &self,
+        effect_origin: StaticOriginId,
+    ) -> Result<BTreeSet<EffectSeatSlot>, CraneliftBackendError> {
+        let operation = self.host_effect_operation(effect_origin)?;
+        let tree = host_effect_recipe_tree(operation);
+        let mut ordinals = BTreeSet::new();
+        collect_site_operand_ordinals(tree.error, &mut ordinals);
+        collect_site_operand_ordinals(tree.ok, &mut ordinals);
+        Ok(ordinals.into_iter().map(EffectSeatSlot::Argument).collect())
     }
 
     /// **Claim the ONE planned record for an exact seat.**
