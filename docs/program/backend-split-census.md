@@ -10,9 +10,14 @@ file in the measured boundary was changed while taking the census.
 ## Inventories
 
 1. [Type ownership](backend-split-census-type-ownership.md) records 278
-   non-private declarations, including all 199 declarations spelled
-   `pub(in crate::cranelift_backend)`, their declaring owners, lexical
-   mint-shape files, and crate-local reference consumers.
+   non-private **type** declarations — `struct`, `enum`, and `type` only —
+   including all 199 spelled `pub(in crate::cranelift_backend)`, their
+   declaring owners, lexical mint-shape files, and crate-local reference
+   consumers. **278 is not the non-private surface of this boundary.** The
+   same domain also holds 694 `pub fn`, 25 `pub const`, 7 `pub static`, and
+   5 `pub mod`, none of which this inventory selects. **Reading 278 as the
+   whole non-private surface understates it, which for a split census is the
+   direction that makes a move look cheaper than it is.**
 2. [Lifecycle, evidence, and closeout](backend-split-census-lifecycles.md)
    records the authority-bearing planner and lowering lifecycles, their
    production evidence, consumers, and terminal checks.

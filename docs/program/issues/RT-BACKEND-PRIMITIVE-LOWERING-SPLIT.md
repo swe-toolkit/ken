@@ -1,7 +1,7 @@
 ---
 id: RT-BACKEND-PRIMITIVE-LOWERING-SPLIT
 title: "Move the primitive-lowering family to its own module — the first production slice of the backend split, and the architectural release point for NATIVE-HANDLE-CARRIER"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -154,9 +154,23 @@ Campaign node #8, cut item 2 — the first production slice of the phase, and th
 only one that is not a planner domain. The phase record and the full 18-item cut
 are in [[RT-BACKEND-MODULE-SPLIT]].
 
-**`draft` until the census returns.** Not framing debt: the frame above is
-shovel-ready and the ownership proof is measured. What is missing is `D6`'s
-verdict, which can re-cut this node — and per the node's own Shape section,
-*"present measurement is enough to choose and frame it; the census supplies the
-binding paths and counts."* **Flip to `ready` when the census merges with a
-clean `D6`.**
+**`ready` as of 2026-08-17. The census merged at squash `8ebc2467d` (PR #2541)
+and its `D6` returned the positive verdict**, which was this node's only bar.
+
+**`D0` is already half-answered, and the answer is in the tree rather than a
+thread.** `D6` revalidated the ownership proof this node was chosen on:
+`lower_primitive_call` has one definition and one caller, every call site of
+the twelve selected helpers lies inside that dispatcher, `lowered_char_list` is
+definition plus one self-recursive call plus the dispatcher, and
+`expect_two_args` is an acyclic shared arity seam confined to selected methods
+rather than a second lowering owner. **No new shared owner and no cycle** —
+so `D0` cites [[RT-BACKEND-SPLIT-CENSUS]]'s record and the measurement SHA
+pinned in it, and does not re-derive the graph.
+
+**The five inventories are the binding reference for `AC-3`'s seam enumeration
+and `AC-1`'s fidelity comparison.** `backend-split-census-type-ownership.md`
+gives the visibility partition, `backend-split-census-reexports.md` gives the
+re-export surface **per build profile** — 29 default library and test, 4
+named-feature only, 2 test-default, 22 test only — and
+`backend-split-census-tests.md` names the 716 tests and 127 mutation surfaces
+that `D2` moves with their subject.
