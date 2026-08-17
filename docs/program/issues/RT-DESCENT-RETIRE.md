@@ -55,19 +55,18 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > verifies** — zero `RecursiveDescentResidual` / `set_selector_variant_exclusion`
 > in `crates/`, both re-homed pins survive.
 >
-> **His mechanism holds, verified by the Steward at `main`:**
+> **The count is SIX**, at `px8l_recursive_decl_native.rs:196` and `:215`,
+> `px8ta_oriented_subcontinuation.rs:279`, `rt_parity_native.rs:643`, and
+> `rt_escape_second_resource_native.rs:628` and `:685`. Six of `ken-cli`'s 33
+> `#[ignore]`s carry `RT-CLOSURE-BOUNDARY-LANE`.
 >
-> - **`ken-cli` has 33 `#[ignore]` tests, and 9 carry `RT-CLOSURE-BOUNDARY-LANE`**
->   — *"a runtime-local closure has no durable lane across the boundary."*
->   (He reported 6; the count depends on the context window. The population is
->   real either way.)
-> - **Row 4's own shape is `host_result_closure_match(...)`**
->   (`control.rs:1368`) — **closure-at-boundary, which is the stated reason
->   those tests are excluded.**
->
-> ⇒ **The corpus that returns "zero source-reachable" has the matching shape
-> removed from it by the ignore rule.** That is a real narrowing of the bound
-> and it was not previously recorded.
+> > **The Steward first recorded NINE and blamed the discrepancy on a "context
+> > window". Both were wrong** (Architect `evt_45fgeg9j7xhpd`, re-verified
+> > here). **A grep over `#[ignore]` attributes is EXACT** — the tag sits on
+> > the attribute, so the count cannot vary with a window. The nine came from
+> > scanning lines *around* each attribute and catching neighbours.
+> > **The Adversary's number was right and the correction to it was not** — and
+> > the "context window" sentence excused the error instead of naming it.
 >
 > ### ONE HALF OF THE FINDING IS REFUTED, AND IT IS ITS STRONGEST SENTENCE.
 >
@@ -82,20 +81,48 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > labels itself a search bound rather than a proof.** The deletion did not
 > outrun its evidence.
 >
-> ### WHAT ACTUALLY STANDS, AND WHY IT STILL MATTERS
+> ### RULED `evt_45fgeg9j7xhpd`: THE INFERENCE OVER-REACHES. NO RECLASSIFICATION.
 >
-> **Not *"the premise is unsettled"* but *"the settled premise's BOUND is
-> narrower than its consumers read it."*** A bounded negative whose search
-> corpus excludes the matching shape is weaker than one whose corpus includes
-> it — and nothing in the tree said which.
+> **The six are excluded at the Closure / DeclarationClosure arm of
+> `boundary_transfer_admissibility` (`mod.rs:11846`) — verbatim their ignore
+> reason. Row 4's new refusal is `Unsupported(StaticWorkerBinding)`, the
+> `close()` conservation-ledger arm. DIFFERENT ARM, DIFFERENT MECHANISM.**
 >
-> **This is the Architect's `AC-10` amendment (`evt_3bkkjpps1bcpe`), so the
-> disposition is his.** It does **not** call for reverting: the record says
-> representability gap over zero source-reachable programs, and the honest
-> repair is to state the bound's domain beside it. **What would settle it is
-> unchanged and cheap relative to what landed: one Ken source program reaching
-> this refusal, or a measurement over a corpus that does not exclude
-> closure-at-boundary tests.**
+> `D1` recorded these as *"one law at two callable kinds"* — and **a shared
+> reason never licenses shared coverage.** That rule is why a separate pin per
+> construct was demanded; it cuts the same way here. ***"Excluded for the
+> Closure arm" is not "would have reached the `StaticWorkerBinding` arm."***
+> ⇒ **The search corpus was NOT gutted of the shape the bound is about.**
+>
+> ### THE CLASSIFICATION NEVER DEPENDED ON THE BOUND. That is the useful outcome.
+>
+> **The six were already `#[ignore]`d at the retirement base `fe5778ef7`, and
+> the population is identical at the landed squash `1aec3e3e1`** — checked at
+> both ends by the Architect and re-verified by the Steward: **6 and 6.**
+>
+> ⇒ ***A test already excluded BEFORE the change cannot be capability the
+> change removed.*** **"Representability gap, not capability loss" STANDS**, on
+> a fact **no future tightening of the bound can disturb.** ⇒ **Stop treating
+> the bound as load-bearing for the classification.** It never was.
+>
+> ### THE DOMAIN TO RECORD IS ARM-LEVEL — not "the corpus excludes closure tests"
+>
+> That drafted framing would have written the imprecise version into the tree,
+> misdirecting the next reader the same way *"fixture-only-by-nature"* was
+> refused for construct 3. The record is:
+>
+> - the bound is over the **`StaticWorkerBinding` conservation arm**;
+> - the six `ken-cli` exclusions sit on the **sibling Closure arm** and **do not
+>   bear on it**;
+> - **but they DO establish that the shared law is source-reachable at the other
+>   arm.** That is the genuinely useful fact, it was nowhere in the tree, and it
+>   is what a reader needs to size the remaining risk honestly.
+>
+> **Successor filed as [[RT-STATIC-WORKER-ARM-SOURCE-WITNESS]], and its cost is
+> corrected: un-ignoring the six does NOT answer it.** They fail at the Closure
+> arm, which is **upstream** — a program refused there never reaches the
+> conservation ledger. **They are not a ready-made corpus**, and *"cheap
+> relative to what just landed"* is not established.
 >
 > ### THE NODE STAYS `active`. TWO DELIVERABLES REMAIN.
 >
