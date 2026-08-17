@@ -11,6 +11,243 @@ github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # 2026-08-17 — `D6a` AND `D7` COMPLETE. THE NODE'S FINAL READS ARE RECORDED.
+>
+> ## `D6a` — THE POST-DELETION REACHABILITY-PREMISE SWEEP
+>
+> **Measured at exact `fd5a010366ee1884c42f1064ec6d395adbf6065e`.** The
+> domain was every non-test portion of the top-level Rust files in
+> `crates/ken-runtime/src/cranelift_backend/lowering/*.rs` and
+> `crates/ken-runtime/src/cranelift_backend/planning/*.rs`. For
+> `planning/static_transition.rs`, the `#[cfg(test)] mod tests` tail beginning
+> at line 18381 was excluded. Test-only bindings embedded in production modules
+> remained in the census and are classified below rather than silently omitted.
+>
+> The seed selector was the frame's four original expressions plus its widened
+> validation expressions:
+>
+> ```text
+> cannot (arrive|occur|reach|happen)
+> never reaches
+> unreachable in practice
+> by construction
+> already refused
+> refused every
+> proved impossible
+> validated upstream
+> guaranteed by the (planner|validator)
+> unreachable-by-validation
+> ```
+>
+> It returned **93 line hits**: 18 lines in `core.rs`, 32 in
+> `mod.rs`, one in `seed_material.rs`, 13 in `units.rs`, and 29 in
+> `static_transition.rs`. The selector was only the seed generator. The actual
+> classification below asks, at each candidate site, which values or routes
+> the statement assumes can reach it and whether that assumption remains true
+> after deletion of `RecursiveDescent`.
+>
+> ### Reachability-premised sites
+>
+> Every site in this table is **at risk by premise**. Every premise remains
+> true on the post-deletion tree; none required a code or comment repair.
+>
+> - `core.rs:11544-11545`: the assumed arrivals are direct-emission projection
+>   pairs whose coordinate and availability have already matched. Producer-local
+>   coordinates are still rejected by that same match, and the projection still
+>   constructs only the matching domain. The deletion changed neither relation.
+> - `core.rs:15250`: the hypothetical arrival is an ordinary clone carrying a
+>   composed-discharge facet. Production still mints that facet only for
+>   `ContinuationDischarge::ComposedSourceContinuation`; removing the authority
+>   selector did not change discharge construction.
+> - `core.rs:19209-19210`: the hypothetical arrival is a declared unit call
+>   whose source is not the one accepted by `validate_declaration_unit_call`.
+>   The arm remains immediately downstream of that validator, which still
+>   constrains the template source before the arm can run.
+> - `core.rs:2318`: the assumed route is the `ProducerArity` control cause
+>   reaching the root-result stop. Its two-argument producer still refuses at
+>   the one-argument `fixture::D2gOut::Node` construct first. Authority deletion
+>   does not alter that fixture route.
+> - `core.rs:2954`: the excluded arrival is a carried word reaching a
+>   specialization-template probe. The source machine still dispatches carried
+>   residual shapes first, before any template probe.
+> - `core.rs:6693`: the excluded route is consumption of a
+>   `StaticWorkerBinding` anywhere except the exact `Var` callee seat. The only
+>   consumer remains the pre-callee exact-`Var` lookup; a non-`Var` or ordinary
+>   value still falls through unchanged.
+> - `core.rs:7093`: the excluded route is the abandoned `Let` body's `Call`
+>   reaching a specialization definition. The backedge still skips that body,
+>   so no call is entered and no definition is emitted.
+> - `mod.rs:4092`: the excluded value is a worker-bearing operand reaching
+>   `specialized_constructor_fields_at`. Recognition still precedes lowering,
+>   and `LoweringEnvironmentBinding::value_at` still refuses that operand on
+>   the producer path before this helper.
+> - `mod.rs:8968`: the excluded value is a worker-bearing template reaching the
+>   materialization read. Both production callers still run the whole graph
+>   through `boundary_transfer_admissibility` and
+>   `source_aggregate_preflight`; recursion remains inside that screened graph.
+> - `mod.rs:9145`: the excluded values are closure-like or protocol-only
+>   operands entering the boundary producer. Entry admissibility still refuses
+>   closure kinds, while `boundary_disposition` still classifies recursive
+>   backedges and traps as protocol-only. The six ignored source tests exercise
+>   the sibling Closure refusal upstream; they do not reach this producer arm.
+> - `units.rs:1285`: the excluded value is a non-worker recursive position in
+>   the selected-worker member loop. The segment input and its checked
+>   `worker_position` still define that population before this loop.
+> - `units.rs:2301-2303`: the excluded state is a continuation-context lookup
+>   returning a row owned by a different enclosing specialization or worker
+>   body. The lookup remains keyed by that pair and the following two equality
+>   checks independently revalidate it.
+> - `units.rs:4788`: the excluded state is disagreement between the token's
+>   selected owner and the owner used at emission. Token selection still supplies
+>   both sides; the deletion did not decouple them, and the defensive comparison
+>   remains live.
+> - `units.rs:4987`: the excluded route is an `R` identity reaching an affine
+>   call seat. `R` remains a fusion-owned body rather than a call target, so
+>   realization still has no call-seat consumption to spend.
+> - `planning/static_transition.rs:2775`: the excluded state is one call
+>   appearing in both `fusion_composed_calls` and the outer-call map. The live
+>   preflight refusal that makes those maps disjoint remains in place.
+> - `planning/static_transition.rs:6895`: the excluded route is an environment
+>   locator outside its owner's source subtree nevertheless being found by the
+>   forward semantic walk. The walk still begins at, and remains within, that
+>   owner subtree; the diagnostic remains its fail-closed outcome.
+> - `planning/static_transition.rs:7455`: the excluded route is a continuation
+>   source outside the same owner's subtree nevertheless acquiring a nearest
+>   alias. The same forward-walk boundary still excludes it.
+> - `planning/static_transition.rs:9154`: the excluded value is a
+>   specialization-key candidate without a checked transport. Candidate
+>   construction still rejects absence before key interning.
+> - `planning/static_transition.rs:10749`: the excluded route is producer-binder
+>   resolution landing directly at the consumer redirect. The planner still
+>   resolves the producer and consumer binder runs independently; the three
+>   governed causes still take the recorded non-redirect route.
+> - `planning/static_transition.rs:10990`: the excluded population is the raw
+>   seed frontier entering oriented enumeration. Enumeration still walks only
+>   admitted discoveries and receives no seed-frontier branch.
+> - `planning/static_transition.rs:15594`: the excluded state is a
+>   non-injective call target reaching the unique-edge lookup. The planner
+>   validator still refuses duplicate targets, and the lookup still performs
+>   its own second uniqueness check.
+>
+> ### Seed hits that are not reachability premises
+>
+> These sites are **not at risk** from the lane deletion. Each dismissal names
+> what carries the statement instead. Consecutive coordinates name one premise.
+>
+> - **Historical or explicitly refuted text:** `core.rs:4915-4916` immediately
+>   says that its quoted premise is false and installs the carried-scrutinee
+>   port; `core.rs:5135` explains the pre-port `Active` failure immediately
+>   before the live early route; `core.rs:19037` documents a retired-route
+>   wrong-arity hazard; `mod.rs:9824` and `mod.rs:9924` explicitly correct the
+>   old Big-integer owner-guard claim; `units.rs:3260` records the replaced
+>   comparison before describing the current planner preflight. None is a live
+>   justification for an arm.
+> - **Test-only observations, mutation controls, or evidence boundaries:**
+>   `core.rs:12479`, `core.rs:13240`, `mod.rs:3878`, `mod.rs:8823`,
+>   `mod.rs:9549`, `mod.rs:9600`, `mod.rs:12285`, `mod.rs:12297`,
+>   `mod.rs:16938`, `units.rs:2815`, `units.rs:6307`,
+>   `planning/static_transition.rs:5367`, and
+>   `planning/static_transition.rs:9624`. They describe why a control can or
+>   cannot distinguish two states, or a `#[cfg(test)]` surface; none delegates
+>   production correctness to an unreachable route.
+> - **Exhaustive enums, sealed partitions, and type/API exclusions:**
+>   `core.rs:16243`; `mod.rs:588`, `mod.rs:777`, `mod.rs:1757`,
+>   `mod.rs:6607`, `mod.rs:11010`, `mod.rs:11557`, `mod.rs:11767`,
+>   `mod.rs:11792`, `mod.rs:11918`, `mod.rs:12218`, `mod.rs:13014`,
+>   `mod.rs:19391`, `mod.rs:21297`, and `mod.rs:21390`;
+>   `seed_material.rs:51`; `units.rs:3287`; and
+>   `planning/static_transition.rs:714`, `:10549`, `:14508`, `:16853`,
+>   `:1713`, `:1715`, `:1908`, `:8726`, `:8794`, and `:9707`. Their
+>   claims follow from exhaustive matching, private constructors, function
+>   signatures, move-only values, or a closed representation partition. The
+>   deleted selector cannot enlarge those sets.
+> - **Construction, indexing, identity, and ownership relations checked at
+>   their producer:** `core.rs:13871`, `core.rs:2385`; `mod.rs:3993`,
+>   `mod.rs:5301`, `mod.rs:6846`, `mod.rs:8553`, `mod.rs:11586`; `units.rs:20`,
+>   `units.rs:5623`, `units.rs:5729`, `units.rs:6049`; and
+>   `planning/static_transition.rs:10264`, `:11323`, `:12448`, `:12452`,
+>   `:12742`, `:14422`, `:15017`, `:17011`, `:6385`, and `:6402`. These are
+>   established by the record constructor, the only push/seed site, descriptor
+>   presence, or the same tuple/index used on both sides, not by which emission
+>   authority wins.
+> - **Reachable refusals rather than claims of unreachability:** `mod.rs:4630`
+>   is the live `close()` consequence for an unconsumed recognition. It is
+>   deliberately reachable and states what failed; it does not justify an arm
+>   by saying the arm cannot run.
+>
+> **Disposition:** the two widened-selector counterexamples are still true at
+> their current coordinates, and the complete behavioral sweep found no stale
+> live premise. The six ignored closure-boundary tests remain an arm-level
+> sibling fact only; `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` remains a separate
+> successor and is not folded into this result.
+>
+> ## `D7` — ABSOLUTE POST-DELETION EMITTED-CODE MEASUREMENT
+>
+> **Measured at the same exact SHA.** The existing
+> `d5a_the_landed_object_fixture_consumes_its_ih_marker_before_emitting_the_worker_call`
+> compiled its normal native object through the targeted `ken-runtime` test.
+> A disposable test-only write exposed those object bytes and was then reverted
+> byte-identically. The artifact was an ELF64 little-endian x86-64 relocatable
+> object. The table is every defined, non-`UND`, `STT_FUNC` symbol reported by
+> `readelf -sW`; sizes are symbol-table bytes.
+>
+> | Bytes | Function |
+> |---:|---|
+> | 85 | `ken_native_int_export_parts_local` |
+> | 100 | `ken_boundary_field_count_local` |
+> | 100 | `ken_boundary_owner_local` |
+> | 100 | `ken_boundary_slot_local` |
+> | 100 | `ken_boundary_tag_local` |
+> | 141 | `ken_boundary_host_success_local` |
+> | 161 | `ken_boundary_scalar_local` |
+> | 163 | `ken_native_int_narrow_local` |
+> | 171 | `ken_native_int_resolve_local` |
+> | 175 | `ken_native_int_export_local` |
+> | 182 | `ken_boundary_field_local` |
+> | 210 | `ken_boundary_store_scalar_local` |
+> | 210 | `ken_boundary_store_tag_id_local` |
+> | 224 | `ken_boundary_host_payload_local` |
+> | 238 | `ken_boundary_byte_local` |
+> | 248 | `ken_boundary_make_immediate_local` |
+> | 257 | `ken_boundary_record_field_local` |
+> | 268 | `ken_boundary_bytes_view_local` |
+> | 306 | `ken_boundary_store_name_local` |
+> | 336 | `ken_boundary_class_local` |
+> | 355 | `ken_boundary_resolve_local` |
+> | 368 | `ken_boundary_store_byte_local` |
+> | 382 | `ken_boundary_escape_check_local` |
+> | 384 | `ken_boundary_store_bytes_len_local` |
+> | 401 | `ken_boundary_store_int_limb_local` |
+> | 416 | `ken_boundary_store_int_tag_local` |
+> | 424 | `ken_native_int_compare_local` |
+> | 442 | `ken_boundary_seal_int_local` |
+> | 464 | `ken_boundary_int_len_local` |
+> | 464 | `ken_boundary_int_sign_local` |
+> | 472 | `ken_boundary_int_view_local` |
+> | 532 | `ken_boundary_int_limb_local` |
+> | 545 | `ken_continuation_1` |
+> | 548 | `ken_boundary_store_int_limbs_local` |
+> | 585 | `ken_boundary_store_field_local` |
+> | 620 | `ken_continuation_0` |
+> | 620 | `ken_continuation_context_0` |
+> | 688 | `ken_native_int_intern_local` |
+> | 862 | `d5a_localization` |
+> | 992 | `ken_boundary_alloc_local` |
+> | 1,234 | `ken_unit_0` |
+> | 1,331 | `ken_native_int_binop_local` |
+> | 4,832 | `ken_unit_1` |
+> | 4,864 | `ken_unit_2` |
+>
+> **Distribution:** 44 emitted functions, 26,600 total symbol bytes; minimum 85
+> bytes and maximum 4,864 bytes. This is a report, not a threshold or tuning
+> target.
+>
+> The opening `RecursiveDescent`-authority figures required by
+> `RT-DECL-CLOSURE-PORT.AC-6` were never written into the tree. That authority's
+> root was deleted at `1aec3e3e1`, so the missing side is no longer recoverable
+> on the post-campaign tree. **No delta, estimate, reconstruction, regression
+> claim, or tuning conclusion is made.**
+>
 > # 2026-08-17 — THE `RecursiveDescent` ROUTE IS DELETED. `D3`-`D6`/`D8` MERGED.
 >
 > **Landed squash `1aec3e3e1c0dbc1100656b1abce84aaf37134910`** (PR #2523),
