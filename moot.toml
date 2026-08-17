@@ -232,12 +232,34 @@ startup_prompt = "You lead Ken's Runtime team. Read agent/COORDINATION.md (feder
 
 [agents.runtime-implementer]
 display_name = "Runtime implementer"
-# Reseated from `claude-opus-5[1m]` back to `gpt-5.6-sol` on 2026-08-13 per the
-# operator, swapping seats with `architect`. Codex harness, so
-# `model_reasoning_effort` — NOT `effort`.
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "high"
+# Reseated from `gpt-5.6-sol` to Sonnet 5 on 2026-08-17 per the operator
+# ("reseat runtime-implementer as sonnet 5 high thinking").
+#
+# This EXECUTES the switch MODELS.md already ruled and scheduled: the operator's
+# 2026-08-10 directive suspends Runtime's T1 exception for the
+# `RT-BACKEND-MODULE-SPLIT` slices, names "default Sonnet 5" between the two T2
+# options, and sets the timing at the phase boundary — "when the first #8 slice
+# is released, not before." That slice, `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT`,
+# merged 2026-08-17. So this is the scheduled T1 -> T2 move, not an ad-hoc one.
+#
+# Done at a seam: the seat had just handed back `RT-SITEOP-CARRIED-WITNESS` `D2`
+# and released a clean worktree. MODELS.md warns that downgrading mid-arc lands
+# the cost on the hardest deliverable — this is the opposite of mid-arc.
+#
+# Claude Code harness, so `effort` — NOT `model_reasoning_effort`, and the
+# `harness = "codex"` key is DELETED, not left behind. Changing `model` alone
+# would misconfigure the seat; this file warns about that key split twice.
+#
+# ⇒ THE STRANDING RISK MOVES BACK. The 2026-08-13 note below says this seat
+# "inherits the Codex behaviour it did not have" — mentions strand it, `moot
+# compact` works, `send-keys -l` needed. On Claude Code that reverses again:
+# it should stop stranding on mentions, and `moot compact` becomes no-op-prone
+# here. Move the per-tick composer check OFF this pane.
+#
+# The exception covers #8 slices. Work that is discovery or semantic repair is
+# documented as staying T1 — raise it rather than assuming this seating carries.
+model = "claude-sonnet-5"
+effort = "high"
 startup_prompt = "You are the Runtime team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/runtime/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.runtime-qa]
