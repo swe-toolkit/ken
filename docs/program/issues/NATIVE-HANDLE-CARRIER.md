@@ -11,6 +11,76 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # IN REVIEW 2026-08-17 — `3d23f1182` is an AUTHORIZED PARTIAL at the exact-SHA gate
+>
+> **The hard stop below is RESOLVED. Read this banner for the current state.**
+>
+> ### The differential came back outcome 1
+>
+> `scripts/ken-cargo test -p ken-cli --test rt_parity_native -- --ignored
+> fs_read_at_malformed_offset_narrows_to_invalid_offset --exact`, run at base
+> `7b8dad7df` **and** at tip `3d23f1182` (`evt_6h59tq0zpe7dn`). Both refuse at
+> `Packaging(ObjectLinkerPackagingError { stage: ObjectEmission, field:
+> checked_process_object, reason: unsupported runtime-IR lowering: BoundaryCarrier
+> … the call provides 1 })` — **`stage`, `field` and `reason` byte-identical.**
+>
+> ⛔ **`--ignored` is load-bearing.** The row is `#[ignore]`d at base, tip **and**
+> `origin/main`, so a plain targeted run reports `0 passed; 0 failed; 1 ignored`
+> at both ends. **That inert result wears "same at both ends" shape** and would
+> have licensed the partial on an instrument that never executed the program.
+> The Steward's first specification of this measurement had that defect;
+> the Architect caught it (`evt_13ax2j6e0jfq2`).
+>
+> ⇒ The candidate **introduces no `AC-5` regression**, `§9`'s ban is stale, and
+> the `D1'`/`D2'`/`D2a` partial is **admissible** — Architect conditional lift,
+> discharged.
+>
+> ### ⛔⛔ `AC-5` IS OUTSTANDING. THE BAN BEING STALE IS NOT THE CRITERION MET.
+>
+> These are two facts one word apart, and the Architect has said they will read
+> the Decision text for exactly that conflation. `D3`, `D4`, `D5` are not
+> claimed; `AC-3` rides on `D3`.
+>
+> ### The gap is a MISSING PORT, owned outside this node
+>
+> **Ruled `evt_13ax2j6e0jfq2`.** The guard is the **fallback arm of a two-arm
+> dispatch**: at all four call sites (`:2978`, `:3477`, `:9759`, `:17513`) an
+> `if let Some(body) = recursive_unit_body` arm sits above it, lowers the
+> arguments and passes them to `call_declared_recursive_position_unit`. ⇒ **A
+> carried residual DOES take arguments when a declared unit exists**, so the
+> determinant is **what the compiler has, not what the value is** — bookkeeping,
+> not denotation.
+>
+> ⇒ **The doc's totality claim is false at all four of its own call sites**
+> (*"the zero-argument structural IH route … is the only one"*). The producer is
+> `recursive_position_unit_body` (`core.rs:15668`), which returns `Some` only for
+> a **capture-free** `LexicalClosure` or a `Closure`; **a lexical closure WITH
+> captures falls to `None`**, because its carried value exposes no capture
+> operands to a generated call frame. That is the port.
+>
+> ⇒ **The durable closure lane is NOT a prerequisite** — the succeeding arm uses
+> no closure, it calls a declared unit. So this node is neither mis-implemented
+> nor mis-sequenced against that lane.
+>
+> ### The publication gate: QA was halted in error, and it is restored
+>
+> The Steward's outcome-1 wording read as authorizing direct publication and QA
+> stood down. **What the Architect lifted is `§9`'s admissibility ban and nothing
+> else** — a policy question, not a verdict on whether `3d23f1182` is a good
+> candidate (`evt_n8n5zbnm4qgh`). ⛔ **`M1` requires a `resolved` Decision read
+> from the object, and none exists.** Corrected at `evt_1g2p10jfy7qbj`.
+>
+> **Declared range, posted before reviewers anchor:** base `7b8dad7df` → tip
+> `3d23f1182`, **4 commits**, **17 files, +568 / -116**, all under `crates/`.
+> ⚠ Three are preserve/WIP commits carried through the rebase (`dc98592de`,
+> `d69e470dd`, `4c9c59d3e`); a reviewer expecting one commit reads them as
+> unexplained. The Architect owes real verdicts on **`AC-1`**'s stale-base
+> control and **`AC-2`**'s Big-identity mutation. Since `crates/` is touched, the
+> Adversary `M8` edge is in scope at publish.
+>
+> ⇒ **[[PX8-F-CAP-41]] Phase 2 does NOT flip on this merge** — see `§12` of the
+> frame and that node's leading banner.
+
 > # HARD-STOPPED 2026-08-17 12:54 — `3d23f1182` HELD, routed to the Architect
 >
 > **Runtime-leader handback `evt_s5bhmq0n4yad`; Steward routing `evt_64w7h59bd91y8`

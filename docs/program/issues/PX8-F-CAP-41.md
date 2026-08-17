@@ -11,7 +11,60 @@ github: 41
 origin: charter backlog (#41); RE-GROUNDED as a live PX8 clause-(a) blocker by architect verdict evt_163mfgjs7fkh8 (2026-07-23); RE-SCOPED spec-first by architect ruling evt_xnkrzjy1c8br (2026-07-23)
 ---
 
-> ## ⭐⭐ 2026-07-27 — Phase 2 IS FRAMED, and it is NOT a separate WP
+> # UNPAIRED 2026-08-17 — Phase 2 does NOT close on [[NATIVE-HANDLE-CARRIER]]'s merge
+>
+> **Architect ruling `evt_13ax2j6e0jfq2`; Steward disposition, this unpairing is
+> the Steward's.** The banner below mandated the opposite and is superseded on
+> its own stated ground.
+>
+> ### Why the pairing dissolved
+>
+> The pairing rested on the honest-partial ban, and **that ban is discharged.**
+> Its warrant was that the candidate *regresses* an already-GREEN native row
+> (`AC-5`). Measured 2026-08-17 with `--ignored` at both ends
+> (`evt_6h59tq0zpe7dn`): the row refuses **identically** at base `7b8dad7df` and
+> at tip `3d23f1182` — same `stage`, `field`, and `reason`, byte-identical.
+> ⇒ The candidate regresses nothing, so the ban is stale and the partial is
+> admissible.
+>
+> ⛔⛔ **`AC-5` IS STILL OUTSTANDING. Do not read the lifted ban as a met
+> criterion** — the ban being stale and the criterion being satisfied are
+> different facts, one word apart in every artifact that describes this.
+>
+> ### ⇒ What Phase 2 may NOT claim
+>
+> **The four CAP-41 rows still refuse**, at `lowering/core.rs:2929`
+> `reject_carried_residual_arguments`. The Architect ruled the gap a **MISSING
+> PORT** whose owner is **outside this node** — the determinant is whether the
+> body has a declared recursive-position unit, not any property of the carried
+> value.
+>
+> ⇒ **The carrier partial may land; Phase 2 closure may NOT ride on it.**
+> Closing Phase 2 on that merge would be **a claim about the past** while the
+> rows it names refuse. The pairing's premise — "the fixture cannot land without
+> the fix" — turned out to be true in the other direction too: **the fix can land
+> without the fixture going green.**
+>
+> ### The separate-framing prohibition is LIFTED, and Phase 2 needs a scope call
+>
+> ⛔ The bar below on framing Phase 2 separately **no longer binds** — it existed
+> only to enforce the one-merge pairing. Phase 2 now needs one of:
+> - **hold the closure claim** until the missing port lands, keeping
+>   `depends_on` pointed at the port's owner rather than at the carrier; or
+> - **redefine Phase 2 to exclude the refusing rows**, which is a real scope cut
+>   and is the Steward's to make.
+>
+> ⚠ **Neither is chosen yet, and `depends_on` still names
+> [[NATIVE-HANDLE-CARRIER]].** That edge is what `gen-progress.sh` reads, so it
+> is what will misreport first: when the carrier partial merges, this node's
+> only dependency reads `merged` and Phase 2 enters the frontier as startable
+> while the rows it exists to green still refuse. ⇒ **Re-point or extend
+> `depends_on` at the port owner as part of the scope call, before that merge
+> lands.**
+
+> ## SUPERSEDED 2026-08-17 — was: Phase 2 IS FRAMED, and NOT a separate WP (07-27)
+>
+> **Read as history. Its operative bars are lifted by the banner above.**
 >
 > **Phase 2 and [[NATIVE-HANDLE-CARRIER]] are ONE deliverable and close in ONE
 > merge.** The frame is `docs/program/wp/NATIVE-HANDLE-CARRIER.md` (owner
