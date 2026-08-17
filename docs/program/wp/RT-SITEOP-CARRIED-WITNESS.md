@@ -11,27 +11,32 @@ be discharged by any byte-span mechanism. This node resolves the conflict.**
 **Risk:** medium-high — the touched typing exists to make an unsound
 substitution unstateable.
 
-**Status `draft`. The gap is measured; the MECHANISM is an open Architect
-fork.** This frame states the gap and the fork. It does **not** pick the
-answer, and a reader must not treat §3's options as a recommendation.
+**Status `ready` as of 2026-08-17. §3's fork is RULED** (Architect
+`evt_559gymspqap8w`, pasted verbatim below). The gap was always measured; what
+was open was the mechanism, and it is now answered.
 
 ---
 
 ## 1. Fixed inputs
 
-Measured at `origin/main = 11bc4c4a`, plus the held `RT-CARRIER-BYTESPAN-OBSERVE`
-`D5` candidate `4244d082915bbd6fe154a5e727c6a23c879f1f37`.
+**RE-PINNED at `origin/main = dd7301fc4` (2026-08-17).** The original anchors
+were measured at `11bc4c4a`; `RT-CARRIER-BYTESPAN-OBSERVE` `D5` and then
+[[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] both landed in this region, moving every
+one of them by roughly 2,200 lines. The `D5` candidate
+`4244d082915bbd6fe154a5e727c6a23c879f1f37` is merged, not held.
 
-| anchor | what it is |
-|---|---|
-| `lowering/mod.rs:11354-11362` | `site_operand_argument` — the sole template projection |
-| `lowering/mod.rs:11640-11667` | the `SiteOperand` reconciliation arm and its refusal |
-| `lowering/mod.rs:11316-11333` | `site_operand_witness` — what a witness may be |
-| `lowering/mod.rs:11300-11304` | why `None` is a refusal rather than a fallback |
+| anchor at `dd7301fc4` | what it is | was |
+|---|---|---|
+| `lowering/mod.rs:13568-13576` | `site_operand_argument` — the sole template projection | `:11354-11362` |
+| `lowering/mod.rs:13872-13888` | the `SiteOperand` reconciliation arm and its refusal | `:11640-11667` |
+| `lowering/mod.rs:13520-13530` | `SiteOperandWitness` and `site_operand_witness` — what a witness may be | `:11316-11333` |
+| `lowering/mod.rs:13517` | why `None` is a refusal rather than a fallback | `:11300-11304` |
 
-**Re-pin at pickup.** `D5` lands in this region before this node starts, and
-these anchors will move. They are recorded so the *derivation* below can be
-checked against what changed — not so the line numbers can be trusted.
+**Verified individually by the Steward at `dd7301fc4`, by content and not by
+offset** — each was located by grepping its own text, so a further shift
+invalidates the number without invalidating the anchor. **Re-pin again at
+pickup** and check the derivation against what moved; the line numbers are
+recorded to be checked, not trusted.
 
 ## 2. The conflict, exactly
 
@@ -55,34 +60,196 @@ substitution for exactly the variants nobody thought about."* Any candidate
 that makes the refusal quieter, rather than making the witness available, is
 the wrong shape and should be rejected on sight.
 
-## 3. THE OPEN FORK — the Architect rules this before the node goes `ready`
+## 3. THE FORK IS RULED — Architect `evt_559gymspqap8w`, 2026-08-17
 
-**The question:** how does a site-bound operand obtain a witness when its seat's
-value is carried?
+**The question was:** how does a site-bound operand obtain a witness when its
+seat's value is carried?
 
-**This frame does not choose.** Sketches of the shape the answer might take are
-recorded only so the fork is legible; **none is endorsed, and the list is not
-asserted to be exhaustive:**
+**The answer is the first of the three sketches, in a specific form: project the
+carried word to runtime `(pointer, len)` through an emitted helper and admit
+that as the site operand's value** — §2g's ruled emitted-helper route.
 
-- give the reconciliation a witness form that a carried span can satisfy;
-- give the site path a provenance independent of the seat, so the synthesized
-  node never reads a seat that activation may carry;
-- constrain the two readers so a seat consumed as `SiteOperand` is structurally
-  ineligible for activation, making the conflict unstateable rather than
-  refused.
+> ### THIS SECTION IS THE AUTHORITY FOR THE RULING. Do not paste it anywhere else.
+>
+> The Architect asked that the ruling be pasted here verbatim rather than cited
+> by event id, so the ring does not have to fetch an id to act on it. **That
+> makes this frame the single place it lives.** Do not copy it into a code
+> comment: `lowering/mod.rs:3506-3509` records that an earlier revision pasted a
+> ruling into a comment and thereby created a **second authority** — *"the exact
+> defect this chain keeps paying for."* Cite this section, do not restate it.
+>
+> **Where this frame and `RT-FNSPLIT-C1-operational-carrier.md §2g` disagree,
+> §2g governs** — it carries Architect Decision `dec_4te25repm33ph` verbatim.
+> The ruling below says the same of itself: *"the frame governs over any
+> restatement — including this post."*
 
-**Each has a materially different blast radius on the soundness argument**, and
-picking between them is a component-design call — `COORDINATION §9`, the
-`any → Architect` edge. **Route it as "which mechanism?", never as "may I do
-X?"**, which presumes the answer.
+### 3a. Coordinate corrections — the ruling's line numbers are 20-25 low
 
-**Until the Architect rules, this node is `draft` and nobody builds against
-it.** A ring that starts here without the ruling will produce a candidate whose
-mechanism is unreviewed at exactly the layer that most needs review.
+**The ruling's prose is verified correct at `dd7301fc4`; its line numbers are
+not.** Every cited site was located by its own text and every substantive claim
+checks out. Use this table, not the numbers inside the quotation.
+
+| the ruling cites | actual at `dd7301fc4` |
+|---|---|
+| `planning/static_transition.rs:5380-5386` | **`:5403-5408`** |
+| `lowering/mod.rs:3633`, `:4066` (the ban) | **`:3963-3967`** (refuses-not-converts), **`:6481-6484`** (the no-inverse block), **`:3345`** |
+| `lowering/mod.rs:13555` `site_operand_witness` | **`:13530`** (enum at `:13520`) |
+| `lowering/mod.rs:3602` `CarriedBoundaryWord` | **`:3499`**, its governing comment at **`:3494-3497`** |
+| `lowering/core/tests/effects.rs:3551` | **`:3548`** |
+| `specialized_join_arm` (no line given) | **`lowering/mod.rs:4029`** |
+| `SynthesizedArgument::into_lowered` (no line given) | **`lowering/mod.rs:13497`** |
+
+### 3b. The ruling, verbatim
+
+> **CAPABILITY RULING — `NATIVE-HANDLE-CARRIER` effect-seat gap.** Grounded in
+> the mechanism; every claim below cites the site I read it at. **The hard stop
+> was correct and so was refusing to add `int_to_uint64_raw`.**
+>
+> ## Q1: both offered locations are the wrong one
+>
+> **`CarriedWord` is the correct representation and §38 stays closed. The
+> seat-observation side is ALSO already correct** — this is not a gap on either
+> side of the fork as posed.
+>
+> `D5` (`RT-CARRIER-BYTESPAN-OBSERVE`) **measured the byte-span observation
+> succeeding at all four** of `FsReadFile/FsWriteFile/FsChangeMode/FsOpen`
+> `Argument(0)`. They were left `Avail::SPECIALIZED_ONLY` **deliberately, and
+> explicitly not because the observer fails them** —
+> `planning/static_transition.rs:5380-5386`:
+>
+> > *"LEFT SPECIALIZED_ONLY, and NOT because the observer fails them — `D5`
+> > measured it succeeding at all four. Each is the `SiteOperand(0)` of its
+> > operation's synthesized `FileError`, so the same seat is read a SECOND time
+> > as a compile-time `Lowered` template. Supplying one from a boundary word is
+> > the `Carried -> Lowered` inverse this node bans. **Flipping them makes the
+> > refusal later and less legible, not absent.**"*
+>
+> ⇒ **The binding constraint is a second, different consumer of the same
+> operand**, and the refusal text names the membership test because that is
+> where the check sits — not because that is what must change.
+>
+> **This is the same trap the ring just stepped around, one layer in.** Widening
+> this seat's `Avail` to `EITHER_PHASE` would be a green, well-tested change
+> that fixes nothing: the refusal relocates into `FileError` synthesis, later
+> and harder to read. It is not even quietly available —
+> `ac_4_byte_span_seats_are_activated_exactly_where_d5_proved_them`
+> (`lowering/core/tests/effects.rs:3551`) asserts the **whole partition** as a
+> normative compatibility vector, so a flip reds there and forces a per-seat
+> evidence decision. That control is doing exactly its job.
+>
+> ## Q2: the mechanism, and what it is not
+>
+> **It is NOT the banned `Carried -> Lowered` inverse.** The ban's content is
+> precise (`lowering/mod.rs:3633`, `:4066`): it forbids **answering a
+> compile-time question about a runtime value** — recovering a *template*. Two
+> in-tree precedents bound it: `specialized_join_arm` **refuses** rather than
+> converts, and the carried-join dual moves `Lowered -> CarriedBoundaryWord`,
+> the sanctioned direction.
+>
+> **The `FileError` site operand does not evidently ask a compile-time
+> question.** `site_operand_witness` (`mod.rs:13555`) maps a byte span to
+> `Values(pointer, len)` — **runtime CLIF values** — and `Lowered` already has
+> runtime-valued inhabitants (`ResponseBytes`, `ResourceToken`,
+> `CapabilityToken`, `BorrowedNativeValue`).
+>
+> **The decisive fact is the carrier's shape.** `CarriedBoundaryWord { word:
+> ir::Value }` is a **single** value (`mod.rs:3602`), and its own governing
+> comment says field counts and children are *"answered by calling an emitted
+> helper at runtime, never by reading a field of this struct — the struct having
+> room for a compile-time answer is exactly how the wall would grow back."*
+>
+> ⇒ **The available direction: project the carried word to runtime `(pointer,
+> len)` through an emitted helper and admit that as the site operand's value.**
+> That is §2g's **ruled emitted-helper route**, which is the sanctioned
+> mechanism by construction — not the inverse. A byte span's pointer and length
+> cannot come from reading the word; they were always going to come from an
+> emitted call.
+>
+> ## What I am NOT ruling — and it is the successor's first deliverable
+>
+> **Two premises I did not walk, stated so nobody treats this as settled:**
+>
+> 1. **Whether the synthesized `FileError`'s child is read as a template
+>    anywhere downstream** — erasure, or the checked-core body view.
+>    `SynthesizedArgument::into_lowered` hands it on as a real `Lowered` child,
+>    so it is not merely witnessed and discarded. **If any downstream reader
+>    takes a template from it, the gap is genuinely representational and my
+>    direction above is wrong.** I enumerated the two accessors and the two
+>    `site_operand_witness` call sites; I did not walk the child's downstream
+>    consumers.
+> 2. **Whether minting a runtime-valued `Lowered` from a carrier is itself
+>    within §2g/§2h.** That is the frame's to answer, and **the frame governs
+>    over any restatement** — including this post.
+>
+> **Answer (1) before sizing anything.** The two answers differ by a lot, and
+> this is precisely the diagnostic-first discipline that just paid for itself.
+>
+> ## Q3: scope
+>
+> **This does not belong in `NATIVE-HANDLE-CARRIER`.** The component that must
+> change is **synthesized error-value construction and site-operand
+> provenance**, not the handle carrier. That node narrows to what its name says;
+> this gets a successor.
+>
+> Agreed the `S` sizing is dead — but **do not re-size the successor until
+> deliverable 1 answers premise (1)**, because a plumbing answer and a
+> representational answer are not the same node. The cut is yours; I am not
+> proposing one.
+
+### 3c. What the ruling does to §2, and it does not soften it
+
+**§2 stands unchanged.** The refusal is still not a bug, and a candidate that
+makes it quieter is still the wrong shape. The ruling *sharpens* why: the
+refusal text names the membership test **because that is where the check sits,
+not because that is what must change**. ⇒ Editing `specialized`, the `Avail`
+partition, or `site_operand_witness`'s `None` arm to make the error go away is
+now doubly banned — §8 already forbade it, and the ruling shows it merely
+relocates the refusal into `FileError` synthesis.
+
+**The third sketch in the original fork — making the conflict unstateable by
+constraining the two readers — is NOT the ruled answer.** Do not build it.
 
 ## 4. Deliverables
 
-**Provisional. `D2` onward depend on §3's ruling and will be re-cut with it.**
+**`D1`/`D1a`/`D1b` are firm and dispatchable now. `D2` onward are cut only
+after `D1b` reports** — see the sizing hold below.
+
+> ### THE SIZING HOLD IS THE ARCHITECT'S, AND IT BINDS ME AS WELL AS YOU
+>
+> *"Do not re-size the successor until deliverable 1 answers premise (1),
+> because a plumbing answer and a representational answer are not the same
+> node."* **The `size: L` in the node's frontmatter is the pre-ruling
+> provisional and is not evidence of anything.** `D1b` is a diagnostic and is
+> sized for about an hour; the rest of this node is unsized on purpose.
+>
+> **Report `D1b` and stop there.** Do not roll into `D2` in the same turn, even
+> if the answer looks obvious — the recut is the Steward's and it depends on
+> which answer you got.
+
+- **`D1b` — THE FIRST DELIVERABLE. Answer the Architect's premise (1): is the
+  synthesized `FileError`'s child read as a TEMPLATE anywhere downstream?**
+
+  Walk the child's downstream consumers — **erasure and the checked-core body
+  view are the two the Architect named**, and the walk is not limited to them.
+  The starting point is `SynthesizedArgument::into_lowered`
+  (`lowering/mod.rs:13497`), which hands the child on as a real `Lowered`, so it
+  is **not merely witnessed and discarded**.
+
+  **The Architect enumerated the two accessors and the two `site_operand_witness`
+  call sites and explicitly did NOT walk the consumers. That is exactly the
+  work.** Do not re-do the enumeration; start where it stopped.
+
+  **The two outcomes are different nodes, so report which one you found:**
+
+  | if | then |
+  |---|---|
+  | **no downstream reader takes a template** from the child | the ruled emitted-helper projection is available, and the remaining work is **plumbing** |
+  | **any downstream reader takes a template** | the gap is **genuinely representational**, the Architect's direction in §3b is **wrong by its own terms**, and this returns to the Architect rather than to a fix |
+
+  **A negative result here is a real deliverable, not a null one.** State the
+  route you walked and what you read, so the negative is falsifiable — a
+  zero-hit grep is evidence about a name, and this claim needs to be about the
+  mechanism.
 
 - **`D1` — carry the measurement in, do not re-derive it.**
   [[RT-CARRIER-BYTESPAN-OBSERVE]]'s `D5` established the blocker on two
@@ -108,7 +275,17 @@ mechanism is unreviewed at exactly the layer that most needs review.
 
 ## 5. Acceptance criteria
 
-**Provisional except `AC-1` and `AC-2`, which hold whatever the mechanism.**
+**`AC-0` is the only one `D1b` must meet. `AC-1` and `AC-2` hold whatever the
+mechanism; the rest are cut with the recut.**
+
+- **`AC-0` — premise (1) is answered on a walked route, and the answer names
+  which of the two outcomes in §4 obtains.** The report cites the consumers it
+  walked, by file and symbol, and says explicitly whether any takes a template
+  from the synthesized `FileError`'s child.
+
+  **This AC is discharged by a report, not by a green suite**, and it is the
+  one deliverable here that cannot be satisfied by a passing test. A candidate
+  that changes code has overrun `D1b`.
 
 - **`AC-1` — the refusal still refuses.** The substitution the `SiteOperand`
   typing exists to prevent is still unstateable, demonstrated by a control that
@@ -122,7 +299,19 @@ mechanism is unreviewed at exactly the layer that most needs review.
   `passed / failed` pair reads green while nothing has been un-skipped.
 - **`AC-3` (no-regression).** Workspace green **in CI** — never a local
   `--workspace` run (`COORDINATION §12`).
-- Further ACs land with §3's ruling.
+- Further ACs land with the `D1b` recut.
+
+## 5a. What "done" unblocks — this node is now on the critical path
+
+**It was `blocks: []` and that was wrong from 2026-08-17.**
+[[NATIVE-HANDLE-CARRIER]] hard-stopped on this exact gap
+(`evt_4eynen6drs79x`), and the Architect ruled the fix does not belong in that
+node. So the edge is real and now recorded: this node **blocks
+[[NATIVE-HANDLE-CARRIER]]**, which in turn heads **19 transitive dependents** —
+`PX8-F-CAP-41` → `PX8` → {`ABI-R3`, `PX9`} → Tracks A/M/S/T.
+
+**Concretely, this is what stands between the tree and a complete Linux ABI.**
+That is a reason to get `D1b`'s answer right, not a reason to hurry past it.
 
 ## 6. Inherited: the `D6` activation-gate discharge pass
 
@@ -160,7 +349,14 @@ activation is a one-line change plus its pin**, and that remains available.
 - **Weakening the `SiteOperand` refusal or `site_operand_witness`'s `None`
   arm** to make the error disappear. See §2 — that is the failure mode, not the
   fix.
-- **Building against §3 before the Architect has ruled it.**
+- **Rolling `D2` into the same turn as `D1b`.** The recut is the Steward's and
+  it depends on which answer `D1b` returns. See §4's sizing hold.
+- **Widening the four `Fs*` `Argument(0)` seats to `EITHER_PHASE`.** §3b rules
+  it: a green change that relocates the refusal into `FileError` synthesis
+  rather than removing it. `ac_4_byte_span_seats_are_activated_exactly_where_
+  d5_proved_them` (`lowering/core/tests/effects.rs:3548`) reds on it by design.
+- **Building the third fork sketch** — making the conflict unstateable by
+  constraining the two readers. It was not the ruled answer.
 - **Absorbing a row whose measured cause turns out not to be this blocker.**
   That is a finding and a Steward recut.
 - **Re-deriving the `D5` measurement** instead of carrying it in.
@@ -170,3 +366,9 @@ activation is a one-line change plus its pin**, and that remains available.
 Stop and return the seam if the ruled mechanism turns out to require changing
 what a `Lowered` witness *is* for readers other than `SiteOperand`, or if the
 29 rows split across more than one cause after `D1a`.
+
+**Added with the ruling: stop if `D1b` finds a downstream template reader.**
+That makes the gap representational, which the Architect stated would make its
+own §3b direction wrong. **Return it — do not try to route around the reader**,
+and do not treat "only one reader, and it looks harmless" as a negative result.
+The Architect asked for this premise precisely because it did not walk it.

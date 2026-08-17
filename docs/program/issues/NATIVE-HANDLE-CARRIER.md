@@ -5,18 +5,55 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]
+depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS]
 blocks: [PX8-F-CAP-41]
 github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # HARD-STOPPED 2026-08-17 ON A NON-PRIMITIVE EFFECT-SEAT GAP. AWAITING AN ARCHITECT RULING.
+> # HARD-STOPPED 2026-08-17. THE ARCHITECT RULED: THE GAP IS NOT THIS NODE'S.
+>
+> **RULED at `evt_559gymspqap8w`** (answering `evt_1vdg5skdf1ndh`). **The hard
+> stop was correct and so was refusing to add `int_to_uint64_raw`.**
+>
+> **The fix does not belong here.** The component that must change is
+> **synthesized error-value construction and site-operand provenance**, not the
+> handle carrier — so **this node narrows to what its name says** and the gap
+> goes to a successor.
+>
+> ### THE SUCCESSOR ALREADY EXISTED: [[RT-SITEOP-CARRIED-WITNESS]], now `ready`.
+>
+> **It was filed 2026-08-07 against this same conflict** and sat `draft` on one
+> bar: an open Architect fork on the mechanism, which is the fork just ruled. It
+> is a **fold, not a new node** — checked before writing one, per §4e. Its
+> `depends_on` ([[RT-CARRIER-BYTESPAN-OBSERVE]]) is `merged`, and it now carries
+> the ruling verbatim in `§3b` of its frame.
+>
+> **`depends_on` gained it on 2026-08-17.** The hard stop is the evidence: this
+> node cannot reach `AC-5` until that one lands.
+>
+> ### THE RULED MECHANISM, AND THE TRAP IT NAMES ONE LAYER IN
+>
+> **`CarriedWord` is the correct representation, §38 stays closed, AND the
+> seat-observation side is already correct** — the gap was on neither side of
+> the fork as I posed it. The four `Fs*` `Argument(0)` seats are
+> `SPECIALIZED_ONLY` **deliberately and not because the observer fails them**
+> (`planning/static_transition.rs:5403-5408`); each is the `SiteOperand(0)` of
+> its own synthesized `FileError`, so **the binding constraint is a second,
+> different consumer of the same operand.**
+>
+> ⇒ **Widening the seat's `Avail` would be the same trap the ring just stepped
+> around, one layer in**: a green, well-tested change that relocates the refusal
+> into `FileError` synthesis rather than removing it.
+>
+> **The available direction is §2g's ruled emitted-helper route** — project the
+> carried word to runtime `(pointer, len)` through an emitted helper. That is
+> sanctioned by construction, not the banned `Carried -> Lowered` inverse.
 >
 > **`status: active` and NOBODY IS WORKING IT.** There is no `blocked` status;
-> `ready` would put it back on the dispatch frontier when it needs a ruling
-> first, so `active` plus this banner is the accurate pair. **Do not dispatch
-> this node until the Architect answers `evt_1vdg5skdf1ndh`.**
+> `ready` would put it back on the dispatch frontier when it is waiting on a
+> successor, so `active` plus this banner is the accurate pair. **Do not
+> dispatch this node until [[RT-SITEOP-CARRIED-WITNESS]] lands.**
 >
 > **No candidate exists and none was sent to QA.** The ring ran the diagnostic
 > first deliverable at base `bad9a9bb0` and reset the branch (`evt_4eynen6drs79x`).
