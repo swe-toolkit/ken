@@ -63,6 +63,44 @@ origin: Architect ruling evt_54zvaqbrm752x (2026-08-10) §5, answering the campa
 > arm is [[NATIVE-HANDLE-CARRIER]]'s and now has a durable home to land in —
 > `lowering/core/primitive.rs`, with the dispatcher at `:43`.
 >
+> ### THE ADVERSARY CLOSED THE HOLE I FLAGGED, AND ITS ARGUMENT IS BETTER THAN MINE
+>
+> **Hunt `evt_32xzh27atv6ee`, no finding.** In the M8 notification I named a
+> shared blind spot — **all three fidelity instruments normalize whitespace and
+> the one forced visibility change before comparing, so three agreements on the
+> same normalization are one chance to catch what it hides, not three** — and
+> said I had no candidate for what could hide there. The Adversary supplied the
+> shape and then measured it.
+>
+> **The blind spot has a name: path-relative resolution.** Normalization
+> preserves text, so what survives it is **text that means something different
+> in the new location.** For a module move that is dominated by two things, and
+> both are measurable:
+>
+> | axis | measured |
+> |---|---|
+> | `#[cfg]` context | 2 attrs in `primitive.rs`, 1 removed from parents — `#[cfg(test)] mod tests;` at `:8` is new scaffolding for the renamed test file, `#[cfg(test)]` at `:306` is the one that moved. **1 moved + 1 new = 2; no moved code changed compilation context.** |
+> | path-relative refs | `crate::` 11, `super::` 1, `self::` 0. **Eleven of twelve are absolute, so their meaning cannot depend on where the code lives**; the twelfth is the conventional `use super::*` a split-out child uses. |
+>
+> ⇒ **This is a structural argument rather than a comparison, and that makes it
+> stronger than the three instruments.** They establish that the text did not
+> change. **This establishes that the text's meaning could not have.**
+>
+> **It is nearly empty, not empty, and the residual is stated rather than
+> waved off.** `use super::*` now binds against `core` where this code
+> previously sat *inside* `core`, so a name reachable in both `core` and
+> `lowering` could in principle bind differently. **Rust errors on ambiguous
+> glob resolution at the use site**, so a silent rebind needs a name present in
+> exactly one of them at each site — which is why the verdict is *nearly*
+> empty.
+>
+> **A second note worth keeping, because it changes how the zero row may be
+> edited.** The new module's all-zero census row is a live sentinel: a later
+> artifact-level definition in `primitive.rs` makes some count `1 ≠ 0` and reds.
+> **Its correctness rests on those counters detecting that pattern at all, which
+> only the roster's non-zero rows establish** — so the zero row is meaningful
+> *because* the roster has non-zero rows, never on its own.
+
 > **One should-fix carried, not respun.** The child's module doc says it owns
 > "symbol dispatch, and **emission**", while the census row added in this same
 > candidate asserts the move creates "no second **emission authority**". Both are
@@ -71,6 +109,12 @@ origin: Architect ruling evt_54zvaqbrm752x (2026-08-10) §5, answering the campa
 > nowhere in the candidate**, and a reader resolving the conflict could conclude
 > the census row is wrong and weaken or delete it. Qualifying the doc as
 > *instruction* emission forecloses that.
+>
+> **Fix it in the DOC, not the row — the direction matters and the Adversary's
+> hunt is why.** The row is the live sentinel described above. **A reader who
+> resolves the conflict by deleting the row removes the detector**, and the
+> census then reads complete while `primitive.rs` sits unmeasured. The doc
+> sentence has no such load.
 
 > # THIS NODE IS WHY 19 NODES DO NOT WAIT FOR THE WHOLE PHASE
 >
