@@ -1,7 +1,7 @@
 ---
 id: RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING
 title: "Three instruments that discharged RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT cannot detect the failures they were chosen for -- AC-3's recorder is satisfied by a no-op D2, AC-4's control reaches its mechanism only from its own unit test, and the cfg(test) pin that cost a review round annotates a census compiled out 19 days earlier"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
@@ -152,6 +152,16 @@ old meaning:
   annotates, or retire the pin with its caveat, or re-key it to all six
   test-gating `cfg` spellings. **Do not just widen the count** — decide first
   what compiled thing it protects.
+
+  > **`D3` GATES [[RT-CAVEAT-GUARD-SPELLING-DOMAIN]], WHICH IS `ready` AND MUST
+  > NOT BE STARTED.** That node widens this same guard from one spelling to the
+  > full test-gating domain, and its opening clause asserts the census *"errs
+  > toward a false red, never a false green"* — which Finding 3 refutes, because
+  > a census that does not compile errs toward nothing. **Only the re-key outcome
+  > leaves that node with work, and then it is likely subsumed here rather than
+  > run separately.** Its measured spelling table stays valid either way:
+  > `#[cfg(test)]` 322, `any(test, feature = "px8-ds-test-support")` 12,
+  > `any(test, feature = "r3-4b-observation")` 6, at `be25ea6a2`.
 
 ## Acceptance criteria
 
