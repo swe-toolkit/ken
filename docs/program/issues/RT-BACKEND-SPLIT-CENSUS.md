@@ -11,12 +11,27 @@ github: null
 origin: Architect ruling evt_54zvaqbrm752x (2026-08-10) decomposing RT-BACKEND-MODULE-SPLIT into independently mergeable slices, cut item 1. Enclave pass anchored at evt_104nz8cedzyat on operator instruction 2026-08-10. Stage A is research/compiler-refactoring-program.md §5.1. Steward-filed per COORDINATION §2.
 ---
 
-> # DRAFT UNTIL [[RT-DESCENT-RETIRE]] MERGES. THAT IS THE POINT OF IT.
+> # THE RETIREMENT MERGED 2026-08-17. THIS NODE IS NOW FRAMED, AND STILL `draft`.
 >
-> This node **is** the post-retirement remeasure. It cannot be framed against a
-> tree the capstone is about to change, and it is the reason every other #8
-> child stays `draft` too: **the census supplies their binding paths, counts and
-> sizes.**
+> **The original bar has expired.** [[RT-DESCENT-RETIRE]] is `merged` — the
+> `RecursiveDescent` route was deleted at `1aec3e3e1` and the closing record
+> landed at PR #2527 — so the tree this node measures now exists and holding
+> the frame back no longer buys anything. **Deliverables and acceptance
+> criteria are written below as of 2026-08-17.**
+>
+> **It stays `draft` for a different and still-live reason: three of its four
+> `depends_on` are unmerged**, and all three edit files inside this node's own
+> scope. Flipping it `ready` now would put a node on the frontier that cannot
+> lawfully start. It flips `ready` when the last of the three lands, and at
+> that point it is shovel-ready with no Steward pass in between.
+>
+> **This node DOES reach `merged`.** It moves no code, but it commits five
+> inventories as documents, so it is not a measurement-only node whose
+> successors would gate on a landing that never happens.
+>
+> This node **is** the post-retirement remeasure. It is the reason every other
+> #8 child stays `draft` too: **the census supplies their binding paths, counts
+> and sizes.**
 
 > # OPERATOR RULING 2026-08-16 — THREE CONTROL FIXES LAND BEFORE THIS CENSUS
 >
@@ -90,6 +105,56 @@ It also holds one **fail-closed verification gate**: it revalidates the
 primitive-lowering call graph that [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] was
 chosen on. If #7 created a new shared owner or a cycle there, this node **stops
 with the exact contradiction** rather than widening the slice.
+
+## Deliverables
+
+**`D0` — fix the measurement SHA, first, and put it in the document.** Every
+inventory is measured at one named commit. Five inventories taken at five
+different bases are not a census; they are five readings that cannot be
+cross-checked, and a later slice checked against them cannot tell which one
+moved.
+
+**`D1`-`D5` — the five inventories**, one section each, committed under
+`docs/program/` as durable documents. Not a thread, not a handback: a later
+slice's acceptance is checked against these, so they must be readable by
+someone who was not in the ring.
+
+**`D6` — the fail-closed verification gate.** Revalidate the primitive-lowering
+call graph that [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] was chosen on. **If a
+new shared owner or a cycle appeared, stop and report the exact contradiction.
+Do not widen the slice to accommodate it** — that is a re-cut and it is the
+Steward's, not this node's.
+
+## Acceptance criteria
+
+- **`AC-1` — one base.** Every inventory names the same measurement SHA, and
+  the document states it once at the top. A reader can re-run any figure.
+
+- **`AC-2` — every lexical count declares its domain.** This is the lesson
+  [[RT-DESCENT-RETIRE]] paid for and it lands hardest on a census node.
+  **A grep-entered population is complete over its selector, never over the
+  mechanism** — a symbol phrased outside the selector never enters the count
+  and is never classified. Wherever an inventory figure came from a pattern,
+  give the pattern and say what it cannot see. **A zero-hit result is evidence
+  about a name, not about a mechanism.**
+
+- **`AC-3` — inventory 3 covers BOTH builds.** The re-export surface is
+  enumerated for the library build **and** the test build. A path visible only
+  under `cfg(test)` is a real edge a move can break, and reading one profile
+  and reporting one number is how it goes missing.
+
+- **`AC-4` — inventory 4 records the caveat guard as FIXED, not as found.**
+  It is a test-property ledger binding on all seventeen later slices, and
+  [[RT-CENSUS-CAVEAT-GUARD]] is sequenced ahead of this node precisely so the
+  ledger does not freeze a broken guard as the expected property. Census the
+  post-fix state; if that node has not landed, this one does not start.
+
+- **`AC-5` — no code moved.** `git diff --stat` against the base shows zero
+  changed paths under `crates/`. An inventory that edits its own subject has
+  invalidated itself.
+
+- **`AC-6` — `D6` reports a verdict either way**, and a contradiction is a
+  **stop**, not a widened scope.
 
 ## Scope
 
