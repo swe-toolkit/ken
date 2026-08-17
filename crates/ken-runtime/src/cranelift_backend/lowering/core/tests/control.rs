@@ -9284,17 +9284,27 @@ fn the_lower_expr_call_population_is_dispositioned_by_owner_not_by_site() {
         "if the receiver-spelled scan agreed with the tokenizer here, this pair \
          would not discriminate and would prove nothing about the 58/59 gap"
     );
+}
 
-    // ⚠ Honest limit, recorded next to the enforced statement rather than left
-    // for the next reader to discover: this census does NOT partition out
-    // `core.rs`'s 22 inline `#[cfg(test)]` regions, so a call added inside one
-    // would be counted as production. That errs toward a FALSE RED, never a
-    // false green, so it is the safe direction — but it is a limit, not a
-    // property, and "production" here means "textually in the production file".
-    assert!(
-        core.contains("#[cfg(test)]"),
-        "the caveat above describes inline cfg(test) regions that are no longer \
-         present, so it has gone stale and must be re-derived"
+#[test]
+fn identifier_census_caveat_tracks_inline_cfg_test_region_count() {
+    let core = include_str!("../../core.rs");
+
+    // Promise class: transition sentinel. The retired identifier census does
+    // not partition out `core.rs`'s 322 inline `#[cfg(test)]` regions, so a call
+    // added inside one would be counted as production. That errs toward a FALSE
+    // RED, never a false green, so it is the safe direction -- but it is a
+    // limit, not a property, and "production" means "textually in the
+    // production file". When this count moves, re-derive this caveat rather
+    // than silently carrying its old magnitude.
+    const DOCUMENTED_INLINE_CFG_TEST_REGIONS: usize = 322;
+    assert_eq!(
+        core.lines()
+            .filter(|line| line.trim() == "#[cfg(test)]")
+            .count(),
+        DOCUMENTED_INLINE_CFG_TEST_REGIONS,
+        "the caveat documents an exact inline cfg(test) region count, but that \
+         count drifted; re-derive both the caveat and this assertion"
     );
 }
 
