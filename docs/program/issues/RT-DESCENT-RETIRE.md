@@ -5,7 +5,7 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION, RT-MATCH-DIFFERENCE-REACHABILITY, RT-DESCENT-RETIRE-PRIOR-ART, RT-MATCH-SCRUTINEE-PORT, RT-DESCENT-LANE-COMPLETENESS, RT-REFUSAL-PINS-REHOMED]
+depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION, RT-MATCH-DIFFERENCE-REACHABILITY, RT-DESCENT-RETIRE-PRIOR-ART, RT-MATCH-SCRUTINEE-PORT, RT-DESCENT-LANE-COMPLETENESS, RT-REFUSAL-PINS-REHOMED, RT-REFUSAL-PIN-ABSENCE-CLAUSE]
 blocks: []
 github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -28,6 +28,24 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > still true is a measurement at current `main`, not an inference from these
 > flips.**
 >
+> ### ONE GATE WAS ADDED BACK THE SAME DAY. IT DOES NOT STOP THE `D2c` INCREMENT.
+>
+> **[[RT-REFUSAL-PIN-ABSENCE-CLAUSE]] joined `depends_on` after the Adversary
+> hunt** (`evt_3t7y5zwng8aba`) found that pin 2 of the re-homed pins asserts two
+> `contains` clauses — **what the refusal must say, and nothing about what it
+> must not say** — so the temporal phrasing `D1c` refuted can be re-added beside
+> both pinned clauses with every assertion still green.
+>
+> **It gates the DELETION, not the reroute.** `D2c` routes to nothing and
+> **deletes nothing**, so the pin's strength is not load-bearing for it. **The
+> in-flight `D2c` increment proceeds unchanged** — do not read this entry as a
+> stop.
+>
+> ⇒ **What it gates is `D3`**, which deletes the enum and leaves pin 2 as the
+> only assertion of that refusal's text anywhere. **A pin that survives the
+> deletion but cannot detect the regression it was written for survives in name
+> only.**
+
 > ### THE HELD `D2c` CANDIDATE IS NOT THE `D2c` LANDING. Cut a fresh one.
 >
 > **`036e8ee91` stays frozen at base `c98f72ba8` — it is EVIDENCE, and rebasing
