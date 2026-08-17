@@ -11,10 +11,9 @@ github: null
 origin: "Adversary hunt evt_3t7y5zwng8aba on merged RT-REFUSAL-PINS-REHOMED (a48c28915...d6a9760a9), 2026-08-17. Confirmed in the tree by the Steward before filing. Cut separately rather than folded into RT-DESCENT-RETIRE because folding it would make the repair ride a gated node, which is the defect's own shape."
 ---
 
-Frame: this node. **Two deliverables, both small: `D1` is one line of test code
-plus a mutation proof; `D2` is two comment corrections at named coordinates.**
-`D1` is the reason the node exists and `D2` is folded in because it is the same
-increment shape in the same crate — **make the artifact say what is true.**
+Frame: this node. **ONE live deliverable: `D1`, one line of test code plus a
+mutation proof.** `D2` is **WITHDRAWN and parked** — see its section; it was
+premised on a candidate that did not land.
 
 ## The finding
 
@@ -79,13 +78,40 @@ candidate**.
 **Confirm pin 1 stays green under that perturbation** — the arms must remain
 independently meaningful.
 
-## Deliverable D2 — two comment corrections at EXACTLY these two sites
+## `D2` — WITHDRAWN 2026-08-17, BEFORE DISPATCH. Both items are premised on a candidate that did not land.
 
-**Architect `evt_2xm79ytjgz3j0`, both raised as should-fix at `D2c`'s approval
-and explicitly not blocking it.** Folded here rather than cut as a third node:
-they are comment-only edits in the same crate, in the same increment shape as
-`D1` — make the artifact say what is true. **Coordinates verified by the Steward
-in the candidate at `f68b8c866`, not transcribed.**
+> ### DO NOT WORK `D2`. Item A would REGRESS a comment that is currently TRUE.
+>
+> **`D2` was folded in from Architect `evt_2xm79ytjgz3j0`, raised as should-fix
+> at the fresh `D2c`'s approval. That candidate then FAILED CI and PR #2509 is
+> closed** — see [[RT-DESCENT-RETIRE]] for why no correct `D2c` can merge
+> through the publisher.
+>
+> **I verified both coordinates against `origin/main` after the failure, and
+> neither survives:**
+>
+> | item | at `origin/main` |
+> |---|---|
+> | B, the `let _ = recursive_descent_residual(…)` discard | **DOES NOT EXIST.** Zero hits — `D2c` introduced it |
+> | A, the *"let the remainder decide"* comment | **CURRENTLY TRUE.** The early `return` `D2c` removed is still there |
+>
+> ⇒ **Item A is not a stale comment to correct; it is an accurate comment, and
+> "correcting" it would make it false.** The comment goes false **only if** a
+> `D2c` lands.
+>
+> **The general form, which is why this is recorded rather than deleted: a
+> should-fix note attaches to a CANDIDATE, not to `main`. When the candidate
+> does not land, its notes do not become work — they become conditional on it
+> landing.** I folded these in while the candidate was in flight and did not
+> re-check them when it failed.
+>
+> **Both items are PARKED, not dropped.** They become live the moment any `D2c`
+> lands, and belong with whatever node carries that. **Content retained below
+> verbatim so it is not reconstructed.**
+
+### PARKED CONTENT — applies only after a `D2c` lands
+
+**Coordinates below are in candidate `f68b8c866`, NOT in `main`.**
 
 **A. `lowering/core.rs:2410-2413` is now FALSE.** The comment above the
 `#[cfg(test)]` exclusion block still reads:
@@ -133,9 +159,9 @@ construction"` alongside both currently-pinned clauses. **Observed, not argued.*
 **AC-2.** Pin 2 still passes at unmodified `origin/main`, and pin 1 is
 untouched and green.
 
-**AC-3.** No production BEHAVIOUR change. This node edits one test guard and two
-comments, and **deletes nothing**. `D2`'s edits are comment-only: control by
-`git diff` showing no change to any expression in `select_body_emission_authority`.
+**AC-3.** No production change. This node edits **one test guard** and **deletes
+nothing**. `select_body_emission_authority` and `lowering/core.rs` are **not
+touched** — `D2` is withdrawn.
 
 **AC-4.** `D2c` `036e8ee916844fb91a4f42f2a2b04ebaea0dde2f` untouched.
 
@@ -146,13 +172,12 @@ targeted only — `-p ken-runtime` or `--test`, never `--workspace`.
 
 - **Rewriting pin 1.** It uses full equality and has no gap; changing it trades
   a stronger assertion for a uniform one.
-- **Any `D3`-`D8` retirement work**, other than `D2`'s two named comment edits,
-  which the Architect raised at `D2c` approval and routed here.
+- **Any `D3`-`D8` retirement work**, and **any `lowering/core.rs` edit at all**
+  — `D2` is withdrawn and its two comment items are parked behind a `D2c`
+  landing.
 - **Widening to other `contains`-style assertions in `control.rs`.** If the
   pattern looks general, **say so and stop** — that is a census, not this node.
-- **A general `D6a` comment sweep.** `D2` covers **exactly the two named sites**
-  and nothing else. Other stale reachability comments are `D6a`'s, and finding
-  one is a report, not a fix to make here.
+- **A general `D6a` comment sweep**, and the two parked comment items with it.
 
 ## Standing
 
