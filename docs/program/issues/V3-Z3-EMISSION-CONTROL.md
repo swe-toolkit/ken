@@ -208,6 +208,36 @@ is the coverage hole this node exists to close.
 > **That check is one observation on one SHA, not a property.** Nothing in the
 > tree fails if a later aggregate edit stops selecting `D1` without removing any
 > job. The node closes with that stated rather than implied.
+>
+> ### CORRECTED SAME DAY: THE DISCHARGE INSTRUMENT IS BLIND, NOT MERELY NARROW
+>
+> **The sentence above understates the defect and it was the Steward's.** It says
+> the check is one observation short of a property. Adversary
+> `evt_526chtkpem6gp` measured the actual limit: **the instrument cannot
+> distinguish the failure it was chosen to detect.**
+>
+> The mutation, run on the landed tree — insert the same probe-and-return idiom
+> at the head of `fixed_goal_emits_complete_smtlib_structure_without_a_solver`
+> (`z3_process.rs:194`) and re-run `--lib`:
+>
+> | | `D1` log line | totals |
+> |---|---|---|
+> | landed | `... ok` | `137 passed; 0 failed; 1 ignored` |
+> | **body never executed** | `... ok` | `137 passed; 0 failed; 1 ignored` |
+>
+> Identical on both axes. `ci.yml:376` runs a bare
+> `cargo test --locked -p ken-elaborator --features z3-process --lib` with **no
+> `--exact`, no count assertion, no membership assertion** — Steward-verified.
+>
+> ⇒ **"Read the log, confirm it names `fixed_goal_…`" passes on a `D1` that does
+> nothing.** A `... ok` row is evidence the row was *selected*, never that its
+> body *ran*. The two readings differ only in a per-test duration libtest does
+> not print.
+>
+> **The route this answers is the one the closeout asked for.** The deselection
+> risk is not the YAML edit — `z3-emission-control` survives at all four sites
+> (`ci.yml:402/415/421/428`), Steward-verified. It is the idiom this candidate
+> introduces one file over.
 
 > ### THE PUBLICATION CONDITION WAS UNDISCHARGEABLE AS FIRST WRITTEN
 >
@@ -226,6 +256,56 @@ is the coverage hole this node exists to close.
 > — a criterion naming an instrument structurally incapable of producing what it
 > asks for. Two instances on one node is the tell worth carrying: when a
 > criterion names a job, ask what that job *prints*, not what it *runs*.
+
+> ### TWO RESIDUALS FILED AGAINST THIS CLOSED NODE. BOTH QUEUE — LANE 2 IS RETIRED.
+>
+> Adversary `evt_526chtkpem6gp`, every coordinate Steward-verified against
+> `4011e58be`. Neither is soundness and neither is reachable in CI today. They
+> are recorded here rather than as new nodes because the operator retired lane 2
+> on 2026-08-17 and a filed node would be dead on arrival. **If verify reopens,
+> start here.**
+>
+> **1. A RUNTIME SELF-SKIP IS OUTSIDE THE REPO'S NOT-RUN NET BY CONSTRUCTION.**
+> `v3_z3_process_adapter.rs:176-183` probes `z3 -version` and `return`s on
+> `NotFound`. Steward-verified as **the only runtime self-skip in `crates/`**.
+> With `z3` present and with `PATH` masked, the harness prints byte-identical
+> lines — the `eprintln!` at `:178` surfaces only under `--nocapture`, and
+> libtest discards captured output for passing rows, so it is absent from
+> exactly the artifact CI keeps.
+>
+> **This repo already treats a not-run row as a first-class hazard**, and that
+> is what makes this a defect rather than a preference. `ignored-row-sweep` sits
+> in `build-test`'s `needs` (`ci.yml:403`) and `scripts/ci-ignored-sweep.py`
+> derives its population from a source scan for `#[ignore = "…"]`, cross-checked
+> against `cargo nextest list --run-ignored=only`. **A runtime `return` carries
+> no attribute, so it is outside that population by construction** — the ignored
+> count stayed `1` across the mutation. ⇒ The repo runs a required job enforcing
+> *"every not-run row is enumerated and claimed"*, and this candidate adds a
+> not-run row through the one door that job has no lock on.
+>
+> Remedy is the owning ring's and either half is cheap: make absence an
+> `#[ignore]`-shaped row the sweep can enumerate, **or** leave the skip and say
+> in the test's own doc block what `ok` no longer entails. That block
+> (`:168-173`) currently reads *"MEASURED: the configured external binary can
+> propose a model that the kernel accepts as a refutation."* **After this change
+> that sentence is conditional and nothing in the file says on what.**
+>
+> **2. `ci.yml`'s OWN `needs` RULE IS NOW FALSE IN THE FILE THAT ASSERTS IT.**
+> `ci.yml:390-393`: *"EVERY TEST-RUNNING JOB MUST BE LISTED IN `needs` AND
+> CHECKED BELOW. This job is what branch protection actually reads, so a test job
+> missing from here reports GREEN no matter how it failed."* Steward-verified:
+> `z3-process-adapter` is **defined and running tests at `:354`** and appears in
+> **no `needs` list**, while `z3-emission-control` appears at `402/415/421/428`.
+>
+> **The repo's established shape for a non-blocking test job is the opposite
+> one:** `ignored-row-sweep` stays in `needs` and makes its findings exit zero
+> (`ci.yml:130-132`). `D2b` needed the adapter job to stop blocking and took the
+> route the file's own rule forbids, when a non-forbidden route with in-tree
+> precedent existed. The job still burns CI time and now reports green however
+> it fails.
+>
+> The Adversary flagged this as outside `COORDINATION §10⁻a` and did not pursue
+> it. **It is the Steward's, and it is recorded rather than dropped.**
 
 ## The de Bruijn fixture: what to build, and the one-binder trap
 
