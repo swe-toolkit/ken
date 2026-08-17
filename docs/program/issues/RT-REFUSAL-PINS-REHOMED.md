@@ -1,7 +1,7 @@
 ---
 id: RT-REFUSAL-PINS-REHOMED
 title: "Constructs 1 and 2 were ruled CORRECT SEMANTICS, so AC-9 owes them asserted-refusal pins -- but the only pin that asserts them today rides RecursiveDescentResidual, which D3 deletes. Re-home the assertion onto a mechanism that survives the retirement, before D6 deletes the tests carrying the fact"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none

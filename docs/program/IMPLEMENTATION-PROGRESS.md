@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 23:59:55Z — from 363 issue file(s) in `docs/program/issues/`.
+2026-08-17 00:01:35Z — from 363 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -313,7 +313,7 @@ the committed file matches the generator's output.
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2443 |
 | `RT-REFUSAL-CONSEQUENCE-RESTORE` | Restore the two clauses the D2 refusal rewrite dropped as collateral -- the consumption site and the runtime-representation consequence -- without reopening the transfer reading D2 closed | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2390 |
-| `RT-REFUSAL-PINS-REHOMED` | Constructs 1 and 2 were ruled CORRECT SEMANTICS, so AC-9 owes them asserted-refusal pins -- but the only pin that asserts them today rides RecursiveDescentResidual, which D3 deletes. Re-home the assertion onto a mechanism that survives the retirement, before D6 deletes the tests carrying the fact | ready | runtime | S | none | — |
+| `RT-REFUSAL-PINS-REHOMED` | Constructs 1 and 2 were ruled CORRECT SEMANTICS, so AC-9 owes them asserted-refusal pins -- but the only pin that asserts them today rides RecursiveDescentResidual, which D3 deletes. Re-home the assertion onto a mechanism that survives the retirement, before D6 deletes the tests carrying the fact | active | runtime | S | none | — |
 | `RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT` | For every refusal still holding the RecursiveDescent retirement, exhibit a Ken source program that reaches it or establish that none exists -- and record the ones with none as compiler invariants | merged | runtime | L | none | https://github.com/swe-toolkit/ken/pull/2440 |
 | `RT-REQUIRED-CONSUMER-REACH-CENSUS` | The projection mints an entry only where required differs from source, so row 4 depth 1 is excluded from the new surface BY CONSTRUCTION -- census which rows the surface reaches, and attribute by SENTENCE the Closure refusal depths 2 and 3 now sit at | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2305 |
 | `RT-REQUIRED-OCCURRENCE-PROJECTION` | Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier | merged | runtime | M | none | — |
@@ -425,7 +425,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
-- `RT-REFUSAL-PINS-REHOMED` — Constructs 1 and 2 were ruled CORRECT SEMANTICS, so AC-9 owes them asserted-refusal pins -- but the only pin that asserts them today rides RecursiveDescentResidual, which D3 deletes. Re-home the assertion onto a mechanism that survives the retirement, before D6 deletes the tests carrying the fact
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
 - `RT-UNSUPPORTED-BINDING-ON-REFUSAL` — A compile that refuses a construct owes a 48 section 5.4 native-artifact binding with status unsupported, and today yields none at all -- the construct half of the lane was named as RuntimeIrConstruct and left with zero producers
@@ -476,7 +475,7 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CALL-EDGE-EXECUTABILITY-AXIS` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` (status: ready)
 - `RT-DESCENT-RETIRE` blocked by `RT-DESCENT-LANE-COMPLETENESS` (status: active)
-- `RT-DESCENT-RETIRE` blocked by `RT-REFUSAL-PINS-REHOMED` (status: ready)
+- `RT-DESCENT-RETIRE` blocked by `RT-REFUSAL-PINS-REHOMED` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
