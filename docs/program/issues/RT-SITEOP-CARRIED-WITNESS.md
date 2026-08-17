@@ -53,6 +53,78 @@ origin: Hard stop returned by RT-CARRIER-BYTESPAN-OBSERVE D5, 2026-08-07, candid
 >    three-valued refusal. Believed unreachable and safe, **but the reachability
 >    argument is non-local and written nowhere at the projection.**
 >
+> ### ADVERSARY HUNT `evt_3ngpqq3pchfcf` — BAN HELD. Count REFUTED, scope SUSTAINED.
+>
+> **Read-only hunt on `2e7daa622..a388dc063`. Both halves measured by the Steward
+> at the tree rather than taken on report.**
+>
+> **The banned `Carried -> Lowered` inverse SURVIVED, and this was the right first
+> check** — the removed ignores named that ban as their blocker.
+> `mod.rs:6496-6497` still carries *"There is deliberately no inverse in this
+> block, and none may be added"*, no such conversion appears in the diff, and the
+> new code adds its own disclaimer at `mod.rs:3978`.
+>
+> #### The "13 un-ignored tests is really 4" claim is REFUTED. 13 is correct.
+>
+> The Adversary measured `ken-cli` `#[ignore]` totals (33 -> 29 = -4) and
+> concluded the 13 had been carried over from the governed-rows population.
+> **Measured per file, base -> candidate:**
+>
+> | file | crate | `#[ignore]` |
+> |---|---|---|
+> | `px4b_native_production.rs` | ken-cli | 3 -> 0 |
+> | `px7p_constructor_field_composition.rs` | ken-cli | 1 -> 0 |
+> | `scenario.rs` | **ken-verify** | 9 -> 0 |
+>
+> ⇒ **4 + 9 = 13.** Their 4 is the **`ken-cli` subtotal**; the nine un-ignores in
+> `ken-verify/src/scenario.rs` lie outside the scope they measured. **All three of
+> their "independent" measurements shared that one scope**, which is why agreement
+> among them was not independence. The Architect's `px4b 3->0, px7p 1->0,
+> scenario.rs 9->0` breakdown is exact.
+>
+> **Note this is the same crate the candidate under-declared.** It called itself
+> "14 Runtime paths" while carrying a `ken-verify` path, and that path holds 9 of
+> the 13. **A mis-scoped description and a mis-scoped audit failed the same way.**
+>
+> #### The SCOPE claim is SUSTAINED, and it improves should-fix 1.
+>
+> **Confirmed at the tree.**
+> `linked_console_broken_pipe_reaches_ken_instead_of_signal`
+> (`px4b_native_production.rs`) is **running at base AND at the candidate** — this
+> candidate never touched its ignore state — yet it carries
+> `// Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.` and
+> `// Owner node: RT-CARRIER-BYTESPAN-OBSERVE.`
+>
+> ⇒ **Pre-existing stale debt above a running test, which a should-fix scoped to
+> "the newly un-ignored tests" misses BY CONSTRUCTION.** The scope must be the
+> **predicate — every owner-block above a running test — not the diff.**
+>
+> ⚠ **And the should-fix's wording CONJOINS two properties** — *names
+> `RT-CARRIER-BYTESPAN-OBSERVE` as owner* **and** *asserts the program never
+> executes*. Those populations differ sharply, so **a repair keyed on the
+> conjunction would touch almost nothing.** Fix on the disjunction, per property.
+>
+> **The full population is larger than any figure so far.**
+> `RT-CARRIER-BYTESPAN-OBSERVE` appears in **17 files** at the candidate
+> (`scenario.rs` 18 occurrences, `rt_parity_native.rs` 10). Many will sit above
+> still-ignored tests, where the reference may be legitimate. ⇒ **The census is
+> owed before the repair**, and it is a predicate census.
+>
+> #### On should-fix 3, a DIRECTION worth carrying
+>
+> The two consumers disagree **asymmetrically**: `site_operand_argument` **masks**
+> a non-zero outcome into a null span, while `wire_bytes_seat` **refuses** on the
+> same word. ⇒ **If the unreachability premise is ever wrong, the masking side
+> yields a silent wrong value where the sibling would have raised a loud
+> refusal.** State that direction at the projection, not just the premise.
+>
+> #### One open Adversary finding did NOT move
+>
+> `RT-CLOSURE-BOUNDARY-LANE` exclusions are still **6**, so
+> `RT-DESCENT-RETIRE`'s zero-source-reachability claim rests on the same excluded
+> population as when `evt_6x0ewnvnvdq3j` was filed. This candidate grew the
+> running corpus by four `ken-cli` tests, none in that class. **Still open.**
+
 > **Scope note:** declared as "14 Runtime paths"; measured it is **9 `ken-cli`,
 > 4 `ken-runtime`, 1 `ken-verify`**. The `ken-verify` path (`scenario.rs`) is
 > test-annotation only.
