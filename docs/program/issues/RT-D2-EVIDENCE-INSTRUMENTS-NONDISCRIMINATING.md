@@ -155,6 +155,15 @@ old meaning:
   a temporary un-preserving read that reddens the new co-occurrence control with
   `route1: true, match_descent: false`.
 
+  > ### `D1` DID NOT CLOSE FINDING 1. See `D4`, filed 2026-08-17 after the merge.
+  >
+  > **The `AC-1` discharge above is weaker than it reads.** Of the two mutations,
+  > the committed no-descent mutant is `D1`'s own ablation switch, which returns
+  > *before* the recorder and so cannot be passed by any resolver that reaches
+  > it. Against the actual Finding-1 mutant — a `return` one line *below* the
+  > recorder — the repaired triad **passes**. `match_descent` records arrival,
+  > not descent. Do not cite `D1` as certifying that lowering walks an arm.
+
   > The census caveat was re-derived here rather than bumped, moving to **324**
   > with an inventory naming the observation scope, the three record helpers and
   > `RuntimeExpr::Var(0)`. **That re-derivation is not `D3`** — it keeps the pin
@@ -190,10 +199,85 @@ old meaning:
   > Nothing in the tree answers this today: the Adversary's whole-suite probe
   > (923 passed / 1 failed, the one failure being `AC-4`'s own unit test) shows
   > only that no *existing test* reaches it.
+- **`D4`** — **record work, not arrival.** `D1`'s `match_descent` bit does not
+  catch the mutant that produced Finding 1. Filed from the Adversary's M8 hunt on
+  `b7e2cf8f8` (`evt_13qerjefkkdpj`), **Steward-verified structurally against the
+  tree** at `core.rs:15884-15901`.
+
+  > **The mechanism.** `record_branched_scrutinee_unit_body_match_descent()`
+  > fires at `:15890`, on **arrival** inside the `if let RuntimeExpr::Match`
+  > branch. Everything the witness claims to observe — `declared_units`, the
+  > `for` loop, `case_body_occurrence`, the recursive
+  > `resolve_recursive_unit_body`, and the `agreeing_recursive_body_unit` call —
+  > is at `:15891-15899`, **below the recorder and inside the bit's blind
+  > region.** A `return Ok(None)` placed one line *below* the recorder yields
+  > `entered=1, route1=false, match_descent=TRUE` while walking no arm: the
+  > triad is satisfied, `:96` passes, and the test reds at `:104` on the
+  > **pre-existing** error-string assertion, exactly as it did before `D1`
+  > landed.
+  >
+  > **Why `D1`'s committed control cannot fail, which is the sharp part.**
+  > `BRANCHED_SCRUTINEE_UNIT_BODY_SKIP_MATCH_DESCENT` is read at `:15886` and
+  > returns at `:15887`, **before** the record call. It ablates the recording
+  > itself, so any bit written at that site is false under it. It is a sound
+  > positive control that the recorder fires when reached, and it is **not** a
+  > discrimination test for descent, because no resolver that reaches the
+  > recorder can pass it.
+  >
+  > ⇒ **Net new discriminating power on this witness is one mutant, and it is
+  > the hook `D1` installed for itself.** The branch-deletion mutant is caught
+  > at `:92` by the pre-existing `route1` assertion, before `:96` is evaluated.
+  > Two mutants with **byte-identical compiler output** get opposite verdicts,
+  > decided by which side of one recorder line the `return` sits on.
+  >
+  > **This is an evidence defect, not a behaviour defect.** The commit message's
+  > own wording is accurate — *"set only after the plain Match branch is actually
+  > entered"*. The overreach is downstream: the witness asserts *"D2 must descend
+  > into the plain Match"*, the module doc claims it *"enters and descends
+  > through the carried child's owning plain `Match`"*, and this node treated the
+  > triad as certifying descent. **Entry is measured; descent is claimed.**
+
+  **Remedy shape, the ring's to choose.** Bump a per-arm counter **inside the
+  loop body**, after `case_body_occurrence` succeeds, so the row separates
+  *arrived at the Match branch* from *walked into an arm* — 0 under the mutant,
+  1 under the landed tree. **A counter recorded after the loop does not work on
+  this witness**: the loop exits through `?` on arm 0, so `declared_units` never
+  completes.
+
+  **`AC-4a` — the discriminating mutant is the Finding-1 mutant**, a `return
+  Ok(None)` placed *below* the recorder. It must red on the descent claim
+  itself, not on the error string at `:104`. State the before/after and a
+  positive control. **`D1`'s ablation switch does not qualify** — it is the
+  control this deliverable exists because of.
+
+  **`AC-4b`** — the printed evidence at
+  `rt_branched_scrutinee_unit_body_port.rs:97-101` still prints only `entered=`
+  and `route1=`, so a handback quoting the test's own output reproduces exactly
+  the pair already ruled insufficient. Print whatever the repaired claim rests
+  on.
+
+  > **Not a defect, recorded so it is not re-filed:** the bit is per-entry, not
+  > per-site — the recorder writes `rows.last_mut()`, so a Match descended at any
+  > depth under one entry sets it. This witness has exactly one entry, so nothing
+  > is wrong today; the assertion text says "the plain Match" while the bit means
+  > "some Match under this entry". The retained-bit unit test at `core.rs:1143`
+  > is **sound and not under attack** — it certifies that the route-1 replacement
+  > composes with the descent bit, which is what it claims.
+
 - **`D3`** — dispose of the pin (Finding 3): either revive the census it
   annotates, or retire the pin with its caveat, or re-key it to all six
   test-gating `cfg` spellings. **Do not just widen the count** — decide first
   what compiled thing it protects.
+
+  > **Measured input for the re-key option** (same hunt, quantified only): across
+  > `ca639b5ef..b7e2cf8f8`, `core.rs` moved own-line `#[cfg(test)]` 323 to 324,
+  > which the pin tracks, and `#[cfg(any(test, feature = "px8-ds-test-support"))]`
+  > **19 to 23**, which it does not. **Four test-gated regions landed invisibly
+  > in the same commit that re-derived the pin, two of them inside
+  > `resolve_recursive_unit_body` itself.** A dropped suspicion, so it is not
+  > re-checked: `#[cfg(test)]` occurs 327 times against 324 own-line matches, and
+  > all three extras are inside comments — the pin's population is correct on its
+  > own criterion.
 
   > **`D3` GATES [[RT-CAVEAT-GUARD-SPELLING-DOMAIN]], WHICH IS `ready` AND MUST
   > NOT BE STARTED.** That node widens this same guard from one spelling to the
