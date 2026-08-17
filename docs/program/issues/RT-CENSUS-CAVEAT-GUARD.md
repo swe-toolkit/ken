@@ -1,7 +1,7 @@
 ---
 id: RT-CENSUS-CAVEAT-GUARD
 title: "The identifier-census caveat's staleness guard is an existence check standing in for a count check, so it cannot detect the drift it was written to catch"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
