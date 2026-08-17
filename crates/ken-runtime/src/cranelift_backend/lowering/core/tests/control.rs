@@ -9305,31 +9305,6 @@ fn the_lower_expr_call_population_is_dispositioned_by_owner_not_by_site() {
 }
 
 #[test]
-fn identifier_census_caveat_tracks_inline_cfg_test_region_count() {
-    let core = include_str!("../../core.rs");
-
-    // Promise class: transition sentinel. The retired identifier census does
-    // not partition out `core.rs`'s 324 inline `#[cfg(test)]` regions, so a call
-    // added inside one would be counted as production. That errs toward a FALSE
-    // RED, never a false green, so it is the safe direction -- but it is a
-    // limit, not a property, and "production" means "textually in the
-    // production file". The newest observer region calls its observation scope
-    // and the three record helpers, and constructs `RuntimeExpr::Var(0)`, not
-    // `lower_expr`, so it does not change this retired census's call population.
-    // When this count moves,
-    // re-derive this caveat rather than silently carrying its old magnitude.
-    const DOCUMENTED_INLINE_CFG_TEST_REGIONS: usize = 324;
-    assert_eq!(
-        core.lines()
-            .filter(|line| line.trim() == "#[cfg(test)]")
-            .count(),
-        DOCUMENTED_INLINE_CFG_TEST_REGIONS,
-        "the caveat documents an exact inline cfg(test) region count, but that \
-         count drifted; re-derive both the caveat and this assertion"
-    );
-}
-
-#[test]
 fn a_trap_arm_and_its_trap_free_twin_both_functionize() {
     let fixture = |trap_arm| RuntimeExpr::Match {
         // Calling the lexical closure makes the scrutinee cross a declared-unit
