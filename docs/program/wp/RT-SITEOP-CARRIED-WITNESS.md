@@ -226,7 +226,30 @@ after `D1b` reports** — see the sizing hold below.
 > if the answer looks obvious — the recut is the Steward's and it depends on
 > which answer you got.
 
-> ### `D1b` RAN 2026-08-17 AND RE-RUNS AGAINST A SHARPENED QUESTION. Read this first.
+> ### `D1b` IS ANSWERED: PLUMBING AVAILABLE. `D2` IS CUT IN §4a. Read that, not this.
+>
+> **Corrected `D1b` at exact `02f255fc1`, reported `evt_5bz715jje5p8s`.** The
+> discriminator was decisive: `px7m`'s `Some bytes |-> bytes` returns the bound
+> bytes **unchanged**, and the error arm hands them to `write_bytes_then_line`,
+> which passes them straight into `Console.write` — **no literal, equality,
+> decode, length or other content-sensitive operation.** The disposable
+> interpreter control passed with stdout `missing.binnot-found` and exactly
+> `[FsReadFile, ConsoleWrite, ConsoleWrite]`.
+>
+> **Verified at the tree by the Steward**, this time checking the classification
+> and not only the coordinate: `write_bytes_then_line (bytes : Bytes)` passes
+> `bytes` directly to `write Stdout bytes`.
+>
+> ⇒ **A runtime-valued `Lowered` suffices for the fixture's downstream use, so
+> the emitted-helper projection is NOT refuted.** `D1b` deliberately **selects no
+> implementation**; that is `D2`.
+>
+> **The block below is the superseded question. It is retained because the
+> correction is the point** — the first `D1b` traced a correct chain and
+> misclassified its terminal step, and both `D1b` runs together are what
+> established where the template demand actually sits.
+
+> ### `D1b` RAN 2026-08-17 AND RE-RUNS AGAINST A SHARPENED QUESTION — SUPERSEDED
 >
 > **The chain below was walked correctly and its terminal step was
 > misclassified** (report `evt_2vj52hacadmab`, Architect ruling
@@ -303,7 +326,110 @@ after `D1b` reports** — see the sizing hold below.
   **The reasons are otherwise good and must not be rewritten wholesale** — they
   name the measured cause and explicitly disclaim `D5` as the blocker, which is
   better than what they replaced. **Repair the pointer, keep the diagnosis.**
-- **`D2` onward — the mechanism.** Cut against §3's ruling.
+- **`D2` onward — the mechanism.** Cut in §4a below, against the plumbing result.
+
+## 4a. THE RECUT — `D2` against `PLUMBING AVAILABLE` (Steward, 2026-08-17)
+
+**Sizing, now that `D1b` is in: `M`.** The Architect held sizing because *"a
+plumbing answer and a representational answer are not the same node."* The answer
+is plumbing, so this is a **port**, not a representation change: one projection
+route plus the population pass. **The node's `size: L` predates the ruling and is
+superseded by this line.**
+
+> ### PREMISE (2) IS DISCHARGED — Architect `evt_tmctzqr3858p`. `D2` may dispatch.
+>
+> **The hard stop does not fire, and the emitted-helper direction is not
+> refuted. It is also NOT endorsed** — non-refutation is not selection, and the
+> Architect says so explicitly. `D2` still owns choosing the mechanism.
+>
+> **The confirmation rests on a CENSUS, not on the fixture, and that difference
+> binds what `D2` may assume.** *"A fixture is EXISTENTIAL and the hard stop's
+> condition is UNIVERSAL"* — one program consuming bytes by value cannot close
+> *"any reader."* So the Architect censused **every** `ConstructorField::
+> Specialized` read site at the base: **there are eight, not one.**
+>
+> | site | what it does | template demand |
+> |---|---|---|
+> | `:3134` `specialized_at` | returns the payload opaquely; refuses only `StaticWorker` | no |
+> | `:3144` `into_specialized_at` | by-value twin | no |
+> | `:4840` `constructor_field_bindings` | clones into `LoweringOperand::Specialized` | no — phase rebinding |
+> | `:5582` `d9_collect` | pushes CLIF values onto `words` | no — a runtime-word walk by construction |
+> | `:7612` unit-boundary rewrite | matches `Lowered::Closure`; non-`Closure` returns unchanged | no |
+> | `:10826` `first_boundary_closure_path` | `#[cfg(test)]` diagnostic | no |
+> | `:18066` `unwrap_terminal_ret` | unwraps `ITree::Ret` opaquely | no |
+>
+> **`:7612` is the one that could have refuted this** — it pattern-matches *into*
+> the `Lowered`, demanding a specific inhabitant. It does not, because every
+> non-`Closure` field falls straight through. **It is also the site a census
+> stopping at "the sole constructor-field reader" would have missed. There was
+> never one reader, and that phrasing was wrong.**
+>
+> ### STATE THE RESULT DENOTATIONALLY. "Not required during lowering" is unsound.
+>
+> **The instrument cannot say that** — an interpreter-only control never lowers;
+> it observes denotation. **Carry these words into `D2`:**
+>
+> > The program's **meaning** never requires the content — the bytes are produced
+> > at runtime, selected structurally, and consumed by the host as a runtime
+> > value. Therefore a lowering that demands compile-time content **is asking for
+> > more than the semantics requires.**
+>
+> ⇒ That is the bookkeeping side of the denotation/bookkeeping split: **a missing
+> port, not correct semantics.** *"Not required during lowering"* invites a
+> reader to think lowering was measured. It was not.
+
+- **`D2` — the emitted-helper projection at the refusal site.** Project the
+  carried word to runtime `(pointer, len)` through an emitted helper and admit
+  that as the site operand's value, at
+  `site_operand_argument`/`ClaimedEffectSeats::specialized` — **the upstream
+  demand, which is where the template is actually required.** Not at
+  `constructor_field_bindings`, which only rebinds a phase and was never the
+  constraint.
+
+  **A byte span's pointer and length were always going to come from an emitted
+  call** — they cannot come from reading the word. §2g is the sanctioned route
+  and §8's bans are unchanged.
+
+  **The refusal this replaces is at `lowering/mod.rs:9639`**, produced by
+  `specialized` (`:13434`, doc `:13427`) via `site_operand_argument` (`:13568`).
+  **That is a PRODUCER demand, not a consumer one** — the half the original
+  falsifier's "downstream" wording excluded.
+
+- **`D2` ALSO FIXES A VOCABULARY DEFECT IN THE SAME FAMILY, and this is a carry
+  the Architect asked to be paid by whoever next edits here.**
+
+  **`specialized_at`'s own doc calls the payload a "template"** — *"readers that
+  consume the template rather than borrow it"* — while `Lowered` demonstrably has
+  runtime-valued inhabitants (`ResponseBytes`, `ResourceToken`, `CapabilityToken`,
+  `BorrowedNativeValue`). **The vocabulary asserts a property the type does not
+  have.**
+
+  **That wording is what produced this misreading twice in one day, in opposite
+  directions.** The `#[ignore]` reason at
+  `px7m_hostresult_computational_match.rs:178` inherits it verbatim.
+
+  **No rename is asked for.** Fix the doc wording while you are in this family,
+  so the third reader does not pay for it.
+
+- **`D1a` — unchanged from §4, and the obligation I briefly added is WITHDRAWN.**
+
+  > **Withdrawn, stated so nobody reinstates it.** On the fixture result alone I
+  > required `D1a` to classify all 29 rows for **content-sensitivity**, reasoning
+  > that `px7m` being content-insensitive is a fact about `px7m` and not about
+  > the other 28.
+  >
+  > **The Architect's eight-site census subsumes that.** The compile-time demand
+  > comes from the **seat** (`specialized`), not from what a Ken source does with
+  > the bytes — a source that compares bytes to a literal lowers to a *runtime*
+  > comparison and introduces no compile-time demand. **No reader in the family
+  > requires compile-time-known content, universally.** So a per-row
+  > content-sensitivity pass would cost a turn and find nothing.
+  >
+  > **What survives is narrower and was already `D1a`'s job:** confirm each row's
+  > *measured cause* is this blocker. **A row whose site-operand value reaches a
+  > consumer OUTSIDE the censused `ConstructorField::Specialized` family is a
+  > finding** and returns to the Steward — that is the residual the census does
+  > not cover, and it is a cause question, not a content question.
 
 ## 5. Acceptance criteria
 

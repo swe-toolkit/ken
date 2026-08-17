@@ -11,7 +11,44 @@ github: null
 origin: Hard stop returned by RT-CARRIER-BYTESPAN-OBSERVE D5, 2026-08-07, candidate 4244d082. The frame's own §1a recut clause fired — the 30 quarantined rows do not discharge from one mechanism. Steward-cut per that clause. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # `D1b` IS INCONCLUSIVE, NOT REPRESENTATIONAL. RECUT IS HELD. `D1b` RE-RUNS.
+> # `D1b` ANSWERED: PLUMBING AVAILABLE. RECUT IS IN THE FRAME'S §4a. SIZE IS `M`.
+>
+> **Corrected `D1b` at exact `02f255fc1` (`evt_5bz715jje5p8s`).** The
+> discriminator was decisive: `px7m`'s `Some bytes |-> bytes` returns the bound
+> bytes **unchanged**, and `write_bytes_then_line` passes them straight into
+> `Console.write` — **no literal, equality, decode or length operation.**
+> Verified at the tree by the Steward.
+>
+> ⇒ **A runtime-valued `Lowered` suffices, so the emitted-helper projection is
+> not refuted.** `D2` is cut in the frame's **§4a**, and **`size: L` in the
+> frontmatter is superseded by `M` there** — this is a port, not a
+> representation change.
+>
+> **PREMISE (2) IS DISCHARGED** (Architect `evt_tmctzqr3858p`), so `D2` may
+> dispatch. **It is not endorsed** — non-refutation is not selection, and `D2`
+> still owns choosing the mechanism.
+>
+> **The confirmation rests on a CENSUS, not the fixture:** *"a fixture is
+> EXISTENTIAL and the hard stop's condition is UNIVERSAL."* Every
+> `ConstructorField::Specialized` read site was censused — **eight, not one** —
+> and none demands compile-time content. `:7612` is the one that could have
+> refuted it; it matches `Lowered::Closure` and lets every other field fall
+> through. **A census stopping at "the sole constructor-field reader" would have
+> missed it: there was never one reader.**
+>
+> **State the result DENOTATIONALLY.** *"Content not required during lowering"*
+> is unsound — an interpreter-only control never lowers. The sound and stronger
+> form: **the program's meaning never requires the content**, so a lowering
+> demanding it asks for more than the semantics requires ⇒ **a missing port, not
+> correct semantics.**
+>
+> **The per-row content-sensitivity obligation I briefly added to `D1a` is
+> WITHDRAWN** — the census subsumes it, since the compile-time demand comes from
+> the seat and not from what a source does with the bytes.
+>
+> **The two `D1b` runs below are retained because the correction is the point.**
+
+> # HOW `D1b` GOT THERE — the first run's chain was right, its terminal step was not
 >
 > **`D1b` reported REPRESENTATIONAL (`evt_2vj52hacadmab`, routed
 > `evt_5ka52dfc8z11q`), and the Architect ruled that the report does not
