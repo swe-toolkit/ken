@@ -1,7 +1,7 @@
 ---
 id: V3-Z3-EMISSION-CONTROL
 title: "Put a control on the SMT-LIB query generator that does not need an installed solver, so the emission path stops being witnessed only by a fleet-wide required CI job"
-status: active
+status: merged
 owner: verify
 size: S
 gate: none
@@ -188,6 +188,44 @@ when `z3` is absent rather than asserting unconditionally, and take the
 `z3-process-adapter` job out of the required aggregate. **State in the commit
 what coverage moved where.** The ordering is not stylistic: `D2b` before `D2a`
 is the coverage hole this node exists to close.
+
+> ### `D2b` LANDED 2026-08-17 AS `4011e58be`. THE NODE IS COMPLETE.
+>
+> Exact `fc3c6f7e49d5d0ef30db679f772b2a09dce70207`, direct base `5bac56000`, one
+> non-merge commit, two paths, `+12/-5`, both verified byte-identical on
+> `origin/main`. Decision `dec_2t672rb1fpt7` resolved APPROVE, QA
+> `evt_39n30q555j5z`, Architect `evt_7k7rb416pv408` with amendment
+> `evt_758x87jj5zn9y`. PR #2578.
+>
+> **The reverse-`D2a` trap was checked, not assumed.** Removing a job from the
+> required set can silently deselect the emission control, and reading the YAML
+> cannot catch it. Discharged from the candidate's own PR run — job
+> `z3 emission control` (`95494411825`), command `cargo test --locked -p
+> ken-elaborator --features z3-process --lib`, log line
+> `test z3_process::tests::fixed_goal_emits_complete_smtlib_structure_without_a_solver ... ok`,
+> 137 passed / 0 failed / 1 ignored. **Required selection is preserved.**
+>
+> **That check is one observation on one SHA, not a property.** Nothing in the
+> tree fails if a later aggregate edit stops selecting `D1` without removing any
+> job. The node closes with that stated rather than implied.
+
+> ### THE PUBLICATION CONDITION WAS UNDISCHARGEABLE AS FIRST WRITTEN
+>
+> `dec_2t672rb1fpt7` originally required *"fresh candidate PR CI must show `D1`
+> running in the required `z3 emission control` job"* as a **pre-merge gate**.
+> It could not be one, for two independent reasons:
+>
+> - the candidate SHA did not exist on GitHub until publication pushed it —
+>   `commits/<sha>/check-runs` returned **422 no-commit-found** — so the evidence
+>   the gate demanded is *created by* the act it was gating;
+> - the publisher reads check-run **status**, never job-log **content**, so it
+>   would have merged on green without ever looking for the name.
+>
+> ⇒ Amended in place to a **Steward-owned post-merge verification**, which is
+> what the block above records. **This is the same shape as `AC-7` on this node**
+> — a criterion naming an instrument structurally incapable of producing what it
+> asks for. Two instances on one node is the tell worth carrying: when a
+> criterion names a job, ask what that job *prints*, not what it *runs*.
 
 ## The de Bruijn fixture: what to build, and the one-binder trap
 
