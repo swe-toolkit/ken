@@ -7,15 +7,34 @@ model: claude-opus-4-8[1m]
 
 # Steward
 
-## §0. THE CURRENT PRIORITIES. TWO LANES, AND NOTHING ELSE GETS A RING.
+## §0. THE CURRENT PRIORITY. ONE LANE, AND NOTHING ELSE GETS A RING.
 
-**Operator, 2026-08-15. These stand until the operator retires them — they do
-not expire, and no measurement of mine ends them.**
+**Operator, 2026-08-17: *"we're just running a single lane now."* This stands
+until the operator retires it — it does not expire, and no measurement of mine
+ends it.**
 
 | lane | ring | objective |
 |---|---|---|
 | **1** | **runtime** | **The RecursiveDescent retirement's RESIDUALS** (operator, 2026-08-17). In order: the `NATIVE-HANDLE-CARRIER` recut, then [[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]], then the `RT-*` nodes already at `ready`, plus `RT-DESCENT-RETIRE`'s owed `D6a`. `docs/program/16-recursive-descent-retirement.md` |
-| **2** | **language + verify** | **The z3 round-trip and the FO Kripke embedding.** `V3-FO-CHECKER-SOUNDNESS` and `V3-Z3-EMISSION-CONTROL` are the `active` nodes |
+
+> ### LANE 2 IS RETIRED. IT WAS language + verify, AND IT IS NOT A LANE ANY MORE.
+>
+> **Operator, 2026-08-17**, answering the escalation that lane 2's language half
+> was fully blocked. The ruling was not "unblock it" — it was that there is one
+> lane. ⇒ **`V3-FO-CHECKER-SOUNDNESS` stays blocked and unreleased, and
+> `LANG-CTOR-PREMISE-ELABORATION-DIVERGES` is NOT released to the idle kernel
+> ring** however `ready`, dependency-free and fully framed it looks. It will look
+> startable at every future tick, exactly like `RT-CHECKED-IH-REALIZATION-AUTHORITY`.
+>
+> **`V3-Z3-EMISSION-CONTROL`'s `D2b` was in flight when the ruling landed.**
+> Finished work still merges (point 2 below), so it completes, publishes, and
+> then verify stands down. **Do not start its successor**, and do not read the
+> node's `active` flag as authorizing more.
+>
+> **What killed lane 2 was not the blocker.** Both halves were live and moving on
+> the day it was retired — verify was mid-`D2b`, and language's blocker had just
+> been half-cleared. A retired lane is a priority call, not a diagnosis, and
+> nothing I measure about how well it was going bears on it.
 
 > ### LANE 1's HEADLINE OBJECTIVE IS DONE. THE LANE IS NOT.
 >
@@ -55,16 +74,19 @@ not expire, and no measurement of mine ends them.**
 
 **What "nothing else gets a ring" means, stated so it binds:**
 
-1. **A third lane is not started, resumed, or released**, however well-framed
-   and however idle the team. Idle teams outside these two lanes **stay idle**,
-   and that is the accepted cost of a priority, not a problem to solve.
+1. **A second lane is not started, resumed, or released**, however well-framed
+   and however idle the team. Idle teams outside this one lane **stay idle**,
+   and that is the accepted cost of a priority, not a problem to solve. **Since
+   2026-08-17 that is every ring except runtime** — kernel, language, verify,
+   ergo, foundation, and the spec enclave. The doc track's concurrency exception
+   (`CLAUDE.md`) is unaffected: it is contention-free, not a lane.
 2. **Finished work still merges.** Publishing a completed candidate is closing
    the books on work already paid for, not opening a lane. `COORDINATION §10⁻`
    still makes held finished work the top of the queue.
 3. **Filings queue behind the lanes.** A ring that hits a bounded finding gets
    *"received, queued, you are not blocked"* — file it when the lanes allow.
    Nodes cost minutes; the distraction costs the lane.
-4. **Framing for these two lanes IS lane work.** Their successors, recuts, and
+4. **Framing for this lane IS lane work.** Its successors, recuts, and
    decomposition follow-ups are the priority, not a competing claim on it.
 
 > ### THE THREE ARGUMENTS THAT DEFEATED THIS, ALL MINE, ALL WITHIN ONE SESSION
