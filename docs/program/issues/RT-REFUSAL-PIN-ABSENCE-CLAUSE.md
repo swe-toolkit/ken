@@ -16,9 +16,11 @@ Frame: this node. **`D1` is DELIVERED at exact
 mutation proof, QA-approved and resolved by the Architect at
 `dec_797e7wbbb1ae9`.
 
-**One live deliverable remains: `D2b`, the limitation note the Architect
-required at the pin.** The original `D2` is **WITHDRAWN, and its two parked
-items are now PERMANENTLY MOOT** — see that section.
+**One live deliverable remains: `D1b`** — replace `D1`'s fragment guard with
+full equality, binding the recognition id that makes it constructible.
+**`D2b` is WITHDRAWN** (the limitation it was to document is closable, not
+documentable), and the original `D2` is **WITHDRAWN with its two items now
+PERMANENTLY MOOT**. Both sections below.
 
 ## The finding
 
@@ -83,7 +85,80 @@ candidate**.
 **Confirm pin 1 stays green under that perturbation** — the arms must remain
 independently meaningful.
 
-## `D2b` IS HELD 2026-08-17, MID-DISPATCH. The limitation may be REMOVABLE, and a comment explaining an open gap is the wrong artifact if it can be closed.
+## RULED 2026-08-17: CLOSE IT, DO NOT DOCUMENT IT. `D2b` IS WITHDRAWN; `D1b` REPLACES IT.
+
+**Architect, `evt_2gma122mayz8v`, resolving the hold.** He verified the
+refutation himself before accepting it: **his premise — *"there is no cheaper
+predicate available"* — is false.** All five interpolated values are knowable
+to the test, including the recognition id, which `recognize()` **returns and
+the pin throws away**. The test never needs to **predict** the id, only to
+**hold** it, so the assertion is stable regardless of issuer state.
+
+**Four grounds for closing rather than annotating, his:**
+
+1. **It closes by CONSTRUCTION rather than by enumeration.** The absence clause
+   is a roster of one forbidden phrasing; full equality is the predicate.
+   **The ruling was for a roster after a campaign spent arguing predicates over
+   rosters.**
+2. **The gap is MEASURED, not argued** — *"prior to construction"* passes all
+   three clauses with pin 1 green. **A demonstrated hole in the sole guard is
+   not a limitation to annotate.**
+3. **After `D3` this is the ONLY assertion of that text.** A sole carrier of a
+   ratified refusal should be **maximally strict**; a fragment match on the last
+   remaining witness is the wrong-record hazard `AC-9` exists to prevent.
+4. **Pin 1 already pays this cost in the same file**, so the trade is
+   established local practice.
+
+**On the real cost, stated rather than hidden: exact equality reds on benign
+rewording.** This campaign **already reworded that exact message once** —
+[[RT-REFUSAL-CONSEQUENCE-RESTORE]] changed the consequence clause. **That is
+the argument FOR strictness.** It was a deliberate semantic change to a
+ratified refusal and should have forced someone to look at the pin; under
+`contains` it could have passed unnoticed.
+
+> ### `D1` STANDS AND THE RING REDOES NOTHING.
+>
+> The absence clause was correct for what it was, and its discriminating power
+> was independently reproduced by the Adversary against production. **It is
+> superseded by a strictly stronger pin, not corrected.**
+
+## Deliverable `D1b` — replace the fragment guard with full equality, and bind the id that makes it constructible
+
+**In `refusal_pins_rehomed_static_worker_without_selector_exclusion`, one test,
+no production change:**
+
+1. **Bind `recognize()`'s return value** instead of discarding it with
+   `.expect(...)` statement-terminated.
+2. **Assert `reason ==` the full expected message**, built from the same five
+   values with the same template as `close()`.
+3. **Drop `!reason.contains("before construction")`** — subsumed. Any added
+   phrasing reds full equality, synonym or not.
+4. **Add the governing line above the pin** — see the condition below. It is
+   **not optional.**
+
+**Do not touch pin 1.** It already asserts full equality on a constant message.
+
+> ### THE CONDITION, and without it the Architect would rather keep the WEAKER pin.
+>
+> **A bare exact-equality assertion invites the update-the-expected-string
+> reflex**, which silently converts a semantic guard into a transcription
+> exercise. The pin must carry a governing line, in substance:
+>
+> > **This is the sole carrier of a ratified refusal. If this reds, the question
+> > is whether the REFUSAL changed — not whether the string did. Do not paste
+> > the new message in without answering that.**
+>
+> **A strict assertion everyone reflexively updates is worse than a loose one
+> people still read.** The line is what makes strictness protective instead of
+> churn.
+
+**Prove it detects, as `D1` did.** In a disposable tree, re-add *"before
+construction"* and separately a **synonym** — *"prior to construction"* —
+to the production refusal. **Observe pin 2 red on BOTH**, where the fragment
+guard caught only the first. **Confirm pin 1 stays green** under each. Revert
+byte-identically before offering a candidate.
+
+## `D2b` — WITHDRAWN 2026-08-17 BEFORE ANY CODE WAS WRITTEN. The hold is why this was cheap.
 
 > ### The Adversary hunted `D1` and refuted half the premise `D2b` was built on. `evt_10kfceqnt1fh1`.
 >
@@ -127,48 +202,33 @@ independently meaningful.
 > passes all three clauses with pin 1 green. **The synonym limitation is
 > measured now, not merely ruled.**
 >
-> **WITH THE ARCHITECT** (`evt_3p3sbs83j6gr0`), because it is his ruling's
-> premise. Three arms: **close it** (bind the recognition, assert full equality,
-> delete `D1`'s clause as subsumed); **document it** with the justification
-> corrected to the rewording trade alone; or **both**, if the two are worth
-> having as independent arms.
+> **RULED: CLOSE IT** (`evt_2gma122mayz8v`). Of the three arms routed — close,
+> document with the justification corrected, or both — **the Architect took
+> close and withdrew `D2b` himself**, verifying the refutation independently
+> first. See the ruling at the head of this node.
 >
-> **`D1` STANDS MERGED under every arm.** The clause discriminates — reproduced
-> against production by the Adversary independently of the ring's report.
+> **What defeated the ruling was a discarded return value**, and the Architect
+> named that as the sharper lesson: he **flagged that shape four times in this
+> campaign and then reasoned from an instance of it without seeing it.**
+>
+> **`D1` STANDS MERGED.** The clause discriminates — reproduced against
+> production by the Adversary independently of the ring's report.
 
-## Deliverable `D2b` — record the pin's DOMAIN beside the pin. HELD; see above.
+### What `D2b` WOULD have said, retained so it is not reconstructed
 
-**One comment, in `control.rs`, immediately above
-`refusal_pins_rehomed_static_worker_without_selector_exclusion`'s guard.** No
-code change, no test change, nothing else in the range.
+It was one comment above the pin, recording that **the clause pins one PHRASING
+of the refuted claim, not the claim** — *"prior to construction"*, *"ahead of
+the build"* pass all three clauses — plus a justification that string matching
+left no better option and that the false-positive direction was deliberate.
 
-**What it must say, in the Architect's terms (`dec_797e7wbbb1ae9`):**
+**The first half is TRUE and is now measured** (the Adversary ran the synonym).
+**It is why `D1b` exists rather than why a comment does.** The second half is
+the refuted premise, and it is the reason `D2b` was withdrawn rather than
+amended: **a comment explaining why a closable gap was left open is the wrong
+artifact, and that clause would have enshrined a false claim in the tree** —
+the exact class [[RT-DESCENT-RETIRE]]'s `D6a` exists to sweep.
 
-> **The clause pins one PHRASING of the refuted claim, not the claim.** A future
-> message re-asserting the same refuted temporal semantics in different words —
-> *"prior to construction"*, *"ahead of the build"* — passes all three clauses.
-
-**Say also why that is not a defect here**, so the next reader does not file it
-as one: there is no cheaper predicate for *"does not assert
-erasure-before-construction"* than string matching, and **the false-positive
-direction is the right one** — a future message legitimately using the phrase
-reds this spuriously, and a red is a prompt to think, where the alternative is
-a silent pass.
-
-**And why `contains` rather than `==`** — **THIS CLAUSE IS WHAT THE HOLD IS
-ABOUT. Do not write it as it stands.** It read: *pin 2's message is a `format!`
-carrying runtime ids, so full equality would conflate a refuted claim returning
-with an incidental rewording or an id change.* **The id half is refuted** — the
-ids are bindable and a reconstructed message tracks them exactly. **Only the
-rewording trade survives**, and whether it carries the conclusion is the
-Architect's to rule.
-
-> **Why this is a deliverable and not a note in the frame.** The failure it
-> prevents is **over-citation of the pin** — a later reader treating it as
-> covering the claim when it covers a phrase. That reader is at the pin, not in
-> this node.
-
-**This node stays `active` until `D2b` lands**, and it is the only thing between
+**This node stays `active` until `D1b` lands**, and it is the only thing between
 [[RT-DESCENT-RETIRE]]'s `D3` and the frontier — so it is a short turn, not a
 parking space.
 
@@ -268,16 +328,26 @@ construction"` alongside both currently-pinned clauses. **Observed, not argued.*
 **AC-2.** Pin 2 still passes at unmodified `origin/main`, and pin 1 is
 untouched and green.
 
-**AC-3.** No production change. This node edits **one test guard** (`D1`) and
-**adds one comment beside it** (`D2b`), and **deletes nothing**.
-`select_body_emission_authority` and `lowering/core.rs` are **not touched** —
-`D2` is withdrawn and struck.
+**AC-3.** No production change. This node edits **one test** — `D1`'s guard,
+then `D1b`'s replacement of it — and **deletes nothing outside that guard**.
+`select_body_emission_authority` and `lowering/core.rs` are **not touched**;
+`D2` and `D2b` are withdrawn.
 
-**AC-6** (`D2b`). The limitation is recorded **at the pin**, and states three
-things: the clause covers a **phrasing**, not the claim; the false-positive
-direction is deliberate; `contains` was chosen over `==` because the message is
-a `format!`. **A reader at the pin can tell what it does and does not cover
-without leaving the file.**
+**AC-6** (`D1b`). **Pin 2 asserts `reason ==` the full expected message**, built
+from the five values `close()` interpolates, with `recognize()`'s return value
+**bound rather than discarded**. The `!contains("before construction")` clause
+is **dropped as subsumed**, and pin 1 is untouched.
+
+**AC-7** (`D1b`). **The synonym is caught.** Under a disposable production
+mutation carrying *"prior to construction"* — the phrasing the fragment guard
+demonstrably tolerated — **pin 2 reds and pin 1 stays green.** Observed on both
+that mutation and the original *"before construction"* one, so the replacement
+is shown strictly stronger rather than merely different.
+
+**AC-8** (`D1b`). **The governing line is at the pin**, saying in substance that
+this is the sole carrier of a ratified refusal and that a red asks whether the
+**refusal** changed, not whether the string did. **Without it the Architect
+prefers the weaker pin**, so this is a criterion and not a nicety.
 
 **AC-4.** `D2c` `036e8ee916844fb91a4f42f2a2b04ebaea0dde2f` untouched.
 
@@ -286,8 +356,11 @@ targeted only — `-p ken-runtime` or `--test`, never `--workspace`.
 
 ## Banned scope
 
-- **Rewriting pin 1.** It uses full equality and has no gap; changing it trades
-  a stronger assertion for a uniform one.
+- **Rewriting pin 1.** It already uses full equality and has no gap. `D1b`
+  brings pin 2 up to it; it does not touch pin 1.
+- **Changing the production refusal message.** `D1b` reconstructs it in the
+  test; it does not edit it. A mutation is disposable and reverted
+  byte-identically.
 - **Any `D3`-`D8` retirement work**, and **any `lowering/core.rs` edit at all**
   — `D2` is withdrawn and its two comment items are struck, not pending.
 - **Weakening or rewriting the absence clause `D1` landed.** `D2b` documents
