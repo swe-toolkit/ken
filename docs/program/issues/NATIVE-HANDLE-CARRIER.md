@@ -11,6 +11,60 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # HARD-STOPPED 2026-08-17 ON A NON-PRIMITIVE EFFECT-SEAT GAP. AWAITING AN ARCHITECT RULING.
+>
+> **`status: active` and NOBODY IS WORKING IT.** There is no `blocked` status;
+> `ready` would put it back on the dispatch frontier when it needs a ruling
+> first, so `active` plus this banner is the accurate pair. **Do not dispatch
+> this node until the Architect answers `evt_1vdg5skdf1ndh`.**
+>
+> **No candidate exists and none was sent to QA.** The ring ran the diagnostic
+> first deliverable at base `bad9a9bb0` and reset the branch (`evt_4eynen6drs79x`).
+>
+> **What the diagnostic ESTABLISHED, and it is real progress:** `c07e63c2`
+> rebases cleanly (the `D1` tree equals `git merge-tree --write-tree bad9a9bb
+> c07e63c2`, range-diff preserving both the main-side RAII/compiler-driver
+> context and the carrier/BigInt changes), and **the saved CAP-41 fixture now
+> passes checked-core body view, the computational-IH census, and erasure.** ⇒
+> **axes (a)-(c) are no longer where the failure lives.**
+>
+> **The first native refusal is elsewhere, and it is a class this frame
+> anticipated:**
+>
+> ```
+> Effect: seat Argument(0) of FsReadFile needs BytesPointerLength,
+> which it cannot observe in CarriedWord
+> ```
+>
+> **Verified in the tree, not taken on report** —
+> `px4b_native_production.rs:429/510/614/719`,
+> `px7f_resource_native.rs:296/327`, `px7l_checked_host_recursive_bind.rs:137`,
+> and decisively **`rt_parity_native.rs:477/506/533/578`, the file holding the
+> control row this node must return to GREEN.** So the pre-existing two-bracket
+> row reaches the identical wall.
+>
+> ⇒ **`int_to_uint64_raw` CANNOT restore `AC-5`, and adding it would be an
+> unauthorized partial** — a green, well-tested change that fixes nothing.
+>
+> **THE ARCHITECT'S PRIMITIVE ENUMERATION HELD. This is the residual it
+> explicitly reserved a stop for:** *"the stop condition is retained only for a
+> non-primitive constructor/effect gap, not another primitive."* Every primitive
+> on the route was already handled; the gap is an effect seat.
+>
+> **The `S` sizing on the native slice was derived from that primitive
+> enumeration, which is no longer the binding constraint. Do not plan against
+> it.**
+>
+> > **Why the diagnostic-first clause was worth keeping — recorded because it
+> > paid off within minutes of the kickoff.** On release I discharged the
+> > axis-(d) **contention** route-back (its concurrent RT track,
+> > [[RT-NATIVE-FNSPLIT]], is `merged`) but kept the Architect's
+> > **diagnostic-first** clause in the same bullet, on the ground that the two
+> > had independent bases and only one had expired. **The whole release chain
+> > pointed at the `int_to_uint64_raw` arm and its fresh durable home. Going
+> > there first would have produced a passing candidate that does not fix the
+> > defect, with nothing to red.**
+
 > ## `ready` AS OF 2026-08-17. EVERY DEPENDENCY IS MERGED — there is no bar left.
 >
 > **All four `depends_on` entries are `merged`.** `RT-NATIVE-FNSPLIT`,
