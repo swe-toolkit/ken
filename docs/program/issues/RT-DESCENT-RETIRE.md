@@ -32,6 +32,24 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > this node removes. **`nc22` reasoning, third occurrence in one node: check what
 > a pin is built ON, not just what it asserts.**
 >
+> **The re-home is now its own node: [[RT-REFUSAL-PINS-REHOMED]], named in this
+> node's `depends_on`.** [[RT-DESCENT-LANE-COMPLETENESS]] closed 2026-08-17
+> having delivered every verdict; **its closure discharged constructs 3 and 4's
+> obligations and NOT constructs 1 and 2's pin.**
+>
+> #### BEFORE RUNNING `D6`: A `closed` PIN NODE IS NOT AUTOMATICALLY A DISCHARGE.
+>
+> **`closed` satisfies a `depends_on`** — `scripts/check-issue-schema.sh:189`,
+> *"closed means resolved-without-landing."* [[RT-REFUSAL-PINS-REHOMED]]'s own
+> `AC-8` makes a **hard stop a legitimate outcome**: it may resolve by reporting
+> that no exclusion-free assertion exists, land no pin, and still close.
+>
+> ⇒ **In that case this node's dependency reads satisfied while constructs 1 and
+> 2 are unpinned — the exact defect `AC-9` exists to prevent, arriving through
+> the dependency mechanism instead of through an increment.** Do not read the
+> gate; **read whether a pin landed.** If none did, `D6` proceeds only on an
+> explicit Steward-and-Architect ruling that it may run unpinned.
+>
 > **STILL OPEN — successor `D5`, routed to the Architect.** `0/12` does **not**
 > bound construct 3: that measurement was over the twelve
 > `LexicalCallArgumentRecursor` renderings, and construct 3's mechanism is a
