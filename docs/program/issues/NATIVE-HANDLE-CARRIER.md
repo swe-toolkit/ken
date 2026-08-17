@@ -11,7 +11,21 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # HARD-STOPPED 2026-08-17. THE ARCHITECT RULED: THE GAP IS NOT THIS NODE'S.
+> # DISPATCHED 2026-08-17 12:35 — UNBLOCKED. All five `depends_on` are `merged`.
+>
+> **Kicked `evt_2ag92pxcjxnyd` at base `7b8dad7df`.** `RT-SITEOP-CARRIED-WITNESS`
+> `D2` merged (PR #2557), which was this node's last bar.
+>
+> **The frame's TOP BANNER is load-bearing** (PR #2556): cut from **`85dcee25`**,
+> not `c07e63c2`; `§7`'s `D1`/`D2` are already done on it; the identity arm has
+> moved to `lowering/core/primitive.rs:206`; and **`D2a` is a hard stop** because
+> `AC-2`'s control cannot see `scalar_kind`.
+>
+> **The 30 minutes between unblock and dispatch were the Steward's**, not the
+> ring's — the seating-boundary note was raised as a blocking question when it
+> should have been flagged alongside a dispatch.
+
+> # SUPERSEDED — HARD-STOPPED 2026-08-17. THE GAP WAS NOT THIS NODE'S, AND IT IS FIXED.
 >
 > **RULED at `evt_559gymspqap8w`** (answering `evt_1vdg5skdf1ndh`). **The hard
 > stop was correct and so was refusing to add `int_to_uint64_raw`.**
