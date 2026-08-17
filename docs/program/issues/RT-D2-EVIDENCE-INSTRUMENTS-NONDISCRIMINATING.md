@@ -6,7 +6,7 @@ owner: runtime
 size: S
 gate: none
 depends_on: []
-blocks: []
+blocks: [RT-CAVEAT-GUARD-SPELLING-DOMAIN]
 github: null
 origin: "Adversary M8 hunt on ca639b5ef, evt_12x7wnwfbfbr (thread thr_5x0fypvv6rzhb), three findings measured by mutation with positive controls, five attacks refuted. Steward-verified the structural half of each before filing. AC-3's amended wording was the Steward's own. Steward-filed per COORDINATION section 2."
 ---
@@ -143,11 +143,53 @@ old meaning:
 ## Deliverables
 
 - **`D1`** — make `entered` and `advanced` independently observable (Finding 1),
-  and correct the three doc sites above.
+  and correct the three doc sites above. **MERGED 2026-08-17**, landed squash
+  `b7e2cf8f885bc103364975c64058dba6887872b4`, four paths, `+96/-15`, all four
+  blob-verified on `main`. The observer row carries a `match_descent` bit set
+  only after the plain Match branch is entered; the later route-1 replacement
+  preserves that bit rather than overwriting it; the three doc sites now
+  distinguish resolver entry, plain-Match descent, and direct non-`Construct`
+  route-1 returns. `AC-1` was discharged by two mutations with the exact
+  candidate restored after each — a committed no-descent mutant that leaves the
+  former entry/route observation satisfied while `match_descent` goes false, and
+  a temporary un-preserving read that reddens the new co-occurrence control with
+  `route1: true, match_descent: false`.
+
+  > The census caveat was re-derived here rather than bumped, moving to **324**
+  > with an inventory naming the observation scope, the three record helpers and
+  > `RuntimeExpr::Var(0)`. **That re-derivation is not `D3`** — it keeps the pin
+  > honest at the new magnitude; deciding what the pin should protect is still
+  > `D3`'s, and the Adversary's second hole on it (it counts exactly
+  > `#[cfg(test)]` while `any(test, feature = ...)` regions move invisibly)
+  > remains open inside `D3`'s option set.
 - **`D2`** — reach `agreeing_recursive_body_unit` from lowering with a real
   witness, or record why the in-situ path cannot be reached and what that means
-  for `AC-4`'s claim (Finding 2). **A mixed-arm `Some`/`None` witness is the
-  first thing to try.**
+  for `AC-4`'s claim (Finding 2). **DISCHARGED 2026-08-17 through its
+  record-why arm**, at exact base `b7e2cf8f8`, no candidate and no retained
+  change (`evt_2p6c34eg8shfm`).
+
+  > **This deliverable used to end "a mixed-arm `Some`/`None` witness is the
+  > first thing to try." That instruction was impossible to satisfy, and
+  > Finding 2 above already said so** — the agreement check is reached only when
+  > *every* arm returns `Some`, because the first `None` or `Err` short-circuits
+  > past it at `:15838-15840`. The sentence is deleted rather than annotated,
+  > because an implementer reads the deliverable, not the finding. The ring
+  > re-derived the short-circuit independently and spent a turn on it.
+  >
+  > **What `D2` established:** the mixed-arm route cannot reach the seam, by
+  > construction. **What it did NOT establish, and must not be read as:** that
+  > the seam is unreachable. The only shape that could reach it is an
+  > **all-`Some`** lowering witness, and `D2` was pointed at the mixed shape, so
+  > it never searched for one. Reachability is **unresolved, not refuted.**
+  >
+  > **Named residual, unowned and not authorized as work:** does any Ken source
+  > program drive `resolve_recursive_unit_body` to return `Some` on *every* arm?
+  > If one exists, the seam is live production behaviour and `AC-4` can be
+  > re-widened against it. If a bounded search finds none, that is a much
+  > stronger statement than `D2` made and belongs in whatever node makes it.
+  > Nothing in the tree answers this today: the Adversary's whole-suite probe
+  > (923 passed / 1 failed, the one failure being `AC-4`'s own unit test) shows
+  > only that no *existing test* reaches it.
 - **`D3`** — dispose of the pin (Finding 3): either revive the census it
   annotates, or retire the pin with its caveat, or re-key it to all six
   test-gating `cfg` spellings. **Do not just widen the count** — decide first

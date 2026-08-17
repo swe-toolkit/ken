@@ -224,6 +224,34 @@ does not discharge this criterion.
 cause, and a control shows the refusal is reachable — a witness whose two arms
 declare different body units. **An untested refusal arm is not a refusal arm.**
 
+> ### AC-4 WAS DISCHARGED, AND THE REACHABILITY HALF OF IT WAS NOT. Narrowed 2026-08-17 by the Steward.
+>
+> **What the discharging control actually establishes:** a `#[cfg(test)]` unit
+> test calls the generic helper `agreeing_recursive_body_unit` directly with
+> `[41_u8, 41]` and `[41_u8, 42]`, so **supplied units reject disagreement.**
+> That much holds.
+>
+> **What it does not establish, though the sentence above claims it:** that the
+> refusal is reachable *from lowering*. It is never reached through
+> `resolve_recursive_unit_body`, never with a `StaticOriginId`, and never from
+> lowering. Measured two independent ways — the Adversary made the helper
+> `panic!` unconditionally and the whole `-p ken-runtime --lib` suite came back
+> **923 passed / 1 failed**, the single failure being `AC-4`'s own unit test
+> while the `D2` CLI witness passed unchanged; and
+> `RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING`'s `D2` established statically
+> that the check sits behind a short-circuit at `:15838-15840` and is reached
+> only when **every** arm returns `Some`.
+>
+> ⇒ Read `AC-4` as the direct-helper claim only. **"An untested refusal arm is
+> not a refusal arm" was the right instinct and the control did not meet it** —
+> the arm is tested in isolation and untested in situ.
+>
+> **This is a narrowing, not a defect report against the landed code.** No
+> behaviour here is known to be wrong. Whether an all-`Some` lowering witness
+> exists is open and recorded as a named residual on
+> [[RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING]]'s `D2`; if one is found,
+> `AC-4` can be re-widened against it.
+
 **AC-5.** No regression across the workspace, green in CI. Local runs stay
 targeted (`scripts/ken-cargo`, `-p ken-runtime`, plus `-p ken-cli` for the parity
 suites); a full `--workspace` run is CI's job, never the laptop's.
