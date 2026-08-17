@@ -187,18 +187,23 @@ All six are currently ignored. The five rows formerly waiting on
 the byte-span repair did not re-arm: byte-span observation now succeeds, but
 each path seat is also read as `SiteOperand(0)`, which still requires a
 compile-time `Lowered` template. The sixth remains quarantined because a
-runtime-local closure has no durable boundary lane. The file's only live test
-calls `elaborates()`, a source-scope rejection check that does not run either
-executor and is not a differential.
+runtime-local closure has no durable boundary lane. The file also has a live
+source-scope rejection check that calls `elaborates()` without running either
+executor, and one live differential over the checked `UInt64` wrapper. That
+differential runs identical source through both executors and requires each to
+admit `UInt64::MAX` while rejecting `UInt64::MAX + 1` and `-1`. It is
+closure-free ground evidence, but it does not exercise any of the six
+narrowing paths.
 
 The binary remains excluded from the **sharded** test run, and a separate
 `native-rt-parity` job still runs it. The required `build + test` job depends
 on that job and checks its result. Read the resulting green precisely: it
-shows that the dedicated job ran and that the live source-scope check passed.
-It carries no current evidence that the interpreter and native backend agree
-on the six narrowing cases. The differential is therefore **unavailable**
-while all six remain ignored. Re-arming one cause would make it partial; only
-re-arming every row makes it live.
+shows that the dedicated job ran, that the live source-scope check passed, and
+that the interpreter and native backend agreed on the bounded-integer case. It
+carries no current evidence that they agree on the six narrowing cases. That
+narrowing differential is therefore **unavailable** while all six remain
+ignored. Re-arming one cause would make it partial; only re-arming every row
+makes it live.
 
 Chapter [04](04-effects-capabilities-and-authority.md) now shows a checked
 filesystem authority exemplar: an explicit `Cap a` parameter beside `[FS]`,
@@ -220,9 +225,9 @@ You can now separate elaboration from execution, identify the marked places
 where partial behavior may enter, and treat the interpreter as the semantic
 oracle for native differential tests. The backend implementation and its
 required CI job are present even though the target decision remains open in
-the specification, but the job currently carries no live interpreter/native
-differential. The curriculum records both divergences instead of reconciling
-them.
+the specification. The job carries one live bounded-integer differential but
+none of the six narrowing cases. The curriculum records both divergences
+instead of reconciling them.
 
 ---
 
