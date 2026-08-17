@@ -1,7 +1,7 @@
 ---
 id: RT-BACKEND-SPLIT-CENSUS
 title: "Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
