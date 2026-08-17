@@ -1017,6 +1017,7 @@ thread_local! {
 #[cfg(any(test, feature = "px8-ds-test-support"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BranchedScrutineeUnitBodyRoute1 {
+    pub route1: bool,
     pub plain_match: bool,
     pub match_scrutinee_is_var: bool,
     pub match_cases: usize,
@@ -1075,14 +1076,80 @@ fn record_branched_scrutinee_unit_body_route1(scrutinee: &RuntimeExpr) {
                 ),
                 _ => (false, false, 0, false),
             };
-            rows.push(BranchedScrutineeUnitBodyRoute1 {
+            let row = rows.last_mut().expect("route-1 entry row");
+            *row = BranchedScrutineeUnitBodyRoute1 {
+                route1: true,
                 plain_match,
                 match_scrutinee_is_var,
                 match_cases,
                 construct_bodies,
+            };
+        }
+    });
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_branched_scrutinee_unit_body_entry() {
+    BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1.with(|cell| {
+        if let Some(rows) = cell.borrow_mut().as_mut() {
+            rows.push(BranchedScrutineeUnitBodyRoute1 {
+                route1: false,
+                plain_match: false,
+                match_scrutinee_is_var: false,
+                match_cases: 0,
+                construct_bodies: false,
             });
         }
     });
+}
+
+fn agreeing_recursive_body_unit<Unit>(
+    declared_units: impl IntoIterator<Item = Unit>,
+) -> Result<Option<Unit>, CraneliftBackendError>
+where
+    Unit: Copy + Eq + std::fmt::Debug,
+{
+    let mut declared_units = declared_units.into_iter();
+    let Some(expected) = declared_units.next() else {
+        return Ok(None);
+    };
+    for unit in declared_units {
+        if expected != unit {
+            return Err(unsupported(
+                "ComputationalMatch",
+                format!(
+                    "plain Match branches declare different recursive body units: \
+                     {expected:?} versus {unit:?}"
+                ),
+            ));
+        }
+    }
+    Ok(Some(expected))
+}
+
+#[cfg(test)]
+mod branched_scrutinee_unit_body_port_tests {
+    use super::agreeing_recursive_body_unit;
+    use crate::cranelift_backend::surface::{CraneliftBackendError, UnsupportedLowering};
+
+    #[test]
+    fn plain_match_declared_body_units_refuse_disagreement_and_the_mutation_discriminates() {
+        let matching = agreeing_recursive_body_unit([41_u8, 41]);
+        assert_eq!(matching.expect("matching arms must agree"), Some(41));
+
+        let disagreement = agreeing_recursive_body_unit([41_u8, 42])
+            .expect_err("mutating one reachable arm unit must refuse");
+        match disagreement {
+            CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }) => {
+                assert_eq!(construct, "ComputationalMatch");
+                assert_eq!(
+                    reason,
+                    "plain Match branches declare different recursive body units: 41 versus 42"
+                );
+            }
+            other => panic!("expected the plain-Match disagreement refusal, got {other:?}"),
+        }
+    }
 }
 
 /// Run `body` with the census recorder installed on this thread, and return its
@@ -15744,6 +15811,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         eliminator_origin: StaticOriginId,
         position: usize,
     ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+        #[cfg(any(test, feature = "px8-ds-test-support"))]
+        record_branched_scrutinee_unit_body_entry();
         let eliminator = self.retained_body_occurrence(eliminator_origin)?;
         let RuntimeExpr::ComputationalMatch { scrutinee, .. } = eliminator.expr else {
             return Err(backend_module(
@@ -15751,9 +15820,29 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             ));
         };
         let scrutinee = self.child_occurrence(eliminator_origin, 0, scrutinee)?;
-        let RuntimeExpr::Construct { args, .. } = scrutinee.expr else {
+        self.resolve_recursive_unit_body(scrutinee.static_origin, position)
+    }
+
+    fn resolve_recursive_unit_body(
+        &self,
+        source_origin: StaticOriginId,
+        position: usize,
+    ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+        let source = self.retained_body_occurrence(source_origin)?;
+        let RuntimeExpr::Construct { args, .. } = source.expr else {
+            if let RuntimeExpr::Match { cases, .. } = source.expr {
+                let mut declared_units = Vec::with_capacity(cases.len());
+                for (case_index, case) in cases.iter().enumerate() {
+                    let body = self.case_body_occurrence(source_origin, case_index, &case.body)?;
+                    let Some(unit) = self.resolve_recursive_unit_body(body.static_origin, position)? else {
+                        return Ok(None);
+                    };
+                    declared_units.push(unit);
+                }
+                return agreeing_recursive_body_unit(declared_units);
+            }
             #[cfg(any(test, feature = "px8-ds-test-support"))]
-            record_branched_scrutinee_unit_body_route1(scrutinee.expr);
+            record_branched_scrutinee_unit_body_route1(source.expr);
             return Ok(None);
         };
         let Some(argument) = args.get(position) else {
@@ -15761,7 +15850,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 "recursive position is outside its source constructor".to_string(),
             ));
         };
-        let argument = self.child_occurrence(scrutinee.static_origin, position, argument)?;
+        let argument = self.child_occurrence(source_origin, position, argument)?;
         match argument.expr {
             RuntimeExpr::LexicalClosure { captures, body, .. } if captures.is_empty() => Ok(Some(
                 self.child_occurrence(argument.static_origin, 0, body)?
