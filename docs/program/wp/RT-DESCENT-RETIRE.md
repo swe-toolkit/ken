@@ -500,6 +500,43 @@ the proof is unavailable and any argument for it is circular.
 > first landing, and what still gates it is
 > [[RT-REFUSAL-PIN-ABSENCE-CLAUSE]] and the `depends_on` list, not `D2c`.
 
+> ### `D3` ALONE CANNOT COMPILE. `D3`-`D6` ARE ONE CANDIDATE. Measured 2026-08-17.
+>
+> **This is the standing gate-compatibility check applied forward** — *does this
+> candidate's own acceptance criterion agree with the gate it will be routed
+> into?* — asked before dispatch this time rather than after a failed publish.
+>
+> **`D3` deletes symbols that `control.rs` references, so a `D3`-only candidate
+> does not build**, let alone go green. Counted at `origin/main` with
+> `grep -rn --include='*.rs'`, production file versus test file:
+>
+> | symbol | `lowering/core.rs` | `core/tests/control.rs` |
+> |---|---|---|
+> | `select_body_emission_authority` | 2 | **28** |
+> | `RecursiveDescentResidual` | 15 | **42** |
+> | `recursive_descent_residual` | 60 | **37** |
+> | `declaration_recursive_descent_residual` | 6 | **1** |
+> | `BodyEmissionAuthority::RecursiveDescent` | 12 | **6** |
+>
+> ⇒ **`D3`, `D4`, `D5` and `D6` land as a single candidate.** The deletion and
+> the disposition of the tests that name the deleted symbols are inseparable at
+> the compiler.
+>
+> **The reverse order is worse and is ruled out.** Running `D6` first would
+> retire tests that are **currently green and asserting a live lane** — deleting
+> the oracle before the deletion it exists to guard, which is the `nc22`
+> ordering violation, and it destroys the evidence `D3`'s red would be read
+> against.
+>
+> **This does NOT re-open the step-1 / step-2 separation.** `AC-7` forbids one
+> candidate that both **reroutes and deletes**; it says nothing about deleting
+> dead code and its tests together. With `D2c` ruled never-merged, any step-2
+> candidate satisfies `AC-7` trivially.
+>
+> **`D7` and `D8` are separable and are not folded in here** — neither
+> references a deleted symbol as its subject. Cut them after, unless the ring
+> measures otherwise and says so.
+
 - **`D3` — Delete the classifiers**: `recursive_descent_residual`,
   `declaration_recursive_descent_residual`, `RecursiveDescentResidual`, and
   `select_body_emission_authority`.
