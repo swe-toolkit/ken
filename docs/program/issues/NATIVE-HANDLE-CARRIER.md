@@ -11,7 +11,7 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-# CURRENT STATE — 2026-08-17, 13:55 UTC
+# CURRENT STATE — 2026-08-17, 18:40 UTC
 
 **Read this section only. Everything below it is reverse-chronological history,
 and the top three banners are superseded on their central claims.** Fifteen
@@ -26,12 +26,25 @@ outside this node.
 
 | | state |
 |---|---|
-| candidate `3d23f1182` | exists, approved once (`dec_1reay8hc7qy2b`), **refused by CI, not landable**, being recut |
-| `dec_1reay8hc7qy2b` | **spent** — it approved a claim set including `AC-6`/`AC-7` that the tree does not produce |
-| PR #2563 | **open with red checks**, annotated, so a fix pushed to `wp/NATIVE-HANDLE-CARRIER` re-runs them |
+| the bounded `D1'`/`D2a`/`D2'` partial | **LANDED** as squash `f9dd79f52`, from exact `06e44819a`, verified byte-identical on all 18 declared paths |
+| candidate `3d23f1182` | **superseded, not landable, and that is now history** — it was recut into `06e44819a`, which deleted the four failing `cap41_*` rows |
+| `dec_1reay8hc7qy2b` | **spent** — it approved a claim set including `AC-6`/`AC-7` that the tree does not produce. `dec_3m3dvn80b7143` is the Decision that landed the partial |
+| PR #2563 | **merged.** PR #2564, which recorded the earlier CI failure, is **closed as superseded** |
 | `AC-5` | **outstanding by measurement.** A stale ban is not a met criterion |
 | `D3` / `D4` / `D5`, `AC-3` | unclaimed |
 | `PX8-F-CAP-41` Phase 2 | **unpaired** — does not close on this node's merge |
+
+> ### TWO ROWS ABOVE WERE FALSE FOR FIVE HOURS: "REFUSED BY CI", "RED CHECKS"
+>
+> They described `3d23f1182` and PR #2563 accurately **when written**, and both
+> statements outlived their subject: the recut landed and the PR merged. Nothing
+> reds when a state table goes stale, and this one sat at the top of the file
+> under a heading promising it was the current state.
+>
+> **The tell was a merge conflict on an unrelated PR**, not a check — #2564
+> could not merge, and reading why is what surfaced that `main` and #2564 were
+> stale in the *same* direction. ⇒ A conflict is sometimes the only instrument
+> pointed at prose.
 
 **Fence on this node's own closure — DISCHARGED 2026-08-17.**
 [[PX8-F-CAP-41]]'s `depends_on` now names
@@ -144,16 +157,38 @@ Same deliverable text, different node, different team. **The node is not cut
 until that is one measurement rather than two readings** (dispatched
 `evt_3sv9516b7b7nk`).
 
-> ### THIS MEASUREMENT IS NOT REPRODUCIBLE IN-TREE AFTER THE RECUT
+> ### CORRECTED 2026-08-17: THE PROGRAMS SURVIVED. ONLY THE RUST ROWS WERE DELETED.
 >
-> Four of the five governed programs **are** the `cap41_*` rows, and the recut
-> deletes them; the fifth is an `#[ignore]`d row. So the measured population
-> ceases to exist in the tree, no test carries the result forward, and **this
-> prose plus the preserved ref is the only record there will be.**
+> **This block previously said the measured population "ceases to exist in the
+> tree" and that prose plus the preserved ref "is the only record there will
+> be". Both are false**, caught by the Adversary on the landed squash and
+> verified independently before this correction.
 >
-> That is what `refs/heads/preserved/native-handle-carrier-route1-3d23f118` is
-> for, and it is why the read was queued **before** the recut rather than after
-> it. Do not delete the ref on the theory that the node is closed.
+> **What the recut actually deleted:** the four Rust `#[test]` rows and the
+> exclusive helper `assert_cap41_derived_without_read`. Confirmed gone from
+> `crates/`.
+>
+> **What survives, in the tree, right now:** all four governed Ken programs, at
+> `crates/ken-cli/tests/rt_parity_native.rs:349-387` — `rt_cap41_endpoint_buffer`
+> reading `MkBufferWindow (8) (4)` against a capacity-8 handle, plus the
+> out-of-range, offset-endpoint and offset-out-of-range siblings, with `_file`
+> wrappers at `:389-423` and `_stage` wrappers at `:426-459`. They live inside
+> the `RT_PARITY_SOURCE` literal (lines 58-481), and **every** `cap41`
+> occurrence in `crates/` falls inside it — zero Rust-level references.
+>
+> ⇒ **Restoring the measurement is FOUR TEST FUNCTIONS in a file you already
+> have.** It is not a cherry-pick from a preserved branch and not a
+> re-derivation. Do not price it as one — runtime-leader read the wrong version
+> back before this was corrected.
+>
+> **Keep `refs/heads/preserved/native-handle-carrier-route1-3d23f118`** anyway:
+> it is the record of the deleted rows and of the pre-recut tree. It is simply
+> not the only copy of the programs.
+>
+> **Why the error survived being written down.** "The rows are deleted" was
+> true, and the population was *identified by* those rows — so deleting them
+> read as deleting the population. **A fixture and the programs it exercises are
+> different objects, and a test file can hold the second without the first.**
 
 **Also identified, so nobody hunts for it:** the refusal is the fallback arm of
 the same two-arm dispatch, not a separate downstream mechanism. `:15951` is the
