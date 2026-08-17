@@ -353,6 +353,12 @@ contingency.
   **Big** carrier. ⛔ **A truncation there survives `AC-2`'s control untouched**,
   so this is a hard stop to the Steward/Architect if the answer is not plainly
   no, not a call to make inside `D2'`.
+  - ✅ **ANSWERED 2026-08-17: a plain no, and DISCHARGED** (`evt_s5bhmq0n4yad`).
+    No `scalar_kind` entry was added. The real sites are **Specialized**, and
+    `Big` is `PersistentGround` while the scalar helpers require
+    `ImmediateInt` — so the carried word cannot reach that path with a `Big`
+    payload. ⭐ **The `Big` fast-path mutation reddens and was reverted**, which
+    is what makes this a measurement rather than a reading of the map.
 - **`D3`** — the four focused discriminators of `§8` (`AC-3`), before the full
   oracle.
 - **`D4`** — the CAP-41 fixture carried to **full native GREEN**, and the full
@@ -437,6 +443,17 @@ contingency.
 - ⛔ **No honest partial.** The Architect ruled this out explicitly: the
   candidate *regresses* an already-GREEN native row (`AC-5`), so interp-only is
   not a landable state.
+  - ⚠ **UNDER REVIEW 2026-08-17 — the ban STILL BINDS until the Architect says
+    otherwise; this note is not a licence.** Its warrant, in the node's
+    "Decisive regression evidence" paragraph, is that `AC-5`'s row failed with
+    `MissingClosureMetadata` — **a cause that is fixed.** The node's own
+    2026-07-29 HELD banner then records that row **GREEN** on preserved
+    `85dcee25`. ⇒ On the record the candidate does not regress it; the refusal
+    arrived from `main` in the rebase. ⛔ **Separate the conclusion from the
+    warrant** — a discharged warrant does not by itself discharge the ruling,
+    and the ruling is the Architect's to revisit. **The deciding measurement is
+    the `AC-5` row at base `7b8dad7df` versus at the tip**, and it has not been
+    run.
 - ⛔ **No concurrent `lowering/core.rs` edit** while `RT-NATIVE-FNSPLIT` is
   live.
 
@@ -493,8 +510,20 @@ the holder — ⛔ don't pipe it through `head`.
   effect-seat gap is [[RT-SITEOP-CARRIED-WITNESS]]'s and is in flight; ⛔ do not
   route *that* one again. The bullet stays live for **any further** such gap;
   **or**
+  - ⇒ ⛔ **IT FIRED AGAIN 2026-08-17 12:54, on a DIFFERENT gap, and that is
+    the node's current state.** All four CAP-41 rows and the directly-run
+    `AC-5` row refuse at `lowering/core.rs:2929`
+    `reject_carried_residual_arguments` — *"a carried recursive hypothesis is
+    an eliminated value, not a callable, so it takes no arguments, but the call
+    provides 1"*. Handback `evt_s5bhmq0n4yad`, routed `evt_64w7h59bd91y8` /
+    `evt_jzd8wsxk74dz`. **The guard is `main`'s** (`feab3cb56 RT-FNSPLIT-C1`;
+    `core.rs` is byte-identical base-to-tip), so this is inherited, not
+    introduced. Disposition is the Architect's; see the node's leading banner;
+    **or**
 - `§7 D2a`'s `scalar_kind` question does not come back a plain no — a truncation
-  path that `AC-2`'s control cannot see is not yours to judge safe; **or**
+  path that `AC-2`'s control cannot see is not yours to judge safe
+  — ✅ **DISCHARGED 2026-08-17: it came back a plain no, with a reverted
+  reddening mutation as the control. This bullet is spent**; **or**
 - identity lowering turns out to be unsound for the Big carrier on the native
   path — that reopens the Architect's means ruling and is not yours to re-decide;
   **or**

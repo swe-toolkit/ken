@@ -11,6 +11,97 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # HARD-STOPPED 2026-08-17 12:54 — `3d23f1182` HELD, routed to the Architect
+>
+> **Runtime-leader handback `evt_s5bhmq0n4yad`; Steward routing `evt_64w7h59bd91y8`
+> plus `evt_jzd8wsxk74dz`.** The tip is **not** routed to QA and **not**
+> published. `refs/heads/wp/NATIVE-HANDLE-CARRIER` = `3d23f1182`, base
+> `7b8dad7df` (verified ancestor), unpushed — no PR exists.
+>
+> ### What is DONE and is not in question
+>
+> `D1'` rebase, `D2'`, and `D2a` are complete. **`D2a` came back a plain no** —
+> the real sites are Specialized, `Big` is `PersistentGround` while scalar
+> helpers require `ImmediateInt`, and the `Big` fast-path mutation reddens and
+> was reverted. **That was the Steward hard stop in `§7`/`§11`; it is
+> discharged.** No `scalar_kind` entry was added, correctly.
+>
+> ### The stop: `§11` bullet 2 fired a SECOND time, on a different gap
+>
+> All four CAP-41 rows and the directly-run `AC-5` row
+> `fs_read_at_malformed_offset_narrows_to_invalid_offset` refuse at
+> `lowering/core.rs:2929` `reject_carried_residual_arguments`:
+>
+> ```
+> BoundaryCarrier: a carried recursive hypothesis is an eliminated value,
+> not a callable, so it takes no arguments, but the call provides 1
+> ```
+>
+> **This is NOT the discharged effect-seat gap and NOT the retired
+> `RecursiveDescent` cause**, so the "do not route *that* one again" amendment
+> does not reach it. The bullet stays live exactly as written.
+>
+> ### The guard is `main`'s, not this candidate's — measured
+>
+> | fact | measurement |
+> |---|---|
+> | guard at `origin/main` and at base `7b8dad7df` | present, 5 hits in `core.rs` |
+> | introduced by | `feab3cb56 RT-FNSPLIT-C1` |
+> | `core.rs` base vs tip | **byte-identical**, sha256 `013514cc28…` |
+> | candidate's whole backend delta | `primitive.rs` 2 lines + 20 test lines |
+>
+> ### ⇒ `§9`'s no-honest-partial ban rests on a warrant that is DISCHARGED
+>
+> The ban's stated basis is the "Decisive regression evidence" paragraph below:
+> the `AC-5` row "was GREEN before and now fails before execution with the
+> identical `MissingClosureMetadata`". **That cause was the elaborator half and
+> is fixed** — body view, census and erasure are GREEN. The row is red today for
+> an unrelated downstream reason.
+>
+> **And the 2026-07-29 HELD banner records that row GREEN on the candidate** at
+> preserved `85dcee25` (`rt_parity_native` 11/1, the single red being the *write*
+> row, which is [[RT-DECL-CLOSURE-PORT]]'s). ⇒ The delta between that green and
+> today's red is **the rebase — `main`'s content — not the candidate's.**
+>
+> ⚠ **Two limits, stated because the conclusion is not yet earned.** That
+> 2026-07-29 line is corpus prose about a different base and has not been
+> re-measured; and the candidate does carry a real elaborator slice
+> (`prelude.rs` +127, `erasure.rs` +46, `checked_core.rs` +40,
+> `compiler_driver.rs` +30), so it could contribute independently to a refusal
+> raised in an unchanged guard.
+>
+> ⇒ **ONE measurement settles both**, and it is owed by the ring: run
+> `fs_read_at_malformed_offset_narrows_to_invalid_offset` **at the base
+> `7b8dad7df`** as well as at the tip.
+> - red at base, red at tip, same refusal ⇒ the candidate regresses nothing,
+>   `§9`'s ban is stale, and `D1'`/`D2'`/`D2a` is an admissible partial.
+> - green at base, red at tip ⇒ the ban stands as written and the elaborator
+>   slice is the cause.
+>
+> ⛔ **The partial call is the ARCHITECT's, not the Steward's** — the ban was an
+> Architect ruling, and a measurement that falsifies its warrant is not a licence
+> to overturn it. Runtime will not widen the node either way.
+>
+> ### The component question routed to the Architect
+>
+> **Is the refusal correct semantics or a missing port?** The message claims what
+> the value *is* ("an eliminated value, not a callable"), which on the
+> denotation-versus-bookkeeping discriminator reads as **correct semantics**.
+> But that discriminator turns on the **fixture**, not the error text — and the
+> fixture is the four CAP-41 seed rows, which `§9` forbids editing. So:
+> - the rows genuinely apply a carried hypothesis to an argument ⇒ either the
+>   seed froze a design defect, or **the durable closure lane is a real
+>   prerequisite dependency** and this node is mis-sequenced, not
+>   mis-implemented;
+> - they do not ⇒ the guard is over-broad, and that is a runtime defect.
+>
+> ⚠ **Observation, not a finding.** The guard refuses on **arity alone**
+> (`arguments: usize`, no inspection), while its doc comment justifies the
+> exclusion by appeal to a **function-valued** recursive field needing the
+> withheld closure lane. Arity and callability are different populations. If the
+> nullary claim is total the check is exactly right; the comment asserts that
+> total reading, and it has not been verified.
+
 > # DISPATCHED 2026-08-17 12:35 — UNBLOCKED. All five `depends_on` are `merged`.
 >
 > **Kicked `evt_2ag92pxcjxnyd` at base `7b8dad7df`.** `RT-SITEOP-CARRIED-WITNESS`
