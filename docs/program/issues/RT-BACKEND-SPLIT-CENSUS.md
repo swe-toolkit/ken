@@ -1,7 +1,7 @@
 ---
 id: RT-BACKEND-SPLIT-CENSUS
 title: "Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -11,7 +11,79 @@ github: null
 origin: Architect ruling evt_54zvaqbrm752x (2026-08-10) decomposing RT-BACKEND-MODULE-SPLIT into independently mergeable slices, cut item 1. Enclave pass anchored at evt_104nz8cedzyat on operator instruction 2026-08-10. Stage A is research/compiler-refactoring-program.md §5.1. Steward-filed per COORDINATION §2.
 ---
 
-> # `ready` AS OF 2026-08-17. ALL FOUR DEPENDENCIES ARE `merged`. THIS IS NEXT.
+> # MERGED 2026-08-17. `D0`-`D6` at squash `8ebc2467d`, PR #2541. STAGE A IS DONE.
+>
+> **Reviewed candidate exact `bdf426ce3a48ac90e5fcbdb5172e632b8ea6eeaa`, range
+> `4de48651434dd6340f81ec9b1b7a5ac2ec8c0199...bdf426ce3a48ac90e5fcbdb5172e632b8ea6eeaa`.**
+> One commit, six `docs/program/` paths, `+1454/-0`, **zero changed paths under
+> `crates/`** — `AC-5`. QA at `evt_54y0ak9ezsr25`; Architect resolved
+> `dec_5xxct147r6ycr`, domain `docs/program/`, one non-blocking should-fix, no
+> respin.
+>
+> **The five inventories are the durable deliverable**, all at one pinned
+> measurement SHA which occurs exactly once in each document (`AC-1`):
+>
+> | inventory | headline |
+> |---|---|
+> | [type ownership](../backend-split-census-type-ownership.md) | 278 non-private type declarations, 24 / 8 / 199 / 47 by visibility |
+> | [lifecycles](../backend-split-census-lifecycles.md) | authority and ledger mint / transition / close / terminal sites |
+> | [re-exports](../backend-split-census-reexports.md) | 57 statements, 29 / 4 / 2 / 22 by build profile |
+> | [tests](../backend-split-census-tests.md) | 716 `#[test]` functions, 127 mutation surfaces, 70 fixtures |
+> | [co-change](../backend-split-census-cochange.md) | 156 distinct commits; 64 / 61 / 79 / 107 per file |
+>
+> ## `D6` RETURNED THE POSITIVE VERDICT, NOT THE STOP
+>
+> **The next slice's ownership proof survived revalidation.**
+> `lower_primitive_call` has one definition and one caller; every call site of
+> the twelve selected helpers lies inside that dispatcher (the three with extra
+> hits are multi-arm dispatch, not foreign callers); `lowered_char_list` is
+> definition plus one self-recursive call plus the dispatcher; `expect_two_args`
+> has five calls, all from selected methods — **an acyclic shared arity seam,
+> not a second lowering owner.** No new shared owner, no cycle.
+>
+> ⇒ **[[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] is `ready`.** Its `draft` bar was
+> exactly this verdict.
+>
+> ## `AC-2` AND `AC-4` ARE WHY THIS NODE WAS WORTH ITS SLOT
+>
+> **Every count carries its selector and states what the selector cannot see.**
+> The type-ownership record names its regex and lists its blind spots outright:
+> private types, macro-generated declarations, declarations whose visibility and
+> type keyword are split across lines, traits, constants, functions, fields.
+>
+> **`AC-4` was amended the same morning, and the amendment changed the
+> artifact.** It had required recording the caveat guard *"as FIXED"*. Inventory
+> 4 now records it as **fixed but partial** — 322 bare `#[cfg(test)]` regions
+> against a rationale domain of **340**, because 18 `any(test, …)` regions
+> remain outside the guard. **A bare 322 would have frozen a false completeness
+> onto seventeen later slices**, which is the failure the criterion exists to
+> prevent, one level down.
+>
+> **The Architect reproduced every headline count from each record's own
+> declared selector** rather than from QA's reproduction, and all matched.
+>
+> ## THE SHOULD-FIX IS APPLIED, AND IT NEEDED TWO SITES RATHER THAN ONE
+>
+> **Architect note, in the resolution:** `backend-split-census.md` item 1 read
+> *"records 278 non-private declarations"*, dropping the word **type** that the
+> measured domain requires. The same domain also holds 694 `pub fn`, 25
+> `pub const`, 7 `pub static`, 5 `pub mod`. **The error direction understates
+> the non-private surface, which for a split census makes a move look cheaper
+> than it is.**
+>
+> **The note called this an index-sentence fix on the ground that the
+> sub-record is exact. I swept for the phrase and it occurs twice.**
+> `backend-split-census-type-ownership.md:20` also read *"It selects 278
+> non-private declarations"*. **The note's judgment about where the harm lives
+> is right** — that sentence sits between the selector, which literally shows
+> `(struct|enum|type)`, and an explicit exclusion list naming traits,
+> constants, functions and fields, so context defuses it there and does not in
+> the index. **But a remedy scoped to the index leaves the same phrase in the
+> tree**, available to the next reader who lifts the sentence rather than the
+> paragraph. Both are corrected, and the index now carries the excluded
+> categories and the direction.
+
+> # SUPERSEDED: the release banner below. Kept — it records the bars coming down.
 >
 > **Every bar is down**, each verified at its landed squash rather than by
 > ancestry:

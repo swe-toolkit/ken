@@ -17,7 +17,7 @@ The declaration domain is every Rust file below
 ^\s*(pub(?:\([^)]*\))?)\s+(struct|enum|type)\s+([A-Za-z_][A-Za-z0-9_]*)
 ```
 
-It selects 278 non-private declarations: `pub` 24, `pub(crate)` 8,
+It selects 278 non-private type declarations: `pub` 24, `pub(crate)` 8,
 `pub(in crate::cranelift_backend)` 199, `pub(super)` 47. It cannot see private
 types, macro-generated declarations, declarations
 whose visibility and type keyword are split across lines, traits, constants,
