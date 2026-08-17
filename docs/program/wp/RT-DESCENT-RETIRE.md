@@ -558,9 +558,37 @@ the proof is unavailable and any argument for it is circular.
 > imports `set_selector_variant_exclusion` and passes
 > `RecursiveDescentResidual::LexicalCallArgumentRecursor` (`:6692-6693`). **It
 > cannot compile after `D3`**, so it is dispositioned inside this candidate,
-> not deferred. Its sibling
+> not deferred.
+>
+> **CORRECTED 2026-08-17 (Adversary `evt_36g5y5adqv2nv`), re-measured by the
+> Steward. `d2k_0` IS NOT A PAIR — IT IS ONE OF 44.**
+>
+> **Measured at `main`: of the 278 top-level `#[test]` functions in
+> `control.rs`, 44 carry a CODE reference to one of the five affected symbols**
+> — the four `D3` deletes plus `set_selector_variant_exclusion`, whose
+> parameter type is one of them — **and therefore cannot compile after `D3`.**
+> Comment lines excluded; state the domain beside the number, since the
+> Adversary's independent count of **31** is over two symbols and agrees.
+>
+> ⇒ **The sibling this frame previously named,
 > `d2k_0_control_reddens_when_the_wrong_consumer_condition_is_removed`
-> (`:6644`) does not name them but is frozen-set row 8.
+> (`:6644`), is NOT in the set.** Its only mention is in a comment — *"No
+> `set_selector_variant_exclusion` at all"* — so **it compiles fine after
+> `D3`.** Among the 44 are `rt_run_functionized`, a **shared helper that drags
+> its callers with it**, plus `d1_each_residual_variant_is_observable`,
+> `d3_the_exact_set_control_still_reds_under_short_circuiting`,
+> `msd_d2a_residual_equals_subject_guard_and_route_complement`, and
+> `recursive_descent_recursors_compile_without_a_boundary_crossing` — the
+> `AC-10` sentinel.
+>
+> **This is the candidate's real size, and it is a sizing input, not
+> bookkeeping.** The `d2k_0` argument — *cannot compile after `D3`, therefore
+> dispositioned inside this candidate* — **applies unchanged to all 44, of
+> which exactly ONE has had its repair costed.**
+>
+> **`D8`'s zero-intersection result is unaffected and was re-verified against
+> this larger population:** none of the five re-described controls is among the
+> 44.
 >
 > **Do not size its repair as "what `D1b` just did to pin 2".** Measured by the
 > Adversary (`evt_2a2kj4dn4drsj`) and verified in the tree:
@@ -582,6 +610,12 @@ the proof is unavailable and any argument for it is circular.
 > that is a finding to route, not a thing to improvise inside a deletion. **One
 > renumbering currently reds four rows at once**, each needing a separate
 > churn-or-regression adjudication, which is exactly the cost `AC-9` is about.
+>
+> **Read that instruction against 44, not against one.** It was first written
+> having costed `d2k_0` alone. **The stop-and-say-so option is the expected
+> outcome here, not the pessimistic one** — a deletion that also owns the
+> disposition of 44 test functions is a plausible place to hand back a
+> re-cut rather than push through.
 
 - **`D3` — Delete the classifiers**: `recursive_descent_residual`,
   `declaration_recursive_descent_residual`, `RecursiveDescentResidual`, and
