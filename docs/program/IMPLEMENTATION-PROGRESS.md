@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-17 05:08:05Z — from 364 issue file(s) in `docs/program/issues/`.
+2026-08-17 05:19:36Z — from 365 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -336,6 +336,7 @@ the committed file matches the generator's output.
 | `RT-SRCBODY-BIND-ORDER` | Functionized source-body units install the parameter run in ABI order where the body reads de Bruijn-nearest-first, so every multi-parameter source body binds its parameters permuted | merged | runtime | M | none | — |
 | `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` | Arm static-worker recognition on the source-machine Construct arm, which never dispatches the classifier, after a bounded check that every eligible-field state can enter the template | merged | runtime | M | none | — |
 | `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` | Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see | ready | runtime | S | none | — |
+| `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` | Find one Ken SOURCE program that reaches the StaticWorkerBinding conservation arm specifically -- the existing bound is a search over hand-authored fixtures, and the six ignored ken-cli tests are NOT a ready-made corpus because they fail upstream at the sibling Closure arm | ready | runtime | M | none | — |
 | `RT-STATIC-WORKER-WITNESS-PROGRAM` | ANSWERED, bounded negative: no reasonable Ken source program was found that reaches the static-worker conservation refusal -- every attempt that keeps the constructor live in the executable closure also supplies a lawful disposition, and that is a search bound, not a universal proof | closed | runtime | M | none | — |
 | `RT-SYMLINK-LANE` | SymlinkPolicy is honoured by the interpreter lane and unreachable in the native lane — FollowWithinScope has no native behaviour | draft | runtime | TBD | none | — |
 | `RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE` | Give the unit-boundary environment record a planner-issued occurrence by extending the synthesized producer arm, so the closure crossing is attempted at the seam that actually refused it | merged | runtime | M | none | 2352 |
@@ -476,6 +477,7 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CALL-EDGE-EXECUTABILITY-AXIS` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
+- `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` blocked by `RT-DESCENT-RETIRE` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
 ## Gate progress
