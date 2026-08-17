@@ -1,7 +1,7 @@
 ---
 id: RT-REFUSAL-PIN-ABSENCE-CLAUSE
 title: "Pin 2 of the re-homed refusal pins asserts two contains() clauses, so it pins what the refusal must SAY and nothing about what it must NOT say -- the temporal phrasing D1c refuted can be re-added beside both pinned clauses and every assertion still passes. Add the absence clause while both lanes still exist"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
