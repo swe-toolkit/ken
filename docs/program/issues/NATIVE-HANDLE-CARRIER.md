@@ -1,7 +1,7 @@
 ---
 id: NATIVE-HANDLE-CARRIER
 title: "Native build-pipeline completeness — a constructor-private resource-carrying handle fails checked-core body-view lowering (MissingClosureMetadata) when it crosses the higher-order withBuffer normalization boundary"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,24 +11,46 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> ## `draft` AS OF 2026-08-17. THE REASON BELOW WAS SUPERSEDED — read this first.
+> ## `ready` AS OF 2026-08-17. EVERY DEPENDENCY IS MERGED — there is no bar left.
 >
-> **The current reason is one edge and it is the last one.** `depends_on` names
-> [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]], which is **`active`** — released to
-> the runtime ring 2026-08-17 at `evt_37rt8aw7yasmm`. **The other three
-> dependencies are `merged`**: `RT-NATIVE-FNSPLIT`, `RT-JOIN-DISPOSITION`,
-> `RT-DECL-CLOSURE-PORT`.
+> **All four `depends_on` entries are `merged`.** `RT-NATIVE-FNSPLIT`,
+> `RT-JOIN-DISPOSITION` and `RT-DECL-CLOSURE-PORT` were already; the fourth,
+> [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]], landed at squash `7b05136bd` (PR
+> #2545) as the **complete** `D0`-`D4` move rather than a partial — which is what
+> its `AC-6` was written to require before a flip could release this node.
 >
-> ⇒ **This node flips `ready` when the primitive-lowering split reaches
-> `merged`, and nothing else is owed first.** The frame is written: a diagnostic
-> first deliverable, the six-axis Architect acceptance matrix at
-> `evt_2zkjr68y1sdgf`, its controls, and the contention fence. **Do not re-frame
-> it, and do not read the absence of `D0`-style headings as absence of a
-> frame** — this node predates that convention.
+> **The frame is written. Do not re-frame it, and do not read the absence of
+> `D0`-style headings as absence of a frame** — this node predates that
+> convention and carries a diagnostic first deliverable, the six-axis Architect
+> acceptance matrix at `evt_2zkjr68y1sdgf`, its controls, and a fence, under
+> prose headings.
 >
-> **`RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` is now the sole bar on this node, and
-> this node is the head of 19 transitive dependents.** That is why the split's
-> `AC-6` forbids flipping it `merged` on an accepted partial.
+> ### TWO COORDINATES IN THIS FRAME WENT STALE WHEN THE SPLIT LANDED. Corrected here.
+>
+> **(i) The durable home now has a path.** Below, this node's remaining
+> `ken-runtime` work is described as the `int_to_uint64_raw` arm "in the durable
+> home" — an abstraction that was correct only while the move was pending. It is
+> now `crates/ken-runtime/src/cranelift_backend/lowering/core/primitive.rs`, with
+> `lower_primitive_call` at **`:43`** as `pub(super) fn`.
+> **[[RT-BACKEND-MODULE-SPLIT]] still cites `core.rs:17977` refusing at `:18208`
+> for this same arm; those coordinates now resolve to nothing.** Do not search
+> `core.rs` for the dispatcher.
+>
+> **(ii) The axis-(d) fence names a contention that no longer exists.** It says
+> that if the fix requires `ken-runtime` constructor/value lowering, that "would
+> contend the concurrent RT track — STOP and route to the Steward." **The
+> concurrent RT track was `RT-NATIVE-FNSPLIT`, which is `merged`**, and the ring
+> that would do this work is the same runtime ring — it cannot contend with
+> itself. Read literally today, the fence sends the ring to ask permission for
+> work its own sequencing already assigned it.
+>
+> ⇒ **The contention route-back is DISCHARGED. The other half of that bullet is a
+> DIFFERENT CLAUSE and still binds.** *"Do not pre-assign the fix to
+> `ken-runtime`/Cranelift on current evidence"* is the Architect's
+> **diagnostic-first** instruction: de-erase the `CheckedCoreBodyViewError` lane
+> and isolation-flip fixture `f0eb65ce` **before** choosing a fix site. **Only
+> the contention basis expired; retiring both because they share a bullet is the
+> error.**
 >
 > ### The superseded reason, retained because the correction is the point
 >
@@ -432,10 +454,22 @@ malformed / stale / closed authority behavior is unchanged.
 - **Primary surface = `ken-elaborator`** (compiler-driver / checked-core / erasure)
   — disjoint from [[RT-NATIVE-FNSPLIT]]'s `ken-runtime`/Cranelift, so the two native
   WPs run **contention-free** as filed.
-- **⚠ Axis (d) contingency:** *if* the fix requires `ken-runtime` constructor/value
-  lowering, that would contend the concurrent RT track — **STOP and route to the
-  Steward** to sequence it. Do not pre-assign the fix to `ken-runtime`/Cranelift on
-  current evidence (Architect).
+- **Axis (d) contingency — HALF OF THIS EXPIRED 2026-08-17. Read both clauses
+  separately.** As filed it read: *if* the fix requires `ken-runtime`
+  constructor/value lowering, that would contend the concurrent RT track — **STOP
+  and route to the Steward** to sequence it; and, do not pre-assign the fix to
+  `ken-runtime`/Cranelift on current evidence (Architect).
+  - **The contention route-back is DISCHARGED.** The concurrent RT track was
+    [[RT-NATIVE-FNSPLIT]], now `merged`, and the ring that would do this work is
+    the same runtime ring — **it cannot contend with itself.** Do not stop for
+    contention, and do not route back for permission on that basis.
+  - **The Architect's diagnostic-first clause STILL BINDS.** Do not pre-assign
+    the fix site. De-erase the underlying `CheckedCoreBodyViewError` lane and
+    isolation-flip `f0eb65ce` first; **only then** choose where the fix goes.
+  - **The two clauses had independent bases and only one lapsed.** Retiring both
+    because they shared a bullet is the error this note exists to prevent.
+  - The `ken-runtime` landing site now exists and is named: the arm goes in
+    `lowering/core/primitive.rs` (dispatcher at `:43`), not `core.rs`.
 - **Local builds targeted only** (`scripts/ken-cargo -p <crate>`); never
   `--workspace` (COORDINATION §12). Full `-p ken-interp` if the reifier/value shape
   changes (attested `eval.rs` ⇒ OID-bump rider).
