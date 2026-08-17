@@ -11,12 +11,44 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> ## STATUS CORRECTED `ready` TO `draft` — 2026-08-08, Steward
+> ## `draft` AS OF 2026-08-17. THE REASON BELOW WAS SUPERSEDED — read this first.
 >
-> **`ready` means shovel-ready: a written frame, dependencies merged.**
-> This node was not, because
-> its `depends_on` names `RT-BACKEND-MODULE-SPLIT`, which is still
-> `draft`. A frame exists, but an unmet dependency cannot be `ready`.
+> **The current reason is one edge and it is the last one.** `depends_on` names
+> [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]], which is **`active`** — released to
+> the runtime ring 2026-08-17 at `evt_37rt8aw7yasmm`. **The other three
+> dependencies are `merged`**: `RT-NATIVE-FNSPLIT`, `RT-JOIN-DISPOSITION`,
+> `RT-DECL-CLOSURE-PORT`.
+>
+> ⇒ **This node flips `ready` when the primitive-lowering split reaches
+> `merged`, and nothing else is owed first.** The frame is written: a diagnostic
+> first deliverable, the six-axis Architect acceptance matrix at
+> `evt_2zkjr68y1sdgf`, its controls, and the contention fence. **Do not re-frame
+> it, and do not read the absence of `D0`-style headings as absence of a
+> frame** — this node predates that convention.
+>
+> **`RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` is now the sole bar on this node, and
+> this node is the head of 19 transitive dependents.** That is why the split's
+> `AC-6` forbids flipping it `merged` on an accepted partial.
+>
+> ### The superseded reason, retained because the correction is the point
+>
+> **It read: *"its `depends_on` names `RT-BACKEND-MODULE-SPLIT`, which is still
+> `draft`."*** That edge was re-pointed on 2026-08-10 to the one #8 child that
+> re-homes the code this node edits — see the NARROWED banner below, which
+> records it correctly and in full.
+>
+> ⇒ **The status stayed right while its stated cause went stale**, and the
+> stale cause sat in the *leading* banner while the correction sat sixty lines
+> down. **A reader arriving top-down got the true status from a false
+> premise**, and a grep for the current dependency would not have surfaced the
+> line that contradicts it. **Fix the reason where the reader meets it, not
+> only where the change happened.**
+>
+> **The original rule still holds:** `ready` means shovel-ready — a written
+> frame **and** dependencies merged. A node advertising startable work it does
+> not have makes the backlog read deeper than it is, and that depth is what a
+> Steward reads to decide whether a team is idle for want of work or for want
+> of a lane.
 >
 > **The correction is not a downgrade of the work.** A node advertising
 > startable work it does not have makes the backlog read deeper than it
@@ -419,6 +451,12 @@ honest-partial, no operator scope exception. Sibling native-completeness WP:
 path to PX8 clause-(a) closure via PX8-F-CAP-41).
 
 ## Sequencing (Steward)
+
+> **THIS PARAGRAPH IS HISTORY. The frontmatter is authoritative: `status:
+> draft`, `owner: runtime`, `size: M`.** It reads `active` and `Size TBD` and
+> `Foundation-owned`, all three superseded — the node was re-homed to Runtime
+> on 2026-07-23 (see the RE-HOMED section above) and sized after the fix
+> surface was scoped. Retained for the filing rationale only.
 
 **`active` 2026-07-23** — filed as the named prerequisite that unblocks
 [[PX8-F-CAP-41]] Phase 2, Foundation-owned, replacing PX8-F-CAP-41 Phase 2 as the
