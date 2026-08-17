@@ -11,7 +11,64 @@ github: null
 origin: "language-implementer's bounded section 5 witness attempt (evt_4n7wdytrehs23), routed for separate ownership by language-leader and language-qa. The Architect made the three-way attribution measurement a REQUIRED follow-up of his approval evt_5b3c38r3xrqm6, owned by this filing rather than by a new SHA. Steward-filed per COORDINATION section 2."
 ---
 
-# CARVE-OUT 2026-08-17 — `AC-6` is being discharged by the RUNTIME ring
+# CARVE-OUT 2026-08-17 — `AC-6` IS DISCHARGED AND ON `main`
+
+**Landed at squash `000d69663`.** All four operand assertion remedies are on
+`main`: landed blob `050343a71`, one path, +27/-22, verified byte-identical to
+the approved tree, and the merge changed exactly that path.
+
+It landed as `2901765d8`, **not** the approved `d2c2258bf` — identical tree,
+re-attested on identity because an abandoned check-suite is permanently bound to
+the original commit and `gh pr checks` unions every suite on the head. PR #2569
+closed as superseded; #2571 merged on a **fresh** CI run, which is the part tree
+identity could not establish.
+
+## OWED, from the Adversary's hunt on the landed squash (`evt_5et3y2g77e97d`)
+
+**Confirmed defect, correctness-of-record. Nothing is silently green.** The
+`:599`/`:604` deletion orphaned two pieces of prose the diff never touched:
+
+| site | what it still promises | repair |
+|---|---|---|
+| `:556` | *"(asserted by the control below)"* — the control now asserts only the class | drop the clause, or re-point it at the doc |
+| `:617` | the `other =>` panic says *"convoy class @9 vs @4"*; what is actually expected is **any** `TypeMismatch` | cut the convoy-class clause |
+
+**`:617` is the one that costs something.** It misdiagnoses at the exact moment
+someone is reading a failure, sending the next pass at an operand nobody checks —
+and it sits **forty-five lines** from the comment at `:602` that says the opposite
+about the same control. The doc's *measurement* at `:556` is true (operands probed
+live and they are exactly those values); its *attribution* is false.
+
+⇒ **This is the audit (e) shape in code rather than in a frame:** when a
+disposition is withdrawn, the deletion's blast radius includes prose the diff does
+not touch. Sweep by phrase, not by diff.
+
+**Routed to the Runtime ring as a bounded tail on the carrier recut** — two text
+edits in a file that recut already re-measures, so it needs no separate node and
+no separate measurement. Not folded into `D2`.
+
+## Two things the same hunt SETTLED, recorded so nobody re-spends them
+
+- **`:514` is mutation-proven end to end.** A filler `data` declaration ahead of
+  `Vec` in `vec_env()` renumbered the head `Dg574 -> Dg576` with the suite green,
+  and the deleted literal does not occur in the new message — so the pre-change
+  assertion would have red on that edit. That is the counterfactual the conversion
+  was for, and it is now a measurement rather than an argument.
+- **The `:599`/`:604` deletion survived two attacks and the operand pins really
+  were redundant.** Forcing the `:3067` skip and an off-by-one at `:2251` both
+  changed the **error class** rather than the operands — on this fixture the
+  failure route is guard-determined, so perturbing the guard moves the rejection
+  off the type checker entirely. **The way to attack this control is not through
+  the guard.** The Adversary also withdrew its own better-looking hypothesis (that
+  a structural encoding was available at `:556` and deletion was chosen instead):
+  no regression could be constructed that the class check misses, so the
+  structural form would have bought nothing.
+
+**`D2`'s semantic repair is NOT discharged by this, and this node stays
+`active`.** The carve-out was the assertion remedies only, executed by the
+Runtime ring; it transferred no Language ownership and no carrier work.
+
+## (as written when the carve-out was authorized) — `AC-6` was being discharged by the RUNTIME ring
 
 **`D2`'s semantic half stays parked. Only the four operand assertions move, and
 they move as a precursor PR to [[NATIVE-HANDLE-CARRIER]].** Steward
