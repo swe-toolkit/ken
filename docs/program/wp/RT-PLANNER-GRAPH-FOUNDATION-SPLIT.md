@@ -15,33 +15,68 @@ large blast radius and a known `cfg`-profile trap.
 
 ## 1. Fixed inputs — the census is CURRENT for this region, and that is measured
 
-Measured at `origin/main = c03331ad8`.
+Re-measured at `origin/main = af29848f7` (2026-08-17). **The anchors below were
+re-verified at that SHA, not carried.**
 
-> ### THE PLANNER HAS NOT MOVED SINCE THE CENSUS. Do not re-take those inventories.
+> ### THE PLANNER HAS MOVED ONCE SINCE THE CENSUS. THE ROWS ARE STILL CURRENT.
 >
 > `docs/program/backend-split-census*.md` pin measurement SHA
-> `4de48651434dd6340f81ec9b1b7a5ac2ec8c0199`. Between that SHA and
-> `c03331ad8`, `crates/ken-runtime/src/cranelift_backend/planning/` has **zero
-> commits and an empty diff** — verified both ways by the Steward. **The census's
-> planner rows are therefore current, not stale**, which is unusual and is worth
-> the one command to re-confirm at pickup rather than assumed:
+> `4de48651434dd6340f81ec9b1b7a5ac2ec8c0199`. **As first written this section
+> said `planning/` had zero commits and an empty diff since then. That was true
+> at `c03331ad8` and is false now**, so the stop rule it stated would halt you on
+> a base that is fine.
+>
+> Since the census, `planning/` has **one** commit — `168e8bbf8`
+> (`RT-SITEOP-CARRIED-WITNESS` `D2`), `+54/-6` in `static_transition.rs`.
+>
+> **The census's planner rows survive it, measured three ways rather than
+> argued:**
+>
+> | what the census depends on | census SHA | `af29848f7` |
+> |---|---|---|
+> | type declarations in `static_transition.rs` | 161 | 161, and the declaration-line diff is **empty** |
+> | `lowering/mod.rs` `use super::planning::{…}` blocks | — | **byte-identical** (lines 70-130 diff clean) |
+> | planner references from `lowering/mod.rs` | 59 | 60 — one added use site of an **already-consumed** type |
+>
+> ⇒ **Ownership and visibility rows are intact, and no external consumer set
+> gained or lost a type.** `168e8bbf8` changed bodies, not the surface the
+> census inventoried.
+>
+> ### THE PICKUP CHECK, CORRECTED — a non-empty diff is NOT the stop condition
+>
+> The old command stops on any change to the region. That is stricter than the
+> property it protects, and it now fires on a base where the inventories are
+> good. Run these instead, and stop only if one of them moves:
 >
 > ```sh
-> git diff --stat 4de48651..<your-base> -- crates/ken-runtime/src/cranelift_backend/planning/
+> P=crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs
+> L=crates/ken-runtime/src/cranelift_backend/lowering/mod.rs
+>
+> # 1. the ownership rows: declaration set must be unchanged
+> diff <(git show 4de48651:$P | grep -E '^\s*(pub(\([^)]*\))?\s+)?(struct|enum|type|trait|union) ') \
+>      <(git show <your-base>:$P | grep -E '^\s*(pub(\([^)]*\))?\s+)?(struct|enum|type|trait|union) ')
+>
+> # 2. the consumer sets: the import surface must be unchanged
+> diff <(git show 4de48651:$L | sed -n '70,130p') \
+>      <(git show <your-base>:$L | sed -n '70,130p')
 > ```
 >
-> **If that diff is non-empty at your base, the fixed inputs below are stale and
-> you re-measure before moving anything.** This is the whole reason the campaign
-> forbids carrying line counts into a frame: the number is only good until
-> someone lands in the region.
+> **Both empty ⇒ the fixed inputs below hold and you do not re-take the
+> inventories.** Either non-empty ⇒ re-measure that half before moving anything.
+> A body-only change in `planning/` is expected and is not a stale signal.
+>
+> This is still the reason the campaign forbids carrying line counts into a
+> frame — but note the failure this section actually had: **the currency test was
+> keyed to a proxy that decays faster than the thing it stands for.** Key it to
+> the property.
 
-| anchor at `c03331ad8` | what it is |
+| anchor, re-verified at `af29848f7` | what it is |
 |---|---|
 | `planning.rs` | the facade; re-exports the planner surface, and carries the `cfg`-gating warnings in §5 |
 | `planning/static_transition.rs` | the planner monolith this node carves |
 | `planning/static_transition.rs:2638` | `StaticTransitionPlan<'src>` — the root plan type |
 | `planning/static_transition.rs:8-9` | `mod abi; mod semantic_ir;` — **the carve pattern that already worked twice in this exact file** |
-| `planning/static_transition.rs:18381` | the inline `mod tests` |
+| `planning/static_transition.rs:18429` | the inline `mod tests` (`#[cfg(test)]` at `:18428`) — **was `:18381` at the census SHA; `168e8bbf8`'s net `+48` shifted it, and `:2638`/`:8-9` did not move because they sit above the change point** |
 | `backend-split-census-type-ownership.md` | 76 planner-owned type rows, with visibility and full external consumer sets per row |
 | `backend-split-census-cochange.md` | which planner regions historically change together |
 

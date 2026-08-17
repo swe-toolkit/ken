@@ -25,13 +25,23 @@ origin: Cut item 3 of RT-BACKEND-MODULE-SPLIT, filed 2026-08-17 once RT-BACKEND-
 > visibility and full external consumer sets. **The constraint that deferred this
 > node has lapsed; the node is not new work.**
 >
-> ### THE CENSUS IS CURRENT FOR THE PLANNER, AND THAT IS MEASURED NOT ASSUMED
+> ### THE CENSUS IS CURRENT FOR THE PLANNER — BUT NOT FOR THE REASON FIRST WRITTEN
 >
-> The inventories pin measurement SHA `4de48651`. Between it and `c03331ad8`,
-> `cranelift_backend/planning/` has **zero commits and an empty diff.** ⇒ The
-> planner rows are current, so `D0` starts from the census rather than re-taking
-> it. **Re-confirm with one command at pickup** — the frame's §1 carries it, and
-> a non-empty diff means the fixed inputs are stale.
+> The inventories pin measurement SHA `4de48651`. This block used to say
+> `planning/` had **zero commits and an empty diff** since then. **True at
+> `c03331ad8`, false at `af29848f7`** — `168e8bbf8`
+> (`RT-SITEOP-CARRIED-WITNESS` `D2`) landed `+54/-6` in `static_transition.rs`.
+>
+> **The rows are still current, and now that is measured against the property
+> rather than a proxy:** the type-declaration set is unchanged (161 both sides,
+> declaration-line diff empty), and `lowering/mod.rs`'s
+> `use super::planning::{…}` blocks are byte-identical. Bodies moved; the
+> surface the census inventoried did not.
+>
+> ⇒ `D0` starts from the census rather than re-taking it. **The pickup check in
+> the frame's §1 was corrected accordingly** — a non-empty diff over `planning/`
+> is *not* a stale signal, and the old one-command form would have stopped the
+> ring on a good base.
 >
 > ### `size: TBD` IS DELIBERATE. Do not fill it in from a line count.
 >
