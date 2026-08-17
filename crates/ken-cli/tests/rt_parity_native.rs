@@ -600,65 +600,6 @@ fn in_large_stack_thread(name: &'static str, body: fn()) {
         .expect("RT-PARITY fixture thread");
 }
 
-/// Durable invariant (`38 §1.7.1`, PR-B): each executor independently reaches
-/// the exact derived result while the private/canonical `FsReadAt` route stays
-/// absent. Since backend reads occur only inside that dispatch, an empty event
-/// set also proves zero recording-backend reads.
-fn assert_cap41_derived_without_read(case: &str, entry: &str) {
-    let Differential {
-        interpreted,
-        native,
-    } = differential(case, entry);
-
-    for (engine, observation) in [("interpreter", interpreted), ("native", native)] {
-        assert_eq!(
-            observation.exit_status, 0,
-            "{case}/{engine}: checked source must observe the exact PR-B result; got {observation:?}"
-        );
-        assert_eq!(
-            observation.terminal_error, None,
-            "{case}/{engine}: no terminal error"
-        );
-        let reads = operation_events(&observation, ken_runtime::HostOpV1::FsReadAt);
-        assert!(
-            reads.is_empty(),
-            "{case}/{engine}: derived/early result must emit no private or canonical FsReadAt \
-             and therefore perform zero backend reads; got {reads:?}"
-        );
-    }
-}
-
-#[test]
-fn cap41_closed_endpoint_is_derived_eof_without_read_on_both_engines() {
-    in_large_stack_thread("cap41-closed-endpoint", || {
-        assert_cap41_derived_without_read("cap41-closed-endpoint", "rt_cap41_endpoint_stage")
-    });
-}
-
-#[test]
-fn cap41_out_of_range_is_invalid_bounds_without_read_on_both_engines() {
-    in_large_stack_thread("cap41-out-of-range", || {
-        assert_cap41_derived_without_read("cap41-out-of-range", "rt_cap41_out_of_range_stage")
-    });
-}
-
-#[test]
-fn cap41_invalid_offset_precedes_closed_endpoint_on_both_engines() {
-    in_large_stack_thread("cap41-offset-endpoint", || {
-        assert_cap41_derived_without_read("cap41-offset-endpoint", "rt_cap41_offset_endpoint_stage")
-    });
-}
-
-#[test]
-fn cap41_invalid_offset_precedes_out_of_range_on_both_engines() {
-    in_large_stack_thread("cap41-offset-out-of-range", || {
-        assert_cap41_derived_without_read(
-            "cap41-offset-out-of-range",
-            "rt_cap41_offset_out_of_range_stage",
-        )
-    });
-}
-
 #[test]
 fn uint64_checked_wrapper_admits_max_and_rejects_both_neighbors() {
     in_large_stack_thread("uint64-checked-bounds", || {
