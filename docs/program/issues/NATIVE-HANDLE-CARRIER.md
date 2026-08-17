@@ -73,6 +73,44 @@ defect is the test's literal `Dg` pin**, and it is another node's — see below.
    per-test inventory on **two** axes (new-or-inherited × passing/failing/
    ignored). **Re-measure `ds5b` on the recut** — the cut changes the
    declaration set again, so it changes the numbering again.
+4. **Preserve `3d23f1182` before the recut touches the branch** —
+   `refs/preserved/native-handle-carrier-route1-3d23f118`. The port is only
+   measurable in a tree that has the CAP-41 fixtures, and the recut deletes
+   them. Cheap now, unrecoverable after a force-push.
+
+## The missing port: the route is measured, its KIND is not
+
+Measured `evt_4tqpqn2gpcsx6`, throwaway instrumentation at
+`recursive_position_unit_body` (`core.rs:15668`): **all five refusing programs —
+the four `cap41_*` rows plus `AC-5`'s row — take route 1, the non-`Construct`
+scrutinee return at `:15680`.** No `Err` path fired.
+
+**Two corrections to how that result reads** (Steward `evt_9jds3whs094h`):
+
+- **Route 1 is undocumented.** The function's doc sentence *"structural-data
+  recursive positions return `None`; they resume the eliminator directly and take
+  no arguments"* is about the **recursive position's** form — decided at `match
+  argument.expr`, which is route 3's arms, and reached only **after**
+  `args.get(position)`. Route 1 returns **before the argument is ever read**, on a
+  property of the **scrutinee**. So the code says nothing at route 1, and whether
+  it is a gap or a correct refusal is **still unknown**.
+- **Routes 2 and 3 are unreachable once route 1 fires**, so their zero counts are
+  counts and not evidence. `StaticWorker` is ruled out as the **first** blocker,
+  **not** as a requirement of the port: once the scrutinee is a proper
+  `Construct`, the argument could still be a captured `LexicalClosure` (route 2)
+  or a `Checked*` IH form (route 3). **The next blocker is unmeasured.**
+
+⇒ **No port node is filed yet, deliberately.** The addendum that sizes it is one
+line on the same instrument: **what `RuntimeExpr` variant is the scrutinee at
+`:15680`?** If it is a `Call`, the owner is the closed `RecursiveDescent` residual
+lineage that `RT-FNSPLIT-B2F` approved and [[RT-FNSPLIT-RECUR-PORT]] ported,
+**not** a new capability. That is the whole difference the cut moves by.
+
+**Also identified, so nobody hunts for it:** the refusal is the fallback arm of
+the same two-arm dispatch, not a separate downstream mechanism. `:15951` is the
+sole call and stores into `invocation.recursive_unit_body`; the four guard sites
+`:2958`, `:3440`, `:9731`, `:17481` each dispatch on it with
+`reject_carried_residual_arguments` as the `else`.
 
 > # SUPERSEDED 2026-08-17 — was: IN REVIEW, `3d23f1182` an AUTHORIZED PARTIAL
 >
