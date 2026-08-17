@@ -1,7 +1,7 @@
 ---
 id: RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL
 title: "Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
