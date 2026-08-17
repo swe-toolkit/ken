@@ -504,18 +504,28 @@ fn intervening_let_fresh_binder_fails_invariantly_across_all_three_bases() {
                  failure, got a different Internal message: {msg:?}"
             );
             assert!(
-                msg.contains("expected: Dg67"),
+                msg.contains("expected: Dg67,"),
                 "expected the measured TypeMismatch's `expected` operand \
                  (bare `Nat`, printed `Dg67`) -- a different expected \
                  operand means this is NOT the three-way-invariant \
                  failure this test pins, got: {msg:?}"
             );
+            // Structural, not the literal `Dg574`/`@8` -- both are
+            // context-shape-dependent (an unrelated prelude/`vec_env()`
+            // edit renumbers them without changing the failure this test
+            // pins). The measured instance (`Vec Nat @8`, printed
+            // `((Dg574 Dg67) @8)`) lives in the doc comment above; the
+            // check here is head-plus-Nat-id: `found` is a doubly-wrapped
+            // application whose inner argument is the SAME `Dg67` as
+            // `expected`, suffixed by a de Bruijn index -- differing from
+            // `expected` only by that wrapper, whatever its head/index
+            // numbers happen to be.
             assert!(
-                msg.contains("found: ((Dg574 Dg67) @8)"),
-                "expected the measured TypeMismatch's `found` operand \
-                 (`Vec Nat @8`, the same head/index shape as the \
-                 predecessor's own D1 signature) -- a different found \
-                 operand means this is NOT the three-way-invariant \
+                msg.contains("found: ((") && msg.contains(" Dg67) @"),
+                "expected the measured TypeMismatch's `found` operand to \
+                 be a head applied to the same `Dg67` (Nat) id as \
+                 `expected`, wrapped with a trailing de Bruijn index -- a \
+                 different shape means this is NOT the three-way-invariant \
                  failure this test pins, got: {msg:?}"
             );
         }
@@ -589,24 +599,19 @@ fn interleaved_let_alias_of_enclosing_field_rejects_differently_under_region_set
          }",
     );
     match &err {
+        // The `@9`/`@4` positional literals asserted here previously added
+        // no discriminating power beyond the error CLASS check below:
+        // the prohibited positional floor rejects with `NotTerminating`,
+        // which lands in the `other =>` arm, so a disjoint error class
+        // already separates the two guards. The literals also matched too
+        // loosely against neighbours (`@4` matches `@40`/`@43`) while
+        // being too brittle against any unrelated binder-structure shift.
+        // A one-armed control over two disjoint error classes is a
+        // complete control -- deleted rather than "completed."
         ElabError::KernelRejected {
-            error: KernelError::TypeMismatch { expected, found },
+            error: KernelError::TypeMismatch { .. },
             ..
-        } => {
-            let expected_dbg = format!("{expected:?}");
-            let found_dbg = format!("{found:?}");
-            assert!(
-                expected_dbg.contains("@9"),
-                "expected the measured convoy-class `expected` operand \
-                 (`@9`), got: {expected_dbg:?}"
-            );
-            assert!(
-                found_dbg.contains("@4"),
-                "expected the measured convoy-class `found` operand \
-                 (`@4`) -- the same signature as the predecessor node's \
-                 own D1, got: {found_dbg:?}"
-            );
-        }
+        } => {}
         other => panic!(
             "expected the measured shipped-region-set rejection (a \
              kernel TypeMismatch, convoy class @9 vs @4) -- got a \
