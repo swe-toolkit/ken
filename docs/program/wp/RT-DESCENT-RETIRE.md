@@ -533,11 +533,59 @@ the proof is unavailable and any argument for it is circular.
 > dead code and its tests together. With `D2c` ruled never-merged, any step-2
 > candidate satisfies `AC-7` trivially.
 >
-> **`D7` and `D8` are separable and are not folded in here** — neither
-> references a deleted symbol as its subject. Cut them after, unless the ring
-> measures otherwise and says so.
+> ### AMENDED 2026-08-17: `D8` IS FOLDED IN. `D7` STAYS SEPARABLE.
 >
-> **`D8`'s separability is now MEASURED, not asserted.** Checked 2026-08-17
+> **The ring measured otherwise and said so, which is what this block invited.**
+> Runtime leader `evt_7cv06zym83m55`, on evidence object `3456fc8cf` (base
+> `7fc7e84ac`, five paths, `+192/-3208`): the targeted post-deletion run is
+> **`911 passed; 10 failed; 4 ignored`.** Five reds are `D6`/`AC-9` population.
+> **The other five are exactly the controls this frame reserved to `D8`.**
+>
+> ⇒ **`AC-1` cannot go green while `D8` edits are banned**, so `D8` is inside
+> this candidate. **The deliverable's CONTENT is unchanged** — repair is still
+> foreclosed (Architect `evt_5h7vzc27mc11j`), and each pin is still specified by
+> the measured first outcome, not by assertion. **Only which candidate carries
+> it has changed.**
+>
+> **`AC-6`'s specification source survives, verified:** the five reruns return
+> exactly the outcomes already tabulated in
+> `docs/program/wp/RT-RECURSOR-TRANSPORT.md` — row 1 owned-scope
+> `PlannerInvariant`; corrected row 2 no `SourceMachine` mint; the two-sibling
+> rows at recursive position 1; row 4 depth-1 `StaticWorkerBinding`
+> conservation; row 5 before-hole `ComputationalMatch`. **Do not re-measure
+> them, and do not treat the post-deletion rerun as a new source.** One wording
+> to reconcile rather than assume: the leader reports the two-sibling row as
+> `Module` where the table says *"recursive position 1 has no projected
+> continuation worker"* — **confirm these name the same outcome before citing
+> either.**
+>
+> ### WHY THE SEPARABILITY CLAIM BELOW WAS WRONG. THE MEASUREMENT WAS RIGHT.
+>
+> **Zero source-symbol intersection is TRUE and does not imply separability.**
+> A test can red after the deletion without ever naming a deleted symbol,
+> because it **compiles a program through the emitter and asserts on the
+> outcome.** All five do: they call `px8j_capture_source_trace(...)` and assert
+> on the captured result or its partition counts.
+>
+> ⇒ **The sentence below that reads *"they reach the lane only through
+> `px8j_capture_source_trace` → `emit_process_entrypoint_object_with_cranelift`
+> — no selector, no residual type, no authority enum"* IS THE COUPLING**, and it
+> was written as the proof of independence. **A compile-time census cannot
+> settle a behavioural question.**
+>
+> **Third instance of one shape in one morning** — measure the cheap proxy,
+> conclude about the thing that matters: the `d2k_0` two-axis claim, the
+> file-level-for-function-level blast radius, and this. **State what a census
+> measures beside what it is being used to decide.**
+>
+> **The retained measurement below is still load-bearing** — it is what proves
+> no `D8` control breaks at COMPILE time, so their reds are behavioural and
+> re-description (not repair) is the right remedy.
+>
+> **`D7` remains separable** and is not folded in: it is a closing measurement
+> that reads the post-deletion tree, so it cannot precede it.
+>
+> **`D8`'s COMPILE-time independence, measured 2026-08-17.** Checked
 > before dispatch. All five re-described refusal controls live in `control.rs`
 > — `px8j_owned_scope_deletion_fails_closed_before_another_frame_is_emitted`
 > (`:1367`), `px8j_all_three_producer_paths_reach_real_consumers` (`:1449`),
@@ -588,7 +636,9 @@ the proof is unavailable and any argument for it is circular.
 >
 > **`D8`'s zero-intersection result is unaffected and was re-verified against
 > this larger population:** none of the five re-described controls is among the
-> 44.
+> 44. **That is a COMPILE-time fact and it does not make `D8` separable** — all
+> five red behaviourally after the deletion, so `D8` is folded into this
+> candidate. See the amendment above.
 >
 > **Do not size its repair as "what `D1b` just did to pin 2".** Measured by the
 > Adversary (`evt_2a2kj4dn4drsj`) and verified in the tree:
@@ -628,7 +678,21 @@ the proof is unavailable and any argument for it is circular.
   `RecursiveDescent` lane are testing deleted code. Do not delete a test that
   is actually asserting a *semantic* property reachable on the surviving lane —
   re-home those. Do not keep a test green by keeping dead code alive for it.
-- **`D6b` — ANSWER THE COVERAGE QUESTION THE ADVERSARY LEFT OPEN.** Folded here
+- **`D6b` — ANSWERED 2026-08-17, and the answer is asymmetric.** Measured by
+  the runtime ring on `3456fc8cf` (`evt_7cv06zym83m55`): **one surviving
+  acceptance row**,
+  `d3_the_ported_producer_call_scrutinee_runs_unhooked_on_the_functionized_lane`
+  — and **NO live same-shape refusal row.**
+
+  ⇒ **The zero-refusal direction is a ROUTED COVERAGE FINDING, not a defect in
+  this candidate, and it is not repaired here.** `AC-5` says so in terms:
+  *"zero live coverage in either direction is a finding to route, not a failure
+  of this AC — the AC fails when the question is left unanswered, not when the
+  answer is unwelcome."* **The question is answered, so `AC-5`'s `D6b` half is
+  discharged.** Do not manufacture a refusal row inside a deletion candidate to
+  make the number symmetric.
+
+- **`D6b` — the original framing.** Folded here
   2026-08-08 rather than filed as its own node: it is a coverage-accounting
   question, `AC-5` already forbids a silent net loss, and this node performs the
   last deletion that can change the answer.
