@@ -5604,6 +5604,36 @@ fn static_worker_as_aggregate_field_is_transported_and_non_materializable() {
 /// Because the harness invokes the source-machine dispatcher directly, it
 /// cannot prove that the governed D2k route continues to reach that dispatcher.
 ///
+/// **`RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` `D1`/`D3` — the existing
+/// seat already pins the narrower dispatch property.** At exact base
+/// `e5286ea0665d4b81c91427e42aab175dfd23cdbb`, replacing the source-machine
+/// `Construct` arm's classifier call with an inert `vec![None; args.len()]`
+/// compiled and made this test fail at the restored `value_at` refusal. The
+/// unmodified test then passed again. No second observation is needed.
+///
+/// The cost census is retained here because it separates that proved property
+/// from the upstream route fact this seat deliberately does not claim:
+///
+/// - this existing result assertion has zero new production surface and
+///   discriminates deletion of the classifier dispatch, so it is selected;
+/// - a new `cfg(test)` arrival counter would add no production type surface,
+///   but would duplicate this assertion and, before the dispatch, observe only
+///   entry to the arm;
+/// - the existing `d5a_trace` state could carry another test-only event, but
+///   would add a stringly call/read pair for a result already observed here;
+/// - no structural argument makes the call unremovable: the deletion mutation
+///   type-checks, so Rust's exhaustiveness and privacy do not enforce it;
+/// - a cross-crate feature-forwarded observer adds a supported feature route
+///   without buying a fact this in-crate test already proves; and
+/// - the D2k-1c route apparatus remains barred because it adds test-only
+///   required-occurrence state to production planned units.
+///
+/// **MEASURED:** a compile entering the actual source-machine `Construct` arm
+/// dispatches recognized fields into the shared constructor template.
+/// **CLAIMED:** removing that arm-local dispatch reds this control.
+/// **THE GAP:** this says nothing about whether a particular upstream D2k route
+/// reaches the arm; the depth-3 observation below remains measured but unpinned.
+///
 /// **MEASURED-BUT-UNPINNED:** under the reverted D2k-1c route probe, row 4 at
 /// depth 3 advanced from its old `value_at` refusal to the disposition-correct
 /// `StaticWorkerBinding` refusal. Retaining the six-file route apparatus only
