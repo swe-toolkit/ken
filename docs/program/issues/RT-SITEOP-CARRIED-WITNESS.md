@@ -3,7 +3,7 @@ id: RT-SITEOP-CARRIED-WITNESS
 title: "Site-bound operand reader cannot witness a carried value — a synthesized SiteOperand demands a compile-time Lowered template from the same seat byte-span activation wants carried"
 status: active
 owner: runtime
-size: L
+size: M
 gate: none
 depends_on: [RT-CARRIER-BYTESPAN-OBSERVE]
 blocks: [NATIVE-HANDLE-CARRIER]
