@@ -553,7 +553,7 @@ fn intervening_let_fresh_binder_fails_invariantly_across_all_three_bases() {
 /// `refine_branch_goal` cleanly and reaches the KERNEL, where the
 /// rejection CLASS is GUARD-DEPENDENT:
 ///
-/// - **shipped region set** (asserted by the control below): `KernelRejected
+/// - **shipped region set**: `KernelRejected
 ///   TypeMismatch`, `expected ((Dg574 Dg67) @9), found ((Dg574 Dg67) @4)`
 ///   -- the same convoy-class signature as the predecessor node's own `D1`
 ///   (`@9` vs `@4`).
@@ -614,7 +614,7 @@ fn interleaved_let_alias_of_enclosing_field_rejects_differently_under_region_set
         } => {}
         other => panic!(
             "expected the measured shipped-region-set rejection (a \
-             kernel TypeMismatch, convoy class @9 vs @4) -- got a \
+             kernel TypeMismatch) -- got a \
              different error, which means this fixture's guard-dependent \
              behaviour needs re-measuring: {other:?}"
         ),

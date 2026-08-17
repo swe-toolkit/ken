@@ -56,7 +56,7 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 }
 
 const RT_PARITY_SOURCE: &str = r#"program capabilities FS AFull
-fn rt_body_ok (_buffer : Resource Buffer)
+fn rt_body_ok (_buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   Ret (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -154,7 +154,7 @@ proc rt_allocate_stage (cap : Cap AFull)
 (withBuffer AFull Unit Unit (sub_int 0 1) rt_body_ok)
 (\outcome. rt_allocate_done outcome)
 
-proc rt_read_offset_body (file : Resource FsHandle) (buffer : Resource Buffer)
+proc rt_read_offset_body (file : Resource FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -180,7 +180,7 @@ proc rt_read_offset_stage (cap : Cap AFull)
   ResourceRead rt_read_offset_file)
 (\outcome. rt_bracket_done outcome)
 
-proc rt_read_window_body (file : Resource FsHandle) (buffer : Resource Buffer)
+proc rt_read_window_body (file : Resource FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -217,7 +217,7 @@ proc rt_read_norights_stage (cap : Cap AFull)
 (\outcome. rt_bracket_done outcome)
 
 proc rt_write_after_read
-  (file : Resource FsHandle) (buffer : Resource Buffer)
+  (file : Resource FsHandle) (buffer : BufferHandle)
   (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
@@ -234,7 +234,7 @@ Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
 
-proc rt_write_body (file : Resource FsHandle) (buffer : Resource Buffer)
+proc rt_write_body (file : Resource FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -276,7 +276,7 @@ Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
   }
 
 proc rt_write_pair_after
-  (sink : Resource FsHandle) (buffer : Resource Buffer)
+  (sink : Resource FsHandle) (buffer : BufferHandle)
   (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
@@ -295,7 +295,7 @@ Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
 
 proc rt_write_pair_buffer
   (source : Resource FsHandle) (sink : Resource FsHandle)
-  (buffer : Resource Buffer)
+  (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -331,6 +331,147 @@ proc rt_write_writable_stage (cap : Cap AFull)
 (withResource AFull Unit Unit cap (bytes_encode "source")
   ResourceRead (rt_write_pair_source cap))
 (\outcome. rt_bracket_done outcome)
+
+fn rt_cap41_expect_eof (outcome : Result ResourceError ReadProgress)
+  : HostIO AFull (ResourceBodyResult Unit Unit) =
+  match outcome {
+  Ok ReadEof |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+  Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+  Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+  }
+
+proc rt_cap41_endpoint_buffer
+  (file : Resource FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file (0 : Int) buffer
+      (MkBufferWindow (8 : Int) (4 : Int)))
+    (\outcome. rt_cap41_expect_eof outcome)
+
+proc rt_cap41_out_of_range_buffer
+  (file : Resource FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file (0 : Int) buffer
+      (MkBufferWindow (9 : Int) (4 : Int)))
+    (\outcome. rt_expect_invalid_bounds outcome)
+
+proc rt_cap41_offset_endpoint_buffer
+  (file : Resource FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file (sub_int 0 1) buffer
+      (MkBufferWindow (8 : Int) (4 : Int)))
+    (\outcome. rt_expect_invalid_offset outcome)
+
+proc rt_cap41_offset_out_of_range_buffer
+  (file : Resource FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file (sub_int 0 1) buffer
+      (MkBufferWindow (9 : Int) (4 : Int)))
+    (\outcome. rt_expect_invalid_offset outcome)
+
+proc rt_cap41_endpoint_file (file : Resource FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit (8 : Int) (rt_cap41_endpoint_buffer file))
+    (\outcome. rt_inner_bracket_result outcome)
+
+proc rt_cap41_out_of_range_file (file : Resource FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit (8 : Int) (rt_cap41_out_of_range_buffer file))
+    (\outcome. rt_inner_bracket_result outcome)
+
+proc rt_cap41_offset_endpoint_file (file : Resource FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit (8 : Int) (rt_cap41_offset_endpoint_buffer file))
+    (\outcome. rt_inner_bracket_result outcome)
+
+proc rt_cap41_offset_out_of_range_file (file : Resource FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit (8 : Int)
+      (rt_cap41_offset_out_of_range_buffer file))
+    (\outcome. rt_inner_bracket_result outcome)
+
+proc rt_cap41_endpoint_stage (cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+    (withResource AFull Unit Unit cap (bytes_encode "source")
+      ResourceRead rt_cap41_endpoint_file)
+    (\outcome. rt_bracket_done outcome)
+
+proc rt_cap41_out_of_range_stage (cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+    (withResource AFull Unit Unit cap (bytes_encode "source")
+      ResourceRead rt_cap41_out_of_range_file)
+    (\outcome. rt_bracket_done outcome)
+
+proc rt_cap41_offset_endpoint_stage (cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+    (withResource AFull Unit Unit cap (bytes_encode "source")
+      ResourceRead rt_cap41_offset_endpoint_file)
+    (\outcome. rt_bracket_done outcome)
+
+proc rt_cap41_offset_out_of_range_stage (cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+    (withResource AFull Unit Unit cap (bytes_encode "source")
+      ResourceRead rt_cap41_offset_out_of_range_file)
+    (\outcome. rt_bracket_done outcome)
+
+fn rt_uint64_checked_bounds_stage (_cap : Cap AFull)
+  : HostIO AFull ExitCode =
+  match intToUInt64 18446744073709551615 {
+  None |-> host_exit AFull (Failure 61);
+  Some bounded |-> match intToUInt64
+      (add_int 18446744073709551615 1) {
+    Some overflow |-> host_exit AFull (Failure 62);
+    None |-> match intToUInt64 (sub_int 0 1) {
+      Some negative |-> host_exit AFull (Failure 63);
+      None |-> host_exit AFull Success
+      }
+    }
+  }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
@@ -457,6 +598,27 @@ fn in_large_stack_thread(name: &'static str, body: fn()) {
         .expect("spawn large-stack RT-PARITY fixture")
         .join()
         .expect("RT-PARITY fixture thread");
+}
+
+#[test]
+fn uint64_checked_wrapper_admits_max_and_rejects_both_neighbors() {
+    in_large_stack_thread("uint64-checked-bounds", || {
+        let Differential {
+            interpreted,
+            native,
+        } = differential("uint64-checked-bounds", "rt_uint64_checked_bounds_stage");
+        assert_eq!(
+            interpreted.exit_status, 0,
+            "interpreter must admit UInt64::MAX and reject both neighbors: {interpreted:?}"
+        );
+        assert_eq!(
+            native.exit_status, 0,
+            "native must admit UInt64::MAX and reject both neighbors: {native:?}"
+        );
+        assert_eq!(interpreted.terminal_error, None);
+        assert_eq!(native.terminal_error, None);
+        assert_eq!(interpreted.terminal_exit, native.terminal_exit);
+    });
 }
 
 // -- BufferAllocate ------------------------------------------------------
