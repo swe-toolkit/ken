@@ -126,16 +126,33 @@ same rule set, same premise counts, same freshness side conditions.
 >   testing it (`inductive.rs:97`). This blocker is kernel-owned and
 >   TCB-resident, and unblocking it is an operator ring decision, not this
 >   ring's.** Details and epistemic status in the linked node.
-> - **`D1b` — `fok_derives` and `fok_classically_valid`. BLOCKED** on
->   [[LANG-TRUNCATION-SURFACE-SYNTAX]]. `fok_derives s := ‖ FokDerivation s ‖`
->   is the only line in this node that needs the missing spelling, and
+> - **`D1b` — `fok_derives` and `fok_classically_valid`. STILL BLOCKED, but no
+>   longer on the blocker named here.** [[LANG-TRUNCATION-SURFACE-SYNTAX]]
+>   **merged 2026-08-17** as `83967e3c1` (`D1-D3`); `TruncBar` is a real token
+>   at `ken-elaborator/src/lexer.rs:112` for both `‖` and the ASCII `||`, so the
+>   missing spelling is closed. **`D1b` is now blocked on `D1a` alone**:
+>   `fok_derives s := ‖ FokDerivation s ‖` needs `FokDerivation` to exist, and
 >   `fok_classically_valid` is defined through it.
 >
 > ⇒ **Do not read this node as one blocker away from proceeding.** `D0` part (1)
 > passing is what made `D1a` look dispatchable; it was, on the evidence
-> available, and the divergence was found by attempting it. **`D2` is
-> unaffected and remains dispatchable** — ordinary `fn`/`theorem` work, which
-> `D1a`'s control cells show elaborates fine.
+> available, and the divergence was found by attempting it. **`D2` is landed**
+> (`d6491e52c`) — ordinary `fn`/`theorem` work, which `D1a`'s control cells show
+> elaborates fine.
+>
+> ### AFTER THE TRUNCATION MERGE, THIS NODE HAS EXACTLY ONE BLOCKER
+>
+> `D1a` gates `D1b`, and `D1b`'s `fok_classically_valid` is the conclusion of
+> the theorem `D3` and `D4` prove. ⇒ **every remaining deliverable descends
+> through `D1a`**, and `D1a` descends through
+> [[LANG-CTOR-PREMISE-ELABORATION-DIVERGES]] — `ready`, dependency-free,
+> `owner: kernel`, TCB-resident.
+>
+> **Two independent blockers became one, and closing one of them changed
+> nothing about whether this node can move.** The tell that they were never
+> symmetric: `D1b`'s blocker was a missing *spelling* on a surface the language
+> ring owns, and `D1a`'s is the admission gate for every inductive declaration
+> in the kernel. Only the second one had a deliverable no lane-2 ring may write.
 
 **`D2` — the Bool-inversion infrastructure.** `fok_check_rule` is built from
 `fok_and`/`fok_or` (`:263`/`:256`), so every step of the soundness proof needs

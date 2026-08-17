@@ -1,6 +1,6 @@
 ---
 id: RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT
-title: "Port the recursive-unit-body resolution through a branched scrutinee -- resolve_recursive_unit_body returns None whenever the scrutinee is a plain Match rather than a literal Construct, so a carried child whose owning form branches has no declared body unit and every consumer falls back to refusal"
+title: "Port the recursive-unit-body resolution through a branched scrutinee -- recursive_position_unit_body returns None whenever the scrutinee is a plain Match rather than a literal Construct, so a carried child whose owning form branches has no declared body unit and every consumer falls back to refusal"
 status: active
 owner: runtime
 size: M
@@ -29,9 +29,22 @@ origin: "NATIVE-HANDLE-CARRIER residual. Route measured evt_4tqpqn2gpcsx6; Stewa
 
 ## The gap, stated at the site
 
-`resolve_recursive_unit_body`, in
-`crates/ken-runtime/src/cranelift_backend/lowering/core.rs` around `:15668` at
-`3d23f1182` — locate it by name, the number will move — opens with
+`recursive_position_unit_body`, in
+`crates/ken-runtime/src/cranelift_backend/lowering/core.rs` at `:15668` at
+`3d23f1182` (`:15742` on `main` at `5bac56000`) — opens with
+
+> **CORRECTED 2026-08-17: THIS FRAME NAMED `resolve_recursive_unit_body`, WHICH
+> RESOLVES IN NO TREE.** At `3d23f1182:15668` — the exact coordinate this frame
+> gives — the function is already `recursive_position_unit_body`. The line
+> number was the half that was right, and the instruction "locate it by name,
+> the number will move" pointed readers at the wrong half. The wrong name
+> reached the runtime ring in the `D2` dispatch before it was caught (Adversary
+> `evt_24xtqbfx7nec6`, coordinates Steward-verified against both trees).
+>
+> A stale line number degrades gracefully — it lands you near the site. **A name
+> that matches nothing sends you looking for a function that never existed**, and
+> a frame that tells you to trust the name over the number inverts which half to
+> rely on.
 
 ```rust
 let RuntimeExpr::Construct { args, .. } = scrutinee.expr else {
@@ -94,12 +107,61 @@ the file and show it is not in the recut's deletion set.
 
 ## D2 — push the resolution through the branches, with agreement required
 
-Extend `resolve_recursive_unit_body` so a plain `Match` scrutinee resolves each
+Extend `recursive_position_unit_body` so a plain `Match` scrutinee resolves each
 arm's declared body unit and **requires the arms to agree**. Disagreement is a
 refusal, not a choice: picking one arm's unit would silently mis-lower the other.
 
 **AC-3.** With D2 landed, the D1 witness's refusal **advances** — it no longer
 originates at route 1. **The acceptance is the advance, not a green test.**
+**The evidence must be `entered >= 1` AND `route1 == 0`, measured by a recorder
+that pushes a row at function ENTRY carrying a route tag.** A bare `route1 == 0`
+does not discharge this criterion.
+
+> ### `route1 == 0` IS CONSISTENT WITH THE PORT NEVER BEING REACHED
+>
+> Amended 2026-08-17 (Adversary `evt_24xtqbfx7nec6`, re-verified by the Steward
+> against `5bac56000`). As `D1` shipped it,
+> `record_branched_scrutinee_unit_body_route1` has **exactly one call site**: the
+> `else` of the `let ... else` at `core.rs:15754-15755`, immediately before the
+> route-1 `return Ok(None)`. **Nothing records at function entry**, and nothing
+> records at the earlier `return Err` at `:15749`.
+>
+> ⇒ At `D2`, `route1 == 0` means *either* entered-and-advanced (the success)
+> *or* never entered — bailed at `:15749`, or the single caller at `:16027`
+> changed. **The instrument records nothing that separates them**, so the
+> criterion as originally written is discharged by a measurement equally
+> consistent with the port being unreachable.
+>
+> **The pattern is 14,700 lines up in the same file and was written for this
+> hazard.** `MatchRecursorCensusRow` (`core.rs:983-1008`) pushes a row for every
+> entry and partitions with `reached_selector`. Its comment states the rule in
+> the imperative: *"a census of firings is a numerator, not a population"*
+> (`:974-976`), and *"a silently empty census and a genuinely empty population
+> are the two readings this must never conflate"* (`:979-981`). **The `D1`
+> observer copies that helper's scope machinery verbatim** — identical `Restore`
+> shape, `:1042-1061` against `:1085-1103` — **and drops both properties the
+> machinery exists to carry.**
+>
+> **`D1`'s own AC-1 measurement is unaffected and remains tight.** The Adversary
+> mutated the function to push a sentinel row at entry and re-ran: the count went
+> 1 -> 2, so the function is entered exactly once per compile and that entry
+> takes route 1. The defect is that the instrument stops being able to say so the
+> moment route 1 stops firing — it is sound as a numerator and unsound as a
+> denominator, and `D2` is the first deliverable that needs the denominator.
+
+> ### THE `D1` PIN WILL GO RED INSIDE `D2`'s DIFF, ASSERTING A REGRESSION
+>
+> `crates/ken-cli/tests/rt_branched_scrutinee_unit_body_port.rs:93` asserts
+> `route1.len() == 1` with the message *"the two-arm plain Match must take route
+> 1 exactly once"*, and `:117` asserts `result.expect_err("D1 stops at the
+> route-1 refusal")`. Both hold only while route 1 fires, so `D2` succeeding
+> turns both red — **the first with text stating the opposite of what happened.**
+>
+> The callout below already warns that the advance "will read as this node
+> failing when what happened is that it succeeded". **The pin manufactures
+> exactly that misreading**, and a reviewer meets it cold inside the diff.
+> `D2` updates the pin and puts one line in the test's doc header saying a red
+> there is the AC-3 advance.
 
 > ### DO NOT WRITE AN AC THAT SAYS THE WITNESS PASSES. ROUTES 2 AND 3 ARE UNMEASURED.
 >
@@ -129,7 +191,7 @@ suites); a full `--workspace` run is CI's job, never the laptop's.
   depends on it. The recut deletes the rows this gap was measured through; a
   fixture authored here before then would be edited by two seats at once.
 - `core.rs` lowering is runtime's alone. No other lane touches
-  `resolve_recursive_unit_body`.
+  `recursive_position_unit_body`.
 - **Not the closed `RecursiveDescent` residual lineage.** A `Call`-shaped
   scrutinee would have put this in `RT-FNSPLIT-B2F` / [[RT-FNSPLIT-RECUR-PORT]]
   and required reopening them. The scrutinee is a match, so this is a new
