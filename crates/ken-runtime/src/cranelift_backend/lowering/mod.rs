@@ -72,12 +72,6 @@ pub(in crate::cranelift_backend) use crate::{
 // (Architect `evt_8vhe6rd6r80c`; the landed §10.3 line said support -> surface
 // only, which these four imports and two production bodies refute.)
 pub(in crate::cranelift_backend) use super::compiled::{CompiledModule, ResultDecoder};
-/// `D2f` Deliverable 0 — the plane observation types and THE shared checked
-/// fixture, reaching the full-compile gate in `core`'s controls.
-#[cfg(test)]
-pub(in crate::cranelift_backend) use super::planning::{
-    d2j_checked_fixture_under, D2jCause, D2J_DECLARATION,
-};
 #[cfg(any(test, feature = "r3-4b-observation"))]
 pub(in crate::cranelift_backend) use super::planning::{
     StaticContinuationFusionDescriptor, StaticContinuationFusionKey, StaticContinuationFusionPlan,
@@ -85,8 +79,7 @@ pub(in crate::cranelift_backend) use super::planning::{
 pub(in crate::cranelift_backend) use super::planning::{
     collect_checked_oriented_markers, collect_checked_subcontinuation_frames,
     build_static_continuation_fusion_plan, plan_static_transition_graph_with_symbols,
-    BodyEmissionDisposition, FusionCompositionLayer, FusionOwnedBody, FusionRegionClaim,
-    FusionRegionClaimLedger,
+    FusionCompositionLayer, FusionRegionClaim, FusionRegionClaimLedger,
     StaticContinuationFusionId, StaticContinuationFusionView,
     validate_oriented_subcontinuation_transport,
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
@@ -106,7 +99,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     ContinuationSourceCoordinate,
     ContinuationSourceSlotAuthority,
     ContinuationSpecializationId,
-    ContinuationUnitView, RequiredConsumerProjection, EmittableCallKind, EmittableUnit,
+    ContinuationUnitView, RequiredConsumerProjection, EmittableCallKind,
     FieldIdentity, JoinPlanToken,
     CaseEmissionStatus, PlannedReferentLifetime,
     host_effect_seat_contract_of, EffectSeatNeed, EffectSeatOperation, EffectSeatPhase,
@@ -145,7 +138,6 @@ pub(in crate::cranelift_backend) struct ScaleBEmissionMetrics {
     pub(in crate::cranelift_backend) production_functions: usize,
     pub(in crate::cranelift_backend) native_int_functions: usize,
     pub(in crate::cranelift_backend) boundary_value_functions: usize,
-    pub(in crate::cranelift_backend) recursive_descent_roots: usize,
     pub(in crate::cranelift_backend) functionized_root_adapters: usize,
     pub(in crate::cranelift_backend) functionized_unit_bodies: usize,
     pub(in crate::cranelift_backend) clif_instructions: usize,
@@ -185,7 +177,6 @@ fn scale_b_begin_emission_attempt(plan: &StaticTransitionPlan<'_>, authority_fun
                 production_functions: 0,
                 native_int_functions: 0,
                 boundary_value_functions: 0,
-                recursive_descent_roots: 0,
                 functionized_root_adapters: 0,
                 functionized_unit_bodies: 0,
                 clif_instructions: 0,
@@ -225,7 +216,6 @@ pub(in crate::cranelift_backend) fn scale_b_last_emission_metrics() -> Option<Sc
 enum ScaleBEmitter {
     NativeInt,
     BoundaryValue,
-    RecursiveDescentRoot,
     FunctionizedRootAdapter,
     FunctionizedUnitBody,
 }
@@ -250,9 +240,6 @@ fn scale_b_record_function(function: &Function, emitter: ScaleBEmitter) {
         match emitter {
             ScaleBEmitter::NativeInt => attempt.metrics.native_int_functions += 1,
             ScaleBEmitter::BoundaryValue => attempt.metrics.boundary_value_functions += 1,
-            ScaleBEmitter::RecursiveDescentRoot => {
-                attempt.metrics.recursive_descent_roots += 1;
-            }
             ScaleBEmitter::FunctionizedRootAdapter => {
                 attempt.metrics.functionized_root_adapters += 1;
             }
@@ -275,11 +262,6 @@ pub(crate) fn scale_b_record_boundary_value(function: &Function) {
 }
 
 #[cfg(test)]
-fn scale_b_record_recursive_descent_root(function: &Function) {
-    scale_b_record_function(function, ScaleBEmitter::RecursiveDescentRoot);
-}
-
-#[cfg(test)]
 fn scale_b_record_functionized_root_adapter(function: &Function) {
     scale_b_record_function(function, ScaleBEmitter::FunctionizedRootAdapter);
 }
@@ -294,9 +276,6 @@ fn scale_b_record_unit_body(function: &Function) {
 // the emitter's admission check and the planner's population read the same
 // list; a local copy could disagree with it silently.
 use crate::cranelift_backend::planning::CRANELIFT_HOST_EFFECT_CONSUMERS_V1;
-#[cfg(test)]
-use crate::cranelift_backend::planning::{set_effect_seat_plan_mutation, EffectSeatPlanMutation};
-
 /// **`D7` — perturbations of one VISIT, as distinct from perturbations of the
 /// planned population.**
 ///
@@ -623,79 +602,6 @@ pub(crate) enum PlannedTrapSeat {
     /// into a boundary trap token.
     RootTrapToken,
 }
-/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` `AC-9` — production's ASSEMBLED
-/// hypothesis prefix.**
-///
-/// The layout authority in the planner reads `recursive_positions` and
-/// `argument_binders` and recomputes the reversal from the same inputs
-/// production uses. A control over it therefore compares the authority against
-/// itself: delete the `.rev()` in this file and the authority still reverses,
-/// and every assertion stays green.
-///
-/// This records what production actually seated, so the control has an
-/// independent side. The recorded prefix is a **fact about the emitted
-/// environment**, not a restatement of the rule.
-#[cfg(test)]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(in crate::cranelift_backend) struct D2eBinderAssembly {
-    /// The case's own checked declaration, as production received it.
-    pub(in crate::cranelift_backend) recursive_positions: Vec<usize>,
-    pub(in crate::cranelift_backend) argument_binders: usize,
-    /// The sibling position production seated at each de Bruijn index of the
-    /// hypothesis prefix, in index order.
-    pub(in crate::cranelift_backend) assembled_prefix: Vec<usize>,
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn d2e_take_binder_assemblies() -> Vec<D2eBinderAssembly> {
-    D2E_BINDER_ASSEMBLY.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
-}
-
-/// Record one assembled hypothesis prefix.
-///
-/// A binding that is not a recursor closure contributes nothing, which is the
-/// same "nothing to record" answer any other non-recursor value gets, and a
-/// dropped hypothesis shows up as a short prefix rather than as a silently
-/// reordered one.
-///
-/// ⛔ **It was described here as "total and lossless over the prefix", and that
-/// is now WITHDRAWN — it is blind to a static-worker induction hypothesis, which
-/// is a real gap rather than a filter.** `assembled_prefix` is built from
-/// `sibling_position`, which only a `Lowered::ComputationalRecursorClosure`
-/// carries. Since the composed eliminator's two-member worker wiring
-/// (`RT-LEXICAL-R3-FUSION-EMITTER` `D3`), a recursive position whose field
-/// transports a worker assembles a [`LoweringEnvironmentBinding::StaticWorker`]
-/// hypothesis instead, and this recorder skips it.
-///
-/// ⇒ So an **empty** `assembled_prefix` has two causes: no hypothesis was
-/// assembled, and every hypothesis was a worker. A control reading emptiness as
-/// the first would be reading the second. Nothing asserts on it for the worker
-/// population today, which is why this is a note rather than a red; widening the
-/// record means giving the worker member a coordinate to report, which changes
-/// what this row means rather than adding to it.
-#[cfg(test)]
-fn d2e_record_binder_assembly(
-    case: &crate::RuntimeComputationalMatchCase,
-    hypotheses: &[LoweringEnvironmentBinding],
-) {
-    let mut assembled_prefix = Vec::with_capacity(hypotheses.len());
-    for binding in hypotheses {
-        if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-            Lowered::ComputationalRecursorClosure { invocation, .. },
-        )) = binding
-        {
-            assembled_prefix.push(invocation.sibling_position);
-        }
-    }
-    D2E_BINDER_ASSEMBLY.with(|cell| {
-        cell.borrow_mut().push(D2eBinderAssembly {
-            recursive_positions: case.recursive_positions.clone(),
-            argument_binders: case.argument_binders,
-            assembled_prefix,
-        })
-    });
-}
-
 #[cfg(test)]
 fn px8j_record_source_event(event: Px8jSourceTraceEvent) {
     PX8J_SOURCE_TRACE.with(|trace| trace.borrow_mut().push(event));
@@ -1295,12 +1201,6 @@ impl FunctionLocalRefs {
         self.trap_exit = Some(TrapExitAuthority::UnitFrame { slots, trap_offset });
         Ok(())
     }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum BodyEmissionAuthority {
-    RecursiveDescent,
-    FunctionizedUnits,
 }
 
 #[cfg(test)]
@@ -2835,8 +2735,6 @@ struct Lowering<'a> {
     /// pins exactly that, by requiring `CompiledModule: 'static`; give the
     /// artifact a borrowed field and the pin stops compiling.
     static_transition_plan: StaticTransitionPlan<'a>,
-    declaration_stack: Vec<RuntimeSymbol>,
-    active_recursive_declarations: Vec<ActiveRecursiveDeclarationV1>,
     result_table: BTreeMap<i64, RuntimeGroundValue>,
     next_token: i64,
     next_recursor_frame_provenance: u64,
@@ -2913,7 +2811,6 @@ struct Lowering<'a> {
     next_dynamic_splice_edge: u64,
     assumptions: BTreeSet<String>,
     unsupported: Vec<String>,
-    body_emission_authority: BodyEmissionAuthority,
     /// **`RT-CONTSPEC-ACTIVATE` `D3`** -- the affine claim ledger, held across
     /// the whole unit-definition pass so a token claimed at one producer
     /// occurrence cannot be claimed again at another.
@@ -4981,9 +4878,8 @@ impl Lowering<'_> {
     /// reason: the disposition of a field recognized in one descent can only be
     /// known once every descent is done.
     ///
-    /// **On `RecursiveDescent` it runs before emission of the root answer**
-    /// (`core.rs:2730`, ahead of every arm that emits `lowered`). **On
-    /// `FunctionizedUnits` it does not, and that is deliberate:**
+    /// On the retired monolithic route it ran before emission of the root
+    /// answer. On the surviving functionized route it does not, deliberately:
     /// `define_root_adapter` is called above it (`core.rs:2581` versus
     /// `:2614`), because the adapter is itself a generated `Function` and
     /// closing the causal ledgers before it would make a ref declared there
@@ -7419,21 +7315,6 @@ impl<'a> Lowering<'a> {
         self.finalize_join_disposition(&required)
     }
 
-    /// Close the one RecursiveDescent root over the recorded population it
-    /// materializes or dispositions while deliberately inlining across planner
-    /// owner boundaries.
-    fn validate_recursive_descent_join_disposition(&mut self) -> Result<(), CraneliftBackendError> {
-        self.close_statically_unselected_match_cases()?;
-        let mut required = self.function_local.consumed_join_origins.clone();
-        required.extend(
-            self.function_local
-                .dispositioned_join_origins
-                .iter()
-                .copied(),
-        );
-        self.finalize_join_disposition(&required)
-    }
-
     fn finalize_join_disposition(
         &mut self,
         required: &BTreeSet<StaticOriginId>,
@@ -7523,20 +7404,6 @@ impl<'a> Lowering<'a> {
         let required = self
             .static_transition_plan
             .required_join_origins(function)?;
-        self.validate_materialized_dead_join_cfg_for(&required, func)
-    }
-
-    fn validate_recursive_descent_materialized_dead_join_cfg(
-        &self,
-        func: &Function,
-    ) -> Result<(), CraneliftBackendError> {
-        let mut required = self.function_local.final_reachable_join_origins.clone();
-        required.extend(
-            self.function_local
-                .dispositioned_join_origins
-                .iter()
-                .copied(),
-        );
         self.validate_materialized_dead_join_cfg_for(&required, func)
     }
 
@@ -12231,13 +12098,6 @@ impl LoweredVariant {
     }
 }
 
-#[derive(Clone)]
-struct ActiveRecursiveDeclarationV1 {
-    symbol: RuntimeSymbol,
-    header: Option<cranelift_codegen::ir::Block>,
-    argument_templates: Vec<Lowered>,
-    induction: Option<Lowered>,
-}
 #[derive(Clone, Copy)]
 struct StructuralNatV1 {
     value: cranelift_codegen::ir::Value,
@@ -16609,23 +16469,6 @@ fn immediate_binder_eliminator(
     let field = index.checked_sub(argument_binder_offset)?;
     (field < argument_binders).then_some((field, eliminator))
 }
-fn ordinary_match_continuation<'a>(
-    params: &[String],
-    body: &'a RuntimeExpr,
-) -> Option<(&'a [crate::RuntimeMatchCase], &'a RuntimeTrap)> {
-    if params.len() != 1 {
-        return None;
-    }
-    let RuntimeExpr::Match {
-        scrutinee,
-        cases,
-        default,
-    } = body
-    else {
-        return None;
-    };
-    matches!(scrutinee.as_ref(), RuntimeExpr::Var(0)).then_some((cases, default))
-}
 fn requires_heterogeneous_deforestation(expr: &RuntimeExpr) -> bool {
     matches!(
         expr,
@@ -16758,84 +16601,6 @@ fn produces_recursive_deforestable_aggregate(expr: &RuntimeExpr, symbol: &str) -
             matches!(callee.as_ref(), RuntimeExpr::DeclarationRef { symbol: callee } if callee == symbol)
         }
         _ => false,
-    }
-}
-fn collect_runtime_declaration_refs(expr: &RuntimeExpr, output: &mut BTreeSet<RuntimeSymbol>) {
-    match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
-        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
-        | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
-        | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
-        | RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => {
-            collect_runtime_declaration_refs(body, output)
-        }
-        RuntimeExpr::DeclarationRef { symbol } => {
-            output.insert(symbol.clone());
-        }
-        RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => {
-            for arg in args {
-                collect_runtime_declaration_refs(arg, output);
-            }
-        }
-        RuntimeExpr::Let { value, body } => {
-            collect_runtime_declaration_refs(value, output);
-            collect_runtime_declaration_refs(body, output);
-        }
-        RuntimeExpr::If {
-            scrutinee,
-            then_expr,
-            else_expr,
-        } => {
-            collect_runtime_declaration_refs(scrutinee, output);
-            collect_runtime_declaration_refs(then_expr, output);
-            collect_runtime_declaration_refs(else_expr, output);
-        }
-        RuntimeExpr::Match {
-            scrutinee, cases, ..
-        } => {
-            collect_runtime_declaration_refs(scrutinee, output);
-            for case in cases {
-                collect_runtime_declaration_refs(&case.body, output);
-            }
-        }
-        RuntimeExpr::ComputationalMatch {
-            scrutinee, cases, ..
-        } => {
-            collect_runtime_declaration_refs(scrutinee, output);
-            for case in cases {
-                collect_runtime_declaration_refs(&case.body, output);
-            }
-        }
-        RuntimeExpr::Record { fields } => {
-            for (_, field) in fields {
-                collect_runtime_declaration_refs(field, output);
-            }
-        }
-        RuntimeExpr::Project { record, .. }
-        | RuntimeExpr::Closure { body: record, .. }
-        | RuntimeExpr::LexicalClosure { body: record, .. } => {
-            collect_runtime_declaration_refs(record, output);
-        }
-        RuntimeExpr::Call { callee, args } => {
-            collect_runtime_declaration_refs(callee, output);
-            for arg in args {
-                collect_runtime_declaration_refs(arg, output);
-            }
-        }
-        RuntimeExpr::Effect {
-            capability, args, ..
-        } => {
-            if let Some(capability) = capability {
-                collect_runtime_declaration_refs(&capability.value, output);
-            }
-            for arg in args {
-                collect_runtime_declaration_refs(arg, output);
-            }
-        }
-        RuntimeExpr::Value(_)
-        | RuntimeExpr::Var(_)
-        | RuntimeExpr::ImportedDeclarationRef { .. }
-        | RuntimeExpr::Trap(_) => {}
     }
 }
 /// Selects an ordinary case by constructor, **with its index**.
@@ -18021,63 +17786,6 @@ impl<'a> Lowering<'a> {
     /// arm arrives as a [`LoweringOperand`] and the phase boundary is taken
     /// HERE, once, rather than at each of the callers.**
     ///
-    /// ⚠ the two-lane native scalar join merges `(tag, payload)` lanes of a native scalar. A carried
-    /// boundary word has no such pair, so it fails closed via
-    /// [`LoweringOperand::specialized_join_arm`] — ⛔ a *pending* boundary, not
-    /// a final one; see that method for why the distinction is kept.
-    fn merge_branch_value(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        join_plan: &JoinPlanToken,
-        lowered: LoweringOperand,
-        construct: &'static str,
-    ) -> Result<(NativeScalarPairV1, bool), CraneliftBackendError> {
-        if join_plan.representation != JoinResultRepresentation::NativeScalarPair {
-            return Err(backend_module(
-                "carrier-result join reached a native-only branch merge consumer".to_string(),
-            ));
-        }
-        let lowered = lowered.specialized_join_arm(construct)?;
-        let checked_root_exit_representation = self.has_checked_root_exit_representation();
-        let lowered = if checked_root_exit_representation {
-            Self::unwrap_terminal_ret(lowered)
-        } else {
-            lowered
-        };
-        let zero_tag = builder.ins().iconst(types::I64, 0);
-        match lowered {
-            Lowered::Int { value, known } => Ok((
-                NativeScalarPairV1 {
-                    tag: self.native_int_tag(builder, value, known)?,
-                    payload: value,
-                },
-                false,
-            )),
-            Lowered::ProcessExitStatus { value } => Ok((
-                NativeScalarPairV1 {
-                    tag: zero_tag,
-                    payload: value,
-                },
-                true,
-            )),
-            lowered if checked_root_exit_representation => Ok((
-                NativeScalarPairV1 {
-                    tag: zero_tag,
-                    payload: self.emit_process_exit_status(builder, lowered),
-                },
-                true,
-            )),
-            _ => Err(unsupported(
-                construct,
-                "dynamic native arms must produce scalar Int values",
-            )),
-        }
-    }
-
-    /// ⭐ **A JOIN — `§2h` calls branch/join forwarding phase-bearing, so the
-    /// arm arrives as a [`LoweringOperand`] and the phase boundary is taken
-    /// HERE, once, rather than at each of the callers.**
-    ///
     /// ⚠ the tagged native scalar join merges `(tag, payload)` lanes of a native scalar. A carried
     /// boundary word has no such pair, so it fails closed via
     /// [`LoweringOperand::specialized_join_arm`] — ⛔ a *pending* boundary, not
@@ -18448,24 +18156,6 @@ impl<'a> Lowering<'a> {
             ));
         }
         self.merge_scalar_operand(builder, lowered, Some(required_kind), construct)
-    }
-
-    fn record_merge_kind(
-        construct: &'static str,
-        expected: &mut Option<bool>,
-        exit_status: bool,
-    ) -> Result<(), CraneliftBackendError> {
-        match expected {
-            Some(expected) if *expected != exit_status => Err(unsupported(
-                construct,
-                "dynamic native arms disagree on scalar versus ExitCode result",
-            )),
-            Some(_) => Ok(()),
-            None => {
-                *expected = Some(exit_status);
-                Ok(())
-            }
-        }
     }
 
     fn lowered_from_scalar_pair(
@@ -20213,34 +19903,6 @@ impl<'a> Lowering<'a> {
         Lowered::Int { value, known: None }
     }
 
-    fn declaration_is_recursive(&self, symbol: &RuntimeSymbol) -> bool {
-        let Some(declaration) = self.declarations.get(symbol.as_str()).copied() else {
-            return false;
-        };
-        let RuntimeDeclarationKind::Transparent { body } = &declaration.kind else {
-            return false;
-        };
-
-        let mut frontier = BTreeSet::new();
-        let mut visited = BTreeSet::new();
-        collect_runtime_declaration_refs(body, &mut frontier);
-        while let Some(candidate) = frontier.pop_first() {
-            if candidate == *symbol {
-                return true;
-            }
-            if !visited.insert(candidate.clone()) {
-                continue;
-            }
-            let Some(declaration) = self.declarations.get(candidate.as_str()).copied() else {
-                continue;
-            };
-            if let RuntimeDeclarationKind::Transparent { body } = &declaration.kind {
-                collect_runtime_declaration_refs(body, &mut frontier);
-            }
-        }
-        false
-    }
-
     fn require_i64(
         builder: &mut FunctionBuilder<'_>,
         actual: cranelift_codegen::ir::Value,
@@ -21720,100 +21382,6 @@ impl<'a> Lowering<'a> {
         token
     }
 }
-/// [`same_recursive_argument_shapes`] over a constructor template's fields.
-///
-/// **A static-worker field is conservatively NOT the same shape as anything,
-/// including another worker field.** This predicate gates recursive
-/// loop-parameter reuse, and answering `true` would let two templates share a
-/// parameter run that has no representation for the worker at all. What
-/// worker-to-worker equality should mean is still unruled, and `D2k-1b-ii` --
-/// which used to own that question -- was folded into `D2k-1b-i`, so it is
-/// owed by whichever increment first needs two worker fields compared.
-///
-/// **Re-derived now that a worker really can appear here.** `false` was
-/// previously justified as *"the answer that cannot be wrong while nothing
-/// constructs one"* — a premise the armed producer deletes. What `false`
-/// **licenses** is the question, and the answer is measured rather than
-/// argued: it licenses nothing, because the loop path it gates refuses a
-/// worker-bearing template outright one step later, at
-/// [`append_recursive_argument_values`]'s `"a recursive loop constructor
-/// field"` read. So the two possible answers differ only in *which* refusal a
-/// worker-bearing loop parameter receives, never in whether it receives one —
-/// and `false` is the one that cannot admit a shared parameter run.
-///
-/// **Both arms name both kinds — there is no wildcard**, so a third field kind
-/// is a compile error here rather than silently falling into `false`.
-fn same_recursive_field_shapes(left: &[ConstructorField], right: &[ConstructorField]) -> bool {
-    left.len() == right.len()
-        && left
-            .iter()
-            .zip(right)
-            .all(|(left, right)| match (left, right) {
-                (ConstructorField::Specialized(left), ConstructorField::Specialized(right)) => {
-                    same_recursive_argument_shapes(
-                        std::slice::from_ref(left),
-                        std::slice::from_ref(right),
-                    )
-                }
-                (ConstructorField::StaticWorker { .. }, ConstructorField::Specialized(_))
-                | (ConstructorField::Specialized(_), ConstructorField::StaticWorker { .. })
-                | (ConstructorField::StaticWorker { .. }, ConstructorField::StaticWorker { .. }) => false,
-            })
-}
-
-fn same_recursive_argument_shapes(left: &[Lowered], right: &[Lowered]) -> bool {
-    left.len() == right.len()
-        && left
-            .iter()
-            .zip(right)
-            .all(|(left, right)| match (left, right) {
-                (Lowered::Int { .. }, Lowered::Int { .. })
-                | (Lowered::Bool { .. }, Lowered::Bool { .. })
-                | (Lowered::ProcessExitStatus { .. }, Lowered::ProcessExitStatus { .. })
-                | (Lowered::CapabilityToken { .. }, Lowered::CapabilityToken { .. })
-                | (Lowered::ResourceToken { .. }, Lowered::ResourceToken { .. })
-                | (Lowered::BoundedNat(_), Lowered::BoundedNat(_))
-                | (Lowered::StructuralNat(_), Lowered::StructuralNat(_))
-                | (Lowered::ResponseBytes { .. }, Lowered::ResponseBytes { .. })
-                | (Lowered::BorrowedNativeValue { .. }, Lowered::BorrowedNativeValue { .. }) => {
-                    true
-                }
-                (Lowered::Bytes(left), Lowered::Bytes(right)) => left == right,
-                (Lowered::String(left), Lowered::String(right)) => left == right,
-                (
-                    Lowered::Constructor {
-                        constructor: left_constructor,
-                        args: left_args,
-                        ..
-                    },
-                    Lowered::Constructor {
-                        constructor: right_constructor,
-                        args: right_args,
-                        ..
-                    },
-                ) => {
-                    left_constructor == right_constructor
-                        && same_recursive_field_shapes(left_args, right_args)
-                }
-                (
-                    Lowered::Record { fields: left, .. },
-                    Lowered::Record { fields: right, .. },
-                ) => {
-                    left.len() == right.len()
-                        && left
-                            .iter()
-                            .zip(right)
-                            .all(|(left, right)| {
-                                left.name == right.name
-                                    && same_recursive_argument_shapes(
-                                        std::slice::from_ref(&left.value),
-                                        std::slice::from_ref(&right.value),
-                                    )
-                            })
-                }
-                _ => false,
-            })
-}
 /// ⛔ **A typed boundary: raw [`Lowered`] only, and STRUCTURALLY so**
 /// (`RT-FNSPLIT-C1` frame `§2h` ¶2).
 ///
@@ -21851,182 +21419,6 @@ fn lowered_value_kind(value: &Lowered) -> &'static str {
         Lowered::Trap(_) => "Trap",
     }
 }
-fn append_recursive_argument_values(
-    builder: &mut FunctionBuilder<'_>,
-    values: &[Lowered],
-    output: &mut Vec<cranelift_codegen::ir::Value>,
-    native_int_tags: &BTreeMap<cranelift_codegen::ir::Value, cranelift_codegen::ir::Value>,
-) -> Result<(), CraneliftBackendError> {
-    for value in values {
-        match value {
-            Lowered::Int { value, known } => {
-                let tag = match native_int_tags.get(value).copied() {
-                    Some(tag) => tag,
-                    None if known.is_some() => builder
-                        .ins()
-                        .iconst(types::I64, crate::NATIVE_INT_SMALL_TAG_V1 as i64),
-                    None => {
-                        return Err(unsupported(
-                            "DeclarationRef",
-                            "recursive Int argument lost its two-word tag transport",
-                        ));
-                    }
-                };
-                output.push(tag);
-                output.push(*value);
-            }
-            Lowered::Bool { value, .. }
-            | Lowered::ProcessExitStatus { value }
-            | Lowered::CapabilityToken { value }
-            | Lowered::ResourceToken { value } => output.push(*value),
-            Lowered::BoundedNat(nat) => output.push(nat.value),
-            Lowered::StructuralNat(nat) => output.push(nat.value),
-            Lowered::ResponseBytes(span) => {
-                output.push(span.pointer());
-                output.push(span.len());
-            }
-            Lowered::BorrowedNativeValue { pointer } => output.push(*pointer),
-            Lowered::Bytes(_) | Lowered::String(_) => {}
-            Lowered::Constructor { args, .. } => {
-                append_recursive_argument_values(
-                    builder,
-                    &specialized_fields_at(args, "a recursive loop constructor field")?,
-                    output,
-                    native_int_tags,
-                )?;
-            }
-            Lowered::Record { fields, .. } => {
-                for field in fields {
-                    append_recursive_argument_values(
-                        builder,
-                        std::slice::from_ref(&field.value),
-                        output,
-                        native_int_tags,
-                    )?;
-                }
-            }
-            _ => {
-                return Err(unsupported(
-                    "DeclarationRef",
-                    "recursive declaration argument has an unsupported native representation",
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-fn rebuild_recursive_argument(
-    template: &Lowered,
-    values: &mut impl Iterator<Item = cranelift_codegen::ir::Value>,
-    native_int_tags: &mut BTreeMap<cranelift_codegen::ir::Value, cranelift_codegen::ir::Value>,
-) -> Result<Lowered, CraneliftBackendError> {
-    let next = |values: &mut dyn Iterator<Item = cranelift_codegen::ir::Value>| {
-        values.next().ok_or_else(|| {
-            unsupported(
-                "DeclarationRef",
-                "recursive declaration loop parameter shape is truncated",
-            )
-        })
-    };
-    Ok(match template {
-        Lowered::Int { .. } => {
-            let tag = next(values)?;
-            let value = next(values)?;
-            native_int_tags.insert(value, tag);
-            Lowered::Int { value, known: None }
-        }
-        Lowered::Bool { .. } => Lowered::Bool {
-            value: next(values)?,
-            known: None,
-        },
-        Lowered::ProcessExitStatus { .. } => Lowered::ProcessExitStatus {
-            value: next(values)?,
-        },
-        Lowered::CapabilityToken { .. } => Lowered::CapabilityToken {
-            value: next(values)?,
-        },
-        Lowered::ResourceToken { .. } => Lowered::ResourceToken {
-            value: next(values)?,
-        },
-        Lowered::BoundedNat(_) => {
-            Lowered::BoundedNat(BoundedNatV1::derived_from_validated(next(values)?))
-        }
-        Lowered::StructuralNat(_) => Lowered::StructuralNat(StructuralNatV1 {
-            value: next(values)?,
-        }),
-        // Rebuilt through the EXISTING span's receiver, which is what makes the
-        // reconstruction reachable without a fresh raw mint. The receiver is a
-        // warrant, not a source: `rebuild_from_collected` discards it, so the
-        // values below are the only thing that decides the result.
-        //
-        // ⇒ THIS call site is why the result is right, and the reason is local:
-        // argument order is left-to-right, matching `d9_collect`'s push order,
-        // so the two values ARE this span's own, taken back in the order it was
-        // flattened. That is a fact about these two lines, verified by review —
-        // the signature does not carry it, and a second caller would inherit
-        // none of it.
-        Lowered::ResponseBytes(span) => {
-            Lowered::ResponseBytes(span.rebuild_from_collected(next(values)?, next(values)?))
-        }
-        Lowered::BorrowedNativeValue { .. } => Lowered::BorrowedNativeValue {
-            pointer: next(values)?,
-        },
-        Lowered::Bytes(bytes) => Lowered::Bytes(bytes.clone()),
-        Lowered::String(string) => Lowered::String(string.clone()),
-        Lowered::Constructor {
-            constructor,
-            synthesized_identity,
-            occurrence,
-            args,
-        } => Lowered::Constructor {
-            constructor: constructor.clone(),
-            synthesized_identity: *synthesized_identity,
-            // A rebuilt recursive argument is the same producer with its
-            // children re-materialized, so the occurrence is preserved rather
-            // than re-derived.
-            occurrence: *occurrence,
-            args: args
-                .iter()
-                .map(|arg| {
-                    Ok(ConstructorField::specialized(rebuild_recursive_argument(
-                        arg.specialized_at("a recursive loop constructor field")?,
-                        values,
-                        native_int_tags,
-                    )?))
-                })
-                .collect::<Result<Vec<_>, CraneliftBackendError>>()?,
-        },
-        Lowered::Record { occurrence, fields } => Lowered::Record {
-            // ⭐ The producer travels with the rebuilt template. Dropping it
-            // here would silently return the record to use-coordinate
-            // authority at exactly the boundary this field exists to cross.
-            occurrence: *occurrence,
-            fields: fields
-                .iter()
-                .map(|field| {
-                    Ok(LoweredRecordField {
-                        name: field.name.clone(),
-                        // The schema travels with the rebuilt template for the
-                        // same reason the occurrence above does: it is the
-                        // producer's fact, and this is the same producer.
-                        identity: field.identity,
-                        value: rebuild_recursive_argument(
-                            &field.value,
-                            values,
-                            native_int_tags,
-                        )?,
-                    })
-                })
-                .collect::<Result<Vec<_>, CraneliftBackendError>>()?,
-        },
-        _ => {
-            return Err(unsupported(
-                "DeclarationRef",
-                "recursive declaration argument has an unsupported native representation",
-            ));
-        }
-    })
-}
 fn expect_two_args(
     symbol: &'static str,
     args: Vec<Lowered>,
@@ -22059,8 +21451,6 @@ fn borrowed_constructor_identity(
 #[cfg(test)]
 thread_local! {
     static PX8J_SOURCE_TRACE: std::cell::RefCell<Vec<Px8jSourceTraceEvent>> =
-        const { std::cell::RefCell::new(Vec::new()) };
-    static D2E_BINDER_ASSEMBLY: std::cell::RefCell<Vec<D2eBinderAssembly>> =
         const { std::cell::RefCell::new(Vec::new()) };
     static PX8J_DELETE_OWNED_SELECTED_SCOPE: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };

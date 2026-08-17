@@ -588,12 +588,8 @@ pub(in crate::cranelift_backend) fn resolve_worker_targets(
 /// one here would put a second copy in a file where the two can disagree.
 ///
 /// ⚠ **Scope, stated rather than left to be discovered.** The ledger is opened
-/// and closed by `define_unit_bodies`, which runs **only** under
-/// `BodyEmissionAuthority::FunctionizedUnits`. Production selects
-/// `RecursiveDescent` until `D6` retires the `TransparentDeclarationClosure`
-/// residual, so today this gate is reachable only under the `cfg(test)` selector
-/// witness — the same reachability every other `D5` law has, and the thing `D6`
-/// changes. It is live production code on the lane it guards, not a test hook.
+/// and closed by `define_unit_bodies`, the sole production body-emission route.
+/// It is live production code on the lane it guards, not a test hook.
 #[derive(Debug, Default)]
 pub(in crate::cranelift_backend) struct CheckedCallLedger {
     planned: BTreeSet<u64>,
@@ -4392,9 +4388,8 @@ impl ContinuationCandidateLedger {
     ///
     /// The domain needs no filtering. A candidate ledger only exists inside the
     /// selected `FunctionizedUnits` arm and only reaches this call on the
-    /// success path, so plan-only rows, `Err` compilations and non-selected
-    /// `RecursiveDescent` plans are absent **by construction** rather than
-    /// removed after the fact.
+    /// success path, so plan-only rows and `Err` compilations are absent **by
+    /// construction** rather than removed after the fact.
     fn close(self) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
         let unsettled = self.candidates.difference(
             &self.settled.keys().cloned().collect::<BTreeSet<_>>(),
