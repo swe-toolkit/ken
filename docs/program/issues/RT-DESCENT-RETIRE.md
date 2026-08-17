@@ -46,7 +46,7 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > deletion but cannot detect the regression it was written for survives in name
 > only.**
 
-> ### `D2c` CANNOT MERGE THROUGH THE PUBLISHER, AND THAT IS A FRAMING DEFECT
+> ### `D2c` CANNOT MERGE THROUGH THE PUBLISHER. RULED: IT NEVER NEEDED TO.
 >
 > **Measured 2026-08-17. The fresh `D2c` `f68b8c866` was approved by QA and the
 > Architect, published, and FAILED CI — as any correct `D2c` must.**
@@ -73,33 +73,56 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > candidate's own acceptance criterion is compatible with the gate it is being
 > sent through.**
 >
-> **ROUTED TO THE ARCHITECT** (`evt_4cw8rsesahmeh`), because it is a
-> campaign-design fork rather than sequencing:
+> **RULED BY THE ARCHITECT, same day, on `evt_4cw8rsesahmeh`: ARM 1. `D2c` is
+> measurement-only — banked, NEVER MERGED, and `D3` is the campaign's first
+> landing.**
 >
-> 1. **`D2c` is measurement-only like its predecessor** — banked, never merged,
->    with `D3` the first actual landing. The held candidate's own treatment
->    supports this reading.
-> 2. **A `D2c` lands**, and the 17 reding tests are dispositioned **in the same
->    candidate** — which **spends the dead-code oracle early** and contradicts
->    *"delete nothing"*, the one property `D2c` exists to have.
+> **Arm 2 was rejected because it destroys the property `D2c` exists to have.**
+> Landing requires dispositioning the 17 reds in the same candidate;
+> dispositioning them means retiring or re-homing tests; that **spends the
+> dead-code oracle inside the measurement commit**, which is the two-step
+> collapse `AC-7` forbids arriving from the other direction, and `D6`/`D7`
+> depend on that oracle being unspent. Three further grounds: the held twin has
+> sat unpublished since the day it ran with nothing downstream suffering; **`D3`
+> deletes `select_body_emission_authority` outright**, so a landed `D2c` would
+> be overwritten by the next candidate; and landing is the one thing that makes
+> a reversible instrument irreversible.
 >
-> **PR #2509 is CLOSED** with this reason. Held `036e8ee91` untouched;
-> `f68b8c866` retained as the fresh measurement's artifact.
+> **The Architect placed the defect with the staging rather than the frame:**
+> `AC-7`'s load-bearing words were *"AS ITS OWN CANDIDATE"*, and *"lands"* was a
+> spelling of *"is separate"* — a disposition specified by accident, which
+> everything downstream inherited. **`AC-7` is restated in the frame in his
+> wording.**
+>
+> **THE CONDITION, and it is not optional: `D2c`'S READING NOW LIVES IN
+> `docs/`.** A candidate that never merges leaves its evidence on a branch and
+> in a thread, and neither is an artifact. **The reading is written out at the
+> `D2c` deliverable in the frame** — the 17 reds classified against the frozen
+> set, the six-red / twenty-one-green direct-caller census, and the
+> reproduction on a moved base. **`036e8ee91` and `f68b8c866` are cited there as
+> PROVENANCE, not as storage.**
+>
+> ⇒ **`D2c` IS DISCHARGED.** `PR #2509` stays closed; **no `D2c` is ever
+> republished.** Held `036e8ee91` untouched; `f68b8c866` retained as the fresh
+> measurement's artifact.
 
-> ### THE HELD `D2c` CANDIDATE IS NOT THE `D2c` LANDING. Cut a fresh one.
+> ### BOTH `D2c` OBJECTS ARE EVIDENCE. NEITHER LANDS, AND NO THIRD IS CUT.
 >
-> **`036e8ee91` stays frozen at base `c98f72ba8` — it is EVIDENCE, and rebasing
-> it destroys the base its numbers are stated against.** The frame's *"do not
-> rebase it"* protected exactly that.
+> **`036e8ee91` stays frozen at base `c98f72ba8` — rebasing it destroys the base
+> its numbers are stated against.** The frame's *"do not rebase it"* protected
+> exactly that.
 >
-> ⇒ **The reroute lands as a NEW candidate cut at current `main`.** That keeps
-> the single-commit-revert property the frame requires of `D2c`, keeps the
-> evidence artifact intact, and rebases nothing. **These were never in tension —
-> the held object's job is to be read, not to be merged.**
+> **This block read *"Cut a fresh one"* and *"the reroute LANDS as a NEW
+> candidate"* until the arm-1 ruling.** The fresh cut `f68b8c866` was made, ran,
+> and **reproduced the held object's census exactly on a moved base** — which is
+> the whole result. **It is now a second evidence artifact, not a landing.** Do
+> not cut a third: the reading exists in `docs/`, and re-measuring at a newer
+> base answers a question nobody has.
 >
-> **Read `D2c`'s numbers against `c98f72ba8` and never against `main`**; the
-> suite population has moved in both directions since. Measured, with the
-> vocabulary half of that concern refuted, in the frame at `D2c`.
+> **Read `D2c`'s numbers against the base each was cut at, never against
+> `main`** — `c98f72ba8` for `036e8ee91`, `634d02c24` for `f68b8c866`. The suite
+> population has moved in both directions since. Measured, with the vocabulary
+> half of that concern refuted, in the frame at `D2c`.
 
 > # 2026-08-16 — `D1` IS IN: TWO CORRECT SEMANTICS, TWO MISSING PORTS.
 > # The functionized lane is NOT a complete replacement. One question remains.

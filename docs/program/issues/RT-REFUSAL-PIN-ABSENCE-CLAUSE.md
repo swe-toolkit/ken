@@ -11,9 +11,14 @@ github: null
 origin: "Adversary hunt evt_3t7y5zwng8aba on merged RT-REFUSAL-PINS-REHOMED (a48c28915...d6a9760a9), 2026-08-17. Confirmed in the tree by the Steward before filing. Cut separately rather than folded into RT-DESCENT-RETIRE because folding it would make the repair ride a gated node, which is the defect's own shape."
 ---
 
-Frame: this node. **ONE live deliverable: `D1`, one line of test code plus a
-mutation proof.** `D2` is **WITHDRAWN and parked** — see its section; it was
-premised on a candidate that did not land.
+Frame: this node. **`D1` is DELIVERED at exact
+`10256e8fbc4df22beb25a6b095d6b1be515e7e90`** — one line of test code plus a
+mutation proof, QA-approved and resolved by the Architect at
+`dec_797e7wbbb1ae9`.
+
+**One live deliverable remains: `D2b`, the limitation note the Architect
+required at the pin.** The original `D2` is **WITHDRAWN, and its two parked
+items are now PERMANENTLY MOOT** — see that section.
 
 ## The finding
 
@@ -78,7 +83,55 @@ candidate**.
 **Confirm pin 1 stays green under that perturbation** — the arms must remain
 independently meaningful.
 
-## `D2` — WITHDRAWN 2026-08-17, BEFORE DISPATCH. Both items are premised on a candidate that did not land.
+## Deliverable `D2b` — record the pin's DOMAIN beside the pin. Architect's requirement at approval.
+
+**One comment, in `control.rs`, immediately above
+`refusal_pins_rehomed_static_worker_without_selector_exclusion`'s guard.** No
+code change, no test change, nothing else in the range.
+
+**What it must say, in the Architect's terms (`dec_797e7wbbb1ae9`):**
+
+> **The clause pins one PHRASING of the refuted claim, not the claim.** A future
+> message re-asserting the same refuted temporal semantics in different words —
+> *"prior to construction"*, *"ahead of the build"* — passes all three clauses.
+
+**Say also why that is not a defect here**, so the next reader does not file it
+as one: there is no cheaper predicate for *"does not assert
+erasure-before-construction"* than string matching, and **the false-positive
+direction is the right one** — a future message legitimately using the phrase
+reds this spuriously, and a red is a prompt to think, where the alternative is
+a silent pass.
+
+**And why `contains` rather than `==`:** pin 2's message is a `format!`
+carrying runtime ids, so full equality would conflate *a refuted claim
+returning* with *an incidental rewording or an id change*. **The absence clause
+pins the semantic fact; full equality was considered and rejected.**
+
+> **Why this is a deliverable and not a note in the frame.** The failure it
+> prevents is **over-citation of the pin** — a later reader treating it as
+> covering the claim when it covers a phrase. That reader is at the pin, not in
+> this node.
+
+**This node stays `active` until `D2b` lands**, and it is the only thing between
+[[RT-DESCENT-RETIRE]]'s `D3` and the frontier — so it is a short turn, not a
+parking space.
+
+## `D2` — WITHDRAWN 2026-08-17 before dispatch, and its items are now PERMANENTLY MOOT.
+
+> ### THE ARM-1 RULING DISSOLVED BOTH PARKED ITEMS. They are not waiting for anything.
+>
+> They were parked as *"live the moment any `D2c` lands."* The Architect then
+> ruled `D2c` **measurement-only and never merged** ([[RT-DESCENT-RETIRE]],
+> `evt_4cw8rsesahmeh`). **No `D2c` ever lands**, so the condition never fires:
+>
+> | item | why it is moot |
+> |---|---|
+> | B, the `let _ = recursive_descent_residual(…)` because-clause | **The site never reaches `main`.** It exists only inside `f68b8c866`, which is an evidence artifact |
+> | A, the *"let the remainder decide"* comment | **It stays TRUE on `main`** — the early `return` is only removed by a `D2c`, and none lands. `D3` deletes the function outright |
+>
+> **Both are struck, not re-parked.** The content stays below because the
+> reasoning is the durable part, not because the work is pending.
+
 
 > ### DO NOT WORK `D2`. Item A would REGRESS a comment that is currently TRUE.
 >
@@ -109,7 +162,7 @@ independently meaningful.
 > lands, and belong with whatever node carries that. **Content retained below
 > verbatim so it is not reconstructed.**
 
-### PARKED CONTENT — applies only after a `D2c` lands
+### STRUCK CONTENT — retained for its reasoning, not as pending work
 
 **Coordinates below are in candidate `f68b8c866`, NOT in `main`.**
 
@@ -159,9 +212,16 @@ construction"` alongside both currently-pinned clauses. **Observed, not argued.*
 **AC-2.** Pin 2 still passes at unmodified `origin/main`, and pin 1 is
 untouched and green.
 
-**AC-3.** No production change. This node edits **one test guard** and **deletes
-nothing**. `select_body_emission_authority` and `lowering/core.rs` are **not
-touched** — `D2` is withdrawn.
+**AC-3.** No production change. This node edits **one test guard** (`D1`) and
+**adds one comment beside it** (`D2b`), and **deletes nothing**.
+`select_body_emission_authority` and `lowering/core.rs` are **not touched** —
+`D2` is withdrawn and struck.
+
+**AC-6** (`D2b`). The limitation is recorded **at the pin**, and states three
+things: the clause covers a **phrasing**, not the claim; the false-positive
+direction is deliberate; `contains` was chosen over `==` because the message is
+a `format!`. **A reader at the pin can tell what it does and does not cover
+without leaving the file.**
 
 **AC-4.** `D2c` `036e8ee916844fb91a4f42f2a2b04ebaea0dde2f` untouched.
 
@@ -173,8 +233,9 @@ targeted only — `-p ken-runtime` or `--test`, never `--workspace`.
 - **Rewriting pin 1.** It uses full equality and has no gap; changing it trades
   a stronger assertion for a uniform one.
 - **Any `D3`-`D8` retirement work**, and **any `lowering/core.rs` edit at all**
-  — `D2` is withdrawn and its two comment items are parked behind a `D2c`
-  landing.
+  — `D2` is withdrawn and its two comment items are struck, not pending.
+- **Weakening or rewriting the absence clause `D1` landed.** `D2b` documents
+  the pin; it does not touch it.
 - **Widening to other `contains`-style assertions in `control.rs`.** If the
   pattern looks general, **say so and stop** — that is a census, not this node.
 - **A general `D6a` comment sweep**, and the two parked comment items with it.
