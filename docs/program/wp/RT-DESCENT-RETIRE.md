@@ -536,6 +536,52 @@ the proof is unavailable and any argument for it is circular.
 > **`D7` and `D8` are separable and are not folded in here** — neither
 > references a deleted symbol as its subject. Cut them after, unless the ring
 > measures otherwise and says so.
+>
+> **`D8`'s separability is now MEASURED, not asserted.** Checked 2026-08-17
+> before dispatch. All five re-described refusal controls live in `control.rs`
+> — `px8j_owned_scope_deletion_fails_closed_before_another_frame_is_emitted`
+> (`:1367`), `px8j_all_three_producer_paths_reach_real_consumers` (`:1449`),
+> `px8j_siblings_share_an_origin_and_nested_ih_gets_a_child_origin` (`:1780`),
+> `px8j_one_two_three_scope_segments_reach_selection_hole_and_unwind`
+> (`:2583`), `px8j_selected_scope_partitions_differ_across_the_real_return_hole`
+> (`:6830`). **Every occurrence of the four deleted symbols in `control.rs` was
+> intersected against those five bodies: zero intersection**, and the helpers
+> they reach carry none either. They reach the lane only through
+> `px8j_capture_source_trace` → `emit_process_entrypoint_object_with_cranelift`
+> — no selector, no residual type, no authority enum. The module uses a glob
+> `use super::*`, so the deletion breaks no named import of theirs.
+>
+> ### `d2k_0` IS INSIDE THIS CANDIDATE, AND ITS REWORK IS NOT PIN 2's PRICE.
+>
+> **`d2k_0_the_five_no_longer_reach_a_static_worker_value_read`
+> (`control.rs:6681-6828`) references two of the four deleted symbols** — it
+> imports `set_selector_variant_exclusion` and passes
+> `RecursiveDescentResidual::LexicalCallArgumentRecursor` (`:6692-6693`). **It
+> cannot compile after `D3`**, so it is dispositioned inside this candidate,
+> not deferred. Its sibling
+> `d2k_0_control_reddens_when_the_wrong_consumer_condition_is_removed`
+> (`:6644`) does not name them but is frozen-set row 8.
+>
+> **Do not size its repair as "what `D1b` just did to pin 2".** Measured by the
+> Adversary (`evt_2a2kj4dn4drsj`) and verified in the tree:
+>
+> - **`d2k_0` is already exact on WORDING** — `assert_eq!` on complete expected
+>   strings across four rows. It is wrong on **one** axis, the identifiers:
+>   eight `StaticOriginId` and four `StaticWorkerRecognitionId` literals
+>   (`26/25`, `36/35`, `46/45`, `22/21`).
+> - **The remedy does not transfer.** Pin 2 builds a **synthetic** fixture and
+>   knows its root, so `planned_root_occurrence` plus `child_static_origin`
+>   recovers everything. `d2k_0` compiles **real** fixtures and hardcodes
+>   **interior** origins, and its rows come from
+>   `d2k_wall_under_current_selector`, which returns `Option<(String, String)>`
+>   — **no plan handle in scope at all.** Computing them means widening that
+>   helper's return or planning each fixture and walking to the constructor
+>   occurrence.
+>
+> ⇒ **If the ring judges that too large for this candidate, say so and stop** —
+> that is a finding to route, not a thing to improvise inside a deletion. **One
+> renumbering currently reds four rows at once**, each needing a separate
+> churn-or-regression adjudication, which is exactly the cost `AC-9` is about.
 
 - **`D3` — Delete the classifiers**: `recursive_descent_residual`,
   `declaration_recursive_descent_residual`, `RecursiveDescentResidual`, and

@@ -28,9 +28,33 @@ deliverable survives this node.
 
 **The property worth carrying forward:** the assertion is **exact on WORDING
 but computed on IDENTIFIERS**, so it cannot be broken by id churn and cannot be
-passed by a reworded refusal. The pin it supersedes in spirit had this
-backwards — `d2k_0_the_five_no_longer_reach_a_static_worker_value_read`
-hardcodes `StaticOriginId(26)` while matching only fragments of the wording.
+passed by a reworded refusal.
+
+> **CORRECTED 2026-08-17 by the Adversary (`evt_2a2kj4dn4drsj`), verified in
+> the tree by the Steward.** This paragraph first said the comparison pin
+> `d2k_0_the_five_no_longer_reach_a_static_worker_value_read` *"had this
+> backwards"* and matched *"only fragments of the wording"*. **That is false.**
+> It compares with `assert_eq!` on **complete expected strings**, wording
+> included (`control.rs:6681-6828`, four rows).
+>
+> ⇒ **It is wrong on ONE axis, not two: exact on wording, HARDCODED on
+> identifiers** — eight `StaticOriginId` and four
+> `StaticWorkerRecognitionId` literals across four rows (`26/25`, `36/35`,
+> `46/45`, `22/21`).
+>
+> **And the remedy does not transfer at pin 2's price.** Pin 2 builds a
+> synthetic fixture and knows its root, so `planned_root_occurrence` plus
+> `child_static_origin` recovers everything. `d2k_0` compiles **real** fixtures
+> and hardcodes **interior** origins, and its rows come from
+> `d2k_wall_under_current_selector`, which returns `Option<(String, String)>`
+> — **no plan handle in scope at all.** Computing them means widening that
+> helper's return or planning each fixture and walking to the constructor
+> occurrence. **The shape is the same; the work is not.** Do not size it as
+> "the same change again".
+>
+> **The error originated in the approving ruling and the Steward repeated it
+> without measuring.** Both halves of a two-axis claim need checking; only the
+> id half had been.
 **`D2b` is WITHDRAWN** (the limitation it was to document is closable, not
 documentable), and the original `D2` is **WITHDRAWN with its two items now
 PERMANENTLY MOOT**. Both sections below.
