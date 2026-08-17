@@ -11,6 +11,38 @@ github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # 2026-08-17 — EVERY GATE IS SATISFIED. UNBLOCKED FOR THE FIRST TIME.
+>
+> **All fourteen `depends_on` entries are `merged` or `closed`**, checked field
+> by field rather than inferred from the tracker. The last one was
+> [[RT-REFUSAL-PINS-REHOMED]], merged at exact `d6a9760a9`, which discharged
+> `AC-9`'s remaining half by pinning constructs 1 and 2 without the enum `D3`
+> deletes.
+>
+> **What that means and what it does not.** The cost question is answered — the
+> `D5` census found **zero `RecursiveDescent` selections across 60 selector
+> arrivals** from real source — and the record obligation is discharged at both
+> the correct-semantics and missing-port ends. **Nothing capability-shaped is
+> known to block the deletion.** It does not mean `D1`'s hard stop is void:
+> `D1` stopped because production still selected the lane, and **whether that is
+> still true is a measurement at current `main`, not an inference from these
+> flips.**
+>
+> ### THE HELD `D2c` CANDIDATE IS NOT THE `D2c` LANDING. Cut a fresh one.
+>
+> **`036e8ee91` stays frozen at base `c98f72ba8` — it is EVIDENCE, and rebasing
+> it destroys the base its numbers are stated against.** The frame's *"do not
+> rebase it"* protected exactly that.
+>
+> ⇒ **The reroute lands as a NEW candidate cut at current `main`.** That keeps
+> the single-commit-revert property the frame requires of `D2c`, keeps the
+> evidence artifact intact, and rebases nothing. **These were never in tension —
+> the held object's job is to be read, not to be merged.**
+>
+> **Read `D2c`'s numbers against `c98f72ba8` and never against `main`**; the
+> suite population has moved in both directions since. Measured, with the
+> vocabulary half of that concern refuted, in the frame at `D2c`.
+
 > # 2026-08-16 — `D1` IS IN: TWO CORRECT SEMANTICS, TWO MISSING PORTS.
 > # The functionized lane is NOT a complete replacement. One question remains.
 >

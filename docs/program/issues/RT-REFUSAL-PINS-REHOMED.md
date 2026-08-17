@@ -1,7 +1,7 @@
 ---
 id: RT-REFUSAL-PINS-REHOMED
 title: "Constructs 1 and 2 were ruled CORRECT SEMANTICS, so AC-9 owes them asserted-refusal pins -- but the only pin that asserts them today rides RecursiveDescentResidual, which D3 deletes. Re-home the assertion onto a mechanism that survives the retirement, before D6 deletes the tests carrying the fact"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -12,6 +12,47 @@ origin: "Steward, 2026-08-16, discharging the undelivered half of RT-DESCENT-LAN
 ---
 
 Frame: `docs/program/wp/RT-REFUSAL-PINS-REHOMED.md`.
+
+## MERGED 2026-08-17 at exact `d6a9760a9`. `D1` found the mechanism; it exists.
+
+**PR #2506, CI green, blob-verified on `main`.** Decision `dec_ezzkjz9vtrr2`
+resolved by the Architect at that exact SHA; QA `evt_55yet6zerfkdm` approved the
+same SHA and independently reproduced both mutations. One commit, one test-only
+path, `+111/-0`.
+
+**`D1`'s question was answered YES, and the hard stop was not needed.** An
+exclusion-free assertion does exist, because the refusals can be reached by
+calling the production code that issues them rather than by forcing a lane:
+
+| construct | how the pin reaches the refusal | asserted at |
+|---|---|---|
+| 1, `ComputationalMatch` | real `boundary_transfer_admissibility` on a built `ComputationalRecursorClosure` | `mod.rs:11985` |
+| 2, `StaticWorkerBinding` | real `StaticWorkerFieldLedger::recognize` then `close` | `mod.rs:4729-4736` |
+
+**Neither mentions `RecursiveDescentResidual` or `set_selector_variant_exclusion`**
+(`AC-1`), and every symbol they depend on is lane-independent, so they survive
+`D3`-`D8` and hold today with both lanes present (`AC-4`).
+
+**`AC-3` was discharged by observation, not assertion.** Each arm was made red
+alone and restored: replacing only the capsule with `Lowered::Trap` gave
+computational red / static green; transitioning and consuming only the static
+recognition gave static red / computational green. **Two independent detectors**
+(`AC-2`), which is the ruling that a shared reason does not license shared
+coverage.
+
+**The candidate is purely additive, so the original detector is retained.** The
+replacement landed **before** the carrier is retired rather than in the same
+commit — the `nc22` ordering that was the whole point of `AC-9`, and the
+candidate got it right without being told.
+
+**Architect's note on this pin's domain, recorded so nobody over-cites it:**
+construct 1's sentence appears at **two** sites — `mod.rs:11985`, the walk arm
+the pin exercises, and `mod.rs:12214` as a `why:` field on a different
+structure. **A change confined to `:12214` would not red this pin.** The walk is
+the law and pinning it is correct; this states the pin's domain rather than a
+defect.
+
+**`D2c` `036e8ee91` unchanged** (`AC-5`), no production change (`AC-6`).
 
 ## Why this node exists, and why it is not part of the node that ruled it
 
