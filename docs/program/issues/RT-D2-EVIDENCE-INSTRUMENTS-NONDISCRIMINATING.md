@@ -164,8 +164,32 @@ old meaning:
   > remains open inside `D3`'s option set.
 - **`D2`** — reach `agreeing_recursive_body_unit` from lowering with a real
   witness, or record why the in-situ path cannot be reached and what that means
-  for `AC-4`'s claim (Finding 2). **A mixed-arm `Some`/`None` witness is the
-  first thing to try.**
+  for `AC-4`'s claim (Finding 2). **DISCHARGED 2026-08-17 through its
+  record-why arm**, at exact base `b7e2cf8f8`, no candidate and no retained
+  change (`evt_2p6c34eg8shfm`).
+
+  > **This deliverable used to end "a mixed-arm `Some`/`None` witness is the
+  > first thing to try." That instruction was impossible to satisfy, and
+  > Finding 2 above already said so** — the agreement check is reached only when
+  > *every* arm returns `Some`, because the first `None` or `Err` short-circuits
+  > past it at `:15838-15840`. The sentence is deleted rather than annotated,
+  > because an implementer reads the deliverable, not the finding. The ring
+  > re-derived the short-circuit independently and spent a turn on it.
+  >
+  > **What `D2` established:** the mixed-arm route cannot reach the seam, by
+  > construction. **What it did NOT establish, and must not be read as:** that
+  > the seam is unreachable. The only shape that could reach it is an
+  > **all-`Some`** lowering witness, and `D2` was pointed at the mixed shape, so
+  > it never searched for one. Reachability is **unresolved, not refuted.**
+  >
+  > **Named residual, unowned and not authorized as work:** does any Ken source
+  > program drive `resolve_recursive_unit_body` to return `Some` on *every* arm?
+  > If one exists, the seam is live production behaviour and `AC-4` can be
+  > re-widened against it. If a bounded search finds none, that is a much
+  > stronger statement than `D2` made and belongs in whatever node makes it.
+  > Nothing in the tree answers this today: the Adversary's whole-suite probe
+  > (923 passed / 1 failed, the one failure being `AC-4`'s own unit test) shows
+  > only that no *existing test* reaches it.
 - **`D3`** — dispose of the pin (Finding 3): either revive the census it
   annotates, or retire the pin with its caveat, or re-key it to all six
   test-gating `cfg` spellings. **Do not just widen the count** — decide first
