@@ -8,12 +8,81 @@ primitive arm plus a real rebase, and landing it closes
 `runtime-qa`). **Branch:** `wp/NATIVE-HANDLE-CARRIER`. **Size:** M.
 **Risk:** medium — the code slice is S; the rebase is where this gets lost.
 
-**Status:** Steward frame, shovel-ready.
-⛔ **SERIALIZED behind [[RT-NATIVE-FNSPLIT]]** — do not start until it merges
-(Steward ruling `evt_1v37rgez26kmf`). Both own `lowering/core.rs`.
+**Status:** Steward frame. **Amended 2026-08-17 — read the banner below before
+any section.** The [[RT-NATIVE-FNSPLIT]] serialization
+(`evt_1v37rgez26kmf`) is **spent**: that node is `merged`.
 
 ⭐ **On the Linux ABI I critical path.** `PX8` gates 15 of that program's 19
 nodes; this is one of `PX8`'s three blockers.
+
+---
+
+> # AMENDED 2026-08-17 (Steward). THE INPUT REF CHANGED AND THE ARM MOVED FILES.
+>
+> **This frame was last edited `b5126f574` at 2026-07-29 15:09. The preserved
+> candidate it should point at was cut at 16:08 — 59 minutes later.** Everything
+> below was written before that candidate existed, so `§1`'s input ref and `§7`'s
+> `D1`/`D2` name work that is already done. Measured at `origin/main =
+> 2e7daa622`.
+>
+> ## What is already done, and where
+>
+> **`85dcee25` is the input. Not `c07e63c2`.** Per this node's own 07-29
+> disposition (`evt_5mtkdft1nxmwp`), `85dcee25` carries **a completed,
+> uncontested `D1` rebase** — `git range-diff` 3/3 `=`, no conflict, no side
+> choice — **plus the `D2` identity arm**, and it validated at
+> `rt_parity_native` **11 passed / 1 failed**.
+>
+> ⇒ **`D1` and `D2` of `§7` are DONE on that ref.** Do not rebase `c07e63c2`
+> across 1580 commits to re-derive a merge that already exists clean.
+>
+> ## But `D2`'s one-line edit NO LONGER HAS A TARGET
+>
+> `85dcee25` adds `int_to_uint64_raw` to the identity arm at
+> **`lowering/core.rs:9713`**. That arm is **no longer in `core.rs`.**
+> [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] merged **2026-08-17** and relocated it
+> to **`lowering/core/primitive.rs:206`**.
+>
+> | | |
+> |---|---|
+> | on `main`, is the primitive still absent from `crates/ken-runtime/src/`? | **yes, zero occurrences** — the frame still has its subject |
+> | the elaborator half of `85dcee25` | carry it forward |
+> | the one-line runtime arm | **re-derive at the new home; the preserved hunk will not apply** |
+>
+> **The whole `ken-runtime` residual is one line plus a 20-line test**
+> (`85dcee25` vs its base: `core.rs` 1/1, `core/tests/values.rs` 20/0). `§9`'s
+> "no concurrent `lowering/core.rs` edit" is spent with `RT-NATIVE-FNSPLIT`; the
+> live contention is `lowering/mod.rs`, see the sequencing note below.
+>
+> ## A SECOND site now exists, and `AC-2`'s control does not point at it
+>
+> `primitive.rs:93-98` is a `scalar_kind` map that did not exist when `85dcee25`
+> was cut. It maps the same `uint8_to_int | int_to_uint8_raw` pair to
+> `Some("Int")`, and its own comment says a carried word in such a position **is
+> projected through the emitted scalar helper.**
+>
+> ⛔ **Open question, and it is NOT the ring's to settle alone:** does
+> `int_to_uint64_raw` need a `scalar_kind` entry, and does routing its operand
+> through a scalar `Int` helper truncate the **Big** carrier that `AC-2` exists
+> to protect? **`AC-2`'s control mutates the arm at `:206`. A truncation living
+> in `scalar_kind` would survive that control untouched** — the control would
+> pass and the defect would ship. Raise it with the coordinates before building.
+>
+> ## Sequencing — this node is behind ONE live node
+>
+> `depends_on` gained [[RT-SITEOP-CARRIED-WITNESS]] on 2026-08-17. That node is
+> `active` and owns `lowering/mod.rs`; its `D2` is in flight. **Do not start this
+> node until it merges** — and note `scalar_kind`'s emitted-scalar-helper route
+> is adjacent mechanism in the same subsystem, which is why the question above
+> matters more than usual.
+>
+> **The 12th row is no longer this node's known blocker.** The 07-29 failure
+> `fs_write_at_malformed_offset_narrows_to_invalid_offset` was owned by
+> [[RT-DECL-CLOSURE-PORT]]'s `AC-1`, root cause `authority=RecursiveDescent`.
+> That node is **`merged`**, and `RecursiveDescent` now has **zero occurrences**
+> in `crates/ken-runtime/src/`. ⛔ **That is the mechanism's absence, not a green
+> row — nobody has run it since.** Measure it first; do not assume either
+> outcome.
 
 ---
 
@@ -28,17 +97,33 @@ f0eb65ce  WIP PX8-F-CAP-41: seal capacity-carrying buffer handle
 8ebe370a  PX8-F-CAP-41 Phase 1 (§38 fold)   <- merge-base with main
 ```
 
-⇒ **Take `c07e63c2` alone.** It already carries the handle/admission impl *and*
-the elaborator slice. ⛔ Do not attempt a merge of the two refs; you would be
-merging a commit with its own ancestor.
+⇒ **Of those two, take `c07e63c2` alone.** It already carries the
+handle/admission impl *and* the elaborator slice. ⛔ Do not attempt a merge of
+the two; you would be merging a commit with its own ancestor.
 
-| ref | sha | what |
-|---|---|---|
-| `origin/preserved/native-handle-carrier-c07e63c2` | `c07e63c2` | **the input** |
-| `origin/preserved/px8-f-cap-41-p2-buffer-handle-f0eb65ce` | `f0eb65ce` | its parent, informational |
+> ### SUPERSEDED 2026-08-17 — A LATER ATTEMPT MADE A THIRD REF, AND IT IS THE INPUT.
+>
+> **This correction settled which of the two 07-23 refs to take, and it is still
+> right about those two.** It is no longer the answer to *"what do I rebase"*:
+> the node was picked up again on 07-29, hit hard stop #21, and preserved a
+> candidate that is **on a divergent lineage from both.**
 
-⚠ Both are `preserved/*` refs, **not** live WP branches. Cut
-`wp/NATIVE-HANDLE-CARRIER` from `c07e63c2`; leave the preserved refs untouched.
+| ref | sha | date | what |
+|---|---|---|---|
+| `origin/preserved/native-handle-carrier-hs21-85dcee25` | `85dcee25` | 07-29 16:08 | **THE INPUT** — completed `D1` rebase + `D2` arm, 11/12 |
+| `origin/preserved/native-handle-carrier-hs21-8bc7556a` | `8bc7556a` | 07-29 13:54 | superseded WIP of the same attempt |
+| `origin/preserved/native-handle-carrier-c07e63c2` | `c07e63c2` | 07-23 15:13 | the elaborator slice, now upstream of the input |
+| `origin/preserved/px8-f-cap-41-p2-buffer-handle-f0eb65ce` | `f0eb65ce` | 07-23 14:43 | `c07e63c2`'s parent, informational |
+
+⛔⛔ **ALL FOUR ARE ON DIVERGENT LINEAGES — verified, none of the `hs21` pair is
+an ancestor or descendant of `c07e63c2`.** So preserving the newest does **not**
+subsume the rest, and a `git log` on one tells you nothing about another. Read
+the table as four separate artifacts, not a history.
+
+⚠ All are `preserved/*` refs, **not** live WP branches. Cut
+`wp/NATIVE-HANDLE-CARRIER` from **`85dcee25`**; leave every preserved ref
+untouched. ⛔ **Do not reset, delete, or repoint `85dcee25`** — it is the only
+copy of a clean rebase, and the hazard is a handoff-gate hard reset, not storage.
 
 ---
 
@@ -108,6 +193,33 @@ that**, and the collision is not incidental:
 ⇒ **All three production files of the elaborator slice were also edited on
 `main`.** This is a genuine three-way merge over the exact lines the slice
 changes, not a fast-forward.
+
+> ### THESE NUMBERS ARE FOR A REBASE ALREADY DONE. Do not run it again.
+>
+> **Measured 2026-08-17 at `origin/main = 2e7daa622`.** The table describes
+> rebasing `c07e63c2`, which `§1` no longer asks you to do. Both figures below
+> are derivations, **never pins** — re-run them at pickup:
+>
+> ```sh
+> git rev-list --count <base>..origin/main
+> git diff --numstat <base>..origin/main -- <the four files>
+> ```
+>
+> | from | commits behind `main` | `prelude.rs` | `erasure.rs` | `compiler_driver.rs` |
+> |---|---|---|---|---|
+> | `8ebe370a` (`c07e63c2`'s base) | **1580** | +391/-13 | +1564/-45 | +810/-108 |
+> | `af056a78` (`85dcee25`'s base) | **1262** | +300/-4 | +1488/-22 | +783/-104 |
+>
+> **`§3`'s argument is now far stronger than when it was written, and its stated
+> stake is a 7x understatement:** taking a side wholesale would revert **1580**
+> commits' worth of landed work, not 215. `erasure.rs` alone moved from +99 to
+> **+1564**.
+>
+> ⇒ **That is the reason to start from `85dcee25`, not a reason to redo the
+> merge.** It already resolved this collision once with `range-diff` 3/3 `=` and
+> no side choice. **The hazard in this section stays fully live** for advancing
+> that ref the remaining 1262 commits — re-derive each hunk, and `AC-1`'s control
+> applies unchanged.
 
 ⭐ **The failure mode this AC exists to catch:** a rebase that resolves a
 `prelude.rs` conflict by taking the branch side wholesale **silently reverts
@@ -184,6 +296,25 @@ Acceptance is **"full two-engine oracle GREEN"**, not "the primitive was added."
 Any further native gap the exact fixture hits is **surfaced and triaged**, never
 worked around.
 
+> ### THE `?` IS RESOLVED, AND THIS SECTION'S PREDICTION HELD EXACTLY.
+>
+> **Step 4 arrived on 2026-08-17 and it was the predicted class.** The fixture
+> hit a **non-primitive effect gap** — not a primitive one, exactly as the
+> paragraph below forecast:
+>
+> ```
+> ... -> int_to_uint64_raw -> effect seat Argument(0) of FsReadFile
+>                             needs BytesPointerLength, unobservable in CarriedWord
+> ```
+>
+> **It was surfaced, routed, and is owned elsewhere.** The Architect ruled the
+> gap is not this node's (`evt_559gymspqap8w`); it belongs to
+> [[RT-SITEOP-CARRIED-WITNESS]], whose `D2` is in flight. ⇒ **Do not re-derive
+> this wall and do not route it to the Steward a second time** — see `§11`.
+>
+> ⚠ **This does not assert step 4 is the last.** The section's discipline is
+> unchanged and still applies to a step 5.
+
 ⭐ The Architect enumerated the checked closure's primitives — `leq_int`,
 `and_bool`, `int_to_uint64_raw`, `sub_int`, `eq_int`, `add_int` — and native
 already handles all but one. `Some`/`None`, handle construction/projection, and
@@ -196,10 +327,29 @@ contingency.
 
 ## 7. Deliverables
 
-- **`D1`** — `c07e63c2` rebased onto current `origin/main`, conflicts resolved
-  hunk-by-hunk, with the stale-base check of `§3` run and reported.
-- **`D2`** — the `int_to_uint64_raw` identity arm in `core.rs`, extending the
-  landed `uint8_to_int | int_to_uint8_raw` arm.
+> ### `D1` AND `D2` ARE DONE ON `85dcee25`. RESTATED BELOW — 2026-08-17.
+>
+> The two originals are struck through, not deleted, because their **controls**
+> (`AC-1`, `AC-2`) still bind on the restated form.
+
+- ~~**`D1`** — `c07e63c2` rebased onto current `origin/main`.~~ **DONE on
+  `85dcee25`**: `range-diff` 3/3 `=`, no conflict, no side choice.
+  ⇒ **`D1'`** — advance `85dcee25` the remaining **1262** commits to current
+  `origin/main`, hunk-by-hunk, with `§3`'s stale-base check run and reported.
+  **`AC-1`'s control applies unchanged.**
+- ~~**`D2`** — the `int_to_uint64_raw` identity arm in `core.rs`.~~ **DONE on
+  `85dcee25` at `core.rs:9713` — but that file no longer holds the arm.**
+  ⇒ **`D2'`** — **re-derive** the one-line arm at its new home,
+  `lowering/core/primitive.rs:206`, extending the landed
+  `uint8_to_int | int_to_uint8_raw` arm. The preserved hunk will not apply;
+  [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] relocated it on 2026-08-17.
+- **`D2a`** — **resolve the `scalar_kind` question before building `D2'`.**
+  `primitive.rs:93-98` maps the same pair to `Some("Int")` and projects a carried
+  word through the emitted scalar helper. Report whether
+  `int_to_uint64_raw` needs an entry and whether that path can truncate the
+  **Big** carrier. ⛔ **A truncation there survives `AC-2`'s control untouched**,
+  so this is a hard stop to the Steward/Architect if the answer is not plainly
+  no, not a call to make inside `D2'`.
 - **`D3`** — the four focused discriminators of `§8` (`AC-3`), before the full
   oracle.
 - **`D4`** — the CAP-41 fixture carried to **full native GREEN**, and the full
@@ -300,6 +450,28 @@ indivisible continuation-partitioning change to that exact file and lands first.
 ⇒ ⭐ **Re-derive the arm's location at pickup.** Do not search for `:6827`;
 search for `"uint8_to_int" | "int_to_uint8_raw"`.
 
+> ### IT MOVED, AND IT LEFT THE FILE. This section called it right — 2026-08-17.
+>
+> **`RT-NATIVE-FNSPLIT` is `merged`, so its serialization is spent.** But the arm
+> then moved *again*, and out of `core.rs` entirely:
+>
+> | | at `origin/main = 2e7daa622` |
+> |---|---|
+> | the identity arm | **`lowering/core/primitive.rs:206`** |
+> | the `scalar_kind` map (new; see `§7 D2a`) | **`lowering/core/primitive.rs:93-98`** |
+> | the same pair in the IR evaluator | `runtime_ir_evaluator.rs:1632` — **a third site; decide whether it is in scope, do not edit it reflexively** |
+> | `core.rs` blob | `e173b6fc7df3f18c638354f72f012d8ba67414ac` — **provenance only** |
+> | who relocated it | [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]], merged 2026-08-17 |
+>
+> ⭐ **The prescribed search string is what saved this, and it still works** —
+> `command grep -rn 'uint8_to_int|int_to_uint8_raw' crates/ken-runtime/src/`
+> finds all three sites across the relocation. **Searching by content survived a
+> whole-module move that any line pin would have failed.** Keep doing that.
+>
+> **Live contention is now `lowering/mod.rs`, not `core.rs`** —
+> [[RT-SITEOP-CARRIED-WITNESS]] `D2` holds it. Re-derive slot availability
+> against that node, not against `RT-NATIVE-FNSPLIT`.
+
 ⚠ Re-derive build-slot availability too. `ken-cargo` blocks silently for up to
 30 minutes on lock contention; `fuser -v /tmp/ken-build-locks/build.lock` names
 the holder — ⛔ don't pipe it through `head`.
@@ -313,8 +485,13 @@ the holder — ⛔ don't pipe it through `head`.
 - the rebase produces a conflict in `prelude.rs`/`erasure.rs`/
   `compiler_driver.rs` you cannot resolve without choosing a side — ⭐ say which
   hunk and what the two sides assert; **or**
-- the fixture hits a **non-primitive** constructor/effect native gap (`§6`);
+- the fixture hits a **non-primitive** constructor/effect native gap (`§6`)
+  — ⚠ **amended 2026-08-17: this bullet FIRED and its gap is DISCHARGED.** The
+  effect-seat gap is [[RT-SITEOP-CARRIED-WITNESS]]'s and is in flight; ⛔ do not
+  route *that* one again. The bullet stays live for **any further** such gap;
   **or**
+- `§7 D2a`'s `scalar_kind` question does not come back a plain no — a truncation
+  path that `AC-2`'s control cannot see is not yours to judge safe; **or**
 - identity lowering turns out to be unsound for the Big carrier on the native
   path — that reopens the Architect's means ruling and is not yours to re-decide;
   **or**
