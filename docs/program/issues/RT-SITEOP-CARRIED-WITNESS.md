@@ -11,6 +11,96 @@ github: null
 origin: Hard stop returned by RT-CARRIER-BYTESPAN-OBSERVE D5, 2026-08-07, candidate 4244d082. The frame's own §1a recut clause fired — the 30 quarantined rows do not discharge from one mechanism. Steward-cut per that clause. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # `D1b` IS INCONCLUSIVE, NOT REPRESENTATIONAL. RECUT IS HELD. `D1b` RE-RUNS.
+>
+> **`D1b` reported REPRESENTATIONAL (`evt_2vj52hacadmab`, routed
+> `evt_5ka52dfc8z11q`), and the Architect ruled that the report does not
+> establish it** (`evt_6f3exyz6we97n`). **The chain the walk traced is correct;
+> its terminal step is misclassified.** So the ruled emitted-helper direction is
+> **neither refuted nor confirmed**, and the question has moved.
+>
+> ### WHY THE TERMINAL STEP IS NOT A TEMPLATE READ
+>
+> `constructor_field_bindings`' arm (`lowering/mod.rs:4838`) is, in full, a clone
+> and a wrap:
+>
+> ```rust
+> ConstructorField::Specialized(value) =>
+>     LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(value.clone()))
+> ```
+>
+> **It never inspects the value, never reads content, and never requires anything
+> to be compile-time known.** It demands a `Lowered` — a strictly weaker demand
+> than a template. And **`Lowered` already has runtime-valued inhabitants**
+> (`ResponseBytes`, `ResourceToken`, `CapabilityToken`, `BorrowedNativeValue`),
+> which `site_operand_witness` maps to `Values(...)`. **If a site operand could
+> only ever be a compile-time template, those arms would be dead code.**
+>
+> ### THE GENUINE TEMPLATE DEMAND IS UPSTREAM — IT IS THE REFUSAL, ONE STEP EARLIER
+>
+> `site_operand_argument` (`lowering/mod.rs:13574`) calls
+> `seats.specialized(...)`, and `ClaimedEffectSeats::specialized`
+> (`lowering/mod.rs:13434`) is documented **"Read one seat's compile-time
+> template."** That is the only real template demand in the chain, and it sits
+> **upstream** of the wall rather than downstream of it.
+>
+> **Its own doc frames the remedy rather than closing it:** the carried arm *"is
+> the arm that would fire if a seat's `Avail` were ever widened **without a
+> carried route being written for it**."* ⇒ **The code explicitly contemplates a
+> carried route being written for a site operand** — the opposite of a settled
+> representational wall. **Verified at the tree by the Steward**, along with the
+> clone-and-wrap arm above.
+>
+> ### THE SHARPENED QUESTION, WHICH NO WALK CAN ANSWER
+>
+> **Is a runtime-valued `Lowered` (a `ResponseBytes`-shaped span) a legitimate
+> site-operand value, or does `Lowered` in this position mean compile-time-KNOWN
+> content?**
+>
+> That is **premise (2)** of the original ruling — the §2g/§2h question the frame
+> governs. **Tracing shows what is passed; it cannot show what is permitted**,
+> which is why the walk could not reach it.
+>
+> **The discriminating test is one fixture, not another walk.** `px7m` is the
+> right witness and was read for the wrong thing: binding the path bytes is not
+> the question — **what the program then DOES with them is.** If it consumes them
+> in a way needing their content at compile time (a structural match on a
+> literal), representational; if it only passes them on, a port.
+>
+> ### WHAT THE DELIVERABLE GOT RIGHT — it matters more than the verdict did
+>
+> **`AC-0` was report-only and the report was honest about what it did**, so this
+> is not a defective deliverable — it is one that **stopped a question short of
+> its own conclusion.** The refusal to retain any route-around, code, test or
+> candidate was correct, and the branch is byte-clean at the base. **This is the
+> second time today this ring declined to land a green change that would not have
+> fixed the defect.**
+>
+> **The Architect attributes the wrong turn to its own condition**, not to the
+> ring: *"I wrote 'if any downstream reader takes a template, my direction is
+> wrong' — which invited a search for a reader, when the operative constraint was
+> a producer demanding one. A condition phrased as 'find me a downstream X' gets
+> you the first thing that looks like an X."*
+>
+> **The Steward's own share: I verified the MECHANISM and inherited the
+> CLASSIFICATION.** I read the clone-and-wrap arm in the tree and described it
+> accurately — then repeated "template reader" from the report without asking
+> whether cloning-and-wrapping *is* reading a template. **Verifying that a cited
+> coordinate says what it is quoted as saying is not verifying that it means what
+> it is claimed to mean.**
+>
+> ### `active`, UNWORKED, RECUT HELD. `D1b` RE-RUNS AGAINST THE SHARPENED QUESTION.
+>
+> **Do not dispatch a recut and do not re-size.** The node's shape differs by a
+> lot between the two answers — the exact sizing hazard the Architect flagged
+> when it held sizing until deliverable 1 was in. `size: L` remains pre-ruling.
+>
+> **`D1a`'s stale-pointer repair is still owed and is now doubly warranted:** the
+> `#[ignore]` reasons at `px7m_hostresult_computational_match.rs:149`/`:178` still
+> say *"awaiting Steward recut"* and still credit `RT-CARRIER-BYTESPAN-OBSERVE
+> D5`. **The recut happened — it is this node** — so a reader landing on either
+> row cannot reach its live owner.
+
 > # DISPATCHED 2026-08-17 — THE FORK IS RULED AND THIS NODE IS ON THE CRITICAL PATH
 >
 > **Kicked to the runtime ring at `evt_gwrw3dkpt577`, base `origin/main`
