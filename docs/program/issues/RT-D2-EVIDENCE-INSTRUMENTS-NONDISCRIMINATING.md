@@ -6,7 +6,7 @@ owner: runtime
 size: S
 gate: none
 depends_on: []
-blocks: []
+blocks: [RT-CAVEAT-GUARD-SPELLING-DOMAIN]
 github: null
 origin: "Adversary M8 hunt on ca639b5ef, evt_12x7wnwfbfbr (thread thr_5x0fypvv6rzhb), three findings measured by mutation with positive controls, five attacks refuted. Steward-verified the structural half of each before filing. AC-3's amended wording was the Steward's own. Steward-filed per COORDINATION section 2."
 ---
@@ -143,7 +143,25 @@ old meaning:
 ## Deliverables
 
 - **`D1`** — make `entered` and `advanced` independently observable (Finding 1),
-  and correct the three doc sites above.
+  and correct the three doc sites above. **MERGED 2026-08-17**, landed squash
+  `b7e2cf8f885bc103364975c64058dba6887872b4`, four paths, `+96/-15`, all four
+  blob-verified on `main`. The observer row carries a `match_descent` bit set
+  only after the plain Match branch is entered; the later route-1 replacement
+  preserves that bit rather than overwriting it; the three doc sites now
+  distinguish resolver entry, plain-Match descent, and direct non-`Construct`
+  route-1 returns. `AC-1` was discharged by two mutations with the exact
+  candidate restored after each — a committed no-descent mutant that leaves the
+  former entry/route observation satisfied while `match_descent` goes false, and
+  a temporary un-preserving read that reddens the new co-occurrence control with
+  `route1: true, match_descent: false`.
+
+  > The census caveat was re-derived here rather than bumped, moving to **324**
+  > with an inventory naming the observation scope, the three record helpers and
+  > `RuntimeExpr::Var(0)`. **That re-derivation is not `D3`** — it keeps the pin
+  > honest at the new magnitude; deciding what the pin should protect is still
+  > `D3`'s, and the Adversary's second hole on it (it counts exactly
+  > `#[cfg(test)]` while `any(test, feature = ...)` regions move invisibly)
+  > remains open inside `D3`'s option set.
 - **`D2`** — reach `agreeing_recursive_body_unit` from lowering with a real
   witness, or record why the in-situ path cannot be reached and what that means
   for `AC-4`'s claim (Finding 2). **A mixed-arm `Some`/`None` witness is the

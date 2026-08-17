@@ -5,7 +5,7 @@ status: ready
 owner: runtime
 size: S
 gate: none
-depends_on: [RT-CENSUS-CAVEAT-GUARD]
+depends_on: [RT-CENSUS-CAVEAT-GUARD, RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING]
 blocks: []
 github: null
 origin: "Adversary hunt evt_6dxxrgvd0w5zs (2026-08-17) on the RT-CENSUS-CAVEAT-GUARD landing be25ea6a2. Steward-filed per COORDINATION section 2, with two corrections to the finding recorded below."
