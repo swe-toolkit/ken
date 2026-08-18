@@ -8,6 +8,7 @@ use super::{
     planner_capacity_error, planner_error, CraneliftBackendError, EdgeKind, StaticEdge,
     StaticEdgeId, StaticNode, StaticNodeId, TransitionKind,
 };
+use super::units::PredeclaredFunctionId;
 use crate::{
     RuntimeExpr, RuntimeIntV1, RuntimePartiality, RuntimePrimitive, RuntimeTrap, RuntimeTrapCode,
     RuntimeValue, Sign,
@@ -239,10 +240,6 @@ pub(super) struct SemanticProgramId(pub(super) u32);
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub(super) struct CaptureLayoutId(pub(super) u32);
-
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-#[repr(transparent)]
-pub(in crate::cranelift_backend) struct PredeclaredFunctionId(pub(super) u32);
 
 /// Which function unit a planned node belongs to.
 ///

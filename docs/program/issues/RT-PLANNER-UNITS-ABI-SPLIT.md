@@ -687,3 +687,26 @@ open the phase record to learn them.
 >   and consumers must be proven first.
 > - **The source machine is relocation only in this phase**, never a transition
 >   IR. Generated traps receive **no fabricated source origin**.
+
+---
+
+## D1 AC-5 adapter/facade debt ledger — `RT-PLANNER-UNITS-ABI-SPLIT` D1
+
+**Candidate:** `45e622243` (post-fix SHA recorded at handback).
+**Slice:** D1 — the move (this slice).
+
+### Scaffolding introduced
+
+| Symbol | Location | Why temporarily required | Closure deletion obligation |
+| --- | --- | --- | --- |
+| `pub(in crate::cranelift_backend) use units::{EmittableCallEdge, EmittableCallKind, PredeclaredFunctionId};` | `planning/static_transition.rs` (parent re-export block, immediately after the `semantic_ir` re-export) | The parent's `pub(in crate::cranelift_backend) use semantic_ir::{...}` block previously re-exported `PredeclaredFunctionId` and the parent directly defined `EmittableCallEdge`/`EmittableCallKind`; consumers in `planning.rs` and `lowering/` resolve these names through the parent namespace. D1 moved the definitions into `units.rs`, so this re-export preserves the parent-path surface those consumers already import from — a behaviour-preserving move must not force every consumer to re-point simultaneously. `EmittableUnit` is **not** re-exported: the compiler proved it unused outside `units.rs` (sole references are doc comments), so the facade is already narrowed to the three consumed names. | `[[RT-BACKEND-SPLIT-CLOSURE]]` (item 18) narrows this facade when consumers re-point at `units.rs` directly. The closure slice deletes this re-export block (or the now-dead names in it) once no consumer resolves through the parent. |
+
+### Evidence seats (guardrail 7)
+
+- **Intention producer:** this D1 slice (the move).
+- **Independent artifact observer / evidence decoder:** `scripts/ken-cargo -p ken-runtime` (scoped build + lib tests; the unused-import warning on `EmittableUnit` was the compiler's evidence the facade was over-broad, acted on in this slice).
+- **Closeout / publication seat:** `[[RT-BACKEND-SPLIT-CLOSURE]]` (item 18).
+
+### Non-scaffolding normalization (permitted, no ledger debt)
+
+Module declaration (`mod units;`), the `use super::units::PredeclaredFunctionId` re-pointing in `abi.rs` and `semantic_ir.rs`, and the one test-only import re-pointing in the parent's `mod tests` are path-qualification normalization, not adapters — they carry no closure obligation.

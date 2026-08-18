@@ -7933,6 +7933,18 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — the Emittable* vocabulary and
+        // the StaticTransitionPlan projections that derive it. A planning
+        // module with no emission, so every count is zero.
+        Census {
+            file: "planning/static_transition/units.rs",
+            source: include_str!("../../../planning/static_transition/units.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         // ⭐ `RT-FNSPLIT-B2F` `AC-2` — THE PREDICTED ROW, and it is predicted
         // rather than fitted.
         //
@@ -8669,6 +8681,14 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
         "planning/static_transition/semantic_ir.rs",
         include_str!("../../../planning/static_transition/semantic_ir.rs"),
     ),
+    // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — the emitter's read-only view of one
+    // validated function unit. Registered here the moment the module exists,
+    // for the same reason as every sibling: a production module absent from
+    // this roster is invisible to every pin that iterates it.
+    (
+        "planning/static_transition/units.rs",
+        include_str!("../../../planning/static_transition/units.rs"),
+    ),
     ("surface.rs", include_str!("../../../surface.rs")),
     ("test_objects.rs", include_str!("../../../test_objects.rs")),
     ("test_support.rs", include_str!("../../../test_support.rs")),
@@ -8730,6 +8750,10 @@ fn the_backend_production_surface_inventory_is_closed() {
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
             ("planning/static_transition.rs", "semantic_ir"),
+            // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — the Emittable* vocabulary and
+            // the StaticTransitionPlan projections that derive it, factored into
+            // their own domain module.
+            ("planning/static_transition.rs", "units"),
         ],
         "AC-4 -- the backend's module inventory changed, so \
          BACKEND_PRODUCTION_SOURCES is no longer the whole production surface and \
@@ -9119,6 +9143,11 @@ fn the_entry_carrying_types_are_module_private() {
             "planning/static_transition.rs",
             "planning/static_transition/abi.rs",
             "planning/static_transition/semantic_ir.rs",
+            // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — `units.rs` names `StaticNodeId`
+            // because `EmittableUnit`'s `planned_node` field moved here from the
+            // parent. The type remains module-private; only its naming site
+            // moved.
+            "planning/static_transition/units.rs",
         ],
         "AC-5(a): another backend file now NAMES an entry-carrying type. That is \
          the measured fact only -- it does not by itself decide whether anything \
@@ -9821,31 +9850,12 @@ fn the_owner_classification_has_a_closed_production_naming_inventory() {
             "pub(in crate::cranelift_backend) struct FieldIdentity(pub(super) DenseRange);",
             "pub(in crate::cranelift_backend) fn tag_abi_word(self) -> Result<u64, CraneliftBackendError> {",
             "pub(in crate::cranelift_backend) fn name_abi_word(self) -> Result<u64, CraneliftBackendError> {",
-            // ⭐ `RT-FNSPLIT-B2F` `D1` adds ONE member, and it is argued here
-            // rather than absorbed, because this pin exists to make a widening a
-            // review event.
-            //
-            // `B2F` emits one closed target function per `PredeclaredFunction`
-            // in the validated owner partition. To do that the emitter must be
-            // able to NAME a unit — to key its declared `FuncId` and to resolve
-            // `D4`'s call edges against the planner's identity rather than
-            // against an iteration ordinal. It must NOT be able to mint one.
-            //
-            // ⭐ The `pub(super)` field is what makes that a fact about the type
-            // system: the newtype is widened, its `u32` is not, so `lowering`
-            // can hold, compare, order and pass a unit identity and cannot
-            // fabricate one or do arithmetic on it. That is the identical
-            // argument `StaticOriginId` was widened on, and it transfers because
-            // it is the same shape, not because it is nearby.
-            //
-            // ⛔ What is deliberately NOT widened, and is the thing this row
-            // must not be read as licensing: `AbiPlane`, `AbiDescriptor`,
-            // `build_abi_plane` and `AbiPlane::validate` all stay `pub(super)`.
-            // The emitter reads one unit's projection; it cannot construct the
-            // plane, mutate a descriptor, or reach the pre-emission validator to
-            // bypass it. A future `AbiPlane` or `build_abi_plane` line appearing
-            // in this list is the violation, not a further capability.
-            "pub(in crate::cranelift_backend) struct PredeclaredFunctionId(pub(super) u32);",
+            // ⭐ `RT-FNSPLIT-B2F` `D1` added `PredeclaredFunctionId` here; it
+            // moved to `units.rs` under `RT-PLANNER-UNITS-ABI-SPLIT` `D1`, so
+            // the widened-visibility row for it is no longer in this plane's
+            // inventory. The type's visibility is unchanged — it is still
+            // `pub(in crate::cranelift_backend)` with a `pub(super)` field —
+            // only its definition file moved.
             "pub(in crate::cranelift_backend) fn with_last_io_error_role_omitted<T>(",
             // ⭐ `RT-DECL-CLOSURE-PORT` `D2a` adds two, and they are the same
             // shape as `with_last_io_error_role_omitted` above: a `cfg(test)`
