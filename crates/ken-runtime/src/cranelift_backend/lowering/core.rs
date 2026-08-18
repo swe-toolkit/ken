@@ -1013,7 +1013,8 @@ thread_local! {
 
 // `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` records resolver entry in
 // `recursive_position_unit_body`, plain-Match descent in
-// `resolve_recursive_unit_body`, and direct non-`Construct` route-1 returns.
+// `resolve_recursive_unit_body`, successful plain-Match arm-body lookups, and
+// direct non-`Construct` route-1 returns.
 // The later BoundaryCarrier refusal has other producers, so it cannot identify
 // this route on its own.
 #[cfg(any(test, feature = "px8-ds-test-support"))]
@@ -1021,6 +1022,7 @@ thread_local! {
 pub struct BranchedScrutineeUnitBodyRoute1 {
     pub route1: bool,
     pub match_descent: bool,
+    pub match_arms_walked: usize,
     pub plain_match: bool,
     pub match_scrutinee_is_var: bool,
     pub match_cases: usize,
@@ -1036,8 +1038,9 @@ thread_local! {
         const { std::cell::Cell::new(false) };
 }
 
-/// Run `body` while recording resolver entry, plain-Match descent, and direct
-/// route-1 returns from `recursive_position_unit_body` on this thread.
+/// Run `body` while recording resolver entry, plain-Match descent, successful
+/// plain-Match arm-body lookups, and direct route-1 returns from
+/// `recursive_position_unit_body` on this thread.
 ///
 /// Hidden and default-off: this observer is inert unless a test scope installs
 /// its counter, and it does not affect the `None` returned by production.
@@ -1101,9 +1104,11 @@ fn record_branched_scrutinee_unit_body_route1(scrutinee: &RuntimeExpr) {
             };
             let row = rows.last_mut().expect("route-1 entry row");
             let match_descent = row.match_descent;
+            let match_arms_walked = row.match_arms_walked;
             *row = BranchedScrutineeUnitBodyRoute1 {
                 route1: true,
                 match_descent,
+                match_arms_walked,
                 plain_match,
                 match_scrutinee_is_var,
                 match_cases,
@@ -1120,6 +1125,7 @@ fn record_branched_scrutinee_unit_body_entry() {
             rows.push(BranchedScrutineeUnitBodyRoute1 {
                 route1: false,
                 match_descent: false,
+                match_arms_walked: 0,
                 plain_match: false,
                 match_scrutinee_is_var: false,
                 match_cases: 0,
@@ -1134,6 +1140,15 @@ fn record_branched_scrutinee_unit_body_match_descent() {
     BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1.with(|cell| {
         if let Some(row) = cell.borrow_mut().as_mut().and_then(|rows| rows.last_mut()) {
             row.match_descent = true;
+        }
+    });
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_branched_scrutinee_unit_body_match_arm_walked() {
+    BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1.with(|cell| {
+        if let Some(row) = cell.borrow_mut().as_mut().and_then(|rows| rows.last_mut()) {
+            row.match_arms_walked += 1;
         }
     });
 }
@@ -15891,6 +15906,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 let mut declared_units = Vec::with_capacity(cases.len());
                 for (case_index, case) in cases.iter().enumerate() {
                     let body = self.case_body_occurrence(source_origin, case_index, &case.body)?;
+                    #[cfg(any(test, feature = "px8-ds-test-support"))]
+                    record_branched_scrutinee_unit_body_match_arm_walked();
                     let Some(unit) = self.resolve_recursive_unit_body(body.static_origin, position)? else {
                         return Ok(None);
                     };
