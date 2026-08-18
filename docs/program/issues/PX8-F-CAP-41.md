@@ -5,7 +5,7 @@ status: draft
 owner: foundation
 size: M
 gate: none
-depends_on: [NATIVE-HANDLE-CARRIER, RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT, RT-RECURSIVE-POSITION-ARM-ARITY]
+depends_on: [NATIVE-HANDLE-CARRIER, RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT, RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE]
 blocks: [PX8]
 github: 41
 origin: charter backlog (#41); RE-GROUNDED as a live PX8 clause-(a) blocker by architect verdict evt_163mfgjs7fkh8 (2026-07-23); RE-SCOPED spec-first by architect ruling evt_xnkrzjy1c8br (2026-07-23)
