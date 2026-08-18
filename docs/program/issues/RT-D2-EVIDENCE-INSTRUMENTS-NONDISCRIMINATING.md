@@ -336,5 +336,9 @@ old meaning:
 
 **Not urgent, and say so when picking it up.** Nothing here says the landed
 behaviour is wrong, and the CLI error-string assertion does catch the Finding-1
-mutation today. This is evidence quality, and it queues behind
-`RT-PLANNER-GRAPH-FOUNDATION-SPLIT`'s pivot.
+mutation today. This is evidence quality.
+
+**That pivot is resolved.** This used to say the node queues behind
+[[RT-PLANNER-GRAPH-FOUNDATION-SPLIT]]'s pivot; the Architect closed that node
+without code on 2026-08-18 (`evt_6r403ez3m2m69`), so it queues behind nothing and
+`D4` is simply the runtime lane's current deliverable.

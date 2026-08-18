@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-18 00:39:41Z — from 370 issue file(s) in `docs/program/issues/`.
+2026-08-18 00:41:46Z — from 370 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -311,7 +311,7 @@ the committed file matches the generator's output.
 | `RT-PLANNED-CLOSURE-PREEXISTENCE` | Suppression cannot answer closure pre-existence because it removes the observation point along with the crossing -- ask the PLANNER instead: does the planned occurrence at origin 5 carry a closure-typed field 0 by construction? | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2317 |
 | `RT-PLANNER-ATTRIB-K` | Boundary A planner: fixed K is a design invariant — move the K-exceeded rejection off the capacity channel | merged | runtime | XS | none | https://github.com/swe-toolkit/ken/pull/935 |
 | `RT-PLANNER-DIAGNOSTIC-K` | Boundary A planner: report planner-invariant failures as planner defects, and assert fixed_k CONSTANT rather than merely affine | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/929 |
-| `RT-PLANNER-GRAPH-FOUNDATION-SPLIT` | Move the planner's shared substrate out of the static-transition monolith — the root plan type and the identity vocabulary that all six planner domain slices quote | active | runtime | TBD | none | — |
+| `RT-PLANNER-GRAPH-FOUNDATION-SPLIT` | Move the planner's shared substrate out of the static-transition monolith — the root plan type and the identity vocabulary that all six planner domain slices quote | closed | runtime | TBD | none | — |
 | `RT-PLANNER-INVARIANT-MESSAGE-LOCALIZATION` | The PlannerInvariant rendering localizes every failure to the static transition planner, and 16 of its direct producers are resident in lowering -- the same false-localization defect this file already ruled on for its neighbour variant | draft | runtime | S | none | — |
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |

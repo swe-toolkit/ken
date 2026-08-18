@@ -62,13 +62,14 @@ complete for its named transfer, independently reviewable and mergeable, and
 | 0 | three campaign spinouts, sequenced ahead of the census — see below | yes |
 | 1 | [[RT-BACKEND-SPLIT-CENSUS]] — Stage A, no code move | yes |
 | 2 | [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] — early critical-path slice | yes |
-| 3 | [[RT-PLANNER-GRAPH-FOUNDATION-SPLIT]] — planner substrate; unblocks 4-9 | yes |
-| 4 | `RT-PLANNER-UNITS-ABI-SPLIT` — first planner domain | |
+| 3 | [[RT-PLANNER-GRAPH-FOUNDATION-SPLIT]] — **CLOSED, no code. The substrate is empty; it gates nothing** | yes |
+| 4 | `RT-PLANNER-UNITS-ABI-SPLIT` — first planner domain, **starts immediately** | |
 | 5 | `RT-PLANNER-OCCURRENCES-SPLIT` | |
-| 6 | `RT-PLANNER-CONTINUATIONS-SPLIT` | |
+| 6 | `RT-PLANNER-CONTINUATIONS-SPLIT` — after the continuation/evidence churn lands | |
 | 7 | `RT-PLANNER-AGGREGATES-SPLIT` | |
 | 8 | `RT-PLANNER-EFFECTS-SPLIT` | |
 | 9 | `RT-PLANNER-JOINS-TRAPS-SPLIT` | |
+| 9b | `RT-PLANNER-ROOT-CLOSURE-SPLIT` — **fresh node after 4-9**, remeasures the residue | |
 | 10 | `RT-LOWERING-FUNCTION-STATE-SPLIT` | |
 | 11 | `RT-LOWERING-VALUES-BOUNDARY-SPLIT` | |
 | 12 | `RT-SOURCE-MACHINE-TYPES-SPLIT` — existing types/control only | |
@@ -79,14 +80,80 @@ complete for its named transfer, independently reviewable and mergeable, and
 | 17 | `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` | |
 | 18 | `RT-BACKEND-SPLIT-CLOSURE` — delete adapters, narrow facades, remeasure | |
 
-> ### ITEM 3 WAS FILED 2026-08-17. The bar below lapsed when the census merged.
+> # THE OPERATOR'S ONLY REQUIREMENT — 2026-08-18. Read this before the prose below.
 >
-> **The bar was evidence, and the evidence landed.** The paragraph below says
-> filing ahead of the census *"would create work ahead of the evidence that sizes
-> it."* [[RT-BACKEND-SPLIT-CENSUS]] is `merged`, and its type-ownership inventory
-> records all 76 planner-owned type declarations with visibility and full external
-> consumer sets. ⇒ Item 3 is now grounded, and it is the one that unblocks the six
-> planner domain slices behind it.
+> **Files over 10k lines are decomposed into architecturally sound smaller
+> files. That is the whole constraint.** *"How that is accomplished — the
+> factorization and the sequencing — is entirely up to you and architect."*
+>
+> ⇒ **Nothing else in this file is an operator constraint**, whatever its tone.
+> The Steward escalated item 3's scope on the strength of `:330-359` being
+> operator-owned framing; it is not. Re-derive a constraint at each use rather
+> than inheriting it (`steward.md` §4c).
+>
+> **The bound population, measured at `b430d73e0` — FOUR files, not three:**
+>
+> | file | lines |
+> |---|---|
+> | `cranelift_backend/planning/static_transition.rs` | 34,883 |
+> | `cranelift_backend/lowering/core/tests/control.rs` | **33,969** |
+> | `cranelift_backend/lowering/mod.rs` | 21,200 |
+> | `cranelift_backend/lowering/core.rs` | 20,360 |
+>
+> **`control.rs` is a TEST file and it is in scope** — the rule says "large
+> files" and excepts nothing. It is a separate axis; see the test-ownership block
+> below.
+
+> ### ITEM 3 IS CLOSED — Architect ruling `evt_6r403ez3m2m69`, 2026-08-18
+>
+> **It gates nothing, and item 4 starts immediately.** The subtraction proof
+> came back empty: `StaticTransitionPlan` is the parent container, the genuinely
+> shared identities already live in `semantic_ir`, every other identity is
+> domain-owned, and the apparent residual at `static_transition.rs:187-379` is
+> data vocabulary with no owned lifecycle. Moving it alone yields the `ids.rs`
+> drawer module the research report warns against.
+>
+> **`StaticTransitionPlan` stays in the parent through all six domain moves.** A
+> child domain module may own its types and domain-specific inherent impls while
+> reading ancestor-private root state.
+>
+> **Item 9b is a FRESH node, not a renamed item 3**, and must not reuse its
+> thread. It remeasures the residue after 4-9: if a cohesive graph
+> construction/validation lifecycle is visible by then, move that whole
+> lifecycle; if the residue still needs nested storage or a new accessor
+> boundary, frame that representation change explicitly, with old-to-new storage,
+> constructor/writer, accessor, derive/layout, visibility and cfg ledgers, before
+> moving anything. **If the parent is already under 10k, 9b records that and does
+> no speculative extraction.**
+>
+> The bar that used to sit here — filing ahead of [[RT-BACKEND-SPLIT-CENSUS]] —
+> lapsed when the census merged, and item 3 was duly filed and run. It returned a
+> hard stop. **That is the node working, not failing.**
+
+> ### `control.rs` IS A COMPANION AXIS, NOT A PHASE. Architect, same ruling.
+>
+> **Do not decompose it on production file boundaries or by line ranges**, and
+> **do not create an upfront "split all tests" phase** — that chooses owners
+> before their production boundaries exist and churns the same imports and
+> fixtures twice. `lowering/core/tests/mod.rs` already states the rule:
+> subject-partitioned leaves, shared fixtures at their lowest common ancestor.
+>
+> `control.rs` holds several independent populations — planner/occurrence,
+> continuation/fusion, function-state and source-machine, emitter and join/trap
+> controls, plus cross-cutting census and closure tests. **That is not one
+> production owner.**
+>
+> **Interleave instead:** move a production owner, establishing its permanent
+> module; immediately follow with a small, separately reviewable test move for
+> the tests whose primary discriminated property belongs to that owner; place
+> multi-leaf fixtures once in `tests/mod.rs` or a narrowly named `support.rs` and
+> never duplicate them; leave genuinely lowering-wide controls in the residual
+> `control.rs`. After the last owner move, a test-root closure remeasures
+> `control.rs` and proves it under 10k.
+>
+> **Default to separate accepted partials** for the production move and its
+> companion test move. Combine them only when an exact compile or
+> mutation-restoration dependency makes the pair semantically atomic.
 >
 > **Items 4-18 remain unfiled and that is still deliberate.** They wait on item
 > 3's `D0`, which reports where the foundation boundary actually falls — and the
