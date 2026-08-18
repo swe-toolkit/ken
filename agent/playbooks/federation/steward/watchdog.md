@@ -312,7 +312,7 @@ correction extends it.
 ## The comms-drop backstop
 
 `capture-pane`, then git-verify, then relay. The federation's recurring defect
-is dropped notifications: a handoff, retro, or `git_request` correctly posted
+is dropped notifications: a handoff or `git_request` correctly posted
 but never waking the target. When a stall pattern fires, do not restart or
 re-mention blind.
 

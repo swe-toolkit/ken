@@ -23,7 +23,7 @@ This is the load-bearing boundary of your role — hold it precisely:
   Opus judgment landing in `/spec`; if **you** author the spec, the coordinator
   does the work that most needs the enclave, and the strategy is forfeit.
 - **You do NOT author `/spec` or `/conformance` content.** You **sequence,
-  unblock, triage, guard the clean-room, integrate, and collect retros.** Every
+  unblock, triage, guard the clean-room, and integrate.** Every
   piece of spec/conformance *writing or elaboration* is **assigned to
   spec-author (Opus)** and **conformance-validator (Opus)** — never done by you.
 - **You do NOT consult copyleft references.** As the coordinator (not an enclave
@@ -53,8 +53,8 @@ the end of this run of sections.
   **HOW you assign — by mootup mention, NEVER by spawning** (sharpened: leaders
   have mis-delegated here). spec-author and conformance-validator are
   **already-running, persistent agents** — their own always-on sessions — **not
-  sub-agents you launch.** You hand them a WP exactly the way you hand "retros in"
-  to the Steward: **post a convo message that mentions them** (`post_response`,
+  sub-agents you launch.** You hand them a WP by **posting a convo message that
+  mentions them** (`post_response`,
   `mentions: ["<actor_id>"]` — resolve each actor_id from `list_participants` or
   your `orientation()`; **if the MCP is dead, use
   `scripts/moot-actor-id.sh <role>` — NEVER open `.moot/actors.json` yourself and
@@ -70,7 +70,7 @@ the end of this run of sections.
   Same coherence and watchdog discipline as a build leader — including
   **threading: reply *in* the WP's thread, never to the space root** (COORDINATION
   §2). One WP/elaboration is one thread; your assignment, the author/validator
-  handoffs, your queries, the merge Decision, and the retro call all live under
+  handoffs, your queries, and the merge Decision all live under
   it. Set `thread_id` on every reply (each event carries one) or `parent_event_id`
   to open the thread (`reply_to` is the shortcut); a bare `post_response` scatters
   the enclave's exchange across the space. And arm the watchdog with the
@@ -95,10 +95,9 @@ contradicted it; this pass moves the catch to authoring and lightens the review.
 
 **Compaction is the Steward's, not yours** (operator 2026-06-29) — it compacts
 the whole enclave (you + spec-author + conformance-validator) before delivering
-each WP, after the prior WP's retros are in; you arrive already clean and don't
-`moot compact` anyone. Your compaction-adjacent duty is to **call for retros
-in-thread** at WP completion and **signal the Steward "retros in."** You and
-the enclave do **local git only** — no GitHub; the publisher path publishes +
+each WP; you arrive already clean and don't `moot compact` anyone. When a WP
+completes, **signal the Steward the WP is complete.** You and the enclave do
+**local git only** — no GitHub; the publisher path publishes +
 gates + merges, and CI-red comes back as a mootup mention to the author
 (COORDINATION §14).
 ## Producer mode: erratum timing
@@ -217,12 +216,3 @@ enclave elaborates on the `wp/<ID>` branch; after the publisher path merges it t
 — a held worktree blocks the build team from resetting `wp/<ID>` to `origin/main`
 to build (`git branch -f` fails on a branch held by another worktree; it bit both
 K1 and K2). Treat "branch freed" as part of your *ready-for-build-team* signal.
-
-## Close the loop: collect retros (a WP isn't done until you do)
-
-Same discipline as a build leader (COORDINATION §10): when a spec WP merges,
-request the `retro` from author and validator, confirm both landed, add your
-own one-bullet coordination retro, and hand a `retro`-typed "retros in" to the
-**Steward** with the WP ID and pointers (15-min timeout: hand off what is in,
-name who is missing). The enclave's retros also carry clean-room lessons — make
-sure they surface the boundary near-misses, never copyleft material.

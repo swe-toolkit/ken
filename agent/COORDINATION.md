@@ -158,13 +158,13 @@ git only.
   threads. A thread's identity is a WP, and the kick's own `event_id` is its
   anchor — §4**). Every event you receive carries a `thread_id`. When you respond
   to a message that belongs to a thread — a kickoff, assignment, query, handoff,
-  review request, or retro call — **reply *into that thread*** (`post_response` with
+  review request, or handoff — **reply *into that thread*** (`post_response` with
   `thread_id` set to that message's thread; or `parent_event_id` on the first
   reply, which opens the thread). A bare `post_response` with no thread drops
   your message at the space root, **scattering one WP's conversation across the
-  space** so the next reader — and the Steward harvesting retros — can't follow
+  space** so the next reader can't follow
   the exchange. **One WP = one thread:** kickoff → ack → queries → handoff →
-  merge Decision → retros all live under it. **`reply_to` needs an *existing*
+  merge Decision all live under it. **`reply_to` needs an *existing*
   thread** — it 404s ("Thread not found") on a **top-level** event that has no
   thread yet (e.g. a kickoff, which is itself a root post). To **open** a thread
   on such an event, use `post_response` with `parent_event_id` set to it; use
@@ -178,7 +178,7 @@ so the next move never fires). The two parameters that get rejected:
 
 - **`message_type` MUST be one of the backend enum values** — guessing a
   natural-language type is a 400 reject. **Valid:** `question`, `code_share`,
-  `git_request`, `review_request`, `retro`, `status_update`, `bug`, `feature`,
+  `git_request`, `review_request`, `status_update`, `bug`, `feature`,
   `decision_propagated`, `pause_issued`, `connection_status`. **REJECTED (do not
   use):** `message`, `kickoff`, `assignment`, `merge_ready`, `handoff`, `nudge`,
   `ack`. Map your *intent* to a valid type:
@@ -188,7 +188,6 @@ so the next move never fires). The two parameters that get rejected:
   | question / query / nudge / ack / general note | `question` |
   | ask for publisher-path merge handling | `git_request` |
   | QA→leader merge-Decision request; "request review" | `review_request` |
-  | a retro bullet-set | `retro` |
   | a status line | `status_update` |
   | a defect note to another team | `bug` |
   When unsure, **`question`** is always accepted. If you get
@@ -286,7 +285,7 @@ ring guess.
 | WP **rescoped in place** (scope amended, hard stop ruled, deliverable added) | **keep the thread.** Nothing was split, so the WP's identity is unchanged |
 | WP **respun** (new candidate SHA after a reject) | **keep the thread.** A rejected candidate is not a new WP |
 | work **routed** to another WP (a `D4` route, an inherited obligation) | **keep both threads.** The route is a reply in the *origin* thread; the obligation lands in the *target* WP's **frame**, not as a cross-post |
-| WP **merged**, retros posted | **the thread is CLOSED.** It takes no further posts, ever |
+| WP **merged** | **the thread is CLOSED.** It takes no further posts, ever |
 
 **The test is "did the set of WPs change?"** — not "did anything change?" Only
 a split changes it.
@@ -295,7 +294,7 @@ a split changes it.
 >
 > **Measured 2026-08-01, one hour after this section landed.** Runtime QA
 > posted **`QA APPROVED — Slice 2 exact ed527eb7…`** into **slice 1's** thread.
-> Slice 1 was merged, retro'd and closed; slice 2 had its own kick and its own
+> Slice 1 was merged and closed; slice 2 had its own kick and its own
 > thread, and the leader and implementer were both already posting there
 > correctly.
 >
@@ -307,7 +306,7 @@ a split changes it.
 >
 > **Note what did NOT cause it: no compaction, no stale id, no rescope.** The
 > seat had simply been living in that thread all afternoon through four review
-> rounds and a retro, and posted where it had been posting. ⇒ **Anchor on the
+> rounds, and posted where it had been posting. ⇒ **Anchor on the
 > WP you are working on, never on the thread you last posted in.** Before every
 > post, ask *which WP is this about* and reply under **that** WP's kick.
 >
@@ -353,7 +352,7 @@ scatter one WP's exchange. Consequences:
   spine — **by the Steward**, per the WP-release process — with a one-line pointer
   from the parent.
 - **Decisions, questions, reviews still thread.** `propose_decision`,
-  `question`, `review_request`, `git_request`, and `retro` all attach to the
+  `question`, `review_request`, and `git_request` all attach to the
   relevant WP thread (their `thread_id`/`parent_event_id`, §2a); the Steward-only
   rule governs *root chat posts*, and these governance objects are never a reason
   to open a new root.
@@ -434,7 +433,7 @@ terse subject:
 - **Work-package threads:** the WP ID, whose letter encodes the owning team —
   `K*` Kernel · `V*` Verify · `L*` Language · `X*` Runtime · `Sec*` security ·
   `B*` seam · `T*` tooling · `F*` foundation. E.g. `K2: decidable conversion`.
-- **Non-WP threads** (a cross-team query, a process/retro note): prefix with the
+- **Non-WP threads** (a cross-team query, a process note): prefix with the
   originating role/team and an arrow if it targets one — `steward: cadence
   pass`, `kernel→spec: OQ on cast normal form`.
 
@@ -684,7 +683,7 @@ was Architect's. Self-ground or route-to-Architect; don't cross into the build
 lane.*
 
 Agents may improve *what they do inside a node*, never *add a communication edge
-or a review cycle* between nodes. When integrating a retro lesson, reject any
+or a review cycle* between nodes. When integrating a lesson or carry, reject any
 carry-forward that would add/move an edge — and do not soften the rejection to
 "candidate, watch one more run." That softening is how coordination entropy
 creeps in.
@@ -705,7 +704,7 @@ pre-confirming what a gate will already check.** None of these adds a new
 *edge*, so the edge-filter above misses them — but each multiplies tokens on
 **every future WP**, and the enclave is serial, so the cost compounds. Treat
 added *traffic* exactly like an added edge: it is **very expensive** (paid
-per-WP, forever) and it is the **operator's to sanction** — never a retro's to
+per-WP, forever) and it is the **operator's to sanction** — never a lesson's to
 add. Default: **route to one, trust the gate, don't convene the room.** When in
 doubt, the thinner flow is the right one.
 
@@ -760,7 +759,7 @@ it has inverted its purpose.** Three binding rules:
    playbook edits, memory promotions, and corpus refactors wait. A finished WP
    that cannot land is the most expensive object in the federation: it has
    consumed a full ring's build + review + QA and is returning nothing.
-2. **Retro and lesson artifacts BATCH; they do not each get a merge.** A lesson
+2. **Lesson artifacts BATCH; they do not each get a merge.** A lesson
    is not perishable — it is equally true an hour later. Accumulate them and land
    them in one publish at a genuine seam. **Publishing them individually converts
    reflection into throughput and makes a stalled fleet look busy** — from the
@@ -825,31 +824,22 @@ It costs a message, invites a reply, converts a report into a thread, and every
 step is individually courteous. **The prohibition is the mechanism; a Steward
 who may reply "just this once" has no rule at all.**
 
-## 10. Knowledge promotion: retro → synthesis → promotion ladder
+## 10. Knowledge promotion: the promotion ladder
 
-- **The retro is a mandatory step, not an afterthought.** A work package is not
-  *done* until its retro is in. The moment a WP's work is verified/merged, every
-  working agent in the ring (implementer, QA; spec-author,
-  conformance-validator) posts a short **`retro`** in the WP's thread — three
-  bullets: **trap** (what cost time, or a defect the process caught or missed),
-  **held** (a discipline that worked, with its prior-run validation count if it
-  has one), and **carry** (a candidate rule to promote). Tag each bullet
-  node-internal or topology-touching, so the Steward's invariance filter (§9) is
-  pre-sorted.
-- **The leader collects and hands off.** When a WP merges, the team leader
-  confirms each working agent's retro landed, adds a one-bullet coordination
-  retro, and posts a `retro`-typed "retros in" to the Steward with the WP ID and
-  pointers. 15-min timeout: hand off what is in and name who is missing. This
-  rides the existing team→Steward workflow edge (§9) — it adds no new edge.
-- The **Steward** harvests retros across teams and promotes lessons up a ladder
-  (see the steward playbook): team-local → archetype source → this file.
+- **Lessons are promoted when observed, not harvested on a schedule.** When any
+  agent learns something durable in the course of a WP — a trap that cost time,
+  a discipline that held, a candidate rule worth generalizing — it is a candidate
+  to promote up the ladder. Tag a candidate node-internal or topology-touching,
+  so the Steward's invariance filter (§9) is pre-sorted.
+- The **Steward** promotes lessons up a ladder (see the steward playbook):
+  team-local → archetype source → this file.
 - A lesson promotes only when it passes all three: **(a) validated across ≥3
   runs *or* independently in ≥2 teams, (b) effort-/model-/operator-agnostic, (c)
   a normative rule, not a one-off fact.** Exception: an explicit operator
   correction promotes on a single data point. On promotion, retire the source
   note atomically. Cross-team replication is a *stronger* generalization signal
   than single-team repetition — use it.
-- **(d) The ratchet guard — retros only ever *add*.** No retro proposes
+- **(d) The ratchet guard — lessons only ever *add*.** No carry-forward proposes
   *removing* a hop; each says "also loop in X," "relay verbatim so nothing's
   lost," "cross-check Y in parallel." Every one is locally sensible and
   collectively ruinous — absent a hard default the communication topology
@@ -932,7 +922,7 @@ apply hit a merge conflict** — git retains the entry on conflict rather than
 dropping it. **On a clean apply it would have silently destroyed another
 agent's work**, and the owner would have found an empty stack with no error, no
 log, and no way to learn who took it. **This is the failure class no individual
-seat can detect**, which is why it is fleet law and not a team retro item.
+seat can detect**, which is why it is fleet law and not a team-local item.
 
 **Use one of these instead — all per-branch, so they cannot collide:**
 
@@ -1332,11 +1322,10 @@ context. Who triggers a compaction is fixed (operator, 2026-06-29):
   Leaders never `moot compact` anyone — `request_context_reset` is self-only, so
   only the Steward can compact another agent (`moot compact`), and it does so for
   teams alone.
-- **Gated by retros.** The Steward compacts a team **only after** its prior WP's
-  retros are posted (compaction would otherwise summarize the retro away), and
-  delivers the next WP **only after** compacting. So a team's WP boundary is:
-  done → leader calls for retros in-thread → members post → leader signals the
-  Steward "retros in" → Steward reviews → Steward compacts → next WP.
+- **Compact at the WP boundary.** The Steward compacts a team at its WP boundary
+  and delivers the next WP **only after** compacting. So a team's WP boundary is:
+  done → leader signals the Steward the WP is complete → Steward compacts →
+  next WP.
 - **Singletons self-compact, EXCEPT the Adversary.** Agents with no team/leader
   — **Steward, Architect, Librarian, Research** — self-compact at their own task
   boundaries (Architect after a review, Librarian after a pass, Steward after a

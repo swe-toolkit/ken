@@ -248,7 +248,7 @@ it down saves the reconstruction on every resume. It holds at least:
   does **not** auto-carry, §2) your re-review starts from your earlier read,
   not from scratch.
 - **Carries** — design lessons / cross-WP patterns you are tracking to hand
-  the Steward (the retro grain you produce).
+  the Steward.
 - **A "last updated / next action" line** for an immediate cold resume.
 
 This is **working memory, not a public artifact** — keep it on your branch, do
