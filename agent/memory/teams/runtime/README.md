@@ -16,6 +16,7 @@ lowering path, function-unit boundaries, and the `RT-NATIVE-FNSPLIT` chain.
 | Lesson | One-line |
 |---|---|
 | [closure-body-is-a-return-successor-not-a-unit-head](closure-body-is-a-return-successor-not-a-unit-head.md) | `TransitionKind::ClosureBody` is a body's return successor, never a unit head — the ruled seeds are `plan.entries` ∪ every `EdgeKind::StaticBody` **target** |
+| [ken-runtime-native-suites-need-the-staticlib-materialized](ken-runtime-native-suites-need-the-staticlib-materialized.md) | ken-runtime native suites red on a cold `test` — materialize `libken_runtime.a` first (`ken-cargo build -p ken-runtime --lib` before `test`) |
 
 **Adding one:** a lesson belongs here when every Runtime seat must apply it and
 it is specific to this backend's structures. A lesson about *how to author a
