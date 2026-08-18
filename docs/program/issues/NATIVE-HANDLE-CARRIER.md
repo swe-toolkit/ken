@@ -5,7 +5,7 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS]
+depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY]
 blocks: [PX8-F-CAP-41]
 github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -131,6 +131,14 @@ Ken programs survive but nothing drives them.
 > ⇒ **Cut and routed as [[RT-RECURSIVE-POSITION-ARM-ARITY]]**, which owns the
 > next measurement. This node stays gated behind it for full green; the bounded
 > partial the Architect's lift permits is unaffected.
+>
+> **That gate is now an EDGE, not only this sentence.** `depends_on` names
+> `RT-RECURSIVE-POSITION-ARM-ARITY` as of `2026-08-18`. It did not until then,
+> and all five of the originally-declared dependencies are `merged` — so
+> `gen-progress.sh`, which reads `depends_on` and not `blocks`, saw this node as
+> carrying **zero unmet dependencies** while `D3`/`D4`/`D5` were gated in prose
+> alone. The successor node's `blocks` field named this one the whole time; a
+> `blocks` entry is not read by the generator and cannot gate anything.
 >
 > **Two readings of `D0'` were wrong and both were the Steward's.** The
 > same-refusal arm was defective, and the string it forked on was produced at a

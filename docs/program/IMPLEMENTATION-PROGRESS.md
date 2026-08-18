@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-18 02:14:12Z — from 371 issue file(s) in `docs/program/issues/`.
+2026-08-18 02:32:11Z — from 371 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -462,6 +462,7 @@ is itself not yet `merged`/`closed`:
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
 - `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: draft)
 - `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: ready)
+- `NATIVE-HANDLE-CARRIER` blocked by `RT-RECURSIVE-POSITION-ARM-ARITY` (status: active)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)
 - `PX10` blocked by `ABI-S5` (status: draft)
