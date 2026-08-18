@@ -146,6 +146,70 @@ one candidate **only** when an exact compile or mutation-restoration dependency
 makes the pair semantically atomic — and say which it was.
 
 
+## `D0` ledger at base `7509c77a7c7a7a4aacece1601235778b70f57489`
+
+The Stage A inventories were read as a starting point and re-measured at this
+base. The owner is a lifecycle, not every name that happens to mention a unit:
+validated semantic ownership -> ABI descriptor/frame -> read-only emission
+view -> pre-emission validation. `StaticOriginId` and source/child
+correspondence remain occurrence-owned; `StaticTransitionPlan` remains the
+parent container.
+
+### Symbol ledger
+
+Selector used for non-private type declarations, with its result checked
+against the entries below:
+
+```sh
+rg -n '^\s*pub(?:\([^)]*\))?\s+(?:struct|enum|type)\s+[A-Za-z_][A-Za-z0-9_]*' \
+  crates/ken-runtime/src/cranelift_backend/planning/static_transition/abi.rs \
+  crates/ken-runtime/src/cranelift_backend/planning/static_transition/semantic_ir.rs \
+  crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs
+```
+
+The selector is a declaration aid, not a closure proof. It cannot see private
+types, macro-generated declarations, split-line declarations, traits,
+constants, functions, or fields. Those blind spots are why the ledger includes
+the named inherent-method groups and validation surface below rather than
+claiming the selector alone establishes ownership.
+
+At this base the `abi.rs` selector returns 21 declarations, and the named
+cross-file identity/view selector returns four:
+`PredeclaredFunctionId`, `EmittableCallEdge`, `EmittableCallKind`, and
+`EmittableUnit`. The four table groups reconcile exactly to that `21 + 4`
+declaration measurement; the method group is deliberately listed separately
+because the declaration selector cannot see it.
+
+| Symbol group | Old path | New path in D1 | Lifecycle reason |
+| --- | --- | --- | --- |
+| `AbiCarrier`, `AbiStorageOwner`, `AbiOwnership`, `AbiSlotKind`, `AbiCaptureProvenance`, `AbiUnitDefinition`, `AbiRootIngress`, `AbiSchedulingIngress`, `AbiProcessParameter`, `AbiSlot`, `AbiFrameHeader` | `planning/static_transition/abi.rs` | unchanged: `planning/static_transition/abi.rs` | closed carrier, ownership, provenance, and frame-slot vocabulary already has its owner |
+| `AbiDescriptorShape`, `AbiDescriptor`, `AbiContinuationDescriptor`, `AbiContinuationInputAuthority`, `AbiContinuationInputProvenance`, `AbiContinuationContextDescriptor`, `AbiStaticContinuationFusionDescriptor`, `PlannedStaticContinuationFusionAbi`, `AbiPlane`, `AbiBoundarySignature` | `planning/static_transition/abi.rs` | unchanged: `planning/static_transition/abi.rs` | descriptor and pre-emission validation plane stays private to planner siblings |
+| `PredeclaredFunctionId` and its unit-identity methods | `planning/static_transition/semantic_ir.rs` | `planning/static_transition/units.rs` | unit identity belongs with descriptors and call-edge views; this is the standing amendment, not a graph-id extraction |
+| `EmittableCallEdge`, `EmittableCallKind`, `EmittableUnit` and their read-only accessors | `planning/static_transition.rs` | `planning/static_transition/units.rs` | planner-minted, lowering-readable unit/call vocabulary with private fields and no lowering constructor |
+| `StaticTransitionPlan::{emittable_units, emittable_call_edges, emittable_unit, executable_units, executable_call_edges}` and ABI preflight/read-only-view helpers | `planning/static_transition.rs` | inherent impl in `planning/static_transition/units.rs` | construction remains in the parent state; this domain owns the validated projection and pre-emission validation |
+
+No visibility widening is authorized. `AbiPlane`, descriptors, builders, and
+validators remain planner-private; `EmittableUnit` and `EmittableCallEdge` stay
+read-only with private fields. This is an old/new relocation ledger, not an API
+change or a facade proposal.
+
+### Test-property ledger
+
+| Test property | Current location | Mutation / discriminating surface | Fixture owner | D1/D2 disposition |
+| --- | --- | --- | --- | --- |
+| descriptor/unit bijection and caller-independent descriptor | `planning/static_transition.rs`: `b2r_ac1_*`, `b2r_ac2_*` | descriptor population and irrelevant caller binding | `b2r_plan`, closure fixtures | D1 with units/ABI tests |
+| capture provenance, carrier choice, ABI payload/depth invariance | `planning/static_transition.rs`: `b2r_ac3_*`, `b2r_ac4_*`, closed-ground-carrier control | capture slots, carrier and implicit-tail validation | `b2r_seed_closure`, `b2r_lexical_closure` | D1 with units/ABI tests |
+| imported-capture refusal and named validation arms | `planning/static_transition.rs`: `b2r_ac5_*`, `b2r_ac11_*` | imported edge and validation-arm mutations | `b2r_plan` | D1 with units/ABI tests |
+| ABI plane remains inert and parser-free | `planning/static_transition.rs`: `b2r_ac6_*`, `b2r_ac7_*` | source-topology inventory only | no runtime fixture | remain planner-wide: not a behavioural D2 move candidate |
+| descriptor population over fixtures | `planning/static_transition.rs`: `b2r_ac10_*` | fixture descriptor prediction | shared B2R fixtures | D1 with units/ABI tests |
+| continuation ABI slot count, affinity/lifetime refusal, allocation-free preflight | `planning/static_transition.rs`: `contspec_abi_*` and `contspec_parameter_affinity_*` | capture addition and owner/lifetime/affinity disagreement | contspec fixtures | D1 with units/ABI tests |
+| pre-emission ABI-domain refusals reach before a call emits | `lowering/core/tests/control.rs`: `d5_c4_abi_domain_mutations_each_refuse_before_any_call_is_emitted` | ABI-domain mutation guards and nonzero reached refusal | shared lowering control fixture | D2: primary discriminated property is this owner, fixture remains at the lowest common ancestor |
+
+The table deliberately leaves source-topology controls lowering-wide: they do
+not establish a moved runtime property and would make D2 a production-path or
+line-range test split. D0 makes no phase-closure claim; only the later closure
+node can discharge the 10k-file objective.
+
 # ACCEPTANCE
 
 **Amended on the Architect's whole-plan verdict `evt_14x1bqgrj4yze`.** The
@@ -355,4 +419,3 @@ open the phase record to learn them.
 >   and consumers must be proven first.
 > - **The source machine is relocation only in this phase**, never a transition
 >   IR. Generated traps receive **no fabricated source origin**.
-
