@@ -264,10 +264,31 @@ old meaning:
   > is **sound and not under attack** — it certifies that the route-1 replacement
   > composes with the descent bit, which is what it claims.
 
-- **`D3`** — dispose of the pin (Finding 3): either revive the census it
+- **`D3` MERGED** at `b430d73e0` (2026-08-18), taking the **retire** option.
+  Dispose of the pin (Finding 3): either revive the census it
   annotates, or retire the pin with its caveat, or re-key it to all six
   test-gating `cfg` spellings. **Do not just widen the count** — decide first
   what compiled thing it protects.
+
+  > ### WHAT LANDED, AND WHAT IT SETTLES
+  >
+  > The candidate deletes only the live
+  > `identifier_census_caveat_tracks_inline_cfg_test_region_count` test, the
+  > caveat sentence it pinned, and the local `DOCUMENTED_INLINE_CFG_TEST_REGIONS`
+  > constant. One path, `+0/-25`, no production code.
+  >
+  > **The ground is that the pin protected nothing compiled.** The census it
+  > annotates sits under `#[cfg(any())]`, so widening its predicate — the re-key
+  > option, and the whole of the measured input below — would have bought a
+  > sharper guard over disabled commentary. The trim-normalized own-line count is
+  > **324** and is now deliberately *not* asserted, rather than asserted at a
+  > number no reader can act on.
+  >
+  > **The two open sub-questions in the blocks below die with the pin, they are
+  > not answered.** The `19 to 23` invisible-drift measurement and the
+  > `#[cfg(test)]` 327-vs-324 comment reconciliation were both inputs to a re-key
+  > that will not happen. If a future node revives a census here, it starts from
+  > the tree, not from these figures.
 
   > **Measured input for the re-key option** (same hunt, quantified only): across
   > `ca639b5ef..b7e2cf8f8`, `core.rs` moved own-line `#[cfg(test)]` 323 to 324,
@@ -279,15 +300,17 @@ old meaning:
   > all three extras are inside comments — the pin's population is correct on its
   > own criterion.
 
-  > **`D3` GATES [[RT-CAVEAT-GUARD-SPELLING-DOMAIN]], WHICH IS `ready` AND MUST
-  > NOT BE STARTED.** That node widens this same guard from one spelling to the
-  > full test-gating domain, and its opening clause asserts the census *"errs
-  > toward a false red, never a false green"* — which Finding 3 refutes, because
-  > a census that does not compile errs toward nothing. **Only the re-key outcome
-  > leaves that node with work, and then it is likely subsumed here rather than
-  > run separately.** Its measured spelling table stays valid either way:
-  > `#[cfg(test)]` 322, `any(test, feature = "px8-ds-test-support")` 12,
-  > `any(test, feature = "r3-4b-observation")` 6, at `be25ea6a2`.
+  > **`D3` GATED [[RT-CAVEAT-GUARD-SPELLING-DOMAIN]], AND HAS NOW CLOSED IT.**
+  > That node widens this same guard from one spelling to the full test-gating
+  > domain, and its opening clause asserts the census *"errs toward a false red,
+  > never a false green"* — which Finding 3 refutes, because a census that does
+  > not compile errs toward nothing. **Only the re-key outcome left that node
+  > with work.** `D3` retired instead, so the guard it would widen no longer
+  > exists, and the node is `closed` — resolved without landing, not abandoned.
+  > Its measured spelling table is preserved there as the record of what the
+  > file held at `be25ea6a2`: `#[cfg(test)]` 322,
+  > `any(test, feature = "px8-ds-test-support")` 12,
+  > `any(test, feature = "r3-4b-observation")` 6.
 
 ## Acceptance criteria
 

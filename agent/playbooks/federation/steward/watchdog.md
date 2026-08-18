@@ -132,6 +132,48 @@ Two properties worth knowing when you read its output:
 See `compaction.md`. It is the mandatory first *reading* step and the one that
 silently lapses.
 
+## Tick step 2b: the disk check — operator-mandated, 2026-08-18
+
+```sh
+df -h /workspaces/ken /
+```
+
+**Read BOTH. They are different filesystems and either one filling wedges the
+box.** `/workspaces/ken` is `/dev/nvme0n1p6`, a 229G partition holding the repo,
+every worktree's `target/`, and the shared sccache. `/` is the container's 77G
+overlay. The failure that makes this step necessary is that a reclaim on one
+looks like a reclaim, while the other is the one at the cliff.
+
+**Below 5G available on either mount, reclaim before any other work.** In order,
+cheapest first:
+
+| lever | cost |
+|---|---|
+| `.moot/truncate-logs.sh` | free |
+| aged `tmp/ken-*` directories | free |
+| `git gc`, if `git count-objects -vH` reports garbage | free |
+| `target/debug/incremental` in an idle worktree | a warm rebuild |
+| a **retired** seat's whole `target/` | a cold rebuild for a seat that no longer exists |
+
+> ### VERIFY A SEAT IS DEAD THREE WAYS BEFORE DELETING ITS `target/`
+>
+> No `tmux` session, no `ps` match, **and** no live process whose
+> `/proc/<pid>/cwd` resolves inside that worktree. **The third is the one that
+> catches you** — measured 2026-08-17, `runtime-implementer` had 8 live
+> processes in a 32G target while its pane read idle, and the first two checks
+> alone would have passed it as dead.
+>
+> **Never delete a live ring's target, at any pressure.** A seat that has to
+> cold-rebuild mid-deliverable costs the lane far more than the disk is worth.
+
+**The axis is imminent work, never size.** The largest directory is usually the
+active ring's, which is precisely the one to leave alone. Sort candidates by
+whether anything is about to read them, then take the biggest of those.
+
+**The sccache lives on p6 deliberately** (operator, 2026-08-18) — see the note in
+`scripts/ken-env.sh`. If you find it on `$HOME`, something repointed it onto the
+77G overlay, and that is a defect to fix rather than a cache to delete.
+
 ## Tick step 3: the idle sweep
 
 **Every tick proactively sweeps active seats' panes for idle, not only

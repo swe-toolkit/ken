@@ -4,11 +4,13 @@ ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` befor
 
 0. CONTEXT GATE FIRST. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At or near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then `moot compact steward` from /workspaces/ken. Announcing is not doing.
 
-1. PRIORITY LANES ARE THE ONLY LANES (operator). Lane 1 = runtime, the RecursiveDescent retirement's RESIDUALS in order: carrier recut, RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT, the ready RT-* nodes, RT-DESCENT-RETIRE D6a (operator ruled 2026-08-17; the headline retirement itself measures done). RT-CHECKED-IH-REALIZATION-AUTHORITY is ready + dependency-free and STAYS HELD -- it looks startable every tick. Lane 2 = language+verify, z3 + FO Kripke. No third lane however idle. Finished work still merges; filings queue.
+0b. DISK (operator, 2026-08-18). `df -h /workspaces/ken /` -- BOTH, they are different filesystems. Either below 5G avail: reclaim before any other work, in this order: `.moot/truncate-logs.sh`; aged `tmp/ken-*`; `git gc` if `git count-objects -vH` shows garbage; a RETIRED seat's `target/`. Verify a seat dead 3 ways -- no tmux session, no `ps` match, no live `/proc/*/cwd` -- and NEVER touch a live ring's target. Axis is imminent work, never size.
 
-2. ARE THE LANES' CRATES MOVING? ANCHOR THE PATHSPEC: `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l` plus `git log -1 --pretty='%ci %h %s' origin/main -- ':/crates/'`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so after any `cd` it silently reports 0 without erroring. Measured: 0 twice while the truth was 10.
+1. RUNTIME IS THE ONLY LANE (operator, 2026-08-17). Residuals in order: carrier recut, the ready RT-* nodes, RT-DESCENT-RETIRE D6a. RT-CHECKED-IH-REALIZATION-AUTHORITY is ready + dependency-free and STAYS HELD -- it looks startable every tick. Every other ring stays idle; that is the cost of the priority, not a defect to fix. Finished work still merges; filings queue.
 
-2b. STEP 2 IS AN AGGREGATE -- A MOVING LANE 1 MASKS A DEAD LANE 2. Check each `status: active` node separately: is its ring working its next deliverable? Read the NODE, never a seat's status line -- it decays silently, in the direction that HIDES unblocked work. Measured: three rings sat idle on ALREADY-LANDED work while their statuses read "queued"/"awaiting review"/"branch frozen", step 2 green throughout. Confirm a landing by BLOB IDENTITY (`git rev-parse origin/main:<path>` vs `<SHA>:<path>`), never ancestry -- the publisher squashes, so a merged SHA reads as not-an-ancestor forever.
+2. ARE THE LANE'S CRATES MOVING? ANCHOR THE PATHSPEC: `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so after any `cd` it silently reports 0 without erroring. Measured: 0 twice while the truth was 10.
+
+2b. STEP 2 IS AN AGGREGATE -- A MOVING LANE MASKS A DEAD ONE. Check each `status: active` node separately: is its ring working its next deliverable? Read the NODE, never a seat's status line -- it decays silently, in the direction that HIDES unblocked work. Measured: three rings idle on ALREADY-LANDED work, step 2 green throughout. Confirm a landing by BLOB IDENTITY (`git rev-parse origin/main:<path>` vs `<SHA>:<path>`), never ancestry -- the publisher squashes.
 
 2c. A DISPATCHED NODE LEFT AT `ready` IS INVISIBLE TO 2b. On release flip it `active`. A ring being awake is not the record.
 
@@ -18,7 +20,7 @@ ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` befor
 
 5. ONE RELEASE AHEAD. Grep other nodes' `depends_on` for the in-flight id (not `blocks` -- they disagree; gen-progress.sh reads depends_on). Successors must be `ready` and shovel-ready. A MEASUREMENT-ONLY node never reaches `merged` -- close it, or successors gate on a landing that cannot happen.
 
-5b. A KICK MUST CARRY THE ANCHOR SENTENCE VERBATIM: "This message is the thread anchor for <WP-ID>. Reply with parent_event_id set to this event's id; thereafter use its thread_id." A kick CANNOT quote the thread it opens -- the first reply mints it. Naming the obligation without the mechanism left a WP with no spine, its review in a MERGED WP's closed thread.
+5b. A KICK MUST CARRY THE ANCHOR SENTENCE VERBATIM: "This message is the thread anchor for <WP-ID>. Reply with parent_event_id set to this event's id; thereafter use its thread_id." A kick CANNOT quote the thread it opens -- the first reply mints it.
 
 6. RESOLVE ACTOR IDS BEFORE COMPOSING MENTIONS: `scripts/moot-actor-id.sh <role>`. A remembered id wakes the wrong seat or nobody, silently.
 

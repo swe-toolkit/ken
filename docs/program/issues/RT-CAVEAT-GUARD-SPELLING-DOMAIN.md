@@ -1,7 +1,7 @@
 ---
 id: RT-CAVEAT-GUARD-SPELLING-DOMAIN
 title: "The census caveat's guard pins one attribute SPELLING while its own rationale clause covers three -- 18 test-gated regions under any(test, feature) are uncounted, and the guard is blind to more arriving"
-status: ready
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -11,7 +11,35 @@ github: null
 origin: "Adversary hunt evt_6dxxrgvd0w5zs (2026-08-17) on the RT-CENSUS-CAVEAT-GUARD landing be25ea6a2. Steward-filed per COORDINATION section 2, with two corrections to the finding recorded below."
 ---
 
-> # HELD 2026-08-17 — THIS NODE'S PREMISE IS NOW IN QUESTION. Do not start it.
+> # CLOSED 2026-08-18 — RESOLVED WITHOUT LANDING
+>
+> **The guard this node would widen no longer exists.**
+>
+> **[[RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING]]'s `D3` merged at
+> `b430d73e0` and took the RETIRE option.** The held block below anticipated
+> exactly this: *"Only the third outcome leaves this node with work."* The third
+> outcome was the re-key. `D3` deleted the pin, its caveat, and its constant
+> instead.
+>
+> ⇒ **There is nothing left to widen.** This node's entire deliverable was to
+> extend a predicate from one `cfg` spelling to the full test-gating domain, and
+> that predicate is gone from the tree. `closed` rather than `merged`, because
+> the correct disposition was reached and no candidate was ever cut.
+>
+> **What survives, and is worth reading.** The measured spelling census below is
+> the record of what `core.rs` held at `be25ea6a2`, and the two corrections to
+> the originating finding — that the gap was between the caveat's *selector*
+> clause and its *rationale* clause, and that an unstated cfg-profile exclusion
+> is how 18 regions went missing — are general lessons that outlive the pin.
+> **`AC-2`'s demand that a population be defined against a named cfg profile is
+> the reusable half**, and any future census here should adopt it.
+>
+> **What is NOT claimed:** that the uncounted 18 regions were harmless, or that
+> the drift the guard watched for is not real. Nobody measured that. The pin was
+> retired because it guarded disabled commentary, which is a statement about the
+> instrument, not about the population.
+
+> # SUPERSEDED — the hold that preceded the closure
 >
 > **Gated behind [[RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING]]'s `D3`.**
 >

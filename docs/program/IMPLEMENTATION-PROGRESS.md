@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-17 23:40:52Z — from 369 issue file(s) in `docs/program/issues/`.
+2026-08-18 00:20:34Z — from 369 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -226,7 +226,7 @@ the committed file matches the generator's output.
 | `RT-CARRIED-RESOURCE-SCALAR` | A carried word cannot satisfy a ResourceScalar effect seat -- same Need-not-in-Avail shape as the byte-span gap, different need, different seats | draft | runtime | TBD | none | — |
 | `RT-CARRIER-BYTESPAN-OBSERVE` | Carrier byte-span observation capability — every BytesPointerLength seat is SPECIALIZED_ONLY and the carrier has no total emitted byte-span observer, so a carried host result cannot satisfy a byte-span effect seat | merged | runtime | L | none | — |
 | `RT-CARRIER-PRODUCER-OCCURRENCE` | a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property | ready | runtime | M | none | — |
-| `RT-CAVEAT-GUARD-SPELLING-DOMAIN` | The census caveat's guard pins one attribute SPELLING while its own rationale clause covers three -- 18 test-gated regions under any(test, feature) are uncounted, and the guard is blind to more arriving | ready | runtime | S | none | — |
+| `RT-CAVEAT-GUARD-SPELLING-DOMAIN` | The census caveat's guard pins one attribute SPELLING while its own rationale clause covers three -- 18 test-gated regions under any(test, feature) are uncounted, and the guard is blind to more arriving | closed | runtime | S | none | — |
 | `RT-CENSUS-CAVEAT-GUARD` | The identifier-census caveat's staleness guard is an existence check standing in for a count check, so it cannot detect the drift it was written to catch | merged | runtime | S | none | — |
 | `RT-CHECKED-IH-REALIZATION-AUTHORITY` | Mint the checked-IH realization authority -- pending marker, oriented plan, call template, slot and parent -- so the ComputationalRecursorClosure capsule is realizable IN PLACE at the source-machine Match seat, without widening the ordinary-Match selector and without any terminal-All licensing | ready | runtime | M | none | — |
 | `RT-CLOSURE-BOUNDARY-LANE` | Admit the source-authored closure crossing on clause 2's liveness-and-domain predicate, routed through B2F's cross-owner carrier -- attempt the repair, and measure only if it fails | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2322 |
@@ -471,7 +471,6 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
-- `RT-CAVEAT-GUARD-SPELLING-DOMAIN` blocked by `RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
