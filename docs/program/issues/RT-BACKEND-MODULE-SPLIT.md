@@ -229,6 +229,28 @@ proposal was *"close all campaign spinouts before the phase"*, which is a
 preference for a tidy graph rather than a grounded constraint; the grounded
 constraint is contention, and it selects three nodes rather than seven.
 
+## Every `D0` gets an Architect review — decided once, not per slice
+
+**Steward ruling, 2026-08-18, on the Architect's routing note
+`evt_1dh3mj0janmfp` and the leader's flag `evt_4sygkd44jmh68`.**
+
+A `D0` ledger **fixes a domain ownership boundary**, and that is a design
+decision. So `COORDINATION §14a`'s exception — the Steward resolves
+`docs/program/` changes without an Architect vote when they are **currency or
+editorial** — **does not apply to a `D0`**, even though a `D0` touches nothing
+but `docs/program/issues/`. The diff scope makes it look editorial; the content
+is not.
+
+⇒ **Each of the fifteen remaining `D0`s carries an Architect vote**, alongside
+the owning team's QA. Recorded here so it is a deliberate standing choice rather
+than something re-derived, differently, at each slice.
+
+**The first one earned its keep**: on item 4 the Architect checked the cut that
+QA's completeness review did not reach — that `PredeclaredFunctionId` moves
+while the `PredeclaredFunction` record that keys on it stays, separating an
+identity from its record — and, on that evidence, **revised one of its own
+whole-plan corrections** rather than confirming it.
+
 ## Gates binding every structural frame in the phase
 
 - Exact old/new symbol and test-property ledgers.
