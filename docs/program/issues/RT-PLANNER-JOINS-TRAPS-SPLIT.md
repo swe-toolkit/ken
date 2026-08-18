@@ -79,7 +79,8 @@ them.
 
 # `D2` — THE COMPANION TEST MOVE. Separate accepted partial.
 
-`lowering/core/tests/control.rs` is **33,969 lines and in scope** — the
+`lowering/core/tests/control.rs` was **33,969 lines at
+`a1cf83622`** and is **in scope** — the
 operator's constraint says large files and excepts nothing, and a test file is
 not exempt. **It is a companion axis, not a phase of its own.**
 
@@ -126,14 +127,31 @@ claimed; what follows is the corrected bar.
   **Each class needs its own fresh selector or syntax inventory, plus an explicit
   manual closure for what that selector cannot see.**
 
+  **For the cfg / attribute / derive / repr / visibility class specifically:
+  this records what the moved population carries TODAY. Preservation across the
+  move is `AC-3`'s job at `D1`** — do not fold the two questions together.
+
   **A group label is not a ledger entry.** "ABI preflight helpers" names a set
   without enumerating it and does not discharge "exact".
 
-  **Reconcile every moved declaration and use site to EXACTLY ONE owner.**
+  **PARTITION every declaration in the bound file(s).** Each one is either
+  **moved to exactly one named owner**, or **EXPLICITLY RETAINED with its owning
+  domain named**. A declaration that is neither is a **gap, not a non-event**.
+  > **A moved-set universal is not the property that discharges "exact".** A
+  > ledger can name four moved items perfectly and remain silent on the other
+  > hundred-odd in the same files. Item 4's first candidate did exactly that —
+  > 25 reconciled against 142 the selector returned — and it read as complete.
+
   Research `evt_1pwq0rssre6d8`: *"A selector count plus a blind-spot paragraph
-  cannot discharge a universal."* Either narrow the words "exact and complete" to
-  a **declared selector population**, or supply a **closure method for the blind
-  classes**. Do not claim the universal on the strength of the count.
+  cannot discharge a universal."* **Declare the selector population for each
+  class AND close its blind classes.** A declared population **bounds** the
+  claim; it does not **discharge** it. Do not claim the universal on the strength
+  of the count.
+  > **The clause above is conjunctive, and the word "either" was the defect**
+  > (Architect `evt_1dh3mj0janmfp`, revising its own correction on item 4's
+  > evidence). Declaring the population is what makes "exact" a **well-formed**
+  > universal rather than an unbounded one — so it is required *as well as* the
+  > closure, never *instead of* it.
 
   **Source-text oracles and `include_str!` paths belong in the ledger** — Stage A
   found **49** such lines, and relocation can change what they mean without
@@ -183,8 +201,18 @@ claimed; what follows is the corrected bar.
 
 - **`AC-4b` — the TARGET CHILD's size is constrained, not just the root's.**
   Record the resulting line count of **every file this slice creates or
-  enlarges**. **No move may create a file over 10k**, and a move that would is a
-  finding to route rather than a transfer to complete.
+  enlarges**. **No move may CREATE OR ENLARGE any file past 10k**, and a move
+  that would is a finding to route rather than a transfer to complete.
+  > **"Create" alone did not match this criterion's own recording obligation**,
+  > which already covers every file the slice *creates or enlarges*. The gap sat
+  > on the most likely path in the plan: `lowering/core/tests/constructors.rs`
+  > is **9,727** lines — 273 under the ceiling, in the very directory the fifteen
+  > `D2` companion-test moves deposit into, and already **+436** with no test
+  > moved yet.
+
+  **Where a slice moves nothing this criterion is INAPPLICABLE, not satisfied**
+  — `RT-PLANNER-ROOT-CLOSURE-SPLIT` under outcome 1, and the closure node, which
+  deletes rather than moves. Restate it as inapplicable; do not tick it.
   > Research `evt_1pwq0rssre6d8`: none of the fifteen move frames constrained the
   > target child's size, so the phase could shrink every root while producing a
   > fresh violation.
@@ -278,7 +306,8 @@ phase, and it is the reason the planner domains come first:
 > closure joining them. **With the current frames they cannot.**
 
 **Re-derive every symbol by name at pickup**, never by the line offsets in any
-frame or census row. `static_transition.rs` is 34,883 lines and every slice
+frame or census row. `static_transition.rs` was 34,883 lines at
+`a1cf83622`, and every slice
 moves some of them.
 
 # GATES BINDING EVERY STRUCTURAL FRAME IN THIS PHASE

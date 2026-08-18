@@ -21,8 +21,9 @@ origin: "Architect ruling evt_54zvaqbrm752x (2026-08-10) decomposing RT-BACKEND-
 > Re-derive a constraint at each use rather than inheriting it.
 
 **Cut item 18 of [[RT-BACKEND-MODULE-SPLIT]]**, which is a **phase record and
-will never merge** — it becomes `closed` when the cut is fully filed. This node
-is complete for its own named transfer and **does not claim phase closure.**
+will never merge** — it becomes `closed` when the cut is fully filed. **This is
+the one node that DOES claim phase closure**, on the full resulting population
+— see `AC-6`.
 
 Bound file for this slice:
 all four bound files.
@@ -32,30 +33,6 @@ all four bound files.
 **Closure.** No new domain. This slice deletes what the phase built as
 scaffolding and proves the operator's constraint is met.
 
-## THE FOUR DELIVERABLE STRANDS
-
-1. **Delete the transitional adapters** every earlier slice was permitted to
-   leave behind.
-2. **Narrow the facades.** A facade that still re-exports the monolith's whole
-   surface has recreated the monolith behind a new name — that is banned by the
-   phase gates and this is where it is checked.
-3. **The test-root closure.** Remeasure `lowering/core/tests/control.rs` and
-   **prove it under 10k.** The companion test moves in items 4-17 are what make
-   this reachable; if it is not reachable, the finding is which owner's tests
-   were never claimed.
-4. **Remeasure all four bound files** and state each one's line count against
-   the 10k constraint.
-
-> # THIS IS WHERE THE OPERATOR'S CONSTRAINT IS DISCHARGED, AND NOWHERE ELSE
->
-> **"Files over 10k lines are decomposed into architecturally sound smaller
-> files. That is the whole constraint."** No earlier slice may claim the
-> constraint is met; each one claims only its own transfer.
->
-> **A file still over 10k here is a result, not a failure to hide.** Report it
-> with the residue's owner analysis and route it, rather than extracting
-> speculatively to get under the number — **optimizing for a line count is the
-> guardrail violation this phase was warned about from the start.**
 
 > **Modules own semantic lifecycles.** The durable direction of the whole phase
 > is *plan construction -> validated read-only views -> lowering state and source
@@ -202,8 +179,18 @@ claimed; what follows is the corrected bar.
 
 - **`AC-4b` — the TARGET CHILD's size is constrained, not just the root's.**
   Record the resulting line count of **every file this slice creates or
-  enlarges**. **No move may create a file over 10k**, and a move that would is a
-  finding to route rather than a transfer to complete.
+  enlarges**. **No move may CREATE OR ENLARGE any file past 10k**, and a move
+  that would is a finding to route rather than a transfer to complete.
+  > **"Create" alone did not match this criterion's own recording obligation**,
+  > which already covers every file the slice *creates or enlarges*. The gap sat
+  > on the most likely path in the plan: `lowering/core/tests/constructors.rs`
+  > is **9,727** lines — 273 under the ceiling, in the very directory the fifteen
+  > `D2` companion-test moves deposit into, and already **+436** with no test
+  > moved yet.
+
+  **Where a slice moves nothing this criterion is INAPPLICABLE, not satisfied**
+  — `RT-PLANNER-ROOT-CLOSURE-SPLIT` under outcome 1, and the closure node, which
+  deletes rather than moves. Restate it as inapplicable; do not tick it.
   > Research `evt_1pwq0rssre6d8`: none of the fifteen move frames constrained the
   > target child's size, so the phase could shrink every root while producing a
   > fresh violation.
@@ -216,10 +203,19 @@ claimed; what follows is the corrected bar.
   > behind.
 
 - **`AC-6` — THIS node DOES claim phase closure, and only on the full
-  population.** State the line count of **every** Rust file in the phase
-  boundary, including every child created by items 4-17. **Closure holds only if
-  all of them are below 10k**; any file over it is recorded with its owner
-  analysis and **leaves closure OPEN with a named successor slice.**
+  population.** State the line count of **every** Rust file in the
+  phase boundary, including every child created by items 4-17.
+  > **THE PHASE BOUNDARY IS THIS EXACT FILE SET, never the bare phrase:** every
+  > `.rs` under `crates/ken-runtime/src/cranelift_backend/`, **plus**
+  > `crates/ken-runtime/src/boundary_value_clif.rs`. That last file sits OUTSIDE
+  > the `cranelift_backend/` subtree and was **9,116** lines at `a1cf83622` —
+  > research `evt_1pwq0rssre6d8` named it as able to cross the ceiling *"without
+  > any frame noticing"*. The standing amendment governs whether it may be
+  > MOVED; this criterion governs whether closure MEASURES it. It does.
+
+  **Closure holds only if all of them are below 10k**; any file over it is
+  recorded with its owner analysis and **leaves closure OPEN with a named
+  successor slice.**
 - **`AC-7`** — the adapter/facade debt population is **closed from the per-slice
   `AC-5` ledgers**, and **ZERO transitional adapters and parallel carriers
   remain**. Any retained surface is explicitly justified and re-ledgered as
