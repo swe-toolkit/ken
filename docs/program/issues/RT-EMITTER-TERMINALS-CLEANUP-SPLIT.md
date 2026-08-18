@@ -11,6 +11,16 @@ github: null
 origin: "Architect ruling evt_54zvaqbrm752x (2026-08-10) decomposing RT-BACKEND-MODULE-SPLIT into independently mergeable slices, cut item 17; boundary and companion-test-axis ruling evt_6r403ez3m2m69 (2026-08-18). Framed by the Steward on the operator's 2026-08-18 directive making RT-BACKEND-MODULE-SPLIT the runtime lane's priority. Binding inputs are the five Stage A inventories from RT-BACKEND-SPLIT-CENSUS (merged 8ebc2467d). Steward-filed per COORDINATION section 2."
 ---
 
+## Model-capability estimate (steward.md §4h): T2 — mechanical
+
+Behaviour-preserving move executing this slice's pre-built D0 symbol and
+test-property ledgers: the T2 (cheap coder) row of steward.md §4h. This records
+per-WP the phase's standing seat ruling — RT-BACKEND-MODULE-SPLIT "runs T2, and
+only this phase" (operator 2026-08-10, agent/MODELS.md) — not a fresh per-slice
+judgment. The design judgment — the domain ownership boundary — is discharged in
+the D0 and its Architect vote, not by the implementer executing the D1/D2 moves.
+
+
 > # THE OPERATOR'S CONSTRAINT, AND IT IS THE ONLY ONE
 >
 > **2026-08-18: "Files over 10k lines are decomposed into architecturally sound
