@@ -380,17 +380,29 @@ derives (below) are the only trait surface they carry, and all are
 
 ### Symbol ledger — cfg, attributes, derive, repr and visibility
 
-Occurrence counts, corpus-scale rather than a per-item table: `#[derive(...)]`
-20 (`abi.rs`) + 29 (`semantic_ir.rs`) + 140 (`static_transition.rs`) = 189;
-`#[cfg(...)]` 9 + 16 + 218 = 243. **Blind spot, stated rather than closed by
-this count:** the selector counts attribute *occurrences*, not distinct
-attributed items — one item can carry several derives, and a doc comment or
-`#[repr]`/visibility modifier is not a `derive`/`cfg` match at all. The
-closure for this class is per-item, not corpus-wide: every moved item's
-attributes, cfg, repr, derive, field/variant order and visibility are
-preserved verbatim and checked individually in the `AC-3` transport manifest
-at `D1` review — this ledger does not re-derive that here, since `D0` moves
-nothing for `AC-3` to apply to yet.
+**Corpus-scale occurrence counts, for the full three-file population:**
+`#[derive(...)]` 20 (`abi.rs`) + 29 (`semantic_ir.rs`) + 140
+(`static_transition.rs`) = 189; `#[cfg(...)]` 9 + 16 + 218 = 243. **Blind
+spot, stated rather than closed by this count:** the selector counts
+attribute *occurrences*, not distinct attributed items — one item can carry
+several derives, and a doc comment or `#[repr]`/visibility modifier is not a
+`derive`/`cfg` match at all.
+
+**Per-item closure for the moved population — what AC-1 asks of `D0` on its
+own, independent of any move.** Read from source, not inferred:
+
+| Item | Derive | `#[repr]` | Visibility | `#[cfg]` |
+| --- | --- | --- | --- | --- |
+| `PredeclaredFunctionId` (`semantic_ir.rs:243-245`) | `Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd` | `transparent` | `pub(in crate::cranelift_backend)` | none |
+| `EmittableCallEdge` (`static_transition.rs:13498-13499`) | `Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd` | none | `pub(in crate::cranelift_backend)` | none |
+| `EmittableCallKind` (`static_transition.rs:13507-13508`) | `Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd` | none | `pub(in crate::cranelift_backend)` | none |
+| `EmittableUnit<'plan>` (`static_transition.rs:13544-13545`) | `Clone, Copy, Debug` | none | `pub(in crate::cranelift_backend)` | none |
+| The 18 moved methods (`EmittableCallEdge`'s 5, `EmittableUnit`'s 7, `StaticTransitionPlan`'s 6) | n/a (methods, not derived) | n/a | uniformly `pub(in crate::cranelift_backend)` — checked individually at each of the 18 sites, not inferred from one | none carry a `#[cfg(...)]` — checked individually at each site |
+
+This is a present-fact statement about what the moved population carries
+today, not a preservation check — preservation across the actual move is
+`AC-3`'s transport manifest at `D1`, which this table does not pre-empt or
+duplicate.
 
 ### Symbol ledger — macro-produced owned items
 
