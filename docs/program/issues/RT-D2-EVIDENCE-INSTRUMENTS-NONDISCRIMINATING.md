@@ -289,6 +289,16 @@ old meaning:
   > `#[cfg(test)]` 327-vs-324 comment reconciliation were both inputs to a re-key
   > that will not happen. If a future node revives a census here, it starts from
   > the tree, not from these figures.
+  >
+  > **The post-merge Adversary hunt (`evt_6npaybf8cznp8`) confirmed every claim
+  > this deliverable made** — one hunk, `+0/-25`, own-line count 324, zero
+  > surviving references under `crates/`, and all three `RETIRED` successors
+  > present and substantive. **It also strengthened the fork's ground:** it
+  > flipped `#[cfg(any())]` to `#[test]` on all three retired censuses in
+  > `control.rs` and **all three fail**, so *revive* was not merely the wrong
+  > option here, it was not an available one. Filed separately as
+  > [[RT-RETIRED-CENSUS-ROT]] — the rot is in the retirement convention, not in
+  > this node, and it is not urgent.
 
   > **Measured input for the re-key option** (same hunt, quantified only): across
   > `ca639b5ef..b7e2cf8f8`, `core.rs` moved own-line `#[cfg(test)]` 323 to 324,
@@ -326,5 +336,9 @@ old meaning:
 
 **Not urgent, and say so when picking it up.** Nothing here says the landed
 behaviour is wrong, and the CLI error-string assertion does catch the Finding-1
-mutation today. This is evidence quality, and it queues behind
-`RT-PLANNER-GRAPH-FOUNDATION-SPLIT`'s pivot.
+mutation today. This is evidence quality.
+
+**That pivot is resolved.** This used to say the node queues behind
+[[RT-PLANNER-GRAPH-FOUNDATION-SPLIT]]'s pivot; the Architect closed that node
+without code on 2026-08-18 (`evt_6r403ez3m2m69`), so it queues behind nothing and
+`D4` is simply the runtime lane's current deliverable.

@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-GRAPH-FOUNDATION-SPLIT
 title: "Move the planner's shared substrate out of the static-transition monolith — the root plan type and the identity vocabulary that all six planner domain slices quote"
-status: active
+status: closed
 owner: runtime
 size: TBD
 gate: none
@@ -11,7 +11,59 @@ github: null
 origin: Cut item 3 of RT-BACKEND-MODULE-SPLIT, filed 2026-08-17 once RT-BACKEND-SPLIT-CENSUS merged and supplied the evidence the campaign deliberately withheld filing ahead of. Framing constraints binding per RT-BACKEND-MODULE-SPLIT:330-359 (operator, 2026-08-08). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # `D0` REPORTED 2026-08-17 — A HARD STOP, AND IT REFUTES THIS NODE'S PREMISE
+> # CLOSED 2026-08-18 — RESOLVED WITHOUT CODE. `D0` discharged; `D1` never cut.
+>
+> **Architect ruling `evt_6r403ez3m2m69`, on `origin/main` at `b430d73e0`.**
+> The subtraction proof is complete and the answer is that **the shared
+> graph/identity foundation this node was cut to move is empty.**
+>
+> - `StaticTransitionPlan<'src>` is the parent container; its private fields
+>   directly store graph/occurrence, ABI, continuation, aggregate, effect, and
+>   join/trap state.
+> - The genuinely shared semantic identities — `StaticOriginId`,
+>   `FieldIdentity`, `ConstructorIdentity`, `PredeclaredFunctionId` — **already
+>   live in `semantic_ir`.**
+> - Every remaining named identity is owned by one domain and moves with that
+>   domain.
+> - The apparent residual at `static_transition.rs:187-379` is **data
+>   vocabulary, not an independently owned graph component.** Its storage stays
+>   flat in `StaticTransitionPlan` while construction and mutation happen through
+>   `Planner` and the two root impl regions. Moving only those declarations
+>   produces the `ids.rs` drawer module the research report warns against: no
+>   owned lifecycle, no closed construction boundary, and no useful reduction of
+>   the 34k-line owner.
+>
+> ⇒ **Making that residual a real graph owner would need a graph aggregate or a
+> new accessor/construction boundary — a representation and API refactor, not a
+> closed pure-move set.** It may yet be the right final shape. **It is not this
+> node, and it must not be pre-claimed.**
+>
+> ### WHAT REPLACES IT, AND WHAT MUST NOT
+>
+> **Do not cut `D1`. Do not keep this node as a prerequisite for the six planner
+> domains, and do not reuse this node's thread for the successor.**
+> `StaticTransitionPlan` stays in the parent throughout all six domain moves; a
+> child domain module may own its types and domain-specific inherent impls while
+> reading ancestor-private root state, which preserves the current privacy
+> direction.
+>
+> The successor is a **fresh** [[RT-PLANNER-ROOT-CLOSURE-SPLIT]], filed after the
+> six domain moves, which **remeasures the actual residue** rather than
+> inheriting this node's premise. It is not a renamed prerequisite.
+>
+> ### THE ESCALATION THAT PRODUCED THIS WAS AVOIDABLE, AND THE LESSON IS FILED HERE
+>
+> The Steward escalated item 3's scope to the operator citing
+> `RT-BACKEND-MODULE-SPLIT:330-359` as **operator-owned framing constraints**.
+> They are not — that is frame prose the node accumulated. The operator's only
+> requirement (2026-08-18) is that files over 10k lines be decomposed into
+> architecturally sound smaller files; **factorization and sequencing belong to
+> the Steward and the Architect.** A justification you have used before is not
+> thereby grounded (`steward.md` §4c); re-derive it at each use.
+
+> # SUPERSEDED — `D0`'s report, which the ruling above builds on
+>
+> ## `D0` REPORTED 2026-08-17 — A HARD STOP, AND IT REFUTES THIS NODE'S PREMISE
 >
 > **`AC-0` is DISCHARGED.** `D0` was commissioned to return a bounded ownership
 > proof *or* the reason none exists, and it returned the second with every
