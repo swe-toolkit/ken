@@ -33,9 +33,15 @@ origin: "NATIVE-HANDLE-CARRIER residual. Route measured evt_4tqpqn2gpcsx6; Stewa
 > ### `D2` FAILED CI ONCE, AND THE CAUSE WAS ITS OWN `AC-4` CONTROL
 >
 > `21ffc99ac` was approved and red on test shard 3/4:
-> `identifier_census_caveat_tracks_inline_cfg_test_region_count` pins the exact
-> count of inline `#[cfg(test)]` regions in `core.rs`. `main` carried **322**;
-> `AC-4`'s added `mod branched_scrutinee_unit_body_port_tests` made **323**.
+> `identifier_census_caveat_tracks_inline_cfg_test_region_count` **then** pinned
+> the exact count of inline `#[cfg(test)]` regions in `core.rs`. `main` carried
+> **322**; `AC-4`'s added `mod branched_scrutinee_unit_body_port_tests` made
+> **323**.
+>
+> **That test no longer exists** — [[RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING]]'s
+> `D3` deleted it at `b430d73e0` because the census it annotated is not compiled.
+> This block is history: the CI event was real, and the trap it describes cannot
+> fire again.
 >
 > **The pin fired as designed** — its own comment says to re-derive when the
 > count moves. The `+6/-4` repair moves both 322 sites and **re-grounds the
