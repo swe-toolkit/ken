@@ -104,6 +104,28 @@ complete for its named transfer, independently reviewable and mergeable, and
 > files" and excepts nothing. It is a separate axis; see the test-ownership block
 > below.
 
+> # THE PHASE BOUNDARY IS AN EXPLICIT FILE SET. Never the bare phrase.
+>
+> **The four files above are the phase's STARTING roots. They are not the
+> population closure measures.** Closure (`RT-BACKEND-SPLIT-CLOSURE` `AC-6`)
+> ranges over:
+>
+> **every `.rs` under `crates/ken-runtime/src/cranelift_backend/`, PLUS
+> `crates/ken-runtime/src/boundary_value_clif.rs`.**
+>
+> **Two files sit near the ceiling and outside every reading of "the four
+> roots"** (Architect `evt_5wfv9cnggagjc`, measured at `a1cf83622`):
+>
+> | file | lines | why it is easy to miss |
+> |---|---|---|
+> | `cranelift_backend/lowering/core/tests/constructors.rs` | **9,727** | 273 under the ceiling, in the directory the fifteen `D2` companion-test moves deposit into, already **+436** with no test yet moved |
+> | `boundary_value_clif.rs` | **9,116** | **outside** the `cranelift_backend/` subtree, so a subtree reading excludes it — research `evt_1pwq0rssre6d8` named this exact risk |
+>
+> ⇒ **Measuring the four roots can go green while a fresh violation exists**, and
+> that is the defeater research and the Architect produced independently. The
+> starting roots answer "what is this phase for"; the boundary set answers "is
+> the constraint discharged". **Do not use one for the other.**
+
 > ### ITEM 3 IS CLOSED — Architect ruling `evt_6r403ez3m2m69`, 2026-08-18
 >
 > **It gates nothing, and item 4 starts immediately.** The subtraction proof
