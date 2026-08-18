@@ -12,7 +12,12 @@
 # Shared compiler cache: a dependency compiled by one agent is reused by all.
 # This is the biggest win for many parallel agents building the same workspace.
 export RUSTC_WRAPPER="${RUSTC_WRAPPER:-sccache}"
-export SCCACHE_DIR="${SCCACHE_DIR:-$HOME/.cache/ken-sccache}"
+# The cache lives on the /workspaces/ken volume (229G), NOT on $HOME, which is
+# the container's 77G overlay. A 20G cache on the overlay competes with every
+# image layer and build artifact for the smaller filesystem; the repo volume has
+# room for it. Operator, 2026-08-18. If you repoint this at $HOME again, expect
+# the overlay to fill and the whole box to wedge.
+export SCCACHE_DIR="${SCCACHE_DIR:-${KEN_SHARED_CACHE_ROOT:-/workspaces/ken/.cache}/sccache}"
 export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-20G}"
 
 # sccache and cargo incremental conflict; incremental units aren't cached. With
