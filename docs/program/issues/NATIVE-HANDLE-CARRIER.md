@@ -11,7 +11,7 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-# CURRENT STATE — 2026-08-17, 18:40 UTC
+# CURRENT STATE — 2026-08-18, 02:10 UTC
 
 **Read this section only. Everything below it is reverse-chronological history,
 and the top three banners are superseded on their central claims.** Fifteen
@@ -21,18 +21,81 @@ carries measurements nothing else records.
 
 **What this node is:** a constructor-private resource-carrying handle fails
 native lowering when it crosses the higher-order `withBuffer` normalization
-boundary. Its own carrier work is done. What remains is a **missing port** owned
-outside this node.
+boundary. Its own carrier work is done.
+
+> ## THE MISSING PORT LANDED. THIS NODE IS UNBLOCKED AND IT IS THE LANE'S NEXT ITEM.
+>
+> Every statement below this node's own history that says *"what remains is a
+> missing port owned outside this node"* is **discharged**.
+> [[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]] is `merged`: `D1` the witness at
+> `5bac56000`, `D2` the port plus the `AC-4` census recut at `ca639b5ef`, all
+> five of its ACs discharged.
+>
+> **Verified in the tree at `36ecc162c`, not read off that node's status.**
+> `recursive_position_unit_body` (`lowering/core.rs:15875`) now enters the
+> plain-`Match` branch at `:15905` and walks arms at `:15910` before route 1 can
+> fire at `:15919`. `int_to_uint64_raw` — absent from `crates/ken-runtime/` for
+> this node's whole life, and the residual `§2` of the frame was built on — is
+> live at `lowering/core/primitive.rs:206`, extending the
+> `uint8_to_int | int_to_uint8_raw` arm exactly as `D2'` predicted, with a
+> Big-carrier test at `primitive/tests.rs:323`.
+>
+> ⇒ **Both mechanisms this node was waiting on now exist.** Nothing has measured
+> what the fixture does with them, because the fixture rows are not in the tree.
 
 | | state |
 |---|---|
 | the bounded `D1'`/`D2a`/`D2'` partial | **LANDED** as squash `f9dd79f52`, from exact `06e44819a`, verified byte-identical on all 18 declared paths |
+| the missing port | **LANDED**, [[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]] `merged` at `ca639b5ef` |
+| the four `cap41_*` Rust rows | **absent from the tree by design** — deleted in the recut; the four Ken programs they drive survive at `rt_parity_native.rs:349-459` |
 | candidate `3d23f1182` | **superseded, not landable, and that is now history** — it was recut into `06e44819a`, which deleted the four failing `cap41_*` rows |
 | `dec_1reay8hc7qy2b` | **spent** — it approved a claim set including `AC-6`/`AC-7` that the tree does not produce. `dec_3m3dvn80b7143` is the Decision that landed the partial |
 | PR #2563 | **merged.** PR #2564, which recorded the earlier CI failure, is **closed as superseded** |
 | `AC-5` | **outstanding by measurement.** A stale ban is not a met criterion |
-| `D3` / `D4` / `D5`, `AC-3` | unclaimed |
+| `D3` / `D4` / `D5`, `AC-3` | unclaimed, and every one of them forks on `D0'` below |
 | `PX8-F-CAP-41` Phase 2 | **unpaired** — does not close on this node's merge |
+
+## `D0'` — THE DECIDING MEASUREMENT, AND IT IS THE WHOLE NEXT CUT
+
+**Restore the four `cap41_*` Rust rows and run them. Report what happens.
+Nothing else.**
+
+Recover them from `4c9c59d3e`, `crates/ken-cli/tests/rt_parity_native.rs`: the
+four `#[test]` rows at `:620`, `:627`, `:634`, `:641` and their exclusive helper
+`assert_cap41_derived_without_read` at `:593`. This is **four test functions
+plus one helper, added to a file you already have** — not a cherry-pick, not a
+rebase, not a re-derivation. The two standing fences hold: do **not** revert
+`4c9c59d3e` (it also modified 7 existing lines), and do **not** touch the Ken
+decls `rt_body_ok` / `rt_cap41_expect_eof`, each of which has a live reference
+that is not one of the four rows.
+
+**Why this is a deliverable and not a preliminary.** The four rows were deleted
+because they failed and adding them to `main` red was inadmissible. They failed
+through route 1 of `recursive_position_unit_body`. That route is now ported. So
+the rows are the only instrument that says whether this node is nearly finished
+or still gapped, and **no such instrument currently exists in the tree** — the
+Ken programs survive but nothing drives them.
+
+**Three outcomes, and the frame forks on which one lands.** Report the outcome,
+do not repair toward one:
+
+| outcome | what it means | what happens next |
+|---|---|---|
+| the four rows are **GREEN** | the port was the whole gap | `D3`/`D4` collapse into an oracle pass; the node is close to done |
+| they refuse for a **new** reason | the port closed the first blocker and exposed the next, as the route-2/3 note below always said it might | the next blocker is measured and cut, exactly as this one was |
+| they refuse for the **same** reason | the port does not reach this population | a hard stop to the Steward — the port node's own banner warns its measured population did not survive this node's recut |
+
+⇒ **A red result is a successful `D0'`.** The deliverable is the measurement,
+and it is releasable in whichever direction it lands. Do not extend the turn
+into a repair.
+
+**Ride `AC-5`'s deciding measurement with it — same file, same pass.** The
+"no honest partial" ban in `§9` of the frame rests on a warrant that is
+discharged, and the measurement that would settle whether the ban still binds
+has never been run: `fs_read_at_malformed_offset_narrows_to_invalid_offset`
+(`rt_parity_native.rs:687`) at base `7b8dad7df` versus at the tip. Report both
+readings. **Do not act on the answer** — lifting that ban is the Architect's,
+and a discharged warrant does not by itself discharge a ruling.
 
 > ### TWO ROWS ABOVE WERE FALSE FOR FIVE HOURS: "REFUSED BY CI", "RED CHECKS"
 >

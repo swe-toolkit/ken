@@ -27,6 +27,66 @@ origin: "Adversary M8 hunt on ca639b5ef, evt_12x7wnwfbfbr (thread thr_5x0fypvv6r
 > A second residual, found by the post-`D3` hunt and filed rather than folded:
 > [[RT-RETIRED-CENSUS-ROT]] — retired-by-`cfg` bodies are never name-resolved, so
 > all three in `control.rs` are dead on revival.
+>
+> ### THIRD RESIDUAL, AND IT IS THIS NODE FAILING ON ITS OWN PREMISE
+>
+> **`D4`'s `match_arms_walked` assertion adds no net discriminating power to the
+> witness.** Measured by the Adversary on the landed `8f09b122b`
+> (`evt_1d9jr3cdp8qpz`), by assertion ablation and by moving the mutant one
+> statement:
+>
+> - **Ablate the new assertion** at `rt_branched_scrutinee_unit_body_port.rs:101`
+>   and re-run the exact mutant `D4` was built to catch — an early
+>   `return Ok(None)` above the loop. It is **still red**, at `:113`, on the
+>   pre-existing constructor-arity refusal. Net new discriminating power on that
+>   mutant: zero.
+> - **Move the same mutant one statement lower**, below
+>   `record_branched_scrutinee_unit_body_match_arm_walked()` at `core.rs:15910`
+>   and above the recursion at `:15911`. The new assertion is **satisfied**
+>   (`match_arms_walked=1`) and the witness reddens only on the error text again.
+>
+> ⇒ **The recorder moved down one statement and the blind region moved with
+> it.** The recursion, the `Some`/`None` short-circuit, `declared_units.push`
+> and `agreeing_recursive_body_unit` all still sit strictly below the last
+> observation. Structurally, not just on these two mutants: the refusal string
+> has exactly one producer, `core.rs:15924`, reachable from the Match branch only
+> through `:15911` — so the pre-existing assertion set already entails
+> `match_arms_walked >= 1`.
+>
+> **The bound the Adversary stated on its own claim, and it is load-bearing:**
+> the argument entails `>= 1`, **not** `== 1`. A mutant walking two arms and
+> still refusing would be caught by the exact count. No such mutant was
+> constructed, so **strict redundancy is not claimed** — what is claimed is that
+> on both mutants in the family this node is about, the discrimination came from
+> the error text.
+>
+> **Why this is recorded here rather than filed.** It is the node's own thesis
+> landing on the node's own last deliverable: `D4` shipped an instrument, and the
+> witness's discrimination is still entirely the behavioural refusal assertion
+> that predated `D2`. **Do not cite this node as evidence that its witness
+> discriminates.** Unowned. If a future cut touches this witness, the remedy
+> shape is the Adversary's and the ring's to choose: put the fact **below** the
+> work — a unit recorded when `resolve_recursive_unit_body` returns `Some` for an
+> arm, or `declared_units.len()` at the point `agreeing_recursive_body_unit` is
+> called — or drop the assertion and say plainly that the error text is the
+> evidence and the row is diagnostic printing.
+>
+> **Two things seen and explicitly not filed**, so nobody re-hunts them: the
+> "after a *successful* `case_body_occurrence`" placement property is unpinned by
+> this witness (it never exercises a failing one, and this is inspection rather
+> than measurement), and `match_arms_walked` accumulates onto `rows.last_mut()`
+> across nesting depth, which this witness cannot exhibit because it has no
+> nesting.
+>
+> **The surviving `match_descent` references under `docs/` are NOT a loose end,
+> and there are eight of them rather than one.** Checked here, since they fall
+> outside the Adversary's `crates/` scope and it correctly declined to evaluate
+> them: **every occurrence is inside this file's own history section**, where it
+> records the name the instrument carried at the time. That is what a history
+> section is for. A rename does not reach backwards into the record of the thing
+> renamed, and rewriting them would make this node's `D4` account unreadable.
+> **Nothing to sweep.** The operative claim — that no rejected descent vocabulary
+> survives under `crates/` — was verified at the merge and still holds.
 
 > # THE CODE IS NOT KNOWN TO BE WRONG. THE EVIDENCE IS KNOWN NOT TO SHOW IT RIGHT.
 >
