@@ -5,7 +5,7 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY]
+depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE]
 blocks: [PX8-F-CAP-41]
 github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -139,6 +139,28 @@ Ken programs survive but nothing drives them.
 > carrying **zero unmet dependencies** while `D3`/`D4`/`D5` were gated in prose
 > alone. The successor node's `blocks` field named this one the whole time; a
 > `blocks` entry is not read by the generator and cannot gate anything.
+
+> ### ARCHITECT RULING `evt_7aeb7hqrykgpz` / `dec_7aajmm0eac45c`, 2026-08-18 — THE BLOCKER IS NOT A DEAD END
+>
+> **`D1` on the arity node moved the governed rows onto the
+> `reject_carried_residual_arguments` refusal, and I asked whether that made
+> CAP-41 out of scope by design. It does not.**
+>
+> **The durable closure lane stays excluded AND a function-valued recursive
+> field is in scope** — those are not in conflict. A lawful route already
+> exists: `lower_recursor_residual_call`'s `recursive_unit_body` /
+> `FunctionizedUnits` arm runs **before** the guard, lowering explicit source
+> arguments through `call_declared_recursive_position_unit`, with capture
+> authority staying compiler-owned. No `Closure` value crosses.
+>
+> ⇒ **Do NOT declare this node's remaining deliverables unreachable, and do not
+> stop gating them.** The real gap is that `recursive_position_unit_body`
+> answers once for the whole source, which `Ret`/`Vis` proves too coarse. It is
+> cut as [[RT-BRANCH-LOCAL-DECLARED-CALLABLE]] and now sits in `depends_on`.
+>
+> **Frame it as eliminating the closure crossing through branch-local declared-
+> callable routing — never as opening a durable closure lane.** The existing
+> refusal stays the backstop wherever branch-local authority is absent.
 >
 > **Two readings of `D0'` were wrong and both were the Steward's.** The
 > same-refusal arm was defective, and the string it forked on was produced at a
