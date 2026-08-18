@@ -189,6 +189,26 @@ after it** is. Both outcomes are good and neither is a failure of `D1`:
   reported, each with its site and refusal identity if it still fails. A report
   that names only the rows that changed does not discharge this.
 
+> # `AC-4` ROW 2 IS REALIZED. Measured by CI on `5c933c6ca`, PR #2607.
+>
+> **The repair works and the refusal ADVANCED.** `main` was green (2 passed / 0
+> failed on `rt_branched_scrutinee_unit_body_port`); at the candidate the suite
+> is 1/1, and the failing assertion is the **terminal-refusal text**, at
+> `:113`, not the `expect_err` at `:111`. **The build still refuses** — it now
+> refuses at the `ObjectEmission` `BoundaryCarrier` site instead of the
+> constructor-arity guard.
+>
+> ⇒ **This is the arity node's own `AC-4` table, row 2, verbatim: "rows fail at
+> a NEW site — the repair is correct and a further blocker is now attributed."**
+> Do not chase that further blocker inside this cut; it belongs to
+> [[RT-BRANCH-LOCAL-DECLARED-CALLABLE]].
+>
+> **The handback's "preserved downstream result: 1 passed / 1 failed" was an
+> ABSOLUTE reading offered as a preservation claim.** The baseline was 2/0.
+> **A preservation claim is differential and needs the before-number**; QA and
+> the Architect both accepted the absolute count as if it could show
+> preservation. That is what let the inverted pin reach CI.
+
 # BANNED SCOPE
 
 - **The `:15924` guard change is authorized ONLY on the per-arm descent path,
@@ -202,7 +222,25 @@ after it** is. Both outcomes are good and neither is a failure of `D1`:
     refusal fires on a base-case constructor that structurally owns no recursive
     position. The ban is lifted **exactly that far** and no further.
 - **No `NATIVE-HANDLE-CARRIER` deliverable.** `D3`/`D4`/`D5` stay gated.
-- **No reopening of [[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]].**
+- **[[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]]'s witness pin MAY be advanced
+  inside `D1`, and nothing else about that node may be.** Its
+  `rt_branched_scrutinee_unit_body_port.rs` witness closes with an assertion
+  that the refusal text is *"recursive position is outside its source
+  constructor"*. **`D1`'s authorized change necessarily falsifies it** — the arm
+  yields `Ok(None)`, the descent advances, and the program refuses at a later
+  site. **Advance that trailing assertion, or stop it naming the terminal
+  site.** Leave the four assertions above it — `entered==1`, `!route1`,
+  `match_branch_entered`, `match_arms_walked==1` — untouched; they are that
+  node's actual subject and they all still hold.
+  - *Superseded, and kept so the narrowing is visible:* this bullet read **"No
+    reopening of [[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]]"**. **Its warrant was
+    to stop the port node's subject — whether the descent happens at all — being
+    relitigated.** Updating a trailing assertion about which refusal comes
+    *after* the descent does not touch that subject. **The ban stands for
+    everything else about that node.**
+  - **This collision was a defect in this frame, not in the ring's work.** The
+    banned scope and the authorization were written against each other, and CI
+    is what surfaced it.
 - **The `+59` `cap41_*` restoration stays uncommitted and is not a merge
   candidate** (Architect `evt_3tfef2baj5pd`). It is the measurement artifact, on
   `wp/NATIVE-HANDLE-CARRIER-D0` at `86049d660`, diff-check clean. **Lifting the
