@@ -209,6 +209,16 @@ Delivery means four things, in order:
    post and is the WP's thread anchor; you are one of three roles that may root
    a post. **The anchor line every kick must carry, and why you cannot quote a
    `thr_` id, are in `COORDINATION §4a`/`§4b` — use the wording there.**
+   **Before you kick, check the assigned seat's current model against the WP's
+   estimated capability tier (§4h).** Read the seat's live model from its pane
+   footer, not from memory — a reseat may have changed it. If the seat is
+   **under-provisioned** (a T1/reasoning WP on a mechanical-tier seat), do not
+   kick blind: reseat within your latitude or escalate the tier to the operator
+   first — a seat that cannot do the work fails the turn, not just the kick. If
+   it is **over-provisioned** (a mechanical WP standing on an expensive T1 seat),
+   flag the cost mismatch to the operator; a whole lane of mechanical WPs on a
+   T1 seat is money burned. The check is one glance and it is yours to run at
+   every kick.
 4. **Next WP.** Do not stop to improve anything.
 
 **Skip retros.** They do not gate closure and you do not chase them. If a
@@ -288,8 +298,8 @@ sequence them across teams.
 
 - **Definition.** One assignable, reviewable deliverable owned by a single
   team: a stable ID, a one-line objective, scope, deliverables, acceptance
-  criteria, dependencies, size, risk. One WP is one branch `wp/<ID>-<slug>` and
-  one PR.
+  criteria, dependencies, size, risk, and the estimated model-capability tier
+  the work demands (§4h). One WP is one branch `wp/<ID>-<slug>` and one PR.
 - **Create and decompose.** Scope comes from the operator, technical
   decomposition input from the Architect. Keep WPs small.
 - **Sequence and assign.** Release a WP to its owning team only when it is
@@ -318,6 +328,33 @@ hour. Both are good outcomes; the bad outcome is neither.
 a frame as an AC and do not derive a deliverable from it. Its diagnostic twin
 is the WIP audit (`steward/escalation.md`): repeatedly firing audits on one
 node means the sizing was the defect and the next cut is yours.
+
+## 4h. Capability: estimate the model tier each WP demands
+
+Every frame carries an estimated **model-capability tier** — what the work
+actually demands to be done well, keyed to `MODELS.md`. This is a distinct axis
+from §4b sizing: sizing is *how much* work, capability is *how hard the thinking
+is*. A WP can be large and mechanical, or tiny and reasoning-dense.
+
+Estimate it by the nature of the work, not its length:
+
+| demands T2 (cheap coder) | demands T1 (deep reasoning) |
+|---|---|
+| behaviour-preserving move, rename, mechanical port | novel design or a new capability |
+| executing a pre-built ledger (e.g. a D0 symbol/test map) | semantic repair, soundness-bearing invention |
+| inventory/registration bookkeeping | cross-cutting decomposition, an open design fork |
+| a diff whose review is differential/byte-faithfulness | a diff whose review turns on an argument |
+
+Write the tier into the frame. It is not an AC and does not gate closure; it is
+the input to the kick-time seat check (§1 step 3) and to any reseat proposal.
+
+**Why this is a first-class frame field.** Measured 2026-08-18: a
+behaviour-preserving type-move (a T2-class WP) ran on a T1-class seat and was the
+single largest cost in the fleet for that run, its reasoning never exercised —
+while a cheaper, proven model would have produced the same diff. Over-provisioning
+burns money silently; under-provisioning risks a failed or multi-respin turn. The
+estimate is what makes either mismatch visible before the kick instead of after
+the invoice.
 
 ## 4c. Before you add a node, interrogate the constraint that demands it
 
