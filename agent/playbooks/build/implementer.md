@@ -208,16 +208,6 @@ do not testify that it did.**
 And say plainly that the branch moved. A reviewer who fetches by branch name
 gets the new tip while quoting the old SHA, and will not notice.
 
-## Retro (closes the WP — do not skip)
-
-When your leader signals the WP merged, post a short `retro` in its thread
-**before** you take the next WP — three bullets: **trap** (what cost you time,
-or a defect QA/CI caught that you should have), **held** (a discipline that
-worked), **carry** (a rule worth promoting). Tag each node-internal or
-topology-touching. This is the grain the Steward's promotion ladder runs on
-(COORDINATION §10); skipping it starves the only mechanism that propagates your
-lessons to the other teams.
-
 ## NEVER TEST THE TEXT OF THE REPOSITORY — test behaviour
 
 **Operator rule, 2026-07-26:** *"Test oracles that assert facts about source

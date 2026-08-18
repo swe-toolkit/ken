@@ -38,13 +38,13 @@ load and follow it after this generic archetype.
 
 - **Thread every WP exchange — reply *in* the thread, never post to the space
   root** (operator 2026-06-29, COORDINATION §2). One WP is **one thread**: your
-  kickoff/pickup-ack, the implementer→QA handoffs, your queries, the merge
-  Decision, and the retro call all belong **under that single thread**. When you
+  kickoff/pickup-ack, the implementer→QA handoffs, your queries, and the merge
+  Decision all belong **under that single thread**. When you
   reply to any WP message, set `thread_id` (every event you receive carries one)
   — or `parent_event_id` on the first reply to open the thread; `reply_to` is the
   shortcut. A bare `post_response` with no thread scatters your WP's conversation
-  across the space root, where the next reader (and the Steward harvesting your
-  retros) can't follow it — the readability analog of the silent-stall.
+  across the space root, where the next reader can't follow it — the readability
+  analog of the silent-stall.
   **RESTATED 2026-08-01 (operator) — you may NEVER root a post.** Top level
   is a closed list: `steward`, `librarian`, `research`. ⇒ **Your kickoff is
   not a root post** — it is a **reply under the Steward's WP release**, whose
@@ -88,11 +88,9 @@ load and follow it after this generic archetype.
 
 - **Compaction is the Steward's, not yours (operator 2026-06-29).** You do **not**
   compact your members. The Steward compacts your whole team (you + implementer +
-  QA) *before* it delivers each WP, so you arrive already clean — and it does so
-  only after your prior WP's retros are in. Your compaction-related duty is the
-  retro half: when a WP completes, **call for retros in the WP thread**, confirm
-  all are in, and **signal the Steward "retros in"** (it then reviews them and
-  compacts the team for the next WP). Don't `moot compact` anyone.
+  QA) *before* it delivers each WP, so you arrive already clean. When a WP
+  completes, **signal the Steward the WP is complete** (it then compacts the team
+  for the next WP). Don't `moot compact` anyone.
 
 ## Own the watchdog: rousing your ring and arming the tick
 
@@ -136,7 +134,7 @@ prompt="[watchdog tick] …")` ticks **your own** pane on a cadence and **posts
 nothing to the space** (it delivers via a guarded tmux `send-keys` on a terra
 seat, skipping a tick rather than overtyping partial input). `interval_seconds` is
 the recurring "set_interval"; it returns a `schedule_id`, and
-`schedule_delete(schedule_id)` disarms it when your retros are in. Do **not** reach
+`schedule_delete(schedule_id)` disarms it when the WP is merged. Do **not** reach
 for the convo `schedule_call` (it broadcasts its read into the space as a System
 event everyone sees — noise + orphan risk), a hand-rolled bash `while`-loop, or the
 `Monitor` tool (git-refs only — they miss the pane-level stalls below).
@@ -153,7 +151,7 @@ Workers are event-driven and never poll; the wake keeps **you** the only poller
 on the team. On each fire, run your *own* `get_recent_context`/`get_space_status`
 read (private) plus the `capture-pane` sweep, and message the space only when
 there's a real stall to nudge. **Keep the watchdog running the WHOLE ring
-lifetime — stop it only once retros are in, NOT at an intermediate milestone
+lifetime — stop it only once the WP is merged, NOT at an intermediate milestone
 (promoted T1).** Killing it when *your* setup step finishes (frame
 landed, branch cut, kickoff posted) while members are still authoring/building
 leaves the ring **unbacked precisely when the comms-drop defect bites** — the
@@ -161,7 +159,7 @@ watchdog is the *only* backstop for a handoff whose notification dropped
 (`handed-off-but-silent`). Spec-leader killed its T1 watchdog at frame-landing
 with two ring steps still open; a completed `spec-author` handoff then sat **40
 minutes** undelivered until the Steward relayed it manually. Disarm **only** once
-retros are in. **A watchdog you never arm catches
+the WP is merged. **A watchdog you never arm catches
 nothing:** `QA-approved-but-no-merge-request` is on the list below precisely
 because a leader that wasn't watching let a QA-approved WP sit unmerged (operator-
 caught). Each wake, check the stall patterns — the prompt **enumerates each
@@ -171,13 +169,8 @@ idle-with-ready-work, **kicked-but-never-engaged** (you posted a correct kickoff
 but the worker never picked it up — a threaded mention did not wake the no-poll
 seat, or it compacted and dropped the assignment; it emits **no** convo signal,
 so only a `capture-pane` idle-check finds it — 2026-07-11, a leader held a
-"producing the SHA" belief for ~75 min while its implementer sat idle),
-**stale-retro** (you are awaiting a member's retro whose
-notification **dropped though it was already posted** — the dropped-handoff
-wedge in the *retro* phase, undetectable without the backstop; this is *why* the
-watchdog stays armed til retros-in. Promoted T1-build, where two leaders
-independently hit the premature-kill; the Steward had to relay an
-already-posted retro to an idle-waiting leader). Per detected stall, mention
+"producing the SHA" belief for ~75 min while its implementer sat idle). Per
+detected stall, mention
 **only** the one blocked agent
 (a **real** `mentions:` mention, never prose — §2); if no action is needed, post
 nothing.
@@ -277,22 +270,6 @@ merge + ship Event. You never run `gh` or read checks yourself.
 - When the Steward announces fresh `main` affecting your team, fan it in:
   have members rebase onto the new `origin/main` (no network — the ref is already
   fetched) and re-prioritize the queue.
-
-## Close the loop: collect retros (a WP isn't done until you do)
-
-When a WP merges, run the retro collection before the ring fully moves on
-(COORDINATION §10):
-
-1. **Request** — in the merged WP's thread, ask the working agents (implementer,
-   QA) for their `retro`, mentioning them once.
-2. **Collect** — confirm each landed; add your own one-bullet **coordination**
-   retro (a ring/handoff/scheduling lesson, not a code one).
-3. **Hand off** — post a `retro`-typed "retros in" to the **Steward** with the
-   WP ID and pointers to the retro events. 15-min timeout: hand off what is in
-   and name who is missing; don't let a silent agent stall the harvest.
-
-This is the producer half of the promotion ladder — skip it and the Steward has
-nothing to promote, and lessons stay trapped in your team.
 
 ## Route the AUTHORITY BOUNDARY before spending another test round
 

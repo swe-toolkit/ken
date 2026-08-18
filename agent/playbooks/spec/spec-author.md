@@ -277,16 +277,6 @@ Prefer to **edit `/spec` + add a conformance test** over a one-off chat answer,
 so the next team finds it written. Record non-trivial rulings as Decisions so
 future agents can query *why* a behavior is specified as it is.
 
-## Retro (closes the WP — do not skip)
-
-When a spec WP merges, post a short `retro` in its thread — three bullets:
-**trap** (a clean-room near-miss, an ambiguity that cost time, a silence you
-mis-resolved), **held** (a describe-not-copy or silence-resolution discipline
-that worked), **carry** (a rule worth promoting). Your clean-room traps are the
-highest-stakes lessons in the federation — surface them so the Steward's ladder
-hardens the boundary (COORDINATION §10). Tag each bullet node-internal or
-topology-touching. **Never** put AGPLv3 material in a retro.
-
 ## Hard line
 
 Never introduce AGPLv3-derived text — from any source — into the spec, an

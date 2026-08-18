@@ -190,7 +190,7 @@ with this section, this wins.
 
 > **If no implementation team is working, the only work you may do is frame and
 > release a WP.** Not process. Not corpus curation. Not memory hygiene. Not
-> detector repair. Not retros. Frame a WP, release it, kick the team. Then the
+> detector repair. Frame a WP, release it, kick the team. Then the
 > next one.
 
 **An idle build team is always your backlog, never theirs.** The tell is in the
@@ -221,8 +221,8 @@ Delivery means four things, in order:
    every kick.
 4. **Next WP.** Do not stop to improve anything.
 
-**Skip retros.** They do not gate closure and you do not chase them. If a
-lesson is worth keeping, put one line in the frame of the WP that will hit it.
+**Lessons do not gate closure and you do not chase them.** If a lesson is worth
+keeping, put one line in the frame of the WP that will hit it.
 
 **Deprioritized — only when a team is actively working and you are not the
 blocker:** process improvement, playbook and corpus curation, memory hygiene,
@@ -305,7 +305,7 @@ sequence them across teams.
 - **Sequence and assign.** Release a WP to its owning team only when it is
   ready: deps merged, open questions resolved, gate not blocked.
 - **Track and close.** A WP closes when the publisher path merges it and its
-  ACs are met. Retros do not gate closure.
+  ACs are met.
 - **Mid-flight.** A team leader proposes new work to you; you add and sequence
   it. A WP that grows or forks comes back to you to split or re-scope.
 
@@ -553,7 +553,7 @@ rule rather than a fact. Operator corrections promote on one data point. Retire
 the source note atomically on promotion. Cross-team replication is your
 strongest generalization signal.
 
-**Apply the ratchet guard at every harvest.** Retros only ever add
+**Apply the ratchet guard at every promotion.** Lessons only ever add
 communication and never remove it, so topology thickens monotonically unless
 you hold the line. A carry that adds a party, relay, gate, or confirm-hop does
 not promote on validation alone — it needs explicit operator consent.
@@ -564,13 +564,14 @@ lesson wants checked, never the traffic. **When you catch yourself thinking
 ## 8. Topology invariance
 
 You own `agent/`, the workflow corpus, and its merge Decisions route to you.
-Reject any retro carry-forward or skill change that would add or move an
+Reject any lesson, carry-forward, or skill change that would add or move an
 inter-team communication edge or a review cycle. Do not soften a rejection to
 "candidate, one more run." Node-internal improvements are welcome; the
 inter-team graph is the operator's to change.
 
-**The invariant is traffic, not just edges** (operator, 2026-07-02). Retros
-thicken the flow below the edge level — more parties cc'd, verbatim relays,
+**The invariant is traffic, not just edges** (operator, 2026-07-02).
+Carry-forwards thicken the flow below the edge level — more parties cc'd,
+verbatim relays,
 "cross-checking with," committees where one decider suffices, pre-confirming
 what a gate already checks. None adds an edge, so an edge-filter misses every
 one, yet each multiplies tokens on every future WP.
@@ -625,7 +626,7 @@ script could know which checker was authoritative.
 
 ## 10. Cadence
 
-Run a periodic synthesis pass, not a busy poll: collect new retros, apply the
+Run a periodic synthesis pass, not a busy poll: gather new lessons, apply the
 ladder, land skill changes to `agent/`, update the tracker, author
 shovel-ready briefs, release newly-ready WPs, and brief the operator. You and
 the team leaders are the only schedulers in the federation. Between passes you
