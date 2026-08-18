@@ -1153,6 +1153,15 @@ fn record_branched_scrutinee_unit_body_match_arm_walked() {
     });
 }
 
+fn recursive_position_construct_argument(
+    args: &[RuntimeExpr],
+    position: usize,
+) -> Result<&RuntimeExpr, CraneliftBackendError> {
+    args.get(position).ok_or_else(|| {
+        backend_module("recursive position is outside its source constructor".to_string())
+    })
+}
+
 #[cfg(test)]
 mod branched_scrutinee_unit_body_observer_tests {
     use super::*;
@@ -1166,6 +1175,16 @@ mod branched_scrutinee_unit_body_observer_tests {
         });
         assert_eq!(rows.len(), 1);
         assert!(rows[0].match_branch_entered && rows[0].route1, "{rows:?}");
+    }
+
+    #[test]
+    fn direct_construct_missing_recursive_position_still_refuses() {
+        let error = recursive_position_construct_argument(&[], 0)
+            .expect_err("a direct Construct without the position must refuse");
+        assert!(
+            format!("{error:?}").contains("recursive position is outside its source constructor"),
+            "direct Construct refusal identity changed: {error:?}"
+        );
     }
 }
 
@@ -15908,6 +15927,12 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     let body = self.case_body_occurrence(source_origin, case_index, &case.body)?;
                     #[cfg(any(test, feature = "px8-ds-test-support"))]
                     record_branched_scrutinee_unit_body_match_arm_walked();
+                    if matches!(
+                        body.expr,
+                        RuntimeExpr::Construct { args, .. } if args.get(position).is_none()
+                    ) {
+                        return Ok(None);
+                    }
                     let Some(unit) = self.resolve_recursive_unit_body(body.static_origin, position)? else {
                         return Ok(None);
                     };
@@ -15919,11 +15944,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             record_branched_scrutinee_unit_body_route1(source.expr);
             return Ok(None);
         };
-        let Some(argument) = args.get(position) else {
-            return Err(backend_module(
-                "recursive position is outside its source constructor".to_string(),
-            ));
-        };
+        let argument = recursive_position_construct_argument(args, position)?;
         let argument = self.child_occurrence(source_origin, position, argument)?;
         match argument.expr {
             RuntimeExpr::LexicalClosure { captures, body, .. } if captures.is_empty() => Ok(Some(
