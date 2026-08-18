@@ -1,7 +1,7 @@
 ---
 id: RT-RECURSIVE-POSITION-ARM-ARITY
 title: "One recursive position index is pushed unchanged into every plain-Match arm body -- resolve_recursive_unit_body recurses per arm with the eliminator's single position, and args.get(position) refuses on any arm whose constructor does not carry that position, so the branched-scrutinee port descends correctly and then fails inside the arm"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none

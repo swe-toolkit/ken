@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-18 11:29:15Z — from 372 issue file(s) in `docs/program/issues/`.
+2026-08-18 12:37:08Z — from 388 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -213,11 +213,12 @@ the committed file matches the generator's output.
 | `RT-BACKEND-MODULE-SPLIT` | Split the oversized ken-runtime backend files into modules — the follow-on to the recursive-descent retirement, not an interlude in it | draft | runtime | M | none | — |
 | `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` | Move the primitive-lowering family to its own module — the first production slice of the backend split, and the architectural release point for NATIVE-HANDLE-CARRIER | merged | runtime | M | none | — |
 | `RT-BACKEND-SPLIT-CENSUS` | Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves | merged | runtime | M | none | — |
+| `RT-BACKEND-SPLIT-CLOSURE` | Close the backend module split -- delete the transitional adapters, narrow the facades, run the test-root closure over control.rs, and prove all four bound files are under 10k | draft | runtime | M | none | — |
 | `RT-BODY-OCCURRENCE-PROVENANCE` | Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree | merged | runtime | M | none | — |
 | `RT-BOUNDARY-IGNORED-CORPUS-MEASURE` | Read unit_boundary_environment_fields on the six ignored closure-at-boundary tests, the population the merged measurement's own selection rule excluded | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2381 |
 | `RT-BRANCH-LOCAL-DECLARED-CALLABLE` | recursive_position_unit_body returns one Option<StaticOriginId> for the whole source, so whole-source agreement is too coarse for a Match whose arms differ -- the cut is constructor-and-recursive-position-specific callable authority installed inside the already-selected constructor case, which eliminates the closure crossing rather than opening a durable closure lane | ready | runtime | L | none | — |
 | `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` | Port the recursive-unit-body resolution through a branched scrutinee -- recursive_position_unit_body returns None whenever the scrutinee is a plain Match rather than a literal Construct, so a carried child whose owning form branches has no declared body unit and every consumer falls back to refusal | merged | runtime | M | none | — |
-| `RT-C2-DRIVER-STAGE-ATTRIBUTION` | The D5 observation identity driver reports every non-zero nested exit as `nested {} compilation failed`, so the one message AC-2 itself produces names the wrong stage -- plus one clause recording why the compiled-feature const must stay adjacent to the gate it mirrors | active | runtime | XS | none | — |
+| `RT-C2-DRIVER-STAGE-ATTRIBUTION` | The D5 observation identity driver reports every non-zero nested exit as `nested {} compilation failed`, so the one message AC-2 itself produces names the wrong stage -- plus one clause recording why the compiled-feature const must stay adjacent to the gate it mirrors | merged | runtime | XS | none | — |
 | `RT-C2-OBSERVATION-ARTIFACT-IDENTITY` | The always-on `dasm-c2-observation` feature has no artifact-identity control, and the always-on choice is what makes the off-configuration unreachable from the crate the controls live in -- the sibling's nested-cargo A/B needs a carrier feature before it can be reused | merged | runtime | S | none | — |
 | `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH` | The artifact-identity control's anti-vacuity self-check reads `ken-cli`'s `dasm-c2-observation` feature while the property that decides whether the two artifacts differ is `ken-runtime`'s -- they agree today and nothing holds them together, so a future `ken-cli` dev-dependency enabling the runtime feature would make the off side ON with the assertion still reading `disabled` and no signal at all | merged | runtime | S | none | 2196 |
 | `RT-CALL-EDGE-EXECUTABILITY-AXIS` | executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error | merged | runtime | S | none | — |
@@ -265,6 +266,11 @@ the committed file matches the generator's output.
 | `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | merged | runtime | M | none | — |
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
 | `RT-EMITTED-WORKER-CONSUMER-WALK` | Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition | closed | runtime | S | none | — |
+| `RT-EMITTER-AGGREGATES-SPLIT` | Move the aggregates emitter family out of the lowering files -- the emitter half of the aggregate lifecycle whose planner half item 7 already owns | draft | runtime | M | none | — |
+| `RT-EMITTER-CALLS-RETURNS-SPLIT` | Move the calls and returns emitter family out of the lowering files -- the first emitter slice, moving against the stable unit and call vocabulary item 4 established | draft | runtime | M | none | — |
+| `RT-EMITTER-CONTROL-JOINS-SPLIT` | Move the control and joins emitter family out of the lowering files -- branch, match and join emission, against the join disposition the planner slice already owns | draft | runtime | M | none | — |
+| `RT-EMITTER-EFFECTS-SPLIT` | Move the effects emitter family out of the lowering files -- the emitter half of the effect-seat lifecycle whose planner half item 8 already owns | draft | runtime | M | none | — |
+| `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` | Move the terminals and cleanup emitter family out of the lowering files -- the last owner move in the phase, after which only closure remains | draft | runtime | M | none | — |
 | `RT-ENTRY-TRAP-254` | public_source_observes_raw_argv_environment_cwd_bytes_in_field_order exits 1 with an explicit entry trap where it expects 254 — branch-introduced, and the only tip failure that is not the byte-span gap | closed | runtime | M | none | — |
 | `RT-ENTRY-TRAP-PX7O` | px7o heterogeneous eliminator frames: native traps at the explicit entry (RuntimeTrap(4), exit 1) where the interpreter returns exit 7 -- the entry-trap family the de Bruijn repair did NOT clear | closed | runtime | TBD | none | — |
 | `RT-ESCAPE` | escaping a second Resource through a bracket fails native lowering | merged | runtime | M | none | PR #911 @ 238a5c5d (origin/main 4ac9141e, CI green) |
@@ -298,6 +304,8 @@ the committed file matches the generator's output.
 | `RT-LEXICAL-R3-FUSION-EMITTER` | Row 5's before-hole expression is the one member of the eight-expression lexical-recursor population whose lawful repair requires static-continuation fusion -- it is carved out of RT-LEXICAL-RECURSOR-CONSUMERS together with its repair and discriminating-control obligations, because leaving the expression in the parent while moving the machinery would give the parent an AC it cannot discharge | merged | runtime | M | none | — |
 | `RT-LEXICAL-RECURSOR-CONSUMERS` | Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam | merged | runtime | M | none | — |
 | `RT-LEXICAL-ROW2-MISSING-MINT` | Row 2 of the lexical-recursor population fails post-compile with a missing Mint rather than at a lowering boundary, so it is not repairable by RT-LEXICAL-RECURSOR-CONSUMERS' D2 | merged | runtime | S | none | — |
+| `RT-LOWERING-FUNCTION-STATE-SPLIT` | Move function-local lowering state out of lowering/mod.rs and lowering/core.rs into its own child -- the first lowering domain, and the point where the phase crosses from the planner files into the lowering files | draft | runtime | M | none | — |
+| `RT-LOWERING-VALUES-BOUNDARY-SPLIT` | Move the values and boundary domain out of the lowering files -- and boundary_value_clif.rs is NOT absorbed merely because it is large; its lifecycle and consumers must be proven first | draft | runtime | M | none | — |
 | `RT-MATCH-DIFFERENCE-REACHABILITY` | Source-reachability of the narrowed MatchScrutineeRecursor difference is NOT SETTLED under the method gate -- normalization is not total, the elaborator refusal has an ascription escape, and the wrapper that blocks a witness is a compiler-path invariant rather than a language rule | merged | runtime | M | none | — |
 | `RT-MATCH-FRAME-FP` | match-frame fingerprints must hash a dedicated closure-free header carrier, not a Debug rendering of closure-capable cases | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1108 |
 | `RT-MATCH-RECURSOR-CONSUMERS` | Complete the MatchScrutineeRecursor consumer repair in Position A — the D2 increment closed one witness, not the population | merged | runtime | M | none | — |
@@ -310,13 +318,20 @@ the committed file matches the generator's output.
 | `RT-OVERCONSTRUCTED-OUTER-RECOGNITION` | Establish that no emitted call can name an outer static-worker transport, and classify which repair shapes that permits -- the repair itself is OUT OF SCOPE and moved to RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT | closed | runtime | M | none | — |
 | `RT-PARITY` | interpreter/native parity erratum (adversary F5 + F6) | closed | runtime | M | none | — |
 | `RT-PLANNED-CLOSURE-PREEXISTENCE` | Suppression cannot answer closure pre-existence because it removes the observation point along with the crossing -- ask the PLANNER instead: does the planned occurrence at origin 5 carry a closure-typed field 0 by construction? | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2317 |
+| `RT-PLANNER-AGGREGATES-SPLIT` | Move the aggregates domain out of planning/static_transition.rs -- aggregate allocation events, relation closures and their planner-side lifecycle | draft | runtime | M | none | — |
 | `RT-PLANNER-ATTRIB-K` | Boundary A planner: fixed K is a design invariant — move the K-exceeded rejection off the capacity channel | merged | runtime | XS | none | https://github.com/swe-toolkit/ken/pull/935 |
+| `RT-PLANNER-CONTINUATIONS-SPLIT` | Move the continuations domain out of planning/static_transition.rs -- sequenced deliberately after the continuation and evidence churn, so the domain is not re-homed against a surface that is still moving | draft | runtime | M | none | — |
 | `RT-PLANNER-DIAGNOSTIC-K` | Boundary A planner: report planner-invariant failures as planner defects, and assert fixed_k CONSTANT rather than merely affine | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/929 |
+| `RT-PLANNER-EFFECTS-SPLIT` | Move the effects domain out of planning/static_transition.rs -- effect seats, seat groups and effect-seat closures on the planner side | draft | runtime | M | none | — |
 | `RT-PLANNER-GRAPH-FOUNDATION-SPLIT` | Move the planner's shared substrate out of the static-transition monolith — the root plan type and the identity vocabulary that all six planner domain slices quote | closed | runtime | TBD | none | — |
 | `RT-PLANNER-INVARIANT-MESSAGE-LOCALIZATION` | The PlannerInvariant rendering localizes every failure to the static transition planner, and 16 of its direct producers are resident in lowering -- the same false-localization defect this file already ruled on for its neighbour variant | draft | runtime | S | none | — |
+| `RT-PLANNER-JOINS-TRAPS-SPLIT` | Move the joins and traps domain out of planning/static_transition.rs -- the last named planner domain, and generated traps receive no fabricated source origin | draft | runtime | M | none | — |
+| `RT-PLANNER-OCCURRENCES-SPLIT` | Move the occurrences domain out of planning/static_transition.rs -- StaticOriginId and source/child correspondence are occurrence-owned and must not be pulled into a shared identity drawer | draft | runtime | M | none | — |
+| `RT-PLANNER-ROOT-CLOSURE-SPLIT` | Remeasure the planner residue after the six domain moves and close static_transition.rs -- a fresh node, not a renamed item 3, and if the parent is already under 10k it records that and extracts nothing | draft | runtime | M | none | — |
+| `RT-PLANNER-UNITS-ABI-SPLIT` | Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain | ready | runtime | L | none | — |
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
-| `RT-RECURSIVE-POSITION-ARM-ARITY` | One recursive position index is pushed unchanged into every plain-Match arm body -- resolve_recursive_unit_body recurses per arm with the eliminator's single position, and args.get(position) refuses on any arm whose constructor does not carry that position, so the branched-scrutinee port descends correctly and then fails inside the arm | active | runtime | S | none | — |
+| `RT-RECURSIVE-POSITION-ARM-ARITY` | One recursive position index is pushed unchanged into every plain-Match arm body -- resolve_recursive_unit_body recurses per arm with the eliminator's single position, and args.get(position) refuses on any arm whose constructor does not carry that position, so the branched-scrutinee port descends correctly and then fails inside the arm | merged | runtime | S | none | — |
 | `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2443 |
 | `RT-REFUSAL-CONSEQUENCE-RESTORE` | Restore the two clauses the D2 refusal rewrite dropped as collateral -- the consumption site and the runtime-representation consequence -- without reopening the transfer reading D2 closed | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2390 |
 | `RT-REFUSAL-PIN-ABSENCE-CLAUSE` | Pin 2 of the re-homed refusal pins asserts two contains() clauses, so it pins what the refusal must SAY and nothing about what it must NOT say -- the temporal phrasing D1c refuted can be re-added beside both pinned clauses and every assertion still passes. Add the absence clause while both lanes still exist | merged | runtime | S | none | — |
@@ -336,6 +351,7 @@ the committed file matches the generator's output.
 | `RT-SECOND-RECOGNITION-ERASURE` | Determine whether the depth-2/3 static-worker rebind is a succession of one obligation or two distinct ones, and select the disposition on that fact -- erasure is REFUTED and is no longer this node's deliverable | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2377 |
 | `RT-SEED-CALL-PORT` | Seed-closure call port — a Call whose callee is the retained non-lexical closure form routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-SITEOP-CARRIED-WITNESS` | Site-bound operand reader cannot witness a carried value — a synthesized SiteOperand demands a compile-time Lowered template from the same seat byte-span activation wants carried | merged | runtime | M | none | — |
+| `RT-SOURCE-MACHINE-TYPES-SPLIT` | Relocate the existing source-machine types and control into their own child -- relocation ONLY, and explicitly not the transition IR, which is deferred to its own semantic node after this phase closes | draft | runtime | M | none | — |
 | `RT-SPECIALIZED-ACTIVE-RESUME` | A live specialized value with an Active frame is refused by a constructor-only destructure — Active resume does not require constructor shape | merged | runtime | S | none | — |
 | `RT-SPECIALIZED-MATCH-ATTRIBUTION` | A Match scrutinee arriving as a Specialized operand falls to the remainder arm, and neither the stage nor the seat says which Lowered class | merged | runtime | S | none | — |
 | `RT-SPLIT` | decompose cranelift_backend.rs | merged | runtime | L | none | — |
@@ -424,6 +440,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `LANG-SYMBOLIC-OPERATOR-NAMES` — `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
+- `RT-BRANCH-LOCAL-DECLARED-CALLABLE` — recursive_position_unit_body returns one Option<StaticOriginId> for the whole source, so whole-source agreement is too coarse for a Match whose arms differ -- the cut is constructor-and-recursive-position-specific callable authority installed inside the already-selected constructor case, which eliminates the closure crossing rather than opening a durable closure lane
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
 - `RT-CHECKED-IH-REALIZATION-AUTHORITY` — Mint the checked-IH realization authority -- pending marker, oriented plan, call template, slot and parent -- so the ComputationalRecursorClosure capsule is realizable IN PLACE at the source-machine Match seat, without widening the ordinary-Match selector and without any terminal-All licensing
@@ -431,6 +448,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
+- `RT-PLANNER-UNITS-ABI-SPLIT` — Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain
 - `RT-RETIRED-CENSUS-ROT` — Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` — Find one Ken SOURCE program that reaches the StaticWorkerBinding conservation arm specifically -- the existing bound is a search over hand-authored fixtures, and the six ignored ken-cli tests are NOT a ready-made corpus because they fail upstream at the sibling Closure arm
@@ -462,7 +480,6 @@ is itself not yet `merged`/`closed`:
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
 - `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: draft)
 - `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: ready)
-- `NATIVE-HANDLE-CARRIER` blocked by `RT-RECURSIVE-POSITION-ARM-ARITY` (status: active)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BRANCH-LOCAL-DECLARED-CALLABLE` (status: ready)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)
@@ -472,14 +489,27 @@ is itself not yet `merged`/`closed`:
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
 - `PX8-F-CAP-41` blocked by `NATIVE-HANDLE-CARRIER` (status: active)
-- `PX8-F-CAP-41` blocked by `RT-RECURSIVE-POSITION-ARM-ARITY` (status: active)
 - `PX8-F-CAP-41` blocked by `RT-BRANCH-LOCAL-DECLARED-CALLABLE` (status: ready)
 - `PX8` blocked by `PX8-F-CAP-41` (status: draft)
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
-- `RT-BRANCH-LOCAL-DECLARED-CALLABLE` blocked by `RT-RECURSIVE-POSITION-ARM-ARITY` (status: active)
+- `RT-BACKEND-SPLIT-CLOSURE` blocked by `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` (status: draft)
+- `RT-EMITTER-AGGREGATES-SPLIT` blocked by `RT-EMITTER-CONTROL-JOINS-SPLIT` (status: draft)
+- `RT-EMITTER-CALLS-RETURNS-SPLIT` blocked by `RT-SOURCE-MACHINE-TYPES-SPLIT` (status: draft)
+- `RT-EMITTER-CONTROL-JOINS-SPLIT` blocked by `RT-EMITTER-CALLS-RETURNS-SPLIT` (status: draft)
+- `RT-EMITTER-EFFECTS-SPLIT` blocked by `RT-EMITTER-AGGREGATES-SPLIT` (status: draft)
+- `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` blocked by `RT-EMITTER-EFFECTS-SPLIT` (status: draft)
+- `RT-LOWERING-FUNCTION-STATE-SPLIT` blocked by `RT-PLANNER-ROOT-CLOSURE-SPLIT` (status: draft)
+- `RT-LOWERING-VALUES-BOUNDARY-SPLIT` blocked by `RT-LOWERING-FUNCTION-STATE-SPLIT` (status: draft)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
+- `RT-PLANNER-AGGREGATES-SPLIT` blocked by `RT-PLANNER-CONTINUATIONS-SPLIT` (status: draft)
+- `RT-PLANNER-CONTINUATIONS-SPLIT` blocked by `RT-PLANNER-OCCURRENCES-SPLIT` (status: draft)
+- `RT-PLANNER-EFFECTS-SPLIT` blocked by `RT-PLANNER-AGGREGATES-SPLIT` (status: draft)
+- `RT-PLANNER-JOINS-TRAPS-SPLIT` blocked by `RT-PLANNER-EFFECTS-SPLIT` (status: draft)
+- `RT-PLANNER-OCCURRENCES-SPLIT` blocked by `RT-PLANNER-UNITS-ABI-SPLIT` (status: ready)
+- `RT-PLANNER-ROOT-CLOSURE-SPLIT` blocked by `RT-PLANNER-JOINS-TRAPS-SPLIT` (status: draft)
+- `RT-SOURCE-MACHINE-TYPES-SPLIT` blocked by `RT-LOWERING-VALUES-BOUNDARY-SPLIT` (status: draft)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
 ## Gate progress

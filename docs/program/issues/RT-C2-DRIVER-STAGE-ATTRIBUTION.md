@@ -1,7 +1,7 @@
 ---
 id: RT-C2-DRIVER-STAGE-ATTRIBUTION
 title: "The D5 observation identity driver reports every non-zero nested exit as `nested {} compilation failed`, so the one message AC-2 itself produces names the wrong stage -- plus one clause recording why the compiled-feature const must stay adjacent to the gate it mirrors"
-status: active
+status: merged
 owner: runtime
 size: XS
 gate: none
