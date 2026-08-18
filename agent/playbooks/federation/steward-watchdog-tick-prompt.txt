@@ -2,28 +2,34 @@ STEWARD WATCHDOG TICK. Run in order; stop as soon as one produces an action.
 
 ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` before arming; never grow a step without trimming another.
 
-0. CONTEXT GATE FIRST. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At or near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then `moot compact steward` from /workspaces/ken. Announcing is not doing.
+0. CREDIT BURN-DOWN (operator, 2026-08-18). OpenAI nearly exhausted; the operator wants it SPENT. Keep runtime, Architect and research on real work. When ACTUALLY empty: let the fleet idle, do NOT fail over to Anthropic, clear_interval. Idle terra/sol seats then are expected, not stalls -- do not rouse or reseat. My seat and the ADVERSARY are Anthropic and outlive the rest; staying quiet then is correct.
 
-0b. DISK (operator, 2026-08-18). `df -h /workspaces/ken /` -- BOTH, they are different filesystems. Either below 5G avail: reclaim before any other work, in this order: `.moot/truncate-logs.sh`; aged `tmp/ken-*`; `git gc` if `git count-objects -vH` shows garbage; a RETIRED seat's `target/`. Verify a seat dead 3 ways -- no tmux session, no `ps` match, no live `/proc/*/cwd` -- and NEVER touch a live ring's target. Axis is imminent work, never size.
+0a. CONTEXT GATE. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At/near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then `moot compact steward`. Announcing is not doing.
 
-1. RUNTIME IS THE ONLY LANE (operator, 2026-08-17). Residuals in order: carrier recut, the ready RT-* nodes, RT-DESCENT-RETIRE D6a. RT-CHECKED-IH-REALIZATION-AUTHORITY is ready + dependency-free and STAYS HELD -- it looks startable every tick. Every other ring stays idle; that is the cost of the priority, not a defect to fix. Finished work still merges; filings queue.
+0b. DISK. `df -h /workspaces/ken /` -- BOTH, different filesystems. Either below 5G: `.moot/truncate-logs.sh`; aged `tmp/ken-*`; `git gc` if garbage; a RETIRED seat's `target/`. Verify a seat dead 3 ways; NEVER touch a live ring's target.
 
-2. ARE THE LANE'S CRATES MOVING? ANCHOR THE PATHSPEC: `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so after any `cd` it silently reports 0 without erroring. Measured: 0 twice while the truth was 10.
+1. THE LANE'S PRIORITY IS RT-BACKEND-MODULE-SPLIT (operator, 2026-08-18). It REPLACED the retirement residuals. Sixteen slice frames are filed as a strict depends_on chain; item 4 RT-PLANNER-UNITS-ABI-SPLIT is released. As each lands, flip the next from draft to ready and release it -- that is the standing loop. Only RT-BACKEND-SPLIT-CLOSURE discharges the operator's 10k constraint; no earlier slice may claim phase closure. Residuals (RT-BRANCH-LOCAL-DECLARED-CALLABLE's post-D0 cut, the carrier D3/D4/D5) are NOT cancelled but are no longer what the lane is for. RT-CHECKED-IH-REALIZATION-AUTHORITY stays HELD.
 
-2b. STEP 2 IS AN AGGREGATE -- A MOVING LANE MASKS A DEAD ONE. Check each `status: active` node separately: is its ring working its next deliverable? Read the NODE, never a seat's status line -- it decays silently, in the direction that HIDES unblocked work. Measured: three rings idle on ALREADY-LANDED work, step 2 green throughout. Confirm a landing by BLOB IDENTITY (`git rev-parse origin/main:<path>` vs `<SHA>:<path>`), never ancestry -- the publisher squashes.
+2. ARE THE LANE'S CRATES MOVING? `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so it silently reports 0.
 
-2c. A DISPATCHED NODE LEFT AT `ready` IS INVISIBLE TO 2b. On release flip it `active`. A ring being awake is not the record.
+2b. STEP 2 IS AN AGGREGATE -- A MOVING LANE MASKS A DEAD ONE. Per `status: active` node: is its ring on its next deliverable? Read the NODE, not a status line. Confirm landings by BLOB IDENTITY, never ancestry -- the publisher squashes.
 
-3. HELD FINISHED WORK IS TOP OF QUEUE (COORDINATION 10-). Any candidate handed back and unpublished? Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file. Check none runs first: `ps -eo pid,ppid,etime,args >f; grep scripted-pr-automerge.sh f`; read the LISTING, skip `bash -c` lines. pgrep + `grep -v claude` HID a live publisher and I started a second. Never fetch or commit while one holds its window; never pipe it through tail/grep -- it block-buffers, poll `gh pr view <N>`. M1 needs a RESOLVED Decision read fresh over HTTP; the API IGNORES `limit`, so save to a file and filter. M8a: COMPACT ADVERSARY before the code-merge notify -- nothing else in the fleet does -- then rouse its pane.
+2c. A DISPATCHED NODE LEFT AT `ready` IS INVISIBLE TO 2b. On release flip it `active`.
 
-4. WIP AUDIT, 60 MIN -- VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: Architect ruling, QA verdict, handoff, leader routing, my own kick. Read the thread first. A reset you never looked for cannot reset a clock.
+2d. READ A PANE AT `-S -25` MINIMUM, NEVER `-S -6`, and grep for `Working|Worked for`. The finished-turn line sits ABOVE the placeholder, so a shallow window reports FALSE IDLE. A blank sweep row is an unmatched capture, not idle -- open that pane.
 
-5. ONE RELEASE AHEAD. Grep other nodes' `depends_on` for the in-flight id (not `blocks` -- they disagree; gen-progress.sh reads depends_on). Successors must be `ready` and shovel-ready. A MEASUREMENT-ONLY node never reaches `merged` -- close it, or successors gate on a landing that cannot happen.
+2e. COMPOSER STRANDS RECUR ON EVERY SEAT. Tell: a `[Pasted Content ...]` block with no Working footer. Repair: send `zz` (it appends = live composer, real strand), check the tail for a numbered modal (a bare Enter there silently downgrades the model), BSpace the probe, then a BARE `Enter` AS ITS OWN send-keys call. Never combine text and Enter. A leader reporting a downstream handoff does NOT mean the downstream seat woke -- verify Working yourself.
 
-5b. A KICK MUST CARRY THE ANCHOR SENTENCE VERBATIM: "This message is the thread anchor for <WP-ID>. Reply with parent_event_id set to this event's id; thereafter use its thread_id." A kick CANNOT quote the thread it opens -- the first reply mints it.
+3. HELD FINISHED WORK IS TOP OF QUEUE. Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file. Check none runs first: `ps -eo pid,ppid,etime,args | grep '[s]cripted-pr-automerge.sh'` and READ THE LISTING -- `grep -c` counts your own wrapper. Never fetch or commit while one holds its window. M1 needs a RESOLVED Decision read fresh from the object. M8a: COMPACT ADVERSARY before any code-merge notify.
 
-6. RESOLVE ACTOR IDS BEFORE COMPOSING MENTIONS: `scripts/moot-actor-id.sh <role>`. A remembered id wakes the wrong seat or nobody, silently.
+4. WIP AUDIT, 60 MIN -- VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: ruling, QA verdict, handoff, routing, my own kick.
 
-7. NEVER call get_transcript. Use get_recent_context/get_mentions with detail="standard"; poll adversary reports with since_event_id from the last tick.
+5. ONE RELEASE AHEAD. Grep other nodes' `depends_on` (not `blocks`; gen-progress.sh reads depends_on). A gate that exists only in prose gates NOTHING.
+
+5b. A KICK CARRIES THE ANCHOR SENTENCE VERBATIM: "This message is the thread anchor for <WP-ID>. Reply with parent_event_id set to this event id; thereafter use its thread_id."
+
+6. RESOLVE ACTOR IDS BEFORE MENTIONS: `scripts/moot-actor-id.sh <role>`.
+
+7. NEVER call get_transcript. Use get_recent_context/get_mentions with detail="standard".
 
 If nothing above produces an action, post nothing and stop. A quiet tick is a correct tick.
