@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-18 12:37:08Z — from 388 issue file(s) in `docs/program/issues/`.
+2026-08-18 12:42:33Z — from 388 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -328,7 +328,7 @@ the committed file matches the generator's output.
 | `RT-PLANNER-JOINS-TRAPS-SPLIT` | Move the joins and traps domain out of planning/static_transition.rs -- the last named planner domain, and generated traps receive no fabricated source origin | draft | runtime | M | none | — |
 | `RT-PLANNER-OCCURRENCES-SPLIT` | Move the occurrences domain out of planning/static_transition.rs -- StaticOriginId and source/child correspondence are occurrence-owned and must not be pulled into a shared identity drawer | draft | runtime | M | none | — |
 | `RT-PLANNER-ROOT-CLOSURE-SPLIT` | Remeasure the planner residue after the six domain moves and close static_transition.rs -- a fresh node, not a renamed item 3, and if the parent is already under 10k it records that and extracts nothing | draft | runtime | M | none | — |
-| `RT-PLANNER-UNITS-ABI-SPLIT` | Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain | ready | runtime | L | none | — |
+| `RT-PLANNER-UNITS-ABI-SPLIT` | Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain | active | runtime | L | none | — |
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-RECURSIVE-POSITION-ARM-ARITY` | One recursive position index is pushed unchanged into every plain-Match arm body -- resolve_recursive_unit_body recurses per arm with the eliminator's single position, and args.get(position) refuses on any arm whose constructor does not carry that position, so the branched-scrutinee port descends correctly and then fails inside the arm | merged | runtime | S | none | — |
@@ -448,7 +448,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
-- `RT-PLANNER-UNITS-ABI-SPLIT` — Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain
 - `RT-RETIRED-CENSUS-ROT` — Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` — Find one Ken SOURCE program that reaches the StaticWorkerBinding conservation arm specifically -- the existing bound is a search over hand-authored fixtures, and the six ignored ken-cli tests are NOT a ready-made corpus because they fail upstream at the sibling Closure arm
@@ -507,7 +506,7 @@ is itself not yet `merged`/`closed`:
 - `RT-PLANNER-CONTINUATIONS-SPLIT` blocked by `RT-PLANNER-OCCURRENCES-SPLIT` (status: draft)
 - `RT-PLANNER-EFFECTS-SPLIT` blocked by `RT-PLANNER-AGGREGATES-SPLIT` (status: draft)
 - `RT-PLANNER-JOINS-TRAPS-SPLIT` blocked by `RT-PLANNER-EFFECTS-SPLIT` (status: draft)
-- `RT-PLANNER-OCCURRENCES-SPLIT` blocked by `RT-PLANNER-UNITS-ABI-SPLIT` (status: ready)
+- `RT-PLANNER-OCCURRENCES-SPLIT` blocked by `RT-PLANNER-UNITS-ABI-SPLIT` (status: active)
 - `RT-PLANNER-ROOT-CLOSURE-SPLIT` blocked by `RT-PLANNER-JOINS-TRAPS-SPLIT` (status: draft)
 - `RT-SOURCE-MACHINE-TYPES-SPLIT` blocked by `RT-LOWERING-VALUES-BOUNDARY-SPLIT` (status: draft)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
