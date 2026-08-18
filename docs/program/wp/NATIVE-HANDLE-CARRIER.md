@@ -139,15 +139,27 @@ the CAP-41 fixture reaches `u64::MAX` through the checked `intToUInt64` bound.
 Body-view, computational-IH census, and erasure are **GREEN**. Interp half is
 GREEN on all four CAP-41 rows.
 
-**The residual, measured at `origin/main = 5404108a`:** the fixture now fails
-only at object emission —
+> ### THIS RESIDUAL IS CLOSED — 2026-08-18. The primitive is in the tree.
+>
+> The paragraph below is the measurement this node was opened on, and it is
+> **history**. `D2'` landed the identity arm: `int_to_uint64_raw` is live at
+> `crates/ken-runtime/src/cranelift_backend/lowering/core/primitive.rs:206`,
+> extending the `uint8_to_int | int_to_uint8_raw` arm, with a Big-carrier test
+> at `primitive/tests.rs:323`. Four occurrences under `crates/ken-runtime/src/`
+> at `36ecc162c`, where there were zero for this node's whole life.
+>
+> **Do not re-run the grep below as a check on current state** — it now returns
+> hits, and reading it as the frame intends would invert its meaning.
+
+**The residual, as measured at `origin/main = 5404108a` and now closed:** the
+fixture failed only at object emission —
 
 ```
 int_to_uint64_raw is not in the supported native set
 ```
 
-`grep -rn 'int_to_uint64_raw' crates/ken-runtime/src/` returns **nothing**. The
-primitive is absent from the native lowering entirely.
+`grep -rn 'int_to_uint64_raw' crates/ken-runtime/src/` returned **nothing** at
+that base. The primitive was absent from the native lowering entirely.
 
 > ✅ **RESIDUAL RE-MEASURED AND STILL TRUE at `origin/main = 06cb2964`**
 > (Steward, 2026-07-29 — supersedes the `dca1b793` and `5404108a` measurements).
@@ -359,10 +371,36 @@ contingency.
     `ImmediateInt` — so the carried word cannot reach that path with a `Big`
     payload. ⭐ **The `Big` fast-path mutation reddens and was reverted**, which
     is what makes this a measurement rather than a reading of the map.
+> ### `D0'` IS NOW THE NEXT CUT, AND IT RUNS BEFORE `D3` — 2026-08-18.
+>
+> **The missing port landed.** [[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]] is
+> `merged` (`D1` `5bac56000`, `D2` `ca639b5ef`), and `§2`'s residual — the
+> absence of `int_to_uint64_raw` from `crates/ken-runtime/` — is closed by this
+> node's own landed `D2'`. Verified in the tree at `36ecc162c`:
+> `recursive_position_unit_body` walks plain-`Match` arms at
+> `lowering/core.rs:15910` before route 1 at `:15919`, and the identity arm is
+> live at `lowering/core/primitive.rs:206`.
+>
+> ⇒ **`D3`, `D4` and `D5` were all written against a tree that could not run
+> them.** They are unchanged in substance and they are no longer the next
+> action; the deciding measurement is, and each of them forks on its result.
+> **Full statement of `D0'` is in the node**, `docs/program/issues/`.
+
+- **`D0'`** — **restore the four `cap41_*` Rust rows and run them; report the
+  outcome.** Recover the four `#[test]` rows and their exclusive helper
+  `assert_cap41_derived_without_read` from `4c9c59d3e`
+  (`crates/ken-cli/tests/rt_parity_native.rs:593`, `:620`, `:627`, `:634`,
+  `:641`). Four test functions plus one helper into a file already in the tree.
+  Ride `AC-5`'s never-run deciding measurement with it — same file, same pass.
+  **Green, a new refusal, and the same refusal are all releasable results**; a
+  red `D0'` is a successful `D0'`. Do not extend the turn into a repair, and do
+  not act on the `AC-5` reading.
 - **`D3`** — the four focused discriminators of `§8` (`AC-3`), before the full
-  oracle.
+  oracle. **Gated on `D0'`.**
 - **`D4`** — the CAP-41 fixture carried to **full native GREEN**, and the full
   two-engine oracle: all four CAP-41 rows absolute GREEN on **both** engines.
+  **Gated on `D0'`** — if `D0'` comes back green this collapses into an oracle
+  pass, and if it comes back red its content is decided by the new refusal.
 - **`D5`** — the Architect's six-axis matrix (a)–(f) discharged, plus the
   2-of-22 family count from `§5` and any further staircase gap encountered.
 
