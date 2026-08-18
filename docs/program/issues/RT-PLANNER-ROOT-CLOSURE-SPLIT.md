@@ -83,62 +83,144 @@ private types, macro-generated declarations, declarations whose visibility and
 type keyword are split across lines, traits, constants, functions, or fields.
 A ledger that does not say what its selector missed is not a ledger.
 
-# `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
-
-Move the owner into its own child module, extending the established seam.
-Adapters are permitted **as transitional scaffolding only**, and item 18 deletes
-them.
-
-# `D2` — THE COMPANION TEST MOVE. Separate accepted partial.
-
-`lowering/core/tests/control.rs` is **33,969 lines and in scope** — the
-operator's constraint says large files and excepts nothing, and a test file is
-not exempt. **It is a companion axis, not a phase of its own.**
-
-**Move only the tests whose primary discriminated property belongs to the owner
-this slice just established** (any planner-root controls left unattributed by
-items 4-9). Place multi-leaf fixtures **once**,
-at their lowest common ancestor — `tests/mod.rs` or a narrowly named
-`support.rs` — and never duplicate them. **Leave genuinely lowering-wide
-controls in the residual `control.rs`.**
-
-> ### DO NOT DECOMPOSE `control.rs` ON PRODUCTION FILE BOUNDARIES OR BY LINE RANGES
+> # THIS NODE DOES NOT CARRY THE UNIFORM `D1`/`D2` TEMPLATE
 >
-> **Architect `evt_6r403ez3m2m69`.** `control.rs` holds several independent
-> populations — planner/occurrence, continuation/fusion, function-state and
-> source-machine, emitter and join/trap controls, plus cross-cutting census and
-> closure tests. **That is not one production owner**, and partitioning it by
-> where the code under test happens to live today re-homes tests twice.
+> **Architect `evt_14x1bqgrj4yze`.** An unconditional "move the owner into a
+> child module" deliverable contradicts this node's own semantics — it may
+> correctly move **nothing**. **`D0` selects exactly one of three outcomes**, and
+> what follows from it depends on which:
 >
-> **There is no upfront "split all the tests" phase**, deliberately: it would
-> choose owners before their production boundaries exist and churn the same
-> imports and fixtures a second time.
-
-**`D1` and `D2` are separate accepted partials by default.** Combine them into
-one candidate **only** when an exact compile or mutation-restoration dependency
-makes the pair semantically atomic — and say which it was.
-
+> | `D0` outcome | what follows |
+> |---|---|
+> | **1. parent already below 10k** | **The measured no-move record IS the complete accepted result.** `D1` and `D2` are **not applicable** and are not written. |
+> | **2. a cohesive graph lifecycle exists** | `D1` moves **that whole lifecycle**; `D2` moves **only its companion tests**. |
+> | **3. a representation or accessor change is required** | **Record the hard stop and frame that semantic change separately. Perform NO "relocation" under this node.** |
+>
+> **Outcome 1 is the most likely and it is a success.** Do not treat an empty
+> move as a failure to find work, and do not extract speculatively to produce a
+> deliverable — that is the size-driven extraction this phase bans.
+>
+> **Outcome 3 requires the full ledger set BEFORE anything moves:** old-to-new
+> storage, constructor/writer, accessor, derive/layout, visibility and cfg. A
+> representation change is not a move and does not get a move's review.
 
 # ACCEPTANCE
 
-- **`AC-1`** — the old/new **symbol ledger** is exact and complete for this
-  owner, and every entry names its old path and its new path. **Control:** the
-  ledger's symbol count reconciles against a fresh selector run at the stated
-  SHA, and the selector and its blind spots are both recorded.
-- **`AC-2`** — the **test-property ledger** is exact, and every moved test names
-  the property it discriminates. **Control:** each moved mutation reds **the same
-  reached property**, with the same **nonzero** denominator, and is restored. A
-  mutation whose denominator is zero has not shown the test reaches anything.
-- **`AC-3`** — **no representation, diagnostic, hash, serialization, behaviour or
-  trust change**, and **no widened production API**. **Control:** the diff is
-  reviewable as a relocation — a reviewer can pair every removed line with an
-  added one, or the hunk is called out as not a move.
+**Amended on the Architect's whole-plan verdict `evt_14x1bqgrj4yze`.** The
+first-cut acceptance did not prove the completeness or the preservation it
+claimed; what follows is the corrected bar.
+
+- **`AC-1` — an EXACT move ledger, closed over every Rust item class.**
+  > **"Record the blind spots" is honest and it does not close them.** Stage A's
+  > type selector sees 278 non-private types and does **not** see 694 `pub fn`,
+  > 25 `pub const`, 7 `pub static`, 5 `pub mod`, private items, traits, impl
+  > methods, macros, split-line declarations, or fields. A ledger built on it
+  > alone is not exact, whatever it says about its own limits.
+
+  Enumerate **every** moved item class: modules and re-exports; types with their
+  fields and variants; traits, impls and methods; functions; consts and statics;
+  cfg, attributes, derive, repr and visibility; and macro-produced owned items.
+  **Each class needs its own fresh selector or syntax inventory, plus an explicit
+  manual closure for what that selector cannot see.**
+
+  **A group label is not a ledger entry.** "ABI preflight helpers" names a set
+  without enumerating it and does not discharge "exact".
+
+  **Reconcile every moved declaration and use site to EXACTLY ONE owner.**
+  Research `evt_1pwq0rssre6d8`: *"A selector count plus a blind-spot paragraph
+  cannot discharge a universal."* Either narrow the words "exact and complete" to
+  a **declared selector population**, or supply a **closure method for the blind
+  classes**. Do not claim the universal on the strength of the count.
+
+  **Source-text oracles and `include_str!` paths belong in the ledger** — Stage A
+  found **49** such lines, and relocation can change what they mean without
+  changing production behaviour.
+
+- **`AC-2` — test identity and DISCOVERY, before the mutation proof.**
+  > **Mutation restoration proves the discriminating tests that have mutations.
+  > It does not prove that every moved test is still DISCOVERED** under the same
+  > cfg and profile. A test that silently stops being collected passes every
+  > mutation check that remains.
+
+  Produce a **before/after test identity and discovery ledger for each relevant
+  build profile**; execute directly and record a **nonzero selected-test count**;
+  **then** the mutation proof — each moved mutation reds the **same reached
+  property**, with the same **nonzero** denominator, restored. **Enumerate any
+  source-oracle path or text rewrite as a non-move hunk.**
+
+  **Each test-ledger row carries its CLASS and its exact old/new production
+  INJECTION POINT.** Research `evt_1pwq0rssre6d8`, from the program report's
+  four-way partition: **domain tests, shared fixtures, mutation controls at their
+  production injection point, and end-to-end controls crossing planning through
+  execution.**
+  > **Class 4 legitimately REMAINS in the residual integration module.** A
+  > ledger row without a class invites an end-to-end control to be converted into
+  > a domain test, or moved by size — which is exactly what the report forbids.
+
+- **`AC-3` — a TRANSPORT MANIFEST, not a line-pairing review aid.**
+  > **Pairing removed lines with added lines is not a behaviour-preservation
+  > control.** Attributes, cfg, visibility, field and variant order, derives,
+  > imports and name resolution, re-export surfaces and diagnostics can all
+  > change while every line still pairs.
+
+  For **every** moved item record **old path, new path**, and an item comparison
+  preserving **body, attributes, cfg, repr/derive, field and variant order,
+  visibility, diagnostic text, hashes and serialization, and public/export
+  profile**.
+
+  **Permitted normalization, and nothing else:** module declarations, imports and
+  path qualification, and **explicitly ledgered** adapter/re-export scaffolding.
+  **Enumerate every other hunk as a non-move. A semantic hunk hard-stops the
+  slice.** `git diff --color-moved` may support the review; **it cannot be the
+  gate.**
+
 - **`AC-4`** — the affected library configuration **and** the targeted test
   configurations both compile. **Control:** scoped `scripts/ken-cargo` runs only;
   the workspace gate is **CI's**, never a local run.
-- **`AC-5`** — this slice's own transfer is stated as complete, and **phase
-  closure is explicitly NOT claimed.** A frame that reports the bound file's new
-  line count as evidence the phase is done fails this criterion.
+
+- **`AC-4b` — the TARGET CHILD's size is constrained, not just the root's.**
+  Record the resulting line count of **every file this slice creates or
+  enlarges**. **No move may create a file over 10k**, and a move that would is a
+  finding to route rather than a transfer to complete.
+  > Research `evt_1pwq0rssre6d8`: none of the fifteen move frames constrained the
+  > target child's size, so the phase could shrink every root while producing a
+  > fresh violation.
+- **`AC-5` — the ADAPTER AND FACADE DEBT LEDGER.** Any `D1` that introduces
+  transitional scaffolding **appends an exact ledger** naming the symbol, why it
+  is temporarily required, and **the final-closure deletion obligation**.
+  > **[[RT-BACKEND-SPLIT-CLOSURE]] cannot prove it deleted "every adapter" if the
+  > earlier slices never closed the population.** This criterion is what makes
+  > that closure checkable, and it is owed by every slice that leaves scaffolding
+  > behind.
+
+- **`AC-6`** — this slice's own transfer is stated as complete, and **phase
+  closure is explicitly NOT claimed.** Reporting a bound file's new line count as
+  evidence the phase is done fails this criterion.
+
+> ### LABEL THE THREE EVIDENCE SEATS IN THE LEDGER. Guardrail 7.
+>
+> **Research `evt_1pwq0rssre6d8`.** The common gate already says plans and
+> commands never count as emitted evidence. The ledger must additionally label,
+> per moved item, the **intention producer**, the **independent artifact
+> observer / evidence decoder**, and the **closeout / publication seat** —
+> **so a convenient emitter-family move cannot silently collapse them into one.**
+
+# THE FROZEN STAGE PREDICATE — so `D0` cannot choose the boundary opportunistically
+
+**Architect `evt_14x1bqgrj4yze`.** The per-domain symbol sets are deliberately
+**not** pre-enumerated here — that would duplicate `D0` and go stale. What is
+frozen is the total predicate:
+
+- **The planner owns** plan identities, minting, relation and seat construction,
+  validation and closure, and read-only projections.
+- **The emitter owns** concrete CLIF/backend mutation that consumes a validated
+  plan, and **may not mint or reshape planner identity**.
+- **Aggregate, effect, and join/trap symbols are assigned EXACTLY ONCE across
+  their planner/emitter pair.** The later `D0` **reconciles against the earlier
+  LANDED ledger, not against its frame.**
+
+That settles items 7/15, 8/16 and 9/14 as a boundary question. **The exact names
+remain `D0`'s job.**
 
 # BANNED SCOPE
 
@@ -162,19 +244,35 @@ makes the pair semantically atomic — and say which it was.
 campaign section 4, ground 3. That is the constraint that orders this whole
 phase, and it is the reason the planner domains come first:
 
-> ### THE PLANNER CHAIN IS CONTENTION-FREE WITH THE LANE'S LIVE SEMANTIC WORK
+> ### CHECK CONTENTION BY FILE INTERSECTION AT PICKUP, NOT BY THIS NODE LIST
 >
-> **Measured 2026-08-18.** The runtime lane's live semantic nodes —
-> [[RT-BRANCH-LOCAL-DECLARED-CALLABLE]] and the residuals behind it — contend on
-> `lowering/core.rs`, **not** on `static_transition.rs`. So items 4 through 9b
-> can run while that work is still in flight.
+> **Architect `evt_14x1bqgrj4yze`.** A frame that names today's live semantic
+> nodes is **deliberately perishable** — the claim was true when written and
+> decays silently.
 >
-> **Items 10 onward cannot**, and that is stated in their own frames. Verify the
-> claim at pickup rather than inheriting it; it is a statement about which nodes
-> are live, and that changes.
+> **The durable rule:** a **planner** slice checks active semantic candidates
+> against `static_transition.rs` and `control.rs`; a **lowering or emitter**
+> slice checks `core.rs`, `mod.rs` and `control.rs`. **A non-empty intersection
+> holds the slice.**
+>
+> The sequencing preference stands — planner work first, lowering and emitter
+> work only after semantic work has left those files.
 
-**The planner slices contend with EACH OTHER** — they all edit one file — so
-they are a strict chain, not a fan-out. That is what `depends_on` encodes here.
+> ### THE CHAIN'S WARRANT IS ARTIFACT DEPENDENCY, NOT SEAT COUNT
+>
+> **Corrected on the Architect's verdict.** This frame first justified the strict
+> chain partly by there being one implementer seat. **Seat count is scheduling
+> state, not architecture, and it must not be encoded as a dependency.**
+>
+> **The chain is nevertheless honest, for a real reason:** every `D2` reads and
+> edits the same `lowering/core/tests/control.rs`, and each later `D0` must
+> **remeasure the tree after the preceding production and test relocation**.
+> Within the planner and the lowering/emitter groups the production roots also
+> collide.
+>
+> ⇒ **If production and test moves were ever split into independent nodes**, the
+> planner-production and lowering-production chains could **fork**, with final
+> closure joining them. **With the current frames they cannot.**
 
 **Re-derive every symbol by name at pickup**, never by the line offsets in any
 frame or census row. `static_transition.rs` is 34,883 lines and every slice
