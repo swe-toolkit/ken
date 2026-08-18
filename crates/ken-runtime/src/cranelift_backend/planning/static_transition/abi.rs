@@ -20,9 +20,10 @@
 use std::collections::BTreeSet;
 
 use super::semantic_ir::{
-    positioned_sources, DenseRange, PredeclaredFunctionId, RuntimeExprShape, SemanticAtomKind,
+    positioned_sources, DenseRange, RuntimeExprShape, SemanticAtomKind,
     SemanticOperandElement, SemanticOwner,
 };
+use super::units::PredeclaredFunctionId;
 use super::{
     planner_capacity_error, planner_error, unsupported, BoundaryReferentOwner,
     ContinuationContextId, ContinuationSourceCoordinate, ContinuationSourceSlotAuthority,
