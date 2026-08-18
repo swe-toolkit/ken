@@ -105,6 +105,11 @@ pub use lowering::core::{
 // `RT-DYNAMIC-ARM-SCALAR-MERGE` `c2`: the real D5 package control's isolated,
 // default-off view of general scalar-merge decisions. The declarations are
 // doc-hidden and explicitly unsupported as production API.
+//
+// Keep this compiled-feature fact adjacent to the feature-gated re-export it
+// mirrors: one `ken-runtime` feature resolution feeds both predicates here.
+// Moving either into another crate would reopen cross-crate feature-resolution
+// drift.
 /// Whether this `ken-runtime` build includes the D5 observation entry point.
 ///
 /// This fact stays available in both configurations so cross-crate controls

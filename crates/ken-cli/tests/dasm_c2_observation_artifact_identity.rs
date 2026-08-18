@@ -139,7 +139,7 @@ fn compile_artifact(target_dir: &Path, output_dir: &Path, observation_enabled: b
     let output = command.output().expect("nested Cargo compilation runs");
     assert!(
         output.status.success(),
-        "nested {} compilation failed:\nstdout:\n{}\nstderr:\n{}",
+        "nested {} run failed:\nstdout:\n{}\nstderr:\n{}",
         if observation_enabled {
             "feature-on"
         } else {
