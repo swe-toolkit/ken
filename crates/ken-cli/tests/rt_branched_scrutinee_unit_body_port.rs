@@ -1,9 +1,10 @@
 //! `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` D1 witness.
 //!
-//! MEASURED: the observer records resolver entry, plain-Match descent, and the
-//! direct non-`Construct` route-1 return while this checked Ken source lowers.
-//! CLAIMED: D2 enters and descends through the carried child's owning plain
-//! `Match`, then advances past route 1.
+//! MEASURED: the observer records resolver entry, plain-Match branch entry, successful
+//! plain-Match arm-body lookup, and the direct non-`Construct` route-1 return
+//! while this checked Ken source lowers.
+//! CLAIMED: D2 enters the carried child's owning plain `Match`, walks its first
+//! arm, then advances past route 1.
 
 #![cfg(target_os = "linux")]
 
@@ -93,11 +94,19 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
         !route1[0].route1,
         "D2 must advance past route 1: {route1:?}"
     );
-    assert!(route1[0].match_descent, "D2 must descend into the plain Match");
+    assert!(
+        route1[0].match_branch_entered,
+        "D2 must enter the plain Match branch"
+    );
+    assert_eq!(
+        route1[0].match_arms_walked, 1,
+        "D4 must walk arm 0 after entering the plain Match: {route1:?}"
+    );
     eprintln!(
-        "RT_BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1 entered={} route1={}",
+        "RT_BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1 entered={} route1={} match_arms_walked={}",
         route1.len(),
         route1.iter().filter(|row| row.route1).count(),
+        route1.iter().map(|row| row.match_arms_walked).sum::<usize>(),
     );
     let error = result.expect_err("D2 exposes the next refusal");
     eprintln!("RT_BRANCHED_SCRUTINEE_UNIT_BODY_D2_ADVANCED {error:?}");
@@ -108,10 +117,10 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
 }
 
 #[test]
-fn suppressed_match_descent_keeps_the_old_observation_but_fails_the_repaired_one() {
+fn suppressing_match_branch_entry_is_a_recorder_positive_control() {
     let root = tempfile::tempdir().expect("temporary native-build root");
     let (_, rows) = ken_runtime::with_branched_scrutinee_unit_body_route1(|| {
-        ken_runtime::with_branched_scrutinee_unit_body_match_descent_suppressed(|| {
+        ken_runtime::with_branched_scrutinee_unit_body_match_branch_entry_suppressed(|| {
             ken_cli::build_native_program(
                 BRANCHED_SCRUTINEE_SOURCE,
                 ken_cli::SourceFormat::Ken,
@@ -123,7 +132,7 @@ fn suppressed_match_descent_keeps_the_old_observation_but_fails_the_repaired_one
     assert_eq!(rows.len(), 1, "the resolver entry remains observable");
     assert!(!rows[0].route1, "the old route-1 observation remains satisfied");
     assert!(
-        !rows[0].match_descent,
-        "the repaired witness must reject a resolver that does not descend"
+        !rows[0].match_branch_entered,
+        "the pre-recorder suppression is a positive control for branch-entry recording"
     );
 }
