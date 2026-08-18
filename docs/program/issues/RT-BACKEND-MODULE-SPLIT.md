@@ -63,22 +63,22 @@ complete for its named transfer, independently reviewable and mergeable, and
 | 1 | [[RT-BACKEND-SPLIT-CENSUS]] — Stage A, no code move | yes |
 | 2 | [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] — early critical-path slice | yes |
 | 3 | [[RT-PLANNER-GRAPH-FOUNDATION-SPLIT]] — **CLOSED, no code. The substrate is empty; it gates nothing** | yes |
-| 4 | `RT-PLANNER-UNITS-ABI-SPLIT` — first planner domain, **starts immediately** | |
-| 5 | `RT-PLANNER-OCCURRENCES-SPLIT` | |
-| 6 | `RT-PLANNER-CONTINUATIONS-SPLIT` — after the continuation/evidence churn lands | |
-| 7 | `RT-PLANNER-AGGREGATES-SPLIT` | |
-| 8 | `RT-PLANNER-EFFECTS-SPLIT` | |
-| 9 | `RT-PLANNER-JOINS-TRAPS-SPLIT` | |
-| 9b | `RT-PLANNER-ROOT-CLOSURE-SPLIT` — **fresh node after 4-9**, remeasures the residue | |
-| 10 | `RT-LOWERING-FUNCTION-STATE-SPLIT` | |
-| 11 | `RT-LOWERING-VALUES-BOUNDARY-SPLIT` | |
-| 12 | `RT-SOURCE-MACHINE-TYPES-SPLIT` — existing types/control only | |
-| 13 | `RT-EMITTER-CALLS-RETURNS-SPLIT` | |
-| 14 | `RT-EMITTER-CONTROL-JOINS-SPLIT` | |
-| 15 | `RT-EMITTER-AGGREGATES-SPLIT` | |
-| 16 | `RT-EMITTER-EFFECTS-SPLIT` | |
-| 17 | `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` | |
-| 18 | `RT-BACKEND-SPLIT-CLOSURE` — delete adapters, narrow facades, remeasure | |
+| 4 | [[RT-PLANNER-UNITS-ABI-SPLIT]] — first planner domain, **starts immediately** |  yes |
+| 5 | [[RT-PLANNER-OCCURRENCES-SPLIT]] |  yes |
+| 6 | [[RT-PLANNER-CONTINUATIONS-SPLIT]] — after the continuation/evidence churn lands |  yes |
+| 7 | [[RT-PLANNER-AGGREGATES-SPLIT]] |  yes |
+| 8 | [[RT-PLANNER-EFFECTS-SPLIT]] |  yes |
+| 9 | [[RT-PLANNER-JOINS-TRAPS-SPLIT]] |  yes |
+| 9b | [[RT-PLANNER-ROOT-CLOSURE-SPLIT]] — **fresh node after 4-9**, remeasures the residue |  yes |
+| 10 | [[RT-LOWERING-FUNCTION-STATE-SPLIT]] |  yes |
+| 11 | [[RT-LOWERING-VALUES-BOUNDARY-SPLIT]] |  yes |
+| 12 | [[RT-SOURCE-MACHINE-TYPES-SPLIT]] — existing types/control only |  yes |
+| 13 | [[RT-EMITTER-CALLS-RETURNS-SPLIT]] |  yes |
+| 14 | [[RT-EMITTER-CONTROL-JOINS-SPLIT]] |  yes |
+| 15 | [[RT-EMITTER-AGGREGATES-SPLIT]] |  yes |
+| 16 | [[RT-EMITTER-EFFECTS-SPLIT]] |  yes |
+| 17 | [[RT-EMITTER-TERMINALS-CLEANUP-SPLIT]] |  yes |
+| 18 | [[RT-BACKEND-SPLIT-CLOSURE]] — delete adapters, narrow facades, remeasure |  yes |
 
 > # THE OPERATOR'S ONLY REQUIREMENT — 2026-08-18. Read this before the prose below.
 >
@@ -155,9 +155,13 @@ complete for its named transfer, independently reviewable and mergeable, and
 > companion test move. Combine them only when an exact compile or
 > mutation-restoration dependency makes the pair semantically atomic.
 >
-> **Items 4-18 remain unfiled and that is still deliberate.** They wait on item
-> 3's `D0`, which reports where the foundation boundary actually falls — and the
-> census may still prove two adjacent small families are one lifecycle.
+> **SUPERSEDED 2026-08-18: ITEMS 4-18 ARE NOW FILED.** This paragraph read
+> *"Items 4-18 remain unfiled and that is still deliberate. They wait on item
+> 3's `D0`"*. **Item 3 ran its `D0` and closed** — the subtraction proof came
+> back empty and it gates nothing — so **the condition this bar named is
+> discharged**, and the operator made this phase the runtime lane's priority the
+> same day. The sixteen frames are filed as a strict `depends_on` chain, with
+> item 4 `ready` and the rest `draft` behind it.
 
 **Only the first two were filed initially, and that was deliberate.** They are the
 two with structural consequence at the time: item 1 gates the phase, and item 2
@@ -433,8 +437,13 @@ a "yes" makes it the first WP of the phase.
 >
 > | report | what it supplies to this frame |
 > |---|---|
-> | `research/compiler-refactoring-program.md` (#1630) | the two-arc program, the recommended module-ownership map (§4), the stage breakdown (§5), the recommended WP cuts (§6), and nine named guardrails (§7) |
-> | `research/compiler-obligation-ir-refactor.md` (#1628, #1631) | canonical planned/generated terms, a closed source machine, a hybrid checked transducer, immediate Cranelift command interpretation, concrete post-emission evidence |
+> | `research/compiler-refactoring-program.md` (#1630) | the two-arc program,
+> the recommended module-ownership map (§4), the stage breakdown (§5), the
+> recommended WP cuts (§6), and nine named guardrails (§7) |
+> | `research/compiler-obligation-ir-refactor.md` (#1628, #1631) | canonical
+> planned/generated terms, a closed source machine, a hybrid checked
+> transducer, immediate Cranelift command interpretation, concrete
+> post-emission evidence |
 >
 > **Reference is not adoption.** Both are marked advisory and neither is an
 > architecture ruling; the first says outright that the Steward and Architect own
