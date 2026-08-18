@@ -76,26 +76,101 @@ the rows are the only instrument that says whether this node is nearly finished
 or still gapped, and **no such instrument currently exists in the tree** — the
 Ken programs survive but nothing drives them.
 
-**Three outcomes, and the frame forks on which one lands.** Report the outcome,
-do not repair toward one:
+> ## `D0'` RAN. THE OUTCOME TABLE BELOW WAS DEFECTIVE AND IT IS THE STEWARD'S.
+>
+> **Result, runtime-leader `evt_2kdscqgge6x2p`, at exact `86049d660`:** all four
+> restored rows **0 passed / 4 failed**, every one at `ObjectEmission` /
+> `checked_process_object` with exactly *"Cranelift backend failure: module
+> operation failed: recursive position is outside its source constructor"*.
+> `AC-5`'s row, run `--ignored`, is **0/1 with the identical refusal at BOTH**
+> the frozen base `7b8dad7df` and the `D0'` tip. The ring read that as the
+> same-refusal arm and hard-stopped, exactly as the table below instructed.
+>
+> ### THE TABLE FORKED ON THE REFUSAL STRING, AND THE STRING CANNOT CARRY IT.
+>
+> **Measured here, and it is decisive:** at `7b8dad7df` the resolver is a
+> single flat `recursive_position_unit_body` at `:15668` with **no Match branch
+> at all** — its only non-`Construct` behaviour is `return Ok(None)` at `:15680`
+> — and that tree **already produces this exact string**, from `:15683-15685`,
+> the `Construct`-with-out-of-range-position site. The post-port site is the
+> same one, now at `core.rs:15924`.
+>
+> ⇒ **The string is produced by a site the port never touched, and it is
+> reachable in both trees.** So it cannot distinguish *"the port did not reach
+> this population"* from *"the port reached it and something downstream fails
+> the same way"* — and `AC-5`'s row producing it on a tree with no Match branch
+> is the positive proof of that, not a coincidence.
+>
+> ### AND THE ERR ABORTS THE COMPILE, SO THE MEASUREMENT MAY BE BLIND BY CONSTRUCTION
+>
+> `:15924` returns `Err`, propagated by `?`. A compile makes **many** calls into
+> this resolver, and the reported message is whichever call aborts **first** —
+> not necessarily the governed population's. The node's own recorded measurement
+> at `3d23f1182` (`evt_42nvqwvj71mjb`) has all five governed programs on **route
+> 1** with a uniformly plain-`Match` scrutinee, which is `Ok(None)` and **cannot
+> produce this string**. Both facts can hold at once only if an **unrelated**
+> call site raises the `Err`.
+>
+> **If that is what is happening, these four rows report the same thing whatever
+> the port does**, and `D0'` measured nothing about this node's subject.
+>
+> ⇒ **NOT a hard stop. The next cut is attribution**, and its instruments are
+> already in the tree.
 
-| outcome | what it means | what happens next |
+**`D0''` — attribute the `Err` to its call site. One run, existing instruments.**
+
+Run the four governed programs under the port node's own observer and report,
+**per program**, `entered` / `route1` / `match_arms_walked`, together with the
+static origin of the call that raises `:15924`.
+
+| reading | means | disposition |
 |---|---|---|
-| the four rows are **GREEN** | the port was the whole gap | `D3`/`D4` collapse into an oracle pass; the node is close to done |
-| they refuse for a **new** reason | the port closed the first blocker and exposed the next, as the route-2/3 note below always said it might | the next blocker is measured and cut, exactly as this one was |
-| they refuse for the **same** reason | the port does not reach this population | a hard stop to the Steward — the port node's own banner warns its measured population did not survive this node's recut |
+| `match_arms_walked >= 1` | the arms **were** walked; the port reached this population and the failure is downstream of it | a new blocker, measured and cut exactly as this one was |
+| `route1 >= 1`, `match_arms_walked == 0` | the scrutinee still never reaches the Match branch | the genuine same-refusal hard stop, now actually established |
+| neither recorder fires for these programs | the `Err` comes from an **unrelated** call and aborts before this node's subject is evaluated | the blocker is somebody else's; find its owner before touching this node |
 
-⇒ **A red result is a successful `D0'`.** The deliverable is the measurement,
-and it is releasable in whichever direction it lands. Do not extend the turn
-into a repair.
+**`match_arms_walked` is the discriminating instrument here** even though the
+Adversary showed it adds nothing on the `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT`
+witness (`evt_1d9jr3cdp8qpz`). That finding is about a witness whose refusal
+assertion already entailed the count. **This question is literally "were the
+arms walked", which is what the counter measures**, and no assertion here
+entails it.
 
-**Ride `AC-5`'s deciding measurement with it — same file, same pass.** The
-"no honest partial" ban in `§9` of the frame rests on a warrant that is
-discharged, and the measurement that would settle whether the ban still binds
-has never been run: `fs_read_at_malformed_offset_narrows_to_invalid_offset`
-(`rt_parity_native.rs:687`) at base `7b8dad7df` versus at the tip. Report both
-readings. **Do not act on the answer** — lifting that ban is the Architect's,
-and a discharged warrant does not by itself discharge a ruling.
+⇒ **A red result is still a successful deliverable.** The deliverable is the
+measurement. Do not repair toward an outcome, and do not enter `D3`/`D4`/`D5`.
+
+> ### THE FRAME DEFECT, STATED SO IT IS NOT REPEATED
+>
+> The table forked on **the refusal's identity** when what the disposition
+> needed was **the refusal's provenance**. An error string names what went
+> wrong; it does not name which call produced it, and on an aborting `Err` in a
+> multi-call path those are different questions. **A fork whose arms are
+> distinguished only by a message is not a fork** — give it an instrument that
+> reads the route.
+
+> ### `AC-5`'s DECIDING MEASUREMENT IS IN. IT REFUTES THE BAN'S FACTUAL PREMISE.
+>
+> Ran `--ignored` at both ends (`evt_2kdscqgge6x2p`):
+> `fs_read_at_malformed_offset_narrows_to_invalid_offset`
+> (`rt_parity_native.rs:687`) is **0 passed / 1 failed at the frozen base
+> `7b8dad7df`**, with the same `ObjectEmission` refusal it gives at the tip.
+>
+> **The row is RED at the base.** The `§9` "no honest partial" ban's stated
+> warrant is that the candidate *regresses an already-GREEN native row*. A row
+> that is red before the candidate exists is not regressed by it. The frame's
+> own 2026-08-17 note predicted exactly this — *"on the record the candidate
+> does not regress it; the refusal arrived from `main` in the rebase"* — and
+> this is that prediction measured rather than argued.
+>
+> ⛔ **THE BAN STILL BINDS.** A refuted warrant is not a lifted ruling, and
+> lifting it is the **Architect's**, not mine and not the ring's. Routed as a
+> ruling request, not acted on. The ring correctly did not act on it either.
+>
+> **One caution for whoever rules.** This row failing identically at a base with
+> **no Match branch at all** is also the evidence that the refusal string is
+> non-discriminating (above). Do not read its redness at base as a fact about
+> *this* row's own health until the `Err` is attributed — it may be an unrelated
+> aborting call, in which case the row's true state is still unmeasured.
 
 > ### TWO ROWS ABOVE WERE FALSE FOR FIVE HOURS: "REFUSED BY CI", "RED CHECKS"
 >
