@@ -63,6 +63,17 @@ source and planner authority.
   through planner-owned operands or an already-admitted structural-value route,
   **that case still refuses. The guard is not weakened.**
 
+> ### WHY THIS IS `ready` WHILE ITS DEPENDENCY IS STILL `active`
+>
+> `gen-progress.sh` warns on this deliberately, so here is the answer rather
+> than an ambiguity. **`D0` is classification only and touches no production
+> line**, so it does not need the arity node's `D1` recut to land first. The
+> `depends_on` edge is real and governs the **implementation** deliverable,
+> which contends on the same function and must sequence after that recut.
+>
+> **Releasing `D0` early is safe; releasing an implementation deliverable early
+> is not.** Do not read this block as licence for the latter.
+
 # `D0` — CLASSIFY THE QUARANTINED ROWS. Do NOT bulk-assign them.
 
 **The Architect ruled this explicitly, and it corrects my own framing.** I
