@@ -186,6 +186,90 @@ live-domain cross-artifact call, durable export/persistence, or **unresolved**.
 > the call site can supply it.** A classification that reads capture shape and
 > stops has not answered the question the implementation needs answered.
 
+## `D0` classification at base `26fcced259f3d87bad3565536825a4f6c4441ce8`
+
+### Set 1: independently derived authority surface
+
+The sole authority-minting seam is
+`Lowering::call_declared_recursive_position_unit` in
+`crates/ken-runtime/src/cranelift_backend/lowering/core.rs`. It resolves a
+planner context from retained coordinates and a declared body origin, then calls
+`call_declared_context` (which appends planner-authorized captures in declared
+order) or a declared unit directly only when no context exists for that body.
+Its no-coordinate/no-context check fails closed rather than emitting a raw call
+where a generated context exists.
+
+Every `recursive_unit_body` consumer was independently re-derived at this base:
+
+| Carried-residual consumer | Authority route | Coordinate authority |
+| --- | --- | --- |
+| `lower_recursor_residual_call` | `Some(body)` calls the seam before the raw-value guard | `None`; fails closed if that body has a generated context |
+| `lower_computational_producer_expr` | `Some(body)` calls the seam before the raw-value guard | retained `CarriedInvocationCoordinates` |
+| `source_call_state` | `Some(body)` calls the seam before the raw-value guard | retained `CarriedInvocationCoordinates` |
+| `lower_carried_computational_match_inner` | `Some(body)` calls the seam before the raw-value guard | retained `CarriedInvocationCoordinates` |
+
+`recursive_position_unit_body` delegates to `resolve_recursive_unit_body`, which
+returns one whole-source `Option<StaticOriginId>`. A direct `Construct` can
+expose a closure body; a plain `Match` resolves every arm and returns `None`
+when any arm lacks the recursive position. It therefore cannot state the
+selected-constructor bucket that Set 1 condition 4 requires.
+
+### Set 2: bounded discovery snapshot
+
+The frozen-base identity query was:
+
+```sh
+for f in crates/ken-cli/tests/{px7f_resource_native,px7l_checked_host_recursive_bind,px7m_hostresult_computational_match,px8ta_oriented_subcontinuation,px8x_single_schema_observation,rt_escape_second_resource_native,rt_parity_native}.rs; do
+  awk -v f="$f" '/a carried recursive hypothesis is an eliminated value, not a callable/{hit=1; next} hit && /^[[:space:]]*fn /{sub(/^crates\/ken-cli\/tests\//, "", f); sub(/^[[:space:]]*fn /, ""); sub(/\(.*/, ""); print f " :: " $0; hit=0}' "$f"
+done
+```
+
+The output identity set is the first table column below. Closure is identity-set
+equality between that output and this table, never count equality; `16` is only
+an informational observation.
+
+### Ten-axis classification table and hard stop
+
+The source query records only the ignored-test annotation. It does not carry a
+consumer tag, selected `(constructor, recursive-position)` key, producer-outcome
+set, body descriptor, capture plan, coordinate authority, or boundary event.
+All four independent consumers converge on the same untagged
+`reject_carried_residual_arguments` helper. Thus the shared `BoundaryCarrier`
+string is compatible with every consumer and with opposite answers to the
+branch-local authority question.
+
+Each row below has all ten required axes: identity, terminal guard, consumer,
+reachable outcomes, selected key, whole-source result, complete descriptor,
+capture/coordinates, boundary, and disposition/evidence. `unmeasured` is an
+honest axis value, not an exclusion. Every row is therefore an **unresolved hard
+stop**, not an intended refusal: without a compiler-owned attribution none can
+be promoted to mechanism-owned, already-served, or intended refusal.
+
+| Identity | Guard | Consumer | Outcomes | Key | Whole source | Descriptor | Captures / coordinates | Boundary | Disposition / evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `px7f_resource_native.rs :: linked_public_right_denial_preserves_exact_masks` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `px7f_resource_native.rs :: linked_public_second_release_is_closed_and_the_handle_closes_once` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `px7l_checked_host_recursive_bind.rs :: delayed_capturing_generic_bind_agrees_across_real_executors` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `px7l_checked_host_recursive_bind.rs :: runtime_selected_non_unit_response_is_consumed_across_real_executors` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `px7m_hostresult_computational_match.rs :: dynamic_ok_payload_selects_a_multistep_tree_across_real_executors` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `px7m_hostresult_computational_match.rs :: dynamic_err_payload_selects_a_multistep_tree_across_real_executors` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `px8ta_oriented_subcontinuation.rs :: public_one_level_bracket_finishes_and_releases` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `px8ta_oriented_subcontinuation.rs :: px8ds_real_same_depth_path_rejects_flat_order_and_runs_exact_edges` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `px8x_single_schema_observation.rs :: linked_route_exposes_real_ordered_bindings_and_filters_reserved_input` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `rt_escape_second_resource_native.rs :: escape_resource_plus_plain_matches_interpreter` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `rt_escape_second_resource_native.rs :: escaped_buffer_used_by_fanning_host_op_matches_interpreter` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `rt_parity_native.rs :: buffer_allocate_malformed_capacity_narrows_to_invalid_bounds` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `rt_parity_native.rs :: fs_read_at_malformed_offset_narrows_to_invalid_offset` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `rt_parity_native.rs :: fs_read_at_malformed_window_narrows_to_invalid_bounds` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `rt_parity_native.rs :: fs_read_at_malformed_offset_without_read_right_narrows_to_invalid_offset` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+| `rt_parity_native.rs :: fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset` | shared `BoundaryCarrier` | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unmeasured | unresolved | unresolved: annotation has no compiler-owned attribution |
+
+The required next measurement must report the exact consumer, selected
+constructor identity and recursive position, all reachable producer outcomes,
+the complete descriptor per selected bucket, capture/coordinate availability,
+and boundary kind. It is not authorization to weaken the raw-value guard or add
+a closure lane.
+
 # ACCEPTANCE
 
 - **`AC-1`** — the **semantic predicate** (Set 1) is recorded, and the **single
