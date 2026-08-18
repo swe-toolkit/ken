@@ -111,8 +111,10 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
     let error = result.expect_err("D2 exposes the next refusal");
     eprintln!("RT_BRANCHED_SCRUTINEE_UNIT_BODY_D2_ADVANCED {error:?}");
     assert!(
-        format!("{error:?}").contains("recursive position is outside its source constructor"),
-        "D2 must advance to the constructor-arity refusal: {error:?}"
+        format!("{error:?}").contains(
+            "BoundaryCarrier: a carried recursive hypothesis is an eliminated value, not a callable, so it takes no arguments, but the call provides 1"
+        ),
+        "D2 must advance to the BoundaryCarrier refusal: {error:?}"
     );
 }
 
