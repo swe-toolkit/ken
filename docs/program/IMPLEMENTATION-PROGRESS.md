@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-18 00:41:46Z — from 370 issue file(s) in `docs/program/issues/`.
+2026-08-18 01:21:27Z — from 370 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -255,7 +255,7 @@ the committed file matches the generator's output.
 | `RT-CROSSING-CALL-SITE-ATTRIBUTION` | The suppression differential cannot separate branch 1 from branch 3' -- the separator is the CALL SITE, so record which invocation of transfer_into_carrier the origin-5 crossing comes from | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2310 |
 | `RT-CROSSING-CALLEE-IDENTITY` | GeneratedUnitCallInput is measured at a shared helper with six callers, so branch 1 is provisional -- record WHOSE call is being carried, and exercise the tag's unused negative arm | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2314 |
 | `RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY` | Why constructor 26 field 0's worker transport is not on the recognized-transport path that constructor 36's is, and whether the route repair is what diverts it | closed | runtime | S | none | — |
-| `RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING` | Three instruments that discharged RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT cannot detect the failures they were chosen for -- AC-3's recorder is satisfied by a no-op D2, AC-4's control reaches its mechanism only from its own unit test, and the cfg(test) pin that cost a review round annotates a census compiled out 19 days earlier | active | runtime | S | none | — |
+| `RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING` | Three instruments that discharged RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT cannot detect the failures they were chosen for -- AC-3's recorder is satisfied by a no-op D2, AC-4's control reaches its mechanism only from its own unit test, and the cfg(test) pin that cost a review round annotates a census compiled out 19 days earlier | merged | runtime | S | none | — |
 | `RT-DECL-CLOSURE-PORT` | Transparent-declaration-closure emission port — a retained TransparentDeclarationClosure residual forces the whole object onto the monolithic RecursiveDescent root, which exceeds Cranelift's per-function ceiling | merged | runtime | L | none | — |
 | `RT-DEPTH2-VAR-PARENT-DERIVATION` | Name the parent of the depth-2 Var occurrence at source-machine origin 25 index 0, so the route fork can be ruled on a derived premise instead of an inherited one | closed | runtime | S | none | — |
 | `RT-DESCENT-LANE-COMPLETENESS` | Is the functionized lane a complete replacement for RecursiveDescent, or has it been carrying only the ported subset? D2c refused NINE programs the retiring lane compiles, across FOUR independent constructs -- a pattern, not a missing case, so this is a lane-completeness question and not a port | closed | runtime | M | none | — |

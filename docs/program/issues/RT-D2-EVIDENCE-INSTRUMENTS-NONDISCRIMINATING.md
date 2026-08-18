@@ -1,7 +1,7 @@
 ---
 id: RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING
 title: "Three instruments that discharged RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT cannot detect the failures they were chosen for -- AC-3's recorder is satisfied by a no-op D2, AC-4's control reaches its mechanism only from its own unit test, and the cfg(test) pin that cost a review round annotates a census compiled out 19 days earlier"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,23 @@ blocks: [RT-CAVEAT-GUARD-SPELLING-DOMAIN]
 github: null
 origin: "Adversary M8 hunt on ca639b5ef, evt_12x7wnwfbfbr (thread thr_5x0fypvv6rzhb), three findings measured by mutation with positive controls, five attacks refuted. Steward-verified the structural half of each before filing. AC-3's amended wording was the Steward's own. Steward-filed per COORDINATION section 2."
 ---
+
+> # MERGED 2026-08-18 — all four deliverables landed. ONE RESIDUAL SURVIVES, UNOWNED.
+>
+> `D1` `b7e2cf8f8` · `D2` discharged by its record-why arm, no candidate · `D3`
+> `b430d73e0` · `D4` `8f09b122b`. The three non-discriminating instruments are
+> repaired or retired.
+>
+> **What is NOT closed, stated here so it is not lost with the node:**
+> **whether `agreeing_recursive_body_unit` is reachable from lowering at all is
+> UNRESOLVED, not refuted.** `D2` established only that the mixed-arm
+> `Some`/`None` route cannot reach it. An all-`Some` witness could, and **nobody
+> searched for one.** Do not cite this node as evidence the path is unreachable;
+> it is evidence that one route is not the way in.
+>
+> A second residual, found by the post-`D3` hunt and filed rather than folded:
+> [[RT-RETIRED-CENSUS-ROT]] — retired-by-`cfg` bodies are never name-resolved, so
+> all three in `control.rs` are dead on revival.
 
 > # THE CODE IS NOT KNOWN TO BE WRONG. THE EVIDENCE IS KNOWN NOT TO SHOW IT RIGHT.
 >
@@ -199,10 +216,46 @@ old meaning:
   > Nothing in the tree answers this today: the Adversary's whole-suite probe
   > (923 passed / 1 failed, the one failure being `AC-4`'s own unit test) shows
   > only that no *existing test* reaches it.
-- **`D4`** — **record work, not arrival.** `D1`'s `match_descent` bit does not
-  catch the mutant that produced Finding 1. Filed from the Adversary's M8 hunt on
-  `b7e2cf8f8` (`evt_13qerjefkkdpj`), **Steward-verified structurally against the
-  tree** at `core.rs:15884-15901`.
+- **`D4` MERGED** at `8f09b122b` (2026-08-18) — **the node's last deliverable,
+  and the one that actually closed Finding 1.** Record work, not arrival. `D1`'s
+  `match_descent` bit did not catch the mutant that produced Finding 1. Filed
+  from the Adversary's M8 hunt on `b7e2cf8f8` (`evt_13qerjefkkdpj`),
+  **Steward-verified structurally against the tree** at `core.rs:15884-15901`.
+
+  > ### WHAT LANDED
+  >
+  > `match_arms_walked` is the sole arm-work fact: zero-initialized, preserved by
+  > the route-1 row replacement, incremented immediately after a successful
+  > `case_body_occurrence` and **before** recursive resolution can short-circuit,
+  > and both required and printed by the source witness. The remedy shape this
+  > frame named was correct — a counter after the loop would not work, because
+  > the loop exits through `?` on arm 0.
+  >
+  > The pre-loop signal is renamed `match_descent` to **`match_branch_entered`**
+  > across the observer and every in-crate consumer, and the retained suppression
+  > case is reworded as a recorder-positive control only. **No rejected descent
+  > vocabulary survives under `crates/`.**
+  >
+  > **`AC-4a` discharged on the real mutant:** the Finding-1 `return Ok(None)`
+  > below the recorder reaches branch-entered true, route1 false, arms-walked
+  > zero, and fails at the new counter assertion **before** the pre-existing
+  > error-string assertion — reddening on the descent claim itself rather than
+  > for the old reason. `AC-4b`: the counter is printed. QA established both
+  > independently on the exact head.
+  >
+  > ### THE RENAME WAS THE DELIVERABLE, NOT TIDYING — the first candidate was blocked for omitting it
+  >
+  > `4fdf39dd8` added a correct counter and **left the operative assertions and
+  > docs carrying the exact attribution this deliverable was opened to retire**:
+  > `core.rs` still calling the pre-loop recorder "plain-Match descent", the
+  > witness still asserting *"D2 must descend into the plain Match"*, the
+  > ablation test still claiming to prove descent while checking only the arrival
+  > bit. Architect block `evt_79mpv38e6jrna`: *"The counter makes arm work
+  > observable. It does not make the old bit retrospectively mean descent."*
+  >
+  > ⇒ **On an evidence-only repair, a correct new instrument does not discharge a
+  > false old claim standing beside it.** That is this node's own thesis applied
+  > to its own last candidate, and it is the durable lesson here.
 
   > **The mechanism.** `record_branched_scrutinee_unit_body_match_descent()`
   > fires at `:15890`, on **arrival** inside the `if let RuntimeExpr::Match`
