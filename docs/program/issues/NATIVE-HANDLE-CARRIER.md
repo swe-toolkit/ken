@@ -162,15 +162,36 @@ measurement. Do not repair toward an outcome, and do not enter `D3`/`D4`/`D5`.
 > does not regress it; the refusal arrived from `main` in the rebase"* — and
 > this is that prediction measured rather than argued.
 >
-> ⛔ **THE BAN STILL BINDS.** A refuted warrant is not a lifted ruling, and
-> lifting it is the **Architect's**, not mine and not the ring's. Routed as a
-> ruling request, not acted on. The ring correctly did not act on it either.
+> ### THE BAN IS LIFTED — Architect `evt_3tfef2baj5pd`, 2026-08-18.
 >
-> **One caution for whoever rules.** This row failing identically at a base with
-> **no Match branch at all** is also the evidence that the refusal string is
-> non-discriminating (above). Do not read its redness at base as a fact about
-> *this* row's own health until the `Err` is attributed — it may be an unrelated
-> aborting call, in which case the row's true state is still unmeasured.
+> **A bounded partial is admissible, and the lift does not wait on `D0''`.** The
+> warrant was a **relational** claim — that this candidate takes the row from
+> GREEN to RED — and the both-end run falsifies it. Whatever call produced the
+> refusal, **the row was already red before the candidate.** Attribution can
+> change the owner and the diagnosis of the red state; it cannot turn that
+> endpoint relation into a candidate-induced regression.
+>
+> ⛔ **Four things the lift does NOT do.** `AC-5` stays **OUTSTANDING** — a stale
+> ban is not a met criterion. A partial may claim **only the ACs actually
+> discharged**, never `AC-5`, `AC-3`, `D3`/`D4`/`D5`, native completeness, or
+> [[PX8-F-CAP-41]] Phase 2. The `+59` restoration **stays uncommitted and is not
+> a merge candidate** — this does not authorize adding failing tests to `main`.
+> No other scope ban or AC changes.
+>
+> **`D0''` continues unchanged, for a different question:** not admissibility,
+> but whether the port reached the governed population, where the abort
+> originated, and which node owns the next blocker. Its result decides the next
+> implementation cut.
+>
+> ### THE FRAME HELD THIS FACT AND ITS NEGATION AT ONCE, AND I QUOTED THE WRONG HALF
+>
+> `§9` said the deciding measurement **had not been run**; `§12` simultaneously
+> recorded it **as run**, an `--ignored` differential at tip `3d23f1182`
+> (`evt_6h59tq0zpe7dn`). **My ruling request took `§9`'s wording without opening
+> `§12`** and told the Architect it had never been run. What was new on
+> 2026-08-18 is the run at the **current** tip `86049d660` — a second
+> differential, not a first. The ruling does not turn on which, and the claim
+> was still false as I made it. Both sections are now reconciled to the ruling.
 
 > ### TWO ROWS ABOVE WERE FALSE FOR FIVE HOURS: "REFUSED BY CI", "RED CHECKS"
 >

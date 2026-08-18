@@ -493,20 +493,48 @@ contingency.
 - ⛔ **No `conformance/` edit.** The four CAP-41 seed rows are the oracle, not
   the deliverable.
 - ⛔ **No family generalization** over the other 20 cast members (`§5`).
-- ⛔ **No honest partial.** The Architect ruled this out explicitly: the
-  candidate *regresses* an already-GREEN native row (`AC-5`), so interp-only is
-  not a landable state.
-  - ⚠ **UNDER REVIEW 2026-08-17 — the ban STILL BINDS until the Architect says
-    otherwise; this note is not a licence.** Its warrant, in the node's
-    "Decisive regression evidence" paragraph, is that `AC-5`'s row failed with
-    `MissingClosureMetadata` — **a cause that is fixed.** The node's own
-    2026-07-29 HELD banner then records that row **GREEN** on preserved
-    `85dcee25`. ⇒ On the record the candidate does not regress it; the refusal
-    arrived from `main` in the rebase. ⛔ **Separate the conclusion from the
-    warrant** — a discharged warrant does not by itself discharge the ruling,
-    and the ruling is the Architect's to revisit. **The deciding measurement is
-    the `AC-5` row at base `7b8dad7df` versus at the tip**, and it has not been
-    run.
+- **The no-honest-partial ban is LIFTED — Architect ruling `evt_3tfef2baj5pd`,
+  2026-08-18.** A bounded partial is admissible. The ban's warrant was a
+  **relational** claim — that this candidate takes the governed native row from
+  GREEN to RED — and the exact both-end run falsifies it:
+  `fs_read_at_malformed_offset_narrows_to_invalid_offset`, `--ignored`, is
+  **0 passed / 1 failed at frozen base `7b8dad7df` and 0/1 at tip `86049d660`**,
+  same `ObjectEmission` refusal identity. **Whatever call produced the refusal,
+  the row was already red before the candidate.** Attribution can change the
+  owner and diagnosis of the red state; it cannot turn that endpoint relation
+  into a candidate-induced regression.
+  - ⛔ **THE LIFT IS NARROW. Four things it does NOT do:**
+    1. **`AC-5` remains OUTSTANDING.** The ban being stale is not the criterion
+       being met. Until `D0''` attributes the abort, the row's own health and
+       the current blocker's ownership are unmeasured.
+    2. **A partial may claim only the exact ACs actually discharged.** It may
+       **not** claim `AC-5`, `AC-3`, `D3`/`D4`/`D5`, native completeness, or
+       [[PX8-F-CAP-41]] Phase 2 closure.
+    3. **The `+59` restoration stays uncommitted and is NOT a merge candidate.**
+       Lifting the partial ban does not authorize adding failing tests to
+       `main`.
+    4. **No other scope ban or AC changes.**
+  - **`D0''` continues unchanged, for a different question.** It is no longer an
+    admissibility precondition; it asks whether the port reached the governed
+    population, where the abort originated, and which node owns the next
+    blocker. Its result decides the next implementation cut.
+
+  > ### THIS BULLET AND §12 CONTRADICTED EACH OTHER, AND THE STEWARD'S RULING REQUEST INHERITED THE WRONG HALF
+  >
+  > The superseded text said *"the deciding measurement ... **has not been
+  > run**"*, while `§12` simultaneously recorded it **as run** — an `--ignored`
+  > differential at tip `3d23f1182` (`evt_6h59tq0zpe7dn`). Both sat in the
+  > operative frame at once.
+  >
+  > **I routed the ruling request on §9's wording without opening §12**, so it
+  > told the Architect the measurement had never been run. What was actually new
+  > on 2026-08-18 is the run at tip **`86049d660`** — a second, current-anchor
+  > differential, not a first. The ruling does not turn on which it was, and the
+  > claim was still false as I made it.
+  >
+  > ⇒ **A frame can hold a fact and its negation in two sections, and the one
+  > you cite is decided by where you happened to be reading.** Sweep the whole
+  > document before quoting a "never measured" from any one bullet.
 - ⛔ **No concurrent `lowering/core.rs` edit** while `RT-NATIVE-FNSPLIT` is
   live.
 
@@ -587,29 +615,40 @@ the holder — ⛔ don't pipe it through `head`.
 
 ## 12. What landing this closes
 
-> ## ⛔ UNPAIRED 2026-08-17 — DO NOT FLIP [[PX8-F-CAP-41]] ON THIS MERGE
->
-> **Architect ruling `evt_13ax2j6e0jfq2`; Steward disposition.** The paragraph
-> below is superseded. The pairing rested on the honest-partial ban, and that ban
-> is discharged by the `--ignored` differential (`evt_6h59tq0zpe7dn`): the `AC-5`
-> row refuses **identically** at base `7b8dad7df` and at tip `3d23f1182`.
->
-> ⇒ **The partial may land. Phase 2 closure may not ride on it.** The four CAP-41
-> rows still refuse at `lowering/core.rs:2929`, the gap is a **missing port**
-> owned outside this node, and flipping Phase 2 would be a claim about the past
-> while the rows it names refuse.
->
-> ⛔ **`AC-5` remains OUTSTANDING.** The ban being stale is not the criterion
-> being met.
->
-> ⇒ **Flip [[NATIVE-HANDLE-CARRIER]] only**, and only to the extent its claimed
-> ACs are voted at the exact SHA. The Phase 2 scope call is recorded on that
-> node's leading banner.
+**This merge closes [[NATIVE-HANDLE-CARRIER]] ONLY, and only to the extent its
+claimed ACs are voted at the exact SHA. It does NOT close [[PX8-F-CAP-41]]
+Phase 2.**
 
-⭐ **This merge closes BOTH [[NATIVE-HANDLE-CARRIER]] and [[PX8-F-CAP-41]]
-Phase 2.** They are one deliverable — the carrier fix is meaningless without the
-fixture it unblocks, and the fixture cannot land without the fix. Flip both
-nodes on the same merge.
+Architect `evt_13ax2j6e0jfq2` (unpairing) and `evt_3tfef2baj5pd` (the ban lift),
+Steward disposition. The pairing rested on the honest-partial ban; **that ban is
+now lifted on its own ruling**, and the pairing does not survive it. Flipping
+Phase 2 would be a claim about the past while the rows it names refuse — at
+`c4366f6c4` the four `cap41_*` rows are **0 passed / 4 failed** on restoration.
 
-⇒ `PX8` then has two blockers left: [[PX8-WROTE-ABS]] (Verify, released) and
-[[PX8-ERRID-SCOPE]] (Verify, behind [[PX8-ERRID-ALLOC]]).
+⛔ **`AC-5` remains OUTSTANDING.** The ban being stale is not the criterion being
+met, and a partial may claim only the ACs actually discharged — see `§9`, which
+is the operative statement of the lift and its four limits.
+
+`PX8`'s remaining blockers are recorded on its own node, not here.
+
+> ### SUPERSEDED HISTORY — kept because it records how the pairing was reasoned
+>
+> ~~*"This merge closes BOTH `NATIVE-HANDLE-CARRIER` and `PX8-F-CAP-41` Phase 2.
+> They are one deliverable — the carrier fix is meaningless without the fixture
+> it unblocks, and the fixture cannot land without the fix. Flip both nodes on
+> the same merge."*~~ **False since `evt_13ax2j6e0jfq2`.**
+>
+> **This paragraph stood as the section's operative text for a day under a
+> banner announcing it superseded**, which is the failure mode exactly: a
+> correction at the top of a section loses to the requirement line inside it.
+> The text above replaces it rather than annotating it.
+>
+> The banner also carried two stale facts worth naming so neither is re-cited:
+> it located the refusal at `lowering/core.rs:2929` (the site is now
+> `core.rs:15924`, with the `BoundaryCarrier` fallback at `:3143`), and it
+> described the gap as *"a missing port owned outside this node"* — **that port
+> landed**, [[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]] `merged` at `ca639b5ef`.
+>
+> Its `--ignored` differential at tip `3d23f1182` (`evt_6h59tq0zpe7dn`) is real
+> and was the **first** run of the measurement `§9` later called never-run. The
+> 2026-08-18 ruling rests on the **second**, at current tip `86049d660`.
