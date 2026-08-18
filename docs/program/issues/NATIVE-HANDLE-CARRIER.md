@@ -117,6 +117,26 @@ Ken programs survive but nothing drives them.
 > ⇒ **NOT a hard stop. The next cut is attribution**, and its instruments are
 > already in the tree.
 
+> ## `D0''` RAN. THE PORT REACHES THIS POPULATION. THE BLOCKER IS DOWNSTREAM.
+>
+> **Measured `evt_2xw4mxcd5z9zp` at exact `86049d660`:** all four governed
+> programs record **`entered=1`, `route1=0`, `match_arms_walked=1`**. The
+> plain-`Match` port descends and walks arms **in every case**. That is row 1 of
+> the table below — the downstream-blocker disposition, not the hard stop.
+>
+> The `Err` at `core.rs:15924` is reached while recursive resolution sits at a
+> `RuntimeExpr::Construct` whose requested recursive position is absent. **It is
+> neither the `D2` plain-`Match` agreement refusal nor a route-1 return.**
+>
+> ⇒ **Cut and routed as [[RT-RECURSIVE-POSITION-ARM-ARITY]]**, which owns the
+> next measurement. This node stays gated behind it for full green; the bounded
+> partial the Architect's lift permits is unaffected.
+>
+> **Two readings of `D0'` were wrong and both were the Steward's.** The
+> same-refusal arm was defective, and the string it forked on was produced at a
+> base with no Match branch at all. **Positive attribution is what settled it**,
+> and it took one run with instruments that already existed.
+
 **`D0''` — attribute the `Err` to its call site. One run, existing instruments.**
 
 Run the four governed programs under the port node's own observer and report,
