@@ -60,49 +60,49 @@ downstream is already correct.
 > false positives, and a watchdog that cries stall trains its readers to ignore
 > it (COORDINATION §13; `reason-in-agent-team-hours-not-human-days`).
 
-> ### Runtime's T1 exception is SUSPENDED for #8 (operator, 2026-08-10)
+> ### Runtime's T1 exception is SUSPENDED for refactoring
 >
-> Operator, verbatim: *"for the refactoring work, this is much more mechanical
-> than the initial implementation and discovery. We can switch to T2 model,
-> either gpt-5.6-terra (medium reasoning effort) or sonnet 5 in the
+> **Operator, 2026-08-10. WIDENED 2026-08-18 — read the widening below.**
+>
+> Operator, 2026-08-10, verbatim: *"for the refactoring work, this is much more
+> mechanical than the initial implementation and discovery. We can switch to T2
+> model, either gpt-5.6-terra (medium reasoning effort) or sonnet 5 in the
 > implementation seat performing the work."*
 >
-> ⇒ **`runtime-implementer` runs T2 for `RT-BACKEND-MODULE-SPLIT`'s slices**
-> (campaign node #8: the census, the planner and lowering domain moves, the
-> emitter families, and closure). The tier exception above is grounded in
-> *"genuinely hard coding tasks"*, and a byte-for-behaviour move against a
-> census ledger is not one.
+> ⇒ **`runtime-implementer` runs T2 for refactoring and instrument work.** The
+> T1 exception above is grounded in *"genuinely hard coding tasks"*, and a
+> byte-for-behaviour move against a census ledger is not one.
 >
-> **THE BOUNDARY, because over-applying this is the obvious failure.** It covers
-> **#8 only**. It does **not** cover `RT-LEXICAL-RECURSOR-CONSUMERS`,
-> `RT-RECURSOR-TRANSPORT`, `RT-FNUNIT-RESULT-TOKEN`, or `RT-DESCENT-RETIRE` —
-> those precede #8, are discovery and semantic repair, and **stay T1**. Nor does
-> it cover the semantic arc deferred *after* #8 closure (canonical terms,
-> transition results, commands, law extraction), which is design work returning
-> to T1.
+> **THE 2026-08-18 WIDENING, and why the old boundary is gone.** This block used
+> to read *"it covers **#8 only**"* and to name `RT-LEXICAL-RECURSOR-CONSUMERS`,
+> `RT-RECURSOR-TRANSPORT`, `RT-FNUNIT-RESULT-TOKEN` and `RT-DESCENT-RETIRE` as
+> staying T1. **All four are now `merged`, so that boundary named an empty set.**
+> The operator confirmed on 2026-08-18 that the whole ring's move to T2 was
+> deliberate, on the ground that *"this is a refactoring task, much simpler than
+> implementing the compiler."*
 >
-> **WHEN, and it is not now.** The switch happens at the phase boundary — when
-> the first #8 slice is released, not before. As of 2026-08-10 the seat is on
-> `D2b`'s closed-projection work, which is exactly what the T1 exception exists
-> for. **Downgrading a seat mid-arc would land the cost on the hardest
-> deliverable in the campaign.**
+> **The line is the WORK, not the node id.** T2 for refactoring, mechanical
+> moves, census and ledger work, and evidence-instrument repair. **T1 returns for
+> genuinely hard compiler implementation** — the semantic arc deferred after #8
+> closure (canonical terms, transition results, commands, law extraction) is
+> design work and comes back to T1. If you cannot tell which side a deliverable
+> falls on, it is the operator's call, not an inference from the node's prefix.
 >
-> **Which of the two: default Sonnet 5.** Both are T2 and the operator left the
-> choice open. The #8 slices carry heavy ledger and mutation-restoration
-> acceptance criteria and precise `pub(super)` seam work, and the Codex
-> stranding shapes cost the ring turns that land on the Steward across an
-> 18-slice phase.
+> **Observed 2026-08-18:** all three runtime seats read `gpt-5.6-terra medium`.
+> That matches this block as now written. It did **not** match the block as
+> previously written, which is what produced the escalation that corrected it.
 >
-> **The condition that flips it to Terra:** Anthropic-pool capacity becoming the
-> binding constraint. The credit-window section below is the argument — the
-> pools are independent, so putting T2 build on the GPT backend buys sustained
-> T1 enclave work at the same time. If T1 seats start waiting on capacity,
-> Terra wins on that ground alone.
+> **Which of the two T2 options.** The seats are on Terra. The earlier default
+> was Sonnet 5 on the grounds that the #8 slices carry heavy ledger and
+> mutation-restoration criteria and that Codex stranding shapes cost the ring
+> turns; **that argument was not overruled, it was outweighed** by Anthropic-pool
+> capacity — the pools are independent, so T2 build on the GPT backend buys
+> sustained T1 enclave work at the same time.
 >
-> ⛔ **Confirm by observation before flipping, per the paragraph above.**
-> Observed 2026-08-10: `runtime-implementer` is `Opus 5 (1M context)`, T1, as
-> documented. A seating change proposed from the Roles column rather than from
-> the pane is the exact error that paragraph records.
+> **Confirm by observation before flipping, per the paragraph above.** A seating
+> change proposed from the Roles column rather than from the pane is the exact
+> error that paragraph records — and note this block has now been wrong in both
+> directions, so read the pane and do not trust this file alone.
 
 The operator is the human product owner; Steward is the primary proxy into the
 federation.
