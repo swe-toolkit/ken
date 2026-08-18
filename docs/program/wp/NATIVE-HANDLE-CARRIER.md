@@ -386,15 +386,30 @@ contingency.
 > action; the deciding measurement is, and each of them forks on its result.
 > **Full statement of `D0'` is in the node**, `docs/program/issues/`.
 
-- **`D0'`** — **restore the four `cap41_*` Rust rows and run them; report the
-  outcome.** Recover the four `#[test]` rows and their exclusive helper
-  `assert_cap41_derived_without_read` from `4c9c59d3e`
-  (`crates/ken-cli/tests/rt_parity_native.rs:593`, `:620`, `:627`, `:634`,
-  `:641`). Four test functions plus one helper into a file already in the tree.
-  Ride `AC-5`'s never-run deciding measurement with it — same file, same pass.
-  **Green, a new refusal, and the same refusal are all releasable results**; a
-  red `D0'` is a successful `D0'`. Do not extend the turn into a repair, and do
-  not act on the `AC-5` reading.
+- ~~**`D0'`** — restore the four `cap41_*` Rust rows and run them.~~ **RAN
+  2026-08-18** (`evt_2kdscqgge6x2p`): 0 passed / 4 failed, all at
+  `ObjectEmission` with *"recursive position is outside its source
+  constructor"*. `AC-5`'s row 0/1 with the identical refusal at **both**
+  `7b8dad7df` and the tip. The restoration is uncommitted on
+  `wp/NATIVE-HANDLE-CARRIER-D0`, base/tip `86049d660`, `+59` lines, **not a
+  merge candidate.**
+  ⛔ **The three-outcome fork this deliverable carried was DEFECTIVE and it was
+  the Steward's.** It forked on the refusal **string**, and that string is
+  produced at `7b8dad7df` too — a tree whose resolver (`:15668`) has **no Match
+  branch at all**, only `return Ok(None)` at `:15680`. So it cannot separate
+  "the port did not reach this population" from "the port reached it and
+  something downstream fails the same way". **Not a hard stop.**
+  ⇒ **`D0''`** — **attribute the `Err` to its call site.** One run, instruments
+  already in the tree: report `entered` / `route1` / `match_arms_walked` **per
+  governed program**, plus the static origin of the call raising `core.rs:15924`.
+  `match_arms_walked >= 1` means the port reached this population and the
+  blocker is downstream; `route1 >= 1` with the counter at zero is the genuine
+  hard stop; **neither recorder firing means the `Err` is an unrelated aborting
+  call and `D0'` measured nothing about this node's subject.** Full statement in
+  the node.
+  ⛔ **`AC-5`'s reading is routed to the Architect, not acted on.** The row is
+  red at the base, so the ban's *regresses-an-already-GREEN-row* warrant is
+  refuted — but **the ban still binds** until the Architect lifts it.
 - **`D3`** — the four focused discriminators of `§8` (`AC-3`), before the full
   oracle. **Gated on `D0'`.**
 - **`D4`** — the CAP-41 fixture carried to **full native GREEN**, and the full
