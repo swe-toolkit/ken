@@ -68,25 +68,33 @@ amendments and it is this slice's to honour, not a later slice's.
 
 # `D0` — THE LEDGER. No code moves in this deliverable.
 
-> ## HELD CANDIDATE `0fd56146f` PREDATES THE AMENDED BAR. Steward, 2026-08-18.
+> ## RE-CUT AT `0542bfbbc`, closing the AC-1 gaps QA found. 2026-08-18.
 >
-> **`D0` candidate `0fd56146fcf95a79c0347f36cccdd06c587227c2` is `+64/-1` on this
-> file at base `7509c77a7`.** That base **predates `40cb6b3b5`**, the publish
-> that applied the Architect and research whole-plan amendments — and
-> `40cb6b3b5` rewrote **this file**. The ledger in the candidate was therefore
-> measured against the **pre-amendment** acceptance bar.
+> **History, for a pickup that does not want to re-derive it.** The original
+> `D0` candidate (`0fd56146f`) was measured at base `7509c77a7`, which predates
+> `40cb6b3b5` — the publish that applied the Architect's and research's
+> whole-plan amendments and rewrote this file. Rebasing alone (to `1a7ecc8e1`,
+> onto `main` at `0542bfbbc`) was clean and produced no semantic delta — QA
+> confirmed the apparent 2343-line/18-frame two-way diff against `main` was
+> base skew, not a candidate defect.
 >
-> **A two-way diff of the candidate against current `main` shows a false delete
-> of 2343 lines across 18 frames.** That is base skew, not the candidate. Diff
-> it against `7509c77a7`, never against `main`.
+> **QA then resolved the routed fork on its own authority, textually, not as a
+> judgment call:** `AC-2` ("each moved test"), `AC-3` ("every moved item") and
+> `AC-4b` ("every file this slice creates or enlarges") all condition on a
+> moved or created artifact. `D0` moves nothing, so none of the three can be
+> evaluated against an artifact that does not yet exist — **they bind `D1`/`D2`,
+> not `D0`.** The Steward confirmed this stands and is not gated on the
+> Architect.
 >
-> **On capacity return, before QA spends a review:** rebase the candidate onto
-> `main`, then settle whether the existing ledger still discharges `D0` under
-> the corrected bar — specifically `AC-2` (test discovery per build profile),
-> `AC-3` (the transport manifest), and `AC-4b` (the target-child constraint),
-> **none of which existed when that ledger was measured.** The Architect was
-> asked this directly and hit its usage limit before answering: the question
-> is **unanswered, not declined.**
+> **What QA found instead, independent of that fork, is what this re-cut
+> closes: the rebased ledger failed `AC-1` on its own terms.** Its own selector
+> command, run across all three bound files and presented as "checked against
+> the entries below," in fact returns 142 type declarations against a table
+> that reconciled only 25; only the type class had a selector at all; one
+> method row named a group ("ABI preflight/read-only-view helpers") instead of
+> enumerating members; and the ledger never stated whether it checked for
+> source-text oracles. The ledger below is the recut against those four points,
+> re-measured at `0542bfbbc`.
 
 **Produce the exact old/new symbol ledger and test-property ledger for this
 owner**, derived from the Stage A inventories and **re-measured at a named SHA**
@@ -146,19 +154,26 @@ one candidate **only** when an exact compile or mutation-restoration dependency
 makes the pair semantically atomic — and say which it was.
 
 
-## `D0` ledger at base `7509c77a7c7a7a4aacece1601235778b70f57489`
+## `D0` ledger, re-measured at `0542bfbbc`
 
 The Stage A inventories were read as a starting point and re-measured at this
-base. The owner is a lifecycle, not every name that happens to mention a unit:
+SHA. The owner is a lifecycle, not every name that happens to mention a unit:
 validated semantic ownership -> ABI descriptor/frame -> read-only emission
 view -> pre-emission validation. `StaticOriginId` and source/child
 correspondence remain occurrence-owned; `StaticTransitionPlan` remains the
 parent container.
 
-### Symbol ledger
+**Declared selector population, per AC-1's escape hatch.** "Exact and
+complete" is narrowed to a stated population for every class below, and every
+declaration that population contains is reconciled to exactly one owner —
+either this slice's Units/ABI owner (and named as a `D1` move target), or a
+named other owner it is excluded to. No class is closed by a count-plus-blind-
+spot paragraph alone.
 
-Selector used for non-private type declarations, with its result checked
-against the entries below:
+### Symbol ledger — types (declared population: 142)
+
+Selector used for non-private type declarations, unchanged from the prior
+ledger:
 
 ```sh
 rg -n '^\s*pub(?:\([^)]*\))?\s+(?:struct|enum|type)\s+[A-Za-z_][A-Za-z0-9_]*' \
@@ -167,31 +182,243 @@ rg -n '^\s*pub(?:\([^)]*\))?\s+(?:struct|enum|type)\s+[A-Za-z_][A-Za-z0-9_]*' \
   crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs
 ```
 
-The selector is a declaration aid, not a closure proof. It cannot see private
-types, macro-generated declarations, split-line declarations, traits,
-constants, functions, or fields. Those blind spots are why the ledger includes
-the named inherent-method groups and validation surface below rather than
-claiming the selector alone establishes ownership.
+At `0542bfbbc` this returns **142** declarations: 21 in `abi.rs`, 28 in
+`semantic_ir.rs`, 93 in `static_transition.rs`. The selector cannot see
+private types, macro-generated declarations, split-line declarations, traits,
+constants, functions, or fields — those classes are ledgered separately
+below, not folded into this count. **Private-type blind spot, checked rather
+than assumed:** `rg -n '^\s*(struct|enum)\s' <range>` over the exact source
+range of every method this `D1` moves (`static_transition.rs:13513`–`18171`)
+returns zero private `struct`/`enum` declarations — the moved surface
+declares no private type the `pub` selector could have hidden.
 
-At this base the `abi.rs` selector returns 21 declarations, and the named
-cross-file identity/view selector returns four:
-`PredeclaredFunctionId`, `EmittableCallEdge`, `EmittableCallKind`, and
-`EmittableUnit`. The four table groups reconcile exactly to that `21 + 4`
-declaration measurement; the method group is deliberately listed separately
-because the declaration selector cannot see it.
+**Every one of the 142 is reconciled below.** Four are this slice's owner and
+move in `D1`. The other 138 are named individually and excluded, grouped by
+the other domain that owns them — this is a closure of the full selector
+population, not a group label standing in for one.
+
+**Moved (4):**
 
 | Symbol group | Old path | New path in D1 | Lifecycle reason |
 | --- | --- | --- | --- |
-| `AbiCarrier`, `AbiStorageOwner`, `AbiOwnership`, `AbiSlotKind`, `AbiCaptureProvenance`, `AbiUnitDefinition`, `AbiRootIngress`, `AbiSchedulingIngress`, `AbiProcessParameter`, `AbiSlot`, `AbiFrameHeader` | `planning/static_transition/abi.rs` | unchanged: `planning/static_transition/abi.rs` | closed carrier, ownership, provenance, and frame-slot vocabulary already has its owner |
-| `AbiDescriptorShape`, `AbiDescriptor`, `AbiContinuationDescriptor`, `AbiContinuationInputAuthority`, `AbiContinuationInputProvenance`, `AbiContinuationContextDescriptor`, `AbiStaticContinuationFusionDescriptor`, `PlannedStaticContinuationFusionAbi`, `AbiPlane`, `AbiBoundarySignature` | `planning/static_transition/abi.rs` | unchanged: `planning/static_transition/abi.rs` | descriptor and pre-emission validation plane stays private to planner siblings |
-| `PredeclaredFunctionId` and its unit-identity methods | `planning/static_transition/semantic_ir.rs` | `planning/static_transition/units.rs` | unit identity belongs with descriptors and call-edge views; this is the standing amendment, not a graph-id extraction |
-| `EmittableCallEdge`, `EmittableCallKind`, `EmittableUnit` and their read-only accessors | `planning/static_transition.rs` | `planning/static_transition/units.rs` | planner-minted, lowering-readable unit/call vocabulary with private fields and no lowering constructor |
-| `StaticTransitionPlan::{emittable_units, emittable_call_edges, emittable_unit, executable_units, executable_call_edges}` and ABI preflight/read-only-view helpers | `planning/static_transition.rs` | inherent impl in `planning/static_transition/units.rs` | construction remains in the parent state; this domain owns the validated projection and pre-emission validation |
+| `AbiCarrier`, `AbiStorageOwner`, `AbiOwnership`, `AbiSlotKind`, `AbiCaptureProvenance`, `AbiUnitDefinition`, `AbiRootIngress`, `AbiSchedulingIngress`, `AbiProcessParameter`, `AbiSlot`, `AbiFrameHeader` | `planning/static_transition/abi.rs` | unchanged: `planning/static_transition/abi.rs` | closed carrier, ownership, provenance, and frame-slot vocabulary already has its owner — **not counted in the "4 moved," listed here because it is the other half of `abi.rs`'s 21** |
+| `AbiDescriptorShape`, `AbiDescriptor`, `AbiContinuationDescriptor`, `AbiContinuationInputAuthority`, `AbiContinuationInputProvenance`, `AbiContinuationContextDescriptor`, `AbiStaticContinuationFusionDescriptor`, `PlannedStaticContinuationFusionAbi`, `AbiPlane`, `AbiBoundarySignature` | `planning/static_transition/abi.rs` | unchanged: `planning/static_transition/abi.rs` | descriptor and pre-emission validation plane stays private to planner siblings — **also unmoved, the rest of `abi.rs`'s 21** |
+| `PredeclaredFunctionId` | `planning/static_transition/semantic_ir.rs` | `planning/static_transition/units.rs` | unit identity belongs with descriptors and call-edge views; the standing amendment, not a graph-id extraction. **Correction from the prior ledger: it has no `impl PredeclaredFunctionId` block anywhere in the crate** (`grep -rn "impl PredeclaredFunctionId" crates/ken-runtime/src/cranelift_backend/` returns nothing) — "and its unit-identity methods" overclaimed a method surface that does not exist. It is a bare `#[repr(transparent)]` newtype, moved by construction/pattern-match sites only. |
+| `EmittableCallEdge`, `EmittableCallKind`, `EmittableUnit` | `planning/static_transition.rs` | `planning/static_transition/units.rs` | planner-minted, lowering-readable unit/call vocabulary with private fields and no lowering constructor; their inherent methods are enumerated in the functions/methods ledger below, not summarized as a group |
+
+`abi.rs`'s 21 are listed above (unmoved) so the "moved (4)" count is
+auditable against the full 142 rather than presented as a bare number: **4
+moved** = `PredeclaredFunctionId` + `EmittableCallEdge` + `EmittableCallKind`
++ `EmittableUnit`; the 21 `abi.rs` types are unmoved members of the same
+file-unchanged group already covered by "unchanged: `abi.rs`" in the prior
+ledger, restated here for completeness rather than double-counted.
+
+**Excluded (138), named individually and grouped by owning domain — none
+moved by this `D1`:**
+
+| Excluded because owned by | Symbols (all individually named; none moved) |
+| --- | --- |
+| Continuations (`RT-PLANNER-CONTINUATIONS-SPLIT`) | `ContinuationSpecializationId`, `ContinuationEmissionOwner`, `ContinuationContextId`, `PlannedContinuationContext`, `ContinuationContextView`, `ContinuationInputSource`, `ProducerLocalBinding`, `ProducerLocalLocator`, `ContinuationSourceCoordinate`, `ContinuationEnvironmentClaimOver`, `ContinuationEnvironmentClaim`, `ContinuationEnvironmentDraft`, `ContinuationFrameRequirement`, `ContinuationFrameIdentity`, `D3bFinalizationPerturbation`, `ContinuationAvailabilityOver`, `ContinuationAvailabilityViews`, `ContinuationAvailabilityDraft`, `ContinuationSourceSlotAuthority`, `ContinuationWorkerCaptureSource`, `ContinuationWorkerCaptureProvenance`, `ContinuationConsumingOccurrence`, `RequiredConsumerProjection`, `ContinuationCallIdentity`, `ContinuationUnitView`, `ContinuationOrdinaryEnvelopeRole`, `ComposedWorkerRouteEligibility`, `ComposedWorkerView`, `ComposedCallTarget`, `ComposedCallTargetDefect`, `ContinuationInputView`, `ContinuationCallView`, `ContinuationResultEdge`, `AdmittedContinuationDiscovery`, `RequiredConsumerProjectionDisposition`, `ContinuationRequiredConsumerObservation`, `RequiredConsumerProjectionMutation`, `EnvelopeDefect`, `CheckedCaseBinderRole`, `CheckedCaseBinderLayout`, `CheckedIhBinding`, `CheckedTransportCoordinate`, `StaticContinuationFusionId`, `StaticContinuationFusionKey`, `StaticContinuationFusionDescriptor`, `StaticContinuationFusionPlan`, `StaticContinuationFusionView`, `BodyEmissionDisposition`, `FusionOwnedBody`, `FusionRegionClaim`, `FusionClaimRefusal`, `FusionRegionClaimLedger`, `FusionClaimParameterMutation`, `FusionProducerCaptureMutation`, `StaticContinuationFusionCandidate`, `FusionComposedEdge`, `FusionOwnedOuterRealization`, `FusionCompositionLayer`, `CaseEmissionStatus`, `DeclarationCallTargetClass` (case/dispatch surface — hedged toward continuations over joins/traps on `ContinuationEmissionOwner`'s adjacency; the claiming slice's own `D0` is the final word) |
+| Aggregates (`RT-PLANNER-AGGREGATES-SPLIT`) | `AggregateOccurrenceId`, `AggregateOccurrenceProducer`, `SynthesizedAggregateRole`, `PlannedAggregateShape`, `PlannedAggregateView`, `PlannedAggregateAllocation`, `PlannedAggregateChild`, `PlannedAggregateOwnership`, `SynthesizedAggregateRoot`, `SynthesizedAggregateStep`, `SynthesizedAggregatePath`, `SynthesizedAggregateNode`, `SynthesizedDynamicSet`, `SynthesizedHostResultTree` |
+| Effects (`RT-PLANNER-EFFECTS-SPLIT`) | `EffectSeatPhase`, `EffectSeatOperation`, `EffectSeatSlot`, `EffectSeatNeed`, `EffectSeatAvail`, `PlannedEffectSeat`, `EffectSeatPlanMutation` |
+| Joins/traps (`RT-PLANNER-JOINS-TRAPS-SPLIT`) | `JoinResultRepresentation`, `JoinPlanToken`, `PlannedTrapIdentity`, `D2jCause`, `D4bVerdict` |
+| Root/parent-shared, stays with `StaticTransitionPlan` (not this slice's to move; no successor slice claim implied) | `StaticTransitionPlan`, `ScaleBPlanCensus`, `PlannedResultFieldKindForTest`, `PlannedReferentLifetime` (allocation-lifetime vocabulary with no single clean domain owner at this reading — flagged, not resolved, for whichever of aggregates/root-closure claims it) |
+| Semantic-IR shared substrate in `semantic_ir.rs` (root/parent-shared — the same "no owned lifecycle" finding item 3 made for the graph-id extraction, applied here to the representation types) | `ConstructorIdentity`, `SynthesizedFixedConstructorRole`, `SynthesizedIoErrorRole`, `SynthesizedConstructorRole`, `FieldIdentity`, `SemanticProgramId`, `CaptureLayoutId`, `SemanticOwner`, `DenseRange`, `SemanticOpcode`, `RuntimeExprShape`, `SemanticSourceKind`, `SemanticSourceSeed`, `SemanticOperandElement`, `SemanticAtomKind`, `SemanticMaterialArena`, `CaptureSlot`, `RuledChild`, `SemanticRecord`, `SemanticProgram`, `CaptureLayout`, `SemanticDescriptor`, `SemanticPlane`, `D2aPopulationMutation`, `BodyOccurrenceMutation` |
+| Occurrence-owned (standing amendment; explicitly not this slice's to move) | `StaticOriginId` |
+| Occurrence-adjacent record, excluded despite touching this owner's id | `PredeclaredFunction` — the `{id, planned_node, body_occurrence, program}` record binding a `PredeclaredFunctionId` to its scheduling seed (`StaticNodeId`) and body occurrence (`StaticOriginId`, occurrence-owned). Only the bare id type is this slice's owner; the binding record couples units to occurrence lifecycle and is excluded, deferred to whichever slice claims the occurrence/lifecycle table. |
+
+**Reconciliation check, by file, against the selector counts above** (the "4
+moved" are a subset of these totals, not additional to them):
+`abi.rs` 21 = 11 + 10, both rows unmoved (the two "moved" table rows above
+are `abi.rs`'s full population, restated from the prior ledger, not new
+moves — `abi.rs` itself does not move); `static_transition.rs` 93 = 3 moved
+(`EmittableCallEdge`, `EmittableCallKind`, `EmittableUnit`) + 90 named in the
+exclusion table (60 Continuations + 14 Aggregates + 7 Effects + 5 Joins/traps
++ 4 root/parent-shared — the Continuations row's list is 60 distinct names,
+not the 62 backtick occurrences in it: `ContinuationEmissionOwner` is named
+once in the list and once more in the row's own hedge parenthetical, and
+`D0` inside that same parenthetical is prose, not a symbol); `semantic_ir.rs`
+28 = 1 moved (`PredeclaredFunctionId`)
++ 27 named in the exclusion table (25 semantic-IR substrate + `StaticOriginId`
++ `PredeclaredFunction`). `21 + 93 + 28 = 142`, and every name in every file's
+selector output above appears in exactly one row of this ledger — checked by
+diffing the selector's raw name list against every backtick-quoted identifier
+in this section, not asserted.
 
 No visibility widening is authorized. `AbiPlane`, descriptors, builders, and
 validators remain planner-private; `EmittableUnit` and `EmittableCallEdge` stay
 read-only with private fields. This is an old/new relocation ledger, not an API
 change or a facade proposal.
+
+**Use-site re-measurement at `0542bfbbc`**, per "re-measure every count you
+rely on" — `rg -l '\b<Symbol>\b' crates/ken-runtime/src/` for each of the 4
+moved types: `PredeclaredFunctionId` in `lowering/core.rs`,
+`lowering/core/tests/{constructors,control}.rs`, `lowering/mod.rs`,
+`lowering/units.rs`, `planning.rs`, `planning/static_transition.rs`,
+`planning/static_transition/{abi,semantic_ir}.rs`; `EmittableCallEdge` in
+`lowering/core/tests/control.rs`, `planning/static_transition.rs`;
+`EmittableCallKind` in `lowering/mod.rs`, `lowering/units.rs`,
+`planning.rs`, `planning/static_transition.rs`; `EmittableUnit` in
+`lowering/core/tests/control.rs`, `planning/static_transition.rs`. Consistent
+with the Stage A census, with `abi.rs` added as a current `PredeclaredFunctionId`
+consumer (a use-site the pinned-SHA census did not carry) — every consumer
+file's import path is re-pointed at `units.rs` in `D1`, not silently left
+stale.
+
+### Symbol ledger — functions and methods (declared population: 317 `pub fn`)
+
+Selector, run per file and excluding `const fn` (a naming trap: an earlier
+draft of this recut's own selector matched `const fn` as a const item before
+this correction — `rg` has no look-ahead, so the exclusion is a manual
+`grep -v`, stated so the next pickup does not repeat it):
+
+```sh
+rg -n '^\s*pub(?:\([^)]*\))?\s+(?:async\s+)?fn\s+[A-Za-z_]' <file>
+```
+
+Counts at `0542bfbbc`: `abi.rs` 13, `semantic_ir.rs` 30, `static_transition.rs`
+274 — **317 total**, inherent methods and free functions together (the
+selector cannot distinguish them from the pattern alone; the split below is
+by manual read of each impl block).
+
+**Moved (18: 5 + 7 + 5 + 1), individually named — this is the enumeration
+that replaces the prior ledger's "ABI preflight/read-only-view helpers"
+group label:**
+
+| Method | Owner type | Notes |
+| --- | --- | --- |
+| `caller`, `callee`, `callee_origin`, `call_site_origin`, `kind` | `EmittableCallEdge` (inherent impl, `static_transition.rs:13513`) | read-only accessors, no lowering constructor |
+| `function`, `body_occurrence`, `entry_origin`, `definition`, `header`, `slots`, `slot_offsets` | `EmittableUnit<'plan>` (inherent impl, `static_transition.rs:13555`) | read-only accessors; `slot_offsets` delegates to `abi::slot_offsets`, not re-derived |
+| `emittable_call_edges`, `executable_units`, `executable_call_edges`, `emittable_units`, `root_emittable_unit` | `StaticTransitionPlan` (inherent impl, `static_transition.rs:13721`–`18171`) | validated read-only projections into the `Emittable*` vocabulary; **`root_emittable_unit` is a real addition over the prior ledger's five-name list, found by grepping every `StaticTransitionPlan` method whose return type mentions `Emittable*`** |
+| `validate_emitted_transfers_are_representable` | `StaticTransitionPlan` (same impl block) | pre-emission validation named directly in this slice's OWNER description; delegates to `abi::validate_emitted_transfers`; was entirely absent from the prior ledger's grouped row |
+
+`PredeclaredFunctionId` contributes zero methods (see the symbol-ledger
+correction above).
+
+**Near-misses checked and excluded — named because a substring match on
+"abi"/"unit"/"predeclared"/"emittable" would have wrongly caught them, and
+each was read in full before exclusion:**
+
+| Method | Why it looks like this owner | Why it is not |
+| --- | --- | --- |
+| `expect_entry_abi` | Returns a tuple including `PredeclaredFunctionId`; name contains "abi" | Method on a Continuations-domain enum variant matcher (`ContinuationInputSource`-family `Self::EntryAbi`/`Self::ProducerLocal`); `#[cfg(test)]`-only assertion helper for continuation input source |
+| `PlannedTrapIdentity::abi_word` | Method name is `abi_word` | Inherent method on `PlannedTrapIdentity`, a Joins/traps-owned type (see the type-exclusion table); the word format happens to be ABI-shaped, the type is not this owner's |
+| `verify_current_lexical_availability` | Takes `emission_owner: PredeclaredFunctionId` as a parameter | Validates a `ContinuationProducerEnvironment` lexical-availability relation; Continuations-domain, `PredeclaredFunctionId` is a foreign key here, not the subject |
+| `verify_predeclared_entry_frame_membership` | Name contains "predeclared"; takes `frame: PredeclaredFunctionId` | Validates continuation-source-coordinate membership (`RT-CONTSRC-PRODUCER-LOCAL D3b`); Continuations-domain despite the vocabulary overlap |
+| `unit_boundary_environment_occurrence` | Name contains "unit" | Aggregate-occurrence lookup keyed on `SynthesizedAggregateRoot::UnitBoundaryEnvironment`; "unit" here names an aggregate root kind, a false-friend collision with this owner's "unit" |
+| `continuation_units` | Adjacent to `root_emittable_unit`; revalidates ABI descriptor/specialization agreement | Returns `Vec<ContinuationUnitView<'_>>`, a Continuations-owned type; it is a cross-boundary *consumer* of this owner's ABI data after `D1`, not a member of it — flagged below as a `D1` consumer to watch, not excluded silently |
+| `required_join_origins` | Takes `function: PredeclaredFunctionId` | Joins/traps-domain (join origin computation); `PredeclaredFunctionId` is a foreign key |
+| `static_body_source_bindings` | Returns a tuple containing `PredeclaredFunctionId` | Source/body-binding tracking is occurrence-domain vocabulary; the id is a foreign key, not the subject |
+
+**Cross-boundary consumer to watch at `D1`, not a blocker:** `continuation_units`
+(Continuations-domain, unmoved) reads this owner's ABI descriptor count and
+the plan's continuation-specialization population to revalidate agreement
+between them. After `D1` this becomes a read across the `units.rs`/parent
+boundary — permitted by the standing "child domain module may own its types
+while reading ancestor-private root state" pattern (`evt_6r403ez3m2m69`), not
+an exposed behavioural dependency requiring a stop.
+
+**Closure for the remaining 299 (317 declared − 18 moved):** none are moved
+by this `D1`. They remain declared exactly where they are today — either
+other planner domains' not-yet-extracted inherent methods on
+`StaticTransitionPlan`, free functions serving those domains'
+validation/construction, or `semantic_ir.rs`'s shared representation methods
+(e.g. `SemanticMaterialArena`, `SemanticPlane`). This `D0` does not
+pre-enumerate their ownership by the same discipline the frame's frozen
+stage predicate applies to per-domain symbol sets: doing so here would
+duplicate and stale the claiming slices' own `D0` ledgers. This is the
+"narrow the declared population" resolution AC-1 permits, applied to a class
+this slice never claimed complete in the first place — unlike the type
+class above, where the prior ledger's own wording claimed a completeness it
+did not have.
+
+### Symbol ledger — consts and statics (declared population: 4 true consts, 35 `thread_local!` keys)
+
+Two selectors, corrected to exclude `const fn` (see the functions section
+above for why a naive `const|static` regex over-matches):
+
+```sh
+rg -n '^\s*pub(?:\([^)]*\))?\s+const\s+' <file> | grep -v 'const fn'
+rg -n '^\s*(pub(?:\([^)]*\))?\s+)?static\s+[A-Za-z_][A-Za-z0-9_]*\s*:' <file>
+```
+
+**True `const` items (4), none moved:** `SynthesizedFixedConstructorRole::ALL`
+(`semantic_ir.rs:89`, Aggregates-owned type), `MAX_HELPERS_PER_STATIC_SOURCE`
+(`static_transition.rs:55`, source-machine/occurrence-scoped),
+`CRANELIFT_HOST_EFFECT_CONSUMERS_V1` (`static_transition.rs:5305`,
+Effects-owned), `D2J_DECLARATION` (`static_transition.rs:19194`,
+Joins/traps-owned test fixture literal).
+
+**`thread_local!`-scoped `static` keys (35), none individually moved:** 4 sit
+in `abi.rs` (`D2_IGNORE_DECLARATION_OWNERSHIP`,
+`D2_CLAIM_ALL_BODIES_DECLARATION_OWNED`, `D3_C4_MATCHES_CLOSURE_BODY_ONLY`,
+`SKIP_CONTINUATION_ABI_PREFLIGHT`) and travel with `abi.rs` unchanged — this
+owner's mutation-test cells, already covered by the "unchanged: `abi.rs`"
+disposition above, not a new move. The remaining 31 are mutation-test cells
+for the other five planner domains (continuation, aggregate, effect, fusion,
+join/worker) declared in `semantic_ir.rs` and `static_transition.rs`; none
+belong to this owner and none move.
+
+### Symbol ledger — modules and re-exports (declared population: 2 `pub use` blocks in scope, 0 `pub mod`)
+
+`static_transition.rs` has no `pub mod`. Its `pub use` statements
+(`static_transition.rs:39-53`, `:18419-18428`):
+
+| Re-export | Contents | D1 effect |
+| --- | --- | --- |
+| `use abi::{...}` (two blocks) | `AbiCaptureProvenance`, `AbiCarrier`, `AbiFrameHeader`, `AbiOwnership`, `AbiProcessParameter`, `AbiRootIngress`, `AbiSchedulingIngress`, `AbiSlot`, `AbiSlotKind`, `AbiStorageOwner`, `AbiUnitDefinition`, `expected_capture_slot` | None — `abi.rs` is unchanged, this re-export line is untouched |
+| `use semantic_ir::{...}` | `ConstructorIdentity`, `FieldIdentity`, `PredeclaredFunctionId`, `StaticOriginId`, `SynthesizedConstructorRole`, `SynthesizedFixedConstructorRole`, `SynthesizedIoErrorRole` | Only the `PredeclaredFunctionId` re-export path changes (it now resolves through `units.rs`, not directly from `semantic_ir`); the other six names are unaffected |
+| `#[cfg(test)] use semantic_ir::{with_last_io_error_role_omitted, with_d2a_population_mutation, D2aPopulationMutation}` | test-only | Aggregates/occurrence-domain (`D2a`), unaffected |
+| `#[cfg(test)] use tests::{contspec_nested_fixture, d2j_checked_fixture_under, d2j_installed_plan_under, D2jCause, D2J_DECLARATION}` | test-only | Joins/traps-domain (`D2j`), unaffected |
+
+### Symbol ledger — traits (declared population: 0)
+
+`rg -c '^\s*pub(?:\([^)]*\))?\s+trait\s+[A-Za-z_]'` returns 0 across all
+three files. No locally declared trait exists to reconcile. The moved types'
+derives (below) are the only trait surface they carry, and all are
+`#[derive(...)]`-generated, not manual `impl Trait for`.
+
+### Symbol ledger — cfg, attributes, derive, repr and visibility
+
+Occurrence counts, corpus-scale rather than a per-item table: `#[derive(...)]`
+20 (`abi.rs`) + 29 (`semantic_ir.rs`) + 140 (`static_transition.rs`) = 189;
+`#[cfg(...)]` 9 + 16 + 218 = 243. **Blind spot, stated rather than closed by
+this count:** the selector counts attribute *occurrences*, not distinct
+attributed items — one item can carry several derives, and a doc comment or
+`#[repr]`/visibility modifier is not a `derive`/`cfg` match at all. The
+closure for this class is per-item, not corpus-wide: every moved item's
+attributes, cfg, repr, derive, field/variant order and visibility are
+preserved verbatim and checked individually in the `AC-3` transport manifest
+at `D1` review — this ledger does not re-derive that here, since `D0` moves
+nothing for `AC-3` to apply to yet.
+
+### Symbol ledger — macro-produced owned items
+
+`macro_rules!` count: 0 in all three files. The only macro-produced owned
+items are the 35 `thread_local!`-scoped `static` keys already reconciled in
+the consts-and-statics section above; there is no second macro-produced
+population to close.
+
+### Source-text oracles (Stage A's corpus-wide 49)
+
+`include_str!` count in the three bound files: 0 in `abi.rs`, 0 in
+`semantic_ir.rs`, **3** in `static_transition.rs` — all of Stage A's
+corpus-wide 49 that fall inside this slice's bound files.
+
+- `b2r_ac6_the_abi_plane_declares_no_emission_construct` and
+  `b2r_ac7_the_abi_plane_adds_no_parser_and_no_dependency_edge`
+  (`static_transition.rs:28229`, `:28280`) both `include_str!` `abi.rs`.
+  `abi.rs`'s path is unchanged by this `D1`, so these are inert to this move
+  — already named in the test-property ledger below (`b2r_ac6_*`, `b2r_ac7_*`).
+- `the_semantic_seed_api_accepts_only_occurrence_origins`
+  (`static_transition.rs:27058`) `include_str!`s `static_transition.rs`
+  itself and counts exact-line occurrences of `children: &[StaticOriginId],`.
+  This is Occurrence-domain (AC-12, not this owner), and its target line
+  occurs only at `static_transition.rs:12558,12575` — outside every method
+  this `D1` moves (`13513`–`18171`). Checked, not assumed: `grep -n
+  'children: &\[StaticOriginId\],' static_transition.rs` returns exactly
+  those two lines. Moving this owner's methods out does not change this
+  test's count.
 
 ### Test-property ledger
 
