@@ -68,6 +68,26 @@ amendments and it is this slice's to honour, not a later slice's.
 
 # `D0` — THE LEDGER. No code moves in this deliverable.
 
+> ## HELD CANDIDATE `0fd56146f` PREDATES THE AMENDED BAR. Steward, 2026-08-18.
+>
+> **`D0` candidate `0fd56146fcf95a79c0347f36cccdd06c587227c2` is `+64/-1` on this
+> file at base `7509c77a7`.** That base **predates `40cb6b3b5`**, the publish
+> that applied the Architect and research whole-plan amendments — and
+> `40cb6b3b5` rewrote **this file**. The ledger in the candidate was therefore
+> measured against the **pre-amendment** acceptance bar.
+>
+> **A two-way diff of the candidate against current `main` shows a false delete
+> of 2343 lines across 18 frames.** That is base skew, not the candidate. Diff
+> it against `7509c77a7`, never against `main`.
+>
+> **On capacity return, before QA spends a review:** rebase the candidate onto
+> `main`, then settle whether the existing ledger still discharges `D0` under
+> the corrected bar — specifically `AC-2` (test discovery per build profile),
+> `AC-3` (the transport manifest), and `AC-4b` (the target-child constraint),
+> **none of which existed when that ledger was measured.** The Architect was
+> asked this directly and hit its usage limit before answering: the question
+> is **unanswered, not declined.**
+
 **Produce the exact old/new symbol ledger and test-property ledger for this
 owner**, derived from the Stage A inventories and **re-measured at a named SHA**
 on the current tree:
