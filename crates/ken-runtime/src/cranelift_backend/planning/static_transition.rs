@@ -53,7 +53,7 @@ pub(in crate::cranelift_backend) use semantic_ir::{
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole, SynthesizedIoErrorRole,
 };
 pub(in crate::cranelift_backend) use units::{
-    EmittableCallEdge, EmittableCallKind, EmittableUnit, PredeclaredFunctionId,
+    EmittableCallEdge, EmittableCallKind, PredeclaredFunctionId,
 };
 
 pub(super) const MAX_HELPERS_PER_STATIC_SOURCE: usize = 8;
