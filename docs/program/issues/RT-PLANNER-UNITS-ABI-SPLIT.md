@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-UNITS-ABI-SPLIT
 title: "Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain"
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
