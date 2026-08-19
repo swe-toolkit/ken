@@ -7729,6 +7729,30 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` — the continuation owner. A
+        // planning module with no emission, so every count is zero. The zero
+        // is load-bearing for the same reason as `abi.rs`: the planner mints
+        // keys, seats and evidence and must never emit against them.
+        Census {
+            file: "planning/static_transition/continuations.rs",
+            source: include_str!("../../../planning/static_transition/continuations.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
+        // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` sub-split — the fusion identity
+        // plane. A planning module with no emission, so every count is zero.
+        Census {
+            file: "planning/static_transition/continuations/fusion.rs",
+            source: include_str!("../../../planning/static_transition/continuations/fusion.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         // ⭐ `RT-FNSPLIT-B2F` `D3`/`AC-2` — THE SECOND PREDICTED ROW, and the
         // prediction was recorded before the module existed for the same reason
         // the first one was.
@@ -8182,6 +8206,21 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
         "planning/static_transition/abi.rs",
         include_str!("../../../planning/static_transition/abi.rs"),
     ),
+    // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` — the continuation owner. Registered
+    // here the moment the module exists, for the same reason as every sibling:
+    // a production module absent from this roster is invisible to every pin
+    // that iterates it.
+    (
+        "planning/static_transition/continuations.rs",
+        include_str!("../../../planning/static_transition/continuations.rs"),
+    ),
+    // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` sub-split — the fusion identity
+    // plane (a child of continuations, declared by continuations.rs via
+    // `mod fusion;`). Registered for the same reason as every sibling.
+    (
+        "planning/static_transition/continuations/fusion.rs",
+        include_str!("../../../planning/static_transition/continuations/fusion.rs"),
+    ),
     // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner. Registered
     // here the moment the module exists, for the same reason as every sibling:
     // a production module absent from this roster is invisible to every pin
@@ -8262,6 +8301,10 @@ fn the_backend_production_surface_inventory_is_closed() {
             ("lowering/mod.rs", "seed_material"),
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
+            // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` — the continuation owner
+            // (keys + seats + evidence surfaces + the fusion identity plane),
+            // factored into its own domain module.
+            ("planning/static_transition.rs", "continuations"),
             // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner
             // (StaticOriginId + records + validations + read views), factored
             // into its own domain module.
@@ -8271,6 +8314,10 @@ fn the_backend_production_surface_inventory_is_closed() {
             // the StaticTransitionPlan projections that derive it, factored into
             // their own domain module.
             ("planning/static_transition.rs", "units"),
+            // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` sub-split — the fusion
+            // identity plane, a child of continuations (declared by
+            // continuations.rs, which the roster scans after static_transition.rs).
+            ("planning/static_transition/continuations.rs", "fusion"),
         ],
         "AC-4 -- the backend's module inventory changed, so \
          BACKEND_PRODUCTION_SOURCES is no longer the whole production surface and \
