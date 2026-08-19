@@ -12,18 +12,20 @@
 //! The lowering-owned half (`AggregateAllocationEvent`,
 //! `AggregateAllocationLedger`, `AggregateRelationClosure`) is a DIFFERENT
 //! thing entirely and stays in `lowering/mod.rs` for item 15 -- see the D0
-//! ledger's boundary proposal in `docs/program/issues/RT-PLANNER-AGGREGATES-SPLIT.md`.
+//! ledger's boundary proposal in
+//! `docs/program/issues/RT-PLANNER-AGGREGATES-SPLIT.md`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    derive_case_producer_fact, occurrence_authority, planner_capacity_error, planner_error,
-    synthesized_seat_emission_owners, BoundaryReferentOwner, CaseProducerSet,
+    occurrence_authority, planner_capacity_error, planner_error,
+    synthesized_seat_emission_owners, BoundaryReferentOwner,
     ContinuationEmissionOwner, CraneliftBackendError, FieldIdentity, JoinResultRepresentation,
     PlannedOccurrenceChildAuthority, PlannedReferentLifetime, PredeclaredFunctionId,
     StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
     SynthesizedFixedConstructorRole,
 };
+use super::closure::{derive_case_producer_fact, CaseProducerSet};
 use crate::boundary_value::{BoundaryClass, BoundaryTag};
 use crate::RuntimeExpr;
 

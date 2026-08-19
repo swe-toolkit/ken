@@ -7800,6 +7800,33 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the construction lifecycle
+        // (minting, relation and seat construction: `Planner`'s own impl).
+        // A planning module with no emission, so every count is zero, for
+        // the same reason as every other planner-owned sibling.
+        Census {
+            file: "planning/static_transition/construction.rs",
+            source: include_str!("../../../planning/static_transition/construction.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
+        // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the closure lifecycle
+        // (validation and closure, and read-only projections: most of
+        // `StaticTransitionPlan`'s own impl). A planning module with no
+        // emission, so every count is zero, for the same reason as every
+        // other planner-owned sibling.
+        Census {
+            file: "planning/static_transition/closure.rs",
+            source: include_str!("../../../planning/static_transition/closure.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         // ⭐ `RT-FNSPLIT-B2F` `D3`/`AC-2` — THE SECOND PREDICTED ROW, and the
         // prediction was recorded before the module existed for the same reason
         // the first one was.
@@ -8292,6 +8319,22 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
         "planning/static_transition/joins_traps.rs",
         include_str!("../../../planning/static_transition/joins_traps.rs"),
     ),
+    // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the construction lifecycle.
+    // Registered here the moment the module exists, for the same reason as
+    // every sibling: a production module absent from this roster is
+    // invisible to every pin that iterates it.
+    (
+        "planning/static_transition/construction.rs",
+        include_str!("../../../planning/static_transition/construction.rs"),
+    ),
+    // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the closure lifecycle.
+    // Registered here the moment the module exists, for the same reason as
+    // every sibling: a production module absent from this roster is
+    // invisible to every pin that iterates it.
+    (
+        "planning/static_transition/closure.rs",
+        include_str!("../../../planning/static_transition/closure.rs"),
+    ),
     // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner. Registered
     // here the moment the module exists, for the same reason as every sibling:
     // a production module absent from this roster is invisible to every pin
@@ -8379,6 +8422,16 @@ fn the_backend_production_surface_inventory_is_closed() {
             // `AggregateAllocationLedger`, `AggregateRelationClosure`) stays
             // in `lowering/mod.rs` for item 15.
             ("planning/static_transition.rs", "aggregates"),
+            // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the closure lifecycle
+            // (validation and closure, and read-only projections: most of
+            // `StaticTransitionPlan`'s own impl), factored into its own
+            // domain module. Alphabetically before `construction` in the
+            // `mod` declaration order this list follows.
+            ("planning/static_transition.rs", "closure"),
+            // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the construction
+            // lifecycle (minting, relation and seat construction: `Planner`'s
+            // own impl), factored into its own domain module.
+            ("planning/static_transition.rs", "construction"),
             // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` — the continuation owner
             // (keys + seats + evidence surfaces + the fusion identity plane),
             // factored into its own domain module.
@@ -8686,6 +8739,22 @@ fn the_entry_carrying_types_are_module_private() {
         vec![
             "planning/static_transition.rs",
             "planning/static_transition/abi.rs",
+            // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — `construction.rs` names
+            // `PlannedExpr` because the type's own declaration, and every
+            // construction-phase reader of it, moved here with `Planner`'s
+            // impl. It is `pub(super)` (root itself reads `.entry`/
+            // `.occurrence` off values `plan_static_transition_graph_with_
+            // symbols` receives back from `Planner`), never wider -- the
+            // reach stays inside `static_transition`'s own module family,
+            // the same discipline items 4-9 used for every cross-child
+            // surface. It does not cross into `lowering` or beyond.
+            "planning/static_transition/construction.rs",
+            // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — `closure.rs` names
+            // `StaticNodeId` because `planned_entry_body` and the closure/
+            // validation family's own occurrence-to-node lookups moved here
+            // with most of `StaticTransitionPlan`'s impl. The type remains
+            // module-private; only its naming site moved.
+            "planning/static_transition/closure.rs",
             // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — `occurrences.rs` names
             // `StaticNodeId` because `origin_of` maps a node to its occurrence
             // origin (the sole mint site). The type remains module-private;
@@ -8707,13 +8776,18 @@ fn the_entry_carrying_types_are_module_private() {
          and is not widened."
     );
 
-    // The naming set is what it is because the declarations are module-private. A
-    // `pub` of any width would widen it without changing any call.
-    let planner = include_str!("../../../planning/static_transition.rs");
+    // The naming set is what it is because the declarations stay inside
+    // `static_transition`'s own module family. A `pub` reaching `lowering` or
+    // beyond would widen it without changing any call; `pub(super)` reaching
+    // only root and root's other descendants (exactly `construction.rs`'s
+    // case, below) is the standing discipline, not a violation of it.
+    let construction = include_str!("../../../planning/static_transition/construction.rs");
     assert!(
-        planner.contains("\nstruct PlannedExpr {"),
-        "AC-5: `PlannedExpr` must stay module-private"
+        construction.contains("\npub(super) struct PlannedExpr {"),
+        "AC-5: `PlannedExpr` must stay confined to `static_transition`'s own \
+         module family (`pub(super)` at most), never reach `lowering`"
     );
+    let planner = include_str!("../../../planning/static_transition.rs");
     assert!(
         planner.contains("\nstruct StaticNodeId(u32);"),
         "AC-5: `StaticNodeId` must stay module-private"
