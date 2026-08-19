@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-19 19:49:29Z — from 388 issue file(s) in `docs/program/issues/`.
+2026-08-19 22:56:23Z — from 388 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -304,7 +304,7 @@ the committed file matches the generator's output.
 | `RT-LEXICAL-R3-FUSION-EMITTER` | Row 5's before-hole expression is the one member of the eight-expression lexical-recursor population whose lawful repair requires static-continuation fusion -- it is carved out of RT-LEXICAL-RECURSOR-CONSUMERS together with its repair and discriminating-control obligations, because leaving the expression in the parent while moving the machinery would give the parent an AC it cannot discharge | merged | runtime | M | none | — |
 | `RT-LEXICAL-RECURSOR-CONSUMERS` | Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam | merged | runtime | M | none | — |
 | `RT-LEXICAL-ROW2-MISSING-MINT` | Row 2 of the lexical-recursor population fails post-compile with a missing Mint rather than at a lowering boundary, so it is not repairable by RT-LEXICAL-RECURSOR-CONSUMERS' D2 | merged | runtime | S | none | — |
-| `RT-LOWERING-FUNCTION-STATE-SPLIT` | Move function-local lowering state out of lowering/mod.rs and lowering/core.rs into its own child -- the first lowering domain, and the point where the phase crosses from the planner files into the lowering files | draft | runtime | M | none | — |
+| `RT-LOWERING-FUNCTION-STATE-SPLIT` | Move function-local lowering state out of lowering/mod.rs and lowering/core.rs into its own child -- the first lowering domain, and the point where the phase crosses from the planner files into the lowering files | ready | runtime | M | none | — |
 | `RT-LOWERING-VALUES-BOUNDARY-SPLIT` | Move the values and boundary domain out of the lowering files -- and boundary_value_clif.rs is NOT absorbed merely because it is large; its lifecycle and consumers must be proven first | draft | runtime | M | none | — |
 | `RT-MATCH-DIFFERENCE-REACHABILITY` | Source-reachability of the narrowed MatchScrutineeRecursor difference is NOT SETTLED under the method gate -- normalization is not total, the elaborator refusal has an ascription escape, and the wrapper that blocks a witness is a compiler-path invariant rather than a language rule | merged | runtime | M | none | — |
 | `RT-MATCH-FRAME-FP` | match-frame fingerprints must hash a dedicated closure-free header carrier, not a Debug rendering of closure-capable cases | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1108 |
@@ -327,7 +327,7 @@ the committed file matches the generator's output.
 | `RT-PLANNER-INVARIANT-MESSAGE-LOCALIZATION` | The PlannerInvariant rendering localizes every failure to the static transition planner, and 16 of its direct producers are resident in lowering -- the same false-localization defect this file already ruled on for its neighbour variant | draft | runtime | S | none | — |
 | `RT-PLANNER-JOINS-TRAPS-SPLIT` | Move the joins and traps domain out of planning/static_transition.rs -- the last named planner domain, and generated traps receive no fabricated source origin | merged | runtime | M | none | — |
 | `RT-PLANNER-OCCURRENCES-SPLIT` | Move the occurrences domain out of planning/static_transition.rs -- StaticOriginId and source/child correspondence are occurrence-owned and must not be pulled into a shared identity drawer | merged | runtime | M | none | — |
-| `RT-PLANNER-ROOT-CLOSURE-SPLIT` | Remeasure the planner residue after the six domain moves and close static_transition.rs -- a fresh node, not a renamed item 3, and if the parent is already under 10k it records that and extracts nothing | ready | runtime | M | none | — |
+| `RT-PLANNER-ROOT-CLOSURE-SPLIT` | Remeasure the planner residue after the six domain moves and close static_transition.rs -- a fresh node, not a renamed item 3, and if the parent is already under 10k it records that and extracts nothing | closed | runtime | M | none | — |
 | `RT-PLANNER-UNITS-ABI-SPLIT` | Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain | merged | runtime | L | none | — |
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
@@ -448,7 +448,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
-- `RT-PLANNER-ROOT-CLOSURE-SPLIT` — Remeasure the planner residue after the six domain moves and close static_transition.rs -- a fresh node, not a renamed item 3, and if the parent is already under 10k it records that and extracts nothing
+- `RT-LOWERING-FUNCTION-STATE-SPLIT` — Move function-local lowering state out of lowering/mod.rs and lowering/core.rs into its own child -- the first lowering domain, and the point where the phase crosses from the planner files into the lowering files
 - `RT-RETIRED-CENSUS-ROT` — Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` — Find one Ken SOURCE program that reaches the StaticWorkerBinding conservation arm specifically -- the existing bound is a search over hand-authored fixtures, and the six ignored ken-cli tests are NOT a ready-made corpus because they fail upstream at the sibling Closure arm
@@ -500,8 +500,7 @@ is itself not yet `merged`/`closed`:
 - `RT-EMITTER-CONTROL-JOINS-SPLIT` blocked by `RT-EMITTER-CALLS-RETURNS-SPLIT` (status: draft)
 - `RT-EMITTER-EFFECTS-SPLIT` blocked by `RT-EMITTER-AGGREGATES-SPLIT` (status: draft)
 - `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` blocked by `RT-EMITTER-EFFECTS-SPLIT` (status: draft)
-- `RT-LOWERING-FUNCTION-STATE-SPLIT` blocked by `RT-PLANNER-ROOT-CLOSURE-SPLIT` (status: ready)
-- `RT-LOWERING-VALUES-BOUNDARY-SPLIT` blocked by `RT-LOWERING-FUNCTION-STATE-SPLIT` (status: draft)
+- `RT-LOWERING-VALUES-BOUNDARY-SPLIT` blocked by `RT-LOWERING-FUNCTION-STATE-SPLIT` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-SOURCE-MACHINE-TYPES-SPLIT` blocked by `RT-LOWERING-VALUES-BOUNDARY-SPLIT` (status: draft)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
