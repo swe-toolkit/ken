@@ -7729,6 +7729,22 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — the aggregates owner. A
+        // planning module with no emission, so every count is zero. The zero
+        // is load-bearing for the same reason as `abi.rs`: the planner mints
+        // aggregate occurrence identities and ownership records and must
+        // never emit against them; the lowering-owned half
+        // (`AggregateAllocationEvent`/`AggregateAllocationLedger`/
+        // `AggregateRelationClosure`) stays in `lowering/mod.rs`.
+        Census {
+            file: "planning/static_transition/aggregates.rs",
+            source: include_str!("../../../planning/static_transition/aggregates.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` — the continuation owner. A
         // planning module with no emission, so every count is zero. The zero
         // is load-bearing for the same reason as `abi.rs`: the planner mints
@@ -8206,6 +8222,14 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
         "planning/static_transition/abi.rs",
         include_str!("../../../planning/static_transition/abi.rs"),
     ),
+    // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — the aggregates owner. Registered
+    // here the moment the module exists, for the same reason as every
+    // sibling: a production module absent from this roster is invisible to
+    // every pin that iterates it.
+    (
+        "planning/static_transition/aggregates.rs",
+        include_str!("../../../planning/static_transition/aggregates.rs"),
+    ),
     // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` — the continuation owner. Registered
     // here the moment the module exists, for the same reason as every sibling:
     // a production module absent from this roster is invisible to every pin
@@ -8301,6 +8325,13 @@ fn the_backend_production_surface_inventory_is_closed() {
             ("lowering/mod.rs", "seed_material"),
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
+            // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — aggregate allocation
+            // events, ownership records, and the planner-side aggregate
+            // lifecycle, factored into its own domain module. The
+            // lowering-owned half (`AggregateAllocationEvent`,
+            // `AggregateAllocationLedger`, `AggregateRelationClosure`) stays
+            // in `lowering/mod.rs` for item 15.
+            ("planning/static_transition.rs", "aggregates"),
             // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` — the continuation owner
             // (keys + seats + evidence surfaces + the fusion identity plane),
             // factored into its own domain module.
