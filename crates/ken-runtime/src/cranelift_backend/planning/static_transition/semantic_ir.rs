@@ -9,6 +9,7 @@ use super::{
     StaticEdgeId, StaticNode, StaticNodeId, TransitionKind,
 };
 use super::units::PredeclaredFunctionId;
+use super::occurrences::StaticOriginId;
 use crate::{
     RuntimeExpr, RuntimeIntV1, RuntimePartiality, RuntimePrimitive, RuntimeTrap, RuntimeTrapCode,
     RuntimeValue, Sign,
@@ -22,17 +23,6 @@ thread_local! {
     static OMIT_LAST_IO_ERROR_ROLE: Cell<bool> = const { Cell::new(false) };
 }
 
-/// The preallocated positional identity of one planned occurrence.
-///
-/// Widened to `pub(in crate::cranelift_backend)` so the
-/// lowering can carry an occurrence's static name to the site that lowers it.
-/// The wrapped ordinal stays `pub(super)` deliberately: a consumer outside this
-/// planner can hold, compare, and pass an origin, but **cannot mint one** from
-/// an arbitrary integer, so the tag population can only ever be the planner's
-/// own.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-#[repr(transparent)]
-pub(in crate::cranelift_backend) struct StaticOriginId(pub(super) u32);
 
 /// The artifact-static identity of a **constructor** symbol (`D1`).
 ///

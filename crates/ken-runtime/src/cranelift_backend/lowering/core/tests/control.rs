@@ -7918,6 +7918,17 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner. A
+        // planning module with no emission, so every count is zero.
+        Census {
+            file: "planning/static_transition/occurrences.rs",
+            source: include_str!("../../../planning/static_transition/occurrences.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         Census {
             file: "planning/static_transition/semantic_ir.rs",
             source: include_str!("../../../planning/static_transition/semantic_ir.rs"),
@@ -8671,6 +8682,14 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
         "planning/static_transition/abi.rs",
         include_str!("../../../planning/static_transition/abi.rs"),
     ),
+    // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner. Registered
+    // here the moment the module exists, for the same reason as every sibling:
+    // a production module absent from this roster is invisible to every pin
+    // that iterates it.
+    (
+        "planning/static_transition/occurrences.rs",
+        include_str!("../../../planning/static_transition/occurrences.rs"),
+    ),
     (
         "planning/static_transition/semantic_ir.rs",
         include_str!("../../../planning/static_transition/semantic_ir.rs"),
@@ -8743,6 +8762,10 @@ fn the_backend_production_surface_inventory_is_closed() {
             ("lowering/mod.rs", "seed_material"),
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
+            // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner
+            // (StaticOriginId + records + validations + read views), factored
+            // into its own domain module.
+            ("planning/static_transition.rs", "occurrences"),
             ("planning/static_transition.rs", "semantic_ir"),
             // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — the Emittable* vocabulary and
             // the StaticTransitionPlan projections that derive it, factored into
@@ -9136,6 +9159,11 @@ fn the_entry_carrying_types_are_module_private() {
         vec![
             "planning/static_transition.rs",
             "planning/static_transition/abi.rs",
+            // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — `occurrences.rs` names
+            // `StaticNodeId` because `origin_of` maps a node to its occurrence
+            // origin (the sole mint site). The type remains module-private;
+            // only its naming site moved.
+            "planning/static_transition/occurrences.rs",
             "planning/static_transition/semantic_ir.rs",
             // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — `units.rs` names `StaticNodeId`
             // because `EmittableUnit`'s `planned_node` field moved here from the
@@ -9836,7 +9864,13 @@ fn the_owner_classification_has_a_closed_production_naming_inventory() {
     assert_eq!(
         widened,
         vec![
-            "pub(in crate::cranelift_backend) struct StaticOriginId(pub(super) u32);",
+            // ⭐ `RT-PLANNER-OCCURRENCES-SPLIT` `D1` moved `StaticOriginId` out
+            // of `semantic_ir.rs` into the new `occurrences.rs` child, so its
+            // widened-visibility row is no longer in this plane's inventory.
+            // The type's visibility is unchanged — it is still
+            // `pub(in crate::cranelift_backend)` with a `pub(super)` field —
+            // only its definition file moved (same shape as the
+            // `PredeclaredFunctionId` note below).
             "pub(in crate::cranelift_backend) struct ConstructorIdentity(pub(super) DenseRange);",
             "pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {",
             "pub(in crate::cranelift_backend) struct SynthesizedIoErrorRole(pub(super) u32);",
