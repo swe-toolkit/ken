@@ -4043,7 +4043,7 @@ pub(super) fn exact_continuation_ordinary_parameters(
 /// load-bearing by neutralizing it and observing the two keys become equal; a
 /// silent no-op would leave them unequal and be read as proof.
 #[cfg(test)]
-pub(super) fn copy_entry_coordinate_component(
+fn copy_entry_coordinate_component(
     target: &mut ContinuationSourceCoordinate,
     source: &ContinuationSourceCoordinate,
     component: ContinuationProjectionOmission,
@@ -4075,7 +4075,7 @@ pub(super) fn copy_entry_coordinate_component(
 }
 
 #[cfg(test)]
-pub(super) fn continuation_keys_equal_under_mutation(
+fn continuation_keys_equal_under_mutation(
     left: &ContinuationSpecializationKey,
     right: &ContinuationSpecializationKey,
     mutation: ContinuationInternMutation,
@@ -4443,7 +4443,7 @@ impl ContinuationRequiredConsumerObservation {
 
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum ContinuationConsumingOccurrenceSeedMutation {
+enum ContinuationConsumingOccurrenceSeedMutation {
     BodyOrigin,
     EliminatorOrigin,
 }
@@ -4511,7 +4511,7 @@ pub(in crate::cranelift_backend) fn take_continuation_required_consumer_observat
 }
 
 #[cfg(test)]
-pub(super) fn with_continuation_consuming_occurrence_seed_mutation<T>(
+fn with_continuation_consuming_occurrence_seed_mutation<T>(
     mutation: ContinuationConsumingOccurrenceSeedMutation,
     run: impl FnOnce() -> T,
 ) -> T {
@@ -4587,7 +4587,7 @@ pub(in crate::cranelift_backend) fn set_envelope_defect(defect: EnvelopeDefect) 
 }
 
 #[cfg(test)]
-pub(super) fn envelope_defect() -> EnvelopeDefect {
+fn envelope_defect() -> EnvelopeDefect {
     ENVELOPE_DEFECT.with(Cell::get)
 }
 
