@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-OCCURRENCES-SPLIT
 title: "Move the occurrences domain out of planning/static_transition.rs -- StaticOriginId and source/child correspondence are occurrence-owned and must not be pulled into a shared identity drawer"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
