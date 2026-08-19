@@ -7769,6 +7769,21 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-PLANNER-EFFECTS-SPLIT` `D1` — the host-effect seat authority. A
+        // planning module with no emission, so every count is zero. The zero
+        // is load-bearing for the same reason as `abi.rs`: the planner mints
+        // seat identities and validates them and must never emit against
+        // them; the emitter-owned half (`EffectSeatGroupId`/
+        // `EffectSeatLedger`/`EffectSeatClosure`) stays in `lowering/mod.rs`.
+        Census {
+            file: "planning/static_transition/effects.rs",
+            source: include_str!("../../../planning/static_transition/effects.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         // ⭐ `RT-FNSPLIT-B2F` `D3`/`AC-2` — THE SECOND PREDICTED ROW, and the
         // prediction was recorded before the module existed for the same reason
         // the first one was.
@@ -8245,6 +8260,14 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
         "planning/static_transition/continuations/fusion.rs",
         include_str!("../../../planning/static_transition/continuations/fusion.rs"),
     ),
+    // `RT-PLANNER-EFFECTS-SPLIT` `D1` — the host-effect seat authority.
+    // Registered here the moment the module exists, for the same reason as
+    // every sibling: a production module absent from this roster is
+    // invisible to every pin that iterates it.
+    (
+        "planning/static_transition/effects.rs",
+        include_str!("../../../planning/static_transition/effects.rs"),
+    ),
     // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner. Registered
     // here the moment the module exists, for the same reason as every sibling:
     // a production module absent from this roster is invisible to every pin
@@ -8336,6 +8359,14 @@ fn the_backend_production_surface_inventory_is_closed() {
             // (keys + seats + evidence surfaces + the fusion identity plane),
             // factored into its own domain module.
             ("planning/static_transition.rs", "continuations"),
+            // `RT-PLANNER-EFFECTS-SPLIT` `D1` — the host-effect seat
+            // authority (seat derivation, contract lookup, closed-form
+            // rebuild-equality and uniqueness validation), factored into its
+            // own domain module. The emitter-owned half (`EffectSeatGroupId`,
+            // `EffectSeatLedger`, `EffectSeatClosure`,
+            // `EffectSeatVisitMutation`, `EffectSeatDispatchMutation`) stays
+            // in `lowering/mod.rs` for item 16.
+            ("planning/static_transition.rs", "effects"),
             // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner
             // (StaticOriginId + records + validations + read views), factored
             // into its own domain module.
