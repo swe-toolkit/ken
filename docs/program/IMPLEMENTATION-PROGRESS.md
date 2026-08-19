@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-19 16:10:19Z — from 388 issue file(s) in `docs/program/issues/`.
+2026-08-19 18:02:55Z — from 388 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -322,10 +322,10 @@ the committed file matches the generator's output.
 | `RT-PLANNER-ATTRIB-K` | Boundary A planner: fixed K is a design invariant — move the K-exceeded rejection off the capacity channel | merged | runtime | XS | none | https://github.com/swe-toolkit/ken/pull/935 |
 | `RT-PLANNER-CONTINUATIONS-SPLIT` | Move the continuations domain out of planning/static_transition.rs -- sequenced deliberately after the continuation and evidence churn, so the domain is not re-homed against a surface that is still moving | merged | runtime | M | none | — |
 | `RT-PLANNER-DIAGNOSTIC-K` | Boundary A planner: report planner-invariant failures as planner defects, and assert fixed_k CONSTANT rather than merely affine | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/929 |
-| `RT-PLANNER-EFFECTS-SPLIT` | Move the effects domain out of planning/static_transition.rs -- effect seats, seat groups and effect-seat closures on the planner side | ready | runtime | M | none | — |
+| `RT-PLANNER-EFFECTS-SPLIT` | Move the effects domain out of planning/static_transition.rs -- effect seats, seat groups and effect-seat closures on the planner side | merged | runtime | M | none | — |
 | `RT-PLANNER-GRAPH-FOUNDATION-SPLIT` | Move the planner's shared substrate out of the static-transition monolith — the root plan type and the identity vocabulary that all six planner domain slices quote | closed | runtime | TBD | none | — |
 | `RT-PLANNER-INVARIANT-MESSAGE-LOCALIZATION` | The PlannerInvariant rendering localizes every failure to the static transition planner, and 16 of its direct producers are resident in lowering -- the same false-localization defect this file already ruled on for its neighbour variant | draft | runtime | S | none | — |
-| `RT-PLANNER-JOINS-TRAPS-SPLIT` | Move the joins and traps domain out of planning/static_transition.rs -- the last named planner domain, and generated traps receive no fabricated source origin | draft | runtime | M | none | — |
+| `RT-PLANNER-JOINS-TRAPS-SPLIT` | Move the joins and traps domain out of planning/static_transition.rs -- the last named planner domain, and generated traps receive no fabricated source origin | ready | runtime | M | none | — |
 | `RT-PLANNER-OCCURRENCES-SPLIT` | Move the occurrences domain out of planning/static_transition.rs -- StaticOriginId and source/child correspondence are occurrence-owned and must not be pulled into a shared identity drawer | merged | runtime | M | none | — |
 | `RT-PLANNER-ROOT-CLOSURE-SPLIT` | Remeasure the planner residue after the six domain moves and close static_transition.rs -- a fresh node, not a renamed item 3, and if the parent is already under 10k it records that and extracts nothing | draft | runtime | M | none | — |
 | `RT-PLANNER-UNITS-ABI-SPLIT` | Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain | merged | runtime | L | none | — |
@@ -448,7 +448,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
-- `RT-PLANNER-EFFECTS-SPLIT` — Move the effects domain out of planning/static_transition.rs -- effect seats, seat groups and effect-seat closures on the planner side
+- `RT-PLANNER-JOINS-TRAPS-SPLIT` — Move the joins and traps domain out of planning/static_transition.rs -- the last named planner domain, and generated traps receive no fabricated source origin
 - `RT-RETIRED-CENSUS-ROT` — Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` — Find one Ken SOURCE program that reaches the StaticWorkerBinding conservation arm specifically -- the existing bound is a search over hand-authored fixtures, and the six ignored ken-cli tests are NOT a ready-made corpus because they fail upstream at the sibling Closure arm
@@ -503,8 +503,7 @@ is itself not yet `merged`/`closed`:
 - `RT-LOWERING-FUNCTION-STATE-SPLIT` blocked by `RT-PLANNER-ROOT-CLOSURE-SPLIT` (status: draft)
 - `RT-LOWERING-VALUES-BOUNDARY-SPLIT` blocked by `RT-LOWERING-FUNCTION-STATE-SPLIT` (status: draft)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
-- `RT-PLANNER-JOINS-TRAPS-SPLIT` blocked by `RT-PLANNER-EFFECTS-SPLIT` (status: ready)
-- `RT-PLANNER-ROOT-CLOSURE-SPLIT` blocked by `RT-PLANNER-JOINS-TRAPS-SPLIT` (status: draft)
+- `RT-PLANNER-ROOT-CLOSURE-SPLIT` blocked by `RT-PLANNER-JOINS-TRAPS-SPLIT` (status: ready)
 - `RT-SOURCE-MACHINE-TYPES-SPLIT` blocked by `RT-LOWERING-VALUES-BOUNDARY-SPLIT` (status: draft)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
