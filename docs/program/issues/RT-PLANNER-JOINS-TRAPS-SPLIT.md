@@ -356,3 +356,307 @@ open the phase record to learn them.
 > - **The source machine is relocation only in this phase**, never a transition
 >   IR. Generated traps receive **no fabricated source origin**.
 
+## D0 ledger, re-measured at `de402e255`
+
+Bound file: `cranelift_backend/planning/static_transition.rs`, **12,726 lines**
+at this SHA. All line numbers below are re-measured at `de402e255` and are not
+inherited from any prior slice's frame or census row.
+
+### THE BEHAVIORAL WATCH-ITEM — result FIRST, since it gates everything else
+
+**No fork. Traps in this domain are identified purely by VALUE, never by
+source origin.** `PlannedTrapIdentity(u32)` is a dedup index into
+`trap_catalog: Vec<RuntimeTrap>`; `intern_trap`/`trap_identity` both take
+`trap: &RuntimeTrap` and return `PlannedTrapIdentity` — no `StaticOriginId`
+or any origin-bearing parameter appears anywhere in this domain's signatures,
+today or after the move. `intern_trap` is called from `expression_seed` (a
+`Planner` method that stays at root, handles every occurrence kind) at a
+point where an origin IS in scope (the enclosing node), but `intern_trap`
+itself never receives or needs it — confirmed by reading its full body
+(`static_transition.rs:2243-2261`): it dedups on `RuntimeTrap` equality
+alone. **No function in the moved population would need to mint an origin to
+compile**, so the hard-stop this watch-item exists to catch does not apply.
+
+### THE FROZEN STAGE PREDICATE, applied — a boundary the frame's own prose
+### does not settle, so `D0` settles it
+
+The frame's `THE OWNER` names *"planned trap seats, trap provenance events"*
+alongside join disposition. **Neither exists in the bound file.**
+`Px8trTrapProvenanceEvent` and `PlannedTrapSeat` are both declared and fully
+implemented in `lowering/mod.rs` (`pub(crate) enum Px8trTrapProvenanceEvent`
+at `lowering/mod.rs:515`; `pub(crate) enum PlannedTrapSeat` at `:605`; the
+recorder `px8tr_record_trap_provenance` at `:622`) — **zero presence in
+`static_transition.rs`**, confirmed by a full-file grep. This is the
+emitter's half of the pair (item 14's, per the frozen predicate: "the
+emitter owns concrete CLIF/backend mutation... assigned EXACTLY ONCE"), and
+it already lives at its correct final home — there is nothing here for
+`D1` to claim or move. **This slice's actual planner-owned population is
+narrower than the frame's own prose suggests: join disposition (which
+representation a source join's result takes) and trap IDENTITY (a
+value-keyed dedup catalog) — not trap seats and not trap provenance.**
+
+### Symbol ledger — closed over every Rust item class
+
+**Types (6):**
+
+| type | lines | kind | fields/variants | vis |
+|---|---|---|---|---|
+| `JoinResultRepresentation` | 449-452 | enum | `NativeScalarPair`, `CarrierWord` | `pub(in crate::cranelift_backend)` |
+| `JoinPlanToken` | 460-464 | struct | `origin`, `representation`, `has_continuing_predecessor` (all `pub(in crate::cranelift_backend)`) | `pub(in crate::cranelift_backend)` |
+| `PlannedJoinResult` | 467-470 | struct | `representation`, `has_continuing_predecessor` | private |
+| `PlannedTrapIdentity` | 551 | tuple struct `(u32)`, `#[repr(transparent)]` | 1 field, private | `pub(in crate::cranelift_backend)` |
+| `ResultPhase` | 843-847 | enum | `SpecializedOnly`, `CarrierRequired` | private |
+| `ResultPhaseSummary` | 855-866 | struct | `phase`, `continues`, `callable_result` | private |
+
+**Impls (2):**
+
+- `impl PlannedTrapIdentity` (553-557): 1 method (`abi_word`, `pub(in
+  crate::cranelift_backend)`).
+- `impl ResultPhaseSummary` (868-914): 2 assoc consts (`TRAP`, `SPECIALIZED`,
+  private) + 4 methods (`carrier`, `callable`, `join`, `sequence`, all
+  private).
+
+**Free functions (5):**
+
+| fn | lines | vis | consumed at |
+|---|---|---|---|
+| `is_source_join` | 916-925 | private | same block + `source_join_origins_in_owner_subtree`/`validate_join_result_plan` (both move) + the `D2` test at `:12060` (currently resident in this file's own `mod tests`) |
+| `planned_partiality_trap` | 927-950 | `pub(in crate::cranelift_backend)` | `lowering/core/primitive.rs:75,83` (cross-boundary) |
+| `summarize_result_phase` | 955-1229 | private | only within this block |
+| `result_phase_environment_for_owner` | 1231-1281 | private | only within this block |
+| `build_join_result_plan` | 1283-1315 | private | root builder (`static_transition.rs:3048`, stays put) |
+
+**Thread-locals (2, `#[cfg(test)]`, 850-852):** `D8_FORCE_VARIABLE_SPECIALIZED`,
+`D8_REMOVE_VARIABLE_CALLABLE_SEED` — both `Cell<bool>`, module-private. Read
+only inside `summarize_result_phase`'s `Var` arm (`:1170,1173`); set only by
+two `D2`-population tests currently resident in this file's own `mod tests`
+(`:11995,11999,12010,12014`).
+
+**A `Planner` method (1) — the first instance of this specific shape in the
+campaign:**
+
+- `intern_trap` (2243-2261), private, inside `impl<'src> Planner<'src>`
+  (the plan-construction BUILDER, a different type from
+  `StaticTransitionPlan` — declared at `:2080`). Mints a `PlannedTrapIdentity`
+  by deduplicating `trap_catalog`. Called from `expression_seed` (another
+  `Planner` method, general-purpose node registration for every occurrence
+  kind, stays at root) at `:2228,2232`. **This is not architecturally novel**
+  — `Planner`, like `StaticTransitionPlan`, may hold multiple `impl` blocks
+  across files, so `intern_trap` moves the same way a `StaticTransitionPlan`
+  method does: a new `impl<'src> Planner<'src> { fn intern_trap(...) }`
+  fragment in the child module, reading `Planner`'s ancestor-private `plan`
+  field under the same standing child-module pattern. Flagged explicitly
+  because it is the first time this campaign moves a `Planner`-impl fragment
+  rather than a `StaticTransitionPlan`-impl fragment or a free function.
+
+**`StaticTransitionPlan` methods (7):**
+
+| method | lines | vis | consumed at |
+|---|---|---|---|
+| `join_plan_token` | 3251-3257 | `pub(in crate::cranelift_backend)` | `lowering/mod.rs:7048,7312` + `control.rs:8942,8959` (cross-boundary) |
+| `join_plan_token_if_planned` | 3263-3276 | `pub(in crate::cranelift_backend)` | `lowering/mod.rs:7285` (cross-boundary) |
+| `required_join_origins` | 3284-3308 | `pub(in crate::cranelift_backend)` | `lowering/mod.rs:7329,7421` (cross-boundary) |
+| `source_join_origins_in_owner_subtree` | 3318-3353 | `pub(in crate::cranelift_backend)` | `lowering/mod.rs:7102,7149` (cross-boundary) |
+| `trap_identity` | 3749-3766 | `pub(in crate::cranelift_backend)` | `lowering/mod.rs:19316` (cross-boundary, production) + `control.rs:9071` (test) |
+| `trap_catalog` | 3768-3770 | `pub(in crate::cranelift_backend)` | `lowering/core.rs:2958`, `lowering/mod.rs` (production) + `lowering/core/tests/{effects,constructors}.rs` (cross-boundary) |
+| `validate_join_result_plan` | 4446-4486 | private | root's own `StaticTransitionPlan::validate` (`:4442`, stays put) |
+
+**Explicitly retained at the parent (not moved, owning domain named):**
+
+- `trap_catalog: Vec<RuntimeTrap>` (field, `:633`) and `join_results:
+  Vec<Option<PlannedJoinResult>>` (field, `:649`) — private fields of
+  `StaticTransitionPlan` itself, which stays at the parent (same rule as
+  every prior slice). Only the field element types' homes change.
+- `build_join_result_plan`/`validate_join_result_plan` call sites at `:3048`
+  (the plan builder's `finish`-like method) and `:4442`
+  (`StaticTransitionPlan::validate`) — root orchestration that calls into
+  every domain's build/validate function, exactly the item 7/8 pattern.
+- `intern_trap`/`planned_partiality_trap` call sites inside `expression_seed`
+  (`:2228,2231-2232`) — general node-registration machinery for every
+  occurrence kind, not domain-specific.
+- `RuntimeTrap`/`RuntimeTrapCode` — crate-level types (`use
+  crate::{..., RuntimeTrap, RuntimeTrapCode};` at `:25`), not declared in
+  this bound file at all; referenced, not owned.
+- `occurrence_authority`, `StaticOriginId`, `PredeclaredFunctionId` —
+  occurrence-owned and unit-owned respectively, referenced only.
+
+### Two negative findings — surface in the keyword scan, not this domain
+
+**`CaseProducerFact::join`** (`:1373`) is a SECOND, unrelated `.join()`
+method in this file — a lattice-join over `CaseProducerSet`
+(open/closed-constructor-set union), part of the already-settled
+case-emission/substrate domain (`CaseProducerSet`, `CaseProducerFlowKind`,
+`CaseProducerFlowEdge`, `CaseProducerAuthority`, `PlannedCaseEmission`, all
+declared at `:472-523`, immediately after this domain's type block and
+immediately before `PlannedTrapIdentity`). **Not mine** — `.join()` on
+`ResultPhaseSummary` (`:897`) is the only join-disposition-domain method of
+that name; a naming grep alone cannot tell the two apart, only reading each
+site's receiver type can.
+
+**The `trap` test-fixture helper** (`:6529`, `pub(in
+crate::cranelift_backend) fn trap(message: &str) -> RuntimeTrap`, declared
+inside this file's own `mod tests`) surfaces in a `trap` keyword scan and
+constructs `RuntimeTrap` VALUES — but it is a **shared cross-domain test
+fixture**, the exact shape of item 8's `governed_nested_resource_bracket`
+finding. It is called 18 times within this file's own tests alone, spanning
+fixtures for domains that have nothing to do with join disposition or trap
+identity (every domain's tests need SOME trap value for a `Match`'s
+`default:` arm). Zero uses in `control.rs`. It has no interaction with
+`PlannedTrapIdentity`/`intern_trap`/`trap_catalog` at all. **Explicitly
+retained wherever the campaign's shared-fixture convention places it — not
+claimed by this slice.** (A second, textually-nested `trap()` inside
+`governed_nested_resource_bracket`'s own body, at `:5050`, is a local item
+scoped to that function and not independently reachable; irrelevant here for
+the same reason it was irrelevant to item 8.)
+
+**A third near-miss, resolved the same way:** `trap_terminal_id`/
+`terminal_id` (`:9031-9046`, a test-only `impl StaticTransitionPlan<'_>`
+fragment nested inside `mod tests`) look up nodes by `TransitionKind::
+Terminal`/`TransitionKind::TrapTerminal` — a **graph-topology** concept (a
+node's transition KIND in the static graph), unrelated to trap VALUE
+identity. Confirmed by its sole consumer (`:8920`, an edge-rewrite/topology
+validation test) asserting nothing about `PlannedTrapIdentity` or
+`trap_catalog`. **Not this domain.**
+
+### THE CARRY-FORWARD CHECK — items 4-8's retained-and-flagged items
+
+**None belong to joins/traps.** `host_effect_operation` and
+`host_effect_site_operand_slots` (item 7's two flags) were confirmed
+Effects-owned and moved by item 8's `D1`. `governed_nested_resource_bracket`
+(item 8's flag) is the shared cross-domain fixture already discussed above —
+no domain claims it, including this one; none of this domain's own tests
+(the `D8` family below) even use it, they use their own `d8_*` fixtures
+instead. `synthesized_seat_emission_owners` (the false-positive item 7's own
+kickoff warned against) is continuations-owned (item 6's). Checked each by
+name against this domain's actual population; none reclassify.
+
+### Source-text oracles
+
+- **LIVE**: `lowering/core/tests/control.rs`'s
+  `the_backend_production_surface_inventory_is_closed` (module-inventory
+  vec), `BACKEND_PRODUCTION_SOURCES` (the `include_str!` roster), and
+  `correspondence_adds_no_emitted_unit_to_the_production_census` (the
+  `Census` array) will need the same 3-location addition for the new child
+  module's name (items 4-8's precedent) once `D1` creates it — ledgered here
+  as an anticipated non-move hunk, not executed in this docs-only `D0`.
+- **INERT**: `lowering/core/tests/control.rs:12424`,
+  `d8_join_helpers_have_the_closed_typed_caller_population`, is gated
+  `#[cfg(any())]` — permanently disabled per its own retirement comment ("RETIRED
+  by the RT-FNSPLIT-RECUR-PORT successor repair: caller-name counts over
+  repository text are not a behavioral representation proof"). Its
+  `helpers.matches("plan: &JoinPlanToken")` census is dead code; `D1` owes it
+  nothing.
+
+### Test-property ledger
+
+**`static_transition.rs`'s own `mod tests`: one contiguous, genuinely
+domain-scoped family, lines 11677-12077.** By-name scan for every
+joins/traps symbol (`JoinResultRepresentation`, `JoinPlanToken`,
+`is_source_join`, `join_plan_token`, `PlannedTrapIdentity`) confirms a clean
+boundary — `:11609` ends a `D4` (declaration-call) test, `:11677` begins this
+family, `:12077` ends it, `:12080` begins a `substrate_*` (case-emission)
+fixture. Contents:
+
+- 6 fixture-producer fns: `d8_mixed_join` (11677), `d8_functionized_plan`
+  (11711 — a leaf helper, used only within this block, not a shared
+  cross-domain fixture like `governed_nested_resource_bracket`),
+  `d8_environment_join` (11723), `d8_bound_callable_join` (11776),
+  `d8_abi_parameter_join` (11829), `d8_abi_parameter_join_origin` (11861).
+- 2 assertion helpers: `assert_d8_environment_join_is_carrier` (11758),
+  `assert_d8_bound_callable_join_is_carrier` (11811).
+- 9 `#[test]` fns, all domain-scoped (none crosses into emission —
+  none calls `recursive_port_process_compiles` or any lowering/JIT
+  entry point): `d8_mixed_join_plan_is_carrier_and_arm_order_independent`
+  (11870), `d8_let_environment_provenance_reaches_the_exact_nested_join`
+  (11900), `d8_bound_lexical_callable_provenance_reaches_the_exact_nested_join`
+  (11916), `d8_abi_parameter_provenance_reaches_the_exact_nested_join` (11932),
+  `d8_inert_abi_slots_do_not_change_recursive_descent_join_storage` (11960),
+  `d8_variable_seed_mutation_reds_at_the_plan_boundary` (11994),
+  `d8_callable_seed_removal_reds_at_the_plan_boundary` (12009),
+  `d8_trap_predecessors_do_not_create_a_result_edge` (12022),
+  `d8_join_plan_is_a_bijection_with_source_join_occurrences` (12053).
+
+**This is a real, non-empty population for `D2` to move** — the mirror image
+of item 8's zero finding. `D2`'s own re-measurement at pickup must re-derive
+these line numbers fresh, per the standing discipline; they will have
+shifted once `D1` moves the production block.
+
+**`control.rs` (32,851 lines at `de402e255`): every joins/traps-symbol hit is
+either Class-4 end-to-end or emitter-owned (item 14's). Nothing moves.**
+Full census by symbol:
+
+- **6 Class-4 end-to-end controls** (all call `recursive_port_process_compiles`,
+  crossing planning through execution, over the campaign's shared fixtures):
+  `a_trap_arm_and_its_trap_free_twin_both_functionize` (`:8855`, asserts
+  `join_plan_token(...).representation`/`.has_continuing_predecessor` directly
+  but is architecturally an end-to-end compile control);
+  `d8_mixed_host_result_uses_one_uniform_carrier_conversion_per_predecessor`
+  (`:12321`), `d8_dynamic_host_result_merge_enters_materialized_dead_cfg_population`
+  (`:12348`), `d8_all_trap_host_result_emits_no_merge_or_predecessor_conversion`
+  (`:12370`), `d8_unsupported_carrier_production_publishes_no_unit_function`
+  (`:12387`), `d8_every_required_join_plan_is_consumed_exactly_once`
+  (`:12727`, the largest — consumes 8 supporting fixture fns at
+  `:12283-12726`, all leaf helpers of this one test). Per `AC-2`'s four-way
+  partition, Class 4 "legitimately REMAINS in the residual integration
+  module" — moving any of these into a joins/traps-only test module would
+  sever them from the emission-level assertions that make them behavioral
+  controls rather than unit checks.
+- **3 emitter-owned tests** (item 14's, not this slice's domain):
+  `typed_trap_exit_preserves_the_planner_identity_across_two_unit_calls`
+  (`:9056`), `typed_trap_exit_rejects_a_deleted_or_root_misclassified_unit_lane`
+  (`:9087`), `typed_trap_exit_identity_and_caller_protocol_mutations_are_discriminating`
+  (`:9113`) — all three drive `TrapFrameBindingMutation`/
+  `TrapIdentityMutation`/`TrapCallerProtocolMutation`, all declared in
+  `lowering/mod.rs` (confirmed by definition-site grep), and all execute via
+  JIT (`run_example_with_seed_observation`). One of the three incidentally
+  calls `plan.trap_identity(...)` as a pre-condition sanity check
+  (`:9071`) before driving the emitter mutation — a single accessor call
+  inside an otherwise emitter-domain test does not reclassify the test.
+
+### The three evidence seats
+
+- **Intention producer**: `build_join_result_plan` (join disposition — mints
+  `join_results` from `summarize_result_phase`'s recursive walk) and
+  `intern_trap` (trap identity — mints `PlannedTrapIdentity` by dedup).
+- **Independent artifact observer / evidence decoder**:
+  `validate_join_result_plan` (the planner's own closed-form density/
+  bijection check against `is_source_join`, at both plan-build and
+  `StaticTransitionPlan::validate`). Trap identity has no independent
+  re-derivation step of its own in this domain — `trap_identity` re-looks-up
+  by value (not a separate derivation), and `.abi_word()`'s own doc comment
+  frames the ABI word as the thing consumed at the emitter's boundary, not
+  independently re-proved here.
+- **Closeout/publication seat**: for join disposition, the emitter's
+  `join_plan_token`/`required_join_origins` consumption at end-of-function
+  (`lowering/mod.rs:7048,7329` etc.) — outside this slice. For trap identity,
+  the emitter's `identity.abi_word()` consumption at CLIF emission
+  (`lowering/mod.rs:19316-19368`) — also outside this slice. Both closeout
+  seats are item 14's (or already-landed emitter machinery), named here so a
+  later slice cannot silently collapse producer and closer into one.
+
+### Blind spots inherited
+
+- The Stage A type-ownership selector cannot see private types — 4 of this
+  domain's 6 types (`PlannedJoinResult`, `ResultPhase`, `ResultPhaseSummary`,
+  and the assoc consts on `ResultPhaseSummary`) are private and were found
+  only by hand-reading the file.
+- Neither `backend-split-census-lifecycles.md` nor
+  `backend-split-census-reexports.md` carries a row distinguishing "trap
+  identity" from "trap seats/provenance" — the frame's own prose conflated
+  them, and this ledger's "frozen predicate, applied" section above is the
+  closure for that gap.
+- Macro-produced items and traits: none exist in this domain's population
+  (confirmed by direct reading).
+
+### Anticipated child size
+
+Summing the closed line ranges above (types+impls `449-914` minus the
+case-emission interior `472-523`, the free-function block `916-1315`, the
+`Planner` method `2243-2261`, and the `StaticTransitionPlan` method block
+`3251-3353` + `3749-3770` + `4446-4486`) is approximately 690 raw source
+lines for `D1` before module boilerplate — close to item 8's `effects.rs`
+(670 raw lines, landed at 733). Adding the `D2` test population
+(`11677-12077`, ~400 lines) if a later measurement combines them would still
+land well under the 10k ceiling; the exact counts are `D1`'s and `D2`'s to
+report.
+
