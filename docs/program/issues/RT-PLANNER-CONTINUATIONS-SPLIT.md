@@ -574,10 +574,11 @@ through the parent today — checked, not assumed).
 
 ### Source-text oracles and `include_str!` paths
 
-`include_str!` count in the bound file: **3** (item 5's ledger) — the
-occurrence-owned `the_semantic_seed_api…` (:26714-equivalent, moved to
-`occurrences.rs` in item 5), and `b2r_ac6`/`b2r_ac7` reading `abi.rs`. All inert
-to THIS move (continuations touch none of them). The control.rs
+`include_str!` count in the bound file: **2** at `11a590363` — `b2r_ac6` and
+`b2r_ac7` (both reading `static_transition/abi.rs`, ~:26639/:26690). The
+occurrence-owned `the_semantic_seed_api…` moved to `occurrences.rs` in item 5, so
+it is no longer in this file — re-derived, not quoted from item 5's ledger. All
+2 inert to THIS move. The control.rs
 `the_owner_classification_has_a_closed_production_naming_inventory` and
 `the_backend_production_surface_inventory_is_closed` pins (item 5's ledger) will
 need D1 re-anchoring when `continuations.rs` becomes a production module — the
@@ -589,22 +590,29 @@ Tests whose PRIMARY discriminated property is continuation-key / continuation-
 seat / continuation-evidence / fusion, re-derived at `11a590363`. Class per the
 four-way partition (domain / fixture / mutation control / end-to-end).
 
-- static_transition.rs `mod tests`: **87** continuation-family tests (the
-  `d2f_*`, `d2i_*`, `d2j_*`, `d2g_*`, `d3_*`, `d5a_*`, `d6a_*`, `d6b_*`,
-  `d6c_*`, `d8*_*`, `contspec_*`, `contsrc_*`, `contkey_*`, `r3_*`,
-  `required_consumer_*`, `composed_*`, `envelope_*`, `checked_transport_*`
-  families) → move to `continuations.rs` `#[cfg(test)] mod tests` in D2. The
-  exact per-test list + class is D2's re-measurement (by name, per the frame's
-  "re-derive every symbol by name" rule), bounded here to the 87-name prefix set.
-- lowering/core/tests/control.rs: the continuation/fusion emission and
-  closeout controls (`d5_c4_*`, `d5a_*`, `d6a_*`, `d8*_*`, `contsrc_*`,
-  `d4a_*`/`d4b_*` continuation-frame controls, `r3_*` fusion) → move to the LCA
-  in D2, except the Class-4 end-to-end emission controls that stay.
-- Borderline flagged for the Architect's D0 vote: the `d5a_*` marker-family and
-  the `d8*_*` composed/transport families sit on the planner/emitter boundary —
-  their primary property is planner-side continuation evidence (move) but a
-  defensible reading treats the `d8m_*`/`d8p_*` transport rows as Class-4
-  end-to-end (stay). Named so the vote can move them.
+- static_transition.rs `mod tests`: **63** continuation-family tests across the
+  8 families actually present (re-measured by prefix at `11a590363`): `d2f` 7,
+  `d2i` 5, `d2j` 4, `d2g` 9, `d3` 11, `d8` 9, `contspec` 9, `contsrc` 9 —
+  PLUS the 7 binder/IH tests exercising the continuation-owned checked-binder /
+  checked-transport surface (`d2e_ih_binding_survives_let_and_nested_match_indirection`,
+  `d2e_ih_binding_does_not_leak_into_a_closure_body`,
+  `d2e_binder_role_separates_a_hypothesis_from_an_ordinary_child`,
+  `d2e_binder_role_hypothesis_prefix_is_reverse_declaration_order`,
+  `d2e_binder_role_past_the_case_run_is_the_frame_environment`,
+  `d2e_binder_role_a_nonrecursive_case_has_no_hypothesis_slot`,
+  `governed_nested_bracket_uses_canonical_four_seat_binder_roles`; classified
+  domain — they discriminate `CheckedCaseBinderRole`/`CheckedIhBinding`/
+  `CheckedTransportCoordinate`, three of the 58 moved types) = **70** total →
+  move to `continuations.rs` `#[cfg(test)] mod tests` in D2. The exact per-test
+  class is D2's re-measurement by name.
+- lowering/core/tests/control.rs (control.rs-only families, per the Architect's
+  vote): `d5a` 16, `d6` 16, `d8m` 6, `d8p` 3, `r3` 11, `required_consumer` 4,
+  `contkey` 4, plus the contspec/contsrc emission controls.
+  **Architect's D0 vote (evt_3478yq3amwf4y): `d5a_*` MOVE to the LCA** (primary
+  property = planner-side continuation marker/seat/generated-context evidence);
+  **`d8m_*`/`d8p_*` STAY as Class-4 end-to-end** (transport discrimination
+  crossing planning through execution). The rest (d6, r3, required_consumer,
+  contkey) are re-classified by primary property in D2's by-name re-measurement.
 
 ### Blind spots (stated, not closed) + evidence seats
 
