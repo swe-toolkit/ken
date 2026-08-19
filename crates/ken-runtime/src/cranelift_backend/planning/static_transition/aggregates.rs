@@ -22,10 +22,10 @@ use super::{
     ContinuationEmissionOwner, CraneliftBackendError, FieldIdentity, JoinResultRepresentation,
     PlannedOccurrenceChildAuthority, PlannedReferentLifetime, PredeclaredFunctionId,
     StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
-    SynthesizedFixedConstructorRole, SynthesizedIoErrorRole,
+    SynthesizedFixedConstructorRole,
 };
 use crate::boundary_value::{BoundaryClass, BoundaryTag};
-use crate::{RuntimeExpr, RuntimeValue};
+use crate::RuntimeExpr;
 
 /// **`RT-DECL-CLOSURE-PORT` `D7` — the opaque identity of one aggregate
 /// emission occurrence.**
@@ -64,7 +64,7 @@ pub(in crate::cranelift_backend) struct AggregateOccurrenceId(
 /// by the origin it happens to be emitted at, which belongs to whatever
 /// expression the emission was reached through.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub(in crate::cranelift_backend::planning::static_transition) enum AggregateOccurrenceProducer {
+pub(in crate::cranelift_backend) enum AggregateOccurrenceProducer {
     /// A `Construct`/`Record` written in the program.
     Source(StaticOriginId),
     /// One exact compiler-synthesized producer USE.
@@ -106,7 +106,7 @@ pub(in crate::cranelift_backend::planning::static_transition) enum AggregateOccu
 /// input; it has no constructor identity because its shape is
 /// [`PlannedAggregateShape::Record`].
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub(in crate::cranelift_backend::planning::static_transition) enum SynthesizedAggregateRole {
+pub(in crate::cranelift_backend) enum SynthesizedAggregateRole {
     /// The full semantic constructor-role sum, fixed and `IOError`. Every
     /// `IOError` alternative is a real allocation with its own path, so this
     /// cannot be narrowed to the fixed half.

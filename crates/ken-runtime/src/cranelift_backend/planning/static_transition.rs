@@ -98,9 +98,10 @@ use continuations::{
 // this module, unchanged from before the move.
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use aggregates::{
-    AggregateOccurrenceId, PlannedAggregateAllocation, PlannedAggregateOwnership,
-    PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
-    SynthesizedAggregateRoot, SynthesizedDynamicSet,
+    AggregateOccurrenceId, AggregateOccurrenceProducer, PlannedAggregateAllocation,
+    PlannedAggregateOwnership, PlannedAggregateShape, SynthesizedAggregateNode,
+    SynthesizedAggregatePath, SynthesizedAggregateRole, SynthesizedAggregateRoot,
+    SynthesizedDynamicSet,
 };
 use aggregates::{
     build_aggregate_ownership_plan, collect_site_operand_ordinals, host_effect_recipe_tree,
@@ -110,8 +111,7 @@ use aggregates::{
 use aggregates::{
     aggregate_child_referent_owners, fixed_node_selected_owner,
     flatten_allocation_reachable_uses, node_referent_owners,
-    validate_aggregate_producers_are_unique, AggregateOccurrenceProducer,
-    SynthesizedAggregateRole, SynthesizedAggregateStep,
+    validate_aggregate_producers_are_unique, SynthesizedAggregateStep,
 };
 
 pub(super) const MAX_HELPERS_PER_STATIC_SOURCE: usize = 8;
