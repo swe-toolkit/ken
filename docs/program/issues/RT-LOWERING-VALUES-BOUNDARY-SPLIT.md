@@ -1,7 +1,7 @@
 ---
 id: RT-LOWERING-VALUES-BOUNDARY-SPLIT
 title: "Move the values and boundary domain out of the lowering files -- and boundary_value_clif.rs is NOT absorbed merely because it is large; its lifecycle and consumers must be proven first"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -20,6 +20,42 @@ only this phase" (operator 2026-08-10, agent/MODELS.md) — not a fresh per-slic
 judgment. The design judgment — the domain ownership boundary — is discharged in
 the D0 and its Architect vote, not by the implementer executing the D1/D2 moves.
 
+# LOWERING-DOMAIN DISCIPLINE (established by item-10 ruling evt_2f3tkq8hgqa4a) — READ FIRST
+
+Item 10 (`RT-LOWERING-FUNCTION-STATE-SPLIT`) determined that **`Lowering<'a>` is
+the retained hub — the lowering-side `StaticTransitionPlan`.** It and every
+frame/eliminator/scope type the indivisible SCC (`impl<'a> Lowering<'a>`,
+`core.rs:3090-20330`) consumes STAY at their LCA (`lowering/mod.rs`); the SCC
+stays whole in `core.rs`, honored not relitigated. Size reduction comes from the
+DOMAIN METHOD-FAMILY slices — of which this is one.
+
+⇒ **This slice moves the values-boundary domain's METHOD FAMILY (impl blocks)
+into a DESCENDANT child of `lowering` that reads the retained hub via descendant
+visibility with ZERO widening — the `construction.rs`/`closure.rs` shape.** You
+do not move `Lowering`, its fields, or any SCC-consumed type; you do not widen a
+visibility to make a move compile (that is a finding, stop and route).
+
+**`D0` MUST classify by PER-TYPE SCC-CONSUMPTION GREP, never textual adjacency.**
+Item 10's withdrawn first cut mis-scoped 23 types by adjacency; its re-cut
+corrected the method and self-caught a real defect — `FunctionLocalRefs` had 0
+bare type-name hits in the SCC but 16 `self.function_local.<field>` NESTED
+accesses that never name the type. Grep for nested field access, not just the
+type name. Check a SECOND pinning population the first cut missed: struct-literal
+construction in `core/tests/*` (descendants of `core`, not of a prospective
+sibling) pins a type until its `D2` relocates it, and `evt_6r403ez3m2m69` forbids
+pulling that forward.
+
+**Starting inventory:** item 10's per-type SCC-pinning census (in
+`RT-LOWERING-FUNCTION-STATE-SPLIT.md`, landed with this node's release) records
+what is already known pinned to the hub. Do not re-derive it; extend it for the
+values-boundary population.
+
+**If the values-boundary method family is itself SCC-pinned** (as function-state
+turned out to be), this node is ALSO a hub-retained determination, not a forced
+move — state `OUTCOME 2` (coherent descendant child, proceed) vs `OUTCOME 3`
+(pinned, hub-retained determination) explicitly in `D0`, and hard-stop the fork
+to the Architect rather than resolving it with a zero-widening claim. That is the
+fork item 10's first cut should have stopped on.
 
 > # THE OPERATOR'S CONSTRAINT, AND IT IS THE ONLY ONE
 >
