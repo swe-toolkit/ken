@@ -351,21 +351,14 @@ jobs:
       - name: Test
         run: cargo nextest run --locked -p ken-cli --test rt_parity_native
 
-  z3-process-adapter:
-    name: optional z3 process adapter
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Z3
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes z3
-          z3 -version
-      - name: Test feature-on adapter
-        run: >-
-          cargo test --locked -p ken-elaborator --features z3-process
-          --test v3_z3_process_adapter
-
+  # The `optional z3 process adapter` job (the v3_z3_process_adapter test) was
+  # REMOVED from CI 2026-08-19 (operator): the z3 process adapter is an
+  # incomplete feature and its test was pathologically slow — a single run at
+  # ~38min, dominating total CI wall-clock while the sharded lane sits at
+  # ~12-14min. To restore it when the adapter is completed: re-add the
+  # `z3-process-adapter` job here AND re-list it in `build-test`'s `needs` and
+  # its result-check loop below (both places, per the warning on that job).
+  # z3-emission-control (the fast, passing `--lib` half) stays.
   z3-emission-control:
     name: z3 emission control
     runs-on: ubuntu-latest
