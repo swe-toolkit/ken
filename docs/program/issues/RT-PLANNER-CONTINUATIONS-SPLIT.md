@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-CONTINUATIONS-SPLIT
 title: "Move the continuations domain out of planning/static_transition.rs -- sequenced deliberately after the continuation and evidence churn, so the domain is not re-homed against a surface that is still moving"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
