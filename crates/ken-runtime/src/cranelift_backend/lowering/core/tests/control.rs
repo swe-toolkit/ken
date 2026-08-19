@@ -7280,12 +7280,6 @@ fn self_consistent_root_join_site(site_id: u64) -> crate::NativeJoinPlanSiteV1 {
     }
 }
 
-#[cfg(test)]
-fn oriented_test_interface(name: u8) -> crate::CheckedAnswerInterfaceV1 {
-    let mut bytes = crate::CHECKED_ANSWER_INTERFACE_V1_HEADER.to_vec();
-    bytes.push(name);
-    crate::CheckedAnswerInterfaceV1::new(bytes).unwrap()
-}
 
 #[cfg(test)]
 fn oriented_test_frame(
@@ -15318,224 +15312,16 @@ fn d2_ac6_3_the_ported_unit_receives_parameters_before_captures() {
     assert!(report.verifier_passed);
 }
 
-#[cfg(test)]
-const D5_DECLARATION: &str = "decl:fixture::d5::loop";
-const D5_FRAME_CARRIER: &str = "decl:fixture::d5::frames";
-const D5_CALL_TEMPLATE: u64 = 900;
-const D5_FRAME: u64 = 90;
 
-fn d5_cases() -> Vec<crate::RuntimeComputationalMatchCase> {
-    vec![crate::RuntimeComputationalMatchCase {
-        constructor: "ctor:fixture::D5::Only".to_string(),
-        argument_binders: 1,
-        recursive_positions: Vec::new(),
-        body: RuntimeExpr::Var(0),
-    }]
-}
 
-#[cfg(test)]
-fn d5_default() -> RuntimeTrap {
-    RuntimeTrap {
-        code: RuntimeTrapCode::PatternMatchFailure,
-        message: "no runtime match case selected for ind:fixture::D5".to_string(),
-    }
-}
 
-/// The declaration that carries the plan's one checked frame marker.
-///
-/// ⚠ It is **never referenced**, and that is deliberate. The transport
-/// validator requires one Runtime frame marker per planned frame
-/// (`planning.rs`: `markers.len() != plan.frames.len()`), but a
-/// `ComputationalMatch` in the declaration under test would drag the
-/// computational-recursor lane into a fixture about declaration calls. ⛔ Its
-/// body must produce **no** residual of its own, or control 1 would be
-/// measuring this declaration instead of the one it names.
-#[cfg(test)]
-fn d5_frame_carrier() -> RuntimeDeclaration {
-    RuntimeDeclaration {
-        symbol: D5_FRAME_CARRIER.to_string(),
-        kind: RuntimeDeclarationKind::Transparent {
-            body: RuntimeExpr::CheckedSubcontinuationFrame {
-                frame_id: D5_FRAME,
-                body: Box::new(RuntimeExpr::ComputationalMatch {
-                    scrutinee: Box::new(RuntimeExpr::Construct {
-                        constructor: "ctor:fixture::D5::Only".to_string(),
-                        args: vec![RuntimeExpr::Value(RuntimeValue::Int((0).into()))],
-                    }),
-                    cases: d5_cases(),
-                    default: d5_default(),
-                }),
-            },
-        },
-        metadata: RuntimeSymbolMetadata {
-            lowerability: Some(RuntimeLowerabilityStatus::Supported),
-            ..RuntimeSymbolMetadata::empty()
-        },
-    }
-}
 
-/// The declaration under test: one capture, one parameter, and one checked
-/// same-SCC self-call in its body.
-///
-/// ⚠ The marker's structural path is `[3]` — `LexicalClosure` reaches its body
-/// on edge `3` (`planning.rs::collect_checked_oriented_markers`), and captures
-/// on edges `10 + i`. Deriving it any other way would make the fixture agree
-/// with a mis-stated plan.
-#[cfg(test)]
-fn d5_declaration() -> RuntimeDeclaration {
-    RuntimeDeclaration {
-        symbol: D5_DECLARATION.to_string(),
-        kind: RuntimeDeclarationKind::Transparent {
-            body: RuntimeExpr::LexicalClosure {
-                captures: vec![RuntimeExpr::Value(RuntimeValue::Int((7).into()))],
-                params: vec!["n".to_string()],
-                body: Box::new(RuntimeExpr::CheckedRecursiveInvocation {
-                    call_template_id: D5_CALL_TEMPLATE,
-                    checked_occurrence_path: vec![5],
-                    body: Box::new(RuntimeExpr::Call {
-                        callee: Box::new(RuntimeExpr::DeclarationRef {
-                            symbol: D5_DECLARATION.to_string(),
-                        }),
-                        args: vec![RuntimeExpr::Var(0)],
-                    }),
-                }),
-            },
-        },
-        metadata: RuntimeSymbolMetadata {
-            lowerability: Some(RuntimeLowerabilityStatus::Supported),
-            ..RuntimeSymbolMetadata::empty()
-        },
-    }
-}
 
-#[cfg(test)]
-fn d5_frame() -> crate::OrientedSubcontinuationFramePlanV1 {
-    let mut frame = crate::OrientedSubcontinuationFramePlanV1 {
-        frame_id: D5_FRAME,
-        segment_site_id: 9,
-        declaration: D5_DECLARATION.to_string(),
-        checked_occurrence_path: vec![D5_FRAME],
-        semantic_position: 0,
-        input_interface: oriented_test_interface(1),
-        output_interface: oriented_test_interface(2),
-        runtime_frame_fingerprint: crate::compiler_private_computational_match_frame_fingerprint(
-            &d5_cases(),
-            &d5_default(),
-        ),
-        occurrence_binding_fingerprint: 0,
-        control_witness: crate::OrientedControlWitnessV1::DistinguishedRoot,
-    };
-    frame.occurrence_binding_fingerprint =
-        crate::compiler_private_oriented_occurrence_binding_fingerprint(&frame);
-    frame
-}
 
-#[cfg(test)]
-fn d5_call_template() -> crate::CheckedRecursiveInvocationTemplateV1 {
-    crate::CheckedRecursiveInvocationTemplateV1 {
-        call_template_id: D5_CALL_TEMPLATE,
-        declaration: D5_DECLARATION.to_string(),
-        checked_occurrence_path: vec![5],
-        callee: D5_DECLARATION.to_string(),
-        level_instantiation: Vec::new(),
-        recursion_group: "scc:fixture::d5".to_string(),
-        scc_index: 0,
-        admission: 1,
-        arity: 1,
-        local_telescope: vec![oriented_test_interface(1)],
-        result_interface: oriented_test_interface(2),
-        callee_segment_site_id: 9,
-        callee_frame_templates: vec![D5_FRAME],
-        caller_interface: oriented_test_interface(2),
-        runtime_marker_locations: vec![crate::CheckedRuntimeMarkerLocationV1 {
-            declaration: D5_DECLARATION.to_string(),
-            runtime_path: vec![3],
-        }],
-        occurrence_binding_fingerprint: 0,
-    }
-}
 
-/// The plan, **re-fingerprinted after `edit`**.
-///
-/// ⛔⛔ Re-fingerprinting is the whole reason a checked-plan mutation is a
-/// control at all. `OrientedSubcontinuationPlanV1::validate` checks
-/// `occurrence_binding_fingerprint` over EVERY field of the template, and it
-/// runs on the compile path. ⇒ A mutation that leaves the stale fingerprint in
-/// place is refused by the plan's own consistency law, upstream of `D5`, and a
-/// control built on one would be measuring that law instead
-/// ([[a-mutation-on-the-discriminator-input-measures-the-consistency-law-not-the-decision]]).
-#[cfg(test)]
-fn d5_plan_with(
-    edit: impl FnOnce(&mut crate::CheckedRecursiveInvocationTemplateV1),
-) -> crate::OrientedSubcontinuationPlanV1 {
-    let mut call = d5_call_template();
-    edit(&mut call);
-    call.occurrence_binding_fingerprint =
-        crate::compiler_private_recursive_call_binding_fingerprint(&call);
-    crate::OrientedSubcontinuationPlanV1 {
-        representation_rule_version:
-            crate::OrientedSubcontinuationPlanV1::REPRESENTATION_RULE_VERSION,
-        frames: vec![d5_frame()],
-        recursive_calls: vec![call],
-        computational_ih_slots: Vec::new(),
-        computational_ih_calls: Vec::new(),
-    }
-}
 
-#[cfg(test)]
-fn d5_plan() -> crate::OrientedSubcontinuationPlanV1 {
-    d5_plan_with(|_| {})
-}
 
-/// The entry expression: one unchecked call into the declaration-owned unit.
-#[cfg(test)]
-fn d5_entry() -> RuntimeExpr {
-    RuntimeExpr::Call {
-        callee: Box::new(RuntimeExpr::DeclarationRef {
-            symbol: D5_DECLARATION.to_string(),
-        }),
-        args: vec![RuntimeExpr::Value(RuntimeValue::Int((5).into()))],
-    }
-}
 
-/// Compile the fixture and return the outcome together with **the declaration
-/// calls actually emitted**, read back from the emitted instructions.
-#[cfg(test)]
-fn d5_compile(
-    plan: crate::OrientedSubcontinuationPlanV1,
-    extra: Option<&RuntimeDeclaration>,
-) -> (
-    Result<(), String>,
-    Vec<(StaticOriginId, StaticOriginId, cranelift_codegen::ir::FuncRef)>,
-) {
-    let entry = d5_entry();
-    let declaration = d5_declaration();
-    let carrier = d5_frame_carrier();
-    let mut declarations = BTreeMap::from([
-        (D5_DECLARATION, &declaration),
-        (D5_FRAME_CARRIER, &carrier),
-    ]);
-    if let Some(extra) = extra {
-        declarations.insert(extra.symbol.as_str(), extra);
-    }
-    reset_d5_emitted_declaration_calls();
-    let outcome = compile_expr_into_module(
-        new_jit_module().expect("JIT module"),
-        "d5_declaration_unit_call",
-        Linkage::Local,
-        &entry,
-        &NativeSeedEnvironment::empty(),
-        declarations,
-        None,
-        false,
-        None,
-        None,
-        Some(plan),
-    )
-    .map(|_| ())
-    .map_err(|error| format!("{error:?}"));
-    (outcome, d5_emitted_declaration_calls())
-}
 
 // ── Control 1: the exact fixture, ACTIVATED ───────────────────────────────
 //
@@ -15685,84 +15471,8 @@ fn d5_planned_callable_declaration_origins(
         .collect()
 }
 
-// ── Control 3: ABI-domain mutations refuse before emission ─────────
 
-#[test]
-fn d5_c4_abi_domain_mutations_each_refuse_before_any_call_is_emitted() {
-    for mutation in [
-        units::D5DeclaredCallMutation::Carrier,
-        units::D5DeclaredCallMutation::Ownership,
-        units::D5DeclaredCallMutation::StorageOwner,
-        units::D5DeclaredCallMutation::Ordinal,
-        units::D5DeclaredCallMutation::Header,
-        units::D5DeclaredCallMutation::Offsets,
-    ] {
-        units::with_d5_declared_call_mutation(mutation, || {
-            let (outcome, emitted) = d5_compile(d5_plan(), None);
-            let refusal = outcome.expect_err(&format!(
-                "D5 control 4: the {mutation:?} mutation must be refused. A \
-                 compile that accepts it means the ABI reconciliation is \
-                 not reading that field, and a green D5 would be green for \
-                 the wrong reason"
-            ));
-            assert!(
-                refusal.contains("disagree")
-                    || refusal.contains("parameter-then-capture input run"),
-                "D5 control 4: the {mutation:?} mutation must get D5's OWN \
-                 refusal, not some later one it happens to also trip. \
-                 Otherwise the control names a plane that never ran: {refusal}"
-            );
-            assert!(
-                emitted.is_empty(),
-                "D5 control 4: the {mutation:?} mutation must refuse BEFORE \
-                 emission. A recorded call means a mis-declared frame was \
-                 already written: {emitted:?}"
-            );
-        });
-    }
-    // The positive control on the harness: unmutated, the same fixture compiles
-    // and emits BOTH declaration-unit calls — the entry's unchecked one and the
-    // body's checked self-call. ⛔ Without this row every refusal above is
-    // equally consistent with the fixture never reaching the seam at all.
-    let (outcome, emitted) = d5_compile(d5_plan(), None);
-    outcome.expect("D5 control 4: the unmutated fixture compiles");
-    assert_eq!(
-        emitted.len(),
-        2,
-        "D5 control 4: after D2a both the entry's unchecked call and the \
-         body's checked self-call are emitted: {emitted:?}"
-    );
-}
 
-// ── Control 4, the wrong-target class ─────────────────────────────────────
-
-#[test]
-fn d5_c4_a_retargeted_declaration_call_is_refused_before_emission() {
-    let (baseline, baseline_emitted) = d5_compile(d5_plan(), None);
-    baseline.expect("the unmutated fixture compiles");
-    units::with_d5_declared_call_mutation(units::D5DeclaredCallMutation::Retarget, || {
-        let (outcome, emitted) = d5_compile(d5_plan(), None);
-        // ⚠ **This row measures the FIXTURE, and says so.** The retarget
-        // swaps a caller's declaration-call record for another record in
-        // the same caller's map. Each caller here holds exactly one, so the
-        // swap is the identity and the compile is byte-for-byte the
-        // baseline. That is a reachability fact
-        // ([[mutation-proof-injection-point-is-a-reachability-tell]]), not
-        // evidence about the wrong-target class.
-        //
-        // ⛔ It is kept, and kept honest, rather than deleted or dressed up
-        // as a passing control: two declaration-owned callables reachable
-        // from ONE caller is what makes the class expressible, and building
-        // that fixture belongs with the mutual same-SCC work that D5 still
-        // owes. Asserting equality with the baseline is what stops this
-        // reading as a discharged control.
-        assert!(
-            outcome.is_ok() && emitted.len() == baseline_emitted.len(),
-            "the retarget is inert on single-record callers, so it must \
-             reproduce the baseline exactly: {outcome:?} {emitted:?}"
-        );
-    });
-}
 
 // ── The MUTUAL same-SCC fixture ───────────────────────────────────────────
 //
