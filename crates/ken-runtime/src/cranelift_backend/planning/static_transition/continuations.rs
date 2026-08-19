@@ -42,18 +42,6 @@ pub(in crate::cranelift_backend) use fusion::{
 };
 #[cfg(test)]
 pub(in crate::cranelift_backend) use fusion::{FusionClaimParameterMutation, FusionProducerCaptureMutation};
-// Transitional re-export (Architect seam ruling evt_5p9yh0f1pq4bf): the parent's
-// D2-moves test module still calls these fusion fns; reaching them through a
-// re-export preserves the import path rather than widening the fns' own
-// visibility. AC-5 debt for the closure node (item 18) to sweep after D2.
-#[cfg_attr(not(test), allow(unused_imports))]
-pub(in crate::cranelift_backend::planning::static_transition) use fusion::{
-    admitted_continuation_discoveries, enumerate_live_fusion_candidates,
-    enumerate_live_fusion_candidates_with_input_size, fusion_claim_error,
-    fusion_resolved_binder_body, fusion_root_source_for_future_enumerator,
-    fusion_through_checked_wrappers, fusion_unique_static_body_triple, primary_fusion_key,
-    rederive_fusion_key,
-};
 #[cfg(test)]
 pub(in crate::cranelift_backend) use fusion::{
     r3_fusion_claim_consumptions, reset_r3_fusion_claim_consumptions,
@@ -7322,3 +7310,2459 @@ impl<'src> StaticTransitionPlan<'src> {
 
 }
 
+#[cfg(test)]
+mod tests {
+    #[allow(unused_imports)]
+    use super::super::tests::*;
+    use super::super::*;
+    use super::*;
+    #[allow(unused_imports)]
+    use crate::{RuntimeComputationalMatchCase, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
+
+    fn contspec_multiple_worker_captures_fixture() -> RuntimeExpr {
+        let worker = RuntimeExpr::LexicalClosure {
+            captures: vec![unit(), unit()],
+            params: vec!["worker".to_string()],
+            body: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::Contspec::Leaf".to_string(),
+                args: Vec::new(),
+            }),
+        };
+        RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: vec!["continuation_input".to_string()],
+            body: Box::new(RuntimeExpr::ComputationalMatch {
+                scrutinee: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    args: vec![worker],
+                }),
+                cases: vec![RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    argument_binders: 1,
+                    recursive_positions: vec![0],
+                    body: unit(),
+                }],
+                default: trap("multiple worker captures"),
+            }),
+        }
+    }
+
+    /// A `ComputationalMatch` consumer sitting inside a `Match` case body, with
+    /// a `Let`-bound host-effect result above both.
+    ///
+    /// The environment reaching that consumer therefore holds **both** `D2`
+    /// binding kinds and an entry parameter, in one vector, which is what lets
+    /// one walk distinguish them instead of three fixtures each proving its own
+    /// half.
+    fn contsrc_d2_both_binding_kinds_fixture() -> RuntimeExpr {
+        RuntimeExpr::Let {
+            value: Box::new(RuntimeExpr::Effect {
+                family: "Console".to_string(),
+                operation: ken_host::HostOpV1::ConsoleRead,
+                capability: None,
+                args: Vec::new(),
+            }),
+            body: Box::new(RuntimeExpr::Match {
+                scrutinee: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    args: vec![unit()],
+                }),
+                cases: vec![RuntimeMatchCase {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    binders: 1,
+                    // ⛔ `Var(3)` is load-bearing, not decoration. The case
+                    // body must REACH past the two computational binders to the
+                    // surrounding environment, or `required_input_count` is
+                    // zero, `exact_inputs` is empty, and every assertion below
+                    // about the gate is satisfied by a fixture that never
+                    // reached it. Index 3 = the two `ComputationalMatch`
+                    // binders, then the enclosing `Match` binder.
+                    body: contspec_parameter_match(RuntimeExpr::Var(3)),
+                }],
+                default: trap("d2 both binding kinds"),
+            }),
+        }
+    }
+
+    /// The environment the walk reaches at `target`, and that target's owner.
+    fn contsrc_d2_reached_environment(
+        plan: &StaticTransitionPlan<'_>,
+        target: StaticOriginId,
+    ) -> Vec<ContinuationValueSourceAuthority> {
+        let owner = occurrence_authority(plan, target)
+            .expect("the target has an occurrence authority")
+            .owner;
+        let entry_sources = continuation_owner_entry_sources(plan, owner)
+            .expect("the owner has an exact entry environment");
+        let entry_environment = entry_sources
+            .into_iter()
+            .map(ContinuationValueSourceAuthority::source)
+            .collect::<Vec<_>>();
+        let root = continuation_owner_source_root(plan, owner).expect("one source root");
+        let (_, reached) =
+            walk_continuation_value_environment(plan, root, target, &entry_environment)
+                .expect("the walk reaches the target");
+        reached.expect("the target is inside its owner's subtree")
+    }
+
+    /// The first occurrence of the given expression shape, in origin order.
+    fn contsrc_d2_first_origin(
+        plan: &StaticTransitionPlan<'_>,
+        matches_shape: impl Fn(&RuntimeExpr) -> bool,
+    ) -> StaticOriginId {
+        let mut origins = plan
+            .occurrence_authorities
+            .iter()
+            .map(|authority| authority.origin)
+            .collect::<Vec<_>>();
+        origins.sort();
+        origins
+            .into_iter()
+            .find(|origin| {
+                plan.planned_occurrence_expr(*origin)
+                    .is_ok_and(&matches_shape)
+            })
+            .expect("the fixture contains that shape")
+    }
+
+    /// `D2b` — find a **lawful** emission seat whose lexical environment holds
+    /// `coordinate` at an index the introduction index does not predict.
+    ///
+    /// ⭐ The seat is *searched for among real occurrences*, never fabricated:
+    /// it must be an occurrence of `owner` and a genuine construct origin of
+    /// some result edge, which is exactly what
+    /// [`continuation_emission_seat_environment`] demands. A hand-picked origin
+    /// would be the place this row stopped measuring the production check.
+    ///
+    /// Returns `(result_origin, construct_origin, index_at_that_seat)`.
+    fn contsrc_d2b_shifted_emission_seat(
+        plan: &StaticTransitionPlan<'_>,
+        owner: PredeclaredFunctionId,
+        coordinate: ContinuationSourceCoordinate,
+        introduction_index: u32,
+    ) -> (StaticOriginId, StaticOriginId, u32) {
+        let mut origins = plan
+            .occurrence_authorities
+            .iter()
+            .map(|authority| authority.origin)
+            .collect::<Vec<_>>();
+        origins.sort();
+        for result_origin in origins.iter().copied() {
+            let Ok(constructs) = continuation_result_origins(plan, result_origin) else {
+                continue;
+            };
+            for construct_origin in constructs.iter().copied() {
+                let Ok(authority) = occurrence_authority(plan, construct_origin) else {
+                    continue;
+                };
+                if authority.owner != owner {
+                    continue;
+                }
+                let environment = ContinuationProducerEnvironment {
+                    producer_owner: owner,
+                    producer_result_origin: result_origin,
+                    producer_construct_origin: construct_origin,
+                    consumer_owner: owner,
+                    inputs: Vec::new(),
+                };
+                let Ok((_, seat)) = continuation_emission_seat_environment(plan, &environment)
+                else {
+                    continue;
+                };
+                let found = seat.iter().position(|value| {
+                    matches!(
+                        value,
+                        ContinuationValueSourceAuthority::Closed(sources)
+                            if sources.iter().any(|source| source.coordinate == coordinate)
+                    )
+                });
+                let Some(index) = found else { continue };
+                let index = u32::try_from(index).expect("a fixture environment index fits");
+                if index > introduction_index {
+                    return (result_origin, construct_origin, index);
+                }
+            }
+        }
+        panic!(
+            "the fixture has no lawful emission seat holding {coordinate:?} past an intervening \
+             binder; without one this row would measure the unshifted case and could not tell a \
+             real nearest-alias selection from returning the introduction index"
+        );
+    }
+
+    fn contsrc_d2_local(
+        value: &ContinuationValueSourceAuthority,
+    ) -> (&ContinuationSourceSlotAuthority, ProducerLocalBinding, ProducerLocalLocator) {
+        let ContinuationValueSourceAuthority::Closed(sources) = value else {
+            panic!("expected an exactly-sourced value, got {value:?}");
+        };
+        let [source] = sources.as_slice() else {
+            panic!("expected exactly one source, got {sources:?}");
+        };
+        let ContinuationSourceCoordinate::ProducerLocal { binding, locator } = source.coordinate
+        else {
+            panic!("expected a producer-local coordinate, got {:?}", source.coordinate);
+        };
+        (source, binding, locator)
+    }
+
+    fn mutate_projection_field(
+        projection: &mut ContinuationInputProjection,
+        field: ContinuationProjectionOmission,
+    ) {
+        match field {
+            ContinuationProjectionOmission::ProducerOwner => {
+                projection.producer_owner = PredeclaredFunctionId(u32::MAX)
+            }
+            ContinuationProjectionOmission::ConsumerOwner => {
+                projection.consumer_owner = PredeclaredFunctionId(u32::MAX)
+            }
+            // `D1` — same three components, now inside the `EntryAbi` arm.
+            // ⛔ The sentinel is written INTO the arm, never by replacing the
+            // arm: swapping the whole coordinate for a producer-local one would
+            // make every row of the matrix pass on the domain tag alone.
+            ContinuationProjectionOmission::SourceOwner
+            | ContinuationProjectionOmission::SourceAbiPosition
+            | ContinuationProjectionOmission::Source => {
+                let ContinuationSourceCoordinate::EntryAbi {
+                    source_owner,
+                    source_abi_position,
+                    source,
+                } = &mut projection.coordinate
+                else {
+                    panic!("the AC-2 omission matrix reached a producer-local coordinate");
+                };
+                match field {
+                    ContinuationProjectionOmission::SourceOwner => {
+                        *source_owner = PredeclaredFunctionId(u32::MAX)
+                    }
+                    ContinuationProjectionOmission::SourceAbiPosition => {
+                        *source_abi_position = u32::MAX
+                    }
+                    ContinuationProjectionOmission::Source => {
+                        *source = ContinuationInputSource::SeedCapture {
+                            defining_origin: StaticOriginId(u32::MAX),
+                        }
+                    }
+                    other => panic!("{other:?} is not a coordinate component"),
+                }
+            }
+            ContinuationProjectionOmission::Ordinal => projection.ordinal = u32::MAX,
+            ContinuationProjectionOmission::Carrier => {
+                projection.carrier = AbiCarrier::GroundValueCarrier
+            }
+            ContinuationProjectionOmission::Ownership => {
+                projection.ownership = AbiOwnership::TransferredToCaller
+            }
+            ContinuationProjectionOmission::StorageOwner => {
+                projection.storage_owner = AbiStorageOwner::ArtifactStatic
+            }
+            ContinuationProjectionOmission::ReferentAffinity => {
+                projection.referent_affinity = vec![BoundaryReferentOwner::PersistentStore]
+            }
+            ContinuationProjectionOmission::OrdinaryAbiPosition => {
+                projection.ordinary_abi_position = u32::MAX
+            }
+        }
+    }
+
+    /// Build one planned edge for a target, with the token fields the closure
+    /// validator checks taken from that target's own key.
+    ///
+    /// Taking them from the key is what makes the negative row below reach the
+    /// NEW check: a hand-picked token would trip "edge token disagrees with its
+    /// exact target" first, and a control that refuses at an earlier rule has
+    /// not exercised the rule it names.
+    #[cfg(test)]
+    fn contspec_edge_for(
+        unit: &PlannedContinuationSpecialization,
+        call_site_sequence: u32,
+    ) -> PlannedContinuationSpecializationCall {
+        PlannedContinuationSpecializationCall {
+            token: ContinuationSpecializationCallToken {
+                producer_owner: unit.key.producer_owner,
+                emission_owner: unit.key.emission_owner,
+                producer_result_origin: unit.key.producer_result_origin,
+                producer_construct_origin: unit.key.producer_construct_origin,
+                producer_alternative: unit.key.producer_alternative,
+                call_site_sequence,
+                target: unit.id,
+                worker: unit.key.worker.clone(),
+            },
+        }
+    }
+
+    /// **`RT-DECL-CLOSURE-PORT` `D3` — the four transport classes are present
+    /// and typed at the declaration-owned callable-unit boundary.**
+    ///
+    /// Capture, parameter, result and trap, asserted as the **exact ordered slot
+    /// run** rather than as counts: a count agrees with a run that has the right
+    /// number of wrong slots.
+    #[test]
+    fn d3_the_callable_declaration_boundary_carries_typed_transport() {
+        let (root, declaration) = d2_declaration_and_anonymous_closure();
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::d2", &declaration);
+        let plan = plan_static_transition_graph(&root, &declarations).expect("plannable");
+        let declaration_origin = plan
+            .declaration_occurrence_origin("decl:fixture::d2")
+            .expect("occurrence");
+
+        let unit = plan
+            .emittable_units()
+            .expect("validated units")
+            .into_iter()
+            .find(|unit| {
+                matches!(
+                    unit.definition(),
+                    AbiUnitDefinition::CallableDeclaration { declaration_origin: origin, .. }
+                        if origin == declaration_origin
+                )
+            })
+            .expect("the declaration owns a callable unit");
+
+        let run = unit
+            .slots()
+            .iter()
+            .map(|slot| (slot.kind, slot.carrier, slot.ordinal))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            run,
+            vec![
+                // the declared parameter
+                (AbiSlotKind::Parameter, AbiCarrier::ValueWord, 0),
+                // the lifted captures, in capture declaration order
+                (AbiSlotKind::Capture, AbiCarrier::ValueWord, 0),
+                (AbiSlotKind::Capture, AbiCarrier::ValueWord, 1),
+                // the result / control / trap / store convention
+                (AbiSlotKind::Result, AbiCarrier::ResultWord, 0),
+                (AbiSlotKind::Control, AbiCarrier::ControlWord, 0),
+                (AbiSlotKind::Trap, AbiCarrier::TrapWord, 0),
+                (AbiSlotKind::Store, AbiCarrier::StoreHandle, 0),
+            ],
+            "D3: the callable declaration boundary must carry typed parameter, \
+             capture, result and trap transport in ABI order"
+        );
+
+        // Ownership and storage owner are part of "typed", not decoration: a
+        // capture that transferred to the caller, or lived in the persistent
+        // store, would be a different transport with the same slot kinds.
+        for slot in unit.slots() {
+            let expected = match slot.kind {
+                AbiSlotKind::Parameter | AbiSlotKind::Capture | AbiSlotKind::Control
+                | AbiSlotKind::Trap => (AbiOwnership::OwnedByFrame, AbiStorageOwner::ActivationFrame),
+                AbiSlotKind::Result => (
+                    AbiOwnership::TransferredToCaller,
+                    AbiStorageOwner::ActivationFrame,
+                ),
+                AbiSlotKind::Store => (
+                    AbiOwnership::BorrowedForActivation,
+                    AbiStorageOwner::PersistentStore,
+                ),
+            };
+            assert_eq!(
+                (slot.ownership, slot.storage_owner),
+                expected,
+                "D3: {:?} slot crosses with the wrong ownership/storage owner",
+                slot.kind
+            );
+        }
+    }
+
+    /// **`RT-DECL-CLOSURE-PORT` `D3` — the SEED producer transports too, with
+    /// its own carrier.**
+    ///
+    /// ⭐ There are **two** `StaticBody` producers, `Closure` and
+    /// `LexicalClosure`, and they differ in exactly the axis under test: a seed
+    /// capture crosses as `GroundValueCarrier`, a lexical one as `ValueWord`. A
+    /// fixture exercising one producer leaves the other's transport unmeasured,
+    /// and "the ported declaration works" would then be a claim about half the
+    /// population.
+    #[test]
+    fn d3_a_seed_provenance_declaration_transports_with_its_own_carrier() {
+        let declaration = RuntimeDeclaration {
+            symbol: "decl:fixture::d3seed".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::Closure {
+                    captures: vec!["decl:fixture::cap".to_string()],
+                    params: vec!["arg0".to_string()],
+                    body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+                },
+            },
+            metadata: crate::RuntimeSymbolMetadata::empty(),
+        };
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::d3seed", &declaration);
+        let plan = plan_static_transition_graph(&RuntimeExpr::Value(RuntimeValue::Bool(true)), &declarations)
+            .expect("plannable");
+        let declaration_origin = plan
+            .declaration_occurrence_origin("decl:fixture::d3seed")
+            .expect("occurrence");
+
+        let unit = plan
+            .emittable_units()
+            .expect("validated units")
+            .into_iter()
+            .find(|unit| {
+                matches!(
+                    unit.definition(),
+                    AbiUnitDefinition::CallableDeclaration { declaration_origin: origin, .. }
+                        if origin == declaration_origin
+                )
+            })
+            .expect("the seed declaration owns a callable unit");
+
+        assert_eq!(
+            unit.definition(),
+            AbiUnitDefinition::CallableDeclaration {
+                declaration_origin,
+                provenance: AbiCaptureProvenance::Seed,
+            },
+            "D3: a Closure-bodied declaration must own a SEED-provenance callable unit"
+        );
+        let captures = unit
+            .slots()
+            .iter()
+            .filter(|slot| slot.kind == AbiSlotKind::Capture)
+            .map(|slot| slot.carrier)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            captures,
+            vec![AbiCarrier::GroundValueCarrier],
+            "D3: a seed capture must cross as GroundValueCarrier, not as the \
+             lexical ValueWord -- the carrier is a function of provenance"
+        );
+    }
+
+    /// **`RT-DECL-CLOSURE-PORT` `D3` — `C4` actually REJECTS on a
+    /// declaration-owned unit, and the control proves that is not free.**
+    ///
+    /// ⭐ This is the one the leader named: routing `C4` through the shared
+    /// predicate in `D2` is only worth something if the exclusion genuinely
+    /// fires for the new arm. ⛔ A green suite cannot establish that — an
+    /// exclusion that silently stopped seeing these units also reports no
+    /// violation.
+    #[test]
+    fn d3_an_imported_capture_on_a_declaration_owned_unit_is_refused() {
+        // The imported EDGE: an imported value in a capture position, which is
+        // where it would have to cross a frame boundary and be given a carrier.
+        let declaration = RuntimeDeclaration {
+            symbol: "decl:fixture::d3".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::LexicalClosure {
+                    captures: vec![RuntimeExpr::ImportedDeclarationRef {
+                        symbol: "decl:other::imported".to_string(),
+                        dependency: "pkg:other".to_string(),
+                        dependency_semantic_hash: "hash".to_string(),
+                    }],
+                    params: Vec::new(),
+                    body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+                },
+            },
+            metadata: crate::RuntimeSymbolMetadata::empty(),
+        };
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::d3", &declaration);
+        let root = RuntimeExpr::Value(RuntimeValue::Bool(true));
+
+        let refused = plan_static_transition_graph(&root, &declarations);
+        assert!(
+            refused.is_err(),
+            "D3/C4: an imported capture edge on a declaration-owned callable \
+             unit must be refused before it receives a callable descriptor"
+        );
+
+        // ⭐ The control. With `C4` restored to matching `ClosureBody` alone,
+        // the SAME program is accepted -- so the assertion above is caused by
+        // the shared predicate reaching the new arm, not by some other refusal
+        // that would have fired anyway.
+        let accepted_under_mutation =
+            super::abi::D3_C4_MATCHES_CLOSURE_BODY_ONLY.with(|flag| {
+                flag.set(true);
+                let outcome = plan_static_transition_graph(&root, &declarations).is_ok();
+                flag.set(false);
+                outcome
+            });
+        assert!(
+            accepted_under_mutation,
+            "D3/C4: the refusal must be CAUSED by C4 reaching the declaration-owned \
+             arm -- if the program is still refused with C4 narrowed back to \
+             ClosureBody, this test is measuring a different rejection and proves \
+             nothing about the population shrink"
+        );
+    }
+
+    /// **`D3` — CALL TARGET IS INJECTIVE, and an interning ALIAS refuses at
+    /// planner closure rather than being defended late in the emitter.**
+    ///
+    /// Ruled at `evt_7akh94dvqeqap`. The closure validator already proved
+    /// key/unit bijection, unique tokens, token/target agreement and surjective
+    /// reachability. It did **not** prove that two distinct edges cannot name
+    /// one unit, and that gap is what had pushed an all-incoming-calls liveness
+    /// scan into lowering -- a scan no lawful source can make fail.
+    ///
+    /// **The negative reaches the NEW rule and not an older one, which is the
+    /// whole difficulty of this row.** The two keys differ **only** in a field
+    /// inside `continuation_inputs`, and no such field appears in the call
+    /// token; both edges therefore still agree with their target on every field
+    /// the existing check compares. Under exact interning they are two units and
+    /// the population is bijective; under `OmitProjection` they conflate to one
+    /// unit and the two distinct edges become an alias.
+    ///
+    /// **MEASURED:** exact interning gives two units, two distinct edges, two
+    /// distinct targets, and closure passes. The same two keys and the same two
+    /// edges under `OmitProjection` give one unit and refuse at the duplicate
+    /// TARGET rule -- not at the duplicate-token rule, which is a separate
+    /// defect and is left free to fire on its own row.
+    /// **CLAIMED:** a specialization's liveness is decided by its own unique
+    /// edge, because the planner refuses any state in which it would not be.
+    /// **THE GAP:** this is planner closure only. It pins no emitter behaviour
+    /// and no composition disposition; the `ComposedCall`/`DirectCall` outcome
+    /// this law makes well-defined is owed with the relation.
+    #[test]
+    fn d3_two_distinct_planned_edges_may_not_name_one_specialization() {
+        let plan = contspec_plan();
+        let base_key = plan.continuation_specializations[0].key.clone();
+        let field = ContinuationProjectionOmission::Ordinal;
+
+        let mut aliasing_key = base_key.clone();
+        mutate_projection_field(&mut aliasing_key.continuation_inputs[0], field);
+        assert_ne!(
+            base_key, aliasing_key,
+            "the two keys must be exactly distinct, or the row tests nothing"
+        );
+
+        // Exact interning: two units, two edges, bijective.
+        let mut interned = BTreeMap::new();
+        let mut units = Vec::new();
+        intern_specialization(&mut interned, &mut units, base_key.clone()).expect("interns");
+        intern_specialization(&mut interned, &mut units, aliasing_key.clone()).expect("interns");
+        let exact_units = units.len();
+        let edges = vec![
+            contspec_edge_for(&units[0], 0),
+            contspec_edge_for(&units[1], 0),
+        ];
+        let exact = validate_continuation_specialization_closure(&interned, &units, &edges);
+
+        // The SAME two keys under projection-omitting interning: one unit.
+        let mut aliased_interned = BTreeMap::new();
+        let mut aliased_units = Vec::new();
+        CONTINUATION_INTERN_MUTATION
+            .with(|mutation| mutation.set(ContinuationInternMutation::OmitProjection(field)));
+        intern_specialization(&mut aliased_interned, &mut aliased_units, base_key.clone())
+            .expect("interns");
+        intern_specialization(&mut aliased_interned, &mut aliased_units, aliasing_key)
+            .expect("interns");
+        CONTINUATION_INTERN_MUTATION
+            .with(|mutation| mutation.set(ContinuationInternMutation::Exact));
+        let aliased_unit_count = aliased_units.len();
+        // Two DISTINCT edges -- different call-site sequences, so the
+        // duplicate-token rule cannot be what answers -- both landing on the one
+        // conflated unit.
+        let aliased_edges = vec![
+            contspec_edge_for(&aliased_units[0], 0),
+            contspec_edge_for(&aliased_units[0], 1),
+        ];
+        assert_ne!(
+            aliased_edges[0].token, aliased_edges[1].token,
+            "the two edges must be distinct tokens, or this row would refuse at the duplicate-\
+             token rule instead of the one it names"
+        );
+        let aliased = validate_continuation_specialization_closure(
+            &aliased_interned,
+            &aliased_units,
+            &aliased_edges,
+        );
+
+        let refusal = |result: Result<(), CraneliftBackendError>| match result {
+            Ok(()) => "closed".to_string(),
+            Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(message))) => {
+                message
+            }
+            Err(other) => format!("other: {other:?}"),
+        };
+
+        assert_eq!(
+            (
+                exact_units,
+                refusal(exact),
+                aliased_unit_count,
+                refusal(aliased)
+            ),
+            (
+                2,
+                "closed".to_string(),
+                1,
+                "two distinct continuation planned edges name one specialization unit, so the \
+                 planner's call and unit populations are not bijective and a specialization's \
+                 liveness is not decided by its own edge"
+                    .to_string()
+            ),
+            "exact interning closes with two units and two edges; the same two keys conflated by \
+             projection omission refuse at the duplicate-TARGET rule, with both edges still \
+             agreeing with their target on every field the older checks compare"
+        );
+    }
+
+    /// **`D3` — A SAME-BODY SIBLING IS TWO UNITS WITH TWO EDGES, and body
+    /// equality is never liveness authority.**
+    ///
+    /// Ruled at `evt_7akh94dvqeqap` point 3. Two exact, closure-valid full keys
+    /// that share the worker body and provenance but differ on one legitimate
+    /// identity coordinate must intern to distinct units with distinct edges, so
+    /// that composing one can never suppress the other.
+    ///
+    /// **This is a PLANNER-RELATION row and deliberately not a source program.**
+    /// It says nothing about whether a Ken program can produce this population --
+    /// ten measured configurations did not -- and it must not be read as source
+    /// reachability. It uses the exact interning path, never a coarsening
+    /// mutation.
+    ///
+    /// **MEASURED:** worker body and full worker provenance equal, one identity
+    /// coordinate differs, two distinct units, two distinct edges, closure
+    /// passes.
+    /// **CLAIMED:** shared body cannot alias two specializations, so a rule that
+    /// keyed liveness on body would be deciding the sibling's fate too.
+    /// **THE GAP:** the composed/direct halves of this row -- that only the
+    /// composed unit leaves the executable population -- need the composition
+    /// relation and are owed with it.
+    #[test]
+    fn d3_a_same_body_sibling_interns_as_two_units_with_two_edges() {
+        let plan = contspec_plan();
+        let left = plan.continuation_specializations[0].key.clone();
+        let mut right = left.clone();
+        // One legitimate identity coordinate, chosen because it is NOT part of
+        // the worker provenance: the sibling stays same-body by construction.
+        right.recursive_position += 1;
+        right.recursive_positions.insert(right.recursive_position);
+
+        let mut interned = BTreeMap::new();
+        let mut units = Vec::new();
+        let (left_id, _) =
+            intern_specialization(&mut interned, &mut units, left.clone()).expect("interns");
+        let (right_id, _) =
+            intern_specialization(&mut interned, &mut units, right.clone()).expect("interns");
+        let edges = vec![
+            contspec_edge_for(&units[0], 0),
+            contspec_edge_for(&units[1], 0),
+        ];
+        let closed =
+            validate_continuation_specialization_closure(&interned, &units, &edges).is_ok();
+
+        assert_eq!(
+            (
+                left.worker == right.worker,
+                left.worker.body_origin == right.worker.body_origin,
+                left != right,
+                left_id != right_id,
+                edges[0].token.target != edges[1].token.target,
+                closed,
+            ),
+            (true, true, true, true, true, true),
+            "the sibling shares worker provenance AND body origin, differs on one identity \
+             coordinate, and still interns to a DISTINCT unit with a distinct edge -- so no \
+             body-keyed rule could compose one without deciding the other"
+        );
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D3b` alias controls 3, 4 and 5 — the rule
+    /// selects by ELIGIBILITY, and order only canonicalizes among proved aliases.**
+    ///
+    /// ⭐⭐ **Controls 1 and 3 select OPPOSITE ENDS of the environment, and that
+    /// is the whole point of having both.** A suite carrying only the
+    /// nearest-alias case passes just as well under a positional shortcut —
+    /// "take the first member containing the coordinate" — because on that
+    /// fixture the first member *is* the answer. Control 3 puts an ambiguous
+    /// `Closed([S, T])` at the inner position and the exact singleton at the
+    /// outer one, so a positional shortcut answers `0` and the ruled rule answers
+    /// `2`. Only the pair distinguishes them.
+    ///
+    /// ⚠ **MEASURED**: eligibility is exact equality of the complete source-slot
+    /// authority, and selection among eligible positions is the minimum index.
+    /// **CLAIMED**: the rule is total over the environment — every position is
+    /// classified before any is chosen. **THE GAP**: this exercises the rule as a
+    /// function; that the planner and the consumer both *call* it is
+    /// `d3b_the_duplicated_entry_source_selects_the_nearest_alias` below.
+    ///
+    /// **Promise class: durable invariant.**
+    #[test]
+    fn d3b_alias_eligibility_not_position_decides() {
+        let expr = Box::leak(Box::new(contspec_complete_environment_fixture()));
+        let symbols = crate::NativeProcessSymbols::legacy_prelude();
+        let plan = plan_static_transition_graph_with_symbols(
+            expr,
+            &BTreeMap::new(),
+            &symbols,
+            AbiRootIngress::Process,
+            false,
+        )
+        .expect("the complete-environment fixture plans");
+        let owner = plan.continuation_specializations[0].key.consumer_owner;
+        // ⛔ Real authorities, not hand-built ones: eligibility is whole-record
+        // equality, so a synthetic S could differ from anything production ever
+        // produces and the row would prove nothing about the live rule.
+        let sources = continuation_owner_entry_sources(&plan, owner).expect("entry sources");
+        assert!(
+            sources.len() >= 2,
+            "the fixture must supply two distinct source slots, or S and T cannot be told apart"
+        );
+        let s = sources[0].clone();
+        let t = sources[1].clone();
+        assert_ne!(s, t, "S and T must be distinct records");
+        assert_ne!(
+            s.coordinate, t.coordinate,
+            "S and T must differ in COORDINATE, or the contract-mismatch arm would fire where \
+             the rows below expect the ambiguity or absence one"
+        );
+        let closed = |sources: Vec<ContinuationSourceSlotAuthority>| {
+            ContinuationValueSourceAuthority::Closed(sources)
+        };
+
+        // Control 1's shape, as a unit: two exact aliases, the nearer wins.
+        let both = vec![closed(vec![s.clone()]), closed(vec![t.clone()]), closed(vec![s.clone()])];
+        assert_eq!(
+            nearest_exact_alias(&s, &both).expect("two exact aliases are eligible"),
+            0,
+            "among proved aliases the minimum de Bruijn index is selected"
+        );
+
+        // ⛔ Control 3 — inner ambiguous, outer exact. The OUTER is selected.
+        let outer = vec![
+            closed(vec![s.clone(), t.clone()]),
+            closed(vec![t.clone()]),
+            closed(vec![s.clone()]),
+        ];
+        assert_eq!(
+            nearest_exact_alias(&s, &outer).expect("the outer singleton is eligible"),
+            2,
+            "an ambiguous Closed([S, T]) at the inner position is NOT an alias, so the rule must \
+             reach past it; answering 0 here would mean it is selecting the first member that \
+             merely contains the coordinate"
+        );
+
+        // ⛔ Control 4 — ambiguous with no singleton anywhere refuses.
+        let ambiguous = vec![closed(vec![s.clone(), t.clone()])];
+        let refusal = nearest_exact_alias(&s, &ambiguous)
+            .expect_err("an ambiguous source set proves nothing and must refuse");
+        assert!(
+            format!("{refusal:?}").contains("ambiguous source set"),
+            "the refusal must be the ambiguity one, not absence: {refusal:?}"
+        );
+
+        // ⛔ Control 5, unit form — same coordinate, different contract.
+        let mut narrowed = s.clone();
+        narrowed.referent_affinity = Vec::new();
+        assert_ne!(narrowed, s, "the narrowing must actually change the record");
+        assert_eq!(narrowed.coordinate, s.coordinate, "and must keep the coordinate");
+        let mismatched = vec![closed(vec![narrowed])];
+        let refusal = nearest_exact_alias(&s, &mismatched)
+            .expect_err("a different contract under the same coordinate must refuse");
+        assert!(
+            format!("{refusal:?}").contains("different carrier, ownership, storage owner"),
+            "the refusal must be the contract-mismatch one: {refusal:?}"
+        );
+
+        // ⛔ Absent entirely — the third refusal, kept distinguishable.
+        let absent = vec![closed(vec![t])];
+        let refusal =
+            nearest_exact_alias(&s, &absent).expect_err("an absent coordinate must refuse");
+        assert!(
+            format!("{refusal:?}").contains("not present in the lexical environment"),
+            "the refusal must be the absence one: {refusal:?}"
+        );
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D3b` alias controls 1, 2 and 6 — the
+    /// measured duplicate selects index 0, and the real consumer rederives it.**
+    ///
+    /// ⭐ This is the exact environment that produced the hard stop: `let y = x`
+    /// forwards process parameter 1, so `EntryAbi { .., 1, Parameter }` occupies
+    /// lexical indices **0 and 2**. The old exact-once law refused it outright.
+    ///
+    /// ⛔ **Control 2 is the canonicality half, and it is deliberately NOT stated
+    /// as "index 2 holds a different value".** It does not — index 2 is a proved
+    /// alias holding the same semantic source. What the consumer refuses is a
+    /// claim that is not the *canonical* selection, and that distinction is the
+    /// reason this rule is safe to share between two planes: planner and consumer
+    /// run one function, so a claim either is what that function returns or is
+    /// rejected.
+    ///
+    /// ⚠ **MEASURED**: the issued claim carries index 0; the production consumer
+    /// accepts it and refuses index 2. **CLAIMED**: the claim a consumer indexes
+    /// with is the planner's own answer, re-derived rather than trusted. **THE
+    /// GAP**: this re-runs the planner's rule, so a defect in the rule itself
+    /// would be reproduced rather than caught — `d3b_alias_eligibility_not_position_decides`
+    /// owns that half.
+    ///
+    /// **Promise class: durable invariant.**
+    #[test]
+    fn d3b_the_duplicated_entry_source_selects_the_nearest_alias() {
+        let expr = Box::leak(Box::new(contspec_complete_environment_fixture()));
+        let symbols = crate::NativeProcessSymbols::legacy_prelude();
+        let plan = plan_static_transition_graph_with_symbols(
+            expr,
+            &BTreeMap::new(),
+            &symbols,
+            AbiRootIngress::Process,
+            false,
+        )
+        .expect("the complete-environment fixture plans");
+        let unit = &plan.continuation_specializations[0];
+        let input = &unit.key.continuation_inputs[0];
+        let requested = ContinuationSourceSlotAuthority {
+            coordinate: input.coordinate,
+            carrier: input.carrier,
+            ownership: input.ownership,
+            storage_owner: input.storage_owner,
+            referent_affinity: input.referent_affinity.clone(),
+        };
+
+        // The duplicate is real and MEASURED here, not assumed from the fixture's
+        // name. ⛔ Without this the row could pass on an environment holding the
+        // coordinate once, where nearest-alias and exact-once agree.
+        let seat_environment = continuation_emission_seat_environment(
+            &plan,
+            &ContinuationProducerEnvironment {
+                producer_owner: unit.key.producer_owner,
+                producer_result_origin: unit.key.producer_result_origin,
+                producer_construct_origin: unit.key.producer_construct_origin,
+                consumer_owner: unit.key.consumer_owner,
+                inputs: Vec::new(),
+            },
+        )
+        .expect("the emission seat has an environment")
+        .1;
+        let exact_positions = seat_environment
+            .iter()
+            .enumerate()
+            .filter(|(_, value)| {
+                matches!(value, ContinuationValueSourceAuthority::Closed(sources)
+                    if sources.as_slice() == [requested.clone()])
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            exact_positions,
+            vec![0, 2],
+            "this row's whole subject is a coordinate at TWO exact-alias positions; one position \
+             would make nearest-alias and the retired exact-once law indistinguishable"
+        );
+
+        let Some(ContinuationEnvironmentDraft::CurrentLexical {
+            emission_owner,
+            producer_result_origin,
+            emission_origin,
+            lexical_environment_origin,
+            nearest_alias_index,
+        }) = input.availability.direct_emission
+        else {
+            panic!("a predeclared emitter must issue a current-lexical direct-emission claim");
+        };
+        // ⛔ Control 1 — the nearer of the two proved aliases.
+        assert_eq!(
+            nearest_alias_index, 0,
+            "the issued claim must carry the minimum eligible index"
+        );
+
+        // The REAL consumer accepts it.
+        verify_current_lexical_availability(
+            &plan,
+            emission_owner,
+            producer_result_origin,
+            emission_origin,
+            lexical_environment_origin,
+            &requested,
+            nearest_alias_index,
+        )
+        .expect("the production consumer must accept the planner's own answer");
+
+        // ⛔ Control 2 — the outer alias is refused as non-canonical.
+        let refusal = verify_current_lexical_availability(
+            &plan,
+            emission_owner,
+            producer_result_origin,
+            emission_origin,
+            lexical_environment_origin,
+            &requested,
+            2,
+        )
+        .expect_err(
+            "a claim naming the outer alias must be refused; accepting it would mean the \
+             consumer indexes with whatever number it is handed as long as something lives there",
+        );
+        assert!(
+            format!("{refusal:?}").contains("does not hold that coordinate at"),
+            "the refusal must be the seat revalidation: {refusal:?}"
+        );
+    }
+
+    /// MEASURED: the nested fixture produces two units and two exact causal
+    /// edges; every key owns the full ordered two-input projection.
+    ///
+    /// CLAIMED: D1-D5 are a closed planner population before any consumer is
+    /// exposed. GAP: Slice 2 still has to declare the ABI unit arm, and Slice 3
+    /// still has to lower a call; this test claims neither.
+    #[test]
+    fn contspec_planner_closes_ordered_keys_units_and_causal_edges_dormantly() {
+        let plan = contspec_plan();
+        assert_eq!(plan.continuation_specializations.len(), 2);
+        assert_eq!(plan.continuation_specialization_calls.len(), 2);
+        for (index, unit) in plan.continuation_specializations.iter().enumerate() {
+            assert_eq!(unit.id.0 as usize, index);
+            assert_eq!(unit.key.continuation_inputs.len(), 2);
+            assert_eq!(
+                unit.key
+                    .continuation_inputs
+                    .iter()
+                    .map(|input| input.ordinal)
+                    .collect::<Vec<_>>(),
+                vec![0, 1]
+            );
+            assert_eq!(
+                unit.key
+                    .continuation_inputs
+                    .iter()
+                    .map(|input| {
+                        let (owner, position, _) = input.coordinate.expect_entry_abi();
+                        (owner, position)
+                    })
+                    .collect::<Vec<_>>(),
+                vec![(unit.key.consumer_owner, 0), (unit.key.consumer_owner, 1)]
+            );
+            assert!(matches!(
+                unit.key.continuation_inputs[1].coordinate.expect_entry_abi().2,
+                ContinuationInputSource::LexicalCapture { .. }
+            ));
+            assert_eq!(
+                unit.key
+                    .continuation_inputs
+                    .iter()
+                    .map(|input| input.ordinary_abi_position)
+                    .collect::<Vec<_>>(),
+                vec![1, 2]
+            );
+        }
+        let targets = plan
+            .continuation_specialization_calls
+            .iter()
+            .map(|call| call.token.target)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(targets.len(), 2, "D5: one target was orphaned or conflated");
+        validate_continuation_specialization_plan(&plan).expect("exact closure");
+        plan.abi
+            .validate_continuation_specializations(&plan.continuation_specializations)
+            .expect("exact dormant ABI");
+        assert_eq!(
+            plan.abi.continuation_descriptors.len(),
+            plan.continuation_specializations.len(),
+            "D1: every interned specialization needs one explicit descriptor"
+        );
+        for (index, descriptor) in plan.abi.continuation_descriptors.iter().enumerate() {
+            assert_eq!(
+                descriptor.definition,
+                AbiUnitDefinition::ContinuationSpecialization {
+                    specialization: ContinuationSpecializationId(index as u32),
+                },
+                "D1: a continuation descriptor masqueraded as an existing unit arm"
+            );
+        }
+
+        // Dormancy is a capability property: the existing emission population
+        // is still exactly the pre-existing ABI descriptors. No accessor above
+        // can project a continuation unit into this population.
+        assert_eq!(
+            plan.emittable_units().expect("existing units").len(),
+            plan.abi.descriptors.len()
+        );
+    }
+
+    /// MEASURED: `Let` forwards process parameter 1 into semantic environment
+    /// ordinal 0. The first case uses no surrounding value, while the second
+    /// case consumes outer ordinal 2, so the case maximum requires three
+    /// inputs. Exact production retains source ABI positions `[1, 0, 1]`; the
+    /// descriptor-count mutation truncates that population to `[1, 0]`, while
+    /// descriptor restatement produces `[0, 1]`.
+    ///
+    /// CLAIMED: D1 obtains owner/position/provenance from the value that reaches
+    /// each continuation-environment ordinal, not from that ordinal itself.
+    ///
+    /// GAP: this remains dormant planner authority. No continuation unit or
+    /// call is emitted in Slice 1.
+    #[test]
+    fn contspec_locally_forwarded_parameter_retains_exact_source_position() {
+        let expr = Box::leak(Box::new(
+            contspec_complete_environment_fixture(),
+        ));
+        let symbols = crate::NativeProcessSymbols::legacy_prelude();
+        let plan = plan_static_transition_graph_with_symbols(
+            expr,
+            &BTreeMap::new(),
+            &symbols,
+            AbiRootIngress::Process,
+            false,
+        )
+        .expect("exact semantic source environment plans");
+        assert_eq!(
+            plan.continuation_specializations[0]
+                .key
+                .continuation_inputs
+                .iter()
+                .map(|input| input.coordinate.expect_entry_abi().1)
+                .collect::<Vec<_>>(),
+            vec![1, 0, 1],
+        );
+
+        CONTINUATION_PRODUCTION_MUTATION.with(|mutation| {
+            mutation.set(ContinuationProductionMutation::DescriptorInputCountTruncation)
+        });
+        let truncated = plan_static_transition_graph_with_symbols(
+            expr,
+            &BTreeMap::new(),
+            &symbols,
+            AbiRootIngress::Process,
+            false,
+        )
+        .expect("compile-valid descriptor-count truncation plans");
+        CONTINUATION_PRODUCTION_MUTATION
+            .with(|mutation| mutation.set(ContinuationProductionMutation::Exact));
+        assert_eq!(
+            truncated.continuation_specializations[0]
+                .key
+                .continuation_inputs
+                .iter()
+                .map(|input| input.coordinate.expect_entry_abi().1)
+                .collect::<Vec<_>>(),
+            vec![1, 0],
+            "the production mutation must discard the required tail",
+        );
+
+        CONTINUATION_PRODUCTION_MUTATION.with(|mutation| {
+            mutation.set(ContinuationProductionMutation::DescriptorOrdinalSources)
+        });
+        let wrong = plan_static_transition_graph_with_symbols(
+            expr,
+            &BTreeMap::new(),
+            &symbols,
+            AbiRootIngress::Process,
+            false,
+        )
+        .expect("compile-valid descriptor-ordinal restatement plans");
+        CONTINUATION_PRODUCTION_MUTATION
+            .with(|mutation| mutation.set(ContinuationProductionMutation::Exact));
+        assert_eq!(
+            wrong.continuation_specializations[0]
+                .key
+                .continuation_inputs
+                .iter()
+                .map(|input| input.coordinate.expect_entry_abi().1)
+                .collect::<Vec<_>>(),
+            vec![0, 1],
+            "the production mutation must restate descriptor ordinals",
+        );
+    }
+
+    /// MEASURED: placing an opaque value, or a join of two distinct parameter
+    /// sources, at required surrounding-environment ordinal 2 leaves the
+    /// enclosing source program valid while producing no dormant continuation
+    /// specialization. Ordinals 0 and 1 remain closed in both fixtures.
+    ///
+    /// CLAIMED: D1 refuses open and ambiguous source provenance at the
+    /// candidate boundary; it neither invents a descriptor slot nor rejects
+    /// an otherwise valid program.
+    ///
+    /// GAP: Slice 1 remains planner-only and emits neither refused candidate.
+    #[test]
+    fn contspec_open_and_ambiguous_sources_refuse_only_the_candidate() {
+        let symbols = crate::NativeProcessSymbols::legacy_prelude();
+        let open = Box::leak(Box::new(contspec_required_tail_fixture(unit())));
+        let open_plan = plan_static_transition_graph_with_symbols(
+            &*open,
+            &BTreeMap::new(),
+            &symbols,
+            AbiRootIngress::Process,
+            false,
+        )
+        .expect("open provenance refuses only the candidate");
+        assert!(open_plan.continuation_specializations.is_empty());
+        assert!(open_plan.continuation_specialization_calls.is_empty());
+
+        CONTINUATION_PRODUCTION_MUTATION.with(|mutation| {
+            mutation.set(ContinuationProductionMutation::DescriptorInputCountTruncation)
+        });
+        let truncated_open = plan_static_transition_graph_with_symbols(
+            &*open,
+            &BTreeMap::new(),
+            &symbols,
+            AbiRootIngress::Process,
+            false,
+        )
+        .expect("descriptor-count truncation discards the open required tail");
+        CONTINUATION_PRODUCTION_MUTATION
+            .with(|mutation| mutation.set(ContinuationProductionMutation::Exact));
+        assert_eq!(truncated_open.continuation_specializations.len(), 1);
+        assert_eq!(
+            truncated_open.continuation_specializations[0]
+                .key
+                .continuation_inputs
+                .len(),
+            2,
+            "the mutation must admit the candidate by discarding ordinal 2",
+        );
+
+        let ambiguous_tail = RuntimeExpr::If {
+            scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+            then_expr: Box::new(RuntimeExpr::Var(0)),
+            else_expr: Box::new(RuntimeExpr::Var(1)),
+        };
+        let ambiguous = Box::leak(Box::new(contspec_required_tail_fixture(
+            ambiguous_tail,
+        )));
+        let ambiguous_plan = plan_static_transition_graph_with_symbols(
+            ambiguous,
+            &BTreeMap::new(),
+            &symbols,
+            AbiRootIngress::Process,
+            false,
+        )
+        .expect("ambiguous provenance refuses only the candidate");
+        assert!(ambiguous_plan.continuation_specializations.is_empty());
+        assert!(ambiguous_plan.continuation_specialization_calls.is_empty());
+    }
+
+    /// MEASURED: one static worker field and two ordered worker capture fields
+    /// produce ABI prefix two. The static worker identity itself is excluded.
+    /// The compile-valid constructor-field-count mutation produces prefix one.
+    ///
+    /// CLAIMED: D1 derives the prefix by walking the runtime worker envelope,
+    /// not from constructor arity or a closure-count proxy.
+    ///
+    /// GAP: capture values remain intentionally absent from the immutable key;
+    /// only their ordered static provenance participates.
+    #[test]
+    fn contspec_ordinary_prefix_uses_the_ordered_worker_envelope() {
+        let expr = Box::leak(Box::new(contspec_multiple_worker_captures_fixture()));
+        let plan = plan_static_transition_graph(expr, &BTreeMap::new()).expect("plans");
+        let unit = plan
+            .continuation_specializations
+            .first()
+            .expect("one continuation specialization");
+        assert_eq!(plan.continuation_specializations.len(), 1);
+        assert_eq!(unit.key.recursive_position, 0);
+        assert_eq!(
+            unit.key
+                .worker
+                .captures
+                .iter()
+                .map(|capture| capture.ordinal)
+                .collect::<Vec<_>>(),
+            vec![0, 1],
+        );
+        assert_eq!(unit.key.ordinary_parameters, 2);
+        assert_eq!(
+            unit.key.continuation_inputs[0].ordinary_abi_position,
+            2,
+        );
+
+        CONTINUATION_PRODUCTION_MUTATION.with(|mutation| {
+            mutation.set(ContinuationProductionMutation::ConstructorFieldCountPrefix)
+        });
+        let wrong = plan_static_transition_graph(expr, &BTreeMap::new())
+            .expect("compile-valid constructor-field count plans");
+        CONTINUATION_PRODUCTION_MUTATION
+            .with(|mutation| mutation.set(ContinuationProductionMutation::Exact));
+        assert_eq!(
+            wrong.continuation_specializations[0].key.ordinary_parameters,
+            1,
+            "the production mutation must count the worker and omit both captures",
+        );
+        assert_eq!(
+            wrong.continuation_specializations[0].key.continuation_inputs[0]
+                .ordinary_abi_position,
+            1,
+        );
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D1`/`D2b` — the two planner-side consumers
+    /// of the coordinate refuse the producer-local domain instead of reading an
+    /// entry ABI position it does not have.**
+    ///
+    /// `D1` represents the domain; `D3` teaches the *emission* consumers to
+    /// assign it. Between the two, the honest behaviour is a refusal, and a
+    /// refusal nobody exercises is indistinguishable from a missing one — so
+    /// this presents a producer-local coordinate directly.
+    ///
+    /// ⚠ **`D2b` changed the second half of this row, and the change is a
+    /// strengthening rather than a weakening.** `exact_continuation_projection`
+    /// no longer refuses *on the domain* — `D2b` gives the producer-local domain
+    /// a real availability derivation. It refuses on the harder question the
+    /// derivation asks: whether the coordinate is genuinely present in the
+    /// lexical environment in force at the emission seat. A **fabricated**
+    /// coordinate like [`ContinuationSourceCoordinate::producer_local_probe`] is
+    /// present nowhere, so it is still refused — but now because no walk places
+    /// it, which is the property `D2b` actually owes.
+    ///
+    /// ⚠ **`D3a` moved the FIRST half the same way, for the same reason.**
+    /// `validate_continuation_source_slot` no longer refuses on the domain
+    /// either — it re-derives producer-local coordinates by re-running the
+    /// forward walk. A **fabricated** coordinate is still refused, but now
+    /// because the re-derivation cannot reach it: this row's probe names
+    /// `PredeclaredFunctionId(u32::MAX)` as its binding owner, and no such
+    /// owner has a source root to walk from.
+    ///
+    /// ⛔ That refusal is real but *shallow* — it rejects the owner before any
+    /// environment is consulted. The deeper property, that a coordinate with a
+    /// genuine owner and a genuine scope is refused when the walk does not
+    /// place it **there**, is deliberately not claimed here: it needs a
+    /// coordinate this probe cannot express, and
+    /// `contsrc_d3a_validator_rederives_a_producer_local_source` measures it
+    /// with real owners, real scopes and a positive control.
+    ///
+    /// MEASURED: `validate_continuation_source_slot` returns `Err` on a
+    /// producer-local coordinate whose binding owner does not exist;
+    /// `exact_continuation_projection` returns `Err` on a producer-local
+    /// coordinate that the forward semantic walk does not find at the emission
+    /// seat; each returns `Ok` on the same record carrying its original entry
+    /// coordinate. CLAIMED: neither consumer has a path that silently reads an
+    /// entry position out of the local domain. THE GAP: this says nothing about
+    /// whether either derivation assigns the *right* answer when the coordinate
+    /// IS present — the `D2b` discriminators below and the `D3a` row above own
+    /// that, and it is deliberately not claimed here.
+    ///
+    /// ⭐ The positive control is the load-bearing half. `Err` is satisfied by a
+    /// record that was malformed for some unrelated reason, so each row proves
+    /// the same record validates when its coordinate is the entry one.
+    ///
+    /// **Promise class: durable invariant.**
+    #[test]
+    fn contsrc_producer_local_coordinate_is_refused_by_both_planner_consumers() {
+        let plan = contspec_plan();
+        let unit = &plan.continuation_specializations[0];
+        let entry_sources = continuation_owner_entry_sources(&plan, unit.key.consumer_owner)
+            .expect("the consumer owner has an exact entry environment");
+        let exact = entry_sources
+            .first()
+            .expect("the fixture consumer has at least one entry input")
+            .clone();
+
+        // Positive control: the untouched record validates.
+        validate_continuation_source_slot(&plan, &exact)
+            .expect("the exact entry-ABI authority must validate, or this row proves nothing");
+
+        let mut local = exact.clone();
+        local.coordinate = ContinuationSourceCoordinate::producer_local_probe();
+        let refusal = validate_continuation_source_slot(&plan, &local)
+            .expect_err("the exact slot validator must refuse a producer-local coordinate");
+        assert_eq!(
+            refusal,
+            planner_error("continuation owner does not have one exact source-occurrence root"),
+            "the validator must refuse with a message from its OWN re-derivation rather than \
+             incidentally"
+        );
+
+        // `D3b` re-cut — the predeclared emitter's arm. BOTH coordinate domains
+        // now take the forward lexical derivation; a fabricated local coordinate
+        // is not in the seat environment, so it refuses.
+        let entry_environment = ContinuationProducerEnvironment {
+            producer_owner: unit.key.producer_owner,
+            producer_result_origin: unit.key.producer_result_origin,
+            producer_construct_origin: unit.key.producer_construct_origin,
+            consumer_owner: unit.key.consumer_owner,
+            inputs: vec![exact],
+        };
+        exact_continuation_projection(
+            &plan,
+            &entry_environment,
+            unit.key.ordinary_parameters,
+            &ContinuationEmitterFrame::Predeclared(entry_environment.producer_owner),
+        )
+        .expect("the entry-coordinate projection must succeed, or this row proves nothing");
+
+        let local_environment = ContinuationProducerEnvironment {
+            inputs: vec![local],
+            ..entry_environment
+        };
+        let refusal = exact_continuation_projection(
+            &plan,
+            &local_environment,
+            unit.key.ordinary_parameters,
+            &ContinuationEmitterFrame::Predeclared(local_environment.producer_owner),
+        )
+        .expect_err("the projection must refuse a coordinate the seat environment does not hold");
+        assert!(
+            format!("{refusal:?}").contains("not present in the lexical environment"),
+            "the projection must refuse because the forward walk does not place this binding at \
+             the emission seat -- NOT incidentally, and not on the domain alone: {refusal:?}"
+        );
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D1` `AC-2` — the coordinate is a CLOSED
+    /// sum, and an entry position is not representable as a local binding.**
+    ///
+    /// The property `AC-2` actually needs is compile-time: a third domain must
+    /// not compile until every consumer assigns it. That is carried by there
+    /// being no wildcard arm at any of the matches, which no runtime assertion
+    /// can observe. What *is* observable, and is the reason the sum exists, is
+    /// that the two domains never compare equal — so an entry coordinate can
+    /// never be mistaken for a local binding by a consumer comparing
+    /// coordinates.
+    ///
+    /// ⛔ This is deliberately NOT an assertion about the source text of the
+    /// matches. It tests the behaviour the type buys.
+    ///
+    /// **Promise class: durable invariant.**
+    #[test]
+    fn contsrc_the_two_coordinate_domains_never_compare_equal() {
+        let plan = contspec_plan();
+        let entry_sources = continuation_owner_entry_sources(
+            &plan,
+            plan.continuation_specializations[0].key.consumer_owner,
+        )
+        .expect("the consumer owner has an exact entry environment");
+        let local = ContinuationSourceCoordinate::producer_local_probe();
+        assert!(
+            !entry_sources.is_empty(),
+            "the fixture must supply at least one entry coordinate to compare against"
+        );
+        for source in &entry_sources {
+            assert!(
+                matches!(
+                    source.coordinate,
+                    ContinuationSourceCoordinate::EntryAbi { .. }
+                ),
+                "the entry walk must produce only entry coordinates"
+            );
+            assert_ne!(
+                source.coordinate, local,
+                "an entry coordinate compared equal to a producer-local one, so the \
+                 generated-context capture lookup could resolve one as the other"
+            );
+        }
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D2` corrected — a `ComputationalMatch`
+    /// case run is `[IH, argument]` and the two subruns are NOT contracted
+    /// alike.**
+    ///
+    /// This is the discriminator `a5a6ce9b` lacked. That checkpoint looped over
+    /// the combined binder count and stamped one contract across both subruns;
+    /// its positive row targeted an inner `ComputationalMatch` but inspected
+    /// that occurrence's *incoming* environment, so it observed an outer
+    /// ordinary-`Match` binder and a host-effect result — never an IH.
+    ///
+    /// MEASURED: the outer case's environment is ordered
+    /// `[Open, producer-local argument binder, ...]`. The IH prefix carries no
+    /// contract at all; the argument binder carries the scrutinee's carrier and
+    /// lifetime. CLAIMED: the two subruns are contracted from their own
+    /// authorities, and the IH's is not invented. THE GAP: the IH's real
+    /// contract is not derived here — it is refused. That is the hard stop
+    /// reported with this correction, not a claim that `Open` is its answer.
+    ///
+    /// ⭐ **This rejects both stampings, which is the point.** Stamping the
+    /// argument contract across the run makes position 0 `Closed`; stamping the
+    /// IH treatment across it makes position 1 `Open`. The row asserts each
+    /// position's domain exactly, so either stamp reds it — and the two
+    /// assertions are what a single `binders`-wide loop cannot satisfy.
+    ///
+    /// **Promise class: durable invariant.**
+    #[test]
+    fn contsrc_d2_a_computational_case_run_separates_its_ih_prefix_from_its_arguments() {
+        let expr = Box::leak(Box::new(contsrc_d2_ih_and_argument_case_fixture()));
+        let plan = plan_static_transition_graph(expr, &BTreeMap::new())
+            .expect("the IH/argument fixture plans");
+        let mut computational = plan
+            .occurrence_authorities
+            .iter()
+            .map(|authority| authority.origin)
+            .filter(|origin| {
+                plan.planned_occurrence_expr(*origin)
+                    .is_ok_and(|expr| matches!(expr, RuntimeExpr::ComputationalMatch { .. }))
+            })
+            .collect::<Vec<_>>();
+        computational.sort();
+        let [outer, inner, ..] = computational.as_slice() else {
+            panic!("the fixture must contain an outer and an inner ComputationalMatch");
+        };
+        let reached = contsrc_d2_reached_environment(&plan, *inner);
+        assert!(
+            reached.len() >= 2,
+            "the walk must land on the outer case's own binder run: {reached:?}"
+        );
+
+        // ⛔ Position 0 is the recursive IH. No contract is claimed for it.
+        // Stamping the argument contract across the run would make this
+        // `Closed`, which is precisely the defect this row exists to catch.
+        assert_eq!(
+            reached[0],
+            ContinuationValueSourceAuthority::Open,
+            "the recursive IH prefix must carry NO contract; a producer-local value here is \
+             the a5a6ce9b misclassification"
+        );
+
+        // Position 1 is the ordinary constructor argument binder, contracted
+        // from the scrutinee. Stamping the IH treatment across the run would
+        // make this `Open`.
+        let (argument, binding, locator) = contsrc_d2_local(&reached[1]);
+        assert_eq!(
+            binding.binding_ordinal, 1,
+            "the ordinal must span the whole run so identity stays (case body, ordinal) \
+             with no new tag"
+        );
+        assert_eq!(binding.binding_origin, locator.environment_origin);
+        assert_eq!(locator.environment_index, 1);
+
+        // The contract is READ from the scrutinee, not chosen. The scrutinee is
+        // a constructor of persistent children, so its lifetime is persistent
+        // and its affinity is the two-element set -- which an IH's
+        // activation-owned treatment could not produce.
+        let scrutinee_lifetime = occurrence_authority(&plan, *outer)
+            .expect("the outer match has an occurrence authority")
+            .children
+            .iter()
+            .find(|child| child.position == 0)
+            .expect("the outer match has a scrutinee child")
+            .lifetime;
+        // ⛔ Non-vacuity: the fixture's scrutinee must actually be PERSISTENT.
+        // An activation-owned scrutinee would give the argument binder the same
+        // affinity an IH's activation-owned treatment produces, and the
+        // comparison below would hold for the wrong reason.
+        assert_eq!(
+            scrutinee_lifetime,
+            PlannedReferentLifetime::Persistent,
+            "the discriminator needs a persistent scrutinee, or the affinity assertion cannot \
+             tell a scrutinee-derived contract from a stamped activation-owned one"
+        );
+        assert_eq!(
+            argument.referent_affinity,
+            lifetime_referent_affinity(scrutinee_lifetime),
+            "the argument binder's affinity must be the scrutinee's, not a stamped constant"
+        );
+        assert_eq!(
+            argument.ownership,
+            argument.carrier.ownership(),
+            "ownership must remain the carrier's projection"
+        );
+        assert_eq!(argument.storage_owner, argument.carrier.storage_owner());
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D2` — both binding kinds are populated as
+    /// DISTINCT structural bindings, with a planner-derived contract.**
+    ///
+    /// One fixture, one walk, one environment vector holding a `Match` case
+    /// binder, a `Let`-bound host-effect result and an entry parameter — so the
+    /// row can tell the two local kinds apart from each other *and* from the
+    /// entry domain, which three separate fixtures could not.
+    ///
+    /// ⛔ Both local values here are an **ordinary `Match` case's constructor
+    /// argument binder** and a host-effect result. No recursive IH binder is in
+    /// this fixture's environment; the IH/argument split is a separate row.
+    ///
+    /// MEASURED: at the consumer inside the case body the environment is
+    /// `[argument binder, effect result, entry ...]`; the two local bindings
+    /// differ in `binding_origin`; each carries the carrier its own authority
+    /// supplies — the scrutinee's for the argument binder, the `Effect` shape's
+    /// for the effect result — with the ownership and storage owner
+    /// `AbiCarrier` derives from it, and a non-empty referent affinity.
+    /// CLAIMED: `D2` populates both kinds through one derivation that restates
+    /// no other record's fact. THE GAP: nothing here admits either binding —
+    /// the candidate still declines, which is the next row.
+    ///
+    /// ⭐ The locator/binding split is asserted, not assumed: for the effect
+    /// result the two origins **differ** (the `Effect` creates the value, the
+    /// `Let` body holds it), and for the argument binder they coincide. If a
+    /// future change collapsed the two fields, the effect row would red.
+    ///
+    /// **Promise class: durable invariant.**
+    #[test]
+    fn contsrc_d2_populates_both_producer_local_binding_kinds() {
+        let expr = Box::leak(Box::new(contsrc_d2_both_binding_kinds_fixture()));
+        let plan = plan_static_transition_graph(expr, &BTreeMap::new())
+            .expect("the D2 fixture plans");
+        let target = contsrc_d2_first_origin(&plan, |expr| {
+            matches!(expr, RuntimeExpr::ComputationalMatch { .. })
+        });
+        let effect_origin = contsrc_d2_first_origin(&plan, |expr| {
+            matches!(expr, RuntimeExpr::Effect { .. })
+        });
+        let reached = contsrc_d2_reached_environment(&plan, target);
+        assert!(
+            reached.len() >= 2,
+            "the fixture must reach the consumer with both local bindings: {reached:?}"
+        );
+
+        // Position 0 -- the `Match` case binder. Its scope introduces it and
+        // holds it, so binding and locator name the same occurrence.
+        let (binder_source, binder_binding, binder_locator) = contsrc_d2_local(&reached[0]);
+        assert_eq!(binder_binding.binding_ordinal, 0);
+        assert_eq!(
+            binder_binding.binding_origin, binder_locator.environment_origin,
+            "a case binder is introduced by, and held in, the same scope"
+        );
+        assert_eq!(binder_locator.environment_index, 0);
+
+        // Position 1 -- the `Let`-bound host-effect result. The `Effect`
+        // creates it; the `Let` body holds it. ⛔ Different origins.
+        let (effect_source, effect_binding, effect_locator) = contsrc_d2_local(&reached[1]);
+        assert_eq!(
+            effect_binding.binding_origin, effect_origin,
+            "the host-effect result must be identified by the Effect occurrence itself"
+        );
+        assert_ne!(
+            effect_binding.binding_origin, effect_locator.environment_origin,
+            "the binding identity and the emission-time locator must not collapse into one"
+        );
+        assert_eq!(effect_locator.environment_index, 0);
+
+        // The two kinds are distinct bindings, which is the deliverable.
+        assert_ne!(
+            binder_binding, effect_binding,
+            "the two D2 binding kinds must not compare equal"
+        );
+
+        // The contract, derived once and consistent with the entry plane's
+        // reading of the same carrier. ⛔ The carrier is asserted against the
+        // authority that supplies it, never against a literal: on this fixture
+        // both authorities answer `ValueWord`, and writing that constant here
+        // would state a blanket rule the derivation deliberately does not have.
+        let expected_argument_carrier = abi::result_carrier(SemanticSourceKind::Expression(
+            RuntimeExprShape::Construct,
+        ))
+        .expect("the fixture's Match scrutinee is a Construct");
+        let expected_effect_carrier =
+            abi::result_carrier(SemanticSourceKind::Expression(RuntimeExprShape::Effect))
+                .expect("the Effect shape has a result carrier");
+        assert_eq!(binder_source.carrier, expected_argument_carrier);
+        assert_eq!(effect_source.carrier, expected_effect_carrier);
+        for (label, source) in [
+            ("argument binder", binder_source),
+            ("effect result", effect_source),
+        ] {
+            assert_eq!(
+                source.ownership,
+                source.carrier.ownership(),
+                "{label} ownership must be the carrier's, not a second statement of it"
+            );
+            assert_eq!(
+                source.storage_owner,
+                source.carrier.storage_owner(),
+                "{label} storage owner must be the carrier's"
+            );
+            assert!(
+                !source.referent_affinity.is_empty(),
+                "{label} must carry a real referent affinity; an empty one is what \
+                 validate_continuation_source_slot rejects for the entry domain"
+            );
+        }
+
+        // ⭐ The referent affinity is derived PER BINDING, not stamped from one
+        // constant. The case binder's scrutinee is a persistent constructor and
+        // the host effect's result is activation-owned, so the two affinities
+        // must differ on this fixture. A single hardcoded affinity — the
+        // easiest wrong implementation — reds here.
+        assert_ne!(
+            binder_source.referent_affinity, effect_source.referent_affinity,
+            "both kinds received the same referent affinity, so the derivation is not \
+             reading each binding's own lifetime authority"
+        );
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D2b` DISCRIMINATOR 1 — current-lexical
+    /// availability counts the binders actually pushed between the binding and
+    /// the emission seat.**
+    ///
+    /// The defect `evt_44k69b55vhek2` reopened `D2` for is that `D1`'s locator
+    /// is *scope-relative* — `environment_index` is where the value sits in the
+    /// scope that introduced it — while the emitter stands somewhere else
+    /// entirely. Any implementation that hands the locator index straight
+    /// through looks correct on every fixture where nothing intervenes.
+    ///
+    /// ⭐ **So the fixture is chosen for the intervening binder.** The
+    /// host-effect result is introduced at index 0 of the `Let` body, and the
+    /// enclosing `Match` case pushes its own binder before the emission seat, so
+    /// the value has moved by the time it is emitted. `nearest_alias_index` and
+    /// `environment_index` are therefore *different numbers on this row* —
+    /// which is what makes "introduction index equals emission index" a failing
+    /// answer here rather than an indistinguishable one.
+    ///
+    /// MEASURED: the projection's `CurrentLexical` arm returns the index at
+    /// which the emission seat's own environment holds this exact coordinate;
+    /// that index differs from the binding's `environment_index`; the position
+    /// the introduction index names at that seat carries a **different** value;
+    /// and the arm is keyed to the exact emission occurrence and lexical
+    /// environment origin. CLAIMED: the availability is derived by the forward
+    /// semantic walk rather than restated from the locator. THE GAP: this says
+    /// nothing about lowering *consuming* the arm — `D3` owns that, and the
+    /// emission seams still refuse it.
+    ///
+    /// **Promise class: durable invariant.**
+    #[test]
+    fn contsrc_d2b_current_lexical_availability_counts_the_intervening_binder() {
+        let expr = Box::leak(Box::new(contsrc_d2_both_binding_kinds_fixture()));
+        let plan =
+            plan_static_transition_graph(expr, &BTreeMap::new()).expect("the D2 fixture plans");
+        let target = contsrc_d2_first_origin(&plan, |expr| {
+            matches!(expr, RuntimeExpr::ComputationalMatch { .. })
+        });
+        let owner = occurrence_authority(&plan, target)
+            .expect("the target has an occurrence authority")
+            .owner;
+        let reached = contsrc_d2_reached_environment(&plan, target);
+        let (effect_source, _, effect_locator) = contsrc_d2_local(&reached[1]);
+        let coordinate = effect_source.coordinate;
+        let introduction_index = effect_locator.environment_index;
+
+        let (result_origin, construct_origin, seat_index) =
+            contsrc_d2b_shifted_emission_seat(&plan, owner, coordinate, introduction_index);
+        let environment = ContinuationProducerEnvironment {
+            producer_owner: owner,
+            producer_result_origin: result_origin,
+            producer_construct_origin: construct_origin,
+            consumer_owner: owner,
+            inputs: vec![effect_source.clone()],
+        };
+
+        // The independent oracle: the seat's own environment, read directly
+        // rather than through the projection under test.
+        let (source_root, seat) = continuation_emission_seat_environment(&plan, &environment)
+            .expect("the searched seat is lawful by construction");
+        let holds = |index: u32| {
+            matches!(
+                seat.get(index as usize),
+                Some(ContinuationValueSourceAuthority::Closed(sources))
+                    if sources.iter().any(|source| source.coordinate == coordinate)
+            )
+        };
+        assert!(
+            holds(seat_index),
+            "the oracle must place this binding at {seat_index} or the row proves nothing"
+        );
+        // ⛔ THE vacuity kill. Had the derivation returned the locator's index,
+        // it would have named a position holding a DIFFERENT value — so this
+        // asserts the wrong answer is wrong, not merely that it is unequal.
+        assert!(
+            !holds(introduction_index),
+            "the introduction index still holds this binding at the emission seat, so nothing \
+             here distinguishes a real nearest-alias selection from passing the locator through"
+        );
+
+        let projected = exact_continuation_projection(
+            &plan,
+            &environment,
+            0,
+            &ContinuationEmitterFrame::Predeclared(environment.producer_owner),
+        )
+        .expect("a producer-local coordinate present at the seat must project");
+        assert_eq!(
+            projected[0].availability,
+            ContinuationAvailabilityDraft {
+                direct_emission: Some(ContinuationEnvironmentDraft::CurrentLexical {
+                    emission_owner: environment.producer_owner,
+                    producer_result_origin: result_origin,
+                    emission_origin: construct_origin,
+                    lexical_environment_origin: source_root,
+                    nearest_alias_index: seat_index,
+                }),
+                // ⛔ The re-cut's load-bearing half of this row. A predeclared
+                // emitter projects NO context-capture claim, so the capture
+                // consumer cannot reach this value at all. Asserting the whole
+                // record rather than the direct view is what makes that a
+                // measured absence instead of an unexamined field.
+                context_capture: None,
+            },
+            "the direct-emission claim must be keyed to the exact emission occurrence, owner and \
+             lexical environment and carry the nearest-alias index, and a predeclared emitter must \
+             project no capture claim at all"
+        );
+        assert_ne!(
+            seat_index, introduction_index,
+            "this fixture must exercise a genuine shift; equal indices would make every \
+             assertion above satisfiable by the identity"
+        );
+
+        // ⛔ Fail-closed 1 of 5 — wrong emission origin. A seat that is not a
+        // construct origin of this result edge has no defined environment.
+        let off_edge = {
+            let lawful = continuation_result_origins(&plan, result_origin)
+                .expect("the result edge resolves");
+            plan.occurrence_authorities
+                .iter()
+                .map(|authority| authority.origin)
+                .find(|origin| !lawful.contains(origin))
+                .expect("the fixture has an occurrence off this result edge")
+        };
+        let wrong_seat = ContinuationProducerEnvironment {
+            producer_construct_origin: off_edge,
+            ..environment.clone()
+        };
+        let refusal = exact_continuation_projection(
+            &plan,
+            &wrong_seat,
+            0,
+            &ContinuationEmitterFrame::Predeclared(environment.producer_owner),
+        )
+        .expect_err("an emission seat off its own result edge must refuse");
+        assert!(
+            format!("{refusal:?}").contains("not an occurrence of its own producer owner"),
+            "the refusal must be the emission-origin one, not an incidental error: {refusal:?}"
+        );
+
+        // ⛔ Fail-closed 2 of 5 — wrong nearest-alias index. A binding the walk
+        // does not place at the seat gets no index at all.
+        let mut absent = effect_source.clone();
+        absent.coordinate = ContinuationSourceCoordinate::producer_local_probe();
+        let refusal = exact_continuation_projection(
+            &plan,
+            &ContinuationProducerEnvironment {
+                inputs: vec![absent],
+                ..environment
+            },
+            0,
+            &ContinuationEmitterFrame::Predeclared(environment.producer_owner),
+        )
+        .expect_err("a binding absent from the seat environment must refuse");
+        assert!(
+            format!("{refusal:?}").contains("not present in the lexical environment"),
+            "the refusal must name the absent binding rather than fall through: {refusal:?}"
+        );
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D2b` DISCRIMINATOR 2 — generated-context
+    /// capture availability, with the root and immediate positions DIFFERENT.**
+    ///
+    /// A generated context reaches a producer-local value only as one of its own
+    /// declared captures, laid out after its parameter run. So the immediate
+    /// capture slot is a third number, distinct from both the binding's
+    /// introduction index and its position in the capture projection — and a
+    /// row where any two of those coincide cannot tell a real lookup from an
+    /// index that happened to line up.
+    ///
+    /// ⭐ The enclosing capture projection is built with a decoy ahead of the
+    /// value, and the context declares parameters, so the three numbers here are
+    /// `0` (introduction), `1` (capture position) and `3` (immediate slot).
+    ///
+    /// MEASURED: the arm resolves to the exact context/owner it is keyed to with
+    /// `immediate_capture_slot = context_parameters + capture position`; and it
+    /// refuses when the caller's proof is absent, when the coordinate is not in
+    /// the capture projection, when the owner is crossed with another unit's
+    /// captures, and when the slot arithmetic would overflow. CLAIMED: a
+    /// producer-local capture exists only where the caller's own current-lexical
+    /// availability proves the value was there. THE GAP: `D3` still owns
+    /// consuming this at emission; nothing here lowers it.
+    ///
+    /// **Promise class: durable invariant.**
+    #[test]
+    fn contsrc_d2b_generated_context_capture_separates_root_from_immediate() {
+        let expr = Box::leak(Box::new(contsrc_d2_both_binding_kinds_fixture()));
+        let plan =
+            plan_static_transition_graph(expr, &BTreeMap::new()).expect("the D2 fixture plans");
+        let target = contsrc_d2_first_origin(&plan, |expr| {
+            matches!(expr, RuntimeExpr::ComputationalMatch { .. })
+        });
+        let owner = occurrence_authority(&plan, target)
+            .expect("the target has an occurrence authority")
+            .owner;
+        let reached = contsrc_d2_reached_environment(&plan, target);
+        let (effect_source, _, effect_locator) = contsrc_d2_local(&reached[1]);
+        let coordinate = effect_source.coordinate;
+        let introduction_index = effect_locator.environment_index;
+
+        let (result_origin, construct_origin, seat_index) =
+            contsrc_d2b_shifted_emission_seat(&plan, owner, coordinate, introduction_index);
+        let source_root = continuation_owner_source_root(&plan, owner).expect("one source root");
+
+        // The CALLER's own projection of this value. ⭐ **The re-cut relocates
+        // this row's caller-proof authority rather than dropping it.** Under the
+        // retired law the projection inspected this record's availability and
+        // refused anything but a current-lexical one. That check is gone, because
+        // a nested generated context's member lawfully carries an entry-frame
+        // claim, so the old refusal was not a law. What replaces it is stronger
+        // and structural: **exact-once membership by whole coordinate in the
+        // enclosing specialization's own continuation inputs** — and those inputs
+        // were themselves projected and validated when that specialization was
+        // interned. A capture cannot be fabricated because there is nothing to
+        // find unless the caller really declares the value.
+        let caller_proof = ContinuationInputProjection {
+            availability: ContinuationAvailabilityDraft {
+                direct_emission: Some(ContinuationEnvironmentDraft::CurrentLexical {
+                    emission_owner: owner,
+                    producer_result_origin: result_origin,
+                    emission_origin: construct_origin,
+                    lexical_environment_origin: source_root,
+                    nearest_alias_index: seat_index,
+                }),
+                context_capture: None,
+            },
+            producer_owner: owner,
+            consumer_owner: owner,
+            coordinate,
+            ordinal: 1,
+            carrier: effect_source.carrier,
+            ownership: effect_source.ownership,
+            storage_owner: effect_source.storage_owner,
+            referent_affinity: effect_source.referent_affinity.clone(),
+            ordinary_abi_position: 7,
+        };
+        // A decoy ahead of it, so the capture POSITION is not zero and cannot
+        // be confused with the introduction index.
+        let decoy = ContinuationInputProjection {
+            availability: ContinuationAvailabilityDraft {
+                direct_emission: Some(ContinuationEnvironmentDraft::EntryFrame {
+                    frame: ContinuationFrameRequirement::Predeclared(owner),
+                    declared_slot: 0,
+                }),
+                context_capture: None,
+            },
+            coordinate: ContinuationSourceCoordinate::EntryAbi {
+                source_owner: owner,
+                source_abi_position: 0,
+                source: ContinuationInputSource::Parameter,
+            },
+            ordinal: 0,
+            ..caller_proof.clone()
+        };
+        let enclosing_inputs = vec![decoy, caller_proof.clone()];
+        const CONTEXT_PARAMETERS: u32 = 2;
+        let context = ContinuationSpecializationId(0);
+        // ⛔ Two DISTINCT worker bodies. The frame identity is a pair, and a row
+        // that only ever supplies one body origin cannot tell a recorded identity
+        // from a defaulted one.
+        let body_origin = target;
+        let other_body_origin = plan
+            .occurrence_authorities
+            .iter()
+            .map(|authority| authority.origin)
+            .find(|origin| *origin != body_origin)
+            .expect("the fixture has a second static origin");
+        let environment = ContinuationProducerEnvironment {
+            producer_owner: owner,
+            producer_result_origin: result_origin,
+            producer_construct_origin: construct_origin,
+            consumer_owner: owner,
+            inputs: vec![effect_source.clone()],
+        };
+        fn resolution<'plan>(
+            context: ContinuationSpecializationId,
+            inputs: &'plan [ContinuationInputProjection],
+            worker_body_origin: StaticOriginId,
+            parameters: u32,
+        ) -> ContinuationEmitterFrame<'plan> {
+            ContinuationEmitterFrame::GeneratedContext {
+                enclosing: context,
+                worker_body_origin,
+                context_parameters: parameters,
+                enclosing_inputs: inputs,
+            }
+        }
+
+        let projected = exact_continuation_projection(
+            &plan,
+            &environment,
+            0,
+            &resolution(context, &enclosing_inputs, body_origin, CONTEXT_PARAMETERS),
+        )
+        .expect("a captured producer-local value with a caller proof must project");
+        let declared = ContinuationEnvironmentDraft::EntryFrame {
+            frame: ContinuationFrameRequirement::GeneratedContext {
+                enclosing: context,
+                worker_body_origin: body_origin,
+            },
+            declared_slot: CONTEXT_PARAMETERS + 1,
+        };
+        assert_eq!(
+            projected[0].availability,
+            // ⭐ BOTH views carry the same claim here, and only here. A generated
+            // context's direct emission and its capture append read one frame --
+            // its own operand run -- so the two consumers agree by identity of
+            // environment rather than by convention. ⛔ Asserting the whole record
+            // is what makes that agreement measured; asserting one view would
+            // leave the other unexamined.
+            ContinuationAvailabilityDraft {
+                direct_emission: Some(declared),
+                context_capture: Some(declared),
+            },
+        );
+        // The three numbers are pairwise distinct, which is what makes the
+        // lookup answerable rather than a coincidence of index.
+        assert_ne!(CONTEXT_PARAMETERS + 1, introduction_index);
+        assert_ne!(CONTEXT_PARAMETERS + 1, 1, "the capture position is not the slot");
+
+        // ⛔ Fail-closed 3 of 5 — missing full-coordinate capture membership.
+        let refusal = exact_continuation_projection(
+            &plan,
+            &environment,
+            0,
+            &resolution(context, &enclosing_inputs[..1], body_origin, CONTEXT_PARAMETERS),
+        )
+        .expect_err("a value absent from the capture projection must refuse");
+        assert!(
+            format!("{refusal:?}").contains("not among the"),
+            "the refusal must be the membership one: {refusal:?}"
+        );
+
+        // ⛔ 4 of 5 — the FRAME IDENTITY is recorded, not defaulted.
+        //
+        // ⭐ **This is the re-cut of the retired "crossed owner/context" refusal,
+        // and the relocation is the point.** That refusal fired in the planner,
+        // which was the wrong plane for it: the planner is handed the emitting
+        // frame and has no second frame to cross it against. What it can be held
+        // to is FAITHFULNESS — that the claim names the frame it was actually
+        // given. The refusal itself now lives at the consumer, in
+        // `verify_entry_frame`, which is the only place both the claimed frame
+        // and the held frame exist. A row asserting a defaulted identity would
+        // make that consumer check unreachable in principle.
+        let crossed = exact_continuation_projection(
+            &plan,
+            &environment,
+            0,
+            &resolution(context, &enclosing_inputs, other_body_origin, CONTEXT_PARAMETERS),
+        )
+        .expect("a different worker body is still a well-formed emitting frame")[0]
+            .availability;
+        assert_eq!(
+            crossed,
+            ContinuationAvailabilityDraft {
+                direct_emission: Some(ContinuationEnvironmentDraft::EntryFrame {
+                    frame: ContinuationFrameRequirement::GeneratedContext {
+                        enclosing: context,
+                        worker_body_origin: other_body_origin,
+                    },
+                    declared_slot: CONTEXT_PARAMETERS + 1,
+                }),
+                context_capture: Some(ContinuationEnvironmentDraft::EntryFrame {
+                    frame: ContinuationFrameRequirement::GeneratedContext {
+                        enclosing: context,
+                        worker_body_origin: other_body_origin,
+                    },
+                    declared_slot: CONTEXT_PARAMETERS + 1,
+                }),
+            },
+            "the claim must name the worker body it was handed; a frame identity that ignores it \
+             would make two different frames indistinguishable to the consumer that has to refuse \
+             one of them"
+        );
+        assert_ne!(
+            crossed, projected[0].availability,
+            "two distinct emitting frames must not project the same claim, or the identity \
+             carries no information"
+        );
+
+        // ⛔ 5 of 5 — the slot arithmetic refuses rather than wraps. The capture
+        // run starts after the parameter run, and `u32::MAX` parameters leaves no
+        // representable slot for a capture at position 1.
+        let refusal = exact_continuation_projection(
+            &plan,
+            &environment,
+            0,
+            &resolution(context, &enclosing_inputs, body_origin, u32::MAX),
+        )
+        .expect_err("an immediate slot past the representable range must refuse");
+        assert!(
+            format!("{refusal:?}").contains("immediate slot position exhausted"),
+            "the refusal must be the slot-arithmetic one: {refusal:?}"
+        );
+
+        // ⛔ 6 — membership is EXACTLY ONCE. A duplicated member makes the
+        // declared slot ambiguous, and taking the first would silently pick one
+        // of two positions holding the same coordinate.
+        let refusal = exact_continuation_projection(
+            &plan,
+            &environment,
+            0,
+            &resolution(
+                context,
+                &[
+                    enclosing_inputs[0].clone(),
+                    caller_proof.clone(),
+                    caller_proof,
+                ],
+                body_origin,
+                CONTEXT_PARAMETERS,
+            ),
+        )
+        .expect_err("a duplicated capture member must refuse rather than take the first");
+        assert!(
+            format!("{refusal:?}").contains("two members for one"),
+            "the refusal must be the ambiguity one: {refusal:?}"
+        );
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D4a` — the binding is ADMITTED, and the
+    /// declined set is refused by the authority that was always there.**
+    ///
+    /// ⭐ **This row is the `D2` sentinel, fired and restated — not deleted.**
+    /// Its predecessor asserted the exact opposite: that no interned
+    /// specialization names a producer-local coordinate. That was `D2`'s law
+    /// and its promise class named `D4` as the event that retires it. `D4a` is
+    /// that event, so the assertion is **inverted rather than dropped**, which
+    /// keeps the transition itself measured instead of leaving a gap where a
+    /// law used to be.
+    ///
+    /// MEASURED: the fixture's environment holds producer-local bindings, and
+    /// at least one interned specialization now names a producer-local
+    /// coordinate, against a nonzero interned-input total. CLAIMED: the `D2`
+    /// filter is gone and the domain reaches interning. THE GAP: this row does
+    /// **not** measure `R`'s decline — this fixture is fully closed, so nothing
+    /// in it reaches either decline clause, and the corpus-level
+    /// `interned = V` / `declined = R` partition is `D4b`'s. It also says
+    /// nothing about lowering, which still refuses both local availability
+    /// arms; that is `D3b`'s, against the emissions this checkpoint creates.
+    ///
+    /// **Promise class: durable invariant** — the admission law itself. It goes
+    /// red if a future change re-filters the domain or weakens either decline
+    /// clause.
+    #[test]
+    fn contsrc_d4a_a_producer_local_environment_is_admitted_and_r_still_declines() {
+        let expr = Box::leak(Box::new(contsrc_d2_both_binding_kinds_fixture()));
+        let plan = plan_static_transition_graph(expr, &BTreeMap::new())
+            .expect("a fixture whose environment names producer-local bindings still PLANS");
+        let target = contsrc_d2_first_origin(&plan, |expr| {
+            matches!(expr, RuntimeExpr::ComputationalMatch { .. })
+        });
+        let reached = contsrc_d2_reached_environment(&plan, target);
+        assert!(
+            reached.iter().any(|value| matches!(
+                value,
+                ContinuationValueSourceAuthority::Closed(sources)
+                    if sources.iter().any(|source| matches!(
+                        source.coordinate,
+                        ContinuationSourceCoordinate::ProducerLocal { .. }
+                    ))
+            )),
+            "the fixture must actually reach the gate, or this row measures nothing: {reached:?}"
+        );
+
+        // ADMISSION, the inverted law. ⛔ The count is asserted alongside, so an
+        // empty interned population cannot satisfy this vacuously — which is
+        // the shape that would have let a still-filtering gate pass.
+        let mut interned_inputs = 0usize;
+        let mut interned_local = 0usize;
+        for plan in [&plan, &contspec_plan()] {
+            for unit in &plan.continuation_specializations {
+                for input in &unit.key.continuation_inputs {
+                    interned_inputs += 1;
+                    if matches!(
+                        input.coordinate,
+                        ContinuationSourceCoordinate::ProducerLocal { .. }
+                    ) {
+                        interned_local += 1;
+                    }
+                }
+            }
+        }
+        assert!(
+            interned_inputs > 0,
+            "no specialization interned any input at all, so this row holds vacuously"
+        );
+        assert!(
+            interned_local > 0,
+            "D4a admits the producer-local domain, so at least one interned specialization must \
+             name one; zero means the gate is still filtering and the deletion did not take"
+        );
+
+        // ⛔ `R`'s decline is deliberately NOT asserted here, and the reason is
+        // that it cannot be asserted honestly from this fixture. This
+        // environment is fully closed — that is precisely why it is admitted —
+        // so nothing in it reaches either decline clause. A row that
+        // constructed an `Open` value locally and matched on it would be a
+        // tautology about the enum, not a measurement of the take-loop.
+        //
+        // What keeps `R` declined is that `D4a` deleted a block *below* the
+        // take-loop and changed nothing in it. The corpus-level partition
+        // proof, `interned = V` and `declined = R` over all 83 instances, is
+        // `D4b`'s deliverable and needs the census harness, not this row.
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D3a` — the validator RE-DERIVES a
+    /// producer-local source instead of refusing its domain.**
+    ///
+    /// ⭐ The positive control is the deliverable: before `D3a` this call was
+    /// an `Err` for every producer-local coordinate, so `Ok(())` here is the
+    /// consumer actually being assigned rather than merely stopping.
+    ///
+    /// ⛔ The three discriminators exist because a lookup that merely *finds*
+    /// the coordinate would pass the positive control. Each perturbs one thing
+    /// the re-derivation must check and asserts the refusal by its own message.
+    ///
+    /// MEASURED: a walk-derived producer-local source validates; relocating it
+    /// to an index the same environment genuinely holds a **different** value
+    /// at is refused; changing the structural binding identity while keeping
+    /// the locator is refused; and corrupting a contract field the coordinate
+    /// does not name — the referent affinity — is refused. CLAIMED: the arm
+    /// re-runs the derivation and compares the whole record, rather than
+    /// confirming the coordinate appears somewhere. THE GAP: production still
+    /// declines every producer-local candidate at the `D2` gate, so this arm is
+    /// reached here by direct construction and not by any fixture compile.
+    ///
+    /// **Promise class: durable invariant.**
+    #[test]
+    fn contsrc_d3a_validator_rederives_a_producer_local_source() {
+        let expr = Box::leak(Box::new(contsrc_d2_both_binding_kinds_fixture()));
+        let plan =
+            plan_static_transition_graph(expr, &BTreeMap::new()).expect("the D2 fixture plans");
+        let target = contsrc_d2_first_origin(&plan, |expr| {
+            matches!(expr, RuntimeExpr::ComputationalMatch { .. })
+        });
+        let reached = contsrc_d2_reached_environment(&plan, target);
+        let (effect_source, _, effect_locator) = contsrc_d2_local(&reached[1]);
+
+        // The positive control, and the whole point of the deliverable.
+        validate_continuation_source_slot(&plan, effect_source)
+            .expect("D3a re-derives a producer-local source rather than refusing its domain");
+
+        // Discriminator 1 — the locator must name the position that actually
+        // holds THIS value.
+        //
+        // ⭐ The decoy is the fixture's OTHER producer-local binding's own
+        // locator, so it is a real occupied position in a real scope that holds
+        // a genuinely different value. That is what makes "walk somewhere and
+        // accept whatever sits at the index" a FAILING answer here rather than
+        // an indistinguishable one — an out-of-range index would only have
+        // measured the bounds guard.
+        let (binder_source, _, binder_locator) = contsrc_d2_local(&reached[0]);
+        assert_ne!(
+            (binder_locator.environment_origin, binder_locator.environment_index),
+            (effect_locator.environment_origin, effect_locator.environment_index),
+            "the two fixture bindings must occupy different positions, or the decoy is the seat"
+        );
+        let mut relocated = effect_source.clone();
+        if let ContinuationSourceCoordinate::ProducerLocal { locator, .. } =
+            &mut relocated.coordinate
+        {
+            *locator = binder_locator;
+        }
+        // The oracle: that position is occupied, and by something else.
+        let decoy_scope = contsrc_d2_reached_environment(&plan, binder_locator.environment_origin);
+        assert!(
+            matches!(
+                decoy_scope.get(binder_locator.environment_index as usize),
+                Some(ContinuationValueSourceAuthority::Closed(sources))
+                    if sources.contains(binder_source) && !sources.contains(&relocated)
+            ),
+            "the decoy position must hold the OTHER binding and not the relocated one, or this \
+             discriminator cannot fail for the intended reason"
+        );
+        assert_eq!(
+            validate_continuation_source_slot(&plan, &relocated).unwrap_err(),
+            planner_error(
+                "continuation value disagrees with its exact producer-local source provenance"
+            )
+        );
+
+        // Discriminator 2 — the structural binding identity is re-derived, not
+        // carried. Keeping the locator exact and moving only the ordinal makes
+        // the coordinate name a binding the walk never places there.
+        let mut crossed_binding = effect_source.clone();
+        if let ContinuationSourceCoordinate::ProducerLocal { binding, .. } =
+            &mut crossed_binding.coordinate
+        {
+            binding.binding_ordinal = binding.binding_ordinal.wrapping_add(1);
+        }
+        assert_eq!(
+            validate_continuation_source_slot(&plan, &crossed_binding).unwrap_err(),
+            planner_error(
+                "continuation value disagrees with its exact producer-local source provenance"
+            )
+        );
+
+        // Discriminator 3 — the CONTRACT, not just the coordinate. Affinity is
+        // re-derived by `producer_local_source` from the binding's lifetime, so
+        // a projection arriving with a different one disagrees even though its
+        // coordinate is exact.
+        //
+        // ⛔ The corrupted affinity is deliberately kept NON-EMPTY. Clearing it
+        // was the first draft, and it passed against a coordinate-only
+        // comparison: the sibling `is_empty()` clause refused it, so the row
+        // named the whole-record comparison while measuring the emptiness
+        // guard. Measured, not reasoned — the mutation to a coordinate-only
+        // match survived until this became a different non-empty value.
+        let mut wrong_affinity = effect_source.clone();
+        assert!(
+            !wrong_affinity.referent_affinity.is_empty(),
+            "the fixture source must carry an affinity to corrupt, or this row is vacuous"
+        );
+        wrong_affinity
+            .referent_affinity
+            .push(wrong_affinity.referent_affinity[0]);
+        assert!(
+            !wrong_affinity.referent_affinity.is_empty()
+                && wrong_affinity.referent_affinity != effect_source.referent_affinity,
+            "the corrupted affinity must be non-empty AND different, or discriminator 3 measures \
+             the emptiness guard instead of the whole-record comparison"
+        );
+        assert_eq!(
+            validate_continuation_source_slot(&plan, &wrong_affinity).unwrap_err(),
+            planner_error(
+                "continuation value disagrees with its exact producer-local source provenance"
+            )
+        );
+
+        // Discriminator 4 — the locator's index is BOUNDED by the environment
+        // that scope actually has, and running off it refuses by its own
+        // message rather than folding into the disagreement above.
+        //
+        // ⚠ This is the one refusal the coordinate comparison cannot subsume.
+        // The locator lives *inside* the coordinate, so a wrong index is
+        // normally caught as a coordinate disagreement — an index past the end
+        // has no position to compare against at all, and reaches a different
+        // guard.
+        let mut past_end = effect_source.clone();
+        if let ContinuationSourceCoordinate::ProducerLocal { locator, .. } =
+            &mut past_end.coordinate
+        {
+            locator.environment_index = u32::MAX;
+        }
+        assert_eq!(
+            validate_continuation_source_slot(&plan, &past_end).unwrap_err(),
+            planner_error(
+                "a producer-local continuation value names an environment index past the end of \
+                 the environment in force at its own locator scope"
+            )
+        );
+    }
+
+    /// **`RT-CONTSRC-PRODUCER-LOCAL` `D3a` — the ABI provenance construction is
+    /// DOMAIN-PRESERVING, on the one input where a domain-total helper looks
+    /// identical.**
+    ///
+    /// ⭐ The whole ruling is about *one* case: the same owner id reached
+    /// through two different coordinate domains. Any helper — including the
+    /// domain-total `provenance_owner()` this replaced — agrees with this one
+    /// on every other input, so a row that varied the owner would pass against
+    /// the rejected design. This holds the owner FIXED and varies only the
+    /// domain.
+    ///
+    /// MEASURED: two coordinates carrying the identical `PredeclaredFunctionId`
+    /// in different domains produce provenance values that are not equal, and
+    /// each lands in its own arm. CLAIMED: an entry-ABI authority and a
+    /// producer-local authority in the same owner are distinguishable at this
+    /// plane. THE GAP: this is the constructor's law only; that the ABI
+    /// cross-check actually *uses* it is
+    /// `contspec_abi_refuses_owner_lifetime_and_affinity_disagreement`.
+    ///
+    /// **Promise class: durable invariant.**
+    #[test]
+    fn contsrc_d3a_abi_provenance_separates_the_domains_at_one_owner() {
+        let owner = PredeclaredFunctionId(11);
+        let entry = abi::AbiContinuationInputProvenance::of(
+            ContinuationSourceCoordinate::EntryAbi {
+                source_owner: owner,
+                source_abi_position: 0,
+                source: ContinuationInputSource::Parameter,
+            },
+        );
+        let local = abi::AbiContinuationInputProvenance::of(
+            ContinuationSourceCoordinate::ProducerLocal {
+                binding: ProducerLocalBinding {
+                    binding_owner: owner,
+                    binding_origin: StaticOriginId(4),
+                    binding_ordinal: 0,
+                },
+                locator: ProducerLocalLocator {
+                    environment_origin: StaticOriginId(4),
+                    environment_index: 0,
+                },
+            },
+        );
+        assert_eq!(
+            entry,
+            abi::AbiContinuationInputProvenance::EntryAbi {
+                source_owner: owner
+            }
+        );
+        assert_eq!(
+            local,
+            abi::AbiContinuationInputProvenance::ProducerLocal {
+                binding_owner: owner
+            }
+        );
+        // ⛔ The kill: a domain-total owner projection makes these equal.
+        assert_ne!(
+            entry, local,
+            "the same owner reached through two domains must not collapse to one provenance"
+        );
+    }
+
+    /// AC-2 omission matrix. Each row is compile-valid and produces one named
+    /// wrong answer: if that field is omitted, two distinct units conflate.
+    #[test]
+    fn contspec_each_projection_field_prevents_one_compile_valid_collision() {
+        let plan = contspec_plan();
+        let base_key = plan.continuation_specializations[0].key.clone();
+        let fields = [
+            ContinuationProjectionOmission::ProducerOwner,
+            ContinuationProjectionOmission::ConsumerOwner,
+            ContinuationProjectionOmission::SourceOwner,
+            ContinuationProjectionOmission::SourceAbiPosition,
+            ContinuationProjectionOmission::Source,
+            ContinuationProjectionOmission::Ordinal,
+            ContinuationProjectionOmission::Carrier,
+            ContinuationProjectionOmission::Ownership,
+            ContinuationProjectionOmission::StorageOwner,
+            ContinuationProjectionOmission::ReferentAffinity,
+            ContinuationProjectionOmission::OrdinaryAbiPosition,
+        ];
+        for field in fields {
+            let mut distinct = base_key.clone();
+            mutate_projection_field(&mut distinct.continuation_inputs[0], field);
+            assert_ne!(
+                base_key, distinct,
+                "AC-2 {field:?}: the exact key selected the wrong existing unit"
+            );
+
+            let mut interned = BTreeMap::new();
+            let mut units = Vec::new();
+            let (left, _) = intern_specialization(
+                &mut interned,
+                &mut units,
+                base_key.clone(),
+            )
+            .unwrap();
+            let (right, _) =
+                intern_specialization(&mut interned, &mut units, distinct).unwrap();
+            assert_ne!(
+                left, right,
+                "AC-2 {field:?}: two units differing only in this field conflated"
+            );
+
+            let mut mutated_interned = BTreeMap::new();
+            let mut mutated_units = Vec::new();
+            CONTINUATION_INTERN_MUTATION.with(|mutation| {
+                mutation.set(ContinuationInternMutation::OmitProjection(field))
+            });
+            let (wrong_left, _) = intern_specialization(
+                &mut mutated_interned,
+                &mut mutated_units,
+                base_key.clone(),
+            )
+            .unwrap();
+            let (wrong_right, _) = intern_specialization(
+                &mut mutated_interned,
+                &mut mutated_units,
+                {
+                    let mut key = base_key.clone();
+                    mutate_projection_field(&mut key.continuation_inputs[0], field);
+                    key
+                },
+            )
+            .unwrap();
+            CONTINUATION_INTERN_MUTATION
+                .with(|mutation| mutation.set(ContinuationInternMutation::Exact));
+            assert_eq!(
+                wrong_left, wrong_right,
+                "AC-2 {field:?}: omission did not produce the named wrong-unit conflation"
+            );
+        }
+    }
+
+    /// AC-3 prefix collision. The prefix is deliberately equal while the exact
+    /// worker/result tail differs; full-key interning must select two targets.
+    #[test]
+    fn contspec_prefix_only_interning_would_select_the_wrong_target() {
+        let plan = contspec_plan();
+        let left = plan.continuation_specializations[0].key.clone();
+        let mut right = left.clone();
+        right.worker.body_origin = StaticOriginId(u32::MAX);
+        let prefix = |key: &ContinuationSpecializationKey| {
+            (
+                key.producer_owner,
+                key.consumer_owner,
+                key.continuation_origin,
+            )
+        };
+        assert_eq!(prefix(&left), prefix(&right), "fixture has no prefix collision");
+        assert_ne!(left, right, "fixture has no exact-key discriminator");
+        let mut interned = BTreeMap::new();
+        let mut units = Vec::new();
+        let (left_id, _) =
+            intern_specialization(&mut interned, &mut units, left.clone()).unwrap();
+        let (right_id, _) =
+            intern_specialization(&mut interned, &mut units, right.clone()).unwrap();
+        assert_ne!(
+            left_id, right_id,
+            "AC-3: prefix-only equality conflated two exact worker targets"
+        );
+
+        let mut wrong_interned = BTreeMap::new();
+        let mut wrong_units = Vec::new();
+        CONTINUATION_INTERN_MUTATION
+            .with(|mutation| mutation.set(ContinuationInternMutation::PrefixOnly));
+        let (wrong_left, _) =
+            intern_specialization(&mut wrong_interned, &mut wrong_units, left).unwrap();
+        let (wrong_right, _) =
+            intern_specialization(&mut wrong_interned, &mut wrong_units, right).unwrap();
+        CONTINUATION_INTERN_MUTATION
+            .with(|mutation| mutation.set(ContinuationInternMutation::Exact));
+        assert_eq!(
+            wrong_left, wrong_right,
+            "AC-3: prefix mutation did not select the named wrong existing target"
+        );
+    }
+
+    /// AC-4 assigned-key mutation. The mutation is compile-valid and changes
+    /// the edge's selected alternative; exact re-derivation must reject it.
+    #[test]
+    fn contspec_assigned_key_mutation_plans_an_edge_to_the_wrong_alternative() {
+        let mut plan = contspec_plan();
+        let assigned = &mut plan.continuation_specializations[0].key;
+        assigned.producer_alternative = assigned.producer_alternative.max(1);
+        assert_eq!(
+            plan.validate().unwrap_err(),
+            planner_error("continuation specialization plan is not the exact closed derivation")
+        );
+    }
+
+    /// AC-5. The normal nested inner-to-outer population terminates with two
+    /// keys. Returning the active item to the frontier without first interning
+    /// it destroys the finite unseen-key measure and reaches the exact bound.
+    #[test]
+    fn contspec_nested_fixed_point_requires_interning_before_discovery() {
+        let normal = contspec_plan();
+        assert_eq!(normal.continuation_specializations.len(), 2);
+
+        let expr = contspec_nested_fixture();
+        WEAKEN_CONTINUATION_DECREASING_MEASURE.with(|mutation| mutation.set(true));
+        let weakened = plan_static_transition_graph(&expr, &BTreeMap::new());
+        WEAKEN_CONTINUATION_DECREASING_MEASURE.with(|mutation| mutation.set(false));
+        let error = match weakened {
+            Ok(_) => panic!("AC-5: weakened measure unexpectedly terminated"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error,
+            planner_error("continuation specialization fixed point did not terminate")
+        );
+    }
+
+    /// D5 planned-edge closure is independently load-bearing: losing a call or
+    /// redirecting its target cannot be hidden by a still-complete unit vector.
+    #[test]
+    fn contspec_planned_edge_closure_rejects_omission_and_redirection() {
+        let plan = contspec_plan();
+        let mut omitted = plan.clone();
+        omitted.continuation_specialization_calls.pop();
+        assert_eq!(
+            omitted.validate().unwrap_err(),
+            planner_error("continuation specialization plan is not the exact closed derivation")
+        );
+
+        let mut redirected = plan;
+        let current = redirected.continuation_specialization_calls[0]
+            .token
+            .target
+            .0;
+        redirected.continuation_specialization_calls[0].token.target =
+            ContinuationSpecializationId(1 - current);
+        assert_eq!(
+            validate_continuation_specialization_closure(
+                &redirected
+                    .continuation_specializations
+                    .iter()
+                    .map(|unit| (unit.key.clone(), unit.id))
+                    .collect(),
+                &redirected.continuation_specializations,
+                &redirected.continuation_specialization_calls,
+            )
+            .unwrap_err(),
+            planner_error("continuation edge token disagrees with its exact target")
+        );
+    }
+}
