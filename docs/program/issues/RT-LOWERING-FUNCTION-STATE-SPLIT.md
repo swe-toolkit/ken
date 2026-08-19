@@ -1,7 +1,7 @@
 ---
 id: RT-LOWERING-FUNCTION-STATE-SPLIT
 title: "Move function-local lowering state out of lowering/mod.rs and lowering/core.rs into its own child -- the first lowering domain, and the point where the phase crosses from the planner files into the lowering files"
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,49 @@ blocks: [RT-LOWERING-VALUES-BOUNDARY-SPLIT]
 github: null
 origin: "Architect ruling evt_54zvaqbrm752x (2026-08-10) decomposing RT-BACKEND-MODULE-SPLIT into independently mergeable slices, cut item 10; boundary and companion-test-axis ruling evt_6r403ez3m2m69 (2026-08-18). Framed by the Steward on the operator's 2026-08-18 directive making RT-BACKEND-MODULE-SPLIT the runtime lane's priority. Binding inputs are the five Stage A inventories from RT-BACKEND-SPLIT-CENSUS (merged 8ebc2467d). Steward-filed per COORDINATION section 2."
 ---
+
+# ARCHITECT DETERMINATION (dec_zkv16ra4nh9j, evt_2f3tkq8hgqa4a) — hub-retained, no material move. NODE CLOSED.
+
+**Ruled 2026-08-19. This node is a determination, not a mover. There is no
+`D1`/`D2` production move. `status: closed`.** The `D0` re-cut ledger below
+(re-measured at `2be7f513c`, commit `85621309a`, Architect-confirmed SOUND) is
+the durable per-type SCC-pinning inventory; it is carried forward as the
+starting inventory for items 11-17's own `D0`s.
+
+**THE RULING (the Architect's third path, rejecting both the ledger's offered
+paths):** function-state IS the retained hub — the lowering-side
+`StaticTransitionPlan`. `Lowering<'a>` and every frame/eliminator/scope type the
+indivisible SCC consumes RETAIN at their LCA (`lowering/mod.rs`); the SCC stays
+whole in `core.rs`, honored not relitigated. The size reduction of
+`mod.rs`/`core.rs` comes from the DOMAIN METHOD-FAMILY slices (items 11-17:
+values-boundary, source-machine, calls, joins/traps, aggregates, effects), whose
+impl blocks move to descendant children reading the retained hub with zero
+widening — the exact `construction.rs`/`closure.rs` shape from
+`RT-PLANNER-ROOT-CLOSURE-SPLIT`.
+
+- **`AC-4b` is INAPPLICABLE** (not satisfied), the same disposition
+  `RT-PLANNER-ROOT-CLOSURE-SPLIT` used for its own no-move outcome.
+- **Path 1 rejected** (trivial 55-line `AmbientBodyAuthority` move):
+  non-material, line-count-driven, and it would pre-claim the permanent
+  `function_state` module name for a sliver — the frame bans naming a module
+  after a thin campaign node.
+- **Path 2's framing rejected** (force an SCC-accessor-boundary representation
+  change so function-state gets its own module): architecturally unsound and
+  contradicts the item-9b precedent this node's own reasoning rests on — the hub
+  stays at its LCA, domain method families move to descendants, not the reverse.
+  You do not rewrite the SCC's dozens of direct field/variant accesses through
+  accessors purely to relocate a 49-field struct; the struct is cheap at the
+  LCA, the mass is in the methods.
+
+**DOWNSTREAM FLAG (Steward/operator to track, NOT reopened here):**
+`lowering/mod.rs` (21,200) is decomposable this way — its four non-SCC domain
+impl blocks (`@:4815/:6500/:13631/:16777`) are the movable mass. But
+`lowering/core.rs` (20,413) is dominated by the ~17k-line immovable SCC
+(`:3090-20330`); **its own path under 10k is a separate question the domain
+slices cannot solve while the SCC ruling stands.** Flagged so it is not
+discovered late. Whether to pursue a representation change to the indivisible
+SCC (vs. accepting `core.rs` stays over 10k) is the operator's call, framed from
+this ruling — not decided here.
 
 ## Model-capability estimate (steward.md §4h): T2 — mechanical
 
@@ -350,4 +393,211 @@ open the phase record to learn them.
 >   and consumers must be proven first.
 > - **The source machine is relocation only in this phase**, never a transition
 >   IR. Generated traps receive **no fabricated source origin**.
+
+## D0 ledger, re-measured at `2be7f513c` (RE-CUT — supersedes `60ae7cb8f`)
+
+**This re-cut responds to Architect CHANGES REQUESTED (`dec_1xqze0vcr7rdg`,
+`evt_1an5avts6vm91`) on the withdrawn D0 `60ae7cb8f`.** That candidate's
+"zero widening required" claim was false: it proposed relocating the moving
+population to a NEW SIBLING of `core` (`lowering::function_state`), which
+severs `core.rs`'s existing ancestor-private access to items declared in
+`lowering` (mod.rs) — `core` reaches them today only because it is a
+**descendant** of `lowering`, not because of anything about siblinghood. A
+sibling module gets no such privilege. This re-cut re-derives the boundary
+per-type, by direct SCC-consumption grep rather than by textual adjacency
+to the struct, exactly as directed.
+
+Bound files unchanged: `lowering/mod.rs` **21200** lines, `lowering/core.rs`
+**20413** lines at `2be7f513c`.
+
+### The corrected mechanism (why the withdrawn D0 was wrong)
+
+`pub(super)` on an item declared *inside* `core` already means `pub(in
+lowering)` — moving such an item to a **different child of `lowering`**
+(a new sibling of `core`) changes nothing about what it means, since the
+new host's own `super` is still `lowering`. That relocation is genuinely
+zero-widening. But a **bare-private** item declared *at* `lowering` (i.e.
+in `mod.rs` itself, or in `core.rs` with no `pub` qualifier at all) is
+visible today to `lowering` and every one of its descendants **only
+because it is declared there** — relocating it to a *different* descendant
+of `lowering` requires adding a `pub(in lowering)`-equivalent qualifier to
+restore the reach it already had, and the Architect's ruling is explicit
+that doing so **to make a move compile** is the banned widening, full stop,
+regardless of whether the net reachable audience is unchanged in the
+abstract. This re-cut applies that literally: a type moves only if its
+**existing** consumers already reach it through a channel unaffected by
+which sibling of `lowering` hosts it (a `pub(super)`-qualified associated
+function call) or have **no** existing consumers requiring private access
+at all.
+
+### Per-type SCC-consumption and test-tree-consumption census (the corrected
+### method)
+
+`core.rs`'s indivisible SCC is `compile_expr_into_module` (`:2040-3089`)
+plus `impl<'a> Lowering<'a>` (`:3090-20330`) — the module doc's own "29-method
+SCC plus `compile_expr_into_module`." Both spans were extracted and grepped
+per candidate type (not sampled). **A second, equally binding population
+was checked this time and was missing from the withdrawn D0: `lowering/core/
+tests/{control.rs,constructors.rs,mod.rs,effects.rs}`** — these are
+descendants of `core`, not of any prospective new sibling, and several
+construct the moving population via bare struct literals (private-field
+access), which is `D2`'s population to relocate, not this `D0`'s, and `D2`
+has not run.
+
+**Pinned by the indivisible SCC's own production code (direct private
+field/variant/method access, confirmed by grep — cannot move under any
+sequencing without reopening the SCC ruling):**
+
+`Lowering<'a>` itself (49 fields, dozens of direct field reads:
+`self.function_local` 25x, `self.process_symbols` 52x,
+`self.static_transition_plan` 23x, `self.defining_emission_owner` 15x,
+`self.consumed_subcontinuation_frames` 14x, `self.defining_function_id`
+12x, more); `FunctionLocalRefs` (**correction to the withdrawn D0**: a
+naive name-grep found 0 textual mentions of the type name in the SCC and
+was read as "unconsumed" — wrong, because the SCC reaches its fields
+through `self.function_local.<field>` without ever naming the type; 25+
+such field accesses confirmed: `.worker_calls`, `.raw_worker_calls`,
+`.defining_abi_operands`, `.unit_calls`, `.declaration_calls`, more);
+`TrapExitAuthority` (`FunctionLocalRefs`'s own `trap_exit` field type — no
+field access to `trap_exit` specifically found in the SCC body, but it
+travels with `FunctionLocalRefs`, which is itself pinned, so splitting it
+out alone buys nothing); `EliminatorFrame` (97 real hits — variant
+construction/destructuring); `EliminatorRole` (8 hits); `ActiveContinuationFrame`
+(11); `ComputationalEliminatorFrame` (9); `OrdinaryEliminatorFrame` (4);
+`PendingLetContinuationFrame` (1, struct-literal construction);
+`InvocationTemplateRef` (4, variant construction/destructuring);
+`CheckedRecursiveInvocationInstance` (2, struct-literal destructuring);
+`OwnedSelectedScope` (3, struct-literal construction); `CarriedInvocationCoordinates`
+(4 hits, including calls to its own `fn of` — a **private**, not `pub`,
+inherent method at `mod.rs:14596`, so the SCC needs ancestor privilege to
+call it at all); `CheckedFrameBranchScope` (`core.rs`-bare-private, 8 real
+hits, genuinely core-internal).
+
+**Pinned by coupling to one of the above (not itself SCC-consumed, but
+depends on a type that is, or is depended on by one):**
+
+`ConsumedSubcontinuationFrame` (`core.rs:1681`, a bare-private tuple-type
+alias) is `CheckedFrameBranchScope`'s own field type (`baseline`/`union:
+BTreeSet<ConsumedSubcontinuationFrame>`) — since `CheckedFrameBranchScope`
+is SCC-pinned and cannot change its own qualifier, the alias its fields
+depend on must stay reachable from `core.rs`, i.e. it stays too.
+`CheckedFrameFunctionScope` (`core.rs:1906`, `pub(super)`) is **not**
+SCC-consumed directly (its only real callers are `units.rs:2366/2520/2741/
+2960/3379/3576/5878/6251` — an *existing sibling* of `core`, reached via its
+already-adequate `pub(super)` qualifier) — but its own field
+(`enclosing_consumed: BTreeSet<ConsumedSubcontinuationFrame>`) depends on
+the now-pinned alias above. Moving `CheckedFrameFunctionScope` alone would
+leave it unable to name its own field's type from a different module, so
+it stays too, co-located with `ConsumedSubcontinuationFrame`.
+
+**Pinned by not-yet-relocated test-tree construction (`D2`'s population, not
+yet moved — a second binding constraint the withdrawn D0 never checked):**
+
+`RecursorFrameProvenance`, `RecursorInvocationSegment`, `RecursorUnwindStack`,
+`ComputationalRecursorLayer` — the Architect's own four named candidates for
+the SCC-independent residual, and **correctly zero-hit in the SCC body
+itself** — but all four are constructed via bare struct literals from
+`lowering/core/tests/{control.rs,constructors.rs,mod.rs}` (`core/tests/mod.rs`
+itself references `RecursorInvocationSegment`, meaning these are **shared
+fixtures threaded through the test tree**, not one narrow test family — e.g.
+`control.rs:641/795/1134/2296/6808/11091/11126`, `constructors.rs:4243-4262`).
+Those test files are descendants of `core`, not of any prospective new
+sibling module, so relocating the production types now — ahead of their own
+`D2` — breaks `core/tests/*` compilation immediately, before `D2` ever runs.
+An atomic `D1`+`D2` pair could in principle rescue this family, but the
+population is woven through shared fixtures across the whole test tree
+(`control.rs` alone is 33,969 lines), not a narrow, cleanly severable slice —
+combining them now would mean exactly the kind of pre-emptive, broad
+`control.rs` test relocation the Architect's standing ruling
+(`evt_6r403ez3m2m69`) forbids doing ahead of a settled production boundary.
+Not pursued as an atomic pair in this `D0`.
+
+**The one type confirmed genuinely free to move, zero widening, no
+atomic pairing needed:**
+
+`AmbientBodyAuthority` (`core.rs:1822`, `pub(super)`) plus its own `bind`/
+`release` methods (`core.rs:1827-1877`). Grep-confirmed: **zero** struct-literal
+construction anywhere in the tree outside its own `impl` block (its private
+fields `enclosing_owner`/`enclosing_unit` are touched only by `bind`/
+`release` themselves); **zero** occurrences in `core/tests/*`; its only
+external callers (`units.rs:2372/2793/3511/5823` and `core.rs:5982/10426/
+12052/12198`, the latter *inside* the SCC) all go through the already-`pub(super)`
+`AmbientBodyAuthority::bind` call, which needs no ancestor privilege — only
+visibility to *name* the type and call its associated function, which
+`pub(super)` already grants from any sibling of `core`, unchanged by
+relocation.
+
+### Population reconciliation
+
+23 originally-proposed types: 15 pinned by direct SCC production
+consumption, 2 pinned by coupling, 4 pinned by not-yet-relocated test-tree
+consumption, 1 (`AmbientBodyAuthority`) confirmed free. 9 originally-proposed
+methods: `Lowering::new`/`FunctionLocalRefs::bind_unit_trap_frame`/
+`CheckedFrameFunctionScope::open`/`close`/`CheckedFrameBranchScope::capture`/
+`start_successor`/`merge_successor`/`finish`/`harness` are all pinned
+(bound to a pinned type); `AmbientBodyAuthority::bind`/`release` (2) are
+free.
+
+### THE OUTCOME DETERMINATION, STATED EXPLICITLY
+
+> RESOLVED by the Architect (dec_zkv16ra4nh9j) — see the ARCHITECT
+> DETERMINATION banner at the top of this frame. The outcome-3 finding below is
+> CONFIRMED, but the two paths this ledger offered were BOTH rejected in favour
+> of a third: hub-retained / no material move. The text below is the ledger's
+> original reasoning, preserved as evidence; the disposition is the banner's.
+
+**The SCC-independent residual is one type and two methods
+(`AmbientBodyAuthority` + `bind`/`release`, roughly 55 lines).** That is
+**not** "a coherent child that materially reduces `mod.rs`" — extracting 55
+lines from a 21,200-line file changes nothing material, and the frame's own
+guardrails forbid exactly this shape of move ("no line-count-driven
+extraction... the constraint is architectural soundness... not equal-sized
+files"; a module created to hold one small type is tidiness, not a
+lifecycle boundary). Every other candidate is pinned either by the
+indivisible SCC's own direct field/variant/private-method access (permanent,
+short of reopening the SCC ruling — out of scope) or by construction sites
+in `core/tests/*` that have not yet relocated (a `D2` dependency this `D0`
+cannot discharge without pre-empting the Architect's own `evt_6r403ez3m2m69`
+ruling against broad, ahead-of-boundary `control.rs` decomposition).
+
+**This is `OUTCOME 3`, not `OUTCOME 2`.** Creating a genuine, materially-sized
+function-state child module — one that actually holds `Lowering` and the
+frame/eliminator/scope vocabulary named as this owner in the kickoff — would
+require converting the indivisible SCC's *direct* private field and variant
+access into a *deliberate accessor boundary* (methods the SCC calls instead
+of touching fields/variants directly). That is a representation change: it
+alters how the SCC's own code is written, not merely where a declaration
+lives, and it is out of scope for a behaviour-preserving "pure move" `D1`.
+Per the frame's own hard-stop instruction, this is exactly the boundary the
+`D0` cannot settle by the frozen predicate.
+
+**HARD-STOP.** Routing back for a ruling on which of two paths this node
+takes:
+1. Accept the residual as-is: a trivial `D1` moving only `AmbientBodyAuthority`
+   (+ `bind`/`release`) into a new child, explicitly documented as **not**
+   materially advancing the file-size constraint, with the true function-state
+   population (the struct, the frame/eliminator/scope core) remaining
+   permanently resident in `mod.rs`/`core.rs` pending a future
+   representation-change node; or
+2. Defer item 10's production move entirely and frame the representation
+   change (SCC accessor boundary) as its own node, with this `D0`'s per-type
+   census carried forward as its starting inventory — item 10 would then
+   close on the census alone, or wait on that node.
+
+Not authorized to choose between these unilaterally — a strategic choice
+between materially different futures, per COORDINATION §6.
+
+### Corrections carried from the withdrawn D0
+
+The two open questions it flagged (`GeneratedContextCaptures`, the
+environment-construction helper cluster `env_with`/`bound_values`/
+`specialized_bindings_at`/`extend_specialized`/`extend_captures`) are now
+moot under either outcome above — neither is part of the tiny confirmed-free
+residual, and both would need the same per-type SCC/test-tree consumption
+check if outcome 1 or a future node revisits them. `include_str!` = 0 both
+files, unchanged. Test-property ledger: still deferred to `D2`, unchanged;
+the `FrameScopeHarnessWitness`/`FrameScopeHarnessMutation` harness pair
+(`core.rs:2022-2037`) is itself part of `CheckedFrameBranchScope`'s own
+harness and is therefore now also pinned, not free — correcting the
+withdrawn D0's listing of it as moving.
 
