@@ -662,3 +662,66 @@ land in the **1000-1300 line range**, well under the 10k ceiling. `AC-4b`
 applies and is not a blocking concern at this scale; the exact count is
 `D1`'s to report.
 
+## D2: no movable tests
+
+Re-verified by name at `34c0ef97a` (`D1` merged) — not copied forward from
+`D0`'s numbers at `0f96b5b99`. `D1` moved production code and the `control.rs`
+structural census only; it never touched a test body, so this re-scan is a
+genuine independent measurement, not an inherited assumption.
+
+**`static_transition.rs`'s own `mod tests` (now starting at line 5158, shifted
+by `D1`'s move): still zero tests with Effects as their primary discriminated
+property.** A fresh by-name scan for every Effects-domain symbol
+(`PlannedEffectSeat`, `EffectSeat*`, `host_effect_*`,
+`CRANELIFT_HOST_EFFECT_CONSUMERS_V1`) inside the test module returns the same
+3 hits `D0` found, at the same relative offsets — `ken_host::HostOpV1::
+BufferAllocate`/`::BufferFreeze` used as fixture content inside
+`d2h_ac2_the_three_expressible_refusals_mint_nothing` and
+`substrate_case_emission_open_ingress_prunes_nothing`, both
+case-emission/substrate-domain tests that use an `Effect`-shaped occurrence as
+example data. Neither asserts anything about seat derivation, contract
+lookup, or seat-plan validation. **Nothing to move here; unchanged from `D0`.**
+
+**`control.rs` (32,851 lines at `34c0ef97a`): the same three-way finding
+holds, re-verified fresh.** A full `Effect` keyword census now returns 32
+hits (up from `D0`'s 27) — the +5 delta is fully attributable to `D1`'s own
+three census-comment additions naming the emitter-owned family
+(`EffectSeatGroupId`/`EffectSeatLedger`/`EffectSeatClosure`/
+`EffectSeatVisitMutation`/`EffectSeatDispatchMutation`, at
+`control.rs:7776-7777` and `:8365-8367`), not to any new or changed test.
+Closing the same three buckets `D0` established:
+
+- **`erasing_a_seat_key_axis_or_collapsing_the_contract_rejects`**
+  (`control.rs:18097`, byte-identical to `D0`'s reading) is the one true
+  positive by symbol for this slice's own domain
+  (`EffectSeatPlanMutation`/`set_effect_seat_plan_mutation`, which exercise
+  `build_host_effect_seat_plan`'s rebuild-equality validation — now living in
+  `effects.rs` after `D1`, reached transparently through the unchanged
+  `planning.rs`/`static_transition.rs` re-export chain the test's own `use
+  crate::cranelift_backend::planning::{...}` already goes through).
+  **Why it stays, not just that it does:** the test compiles a WHOLE process
+  via `recursive_port_process_compiles`, crossing planning through execution
+  over the shared `governed_nested_resource_bracket` fixture — it is a
+  Class-4 end-to-end control in `AC-2`'s four-way partition (domain tests,
+  shared fixtures, mutation controls at their production injection point, and
+  end-to-end controls crossing planning through execution), and Class 4
+  "legitimately REMAINS in the residual integration module" by the frame's
+  own words. Moving it into `effects.rs`'s own test module would sever it
+  from the very thing that makes it a *behavioral* control rather than a unit
+  check on `build_host_effect_seat_plan` alone: its assertions read the
+  compiled process's refusal message, not `effects.rs`'s internal state
+  directly, and its shared fixture is deliberately resident at the LCA of the
+  planning and emission controls rather than owned by either.
+- **`an_incomplete_duplicate_discarded_or_misobserved_visit_rejects`**
+  (`control.rs:18166`) and **`a_discarded_visit_refuses_before_its_body_is_
+  defined`** (`control.rs:18237`) both use
+  `EffectSeatVisitMutation`/`set_effect_seat_visit_mutation` —
+  **lowering-owned symbols** (`lowering/mod.rs`, item 16's emitter-side
+  territory), confirmed unchanged from `D0`. Not this slice's domain.
+
+**Conclusion: `D2` moves zero tests from either `static_transition.rs` or
+`control.rs`.** This is the recorded closure of the finding `D0` stated and
+the Architect's `D1` vote asked to have written down rather than left to read
+as an unexamined gap. No code changes; this docs-only commit is item 8's
+final deliverable.
+
