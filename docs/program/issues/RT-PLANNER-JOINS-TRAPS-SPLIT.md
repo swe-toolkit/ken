@@ -449,7 +449,7 @@ campaign:**
   because it is the first time this campaign moves a `Planner`-impl fragment
   rather than a `StaticTransitionPlan`-impl fragment or a free function.
 
-**`StaticTransitionPlan` methods (6):**
+**`StaticTransitionPlan` methods (7):**
 
 | method | lines | vis | consumed at |
 |---|---|---|---|
