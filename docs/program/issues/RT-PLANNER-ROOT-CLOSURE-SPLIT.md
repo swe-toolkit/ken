@@ -362,3 +362,272 @@ open the phase record to learn them.
 > - **The source machine is relocation only in this phase**, never a transition
 >   IR. Generated traps receive **no fabricated source origin**.
 
+## D0 ledger, re-measured at 460141f5f
+
+**SHA measured:** `460141f5f`. `git rev-parse HEAD` confirmed at pickup.
+**File measured:** `cranelift_backend/planning/static_transition.rs`, **11630
+lines** total -- over the 10k ceiling. **Outcome 1 (already under 10k) is OFF**,
+matching the frame's own statement of that fact at item 9's merge.
+
+**Region split** (the boundary that shapes this whole ledger): `mod tests {`
+opens at line **4465** and runs to EOF. So the file is **4464 lines of
+production/root code** followed by **7166 lines of `mod tests`** -- the test
+region is now 1.6x the production region.
+
+### THE DETERMINATION: OUTCOME 2, with a required internal sub-split
+
+**A cohesive graph construction/validation/closure lifecycle is visible in the
+residue**, and it is not a vocabulary drawer -- it is exactly the frozen stage
+predicate's own words, applied to the two types the predicate is *about*:
+
+> "The planner owns plan identities, minting, relation and seat construction,
+> validation and closure, and read-only projections."
+
+That sentence has two verbs-worth of a lifecycle, both still resident here:
+- **"minting, relation and seat construction"** -- `Planner<'src>`'s own impl:
+  the raw graph-construction machine (node/edge/store allocation, the
+  recursive `plan_expr` descent, declaration-call-target resolution).
+- **"validation and closure, and read-only projections"** -- most of
+  `StaticTransitionPlan<'src>`'s own impl: `validate`, `validate_source_
+  return_topology`, `census`, `semantic_census`, and the case-emission /
+  case-producer / static-worker-member / substrate-preallocation validators
+  that back `validate`.
+
+**Why not outcome 1:** stated above -- 11630 > 10000.
+
+**Why not outcome 3 (a representation change):** every cross-sibling consumer
+of a residue symbol already reaches it through the *identical* visibility
+mechanism items 4-9 used throughout -- `pub(in
+crate::cranelift_backend::planning::static_transition)` for sibling reach,
+`pub(super)` for grandparent reach, and the "many `impl` blocks for one type
+across many files" pattern (item 4's `units.rs` precedent, already extended
+to `Planner` itself in item 9's `intern_trap`). Moving `Planner`'s and
+`StaticTransitionPlan`'s impls into new child modules changes **which file**
+grants that visibility, not **whether** it can be granted without new nested
+storage or a new accessor. No field needs to move behind a new accessor
+boundary; no storage needs to be renested. **This is an ordinary move**, not a
+representation change.
+
+**But a single combined child would itself violate the ceiling this campaign
+exists to enforce**, so the move is not a flat "one new file" the way items
+4-8 were. Rough accounting: `Planner`'s impl (974 production lines) +
+`StaticTransitionPlan`'s validate/closure-side methods (roughly 1000 of its
+1557 impl lines, see the method-level split below) + their owned types and
+free functions (roughly 700-900 more production lines) is already
+**~3000-3200 production lines** before a single companion test moves: 60
+`#[test]` fns plus roughly 79 non-test helper/fixture fns spanning most of
+the 7166-line `mod tests` region would push either a combined child, or even
+one badly-drawn half of a two-way split, well past 10k on its own. **This
+requires the item-6 sub-split precedent (`continuations.rs` +
+`continuations/fusion.rs`) applied here**, not a flat move.
+
+**Proposed boundary — split along the predicate's own two clauses, not by
+line count:**
+
+- **`construction.rs`** — "minting, relation and seat construction." Owns:
+  `Planner<'src>` (struct + its full 974-line impl, lines 1576-2549:
+  `new`, `source`, `push_node`, `control_node`, `expression_node`,
+  `expression_seed`, `connect_declaration_calls`, `declaration_call_target`,
+  `edge`, `store`, `frame`, `plan_sequence`, `plan_cases`,
+  `register_static_body`, `plan_expr`); the `StaticTransitionPlan` methods
+  that are Planner's own registration write-path, confirmed by call site
+  (not by guess) -- `register_scheduling_entry` (called from `plan_static_
+  transition_graph_with_symbols` at line 4250/4258, and self-called from
+  `record_planned_entry_body`), `record_planned_entry_body` (called from
+  `Planner::plan_expr` at line 2080), `planned_entry_body` (the paired read
+  accessor); `runtime_expr_tag` (called only from `plan_expr`, line 2095);
+  `D4DeclarationTargetMutation` and its thread_local (the
+  `connect_declaration_calls` mutation cell).
+- **`closure.rs`** — "validation and closure, and read-only projections."
+  Owns: the rest of `StaticTransitionPlan`'s big impl -- `helper_key_for_
+  activation` (called from inside `validate` at line 3693, not from
+  construction), `validate` (3547-3796), `validate_source_return_topology`,
+  `activation_successor`, `require_only_outgoing_edge`, `require_only_
+  incoming_edge`, `census`, `semantic_census`, plus the second, small `impl
+  StaticTransitionPlan` block at 2551-2588 (`process_parameter_slot`, a
+  read-only ABI projection); the case-producer-authority / case-emission
+  family in full -- confirmed by internal call site, not by external-consumer
+  count alone: `derive_case_producer_fact` and `build_case_emission_plan` are
+  both called from inside `Planner::finish` (line 2453) and from `validate`
+  (line 3778/2666), so despite `aggregates.rs`/`continuations.rs` also
+  calling `derive_case_producer_fact` externally, its primary role is
+  closure-lifecycle-internal -- `CaseProducerSet`, `CaseProducerFlowKind`,
+  `CaseProducerFlowEdge`, `CaseProducerAuthority`, `CaseProducerFact`+impl,
+  `CaseEmissionStatus`, `PlannedCaseEmission`, `validate_case_emission_plan`,
+  `D4bVerdict`, `d4b_arm_admission`/`d4b_take_admission`; the static-worker-
+  member mutation family (`StaticWorkerMemberMutation`, `with_static_worker_
+  member_mutation`, `apply_static_worker_member_mutation`, `validate_static_
+  worker_member_population` -- called from `finish` at 2545 and `validate` at
+  3562); `validate_substrate_preallocation_closure` (called from `finish` at
+  2457 and `validate` at 3782); the boundary/scale census types
+  (`BoundaryACensus`, `ScaleBPlanCensus`, `BoundaryB1Census`) that `census`/
+  `semantic_census` return; `PlannedResultFieldKindForTest` (paired with the
+  `#[cfg(test)]` `planned_result_field_kinds_for_test` method).
+- **EXPLICITLY RETAINED at the root (`static_transition.rs` itself), neither
+  child** -- confirmed by a zero- or symmetric-internal-caller check, not by
+  the earlier census's external-consumer count alone:
+  - `plan_static_transition_graph` / `plan_static_transition_graph_with_
+    symbols` (4210-4294) -- the two top-level entry points. This is the root
+    orchestration function class the frame anticipates staying: it sequences
+    `Planner::new` -> the construction child -> `.finish()` -> the closure
+    child, and owns none of either child's internals. After this move
+    `static_transition.rs` becomes a thin orchestrator over **nine**
+    children (the 8 existing plus these two new ones), the same shape it
+    already has one level up (`planning.rs` orchestrating
+    `static_transition.rs`).
+  - `planner_error` / `planner_capacity_error` (804, 808) -- universal error
+    constructors with an internal caller count in the hundreds across *every
+    one of the 8 sibling domains*; moving them into either new child would
+    just relocate the same wide fan-out problem, not solve it.
+  - `PlannedReferentLifetime` (the enum) and its sole constructor
+    `runtime_value_lifetime` (1155) -- **zero internal caller** in
+    `static_transition.rs` itself (checked: neither `Planner`'s nor
+    `StaticTransitionPlan`'s methods call it); its only call sites are
+    `occurrences.rs` (the constructor) and `aggregates.rs`/`continuations.rs`/
+    `lowering/mod.rs`/the grandparent `planning.rs` (the type, read across
+    the planner/emitter boundary itself). This is cross-cutting shared
+    vocabulary, not lifecycle-owned.
+  - `dense_slice` (521) -- zero internal caller; consumed only by
+    `continuations.rs` and `continuations/fusion.rs`.
+  - `synthesized_seat_emission_owners` (1216) -- zero internal caller;
+    consumed only by `aggregates.rs`.
+  - `AC4_RESOLUTIONS` / `AC4_ROUTE_INVOCATIONS` thread_locals plus `ac4_open_
+    route_window` / `ac4_note_route_invocation` / `ac4_route_counts`
+    (2614-2644) -- written from `occurrences.rs`'s `source_occurrence`
+    (confirmed: that function is not defined in this file at all), read by
+    the grandparent `planning.rs` and `lowering/core.rs`. Cross-cutting
+    instrumentation that happens to be textually declared here; not
+    construction- or closure-owned.
+  - `governed_nested_resource_bracket` (4325) and the shared `trap()` fixture
+    inside `mod tests` -- already-established shared cross-domain fixtures
+    per item 8's own D0 negative-finding pattern; same treatment here.
+  - `D2jCause` and its 3 external consumers (`planning.rs`,
+    `lowering/core/tests/control.rs`, `continuations/fusion.rs`), and the
+    `contspec_nested_fixture` re-export -- pre-existing shared fixtures,
+    re-exported out of `mod tests` at lines 4455/4460; untouched by this
+    node regardless of outcome.
+  - `MAX_HELPERS_PER_STATIC_SOURCE` (139) -- used only inside `validate`
+    (closure-side) and inside `mod tests`; **this one should actually travel
+    with `closure.rs`**, not stay at root -- flagging the correction here
+    rather than silently fixing the classification above, since D0's job is
+    to expose exactly this kind of reclassification for D1 to execute
+    against, not to have gotten every item right on the first pass.
+
+**Graph-primitive types** (`StaticNodeId`, `StaticEdgeId`, `StaticSourceId`,
+`PersistentNodeId`, `TransitionKind`, `EdgeKind`, `StoreKind`,
+`PlannedHelperKey`, `DynamicActivationFrame`, `PersistentStoreNode`,
+`StaticNode`, `StaticEdge`, `EdgeEvidence`, `PlanContext`, `PlannedExpr`,
+`PlannedEntryBody`) are minted by `Planner` and read by `StaticTransitionPlan`
+alike -- **their exact per-child assignment is D1's job**, resolved the same
+way every ambiguous item above was resolved (by which side's methods
+primarily construct vs. primarily read them), not asserted here.
+
+### AC-1 -- closed math, by item class
+
+| class | production region | `mod tests` region | notes |
+|---|---|---|---|
+| `mod` declarations | 8 (existing children) + 0 new yet | `mod tests` (1) | D1 adds 2: `mod construction;`, `mod closure;` |
+| re-exports (`use`/`pub(...) use`) | ~30 lines (18-137), all import FROM the 8 children back into root scope | 2 re-exports OUT of `mod tests` (`D2jCause` family, `contspec_nested_fixture`) | closed by direct read of the import block, not sampled |
+| types (struct/enum) | **32** declared directly in this file (2 are function-local to `governed_nested_resource_bracket` and excluded as non-items) | **5** module-level (2 more are function-local `Restore` RAII guards, excluded) | see full name/line list folded into the boundary proposal above; `StaticTransitionPlan` (529-682, 33 fields) and `Planner` (796-802, 5 fields) are the two field-holding structs the file exists to define, confirmed **still declared here**, not previously moved |
+| `impl` blocks on file-local types | 6 blocks total: `RecursiveLoweringFrameGuard`+`Drop` (2), `PlannedHelperKey` (1), `CaseProducerFact` (1), `Planner<'src>` (1, 974 lines), `StaticTransitionPlan<'_>`/`StaticTransitionPlan<'src>` (2 blocks, 38 + 1557 lines) | 0 (test fixtures are free fns, not impls, in this region) | the `Planner` + `StaticTransitionPlan` impls together are 2569 of the file's 4464 production lines (58%) |
+| free functions | ~25 production-region free fns enumerated by name/line/consumer in the boundary proposal above | ~79 non-`#[test]` helper/fixture fns (counted, not individually named here -- see blind spots) | |
+| consts/statics/`thread_local!` | 1 `const` (`MAX_HELPERS_PER_STATIC_SOURCE`), 6 `thread_local!` blocks, **all** `#[cfg(test)]`-gated | (thread_locals live in production region even though cfg-test; none new in `mod tests` itself) | |
+| traits | **0**, whole file | | |
+| macros (`macro_rules!`) | **0**, whole file | | |
+| `include_str!` / source-text oracles | 0 | **2** (lines 10096, 10147), both `include_str!("static_transition/abi.rs")`, feeding `b2r_ac6_*`/`b2r_ac7_*` -- negative source-text controls on the already-moved `abi.rs`, not on the residue | |
+| `#[test]` fns | -- | **60**, exact names/lines extracted by a `#[test]` -> next-`fn` scan (not sampled); family breakdown below | |
+| visibility distribution (production region) | `pub(in crate::cranelift_backend)`: ~14 items (the cross-into-`lowering` surface). `pub(super)`: 1 (`MAX_HELPERS_PER_STATIC_SOURCE`). bare-private: the large majority, including `Planner` itself and most of `StaticTransitionPlan`'s methods | | |
+
+**Test family -> lifecycle-side mapping** (closes AC-2's discovery
+requirement's prerequisite -- which side each family belongs to; the exact
+per-test move is D1/D2's job, not asserted line-by-line here):
+
+| family | count | production injection point | side |
+|---|---|---|---|
+| `boundary_*` (b1/b1r/c1/a) | 17 | `census`/`semantic_census`/`validate` | closure |
+| `b2o_*` | 6 | `semantic_census().function_units` | closure |
+| `d2h_*` | 4 | `PlannedHelperKey`/`helper_key_for_activation` | closure |
+| `d7_1c_*` | 3 | `StaticWorkerMemberMutation`/`validate_static_worker_member_population` | closure |
+| `substrate_*` | 3 | `build_case_emission_plan`/`validate_substrate_preallocation_closure` | closure |
+| `b2r_*` | 2 | `include_str!` oracle on `abi.rs` | closure (source-text control on the validated plan's own inertness claim, not construction) |
+| `d2a_*`/`d2_*`/`d4_*` (excluding `d4b_*`) | mixed within the 8-count family reported earlier | `connect_declaration_calls`/`declaration_call_target` (`Planner`) | construction |
+| `d4b_*` | mixed within the same 8-count family | `D4bVerdict`/case-emission admission | closure |
+| 17 singly-named tests | 17 | mixed -- some exercise `Planner::plan_expr`/`connect_declaration_calls` directly (construction), others `validate`/`validate_source_return_topology` (closure); the one Class-4 fixture (`ac3_emit`, line 8557, driving real lowering end-to-end through 3 of these 17) legitimately stays wherever its 3 consuming tests land, per the frame's own Class-4 exception |
+
+**Closed math total:** 17+6+4+3+3+2 = 35 tests confidently closure-side by
+direct production injection point; the remaining 25 (the `d2a`/`d2`/`d4`/
+`d4b`-family 8 plus the 17 singly-named) split construction/closure by
+per-test read at D1/D2 -- **not claimed closed here**, honestly bounded
+instead: both sides get a substantial, non-trivial companion population
+either way (nothing close to a 60-0 split), which is itself evidence this is
+a real two-lifecycle boundary and not a line-count-driven cut.
+
+**Blind spots (AC-1's own requirement):**
+- The ~79 non-`#[test]` fixture/helper fns inside `mod tests` are counted,
+  not individually named here; D1/D2 pickup needs a fresh per-fn pass to
+  assign each to construction/closure/shared, same as every prior item's D0
+  named its population and D1 closed the last mile.
+- No `#[doc(hidden)]` items and no `macro_rules!`-produced items were found
+  (0 macros, 0 hits), so this blind class is empty for this file, not
+  unchecked.
+- The two long single-line `pub(in ...) use continuations::{...}` re-export
+  blocks (lines 74, 79) pack many names onto one physical line; a future
+  selector assuming one identifier per line would miss members of those
+  blocks. Flagging for D1, not re-deriving the full member list here since
+  those two lines are untouched by this move (they import FROM
+  `continuations`, already landed, not part of the residue being split).
+- Whole-workspace (not just `cranelift_backend`) consumer greps were not run
+  for every retained free function -- crate-privacy already bounds every
+  `pub(in crate::cranelift_backend)` item to inside this crate's module tree,
+  so a `cranelift_backend`-scoped grep is sufficient for correctness, but is
+  narrower in principle than a workspace-wide sweep.
+
+### AC-3 note (transport manifest) -- deferred to D1
+
+D0 is docs-only; no item has moved. The construction/closure boundary and
+per-item classification above is the manifest's *plan*, not its execution --
+AC-3's actual old-path/new-path/attribute-preservation table is produced at
+D1, against whichever child each item lands in.
+
+### AC-4b -- anticipated child sizes
+
+Rough production-line accounting from the boundary proposal (before any
+companion tests move): `construction.rs` ≈ 974 (Planner's impl) + ~150
+(registration-path `StaticTransitionPlan` methods + `runtime_expr_tag` +
+`D4DeclarationTargetMutation`) ≈ **1100-1200 production lines**.
+`closure.rs` ≈ 1557-150 (the non-registration remainder of the big
+`StaticTransitionPlan` impl) + 38 (`process_parameter_slot`) + ~500
+(case-producer/case-emission/static-worker-member/substrate-preallocation
+families' types+fns) + `MAX_HELPERS_PER_STATIC_SOURCE` ≈ **1900-2000
+production lines**. Both comfortably clear of 10k on production code alone.
+
+**The real ceiling risk is the companion test population**, not the
+production split: even an even test split (~30/30 of the 60 named `#[test]`
+fns, plus roughly half of the ~79 helper fns each) would land each child in
+the low-to-mid thousands of test lines on top of its production lines --
+**both children should land safely under 10k**, but this is D1/D2's number
+to confirm by direct measurement once the exact per-test assignment is made,
+not asserted here as a proof.
+
+If D1's actual measurement shows either child approaching the ceiling, the
+frame's own item-6 precedent (`continuations.rs` + `continuations/fusion.rs`)
+is already the sanctioned escape hatch -- a further sub-split within
+whichever child needs it, not a re-opening of this D0's boundary.
+
+### AC-5 -- adapter/facade debt
+
+None anticipated. Every retained-at-root symbol above is retained because it
+is genuinely shared (multiple sibling consumers, or the top-level entry
+point itself), not because a temporary facade was introduced to make a move
+compile. No scaffolding ledger entry is owed by this D0.
+
+### AC-6 -- this transfer's own completeness, phase closure NOT claimed
+
+This D0 is complete for its own question: the residue's outcome is
+determined (**outcome 2**, with a required internal sub-split), and the
+construction/closure boundary is proposed with named populations closed
+per item class above. **This does not close item 9b**, which needs its own
+`D1`/`D2` execution and QA/Architect gate, and it explicitly **does not
+claim phase closure** for `RT-BACKEND-MODULE-SPLIT` -- that remains item 18's
+job, per this frame's own `AC-6`.
+
