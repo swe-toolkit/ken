@@ -352,3 +352,313 @@ open the phase record to learn them.
 > - **The source machine is relocation only in this phase**, never a transition
 >   IR. Generated traps receive **no fabricated source origin**.
 
+## D0 ledger, re-measured at `0f96b5b99`
+
+Bound file: `cranelift_backend/planning/static_transition.rs`, **13,420 lines**
+at this SHA. All line numbers below are re-measured at `0f96b5b99` and are not
+inherited from any prior slice's frame or census row.
+
+### Boundary proposal (frozen-predicate application)
+
+The planner-owned Effects family is the **host-effect seat authority**: derive
+one `PlannedEffectSeat` per capability/argument seat of every admitted `Effect`
+occurrence, validate the population is the exact closed rebuild plus pairwise
+distinct, and expose read-only projections of it. This is `plan
+identities/minting/relation/seat construction/validation/closure/read-only
+projections` verbatim — the planner half of the frozen predicate.
+
+The emitter-owned Effects family — `EffectSeatGroupId`, `EffectSeatLedger`,
+`EffectSeatClosure`, `EffectSeatVisitMutation`, `EffectSeatDispatchMutation` —
+all live in `lowering/mod.rs` already, all consume a validated
+`PlannedEffectSeat` population by claiming/closing seats, and none of them
+mint or reshape a seat's identity. That is item 16's territory; this ledger
+does not touch it and does not re-litigate it.
+
+### THE CARRY-FORWARD — `host_effect_operation` and `host_effect_site_operand_slots`, re-derived from first principles
+
+Both are `StaticTransitionPlan` methods still resident at the parent
+(`host_effect_operation` @4182, private; `host_effect_site_operand_slots`
+@4143, `pub(in crate::cranelift_backend)`). Item 7's D0 correctly identified
+both as Effects-owned and item 7's D1 correctly left them at the parent,
+because item 7 was not the Effects slice. **That deferral reason no longer
+applies — this is the Effects slice.** Re-deriving from scratch against this
+slice's own frozen predicate:
+
+- **`host_effect_operation`** answers "what host operation does this
+  occurrence represent" by matching `self.source_occurrences` against
+  `RuntimeExpr::Effect` — a read-only projection of one seat's identity.
+  Effects-owned, unambiguously. **Verdict: Effects-owned, moves in this
+  slice's `D1`.**
+- **`host_effect_site_operand_slots`** returns `BTreeSet<EffectSeatSlot>` — an
+  Effects-typed read-only projection — by consulting
+  `host_effect_recipe_tree`/`collect_site_operand_ordinals` (both
+  **aggregates-owned**, already landed in `aggregates.rs` by item 7's `D1`,
+  reached via `super::aggregates::{...}`). The internal dependency on another
+  domain's helper is ordinary cross-domain consumption (the same shape as
+  `lowering` depending on both `aggregates` and `effects`), not a reason to
+  retain — the method's own identity (its name, its return type, its role as
+  a planner-side effect-seat view) is Effects-owned. **Verdict: Effects-owned,
+  moves in this slice's `D1`.**
+
+**A load-bearing widening this move requires, flagged rather than silently
+applied (`BANNED SCOPE`: "if a symbol must widen, that is a finding"):**
+`host_effect_operation` is called not only by its own sibling
+`host_effect_site_operand_slots` but also by **`aggregates.rs`** — a SIBLING
+child module, at two call sites (`aggregates.rs:1614`, `aggregates.rs:1833`,
+inside the `impl StaticTransitionPlan` wrapper item 7's `D1` installed there).
+Today it is private to the file it is textually in
+(`static_transition.rs`), which is visible to `aggregates.rs` only because
+Rust privacy makes a parent module's private items visible to all its
+descendants. Once `host_effect_operation` moves into a NEW child
+(`effects.rs`, a sibling of `aggregates.rs`), plain module-privacy no longer
+reaches `aggregates.rs` — the two are siblings, not ancestor/descendant. It
+must widen to at least `pub(in
+crate::cranelift_backend::planning::static_transition)` (equivalently
+`pub(super)` from `effects.rs`, since `effects.rs`'s parent module IS
+`static_transition`) to remain callable from `aggregates.rs`. This is a
+widening **driven by real, already-existing cross-sibling consumption**, not
+a convenience widening to make an unrelated move compile — it is `D1`'s to
+apply, not `D0`'s, and is recorded here so `D1` does not have to rediscover
+it from a compile error.
+
+### THE NEGATIVE FINDING — `governed_nested_resource_bracket` is NOT Effects-owned
+
+`governed_nested_resource_bracket` (`static_transition.rs:5712`,
+`#[cfg(test)]`, `pub(in crate::cranelift_backend)`) surfaces in an `effect`
+keyword scan — its body constructs `RuntimeExpr::Effect` nodes
+(`BufferAllocate`/`BufferFreeze`) and one of its heaviest consumers is an
+Effects-domain mutation control. **That is the same shape of trap this
+frame's own kickoff names for `synthesized_seat_emission_owners`: present in
+an effect-keyword scan, owned by neither domain the scan suggests.**
+
+Its own doc comment states the real disposition: *"The governed nested-bracket
+source shared by the planning and emission controls. Keeping one constructor
+prevents the emission gate from silently measuring a trap-free or
+non-recursive surrogate."* A full-crate grep of its call sites
+(14 in `lowering/core/tests/control.rs` alone, spanning worker-construction,
+capture, and bracket/scope tests entirely unrelated to Effects, plus the two
+genuinely Effects-adjacent D7 controls) confirms it: this is a **general
+cross-cutting fixture generator**, reached through `planning.rs`'s
+general-fixture re-export group (`contspec_nested_fixture,
+governed_nested_resource_bracket, plan_static_transition_graph`) — a
+**different** re-export group than the Effects-domain group two lines below
+it (`host_effect_seat_contract_of, EffectSeatNeed, ...`). It happens to be
+resident in `static_transition.rs` (the bound file) and happens to build
+`Effect`-shaped occurrences as example content, but it is not itself part of
+the host-effect seat authority and does not become part of it by proximity.
+
+**Verdict: EXPLICITLY RETAINED at the parent, owning domain "shared
+cross-domain test fixture" — not claimed by this slice.** Moving it would
+also be a `BANNED SCOPE` violation on its own terms (it is not this domain's
+to move), and — checked, since the frame's `D2` fixture-placement rule
+applies in spirit — it already sits at its own lowest common ancestor (the
+bound file every consuming domain's tests reach through one facade), so there
+is no placement defect to fix.
+
+### Symbol ledger — closed over every Rust item class
+
+**Types (7, all already `pub(in crate::cranelift_backend)`, all
+`#[derive(Clone, Copy, Debug, Eq, Ord, PartialOrd, PartialEq)]` except
+`EffectSeatPlanMutation` which derives only `Clone, Copy, Debug, Eq,
+PartialEq` — no `Ord`/`PartialOrd`):**
+
+| type | lines | kind | fields/variants | cfg |
+|---|---|---|---|---|
+| `EffectSeatPhase` | 1752-1757 | enum | `SpecializedTemplate`, `CarriedWord` | none |
+| `EffectSeatOperation` | 1761-1773 | enum | `SelectClosedTag`, `ProjectBytesSpan`, `ObserveResourceHandle`, `ObserveCapabilityToken`, `NarrowExactInt` | none |
+| `EffectSeatSlot` | 1784-1789 | enum | `Capability`, `Argument(u32)` | none |
+| `EffectSeatNeed` | 1806-1823 | enum | `ConstructorTag`, `BytesPointerLength`, `ResourceScalar`, `CapabilityTokenScalar`, `ExactIntU64` | none |
+| `EffectSeatAvail` | 1835-1838 | struct | `specialized: bool`, `carried: bool` (both `pub(in crate::cranelift_backend)`) | none |
+| `PlannedEffectSeat` | 1872-1908 | struct | 9 fields (`effect_origin`, `child_origin`, `position`, `operation`, `slot`, `producer_owner`, `consumer_owner`, `semantic_operation`, `need`, `avail` — all `pub(in crate::cranelift_backend)`) | none |
+| `EffectSeatPlanMutation` | 1959-1972 | enum | `Exact`, `EraseOperation`, `EraseOrdinal`, `EraseNeed`, `CollapseContract` | `#[cfg(test)]` |
+
+**Impls (2):**
+
+- `impl EffectSeatAvail` (1840-1862): 2 assoc consts (`SPECIALIZED_ONLY`,
+  `EITHER_PHASE`, both module-private `const`) + 1 method (`admits`,
+  1856-1861, `pub(in crate::cranelift_backend)`).
+- `impl PlannedEffectSeat` (1918-1946): itself `#[cfg(test)]`; 1 method
+  (`for_observer_control`, 1930-1945, doubly-gated `#[cfg(test)]` on both the
+  impl and the fn — the exact pattern a prior fix (item 7's D1 notes)
+  recorded as load-bearing, since the `--lib` profile cannot see a
+  wrongly-scoped single gate).
+
+**Free functions (7):**
+
+| fn | lines | vis | cfg | called from (outside its own domain family) |
+|---|---|---|---|---|
+| `set_effect_seat_plan_mutation` | 1981-1985 | `pub(in crate::cranelift_backend)` | `#[cfg(test)]` | `lowering/core/tests/control.rs` (cross-boundary) |
+| `host_effect_seat_contract` | 2023-2187 | private | none | (only its own domain family) |
+| `build_host_effect_seat_plan` | 2204-2275 | private | none | root builder (`static_transition.rs:3675`, stays put) |
+| `mutate_planned_effect_seat` | 2278-2308 | private | `#[cfg(test)]` | (only its own domain family) |
+| `host_effect_seat_contract_of` | 2318-2323 | `pub(in crate::cranelift_backend)` | none (production) | `lowering/mod.rs:13162` (cross-boundary, the emitter's independent close-time recompute) |
+| `validate_host_effect_seats_are_unique` | 2331-2344 | private | none | (only its own domain family) |
+| `validate_host_effect_seat_plan` | 2346-2356 | private | none | root builder + root validator (`static_transition.rs:3676`, `:5127`, both stay put) |
+
+**Consts/statics (2):**
+
+- `CRANELIFT_HOST_EFFECT_CONSUMERS_V1` (1994-2009): `pub(in
+  crate::cranelift_backend) const`, `[ken_host::HostOpV1; 13]`, no cfg.
+  Cross-boundary: `lowering/mod.rs:278`, `planning.rs:73`.
+- `EFFECT_SEAT_PLAN_MUTATION` (1975-1978): `thread_local!` `static`, module
+  private, `Cell<EffectSeatPlanMutation>`, `#[cfg(test)]`.
+
+**`StaticTransitionPlan` methods (5, all `impl` fragments in the shared root
+impl block — a method-level move, not a block move, same discipline as item
+7):**
+
+| method | lines | vis | consumed at |
+|---|---|---|---|
+| `host_effect_seat_records` | 4114-4117 | `pub(in crate::cranelift_backend)` | `lowering/units.rs:5414` (cross-boundary) |
+| `host_effect_seat_slots` | 4119-4134 | `pub(in crate::cranelift_backend)` | `lowering/core.rs:17992`, `lowering/mod.rs:9587` (cross-boundary) |
+| `host_effect_site_operand_slots` | 4136-4153 | `pub(in crate::cranelift_backend)` | `lowering/mod.rs:9649` (cross-boundary) |
+| `host_effect_seat` | 4155-4176 | `pub(in crate::cranelift_backend)` | `lowering/mod.rs:9629` (cross-boundary) |
+| `host_effect_operation` | 4181-4197 | private | `aggregates.rs:1614`, `:1833` (sibling — the flagged widening above) |
+
+**Explicitly retained at the parent (not moved, owning domain named):**
+
+- `host_effect_seats: Vec<PlannedEffectSeat>` — private field of
+  `StaticTransitionPlan` itself (declared 700, initialized `Vec::new()` at
+  2728). `StaticTransitionPlan` stays at the parent (same rule as every prior
+  slice); only the field's element type's home changes, via an import.
+- `build_host_effect_seat_plan`/`validate_host_effect_seat_plan` call sites
+  at 3675-3676 (the plan builder's `finish`) and 5127 (`StaticTransitionPlan::
+  validate`) — root orchestration that calls into every domain's
+  build/validate function; stays at the parent exactly as
+  `build_aggregate_ownership_plan`'s call sites did for item 7.
+- `governed_nested_resource_bracket` (5712-5843) — the negative finding
+  above: a shared cross-domain fixture, not Effects-owned.
+- `occurrence_authority` (consumed at `build_host_effect_seat_plan:2224`) —
+  already occurrences-owned (item 5, `occurrences.rs:253`,
+  `pub(super)`), a cross-domain dependency only.
+- `StaticOriginId`, `PredeclaredFunctionId` — occurrence-owned and
+  unit-owned respectively per the frame's own "THREE STANDING AMENDMENTS";
+  referenced, not owned, by this domain.
+
+### Source-text oracles
+
+- **LIVE**: `lowering/core/tests/control.rs`'s
+  `the_backend_production_surface_inventory_is_closed` (module-inventory
+  vec), `BACKEND_PRODUCTION_SOURCES` (the `include_str!` roster), and
+  `correspondence_adds_no_emitted_unit_to_the_production_census` (the
+  `Census` array) already carry rows for `"abi"`, `"aggregates"`,
+  `"continuations"`, `"occurrences"` (items 4-7's precedent, each a 3-location
+  addition). **`D1` will need the same 3-location addition for `"effects"`**
+  once `effects.rs` exists — ledgered here as an anticipated non-move hunk,
+  not executed in this docs-only `D0`.
+- **INERT**: `lowering/core/tests/mod.rs:978-1135`,
+  `exactly_one_plan_origin_to_expression_lookup_exists`, is gated
+  `#[cfg(any())]` — permanently disabled, never compiled. Its `let planner =
+  include_str!("../../../planning/static_transition.rs")` census would, if
+  live, be sensitive to any Effects-domain `pub(in crate::cranelift_backend)
+  fn` moving out of `static_transition.rs`'s own text — but it is dead code
+  (its own exported-list is already stale against the live tree, a further
+  sign of its disablement), so `D1` owes it nothing.
+
+### Test-property ledger
+
+**Zero tests in `static_transition.rs`'s own `mod tests` have Effects as
+their primary discriminated property.** A by-name scan for every
+Effects-domain symbol (`PlannedEffectSeat`, `EffectSeat*`, `host_effect_*`,
+`CRANELIFT_HOST_EFFECT_CONSUMERS_V1`) inside the test module (starting
+5852) returns exactly 3 hits, all `ken_host::HostOpV1::BufferAllocate` /
+`::BufferFreeze` used as **fixture content** inside
+`d2h_ac2_the_three_expressible_refusals_mint_nothing` (7129) and
+`substrate_case_emission_open_ingress_prunes_nothing` (12862) — both
+case-emission/substrate-domain tests (a different, already-settled owner)
+that happen to use an `Effect`-shaped occurrence as example data, exactly the
+same shape as `governed_nested_resource_bracket`'s own false-positive above.
+Neither test asserts anything about seat derivation, contract lookup, or
+seat-plan validation. **This slice's `D2` therefore moves NO tests out of
+`static_transition.rs`'s own test module** — the population is empty, stated
+as a fact rather than left silent (per `AC-2`'s discovery-before-mutation
+discipline, an empty population is still a population and is recorded as
+one).
+
+**Control.rs re-verification (required at this SHA, not inherited from any
+prior slice's scan):** a full keyword census of `Effect` in
+`lowering/core/tests/control.rs` (32,820 lines at `0f96b5b99`) returns 27
+hits, closing as follows:
+
+- 3 hits (`7365`, `7437`, `12271`, `18308` — 4 lines, one is prose) are
+  generic `RuntimeExpr::Effect` fixture construction, unrelated to this
+  domain's own symbols (`RuntimeExpr` is not owned by `static_transition.rs`
+  at all).
+- 13 hits (`18066`-`18105`) are `erasing_a_seat_key_axis_or_
+  collapsing_the_contract_rejects` — a genuinely **planner-Effects**-domain
+  mutation control (`set_effect_seat_plan_mutation`/`EffectSeatPlanMutation`,
+  which exercise `build_host_effect_seat_plan`'s rebuild-equality
+  validation). **Its primary discriminated property is Effects-planner, but
+  the test itself is a Class-4 end-to-end control** — it compiles a whole
+  process via `recursive_port_process_compiles`, crossing planning through
+  execution, over the shared `governed_nested_resource_bracket` fixture.
+  `AC-2`'s four-way partition states Class 4 "legitimately REMAINS in the
+  residual integration module." **Verdict: found, not a mover.**
+- 11 hits (`18135`-`18261`, two tests:
+  `an_incomplete_duplicate_discarded_or_misobserved_visit_rejects` and
+  `a_discarded_visit_refuses_before_its_body_is_defined`) use
+  `set_effect_seat_visit_mutation`/`EffectSeatVisitMutation`, both
+  **lowering/emitter**-owned symbols (`lowering/mod.rs`, item 16's
+  territory). **Verdict: not this slice's domain at all.**
+
+**Net: control.rs carries one true positive for the Effects-planner domain by
+symbol, and that one test is architecturally excluded from `D2` by the
+frame's own Class-4 rule. This slice's `D2` moves zero tests from either
+`static_transition.rs` or `control.rs`.** State this now so `D2`'s kickoff
+does not have to re-derive it, and so it is not mistaken for an unexamined
+gap.
+
+### The three evidence seats
+
+- **Intention producer**: `build_host_effect_seat_plan` — mints the planned
+  seat population from `plan.source_occurrences` and
+  `host_effect_seat_contract`.
+- **Independent artifact observer / evidence decoder**: two, at different
+  points in the lifecycle — `validate_host_effect_seat_plan` (the planner's
+  own closed-form rebuild-equality plus uniqueness check, at plan-build and
+  at `StaticTransitionPlan::validate`) and `host_effect_seat_contract_of`
+  (the emitter's INDEPENDENT recomputation of the same contract from nothing
+  but `(operation, slot)`, consulted at `lowering/mod.rs:13162` during the
+  ledger's own close — its own doc comment names this: *"Without it `need`
+  would be diagnostic text... erasing it would change no decision."*).
+- **Closeout/publication seat**: `EffectSeatGroupId::close`/
+  `EffectSeatLedger::close` → `EffectSeatClosure`, in `lowering/mod.rs` —
+  item 16's territory, outside this slice, but the seat this domain's
+  evidence is produced FOR. Named here so a later slice cannot silently
+  collapse producer and closer into one.
+
+### Blind spots inherited
+
+- The Stage A type-ownership selector cannot see private types (none of this
+  domain's *types* are private, but every retained free fn/method that IS
+  private was found only by hand-reading the file, not by the selector).
+- **`backend-split-census-lifecycles.md` has no row for the planner-side seat
+  lifecycle** — its only Effects row (line 55) is the emitter's
+  mint/claim/close cycle. The planner-side mint
+  (`build_host_effect_seat_plan`) / validate-close
+  (`validate_host_effect_seat_plan`) cycle is undocumented there; this
+  ledger's "three evidence seats" section above is the closure for that gap.
+- The reexports census (`backend-split-census-reexports.md:210`) already
+  names the exact Effects-domain re-export group at `planning.rs:71-73`
+  (`host_effect_seat_contract_of, EffectSeatNeed, EffectSeatOperation,
+  EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
+  CRANELIFT_HOST_EFFECT_CONSUMERS_V1`) plus the `#[cfg(test)]` group at
+  `:381` (`set_effect_seat_plan_mutation, EffectSeatPlanMutation`) — both
+  re-verified against the live tree above and unchanged.
+- Macro-produced items, traits, and split-line declarations: none exist in
+  this domain's population (confirmed by direct reading, not by a selector
+  that would miss them).
+
+### Anticipated child size
+
+Summing the closed line ranges above (types 1752-1972, the const/statics
+block 1975-2009, the free-function block 2011-2356, and the method block
+4114-4197) is approximately 670 raw source lines before module boilerplate
+(header doc comment, `use` block). Compare item 7's `aggregates.rs`, whose
+much larger population (16 types + 16 fns + 15 methods + 4 impls) landed at
+1929 lines pre-`D2`. This domain's population (7 types + 7 fns + 5 methods +
+2 impls + 2 consts/statics, roughly a third of item 7's count) is expected to
+land in the **1000-1300 line range**, well under the 10k ceiling. `AC-4b`
+applies and is not a blocking concern at this scale; the exact count is
+`D1`'s to report.
+
