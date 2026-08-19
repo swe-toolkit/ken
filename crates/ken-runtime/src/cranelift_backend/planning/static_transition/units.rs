@@ -12,9 +12,9 @@
 use std::collections::BTreeMap;
 
 use super::abi::{self, AbiFrameHeader, AbiSlot, AbiUnitDefinition};
-use super::semantic_ir::StaticOriginId;
+use super::occurrences::{origin_of, StaticOriginId};
 use super::{
-    origin_of, planner_error, CraneliftBackendError, StaticNodeId, StaticTransitionPlan,
+    planner_error, CraneliftBackendError, StaticNodeId, StaticTransitionPlan,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
