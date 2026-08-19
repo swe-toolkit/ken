@@ -1,7 +1,7 @@
 ---
 id: RT-LOWERING-FUNCTION-STATE-SPLIT
 title: "Move function-local lowering state out of lowering/mod.rs and lowering/core.rs into its own child -- the first lowering domain, and the point where the phase crosses from the planner files into the lowering files"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
