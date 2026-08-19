@@ -1248,3 +1248,1200 @@ fn runtime_expr_tag(expr: &RuntimeExpr) -> u32 {
         RuntimeExpr::Trap(_) => 21,
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::super::*;
+    use crate::RuntimeValue;
+    use super::super::tests::{
+        b2ac_topology_fixtures, b2o_transparent_declaration, d2_declaration_and_anonymous_closure,
+    };
+
+
+    /// A canonical digest of the Boundary-A transfer graph: node transitions in
+    /// order, then every edge as `(from, to, kind)` in order.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend::planning::static_transition) fn b2ac_topology_digest(expr: &RuntimeExpr) -> String {
+        let plan = plan_static_transition_graph(expr, &BTreeMap::new()).expect("plannable");
+        let mut digest = String::new();
+        digest.push_str(&format!(
+            "nodes={} edges={}",
+            plan.nodes.len(),
+            plan.edges.len()
+        ));
+        for node in &plan.nodes {
+            digest.push_str(&format!("|n{}:{:?}", node.id.0, node.transition));
+        }
+        for edge in &plan.edges {
+            digest.push_str(&format!(
+                "|e{}:{}->{}:{:?}",
+                edge.id.0, edge.from.0, edge.to.0, edge.kind
+            ));
+        }
+        digest.push_str(&format!("|entries={:?}", plan.entries));
+        digest
+    }
+
+    /// **AC-11 — every transfer edge is unchanged and consumes `.entry`.**
+    ///
+    /// These digests were captured by running the identical probe against the
+    /// WP's base commit `70bd2c74` — before `PlannedExpr` existed — in a scratch
+    /// worktree, and are asserted here against the post-D9 planner. Equality is
+    /// the mechanical proof that the Boundary-A graph is topologically
+    /// identical: same nodes in the same order, same edges with the same
+    /// `(from, to, kind)`, same scheduling entries.
+    ///
+    /// ## ⚠ Reproducing the baseline — the recipe, because equality hides
+    /// its own provenance
+    ///
+    /// ⛔ The asserted property is *equality against committed constants*, so a
+    /// re-capture taken **after** the change would have produced byte-identical
+    /// values. **Nothing in this file distinguishes a genuine pre-change baseline
+    /// from a re-recording**, and the scratch worktree it was taken in is gone. So
+    /// the binding is demonstrated here rather than testified to — anyone can
+    /// redo it in about two minutes:
+    ///
+    /// ```text
+    /// git worktree add --detach /tmp/b2ac-base 70bd2c74
+    /// # port these two functions into that tree's test module verbatim:
+    /// #   `b2ac_topology_fixtures`  (the seven fixtures, by name)
+    /// #   `b2ac_topology_digest`    (nodes, edges, entries -- it reads nothing
+    /// #                              that postdates the base, which is why it
+    /// #                              compiles there at all)
+    /// cd /tmp/b2ac-base
+    /// scripts/ken-cargo test -p ken-runtime --lib -- b2ac_topology
+    /// git worktree remove /tmp/b2ac-base
+    /// ```
+    ///
+    /// ⛔ `scripts/ken-cargo`, never raw `cargo` — `COORDINATION §12`, and it
+    /// binds inside a copied recipe exactly as it binds anywhere else. A recipe
+    /// that
+    /// spells the raw command teaches the next reader to bypass the build lock.
+    ///
+    /// Verified this way by the adversary on `2db29abe`: **all seven rows
+    /// reproduce byte-for-byte** from `70bd2c74`, including
+    /// `computational-under-let`, which is the row carrying the load.
+    ///
+    /// ⭐ Read `computational-under-let`: the parent `Sequence` (n12) edges to
+    /// **n11**, the computational match's scrutinee, and *not* to the
+    /// `SourceReturnResume` (n6). That is D9's promise — the occurrence moved to
+    /// the resume while the schedule stayed on the scrutinee — and this row is
+    /// what would redden if a future change returned the resume as the entry.
+    #[cfg(test)]
+    const B2AC_BASE_TOPOLOGY: &[(&str, &str)] = &[
+        ("leaf", "nodes=3 edges=1|n0:Terminal|n1:TrapTerminal|n2:Evaluate|e0:2->0:Continue|entries=[StaticNodeId(2)]"),
+        ("let-if", "nodes=9 edges=8|n0:Terminal|n1:TrapTerminal|n2:Evaluate|n3:Evaluate|n4:Evaluate|n5:Branch|n6:Evaluate|n7:Evaluate|n8:Sequence|e0:2->0:Continue|e1:3->2:Continue|e2:4->2:Continue|e3:5->3:Select|e4:5->4:Reject|e5:6->5:Continue|e6:7->6:Continue|e7:8->7:Continue|entries=[StaticNodeId(8)]"),
+        ("match", "nodes=7 edges=6|n0:Terminal|n1:TrapTerminal|n2:Evaluate|n3:Evaluate|n4:CaseTest|n5:Evaluate|n6:Evaluate|e0:2->1:Trap|e1:3->0:Continue|e2:4->3:Select|e3:4->2:Reject|e4:5->4:Continue|e5:6->5:Continue|entries=[StaticNodeId(6)]"),
+        ("lexical-closure-call", "nodes=8 edges=7|n0:Terminal|n1:TrapTerminal|n2:Evaluate|n3:ClosureBody|n4:Evaluate|n5:Evaluate|n6:Evaluate|n7:Sequence|e0:2->0:Continue|e1:3->0:Continue|e2:4->3:Continue|e3:5->2:Continue|e4:6->5:Continue|e5:6->4:StaticBody|e6:7->6:Continue|entries=[StaticNodeId(7)]"),
+        ("computational", "nodes=11 edges=10|n0:Terminal|n1:TrapTerminal|n2:CompletedTail|n3:ProducerTail|n4:ProducerWrapper|n5:SourceReturnResume|n6:Evaluate|n7:Evaluate|n8:CaseTest|n9:Evaluate|n10:Sequence|e0:5->4:InvokeProducerWrapper|e1:4->3:InvokeProducerTail|e2:3->2:CompleteProducerTail|e3:2->0:Continue|e4:6->1:Trap|e5:7->5:SourceReturnOwnedResume|e6:8->7:Select|e7:8->6:Reject|e8:9->8:Continue|e9:10->9:Continue|entries=[StaticNodeId(10)]"),
+        ("computational-nested", "nodes=19 edges=19|n0:Terminal|n1:TrapTerminal|n2:CompletedTail|n3:ProducerTail|n4:ProducerWrapper|n5:SourceReturnResume|n6:Evaluate|n7:CompletedTail|n8:ProducerTail|n9:ProducerWrapper|n10:SourceReturnResume|n11:Evaluate|n12:Evaluate|n13:CaseTest|n14:Evaluate|n15:Sequence|n16:CaseTest|n17:Evaluate|n18:Sequence|e0:5->4:InvokeProducerWrapper|e1:4->3:InvokeProducerTail|e2:3->2:CompleteProducerTail|e3:2->0:Continue|e4:6->1:Trap|e5:10->9:InvokeProducerWrapper|e6:9->8:InvokeProducerTail|e7:8->7:CompleteProducerTail|e8:7->5:SourceReturnOwnedResume|e9:11->1:Trap|e10:12->10:SourceReturnOwnedResume|e11:13->12:Select|e12:13->11:Reject|e13:14->13:Continue|e14:15->14:Continue|e15:16->15:Select|e16:16->6:Reject|e17:17->16:Continue|e18:18->17:Continue|entries=[StaticNodeId(18)]"),
+        ("computational-under-let", "nodes=13 edges=12|n0:Terminal|n1:TrapTerminal|n2:Evaluate|n3:CompletedTail|n4:ProducerTail|n5:ProducerWrapper|n6:SourceReturnResume|n7:Evaluate|n8:Evaluate|n9:CaseTest|n10:Evaluate|n11:Sequence|n12:Sequence|e0:2->0:Continue|e1:6->5:InvokeProducerWrapper|e2:5->4:InvokeProducerTail|e3:4->3:CompleteProducerTail|e4:3->2:Continue|e5:7->1:Trap|e6:8->6:SourceReturnOwnedResume|e7:9->8:Select|e8:9->7:Reject|e9:10->9:Continue|e10:11->10:Continue|e11:12->11:Continue|entries=[StaticNodeId(12)]"),
+    ];
+
+    #[test]
+    fn boundary_a_topology_is_identical_to_the_pre_d9_planner() {
+        let expected: BTreeMap<&str, &str> = B2AC_BASE_TOPOLOGY.iter().copied().collect();
+        for (name, expr) in b2ac_topology_fixtures() {
+            let digest = b2ac_topology_digest(&expr);
+            let base = expected
+                .get(name)
+                .expect("every fixture has a recorded base digest");
+            assert_eq!(
+                &digest.as_str(),
+                base,
+                "AC-11: `{name}` changed the Boundary-A transfer graph. D9 must move \
+                 only which identity is RECORDED at a source position, never which \
+                 node is SCHEDULED."
+            );
+        }
+    }
+
+    /// **AC-13 — the split is exactly one variant.**
+    #[test]
+    fn computational_match_is_the_sole_entry_occurrence_split() {
+        let mut split = Vec::new();
+        for (name, expr) in b2ac_topology_fixtures() {
+            let mut planner = Planner::new().expect("planner");
+            let empty = PersistentNodeId(0);
+            let context = PlanContext {
+                environment: empty,
+                continuation: empty,
+                path: empty,
+                cleanup: empty,
+                affine: empty,
+                source_return: empty,
+            };
+            let planned = planner
+                .plan_expr(&expr, context, planner.terminal, EdgeKind::Continue, 0)
+                .expect("plannable");
+            if planned.occurrence != origin_of(planned.entry) {
+                split.push(name);
+            }
+        }
+        assert_eq!(
+            split,
+            vec!["computational", "computational-nested"],
+            "AC-13: only a `ComputationalMatch` result may split entry from \
+             occurrence, and every such result must. `computational-under-let` is \
+             a `Let` at the root, so its own result does not split."
+        );
+    }
+
+
+    /// Emit one fixture end to end, returning the failure text if it refuses.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend::planning::static_transition) fn ac3_emit(
+        root: &RuntimeExpr,
+        declarations: &BTreeMap<&str, &RuntimeDeclaration>,
+    ) -> Result<(), String> {
+        use crate::cranelift_backend::artifact::new_object_module_for_lowering_tests;
+        use crate::cranelift_backend::lowering::core::{
+            compile_expr_into_object_module, NativeSeedEnvironment,
+        };
+        let seed_env = NativeSeedEnvironment::empty();
+        compile_expr_into_object_module(
+            new_object_module_for_lowering_tests("ac3")
+                .map_err(|error| format!("{error:?}"))?,
+            "ac3_entry",
+            cranelift_module::Linkage::Export,
+            root,
+            &seed_env,
+            declarations.clone(),
+            None,
+            true,
+            None,
+            Some(crate::cranelift_backend::test_support::test_only_distinguished_root_join_plan()),
+            None,
+        )
+        .map(|_| ())
+        .map_err(|error| format!("{error:?}"))
+    }
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-3` — collapsing the issued body
+    /// back to the scheduling entry recreates the traversal/closeout failure.**
+    ///
+    /// > **PROPERTY:** the issued body occurrence is what makes the source
+    /// > traversal reach the unit's join subtree.
+    /// > **OPERAND THAT MOVED:** the **population** — the value the planner
+    /// > issues for a `SchedulingEntry` seed, mutated at the seat that resolves
+    /// > it, back to the pre-correction `StaticOriginId(seed.0)` alias. No
+    /// > detector, assertion or validator arm was touched.
+    /// > **OBSERVED BOUNDARY:** `finalize_join_disposition` refuses with
+    /// > *"function left planned source join … neither emitted nor statically
+    /// > unselected"* — a required join reached by neither consumption nor
+    /// > disposition, which is the attribution record's failure exactly.
+    ///
+    /// **Population-side is the whole point.** `AC-3` asserts REACH. A
+    /// detector-side mutation would redden this same test name while the
+    /// carried value never moved, and would keep reddening for the entire life
+    /// of a correction that reached nothing.
+    ///
+    /// **The `Exact` arm is not a fourth assertion — it is what validates the
+    /// other three.** A refusal control only has to reach its own guard; the
+    /// success arm has to traverse every guard, so it is the only arm that
+    /// establishes the fixture could have lowered at all. Without it, a fixture
+    /// broken upstream would refuse under both settings and read as a discharge.
+    ///
+    /// **Honest scope of the two arms.** The root arm exercises the arm that
+    /// previously carried a *workaround* (`define_unit_body`'s `is_root`
+    /// substitution), so it demonstrates the mechanism rather than the shipped
+    /// defect. The **non-root** arm is the population that was actually broken:
+    /// nothing compensated for it, which is why the defect shipped. Both are
+    /// asserted; neither is offered as the other.
+    #[test]
+    fn collapsing_the_body_to_its_scheduling_entry_recreates_the_closeout_failure() {
+        use super::super::semantic_ir::{with_body_occurrence_mutation, BodyOccurrenceMutation};
+
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+
+        // Arm 1: the ROOT unit.
+        let empty = BTreeMap::new();
+        assert_eq!(
+            ac3_emit(&computational, &empty),
+            Ok(()),
+            "AC-3 positive control: the root fixture must lower under the exact \
+             pairing, or the refusals below prove nothing about the pairing"
+        );
+        let collapsed_root = with_body_occurrence_mutation(
+            BodyOccurrenceMutation::CollapseSchedulingEntryBody,
+            || ac3_emit(&computational, &empty),
+        );
+        assert_eq!(
+            collapsed_root,
+            Err(
+                "Backend(Module(\"function left planned source join StaticOriginId(5) \
+                 neither emitted nor statically unselected\"))"
+                    .to_string()
+            ),
+            "AC-3: with the body collapsed to the scheduling entry the traversal \
+             enters the entry and never reaches the join subtree, so closeout \
+             finds a required join neither consumed nor dispositioned"
+        );
+
+        // Arm 2: a NON-ROOT unit — the population that actually shipped broken.
+        let declaration = b2o_transparent_declaration(computational.clone());
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::b2o", &declaration);
+        let root = RuntimeExpr::Value(RuntimeValue::Bool(true));
+        assert_eq!(
+            ac3_emit(&root, &declarations),
+            Ok(()),
+            "AC-3 positive control: the non-root fixture must lower under the \
+             exact pairing"
+        );
+        let collapsed_declaration = with_body_occurrence_mutation(
+            BodyOccurrenceMutation::CollapseSchedulingEntryBody,
+            || ac3_emit(&root, &declarations),
+        );
+        assert!(
+            collapsed_declaration
+                .as_ref()
+                .err()
+                .is_some_and(|message| message.contains("planned source join")),
+            "AC-3: the non-root unit is the population the removed root-only \
+             substitution never covered; collapsing its body must recreate the \
+             same closeout failure. got {collapsed_declaration:?}"
+        );
+    }
+
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-1b` — the `StaticBodyTarget` class
+    /// takes its ISSUED pair, not its seed's own ordinal.**
+    ///
+    /// > **MEASURED:** for a closure whose body is a computational match, the
+    /// > unit seeded on the `StaticBody` target carries a body occurrence that
+    /// > differs from `origin_of(seed)`, and equals the pair issued when that
+    /// > body's `StaticBody` edge was registered.
+    /// > **CLAIMED:** the retired `StaticOriginId(edge.to.0)` fallback is gone
+    /// > and this class reads the one relation.
+    /// > **THE GAP:** the fixture's closure body must genuinely schedule
+    /// > something before itself. For an ordinary body the seed's own ordinal
+    /// > IS its occurrence, so the fallback and the relation agree and the test
+    /// > passes under both -- which is exactly how the carve-out survived
+    /// > review the first time.
+    ///
+    /// This is the class the original bounded contract exempted as
+    /// already-grounded. On venue 4 that exemption issued `SOI(58)` to a unit
+    /// whose real body was `SOI(26)`, and its four planned joins were never
+    /// entered.
+    #[test]
+    fn a_static_body_target_whose_body_is_computational_takes_its_issued_pair() {
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+        let expr = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["x".to_string()],
+                body: Box::new(computational),
+            }),
+            args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
+        };
+        let plan = plan_static_transition_graph(&expr, &BTreeMap::new()).expect("plannable");
+
+        let body_edge = plan
+            .edges
+            .iter()
+            .find(|edge| edge.kind == EdgeKind::StaticBody)
+            .expect("precondition: the fixture must carry a static body edge");
+        let unit = plan
+            .semantic
+            .functions
+            .iter()
+            .find(|function| function.planned_node == body_edge.to)
+            .expect("the static body target seeded a function unit");
+
+        assert_ne!(
+            unit.body_occurrence,
+            origin_of(unit.planned_node),
+            "AC-1b precondition AND claim: the closure body must schedule \
+             something before itself, so the retired fallback \
+             `StaticOriginId(edge.to.0)` and the issued pair DISAGREE here. If \
+             they agreed, this test would pass under the carve-out too"
+        );
+        assert_eq!(
+            plan.planned_entry_body(body_edge.to),
+            Some(unit.body_occurrence),
+            "AC-1b: the unit reads the row issued when its static body edge was \
+             registered -- one relation, not a per-class rule"
+        );
+    }
+
+    /// **`AC-3` `StaticBodyTarget` arm — the CLASS-SELECTIVE collapse.**
+    ///
+    /// > **OPERAND THAT MOVED:** the population, restricted to the
+    /// > `StaticBodyTarget` class -- the retired `StaticOriginId(edge.to.0)`
+    /// > fallback restored for that class ONLY.
+    ///
+    /// A global collapse reddens first through the `SchedulingEntry` class and
+    /// therefore says nothing about this one. The informative side is the arm
+    /// that would still green if this class were left on the fallback, which is
+    /// why the mutation has to be class-selective rather than plan-wide.
+    #[test]
+    fn collapsing_only_the_static_body_target_class_is_refused() {
+        use super::super::semantic_ir::{with_body_occurrence_mutation, BodyOccurrenceMutation};
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+        let expr = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["x".to_string()],
+                body: Box::new(computational),
+            }),
+            args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
+        };
+        let empty = BTreeMap::new();
+        assert_eq!(
+            ac3_emit(&expr, &empty),
+            Ok(()),
+            "AC-3 positive control: the fixture must lower under the exact \
+             relation, or the refusal below proves nothing about the relation"
+        );
+        let collapsed = with_body_occurrence_mutation(
+            BodyOccurrenceMutation::CollapseStaticBodyTargetBody,
+            || ac3_emit(&expr, &empty),
+        );
+        assert!(
+            collapsed
+                .as_ref()
+                .err()
+                .is_some_and(|message| message.contains("planned source join")),
+            "AC-3: restoring the retired fallback for this class alone must \
+             recreate the traversal/closeout failure. got {collapsed:?}"
+        );
+    }
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-4` — call identity is the ENTRY
+    /// axis and did not move with the body axis.**
+    ///
+    /// > **MEASURED:** across every `b2ac` fixture, each call edge's
+    /// > `callee_origin` equals `origin_of(callee_unit.planned_node)`.
+    /// > **CLAIMED:** the correction changed the BODY axis only; call identity
+    /// > is invariant under it.
+    /// > **THE GAP:** at least one fixture must have a unit whose two axes
+    /// > DIFFER, or the equality holds for both readings and the pin cannot
+    /// > tell which axis it measured.
+    ///
+    /// **This is the invariant most easily broken by accident, and the one a
+    /// green suite is least likely to catch.** The old `origin` field was an
+    /// alias of `planned_node`, so every consumer read the entry axis whether or
+    /// not it meant to. Renaming that field in bulk would have silently moved
+    /// call identity onto the body axis for exactly the units where the two
+    /// differ — the same units the correction targets — and every fixture whose
+    /// axes coincide would have stayed green.
+    #[test]
+    fn call_identity_stays_on_the_entry_axis_after_the_body_axis_moved() {
+        let mut fixtures_with_split_axes = 0usize;
+        let mut checked_edges = 0usize;
+
+        for (name, expr) in b2ac_topology_fixtures() {
+            let plan = plan_static_transition_graph(&expr, &BTreeMap::new())
+                .unwrap_or_else(|error| panic!("{name} must plan: {error:?}"));
+
+            fixtures_with_split_axes += usize::from(
+                plan.semantic
+                    .functions
+                    .iter()
+                    .any(|function| function.body_occurrence != origin_of(function.planned_node)),
+            );
+
+            for edge in plan.emittable_call_edges().expect("call edges") {
+                let callee = plan
+                    .semantic
+                    .functions
+                    .iter()
+                    .find(|function| function.id == edge.callee())
+                    .expect("a call edge names a planned unit");
+                assert_eq!(
+                    edge.callee_origin(),
+                    origin_of(callee.planned_node),
+                    "AC-4 [{name}]: a call names the unit it ENTERS. The body \
+                     occurrence is where that unit's traversal begins once \
+                     inside, and moving call identity onto it would change which \
+                     unit a call resolves to"
+                );
+                checked_edges += 1;
+            }
+        }
+
+        // Non-vacuity, both axes.
+        assert!(
+            fixtures_with_split_axes > 0,
+            "AC-4 precondition: at least one fixture must have a unit whose entry \
+             and body DIFFER, or this test passes under either reading and \
+             measures nothing"
+        );
+        assert!(
+            checked_edges > 0,
+            "AC-4 precondition: the fixture set must actually produce call edges"
+        );
+    }
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-1` — the issued pair is `n18 ->
+    /// n5`, and `n10` is not registered as that unit's body.**
+    ///
+    /// > **MEASURED:** on the frozen `computational-nested` fixture, the sole
+    /// > row of the pairing authority is `(n18, origin_of(n5))`, and no
+    /// > `PredeclaredFunction` carries `origin_of(n10)` as its body.
+    /// > **CLAIMED:** the registration binds the OUTER scheduling entry to the
+    /// > outer body occurrence its own visit returned, and excludes the nested
+    /// > call's occurrence.
+    /// > **THE GAP:** `n10` must actually EXIST and be the inner match's
+    /// > occurrence. "`n10` is not registered" is vacuously true of a node the
+    /// > fixture never planned, so the exclusion carries no information until
+    /// > the excluded thing is shown to be the real, competing candidate.
+    ///
+    /// **The non-vacuity arms are the test.** Both are asserted here rather
+    /// than assumed: `n5 != n10` (two distinct resumes exist under one entry, so
+    /// there is a genuine choice to get wrong) and `origin_of(n18) != n5` (the
+    /// entry is not the body, so a pin that read the entry would differ). On a
+    /// fixture where the axes coincide this test would pass while measuring
+    /// nothing.
+    ///
+    /// The exact node identities are a **normative compatibility vector**:
+    /// they are the frozen `B2AC_BASE_TOPOLOGY` row for this fixture, which
+    /// pins `nodes=19`, `n5`/`n10` as the two `SourceReturnResume` nodes and
+    /// `entries=[StaticNodeId(18)]`. A topology change reddens that row first.
+    #[test]
+    fn nested_registration_issues_the_outer_pair_and_excludes_the_inner_resume() {
+        let (_, nested) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational-nested")
+            .expect("the nested computational fixture");
+        let plan = plan_static_transition_graph(&nested, &BTreeMap::new()).expect("plannable");
+
+        let n18 = StaticNodeId(18);
+        let n5 = origin_of(StaticNodeId(5));
+        let n10 = origin_of(StaticNodeId(10));
+
+        // Non-vacuity, before anything is concluded from an absence.
+        assert_ne!(
+            n5, n10,
+            "AC-1 precondition: the fixture must supply TWO distinct resumes \
+             under one entry, or there is no wrong answer available to exclude"
+        );
+        assert_ne!(
+            origin_of(n18),
+            n5,
+            "AC-1 precondition: entry and body must differ on this fixture, or \
+             reading the entry would be indistinguishable from reading the body"
+        );
+        let outer = plan.root_static_origin().expect("root occurrence");
+        assert_eq!(outer, n5, "the outer occurrence is the outer resume");
+        assert_eq!(
+            plan.child_static_origin(outer, 1)
+                .expect("the outer match's case body resolves"),
+            n10,
+            "AC-1 precondition: `n10` is the INNER match's occurrence — a real, \
+             competing candidate, not an absent node"
+        );
+
+        // The issued pairing itself.
+        assert_eq!(
+            plan.planned_entry_bodies,
+            vec![PlannedEntryBody {
+                entry: n18,
+                body_occurrence: n5,
+            }],
+            "AC-1: the sole issued pair binds the outer scheduling entry to the \
+             outer body occurrence its own visit returned"
+        );
+
+        // And no unit claims the nested call's occurrence as its body.
+        assert!(
+            plan.semantic
+                .functions
+                .iter()
+                .all(|function| function.body_occurrence != n10),
+            "AC-1: `n10` is the occurrence the NESTED call returned to its \
+             parent; recovering an `outermost` resume by graph shape is exactly \
+             what would select it"
+        );
+    }
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` supporting discrimination — a NON-ROOT
+    /// unit whose body schedules something before itself has entry != body.**
+    ///
+    /// **This is NOT the node's `AC-2`, and it must not be read as discharging
+    /// it.** The node's `AC-2` is the exact `LiftRose` synthetic-venue result:
+    /// owner 2's required `{26, 33, 39, 53}` reached and closed. This test is
+    /// obligation 2 of the LEADER'S DISPATCH list, which numbers differently
+    /// from the node's acceptance table — an earlier revision of this file
+    /// labelled it `AC-2` and thereby claimed a gate it does not touch. The
+    /// node's table is the authority; a dispatch's ordering is not.
+    ///
+    /// > **MEASURED:** for a transparent declaration whose body is a
+    /// > computational match, the unit's `body_occurrence` differs from
+    /// > `origin_of(planned_node)`, and equals the declaration occurrence the
+    /// > planner recorded for that symbol.
+    /// > **CLAIMED:** the correction reaches NON-ROOT units — the population the
+    /// > removed root-only substitution never covered.
+    /// > **THE GAP:** the unit must genuinely be non-root. `AC-1`'s fixture has
+    /// > exactly one entry and it IS the root, so it cannot discharge this;
+    /// > passing it off as coverage would leave the entire defect population
+    /// > unmeasured.
+    ///
+    /// This is the discriminating pair the old code could not produce: before
+    /// the correction `body_occurrence` was `StaticOriginId(seed.0)`, so the
+    /// first assertion below was an identity and could not fail.
+    #[test]
+    fn a_non_root_computational_declaration_body_differs_from_its_entry() {
+        // Reuse the frozen `computational` fixture shape as the DECLARATION
+        // body, so the only thing varying from `AC-1` is root-ness.
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+        let declaration = b2o_transparent_declaration(computational);
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::b2o", &declaration);
+        let root = RuntimeExpr::Value(RuntimeValue::Bool(true));
+        let plan = plan_static_transition_graph(&root, &declarations).expect("plannable");
+
+        let root_entry = plan.root_entry.expect("a root entry");
+        let declaration_body = plan
+            .declaration_occurrence_origin("decl:fixture::b2o")
+            .expect("the declaration was planned");
+
+        let pair = plan
+            .planned_entry_bodies
+            .iter()
+            .find(|pair| pair.entry != root_entry)
+            .expect("precondition: a non-root scheduling entry exists");
+
+        assert_ne!(
+            origin_of(pair.entry),
+            pair.body_occurrence,
+            "a non-root unit whose body schedules its scrutinee first must \
+             not have its entry aliased as its body — this equality is what the \
+             correction removed"
+        );
+        assert_eq!(
+            pair.body_occurrence, declaration_body,
+            "the issued body is the occurrence the declaration's own visit \
+             returned"
+        );
+
+        // The unit built from that seed carries the issued value, not the alias.
+        let unit = plan
+            .semantic
+            .functions
+            .iter()
+            .find(|function| function.planned_node == pair.entry)
+            .expect("the non-root seed built a function unit");
+        assert_eq!(
+            unit.body_occurrence, declaration_body,
+            "the carried field is the issued body occurrence"
+        );
+        assert_ne!(
+            unit.body_occurrence,
+            origin_of(unit.planned_node),
+            "and it is NOT an alias of the scheduling entry"
+        );
+    }
+
+    /// **`RT-FNSPLIT-B2A-S` AC-5 — keying selection by the scheduling ENTRY
+    /// resolves to the WRONG body. Demonstrated, not forbidden by a grep.**
+    ///
+    /// ⛔ The first candidate discharged AC-5 by scanning for four container
+    /// spellings keyed by `StaticNodeId`. The Architect rejected that
+    /// (`evt_6sq2tq3v9jcd0`) and was right: a `Vec` indexed by `planned.entry.0`, a
+    /// type alias, or a bespoke collection all violate the ruled property while
+    /// such a scan stays green. **The property is about which value selects a body,
+    /// so the control has to be about that too.**
+    #[test]
+    fn keying_selection_by_the_scheduling_entry_does_not_resolve_the_body() {
+        // Promise class: durable invariant.
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+        let plan =
+            plan_static_transition_graph(&computational, &BTreeMap::new()).expect("plannable");
+
+        let occurrence = plan.root_static_origin().expect("root occurrence");
+        let entry = *plan.entries.first().expect("a root entry");
+        assert_ne!(
+            occurrence,
+            origin_of(entry),
+            "AC-5: the fixture must actually exhibit the split, or this test is vacuous"
+        );
+
+        // What the TAG resolves to: this match.
+        let by_tag = plan
+            .source_occurrence(occurrence)
+            .expect("the occurrence resolves its own body");
+        assert!(
+            matches!(by_tag, RuntimeExpr::ComputationalMatch { .. }),
+            "AC-5: the occurrence must resolve to the match itself"
+        );
+
+        // What an ENTRY-keyed lookup would resolve to: anything but this body. It
+        // is either a different term or no source occurrence at all -- both are
+        // wrong answers for "the body of this match", which is the point.
+        let by_entry = plan.source_occurrence(origin_of(entry));
+        assert!(
+            !matches!(by_entry, Ok(term) if std::ptr::eq(term, by_tag)),
+            "AC-5: the scheduling entry must not resolve to the occurrence's body; \
+             if it does, entry and occurrence have been conflated again and \
+             hard-stop #8 is back"
+        );
+    }
+
+    /// The definition arms of a `D2` plan, paired with each unit's declared
+    /// `(parameters, captures)`.
+    pub(in crate::cranelift_backend::planning::static_transition) fn d2_units(plan: &StaticTransitionPlan<'_>) -> Vec<(AbiUnitDefinition, (u32, u32))> {
+        plan.emittable_units()
+            .expect("validated units")
+            .into_iter()
+            .map(|unit| {
+                (
+                    unit.definition(),
+                    (unit.header().parameters, unit.header().captures),
+                )
+            })
+            .collect()
+    }
+
+    /// **`D2` — a transparent closure-seed declaration owns its own callable
+    /// unit, and an anonymous closure in the same program does not.**
+    #[test]
+    fn d2_a_transparent_closure_seed_declaration_owns_a_callable_unit() {
+        let (root, declaration) = d2_declaration_and_anonymous_closure();
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::d2", &declaration);
+        let plan = plan_static_transition_graph(&root, &declarations).expect("plannable");
+
+        let declaration_origin = plan
+            .declaration_occurrence_origin("decl:fixture::d2")
+            .expect("the transparent declaration has an occurrence origin");
+        let units = d2_units(&plan);
+
+        // The declaration's callable unit: owned by the DECLARATION's occurrence,
+        // carrying the closure's own arity. Asserted as an exact member rather
+        // than "some unit is a CallableDeclaration", so a unit owned by the
+        // wrong occurrence cannot satisfy it.
+        assert!(
+            units.contains(&(
+                AbiUnitDefinition::CallableDeclaration {
+                    declaration_origin,
+                    provenance: AbiCaptureProvenance::Lexical,
+                },
+                (1, 2),
+            )),
+            "D2: the declaration's closure-seed body must be a callable unit \
+             owned by the declaration, with the closure's own arity; got {units:?}"
+        );
+
+        // The discriminator: the anonymous closure stays an anonymous body. ⛔ Its
+        // defining origin is NOT the declaration's, and that is the whole content
+        // of "separately owned".
+        let anonymous = units
+            .iter()
+            .filter_map(|(definition, arity)| match definition {
+                AbiUnitDefinition::ClosureBody {
+                    defining_origin, ..
+                } => Some((*defining_origin, *arity)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let [(anonymous_origin, anonymous_arity)] = anonymous[..] else {
+            panic!("D2: expected exactly one anonymous ClosureBody unit, got {anonymous:?}");
+        };
+        assert_eq!(
+            anonymous_arity,
+            (0, 1),
+            "D2: the anonymous closure must keep its own arity, distinct from \
+             the declaration's -- reading the wrong unit's header would agree \
+             with the declaration's (1, 2) instead"
+        );
+        assert_ne!(
+            anonymous_origin, declaration_origin,
+            "D2: the anonymous closure body must not be owned by the declaration"
+        );
+    }
+
+    /// **`D2` causal control — the derivation, not the fixture, decides.**
+    ///
+    /// ⭐ Two mutations, and **each catches a defect the other cannot**. Ignoring
+    /// ownership reds only the positive arm; claiming universal ownership reds
+    /// only the discriminator. A single control here would leave one of the two
+    /// wrong derivations green, and both wrong derivations still compile.
+    #[test]
+    fn d2_the_owner_split_is_causal_in_both_directions() {
+        let (root, declaration) = d2_declaration_and_anonymous_closure();
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::d2", &declaration);
+
+        let arms = |units: &[(AbiUnitDefinition, (u32, u32))]| {
+            let callable = units
+                .iter()
+                .filter(|(definition, _)| {
+                    matches!(definition, AbiUnitDefinition::CallableDeclaration { .. })
+                })
+                .count();
+            let bodies = units
+                .iter()
+                .filter(|(definition, _)| {
+                    matches!(definition, AbiUnitDefinition::ClosureBody { .. })
+                })
+                .count();
+            (callable, bodies)
+        };
+
+        let plan = plan_static_transition_graph(&root, &declarations).expect("plannable");
+        assert_eq!(
+            arms(&d2_units(&plan)),
+            (1, 1),
+            "D2: the fixture must hold exactly one unit of each owner"
+        );
+
+        // Mutation 1 -- the pre-port derivation. The declaration loses its unit.
+        let ignored = super::super::abi::D2_IGNORE_DECLARATION_OWNERSHIP.with(|flag| {
+            flag.set(true);
+            let plan = plan_static_transition_graph(&root, &declarations).expect("plannable");
+            let observed = arms(&d2_units(&plan));
+            flag.set(false);
+            observed
+        });
+        assert_eq!(
+            ignored,
+            (0, 2),
+            "D2: ignoring the owner discriminator must restore the pre-port \
+             classification -- if this stays (1, 1) the split is not derived \
+             from declaration ownership at all"
+        );
+
+        // Mutation 2 -- the opposite defect. The anonymous closure is captured
+        // by the new arm, which the positive assertion alone accepts happily.
+        let claimed = super::super::abi::D2_CLAIM_ALL_BODIES_DECLARATION_OWNED.with(|flag| {
+            flag.set(true);
+            let plan = plan_static_transition_graph(&root, &declarations).expect("plannable");
+            let observed = arms(&d2_units(&plan));
+            flag.set(false);
+            observed
+        });
+        assert_eq!(
+            claimed,
+            (2, 0),
+            "D2: claiming universal declaration ownership must swallow the \
+             anonymous closure -- the discriminator is what rejects this"
+        );
+    }
+
+
+    /// **`RT-DECL-CLOSURE-PORT` `D4` fixture — one program holding BOTH target
+    /// classes, each actually referenced.**
+    ///
+    /// ⭐ A closure-seed declaration and a non-closure transparent declaration,
+    /// with a `DeclarationRef` to each, because `D4`'s property is a
+    /// **partition**. A fixture carrying only the closure seed cannot tell
+    /// "retargeted by seed class" apart from "retargeted unconditionally" — and
+    /// the unconditional reading is the hazard: a non-closure declaration's
+    /// entry *is* its unit, so moving its call breaks every declaration call
+    /// the corpus already makes.
+    ///
+    /// The two declarations carry different arities on purpose, so an assertion
+    /// cannot be satisfied by reading the wrong unit's header and still agree.
+    pub(in crate::cranelift_backend::planning::static_transition) fn d4_both_target_classes() -> (RuntimeExpr, RuntimeDeclaration, RuntimeDeclaration) {
+        let closure_seed = RuntimeDeclaration {
+            symbol: "decl:fixture::d4::callable".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::LexicalClosure {
+                    captures: vec![RuntimeExpr::Var(0), RuntimeExpr::Var(1)],
+                    params: vec!["arg0".to_string()],
+                    body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+                },
+            },
+            metadata: crate::RuntimeSymbolMetadata::empty(),
+        };
+        let thunk = RuntimeDeclaration {
+            symbol: "decl:fixture::d4::thunk".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::Value(RuntimeValue::Int(73.into())),
+            },
+            metadata: crate::RuntimeSymbolMetadata::empty(),
+        };
+        // ⭐ A THIRD closure, anonymous and at the root, carrying an arity that
+        // matches neither declaration. It is what makes "the static-body edge
+        // leaving THIS declaration's entry" distinguishable from "some
+        // static-body edge": with one closure in the program those two
+        // derivations agree, and a reverse body search would pass unnoticed.
+        let root = RuntimeExpr::Let {
+            value: Box::new(RuntimeExpr::Call {
+                callee: Box::new(RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: Vec::new(),
+                    body: Box::new(RuntimeExpr::Value(RuntimeValue::Int(7.into()))),
+                }),
+                args: Vec::new(),
+            }),
+            body: Box::new(RuntimeExpr::Let {
+                value: Box::new(RuntimeExpr::DeclarationRef {
+                    symbol: "decl:fixture::d4::callable".to_string(),
+                }),
+                body: Box::new(RuntimeExpr::DeclarationRef {
+                    symbol: "decl:fixture::d4::thunk".to_string(),
+                }),
+            }),
+        };
+        (root, closure_seed, thunk)
+    }
+
+    /// Every planned declaration call, as
+    /// `(recorded class, callee definition, callee (parameters, captures))`.
+    ///
+    /// ⭐ Joined through the **resolved call edge**, not through the recorded
+    /// class alone: the class is what the planner decided, and the descriptor is
+    /// where the decision landed. Reading only the class would let a correct
+    /// record sit above an edge that went somewhere else entirely.
+    pub(in crate::cranelift_backend::planning::static_transition) fn d4_declaration_calls(
+        plan: &StaticTransitionPlan<'_>,
+    ) -> Vec<(
+        DeclarationCallTargetClass,
+        AbiUnitDefinition,
+        (u32, u32),
+    )> {
+        let units = plan.emittable_units().expect("validated units");
+        let mut calls = plan
+            .emittable_call_edges()
+            .expect("validated call edges")
+            .into_iter()
+            .filter(|edge| edge.kind() == EmittableCallKind::Declaration)
+            .map(|edge| {
+                let unit = units
+                    .iter()
+                    .find(|unit| unit.function() == edge.callee())
+                    .expect("a declaration call edge names an emittable unit");
+                (
+                    plan.declaration_call_target_class(edge.call_site_origin())
+                        .expect("a planned declaration call records its target class"),
+                    unit.definition(),
+                    (unit.header().parameters, unit.header().captures),
+                )
+            })
+            .collect::<Vec<_>>();
+        calls.sort_by_key(|(class, _, _)| *class);
+        calls
+    }
+
+    /// **`D4` — a closure-seed declaration's call reaches its declaration-owned
+    /// callable unit, and a non-closure declaration's call does NOT move.**
+    ///
+    /// Promise class: durable invariant. It is asserted as an equality over the
+    /// whole declaration-call population, so a third class, a lost call, or a
+    /// duplicated one all red — none of which a per-call `contains` would see.
+    #[test]
+    fn d4_the_declaration_call_partition_follows_the_seed_class() {
+        let (root, closure_seed, thunk) = d4_both_target_classes();
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::d4::callable", &closure_seed);
+        declarations.insert("decl:fixture::d4::thunk", &thunk);
+        let plan = plan_static_transition_graph(&root, &declarations).expect("plannable");
+
+        let callable_origin = plan
+            .declaration_occurrence_origin("decl:fixture::d4::callable")
+            .expect("the closure-seed declaration has an occurrence origin");
+
+        assert_eq!(
+            d4_declaration_calls(&plan),
+            vec![
+                (
+                    DeclarationCallTargetClass::SchedulingEntry,
+                    AbiUnitDefinition::SchedulingEntry {
+                        ingress: abi::AbiSchedulingIngress::Empty,
+                    },
+                    (0, 0),
+                ),
+                (
+                    DeclarationCallTargetClass::CallableDeclaration,
+                    AbiUnitDefinition::CallableDeclaration {
+                        declaration_origin: callable_origin,
+                        provenance: AbiCaptureProvenance::Lexical,
+                    },
+                    (1, 2),
+                ),
+            ],
+            "D4: the closure-seed declaration's call must reach the unit that \
+             declares its one parameter and two captures, and the non-closure \
+             declaration's call must still reach its own zero-input scheduling \
+             entry"
+        );
+    }
+
+    // ─── RT-DECL-CLOSURE-PORT D2a — the function-unit population ───
+    //
+    // ⭐⭐ **One source declaration contributes ONE function.** Before `D2a` a
+    // closure-seed transparent declaration contributed two: its `StaticBody`
+    // target (the `D2` callable unit) and its own zero-input `SchedulingEntry`
+    // at the closure occurrence. The second has no lawful runtime meaning — it
+    // cannot call the callable unit without the missing parameters and
+    // captures, cannot return the closure, and cannot be a no-op without
+    // changing program meaning.
+
+    /// Every class in the ruled partition, in one program.
+    ///
+    /// ⚠ All four are present **and distinguishable**: the two declaration
+    /// closure forms differ in arity, and the anonymous closure differs from
+    /// both. A fixture carrying one closure cannot tell "the relation leaving
+    /// THIS declaration" from "some relation".
+    #[cfg(test)]
+    pub(in crate::cranelift_backend::planning::static_transition) fn d2a_every_partition_class() -> (RuntimeExpr, Vec<RuntimeDeclaration>) {
+        let lexical = RuntimeDeclaration {
+            symbol: "decl:fixture::d2a::lexical".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::LexicalClosure {
+                    captures: vec![RuntimeExpr::Value(RuntimeValue::Int(1.into()))],
+                    params: vec!["a".to_string()],
+                    body: Box::new(RuntimeExpr::Var(0)),
+                },
+            },
+            metadata: crate::RuntimeSymbolMetadata::empty(),
+        };
+        let seed = RuntimeDeclaration {
+            symbol: "decl:fixture::d2a::seed".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::Closure {
+                    captures: Vec::new(),
+                    params: vec!["p".to_string(), "q".to_string()],
+                    body: Box::new(RuntimeExpr::Var(0)),
+                },
+            },
+            metadata: crate::RuntimeSymbolMetadata::empty(),
+        };
+        let thunk = RuntimeDeclaration {
+            symbol: "decl:fixture::d2a::thunk".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::Value(RuntimeValue::Int(73.into())),
+            },
+            metadata: crate::RuntimeSymbolMetadata::empty(),
+        };
+        // The root, carrying an ANONYMOUS closure that must keep its own
+        // `ClosureBody` unit and its own emitted `StaticBody` call.
+        let root = RuntimeExpr::Let {
+            value: Box::new(RuntimeExpr::Call {
+                callee: Box::new(RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: Vec::new(),
+                    body: Box::new(RuntimeExpr::Value(RuntimeValue::Int(7.into()))),
+                }),
+                args: Vec::new(),
+            }),
+            body: Box::new(RuntimeExpr::Let {
+                value: Box::new(RuntimeExpr::DeclarationRef {
+                    symbol: "decl:fixture::d2a::lexical".to_string(),
+                }),
+                body: Box::new(RuntimeExpr::Let {
+                    value: Box::new(RuntimeExpr::DeclarationRef {
+                        symbol: "decl:fixture::d2a::seed".to_string(),
+                    }),
+                    body: Box::new(RuntimeExpr::DeclarationRef {
+                        symbol: "decl:fixture::d2a::thunk".to_string(),
+                    }),
+                }),
+            }),
+        };
+        (root, vec![lexical, seed, thunk])
+    }
+
+    /// The unit population as a sorted class census, plus the count of emitted
+    /// `StaticBody` **calls**.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend::planning::static_transition) fn d2a_population(plan: &StaticTransitionPlan<'_>) -> (Vec<&'static str>, usize) {
+        let mut classes = plan
+            .emittable_units()
+            .expect("validated units")
+            .into_iter()
+            .map(|unit| match unit.definition() {
+                AbiUnitDefinition::SchedulingEntry { .. } => "SchedulingEntry",
+                AbiUnitDefinition::CallableDeclaration { .. } => "CallableDeclaration",
+                AbiUnitDefinition::ClosureBody { .. } => "ClosureBody",
+                AbiUnitDefinition::ContinuationSpecialization { .. } => {
+                    "ContinuationSpecialization"
+                }
+                // `D2f`: named rather than filtered, so the census stays a
+                // TOTAL classification of the planned population. Absorbing the
+                // class into another label is how a new unit class becomes
+                // invisible to the very control that measures the population.
+                AbiUnitDefinition::StaticContinuationFusion { .. } => {
+                    "StaticContinuationFusion"
+                }
+            })
+            .collect::<Vec<_>>();
+        classes.sort_unstable();
+        let static_body_calls = plan
+            .emittable_call_edges()
+            .expect("validated call edges")
+            .into_iter()
+            .filter(|edge| edge.kind() == EmittableCallKind::StaticBody)
+            .count();
+        (classes, static_body_calls)
+    }
+
+    /// **`D2a` — the closed partition, stated as a population.**
+    #[test]
+    fn d2a_one_source_declaration_contributes_exactly_one_function() {
+        let (root, declarations) = d2a_every_partition_class();
+        let declarations = declarations
+            .iter()
+            .map(|declaration| (declaration.symbol.as_str(), declaration))
+            .collect::<BTreeMap<_, _>>();
+        let plan = plan_static_transition_graph_with_symbols(
+            &root,
+            &declarations,
+            &crate::NativeProcessSymbols::legacy_prelude(),
+            abi::AbiRootIngress::Value,
+            true,
+        )
+        .expect("the D2a fixture plans");
+        let (classes, static_body_calls) = d2a_population(&plan);
+        assert_eq!(
+            classes,
+            vec![
+                // the two closure declarations
+                "CallableDeclaration",
+                "CallableDeclaration",
+                // the anonymous closure at the root
+                "ClosureBody",
+                // the root, and the non-closure thunk declaration
+                "SchedulingEntry",
+                "SchedulingEntry",
+            ],
+            "D2a: root + thunk are the ONLY scheduling entries; each closure \
+             declaration contributes exactly one callable unit and no separate \
+             scheduling entry; the anonymous closure keeps its ClosureBody"
+        );
+        assert_eq!(
+            static_body_calls, 1,
+            "D2a: only the ANONYMOUS closure's static-body relation is an \
+             emitted call. A declaration-owned pair's relation is a \
+             definition/signature relation inside one unit, and emitting it as \
+             a call would reintroduce the phantom from the other side"
+        );
+        // Cross-plane one-for-one: the semantic partition, the ABI descriptors,
+        // and the declared function population must state the same result.
+        // ⛔ A repair that only skipped `emittable_units` would leave a phantom
+        // owner here, which is one of the four explicitly rejected half-measures.
+        assert_eq!(
+            plan.semantic.functions.len(),
+            classes.len(),
+            "D2a: the semantic function population must equal the ABI \
+             descriptor population exactly"
+        );
+    }
+
+    /// **`D2a` — the substitution is CAUSAL.**
+    #[test]
+    fn d2a_retaining_the_obsolete_scheduling_unit_restores_the_phantom() {
+        let (root, declarations) = d2a_every_partition_class();
+        let declarations = declarations
+            .iter()
+            .map(|declaration| (declaration.symbol.as_str(), declaration))
+            .collect::<BTreeMap<_, _>>();
+        let retained = with_d2a_population_mutation(
+            D2aPopulationMutation::RetainObsoleteSchedulingUnit,
+            || {
+                plan_static_transition_graph_with_symbols(
+                    &root,
+                    &declarations,
+                    &crate::NativeProcessSymbols::legacy_prelude(),
+                    abi::AbiRootIngress::Value,
+                    true,
+                )
+                .map(|plan| d2a_population(&plan).0)
+            },
+        );
+        let retained = retained.expect("the pre-D2a population still plans");
+        assert_eq!(
+            retained.iter().filter(|class| **class == "SchedulingEntry").count(),
+            4,
+            "D2a: with the substitution suppressed, BOTH closure declarations \
+             get their obsolete zero-input scheduling entry back — 4 entries \
+             where the ruled partition has 2. If this count did not move, the \
+             partition assertion above is not caused by D2a: {retained:?}"
+        );
+    }
+
+    /// **`D4` — the partition is CAUSAL in both directions.**
+    ///
+    /// ⭐ Two mutations, because one cannot defeat a split. Without
+    /// `NeverRetarget` the positive assertion above is consistent with the
+    /// retarget never having been installed on a plan that happened to agree;
+    /// without `AlwaysRetarget` it is consistent with a blanket retarget that
+    /// drags the thunk along and is only accidentally right about the closure
+    /// seed.
+    #[test]
+    fn d4_the_declaration_call_partition_is_causal_in_both_directions() {
+        let (root, closure_seed, thunk) = d4_both_target_classes();
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::d4::callable", &closure_seed);
+        declarations.insert("decl:fixture::d4::thunk", &thunk);
+
+        let under = |mutation: D4DeclarationTargetMutation| {
+            D4_DECLARATION_TARGET_MUTATION.with(|cell| {
+                cell.set(mutation);
+                let outcome = plan_static_transition_graph(&root, &declarations)
+                    .map(|plan| d4_declaration_calls(&plan));
+                cell.set(D4DeclarationTargetMutation::Exact);
+                outcome
+            })
+        };
+
+        // Direction 1 -- the pre-`D4` world, and `D2a` has made it STRICTLY
+        // unreachable rather than merely wrong.
+        //
+        // ⭐ Before `D2a` this mutation planned: both calls landed on a
+        // zero-input scheduling entry, so the closure-seed reference called a
+        // thunk declaring none of its parameters or captures. That wrong-arity
+        // target was the thing `D4` removed. `D2a` removes the target itself —
+        // a closure-seed declaration's scheduling entry is no longer a function
+        // unit — so the same mutation now cannot be planned at all.
+        //
+        // ⚠ The assertion was updated because the mechanism got stronger, not
+        // because the control was re-fit to whatever the code now does: the
+        // direction being measured is unchanged (suppress the retarget, prove
+        // the positive partition was caused by the seed discriminator), and it
+        // is now measured by a refusal instead of by an arity.
+        let never = under(D4DeclarationTargetMutation::NeverRetarget);
+        let Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason))) = never
+        else {
+            panic!(
+                "D4/D2a: with the retarget suppressed the closure-seed call \
+                 targets a scheduling entry that D2a no longer seeds as a unit, \
+                 so planning must refuse it: {never:?}"
+            );
+        };
+        assert!(
+            reason.contains("declaration call edge target is not its function unit's seed"),
+            "D4/D2a: the refusal must name the missing unit seed. Any other \
+             invariant would leave the suppressed retarget unpinned: {reason}"
+        );
+
+        // Direction 2 -- the ruled-out reverse body search. It lands on the
+        // anonymous closure's body, which is a `ClosureBody` unit owned by
+        // nobody's declaration. ⛔ It must not merely produce a different
+        // partition: a declaration call to an anonymous closure body is not a
+        // lawful target at all, so planning refuses it.
+        let any = under(D4DeclarationTargetMutation::AnyStaticBody);
+        let Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason))) = any
+        else {
+            panic!(
+                "D4: a declaration call retargeted by reverse body search reaches \
+                 an anonymous closure body, which must be refused rather than \
+                 planned: {any:?}"
+            );
+        };
+        assert!(
+            reason.contains("neither a scheduling entry nor a callable declaration unit"),
+            "D4: the refusal must name the target CLASS -- a refusal for some \
+             other invariant would leave the wrong-owner target unpinned: {reason}"
+        );
+    }
+}
