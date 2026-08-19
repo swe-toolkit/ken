@@ -359,3 +359,275 @@ open the phase record to learn them.
 > - **The source machine is relocation only in this phase**, never a transition
 >   IR. Generated traps receive **no fabricated source origin**.
 
+
+---
+
+## D0 ledger, re-measured at `11a590363`
+
+The Stage A inventories (taken at `4de486514`) were read as a starting point
+and re-measured here at `11a590363` — the item-6 release commit, which already
+carries item 4's D1/D2 (units) and item 5's D1/D2 (occurrences). Every count is
+re-derived at this SHA with the selector stated; the census pages are not cited
+as authority.
+
+### Churn gate, re-derived (the frame's own instruction)
+
+The frame orders this slice last among the early planner domains so the
+continuation/evidence surface is not re-homed while it is still moving. The
+Steward's ruling (`evt_30wcfm1bpswwj`) holds the gate: the two ready-but-parked
+continuation nodes — `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` and
+`RT-CONTSRC-CALLABLE-CONTRACT` — are parked (not dispatched) under the
+operator's single-lane priority, so neither can land while item 6 is in flight.
+"No continuation churn lands mid-slice" is guaranteed by the parking, not by the
+nodes being merged. They re-anchor to the moved child module when unparked; that
+cost falls on them, not on this slice. Recorded, not silent.
+
+### Boundary proposal — the design judgment this D0 discharges
+
+The continuations domain is **continuation keys, continuation-seat
+construction, and the evidence surfaces keyed on them** — plus the
+static-continuation **fusion** identity plane, which item 5's landed ledger
+grouped under this same owner ("Continuations + fusion",
+`RT-PLANNER-UNITS-ABI-SPLIT.md` exclusion table). `StaticTransitionPlan` stays
+the parent container; only the continuation-owned types, records, validations
+and views move.
+
+**MOVED → new `planning/static_transition/continuations.rs` child module:**
+
+- 58 non-private types (the whole `Continuation*`/`Composed*`/`Required*`/
+  `Envelope*`/`Checked*`/`StaticContinuationFusion*`/`Fusion*` vocabulary plus
+  `BodyEmissionDisposition`) — full name list in the type ledger below.
+- 19 private records/keys (`ContinuationInputProjection`,
+  `ContinuationEmitterFrame`, `ContinuationValueSourceAuthority`,
+  `ContinuationProducerEnvironment`, `ContinuationProjectionOmission`,
+  `ContinuationInternMutation`, `ContinuationProductionMutation`,
+  `ContinuationWorkerProvenance`, `ContinuationSpecializationKey`,
+  `PlannedContinuationSpecialization`, `ContinuationSpecializationCallToken`,
+  `PlannedContinuationSpecializationCall`,
+  `ContinuationConsumingOccurrenceSeed`, `ContinuationConsumingOccurrenceSeeds`,
+  `ContinuationRequiredConsumingOccurrence`, `ContinuationDiscovery`,
+  `ContinuationConsumingOccurrenceSeedMutation`, `CheckedBinderProvenance`,
+  `CheckedTransportScope`).
+- The 45 continuation-owned free functions (name list in the fn ledger) and
+  the inherent methods on the 58 moved types (each moved type's `impl` block
+  moves with it).
+- The Steward's D0 ruling (`evt_30wcfm1bpswwj`), carried verbatim:
+  `consuming_occurrence_from_seed` (~:10991), `rederive_consuming_occurrence`
+  (~:11148), and `ContinuationSourceSlotAuthority` (:1434) are part of the
+  continuations domain and move WITH it.
+
+**RETAINED — `StaticTransitionPlan` stays the parent.** Its continuation-keyed
+FIELDS (`continuation_specializations`, `continuation_specialization_calls`,
+`required_consumer_projections`, `continuation_contexts`,
+`static_continuation_fusions`, …) stay on it (storage is the container's); only
+the field TYPES move. The origin-enumerating / aggregate / effect / join /
+case-emission views remain with their domains; `StaticOriginId`/`StaticNodeId`
+remain occurrence/graph-owned (item 5, not re-opened).
+
+**No genuine fork found.** The one boundary that could have forked — is fusion
+continuations-owned or a separate later slice? — is settled by item 5's landed
+ledger, which already grouped `StaticContinuationFusion*`/`Fusion*` under this
+owner. Recording it here as considered-and-settled-by-precedent, not re-derived.
+
+### Symbol ledger — types (declared population: 91 non-private + 53 private)
+
+Non-private selector, unchanged from items 4/5:
+
+```sh
+grep -nE '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+(struct|enum|type)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*' \
+  crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs
+```
+
+Returns **91** at `11a590363`. Private selector `^(struct|enum|type)` (column 0)
+returns **53**. Blind spot: private types (closed below), macro-produced decls
+(macro_rules! count 0), split-line decls, traits, consts, fns, fields.
+
+**Moved (58 non-private + 19 private = 77):**
+
+Non-private (58), by name: `ContinuationSpecializationId`,
+`ContinuationEmissionOwner`, `ContinuationContextId`, `PlannedContinuationContext`,
+`ContinuationContextView`, `ContinuationInputSource`, `ProducerLocalBinding`,
+`ProducerLocalLocator`, `ContinuationSourceCoordinate`,
+`ContinuationEnvironmentClaimOver`, `ContinuationEnvironmentClaim`,
+`ContinuationEnvironmentDraft`, `ContinuationFrameRequirement`,
+`ContinuationFrameIdentity`, `D3bFinalizationPerturbation`,
+`ContinuationAvailabilityOver`, `ContinuationAvailabilityViews`,
+`ContinuationAvailabilityDraft`, `ContinuationSourceSlotAuthority`,
+`ContinuationWorkerCaptureSource`, `ContinuationWorkerCaptureProvenance`,
+`ContinuationConsumingOccurrence`, `RequiredConsumerProjection`,
+`ContinuationCallIdentity`, `ContinuationUnitView`,
+`ContinuationOrdinaryEnvelopeRole`, `ComposedWorkerRouteEligibility`,
+`ComposedWorkerView`, `ComposedCallTarget`, `ComposedCallTargetDefect`,
+`ContinuationInputView`, `ContinuationCallView`, `ContinuationResultEdge`,
+`FusionComposedEdge`, `FusionOwnedOuterRealization`, `FusionCompositionLayer`,
+`AdmittedContinuationDiscovery`, `RequiredConsumerProjectionDisposition`,
+`ContinuationRequiredConsumerObservation`, `RequiredConsumerProjectionMutation`,
+`EnvelopeDefect`, `CheckedCaseBinderRole`, `CheckedCaseBinderLayout`,
+`CheckedIhBinding`, `CheckedTransportCoordinate`, `StaticContinuationFusionId`,
+`StaticContinuationFusionKey`, `StaticContinuationFusionDescriptor`,
+`StaticContinuationFusionPlan`, `StaticContinuationFusionView`,
+`BodyEmissionDisposition`, `FusionOwnedBody`, `FusionRegionClaim`,
+`FusionClaimRefusal`, `FusionRegionClaimLedger`, `FusionClaimParameterMutation`,
+`FusionProducerCaptureMutation`, `StaticContinuationFusionCandidate`.
+
+Private (19): the name list in the boundary section above.
+
+**Excluded (33 non-private + 34 private), grouped by owning domain — none
+moved:**
+
+| Excluded because owned by | Names (count) |
+| --- | --- |
+| Declaration-call | `DeclarationCallTargetClass` (1) |
+| Joins/traps (`RT-PLANNER-JOINS-TRAPS-SPLIT`) | `JoinResultRepresentation`, `JoinPlanToken`, `PlannedTrapIdentity`, `D4bVerdict`, `D2jCause` (5) |
+| Case-emission | `CaseEmissionStatus` (1) |
+| Root/parent-shared, stays with `StaticTransitionPlan` | `StaticTransitionPlan`, `ScaleBPlanCensus`, `PlannedResultFieldKindForTest`, `PlannedReferentLifetime` (4) |
+| Aggregates (`RT-PLANNER-AGGREGATES-SPLIT`) | `AggregateOccurrenceId`, `AggregateOccurrenceProducer`, `SynthesizedAggregateRole`, `PlannedAggregateShape`, `PlannedAggregateView`, `PlannedAggregateAllocation`, `PlannedAggregateChild`, `PlannedAggregateOwnership`, `SynthesizedAggregateRoot`, `SynthesizedAggregateStep`, `SynthesizedAggregatePath`, `SynthesizedAggregateNode`, `SynthesizedDynamicSet`, `SynthesizedHostResultTree` (14) |
+| Effects (`RT-PLANNER-EFFECTS-SPLIT`) | `EffectSeatPhase`, `EffectSeatOperation`, `EffectSeatSlot`, `EffectSeatNeed`, `EffectSeatAvail`, `PlannedEffectSeat`, `EffectSeatPlanMutation` (7) |
+| Test-fixture enum (item 5's D2 seam) | `FixtureWitness` (1) |
+
+Private (34) are graph/planner/case/join/boundary-owned and stay:
+`RecursiveLoweringFrameGuard` (lowering-guard), `PlannedExpr`, `PlannedEntryBody`,
+`StaticNodeId`, `StaticEdgeId`, `StaticSourceId`, `PersistentNodeId`,
+`TransitionKind`, `EdgeKind`, `D4DeclarationTargetMutation`, `StoreKind`,
+`PlannedHelperKey`, `DynamicActivationFrame`, `PersistentStoreNode`,
+`StaticNode`, `StaticEdge`, `EdgeEvidence`, `PlanContext`, `PlannedJoinResult`,
+`CaseProducerSet`, `CaseProducerFlowKind`, `CaseProducerFlowEdge`,
+`CaseProducerAuthority`, `PlannedCaseEmission`, `BoundaryACensus`,
+`BoundaryB1Census`, `Planner`, `ResultPhase`, `ResultPhaseSummary`,
+`CaseProducerFact`, `SynthesizedTreeResolution`, `FlattenedSynthesizedUse`,
+`ProducerLocalKind`, `StaticWorkerMemberMutation`.
+
+Reconciliation: `91 = 58 + 1 + 5 + 1 + 4 + 14 + 7 + 1`;
+`53 = 19 + 34`. `91 + 53 = 144`, every name above appears in exactly one row.
+
+### Symbol ledger — functions and methods (declared population: 269 `pub fn` + 45 private free fns)
+
+Selector (per file, excluding `const fn` by `grep -v`):
+
+```sh
+grep -nE '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+(async[[:space:]]+)?fn[[:space:]]+[A-Za-z_]' <file>
+```
+
+Returns **269** at `11a590363`. Plus 45 top-level private free functions owned
+by continuations (moved, name list below).
+
+**Moved free functions (45, private), by name:** `finalize_continuation_frame`,
+`finalize_continuation_claim`, `finalize_continuation_availability`,
+`finalize_continuation_availability_plan`, `continuation_input_view`,
+`continuation_result_origins`, `build_continuation_worker_provenance`,
+`continuation_owner_entry_sources`, `producer_local_source`,
+`producer_local_value`, `walk_continuation_value_environment`,
+`validate_continuation_source_slot`, `continuation_owner_source_root`,
+`exact_continuation_source_environment`,
+`continuation_emission_seat_environment`, `current_lexical_availability`,
+`exact_continuation_projection`, `exact_continuation_ordinary_parameters`,
+`continuation_keys_equal_under_mutation`, `intern_specialization`,
+`with_continuation_consuming_occurrence_seed_mutation`, `envelope_defect`,
+`derive_checked_transport`, `build_checked_transport`, `primary_fusion_key`,
+`rederive_fusion_key`, `fusion_claim_error`,
+`fusion_unique_static_body_triple`, `fusion_resolved_binder_body`,
+`fusion_through_checked_wrappers`, `enumerate_live_fusion_candidates`,
+`enumerate_live_fusion_candidates_with_input_size`,
+`fusion_root_source_for_future_enumerator`, `admitted_continuation_discoveries`,
+`initial_continuation_discoveries`, `continuation_result_constructor_identities`,
+`consuming_occurrence_from_seed`, `required_consuming_occurrence_for_alternative`,
+`derive_required_consumer_occurrence`, `rederive_consuming_occurrence`,
+`validate_continuation_consuming_occurrences`,
+`build_continuation_specialization_plan`,
+`validate_continuation_specialization_closure`,
+`validate_required_consumer_projections`,
+`validate_continuation_specialization_plan`.
+
+**Moved methods:** the inherent `impl` blocks of the 58 moved types move with
+their types (each accessor/projection is enumerated in D1's transport manifest,
+per item 4's method-ledger discipline). The `StaticTransitionPlan`
+continuation-owned view methods (the `pub(in crate::cranelift_backend)`
+`continuation_*` / `composed_*` / `fusion_*` projections, e.g.
+`continuation_units`, `continuation_context_for`, `continuation_fusions`,
+`continuation_inputs`, `continuation_result_edges_owned_by`,
+`ordinary_continuation_targets`, `install_static_continuation_fusions`,
+`install_fusion_owned_bodies`, `observed_fusion_definition_count`,
+`rederive_continuation_consuming_occurrence`) move too — the full list is D1's
+AC-3 manifest, gated on this D0's boundary.
+
+**Closure for the remainder:** none moved. They are the aggregate/effect/join/
+case-emission/root-shared methods and free functions, and the occurrence/
+semantic-IR substrate items that items 4/5 already assigned. Their per-item
+ownership is their claiming slice's own D0 (the same narrowing items 4/5 applied).
+
+### Symbol ledger — consts and statics (declared population: 3 consts + 28 `thread_local!` keys)
+
+True `const` items: **3** (`MAX_HELPERS_PER_STATIC_SOURCE`,
+`CRANELIFT_HOST_EFFECT_CONSUMERS_V1`, `D2J_DECLARATION`) — none moved.
+`thread_local!`-scoped `static` keys: **28** — none individually moved; the
+continuation/fusion mutation cells (`D3_C4_MATCHES_CLOSURE_BODY_ONLY` in
+`abi.rs`, the `D2a`/`BodyOccurrence` cells in `semantic_ir`) are test seams and
+stay with their files. The continuation-owned mutation cells in
+`static_transition.rs` (`CONTINUATION_PRODUCTION_MUTATION`,
+`CONTINUATION_INTERN_MUTATION`, …) move with their domain in D1.
+
+### Symbol ledger — traits (0) · modules/re-exports (0 `pub mod`, re-export paths unchanged) · macro-produced items (0)
+
+`pub trait` count 0; `macro_rules!` count 0. The parent's `pub use`
+re-export blocks are unchanged by this move (no continuation name is re-exported
+through the parent today — checked, not assumed).
+
+### Source-text oracles and `include_str!` paths
+
+`include_str!` count in the bound file: **2** at `11a590363` — `b2r_ac6` and
+`b2r_ac7` (both reading `static_transition/abi.rs`, ~:26639/:26690). The
+occurrence-owned `the_semantic_seed_api…` moved to `occurrences.rs` in item 5, so
+it is no longer in this file — re-derived, not quoted from item 5's ledger. All
+2 inert to THIS move. The control.rs
+`the_owner_classification_has_a_closed_production_naming_inventory` and
+`the_backend_production_surface_inventory_is_closed` pins (item 5's ledger) will
+need D1 re-anchoring when `continuations.rs` becomes a production module — the
+module-inventory census adds a row; ledgered here, re-anchored in D1.
+
+### Test-property ledger (for D2 — the companion test move)
+
+Tests whose PRIMARY discriminated property is continuation-key / continuation-
+seat / continuation-evidence / fusion, re-derived at `11a590363`. Class per the
+four-way partition (domain / fixture / mutation control / end-to-end).
+
+- static_transition.rs `mod tests`: **63** continuation-family tests across the
+  8 families actually present (re-measured by prefix at `11a590363`): `d2f` 7,
+  `d2i` 5, `d2j` 4, `d2g` 9, `d3` 11, `d8` 9, `contspec` 9, `contsrc` 9 —
+  PLUS the 7 binder/IH tests exercising the continuation-owned checked-binder /
+  checked-transport surface (`d2e_ih_binding_survives_let_and_nested_match_indirection`,
+  `d2e_ih_binding_does_not_leak_into_a_closure_body`,
+  `d2e_binder_role_separates_a_hypothesis_from_an_ordinary_child`,
+  `d2e_binder_role_hypothesis_prefix_is_reverse_declaration_order`,
+  `d2e_binder_role_past_the_case_run_is_the_frame_environment`,
+  `d2e_binder_role_a_nonrecursive_case_has_no_hypothesis_slot`,
+  `governed_nested_bracket_uses_canonical_four_seat_binder_roles`; classified
+  domain — they discriminate `CheckedCaseBinderRole`/`CheckedIhBinding`/
+  `CheckedTransportCoordinate`, three of the 58 moved types) = **70** total →
+  move to `continuations.rs` `#[cfg(test)] mod tests` in D2. The exact per-test
+  class is D2's re-measurement by name.
+- lowering/core/tests/control.rs (control.rs-only families, per the Architect's
+  vote): `d5a` 16, `d6` 16, `d8m` 6, `d8p` 3, `r3` 11, `required_consumer` 4,
+  `contkey` 4, plus the contspec/contsrc emission controls.
+  **Architect's D0 vote (evt_3478yq3amwf4y): `d5a_*` MOVE to the LCA** (primary
+  property = planner-side continuation marker/seat/generated-context evidence);
+  **`d8m_*`/`d8p_*` STAY as Class-4 end-to-end** (transport discrimination
+  crossing planning through execution). The rest (d6, r3, required_consumer,
+  contkey) are re-classified by primary property in D2's by-name re-measurement.
+
+### Blind spots (stated, not closed) + evidence seats
+
+The type selector cannot see private types (closed by the private selector),
+macro-produced decls (0), split-line decls (none in the moved surface), traits
+(0), consts/fns (separate selectors above), fields (the continuation-keyed
+`StaticTransitionPlan` fields are named in the boundary section, not counted).
+A declaration silent in the tables above is a gap, not a non-event.
+
+- **Intention producer:** this D0 slice (the ledger).
+- **Independent artifact observer / evidence decoder:** the selectors above, run
+  against the tree at `11a590363`; D1's `scripts/ken-cargo` compile is the
+  decode for the actual move.
+- **Closeout / publication seat:** D1's AC-3 transport manifest +
+  `[[RT-BACKEND-SPLIT-CLOSURE]]` (item 18).
+
+This slice's own transfer (the ledger) is complete; **phase closure is NOT
+claimed**.
