@@ -13,9 +13,10 @@ use std::collections::BTreeSet;
 use super::semantic_ir::SemanticSourceKind;
 use super::{
     planner_capacity_error, planner_error, runtime_value_lifetime,
-    CraneliftBackendError, PlannedReferentLifetime, Planner, PredeclaredFunctionId,
+    CraneliftBackendError, PlannedReferentLifetime, PredeclaredFunctionId,
     StaticNodeId, StaticTransitionPlan,
 };
+use super::construction::Planner;
 #[cfg(test)]
 use super::AC4_RESOLUTIONS;
 use crate::RuntimeExpr;
@@ -999,7 +1000,10 @@ mod tests {
     /// child position at all.
     #[test]
     fn the_semantic_seed_api_accepts_only_occurrence_origins() {
-        let source = include_str!("../static_transition.rs");
+        // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — `expression_node` and
+        // `expression_seed` moved into `construction.rs` with the rest of
+        // `Planner`'s own impl; this oracle follows them.
+        let source = include_str!("../static_transition/construction.rs");
         // ⚠ Count DECLARATION lines, not substring hits: this test's own
         // assertion text mentions both spellings, and a substring oracle would
         // fire on the prose that denies them.

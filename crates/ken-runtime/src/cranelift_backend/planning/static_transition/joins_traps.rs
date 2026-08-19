@@ -21,8 +21,9 @@ use std::collections::BTreeSet;
 
 use super::{
     planner_capacity_error, planner_error, AbiSchedulingIngress, AbiSlotKind, AbiUnitDefinition,
-    CraneliftBackendError, Planner, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
+    CraneliftBackendError, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
 };
+use super::construction::Planner;
 use crate::{RuntimeExpr, RuntimePartiality, RuntimeTrap, RuntimeTrapCode};
 
 /// The complete, pre-emission result representation of one source join.

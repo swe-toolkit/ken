@@ -28,7 +28,7 @@ use super::{
 };
 use crate::boundary_value::BoundaryReferentOwner;
 #[cfg(test)]
-use super::{D4B_ADMISSION, D4B_ADMISSION_ARMED, D4bVerdict};
+use super::closure::{D4B_ADMISSION, D4B_ADMISSION_ARMED, D4bVerdict};
 use crate::RuntimeExpr;
 
 mod fusion;
