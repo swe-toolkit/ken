@@ -422,7 +422,7 @@ reading that would also move the dense semantic-IR `child_origins` table
 contradicts item 4's landed exclusion, so it is not genuinely defensible; it is
 recorded here as considered-and-rejected rather than silent.
 
-### Symbol ledger — types (declared population: 117 non-private + 56 private)
+### Symbol ledger — types (declared population: 117 non-private + 57 private)
 
 Selector (non-private types), unchanged from item 4:
 
@@ -437,10 +437,14 @@ Returns **117** at `c4f79f7fa`: 90 in `static_transition.rs`, 27 in
 decls, traits, consts, fns, fields.
 
 **Private types, closed rather than counted.** The private selector
-`^(struct|enum|type)` (column 0) returns **55** top-level private types in
-`static_transition.rs` and **1** in `semantic_ir.rs` (`OwnershipPartition`).
-All 56 are reconciled below; none are macro-produced (macro_rules! count 0 in
-both files).
+`^(struct|enum|type)` (column 0) returns **56** top-level private types in
+`static_transition.rs` and **1** in `semantic_ir.rs` (`OwnershipPartition`) —
+57 total, all reconciled. None are macro-produced (macro_rules! count 0 in
+both files). The body-less forward decl `struct RecursiveLoweringFrameGuard;`
+(`static_transition.rs:73`) is a member of this class: it has impl+Drop at
+`:76-93` and a production use at `:13004`
+(`RecursiveLoweringFrameGuard::enter()`); it is **explicitly retained** with
+the lowering-guard domain, not occurrence.
 
 **Moved (4):**
 
@@ -451,7 +455,7 @@ both files).
 | `PlannedOccurrenceChildAuthority` | `static_transition.rs:490` → `occurrences.rs` | private |
 | `PlannedOccurrenceAuthority` | `static_transition.rs:498` → `occurrences.rs` | private |
 
-**Excluded (113 non-private + 53 private), named individually and grouped by
+**Excluded (113 non-private + 54 private), named individually and grouped by
 owning domain — none moved:**
 
 | Excluded because owned by | Non-private names (count) |
@@ -465,13 +469,20 @@ owning domain — none moved:**
 | Semantic-IR shared substrate in `semantic_ir.rs` | `ConstructorIdentity`, `SynthesizedFixedConstructorRole`, `SynthesizedIoErrorRole`, `SynthesizedConstructorRole`, `FieldIdentity`, `SemanticProgramId`, `CaptureLayoutId`, `SemanticOwner`, `DenseRange`, `SemanticOpcode`, `RuntimeExprShape`, `SemanticSourceKind`, `SemanticSourceSeed`, `SemanticOperandElement`, `SemanticAtomKind`, `SemanticMaterialArena`, `CaptureSlot`, `RuledChild`, `SemanticRecord`, `SemanticProgram`, `CaptureLayout`, `PredeclaredFunction`, `SemanticDescriptor`, `SemanticPlane`, `D2aPopulationMutation`, `BodyOccurrenceMutation` (26) |
 
 Non-private reconciliation: `90 = 58 + 14 + 7 + 5 + 2 + 4`;
-`27 = 1 moved + 26 excluded`. `90 + 27 = 117`, and the 3 private occurrence
-records are the only private types that move; the other 53 private types
+`27 = 1 moved + 26 excluded`. `90 + 27 = 117`. Private reconciliation:
+`56 + 1 = 57`, of which 3 move (the occurrence records) and 54 are retained.
+The private class is NARROWED, not fully enumerated: the 3 moved records are
+named in the moved table above; `RecursiveLoweringFrameGuard` (`st:73`) is
+named retained (lowering-guard); `OwnershipPartition` (`sem:892`) is named
+retained (semantic-IR substrate). The remaining 52 private types
 (`StaticNodeId`, `StaticEdgeId`, `StaticSourceId`, `Planner`, `StaticNode`,
 `StaticEdge`, `EdgeKind`, `TransitionKind`, `PlannedCaseEmission`,
-`CaseProducerAuthority`, `CaseProducerFlowEdge`, `PlanContext`, …) are
+`CaseProducerAuthority`, `CaseProducerFlowEdge`, `PlanContext`, and the
+continuation/case-emission/fusion private records) are
 graph/planner/case-emission/continuation-owned and stay in
-`static_transition.rs`; `OwnershipPartition` stays in `semantic_ir.rs`.
+`static_transition.rs`; their per-item ownership is the claiming slices' own
+D0s, NOT this ledger's — AC-1's declared-population narrowing, stated rather
+than asserted as "all reconciled".
 
 ### Symbol ledger — functions and methods (declared population: 293 `pub fn`)
 
@@ -503,15 +514,24 @@ shared representation methods. They stay where they are today; their ownership
 is their claiming slice's own D0, not this one's (the same narrowing item 4
 applied, AC-1's declared-population clause).
 
-### Symbol ledger — consts and statics (declared population: 5 consts + 31 `thread_local!` keys)
+### Symbol ledger — consts and statics (declared population: 4 consts + 31 `thread_local!` keys)
 
 ```sh
 grep -nE '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+const[[:space:]]+' <file> | grep -v 'const fn'
 grep -nE '^[[:space:]]*(pub(\([^)]*\))?[[:space:]]+)?static[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*:' <file>
 ```
 
-True `const` items: **5** (3 `static_transition.rs`, 2 `semantic_ir.rs`) — none
-moved. `thread_local!`-scoped `static` keys: **31** (28 + 3) — none moved; the
+True `const` items: **4** (3 `static_transition.rs`, 1 `semantic_ir.rs`) — none
+moved. Corrected from a first pass that read 5: the phantom 5th was
+`semantic_ir.rs:473` `pub(super) const fn control(...)` — a `const fn`, which
+the selector's own `grep -v 'const fn'` excludes — and the `const { ... }`
+blocks at `semantic_ir.rs:991`/`:1080` are `thread_local!` initializer
+expressions, not `const` items. The four true consts
+(`MAX_HELPERS_PER_STATIC_SOURCE:59`, `CRANELIFT_HOST_EFFECT_CONSUMERS_V1:5309`,
+`D2J_DECLARATION:18851`, `SynthesizedFixedConstructorRole::ALL:90`) are none
+occurrence-owned, and the moved fns' bodies carry zero references to
+`MAX_HELPERS_PER_STATIC_SOURCE` — "none moved" holds.
+`thread_local!`-scoped `static` keys: **31** (28 + 3) — none moved; the
 occurrence domain has no mutation cell of its own (its `D2a`/`BodyOccurrence`
 mutation cells live in `semantic_ir` and stay, per the substrate exclusion).
 
