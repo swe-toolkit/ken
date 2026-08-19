@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-ROOT-CLOSURE-SPLIT
 title: "Remeasure the planner residue after the six domain moves and close static_transition.rs -- a fresh node, not a renamed item 3, and if the parent is already under 10k it records that and extracts nothing"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none

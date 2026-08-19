@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-JOINS-TRAPS-SPLIT
 title: "Move the joins and traps domain out of planning/static_transition.rs -- the last named planner domain, and generated traps receive no fabricated source origin"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
