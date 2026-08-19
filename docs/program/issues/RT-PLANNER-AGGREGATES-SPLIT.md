@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-AGGREGATES-SPLIT
 title: "Move the aggregates domain out of planning/static_transition.rs -- aggregate allocation events, relation closures and their planner-side lifecycle"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none

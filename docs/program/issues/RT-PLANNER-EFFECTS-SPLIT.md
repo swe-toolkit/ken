@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-EFFECTS-SPLIT
 title: "Move the effects domain out of planning/static_transition.rs -- effect seats, seat groups and effect-seat closures on the planner side"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
