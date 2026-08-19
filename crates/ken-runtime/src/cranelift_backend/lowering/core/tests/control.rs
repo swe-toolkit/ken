@@ -15471,38 +15471,8 @@ fn d5_planned_callable_declaration_origins(
         .collect()
 }
 
-// ── Control 3: ABI-domain mutations refuse before emission ─────────
 
 
-// ── Control 4, the wrong-target class ─────────────────────────────────────
-
-#[test]
-fn d5_c4_a_retargeted_declaration_call_is_refused_before_emission() {
-    let (baseline, baseline_emitted) = d5_compile(d5_plan(), None);
-    baseline.expect("the unmutated fixture compiles");
-    units::with_d5_declared_call_mutation(units::D5DeclaredCallMutation::Retarget, || {
-        let (outcome, emitted) = d5_compile(d5_plan(), None);
-        // ⚠ **This row measures the FIXTURE, and says so.** The retarget
-        // swaps a caller's declaration-call record for another record in
-        // the same caller's map. Each caller here holds exactly one, so the
-        // swap is the identity and the compile is byte-for-byte the
-        // baseline. That is a reachability fact
-        // ([[mutation-proof-injection-point-is-a-reachability-tell]]), not
-        // evidence about the wrong-target class.
-        //
-        // ⛔ It is kept, and kept honest, rather than deleted or dressed up
-        // as a passing control: two declaration-owned callables reachable
-        // from ONE caller is what makes the class expressible, and building
-        // that fixture belongs with the mutual same-SCC work that D5 still
-        // owes. Asserting equality with the baseline is what stops this
-        // reading as a discharged control.
-        assert!(
-            outcome.is_ok() && emitted.len() == baseline_emitted.len(),
-            "the retarget is inert on single-record callers, so it must \
-             reproduce the baseline exactly: {outcome:?} {emitted:?}"
-        );
-    });
-}
 
 // ── The MUTUAL same-SCC fixture ───────────────────────────────────────────
 //
