@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-18 12:42:33Z — from 388 issue file(s) in `docs/program/issues/`.
+2026-08-19 03:28:19Z — from 388 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -326,7 +326,7 @@ the committed file matches the generator's output.
 | `RT-PLANNER-GRAPH-FOUNDATION-SPLIT` | Move the planner's shared substrate out of the static-transition monolith — the root plan type and the identity vocabulary that all six planner domain slices quote | closed | runtime | TBD | none | — |
 | `RT-PLANNER-INVARIANT-MESSAGE-LOCALIZATION` | The PlannerInvariant rendering localizes every failure to the static transition planner, and 16 of its direct producers are resident in lowering -- the same false-localization defect this file already ruled on for its neighbour variant | draft | runtime | S | none | — |
 | `RT-PLANNER-JOINS-TRAPS-SPLIT` | Move the joins and traps domain out of planning/static_transition.rs -- the last named planner domain, and generated traps receive no fabricated source origin | draft | runtime | M | none | — |
-| `RT-PLANNER-OCCURRENCES-SPLIT` | Move the occurrences domain out of planning/static_transition.rs -- StaticOriginId and source/child correspondence are occurrence-owned and must not be pulled into a shared identity drawer | draft | runtime | M | none | — |
+| `RT-PLANNER-OCCURRENCES-SPLIT` | Move the occurrences domain out of planning/static_transition.rs -- StaticOriginId and source/child correspondence are occurrence-owned and must not be pulled into a shared identity drawer | ready | runtime | M | none | — |
 | `RT-PLANNER-ROOT-CLOSURE-SPLIT` | Remeasure the planner residue after the six domain moves and close static_transition.rs -- a fresh node, not a renamed item 3, and if the parent is already under 10k it records that and extracts nothing | draft | runtime | M | none | — |
 | `RT-PLANNER-UNITS-ABI-SPLIT` | Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain | active | runtime | L | none | — |
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
@@ -503,7 +503,7 @@ is itself not yet `merged`/`closed`:
 - `RT-LOWERING-VALUES-BOUNDARY-SPLIT` blocked by `RT-LOWERING-FUNCTION-STATE-SPLIT` (status: draft)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-PLANNER-AGGREGATES-SPLIT` blocked by `RT-PLANNER-CONTINUATIONS-SPLIT` (status: draft)
-- `RT-PLANNER-CONTINUATIONS-SPLIT` blocked by `RT-PLANNER-OCCURRENCES-SPLIT` (status: draft)
+- `RT-PLANNER-CONTINUATIONS-SPLIT` blocked by `RT-PLANNER-OCCURRENCES-SPLIT` (status: ready)
 - `RT-PLANNER-EFFECTS-SPLIT` blocked by `RT-PLANNER-AGGREGATES-SPLIT` (status: draft)
 - `RT-PLANNER-JOINS-TRAPS-SPLIT` blocked by `RT-PLANNER-EFFECTS-SPLIT` (status: draft)
 - `RT-PLANNER-OCCURRENCES-SPLIT` blocked by `RT-PLANNER-UNITS-ABI-SPLIT` (status: active)
