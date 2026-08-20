@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-20 22:19:22Z — from 389 issue file(s) in `docs/program/issues/`.
+2026-08-20 22:39:15Z — from 390 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -119,6 +119,7 @@ the committed file matches the generator's output.
 | `F1-37` | F1 [task-list #37] — bignum Int soundness review for K3 trusted-base promotion | draft | runtime | TBD | none | — |
 | `F3-39` | F3 [task-list #39] — reducer: degrade-not-wrap + retire legacy arms | draft | runtime | TBD | none | — |
 | `F4` | content-addressing + value-model design (aka PX8-F-PROOF) | draft | foundation+spec-enclave | M | none | — |
+| `KERNEL-ELIM-SHAPE-NORMALIZE-DIVERGES` | Eliminator/recursor shape derivation over a proof-carrying inductive family diverges -- derive_recursive_shape and structured_lift normalize a constructor premise before the occurrence test, the elimination-time twin of LANG-CTOR-PREMISE-ELABORATION-DIVERGES | active | kernel | M | none | — |
 | `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | active | kernel | L | none | — |
 | `KERNEL-RECURSIVE-RESULT-SURFACE` | A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible | merged | spec-enclave | M | none | — |
 | `KERNEL-SUBST-OUTER-INDEX-SCOPE` | Rule whether kernel subst_outer should bound its parameter index -- it panics on an out-of-range params[p_idx] and is defended only by a reachability argument enumerating one of its 29 call sites | draft | spec-enclave | S | none | — |
