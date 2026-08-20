@@ -1,8 +1,18 @@
-//! The indivisible lowering SCC (RT-SPLIT §10.1/§10.2).
+//! The lowering core -- reducible, not the indivisible SCC RT-SPLIT
+//! §10.1/§10.2 first called it.
 //!
 //! Moved verbatim from `cranelift_backend.rs` in RT-SPLIT slice 4; the
-//! 29-method SCC plus `compile_expr_into_module`. Imports come only from
-//! this module's parent, per §10.5, so slice 5 need not touch this file.
+//! 29-method SCC plus `compile_expr_into_module`. **Doc erratum reconciled
+//! at `RT-BACKEND-SPLIT-CLOSURE` (item 18):** items 11-12 falsified the
+//! "indivisible" claim -- `RT-LOWERING-VALUES-BOUNDARY-SPLIT` (item 11) and
+//! `RT-SOURCE-MACHINE-TYPES-SPLIT` (item 12) each relocated whole method
+//! families out to sibling modules (`boundary.rs`, `source.rs`) via
+//! `pub(super)`, with the struct and its field ownership retained at the
+//! LCA. The realized structure: **type/field-ownership is LCA-pinned in
+//! `core.rs`; method families relocate to sibling modules via
+//! `pub(super)`** -- a comment reconciliation, not a further code move,
+//! grounded by Architect `evt_4x0gdq2vmyz8j`, which ruled `core.rs` IS
+//! reducible. Imports come only from this module's parent, per §10.5.
 
 // Re-exported at facade scope so this module's `tests` subtree inherits the
 // same names; a private `use` cannot be re-globbed by a descendant.

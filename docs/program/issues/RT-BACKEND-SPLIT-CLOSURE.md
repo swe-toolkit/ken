@@ -381,3 +381,290 @@ open the phase record to learn them.
 > - **The source machine is relocation only in this phase**, never a transition
 >   IR. Generated traps receive **no fabricated source origin**.
 
+# CLOSURE LEDGER — the four strands, executed at pickup `f3a500d1f`
+
+**Not a standard D0/D1/D2 candidate; this is the bespoke closure record
+itself.** All four strands below were executed against the tree at
+this item's own pickup SHA, re-measured directly, not inherited from
+any earlier item's own counts.
+
+## Strand 1 — adapter/facade debt, closed from the AC-5 ledgers
+
+**Ledger closure first (AC-7's own requirement):** every one of items
+4-16's own frame docs was read for its `AC-5` section. Only **item 4**
+(`RT-PLANNER-UNITS-ABI-SPLIT`) carries a populated ledger entry. Items
+9b, 13, 14, 15, 16 each explicitly state `AC-5: empty/inapplicable --
+no scaffolding introduced`. Items 5, 6, 7, 8, 9, 10, 11, 12 carry no
+populated `AC-5` heading at all -- independently checked each for any
+adapter/facade/scaffolding discussion outside the criterion's own
+boilerplate text; found none. **The item-17 RETAIN accounting**
+(carried into this closure per the Architect's absorption ruling,
+`evt_2ng0vm7h85zst`) names no adapter debt either -- it is a
+classification record, not a move.
+
+**Item 4's one entry, current disposition:** `use units::{
+EmittableCallEdge, EmittableCallKind, PredeclaredFunctionId };` in
+`planning/static_transition.rs`, re-exported further by `planning.rs`
+and consumed by `lowering/mod.rs`. `EmittableCallEdge` has already
+narrowed away naturally (zero references anywhere in the crate).
+`EmittableCallKind`/`PredeclaredFunctionId` are genuinely load-bearing
+across the full three-layer chain (`units.rs` declares ->
+`static_transition.rs` re-exports -> `planning.rs` re-exports ->
+`lowering/mod.rs` consumes directly) -- **this is the facade doing its
+positive re-export duty, not debt.** (First traced this wrong myself --
+checked only the fully-qualified `static_transition::EmittableCallKind`
+path for consumers and found none, concluded dead; the actual consumer
+reaches it one layer up, through `planning::EmittableCallKind`. The
+compiler's own clean build is what caught the error before it became a
+ledger claim.) **Item 4's `AC-5` ledger closes: 1 of 3 named symbols
+already resolved by natural narrowing; the other 2 are not adapter
+debt.**
+
+**Supplementary compiler-driven sweep (not the primary evidence --
+AC-7 wants ledger-closure primarily; this is a cross-check).** Ran
+`scripts/ken-cargo build -p ken-runtime --lib` and `--tests`, captured
+every `unused import` warning, and checked each crate-wide (production
+AND test files, not just the flagging file) before treating any as
+real debt -- **most turned out to be false positives**: rustc's
+per-file unused check cannot see a descendant module's own `use
+super::*` consumption, so a name unused *within* a hub file
+(`lowering/mod.rs`, `planning.rs`) is frequently still load-bearing for
+a sibling production file or a test-tree descendant reaching it
+through the glob chain. Confirmed genuinely dead (zero consumers
+anywhere, re-checked past the initial false-positive pattern) and
+narrowed, three cases, each rebuilt and retested clean (926/0/4 lib +
+26/0 + 14/0 after every one):
+
+1. `lowering/mod.rs` -- `GovernedAllocationMutationGuard`/
+   `SiblingProducerSubstitution` (item 15's own `D2` leftover: their
+   sole consumer, a test formerly in `constructors.rs`, relocated into
+   `aggregates::tests` at item 15's own `D2`, where both names are
+   already in scope without re-export). `GovernedAllocationMutation`
+   alone stays -- still used by `constructors.rs`'s residual
+   `d7_ownership_run`.
+2. `core/tests/mod.rs` -- `effect_seat_dispatch_mutation`/
+   `effect_seat_visit_mutation` (the GETTERS, never called by any
+   test) and the raw `SITE_OPERAND_SUBSTITUTION_HITS` static (item
+   16's own `D1` leftover, this ring's own prior work -- the accessor
+   fn `site_operand_substitution_hits()`, which IS the real reader of
+   the static, stays).
+3. `planning/static_transition.rs` -- `validate_continuation_
+   specialization_closure`/`ContinuationProjectionOmission`/
+   `ContinuationInternMutation` (an item-6-era leftover: neither is
+   consumed anywhere in the whole `lowering/` tree, and `planning.rs`
+   does not re-export either further). `ContinuationProductionMutation`
+   alone stays. The neighboring `#[allow(unused_imports)]`-marked
+   mutation-const block was left untouched -- a deliberate, already-
+   flagged suppression, not adapter debt.
+
+**Not chased further, explicitly out of scope for this pass:** a
+handful of `unused import` warnings in files outside the split's own
+subtree or attributable to a different campaign (`boundary_value_
+clif.rs`'s own two test-local imports, `cranelift_backend.rs:74`'s
+dead `#[cfg(test)]` re-export -- explicitly attributed in its own
+comment to `RT-DYNAMIC-ARM-SCALAR-MERGE`, a different initiative --
+`native_execution_differential.rs`, `object_linker_packaging.rs`).
+None of these are RT-BACKEND-MODULE-SPLIT adapter debt; touching them
+here would be scope creep into another campaign's or pre-existing
+debt's territory.
+
+**AC-7's own residual limitation, stated plainly:** this sweep finds
+adapters the compiler can see as *unused*. It cannot find an adapter
+that is still *used* only because nothing has been re-pointed to the
+direct path yet -- that class of debt (a re-export kept alive purely
+by inertia, not by a load-bearing use) is not something a mechanical
+sweep discharges; it would need a per-symbol "is this the direct path
+or an inherited one" judgment this pass did not attempt at that
+granularity beyond the one item-4 case already traced.
+
+## Strand 2 — facade positive duties, reconciled to a named owner (`AC-8`)
+
+**`lowering/mod.rs` -- the lowering facade.** Positive duties and their
+owners:
+- **Hub type/state ownership** (the `Lowering<'a>` struct itself,
+  `Lowered`, `LoweringOperand`, `FunctionLocalRefs`, and the several
+  ledger fields items 9-16 each qualified to their own moved type) --
+  owner: `mod.rs` itself, by design (`Lowering` is the compilation
+  state every emitter borrows and mutates; "modules own semantic
+  lifecycles" makes the hub struct's own home the natural owner, not a
+  campaign artifact to relocate).
+- **Planner read-only projection re-export** (the large `use super::
+  planning::{...}` block) -- owner: `mod.rs`, whose duty is making the
+  planner's validated, read-only types reachable to every emitter
+  sibling (aggregates/calls/joins/effects/boundary/source/units) via
+  the `use super::*` chain, without each sibling importing from
+  `planning` directly. This is exactly a "backend entry point" /
+  "read-only plan views" duty per the research's own named list, and
+  it is why several names in that block read `unused` in `mod.rs`
+  itself while being genuinely load-bearing for a descendant -- the
+  facade's OWN correctness is in doing this re-export, not in
+  consuming every name itself.
+- **Cross-domain shared primitives** (`require_i64`/`require_nonzero`,
+  `child_occurrence`, `lowered_value_kind`, `lower_expr`'s own
+  dispatch, and the several other hub-stays helpers items 11-16 each
+  independently confirmed) -- owner: `mod.rs`, genuinely shared
+  (multiple sibling consumers each item's own D0 traced), not a
+  facade artifact.
+
+**`planning.rs` -- the planning facade.** Positive duties and their
+owners:
+- **Single point of entry to the whole planner subsystem** (`use
+  static_transition::{...}` blocks re-exporting the planner's own
+  validated types/functions to the backend) -- owner: `planning.rs`,
+  serving the same re-export duty for `lowering/mod.rs` and any other
+  crate-level consumer that `lowering/mod.rs` serves for its own
+  siblings, one layer further out.
+- **Orchestration entry points**
+  (`plan_static_transition_graph_with_symbols` and siblings) -- owner:
+  `planning.rs`/`static_transition.rs` jointly, unchanged since before
+  this campaign; no split item moved this orchestration seam, so there
+  is nothing to reconcile that wasn't already reconciled.
+
+**Neither facade "still re-exports the monolith's whole surface."**
+Both are narrow, named re-export surfaces with a stated purpose per
+block (every block above carries its own attributing comment naming
+which item's move or which descendant consumer needs it) -- the
+`AC-8` finding is that the positive duties are ALREADY reconciled by
+the accumulated per-item work, not that this closure item newly
+reconciles them. Strand 1's three narrowings are the only corrections
+this pass found necessary.
+
+## Strand 3 — residual test root, classified before closed
+
+`lowering/core/tests/control.rs` -- 218 `#[test]` functions across
+30,161 lines at pickup, re-measured directly. **Exhaustive
+classification** (four-way: domain / shared-fixture / mutation-control
+at its production injection point / class-4 end-to-end) run over the
+full population, two representative clusters independently
+spot-checked against the classification given (both confirmed correct:
+`d8i_the_discharge_facet_is_transported_stated_and_refuses_both_ways`
+reaches its own hub-declared `d8i_*`/`d8d_*` helpers directly from
+`crate::cranelift_backend::lowering`, no extracted domain;
+`d6a_a_specialization_binds_two_leading_static_workers_for_the_ih_and_its_recursive_argument`
+compiles a whole governed-bracket fixture and inspects trace output,
+squarely class-4).
+
+**One genuine class-1 finding, acted on:**
+`refusal_pins_rehomed_computational_match_without_selector_exclusion`
+constructed a `Lowered::ComputationalRecursorClosure` directly and
+pinned `boundary_transfer_admissibility`'s exact refusal -- `boundary.rs`'s
+own domain (the method is declared there), matching the idiom of sibling
+tests already in `boundary.rs`'s own `mod tests`. **Relocated** (verbatim
+body, two missing imports added -- `inert_test_static_origin`,
+`UnsupportedLowering`, both rustc-suggested and independently confirmed by
+the clean build). Discovery parity confirmed: the test now discovers as
+`cranelift_backend::lowering::boundary::tests::{name}`, once, matching
+AC-2's exact-name requirement. Its immediate neighbor,
+`refusal_pins_rehomed_static_worker_without_selector_exclusion`, exercises
+`StaticWorkerFieldLedger` (hub-declared at `mod.rs`, no single-domain
+owner) -- confirmed NOT class-1, stays.
+
+**The rest of the population, approximate (not individually pinned to
+the test):** roughly 40-55 class-3 (mutation controls at an
+already-moved domain's own injection point -- the `ced_d3_*`/`d3b_*`/
+`d3c_*`/`typed_trap_exit_*`/`d5a_*` clusters, each flipping a
+domain-owned `#[cfg(test)]` mutation enum), roughly 150-165 class-4
+(built on whole-pipeline entry points -- `compile_expr_into_module`,
+`px8j_capture_source_trace`, `plan_static_transition_graph[_with_symbols]`
+-- including the two explicit whole-backend census tests, which
+deliberately span multiple domains by design). 154 of 218 hit zero
+extracted-domain symbol at all -- these are the file's own designated
+subject matter per its header (`oriented_*`/`px8j_*`/root-authority/recursor
+tests), not any domain's.
+
+**Per the frame's own strand-3 correction:** the large majority being
+class-4 is not evidence a production owner was missed -- it is the
+class of test the report says legitimately remains here. **Control.rs
+closing at ~30k lines with genuine class-4 population is therefore a
+fresh integration-test ownership question, not a missed-move finding**
+-- named as such in Strand 4 below, not silently converted into
+"needs another domain extraction."
+
+**Stated limitation, not banked:** the sub-agent that ran this
+classification did not individually read all ~150 class-4-bucketed
+tests line by line; classification there rests on the presence of a
+whole-pipeline entry point in the body, a strong but not airtight
+signal, corroborated here by two independent spot-checks (both
+confirmed correct) but not by a full second read. If a tighter audit
+is ever wanted, the `d8i`/`d8j`/`d8k`/`d8o` and `d6a`/`d6b`/`d6c`
+clusters were named as the lightest-sampled.
+
+## Strand 4 — the complete resulting file population
+
+**Every `.rs` under `crates/ken-runtime/src/cranelift_backend/` (37
+files) plus `boundary_value_clif.rs`, measured directly, not from any
+earlier item's own count:**
+
+| file | lines |
+|---|---|
+| `lowering/core/tests/control.rs` | **30,099** (post strand-1/3 edits; was 30,161 at pickup) |
+| `lowering/core.rs` | **13,019** |
+| `lowering/mod.rs` | **12,323** (post strand-1 narrowing; was 12,319 at pickup) |
+| `planning/static_transition/continuations.rs` | 9,768 |
+| `lowering/core/tests/constructors.rs` | 7,813 |
+| `planning/static_transition/closure.rs` | 6,763 |
+| `lowering/units.rs` | 6,319 |
+| `lowering/source.rs` | 6,216 |
+| `planning/static_transition/continuations/fusion.rs` | 6,147 |
+| `lowering/aggregates.rs` | 5,581 |
+| `lowering/boundary.rs` | 2,889 (post strand-3 addition; was 2,817 at pickup) |
+| `lowering/core/tests/effects.rs` | 4,083 (unchanged by this item) |
+| `boundary_value_clif.rs` (outside the subtree, in-boundary per `AC-6`) | 9,116 |
+| *(remaining 24 files)* | each under 3,200, full list available on request |
+
+**Three files remain over 10k.** Per the frame's own explicit rule ("if
+any file remains over 10k, recording its owner analysis is an ACCEPTED
+FINDING and phase closure remains OPEN, requiring a named successor slice"
+-- and "do not extract speculatively to get under the number"),
+**this closure item does NOT force these three down**, and states each
+one's own owner analysis rather than ticking the box:
+
+- **`control.rs` (30,155 lines).** Strand 3's own classification is the
+  owner analysis: the large majority of its population is genuine
+  class-4 end-to-end control, which the frame's own guidance says
+  belongs here. This is **not** "an unclaimed domain hiding at scale"
+  -- it is a residual integration-test file whose size is a direct,
+  expected consequence of the campaign's own design (every domain's
+  own mutation/unit tests moved to their sibling files across 13
+  items; what's left is deliberately the cross-cutting and
+  whole-pipeline population). **Named successor:** a fresh
+  integration-test ownership cut -- e.g. partitioning class-4 controls
+  by which planning/lowering seam they cross (continuation-composition
+  end-to-end vs. effect/host-call end-to-end vs. census/inventory
+  self-checks) -- is the correctly-scoped next slice, not a domain
+  extraction from this campaign's own owner list.
+- **`core.rs` (13,019 lines) and `mod.rs` (12,331 lines).** These are
+  the two files 13 of this phase's 17 items have already extracted
+  from (`core.rs` was 20,413 lines and `mod.rs` 21,200 at `7509c77a7`,
+  the frame's own cited baseline -- now down to 63.8%/58.2% of that).
+  Item 17's own D0 (folded into this closure) found no further
+  distinct semantic lifecycle left in either file after an exhaustive,
+  independently-forked search, and the Architect's own absorption
+  ruling (`evt_2ng0vm7h85zst`) confirmed this empirically (zero native
+  CLIF trap emission anywhere in `lowering/`) and architecturally (the
+  frame's own 13-owner map names no fourteenth). **Named successor: none
+  identified by owner-search** -- these two files' residual content
+  (the `Lowering` hub struct's own state/dispatch, the giant
+  `compile_expr_into_module_with_root_projection` driver, and the
+  several genuinely-shared cross-domain primitives Strand 2 names) has
+  no single further semantic lifecycle this campaign's own
+  decomposition strategy (`stage -> owner -> module`) can extract
+  without inventing a domain that doesn't exist, which the banned
+  scope forbids. **This is an honest limit of the campaign's own
+  strategy, not a deferred task** -- closing it further would need a
+  different decomposition axis than "find one more owner" (e.g.
+  splitting the hub struct's OWN state into narrower per-concern
+  structs, a genuinely different and larger design question this
+  closure item is not positioned to open unilaterally).
+
+## Net disposition
+
+**Phase closure remains OPEN**, per `AC-6`'s own explicit rule -- three
+files over 10k, two with no further owner-search successor identified,
+one (`control.rs`) with a named successor (a fresh integration-test
+ownership cut). Strands 1-3's own work (three adapter narrowings, one
+test relocation, the facade reconciliation write-up) is this item's
+own complete, mergeable transfer regardless of the open-closure
+finding -- per `AC-6`'s own text, this node's job is to state the
+finding accurately, not to force a false "closed."
+
