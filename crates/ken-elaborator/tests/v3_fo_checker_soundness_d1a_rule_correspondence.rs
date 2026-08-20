@@ -1,7 +1,10 @@
-//! `V3-FO-CHECKER-SOUNDNESS` D1a rule-correspondence controls (`AC-2`).
+//! `V3-FO-CHECKER-SOUNDNESS` D1a artifact and correspondence controls
+//! (`AC-1`/`AC-2`).
 //!
-//! Promise class: durable invariant. The controls stay green for changes that
-//! preserve the three-rule slice and turn red when either `FokDerivation` or
+//! Promise class: durable invariant. The artifact control pins the registered
+//! family's closed four-constructor inventory, index shape, and ordered argument
+//! arities. The correspondence controls stay green for changes that preserve the
+//! four accepted checker branches and turn red when either `FokDerivation` or
 //! `fok_check_rule` changes a conclusion, recursive-premise arity, or the
 //! ForallRight freshness condition.
 //!
@@ -32,6 +35,48 @@ fn elaborate_all(env: &mut ElabEnv, decls: &[&str]) {
         env.elaborate_decl(decl)
             .unwrap_or_else(|err| panic!("D1a control declaration rejected:\n{decl}\n{err}"));
     }
+}
+
+#[test]
+fn fok_derivation_kernel_artifact_has_closed_rule_inventory() {
+    let env = mk_env();
+    let family_id = *env
+        .globals
+        .get("FokDerivation")
+        .expect("FokDerivation must be registered globally");
+    let family = env
+        .env
+        .inductive(family_id)
+        .expect("FokDerivation must be registered as an inductive family");
+
+    assert_eq!(
+        family.indices.len(),
+        1,
+        "FokDerivation must have exactly the FokSequent index"
+    );
+    assert_eq!(
+        family.constructors.len(),
+        4,
+        "FokDerivation must have exactly the four accepted checker branches"
+    );
+    assert_eq!(
+        family
+            .constructors
+            .iter()
+            .map(|constructor| constructor.target_indices.len())
+            .collect::<Vec<_>>(),
+        vec![1, 1, 1, 1],
+        "every FokDerivation constructor must target exactly one sequent index"
+    );
+    assert_eq!(
+        family
+            .constructors
+            .iter()
+            .map(|constructor| constructor.args.len())
+            .collect::<Vec<_>>(),
+        vec![9, 7, 8, 8],
+        "constructor argument arities must stay ordered as Init, ImpRight, World, Obj"
+    );
 }
 
 #[test]
