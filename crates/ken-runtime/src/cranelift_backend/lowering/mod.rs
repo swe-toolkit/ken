@@ -160,15 +160,19 @@ use effects::{EffectSeatClosure, EffectSeatLedger};
 
 // `core/tests/constructors.rs`'s residual `d7_ownership_run` (the one
 // multi-leaf fixture that stays there, `RT-EMITTER-AGGREGATES-SPLIT` `D2`)
-// names `GovernedAllocationMutation`/`GovernedAllocationMutationGuard`/
-// `SiblingProducerSubstitution` in its own signature and body; the same
+// names `GovernedAllocationMutation` in its own signature and body; the same
 // test-glob-chain mechanism as `joins`'s own `#[cfg(test)]` re-export above.
 // `CarrierAllocationRequest` no longer needs re-exporting here: its only
 // test consumer moved into `aggregates::tests` itself at `D2`.
+// `GovernedAllocationMutationGuard`/`SiblingProducerSubstitution` -- narrowed
+// away at `RT-BACKEND-SPLIT-CLOSURE` (item 18): their own only-ever consumer
+// (a test formerly in `constructors.rs`) relocated into `aggregates::tests`
+// itself at item 15's own `D2`, where both names are already in scope
+// without any re-export; the compiler confirmed zero remaining consumers
+// crate-wide before this narrowing (`unused import` warning, independently
+// re-verified by direct grep, not applied on the warning alone).
 #[cfg(test)]
-use aggregates::{
-    GovernedAllocationMutation, GovernedAllocationMutationGuard, SiblingProducerSubstitution,
-};
+use aggregates::GovernedAllocationMutation;
 
 // `calls.rs`'s retained `call_declared_unit_target` reads
 // `SELF_AUTHORIZED_FALLBACK_REACHES` directly, under `#[cfg(test)]`, as part

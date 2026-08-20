@@ -66,11 +66,16 @@ pub(in crate::cranelift_backend) use crate::cranelift_backend::artifact::{
 // `mint_validated_progress_nat` is an associated fn of `Lowering` (called as
 // `Lowering::mint_validated_progress_nat(...)`), not a free item -- reached
 // through the `Lowering` type itself, already in scope, not imported here.
+// `effect_seat_dispatch_mutation`/`effect_seat_visit_mutation` (the GETTERS)
+// and `SITE_OPERAND_SUBSTITUTION_HITS` (the raw static) -- narrowed away at
+// `RT-BACKEND-SPLIT-CLOSURE` (item 18): no test calls either getter, and
+// `site_operand_substitution_hits()` (the accessor fn, kept below) is the
+// only actual reader of the static. Compiler-confirmed unused, independently
+// re-verified crate-wide before narrowing.
 pub(in crate::cranelift_backend::lowering) use super::super::effects::{
-    effect_seat_dispatch_mutation, effect_seat_visit_mutation, set_effect_seat_dispatch_mutation,
-    set_effect_seat_visit_mutation, site_operand_substitution_hits, EffectSeatDispatchMutation,
-    EffectSeatVisitMutation, RESOURCE_ERROR_INVALID_BOUNDS, RESOURCE_ERROR_MALFORMED_RESOURCE,
-    SITE_OPERAND_SUBSTITUTION_HITS,
+    set_effect_seat_dispatch_mutation, set_effect_seat_visit_mutation,
+    site_operand_substitution_hits, EffectSeatDispatchMutation, EffectSeatVisitMutation,
+    RESOURCE_ERROR_INVALID_BOUNDS, RESOURCE_ERROR_MALFORMED_RESOURCE,
 };
 
 // `RT-EMITTER-AGGREGATES-SPLIT` `D2` -- `aggregates::tests` reaches this
