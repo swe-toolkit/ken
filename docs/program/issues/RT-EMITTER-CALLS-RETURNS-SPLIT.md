@@ -558,6 +558,18 @@ RETAIN, same planner/continuation domain. No new MOVE candidates.
 
 **Read through line ~22,500 of 30,289 (about 74%).** Continuing next.
 
+### Addendum 8 — AC-2 progress checkpoint, read through ~79%
+
+Continued through line ~24,000 (`D8m` bridge-arm partition/bijection,
+`D8p`: checked-IH-application binding at the source-machine's call edge
+— "a checked application binds and emits in every defining body that
+lowers it"). Traced `D8p`'s own subject: which call edges consult the
+checked-IH marker consumption seam, not the emission target itself —
+same checked-invocation domain as the rest of the D5-D8 family (item
+12's landed cluster), RETAIN. No new MOVE candidates.
+
+**Read through line ~24,000 of 30,289 (about 79%).** Continuing next.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
