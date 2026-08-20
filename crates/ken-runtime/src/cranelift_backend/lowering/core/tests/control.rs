@@ -7615,6 +7615,19 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D1` — the source machine's own
+        // dispatch, moved verbatim from `core.rs`/`mod.rs`. It emits IR into
+        // the `FunctionBuilder` its caller already owns; it never mints a new
+        // defined function or data object.
+        Census {
+            file: "lowering/source.rs",
+            source: include_str!("../../source.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         Census {
             file: "planning.rs",
             source: include_str!("../../../planning.rs"),
@@ -8271,6 +8284,10 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     // source absent from this roster is invisible to every pin that iterates
     // it.
     ("lowering/boundary.rs", include_str!("../../boundary.rs")),
+    // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D1` — registered the moment the module
+    // exists, for the same reason as `boundary.rs` above: a production source
+    // absent from this roster is invisible to every pin that iterates it.
+    ("lowering/source.rs", include_str!("../../source.rs")),
     // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. Registered
     // here the moment the module exists, because every pin that iterates this
     // roster is closed only over the files it lists: a production emitter absent
@@ -8437,6 +8454,11 @@ fn the_backend_production_surface_inventory_is_closed() {
             // and the carrier-emission machinery that consumes this
             // vocabulary stay SCC-pinned in `mod.rs`/`core.rs`.
             ("lowering/mod.rs", "boundary"),
+            // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D1` — the source machine's own
+            // state types and dispatch control. A sibling of
+            // `core`/`units`/`seed_material`/`boundary`; the types the moving
+            // methods merely manipulate stay SCC-pinned in `mod.rs`.
+            ("lowering/mod.rs", "source"),
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
             // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — aggregate allocation
@@ -24163,7 +24185,7 @@ fn d8p_preserves_the_refusals_the_projection_could_have_weakened() {
 /// **Promise class: durable invariant.**
 #[test]
 fn d8f_the_declined_call_does_not_answer_for_the_checked_identity() {
-    use crate::cranelift_backend::lowering::core::set_d8f_declined_call_claims;
+    use crate::cranelift_backend::lowering::source::set_d8f_declined_call_claims;
     use crate::cranelift_backend::lowering::{
         d8f_dispositions, d8j_discharged, d8p_application_bindings, reset_d8j_discharged,
         reset_d8n_observations, CheckedApplicationDisposition,
@@ -29231,10 +29253,10 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
 /// one real projection route; it does not pin the population's cardinality.
 #[test]
 fn lrc_d2a_forwards_each_arrival_and_excludes_projection_owned_early_refusals() {
-    use crate::cranelift_backend::lowering::core::{
+    use crate::cranelift_backend::lowering::core::with_required_consumer_route_suppressed;
+    use crate::cranelift_backend::lowering::source::{
         lrc_d2a_backedge_arrivals, lrc_d2a_backedge_forwards, reset_lrc_d2a_counts,
         set_lrc_d2a_suppress_forward,
-        with_required_consumer_route_suppressed,
     };
     struct Restore;
     impl Drop for Restore {
@@ -29532,7 +29554,7 @@ fn d2b_the_runtime_envelope_excludes_every_recursive_position() {
 /// shape of a fix.
 #[test]
 fn d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_it() {
-    use crate::cranelift_backend::lowering::core::{
+    use crate::cranelift_backend::lowering::source::{
         set_lrc_d2b_let_disposition, LrcD2bLetDisposition,
     };
     use crate::cranelift_backend::lowering::{
@@ -29751,7 +29773,7 @@ fn px8j_sibling_result_with_ordinary_let_value() -> RuntimeExpr {
 /// be measuring two changes instead of one.
 #[test]
 fn d2b_capability_gate_the_two_position_shape_refuses_before_its_case_body() {
-    use crate::cranelift_backend::lowering::core::{
+    use crate::cranelift_backend::lowering::source::{
         set_lrc_d2b_let_disposition, LrcD2bLetDisposition,
     };
     use crate::cranelift_backend::lowering::{
@@ -29946,7 +29968,7 @@ fn px8j_single_position_let_wrapped_recursive_call() -> RuntimeExpr {
 /// refusal precedes the body entirely. That is why the pair is split.
 #[test]
 fn d2b_row_b_a_live_nonbackedge_let_runs_its_body_and_consumes_its_join() {
-    use crate::cranelift_backend::lowering::core::{
+    use crate::cranelift_backend::lowering::source::{
         set_lrc_d2b_let_disposition, LrcD2bLetDisposition,
     };
     use crate::cranelift_backend::lowering::{

@@ -1180,12 +1180,20 @@ fn exactly_one_plan_origin_to_expression_lookup_exists() {
 
 #[test]
 fn every_source_term_carrier_holds_an_occurrence_and_never_a_bare_expression() {
-    let source = include_str!("../../mod.rs");
+    // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D1` moved `SourceContinuation` and
+    // `SourceMachineState` into `source.rs`; `SourcePrefixTemplate` stayed at
+    // the `mod.rs` hub (shared with retained checked-invocation/continuation-
+    // frame machinery). Each header is read from its own current file, per
+    // AC-3's source-text-oracle-relocation rule -- the property below is
+    // unchanged, only which buffer names its declaration.
+    let mod_source = include_str!("../../mod.rs");
+    let source_source = include_str!("../../source.rs");
     for header in [
-        "enum SourceContinuation<'a> {",
-        "enum SourcePrefixTemplate {",
-        "enum SourceMachineState<'a> {",
+        ("enum SourceContinuation<'a> {", source_source),
+        ("enum SourcePrefixTemplate {", mod_source),
+        ("enum SourceMachineState<'a> {", source_source),
     ] {
+        let (header, source) = header;
         let span = declaration_span(source, header);
         let bare: Vec<&str> = span
             .iter()
