@@ -655,9 +655,55 @@ Class 2 has ten named cfg-gated sites across eight functions, all
 finding. None of the four classes revises the boundary already closed in
 Addenda 1-3.
 
-Continuing this D0 next — assembling the closed MOVE-set summary and
-requesting `runtime-leader`'s object-store verify + the Architect's
-endorsing vote. No action needed from anyone now.
+### Addendum 5 — the closed MOVE set, restated for a single reference point
+
+**`core.rs`:** `lower_carried_match`, `lower_nonborrowed_carried_match`,
+`lower_carried_constructor_match`, `lower_borrowed_match`, `lower_
+borrowed_option_match`, `lower_dynamic_host_result_match`, `lower_
+bounded_nat_match`, `lower_dynamic_constructor_match`, `carried_join_arm`,
+`append_planned_join_params`, `jump_planned_join_arm`, `finish_planned_
+join`.
+
+**`mod.rs`:** `consume_join_plan`, `consumed_join_plan_token`, `disposition_
+statically_unselected_source_subtree`, `disposition_statically_unselected_
+match_cases`, `close_statically_unselected_match_cases`, `validate_join_
+plan_consumption`, `finalize_join_disposition`, `validate_materialized_
+dead_join_cfg`, `validate_materialized_dead_join_cfg_for`, `merge_scalar_
+branch`, `merge_scalar_operand`, `record_scalar_merge_kind`, `LoweringOperand::
+specialized_join_arm`, `emit_current_trap`, `seal_source_trap_branch`,
+`FunctionLocalRefs::bind_unit_trap_frame`, `ScalarMergeKind` (enum),
+`TrapIdentityMutation` (enum), `TRAP_IDENTITY_MUTATION` (thread_local),
+`set_trap_identity_mutation`, `DasmC2ScalarMergeObservation` (struct),
+`DASM_C2_SCALAR_MERGE_OBSERVATIONS`/`DASM_C2_SCALAR_MERGE_OBSERVATION_
+ENABLED` (thread_local), `dasm_c2_record_scalar_merge`, `dasm_c2_take_
+scalar_merge_observations`, `dasm_c2_scalar_merge_observation_scope`,
+`DasmC2ScalarMergeObservationScope` (struct + its `impl` + `impl Drop`).
+
+**RETAIN, hub-stays (do not re-trace):** `TrapExitAuthority`, `TrapFrame
+BindingMutation`+`TRAP_FRAME_BINDING_MUTATION`+`set_trap_frame_binding_
+mutation`, `Px8trTrapProvenanceEvent`+`px8tr_record_trap_provenance`+
+`PX8TR_TRAP_PROVENANCE`, `PlannedTrapSeat` (flagged judgment call),
+`specialized_at`/`specialized_ref_at`/`effect_seat_phase`,
+`JoinConsumptionMutation`, `NativeScalarPairV1`.
+
+**RETAIN, other domain (do not re-trace):** the `emit_carrier_*` family
+(item 15's), `lower_computational_match_expr`/`lower_computational_
+producer_expr`/`lower_computational_match_value_composed`/`lower_carried_
+computational_match`/`lower_carried_computational_match_inner`/`lower_
+bounded_nat_computational` (item 12's), `planned_join_site_for_frame`/
+`require_complete_join_plan_consumption` (item 12's checked native-join-
+plan), `MatchRecursorCensusRow`/`BranchedScrutineeUnitBodyRoute1`/
+`CheckedFrameBranchScope`/`OpenControlObligation`/`OrientedControlLedger
+Entry`/`SourceJoinTarget`/`SourceBranchFanout`/`BoundaryCarrierRefs`/
+`CarrierAllocationRequest` (item 12's or item 15's, per Addendum 2).
+
+**AC-2 population:** empty, per Addendum 3's marker scan + name sweep,
+flagged for the Architect's judgment on whether that discharges the bar
+without a literal re-read given the file is provably unchanged since
+item 13's own exhaustive read.
+
+Ready for `runtime-leader`'s object-store verify and the Architect's
+endorsing vote.
 
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
