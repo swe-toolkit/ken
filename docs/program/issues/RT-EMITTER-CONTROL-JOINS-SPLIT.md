@@ -91,23 +91,23 @@ any prior item's frame or census row — both shrank again under item 13).
 ### Method used
 
 Production-injection-point tracing (items 11/12/13's discipline), reconciled
-against the two nearest LANDED ledgers rather than re-deriving their domains:
-item 13's own landed D0/D1 ledger (`docs/program/issues/RT-EMITTER-CALLS-
-RETURNS-SPLIT.md`, the calls-and-returns emitter, merged immediately before
-this item) and item 9's landed D0 ledger (`docs/program/issues/RT-PLANNER-
-JOINS-TRAPS-SPLIT.md`, the joins/traps planner half, merged earlier). Item
-9's own ledger explicitly pre-identifies several pieces of this item's
-boundary (see "reconciliation against item 9" below) — a genuine head start,
-used as a starting hypothesis and independently re-verified against the
-current tree, not taken on faith.
+against the two nearest LANDED ledgers rather than re-deriving their
+domains: item 13's own landed D0/D1 ledger (`docs/program/issues/RT-
+EMITTER-CALLS-RETURNS-SPLIT.md`, the calls-and-returns emitter, merged
+immediately before this item) and item 9's landed D0 ledger
+(`docs/program/issues/RT-PLANNER-JOINS-TRAPS-SPLIT.md`, the joins/traps
+planner half, merged earlier). Item 9's own ledger explicitly pre-identifies
+several pieces of this item's boundary (see "reconciliation against item 9"
+below) — a genuine head start, used as a starting hypothesis and
+independently re-verified against the current tree, not taken on faith.
 
 **`control.rs` is byte-identical since item 13's D2 landed** (`git diff
-b67c805a2 origin/main -- .../control.rs` is empty at this pickup) — so this
-item's AC-2 can reconcile against my own exhaustive item-13 AC-2 read of the
-exact same 30,222-line file (all 220 `#[test]` functions individually read
-in place during that item's own D0), rather than re-reading it blind. AC-2's
-own reconciliation section below states this explicitly and names what
-still needs a fresh look.
+b67c805a2 origin/main -- .../control.rs` is empty at this pickup) — so
+this item's AC-2 can reconcile against my own exhaustive item-13 AC-2 read
+of the exact same 30,222-line file (all 220 `#[test]` functions
+individually read in place during that item's own D0), rather than
+re-reading it blind. AC-2's own reconciliation section below states this
+explicitly and names what still needs a fresh look.
 
 ### Reconciliation against item 9's landed ledger (planner/emitter boundary)
 
@@ -138,9 +138,10 @@ Item 9's ledger also named the exact emitter-side consumption sites for the
 planner-owned `StaticTransitionPlan` join/trap accessors it retained
 (`join_plan_token`, `join_plan_token_if_planned`, `required_join_origins`,
 `source_join_origins_in_owner_subtree`, `trap_identity`, `trap_catalog`) —
-each at a `lowering/mod.rs`/`lowering/core.rs` line number from its own pickup
-SHA. Re-derived those call sites fresh in this item's own trace below (not
-copied forward) since both files have shrunk since item 9's `de402e255`.
+each at a `lowering/mod.rs`/`lowering/core.rs` line number from its own
+pickup SHA. Re-derived those call sites fresh in this item's own trace
+below (not copied forward) since both files have shrunk since item 9's
+`de402e255`.
 
 ### AC-1 — MOVE population traced so far
 
@@ -182,11 +183,12 @@ copied forward) since both files have shrunk since item 9's `de402e255`.
   `Lowering`) — the one-shot "every dynamic arm agrees on result kind"
   check shared by both merge consumers above.
 - `LoweringOperand::specialized_join_arm` (`mod.rs`, private method on
-  `LoweringOperand`, not `Lowering`) — "every call is an inventory entry for
-  the join work" per its own doc comment; **sole caller is `merge_scalar_
-  operand`** (grep-confirmed, 1 call site crate-wide), unlike its siblings
-  `specialized_at`/`specialized_ref_at`/`effect_seat_phase` (12+ call sites
-  spanning many domains — those stay hub-stays, see RETAIN below).
+  `LoweringOperand`, not `Lowering`) — "every call is an inventory entry
+  for the join work" per its own doc comment; **sole caller is `merge_
+  scalar_operand`** (grep-confirmed, 1 call site crate-wide), unlike its
+  siblings `specialized_at`/`specialized_ref_at`/`effect_seat_phase` (12+
+  call sites spanning many domains — those stay hub-stays, see RETAIN
+  below).
 
 **Branch and match emission (`core.rs` unless noted):**
 
@@ -194,13 +196,13 @@ copied forward) since both files have shrunk since item 9's `de402e255`.
   `lower_carried_constructor_match`, `lower_borrowed_match`,
   `lower_borrowed_option_match`, `lower_dynamic_host_result_match`,
   `lower_bounded_nat_match`, `lower_dynamic_constructor_match` — the
-  ordinary (non-checked-invocation) match-case dispatch family: constructor-
-  tag comparison chains (`builder.ins().icmp`/`.brif`), per-case block
-  creation, and per-arm join-arm emission via the join-family functions
-  above. `lower_borrowed_match`/`lower_borrowed_option_match`/`lower_
-  dynamic_host_result_match`/`lower_bounded_nat_match`/`lower_dynamic_
-  constructor_match` were already individually traced and confirmed NOT
-  item 13's during that item's own D0 ("match-lowering domain..., a
+  ordinary (non-checked-invocation) match-case dispatch family:
+  constructor-tag comparison chains (`builder.ins().icmp`/`.brif`), per-case
+  block creation, and per-arm join-arm emission via the join-family
+  functions above. `lower_borrowed_match`/`lower_borrowed_option_match`/
+  `lower_dynamic_host_result_match`/`lower_bounded_nat_match`/`lower_
+  dynamic_constructor_match` were already individually traced and confirmed
+  NOT item 13's during that item's own D0 ("match-lowering domain..., a
   different, not-yet-split item's territory") — that finding reconciles
   cleanly into this item's own MOVE set.
 
@@ -232,8 +234,8 @@ RETAINS (see the hub-stays findings below):**
 symbol:** a RETAINED file that calls a mover **opaquely** (`x.method(...)`,
 never touching the callee's internals) does not make the callee hub-stays —
 that is the ordinary cross-sibling-visibility case item 13 resolved
-repeatedly with `pub(super)` widening. A RETAINED file that **constructs or
-matches a type's own variants/fields directly** is the hub-stays case
+repeatedly with `pub(super)` widening. A RETAINED file that **constructs
+or matches a type's own variants/fields directly** is the hub-stays case
 (item 13's `StaticWorkerEmission`/`StaticWorkerCallOutcome` precedent). The
 methods above are all the first shape; the types below are the second.
 
@@ -249,13 +251,13 @@ methods above are all the first shape; the types below are the second.
   (`#[cfg(test)]` static), **`set_trap_frame_binding_mutation`** (fn) —
   `units.rs` reads the static directly (`units.rs:5921`) and matches the
   enum's variants directly (`units.rs:5770,5774`) to decide whether to call
-  `bind_unit_trap_frame` at all. **Zero production consumer inside `core.rs`/
-  `mod.rs` itself** — the real "does this unit get a trap frame" decision is
-  entirely `units.rs`'s (item 8's/`RT-FNSPLIT-B2F`'s territory, a different,
-  already-completed campaign, outside this slice's bound files). This is not
-  this item's owner ("branch/match/join/terminator emission on the emitter
-  side") so much as it is a unit-emission concern that happens to be
-  declared in the shared `mod.rs` hub. Stays put.
+  `bind_unit_trap_frame` at all. **Zero production consumer inside
+  `core.rs`/`mod.rs` itself** — the real "does this unit get a trap frame"
+  decision is entirely `units.rs`'s (item 8's/`RT-FNSPLIT-B2F`'s territory, a
+  different, already-completed campaign, outside this slice's bound files).
+  This is not this item's owner ("branch/match/join/terminator emission on
+  the emitter side") so much as it is a unit-emission concern that happens
+  to be declared in the shared `mod.rs` hub. Stays put.
 - **`Px8trTrapProvenanceEvent`** (enum), **`px8tr_record_trap_provenance`**
   (fn), **`PX8TR_TRAP_PROVENANCE`** (`pub(super)` static) — a generic
   cross-domain trap-provenance observability log. Its variants are
@@ -273,13 +275,13 @@ methods above are all the first shape; the types below are the second.
   MOVE candidate on the discriminator above. It is kept RETAIN here instead
   because it is a field type inside `Px8trTrapProvenanceEvent::
   PlannedTrapEmitted` (hub-stays, per the previous bullet) and is declared
-  immediately adjacent to it (`mod.rs:664`, right after `Px8trTrapProvenance
-  Event` at `:574`) as part of the same trap-provenance vocabulary cluster
-  — moving it alone would leave the hub-owned enum's own variant referencing
-  a child module's type, an unusual parent-references-child shape this
-  ledger did not find a precedent for in items 11-13. If the Architect
-  judges the exclusive-construction-site discriminator should win here
-  regardless, this is a one-line reclassification, not a re-trace.
+  immediately adjacent to it (`mod.rs:664`, right after
+  `Px8trTrapProvenanceEvent` at `:574`) as part of the same trap-provenance
+  vocabulary cluster — moving it alone would leave the hub-owned enum's own
+  variant referencing a child module's type, an unusual parent-references-
+  child shape this ledger did not find a precedent for in items 11-13. If
+  the Architect judges the exclusive-construction-site discriminator should
+  win here regardless, this is a one-line reclassification, not a re-trace.
   **Superseded by Addendum 7** — the exclusive-construction premise above
   is FALSE (`calls.rs`, item 13's landed module, also constructs all three
   variants); RETAIN stands but is no longer a judgment call. Addendum 7's
@@ -478,16 +480,16 @@ RETAIN item) — this ledger states that as its own prior for the residual
 ### Addendum 3 — AC-2 reconciliation: a marker scan plus a name sweep, both
 ### zero, plus the honest gap this does NOT close
 
-**Marker scan, string/comment-aware (the same defect class item 13's own D0
-Addendum 1 first draft had, fixed here before trusting it):** scanned every
-one of `control.rs`'s 220 `#[test]` function bodies (brace-matched with a
-string/char-literal-aware tokenizer, not a naive `{`/`}` count — the naive
-version falsely inflated several spans on this exact file because of a
-`"...{...}..."` string literal inside an unrelated census test) for every
-name in this item's traced MOVE set (the join family, the ordinary match-
-dispatch family, `emit_current_trap`/`seal_source_trap_branch`/`bind_unit_
-trap_frame`, `TrapIdentityMutation`, the `DasmC2ScalarMergeObservation`
-cluster, `JoinConsumptionMutation`).
+**Marker scan, string/comment-aware (the same defect class item 13's own
+D0 Addendum 1 first draft had, fixed here before trusting it):** scanned
+every one of `control.rs`'s 220 `#[test]` function bodies (brace-matched
+with a string/char-literal-aware tokenizer, not a naive `{`/`}` count —
+the naive version falsely inflated several spans on this exact file because
+of a `"...{...}..."` string literal inside an unrelated census test) for
+every name in this item's traced MOVE set (the join family, the ordinary
+match-dispatch family, `emit_current_trap`/`seal_source_trap_branch`/
+`bind_unit_trap_frame`, `TrapIdentityMutation`, the `DasmC2ScalarMerge
+Observation` cluster, `JoinConsumptionMutation`).
 
 **Six hits, all already accounted for and RETAIN:**
 
@@ -499,24 +501,24 @@ cluster, `JoinConsumptionMutation`).
 - `typed_trap_exit_preserves_the_planner_identity_across_two_unit_calls`,
   `typed_trap_exit_rejects_a_deleted_or_root_misclassified_unit_lane`,
   `typed_trap_exit_identity_and_caller_protocol_mutations_are_discriminating`
-  — the shared trap-exit cluster, already addressed in the reconciliation
-  section above.
+  — the shared trap-exit cluster, already addressed in the
+  reconciliation section above.
 
 **Zero hits on this item's own function names** (`lower_carried_match`,
-`carried_join_arm`, `merge_scalar_operand`, and every other MOVE-set symbol
-traced in AC-1) — a genuinely different result from item 13's own AC-2,
-which found several direct hits before its one invisible-to-marker-scan
-finding. Per the standing discipline (do not certify a residual population
-empty from a marker scan alone), this is a lower bound, not a closure — so
-a second, independent check follows.
+`carried_join_arm`, `merge_scalar_operand`, and every other MOVE-set
+symbol traced in AC-1) — a genuinely different result from item 13's own
+AC-2, which found several direct hits before its one invisible-to-marker-
+scan finding. Per the standing discipline (do not certify a residual
+population empty from a marker scan alone), this is a lower bound, not a
+closure — so a second, independent check follows.
 
 **Second check: every `#[test]` whose own NAME contains "match" or "branch"
-regardless of domain tag**, to catch anything the marker scan's symbol list
-might have missed by testing the property indirectly (item 13's own
+regardless of domain tag**, to catch anything the marker scan's symbol
+list might have missed by testing the property indirectly (item 13's own
 `d6_a_functionized_recursive_declaration_accepts_a_changing_argument_
-constructor` shape — reachable through the full pipeline, naming no
-MOVE-set symbol). Found 6 real `#[test]` functions (the rest of the
-grep hits are fixture-producer helpers, not tests themselves) —
+constructor` shape — reachable through the full pipeline, naming no MOVE-
+set symbol). Found 6 real `#[test]` functions (the rest of the grep hits
+are fixture-producer helpers, not tests themselves) —
 `checked_frame_branch_scope_harness_uses_live_lowering_ledger` (ties to
 `CheckedFrameBranchScope`, already RETAIN/item 12's), `contkey_wrong_
 inner_match_eliminator_seed_is_rejected` (`contkey`-prefixed planner/
@@ -529,36 +531,36 @@ already RETAIN/item 12's), `d9b_the_assembled_ordinary_run_matches_the_
 planner_role_sequence_by_position` ("matches" is English usage here, not
 `RuntimeExpr::Match`; `D9b`/`RT-CONTSRC-PRODUCER-LOCAL`, already known
 planner-adjacent), `refusal_pins_rehomed_computational_match_without_
-selector_exclusion` (`RT-REFUSAL-PINS-REHOMED`, `computational_match`
-ties to item 12's again). **Every one reconciles to an already-known
-RETAIN domain; none is a new finding.**
+selector_exclusion` (`RT-REFUSAL-PINS-REHOMED`, `computational_match` ties
+to item 12's again). **Every one reconciles to an already-known RETAIN
+domain; none is a new finding.**
 
 **A fifth confirmed instance of the naming trap surfaced along the way:**
 `RT-MATCH-SCRUTINEE-DISPOSITION` (the domain tag on `rt_d2_trace_shows_
 the_marker_propagated_and_never_reaching_the_composed_consumer` and
-siblings) has "MATCH" in its own name but is about which ROUTE a
-RECURSOR's scrutinee takes (`rt_d2_backedge_propagations`, `active-resume`
-vocabulary) — item 12's checked-invocation/recursor domain, not this
-item's ordinary case-dispatch sense of "match."
+siblings) has "MATCH" in its own name but is about which ROUTE a RECURSOR's
+scrutinee takes (`rt_d2_backedge_propagations`, `active-resume` vocabulary)
+— item 12's checked-invocation/recursor domain, not this item's ordinary
+case-dispatch sense of "match."
 
 **The honest gap, stated rather than papered over:** this reconciliation
 is a marker scan (properly tooled) plus a targeted name sweep, cross-
 checked against the domain classifications from my own exhaustive,
-individual, in-place read of every one of these 220 tests during item
-13's own D0 AC-2 (completed on this exact byte-identical file). It is
-**not** a fresh line-by-line re-read performed as its own dedicated pass
-under this item's own name. The file has not changed since that read, and
-every domain this pass's two independent scans surfaced matches that
-read's own classifications exactly — but the campaign's own bar for AC-2
-is an individual read, and this ledger states plainly that the literal
-re-read has not been separately re-executed here. Given the population
-this bar would be checking is (per both independent scans) empty, and
-matches item 8's own "mirror image... zero finding" shape (item 9's
-ledger's own words for its analogous situation) — this is flagged for the
-Architect's judgment: whether the marker scan + name sweep + reconciliation
-against an already-exhaustive same-file read discharges AC-2 for a
-genuinely-empty-by-all-evidence population, or whether a literal re-read
-is still required before the endorsing vote. Not decided unilaterally here.
+individual, in-place read of every one of these 220 tests during item 13's
+own D0 AC-2 (completed on this exact byte-identical file). It is **not** a
+fresh line-by-line re-read performed as its own dedicated pass under this
+item's own name. The file has not changed since that read, and every domain
+this pass's two independent scans surfaced matches that read's own
+classifications exactly — but the campaign's own bar for AC-2 is an
+individual read, and this ledger states plainly that the literal re-read
+has not been separately re-executed here. Given the population this bar
+would be checking is (per both independent scans) empty, and matches item
+8's own "mirror image... zero finding" shape (item 9's ledger's own words
+for its analogous situation) — this is flagged for the Architect's judgment:
+whether the marker scan + name sweep + reconciliation against an already-
+exhaustive same-file read discharges AC-2 for a genuinely-empty-by-all-
+evidence population, or whether a literal re-read is still required before
+the endorsing vote. Not decided unilaterally here.
 
 **If the population is confirmed empty**, `D2` for this item states that
 explicitly and moves nothing — the mirror image of item 8's own `D2`,
@@ -601,12 +603,13 @@ Scanned every MOVE-set function's own body (not just its signature) for
 internal `cfg(...)` attributes, using the same string-aware brace-matcher
 as AC-2's scan:
 
+
 - `carried_join_arm` — two `#[cfg(test)]` sites (a population-counter
   increment in the `Carried` arm, another in the `Specialized` arm).
 - `lower_dynamic_host_result_match` — two `#[cfg(test)]` sites.
-- `consume_join_plan` — one `#[cfg(test)] match` block over `JoinConsumption
-  Mutation` (the hub-stays enum, Addendum 2) — carries the gate, references
-  a type that stays at the hub.
+- `consume_join_plan` — one `#[cfg(test)] match` block over
+  `JoinConsumptionMutation` (the hub-stays enum, Addendum 2) — carries the
+  gate, references a type that stays at the hub.
 - `disposition_statically_unselected_source_subtree` — one `#[cfg(test)]`
   site (an early-return under `JoinConsumptionMutation::
   IncludeStaticallyUnselected`).
@@ -632,10 +635,10 @@ as AC-2's scan:
 
 No `#[repr(...)]` or non-standard `#[derive(...)]` found on any MOVE-set
 type (only ordinary `Clone`/`Copy`/`Debug`/`Eq`/`PartialEq`, confirmed by
-direct reading of `TrapIdentityMutation`, `ScalarMergeKind`, `DasmC2Scalar
-MergeObservation`). No signature-level `#[cfg(...)]` parameter found on
-any MOVE-set function (unlike item 13's `launch_ingress` case) — every
-cfg site above is inside a function body, not on its signature.
+direct reading of `TrapIdentityMutation`, `ScalarMergeKind`,
+`DasmC2ScalarMergeObservation`). No signature-level `#[cfg(...)]` parameter
+found on any MOVE-set function (unlike item 13's `launch_ingress` case) —
+every cfg site above is inside a function body, not on its signature.
 
 #### Class 3 — macro-produced owned items: CLOSED, zero found
 
@@ -649,18 +652,17 @@ declaration, already named in Addendum 1).
 Direct grep for every MOVE-set symbol name appearing as a quoted string
 literal in `core.rs`, `mod.rs`, `core/tests/control.rs`, or `core/tests/
 mod.rs`: zero hits. `BACKEND_PRODUCTION_SOURCES` (the same self-defending
-roster item 13's `D1` added `calls.rs` to) will need this item's new
-module added at `D1`, following the identical precedent — already stated
-as an anticipated non-move hunk in the blind-spots list, not a silent
-hazard (the roster's own companion assertion catches an omission loudly).
+roster item 13's `D1` added `calls.rs` to) will need this item's new module
+added at `D1`, following the identical precedent — already stated as an
+anticipated non-move hunk in the blind-spots list, not a silent hazard (the
+roster's own companion assertion catches an omission loudly).
 
 **Summary for the endorsing vote**: Classes 3 and 4 are fully closed with
 zero findings. Class 1 has one real re-export (a path-update disposition,
-not a widening) that also completed the MOVE set by two more members.
-Class 2 has ten named cfg-gated sites across eight functions, all
-"carry this gate exactly at `D1`," none a new MOVE/RETAIN boundary
-finding. None of the four classes revises the boundary already closed in
-Addenda 1-3.
+not a widening) that also completed the MOVE set by two more members. Class
+2 has ten named cfg-gated sites across eight functions, all "carry this
+gate exactly at `D1`," none a new MOVE/RETAIN boundary finding. None of the
+four classes revises the boundary already closed in Addenda 1-3.
 
 ### Addendum 5 — the closed MOVE set, restated for a single reference point
 
@@ -671,16 +673,17 @@ bounded_nat_match`, `lower_dynamic_constructor_match`, `carried_join_arm`,
 `append_planned_join_params`, `jump_planned_join_arm`, `finish_planned_
 join`.
 
-**`mod.rs`:** `consume_join_plan`, `consumed_join_plan_token`, `disposition_
-statically_unselected_source_subtree`, `disposition_statically_unselected_
-match_cases`, `close_statically_unselected_match_cases`, `validate_join_
-plan_consumption`, `finalize_join_disposition`, `validate_materialized_
-dead_join_cfg`, `validate_materialized_dead_join_cfg_for`, `merge_scalar_
-branch`, `merge_scalar_operand`, `record_scalar_merge_kind`, `LoweringOperand::
-specialized_join_arm`, `emit_current_trap`, `seal_source_trap_branch`,
-`FunctionLocalRefs::bind_unit_trap_frame`, `ScalarMergeKind` (enum;
-**superseded by Addendum 7** — reclassified RETAIN, hub-stays, not part
-of the MOVE set; not relied on here),
+**`mod.rs`:** `consume_join_plan`, `consumed_join_plan_token`,
+`disposition_statically_unselected_source_subtree`,
+`disposition_statically_unselected_match_cases`,
+`close_statically_unselected_match_cases`, `validate_join_plan_consumption`,
+`finalize_join_disposition`, `validate_materialized_dead_join_cfg`,
+`validate_materialized_dead_join_cfg_for`, `merge_scalar_branch`,
+`merge_scalar_operand`, `record_scalar_merge_kind`,
+`LoweringOperand::specialized_join_arm`, `emit_current_trap`,
+`seal_source_trap_branch`, `FunctionLocalRefs::bind_unit_trap_frame`,
+`ScalarMergeKind` (enum; **superseded by Addendum 7** — reclassified
+RETAIN, hub-stays, not part of the MOVE set; not relied on here),
 `TrapIdentityMutation` (enum), `TRAP_IDENTITY_MUTATION` (thread_local),
 `set_trap_identity_mutation`, `DasmC2ScalarMergeObservation` (struct),
 `DASM_C2_SCALAR_MERGE_OBSERVATIONS`/`DASM_C2_SCALAR_MERGE_OBSERVATION_
@@ -688,10 +691,10 @@ ENABLED` (thread_local), `dasm_c2_record_scalar_merge`, `dasm_c2_take_
 scalar_merge_observations`, `dasm_c2_scalar_merge_observation_scope`,
 `DasmC2ScalarMergeObservationScope` (struct + its `impl` + `impl Drop`).
 
-**RETAIN, hub-stays (do not re-trace):** `TrapExitAuthority`, `TrapFrame
-BindingMutation`+`TRAP_FRAME_BINDING_MUTATION`+`set_trap_frame_binding_
-mutation`, `Px8trTrapProvenanceEvent`+`px8tr_record_trap_provenance`+
-`PX8TR_TRAP_PROVENANCE`, `PlannedTrapSeat` (flagged judgment call),
+**RETAIN, hub-stays (do not re-trace):** `TrapExitAuthority`,
+`TrapFrameBindingMutation`+`TRAP_FRAME_BINDING_MUTATION`+`set_trap_frame_
+binding_mutation`, `Px8trTrapProvenanceEvent`+`px8tr_record_trap_provenance`
++`PX8TR_TRAP_PROVENANCE`, `PlannedTrapSeat` (flagged judgment call),
 `specialized_at`/`specialized_ref_at`/`effect_seat_phase`,
 `JoinConsumptionMutation`, `NativeScalarPairV1`.
 
@@ -718,8 +721,8 @@ landed" (comparing `b67c805a2` to `367b846d1`, which ARE identical) and
 used that to justify reconciling against my own item-13 exhaustive read
 without a fresh pass. That comparison answered the wrong question.** The
 file I actually read exhaustively (during item 13's own D0 AC-2) was at
-`edb69247e` — item 13's D0 pickup SHA, well before item 13's own D1
-(+25 lines) and D2 (-92 lines) touched `control.rs`. `edb69247e` and
+`edb69247e` — item 13's D0 pickup SHA, well before item 13's own D1 (+25
+lines) and D2 (-92 lines) touched `control.rs`. `edb69247e` and
 `367b846d1` are NOT identical, and stating that they were is a false
 premise, caught by `runtime-leader` at object-store verify (this item's
 kickoff thread, `evt_91c5zzng99x4`).
@@ -727,8 +730,8 @@ kickoff thread, `evt_91c5zzng99x4`).
 **The correction, and it is evidence rather than a repaired assertion:**
 `git diff edb69247e 367b846d1 -- .../control.rs` — the exact delta between
 the file actually read and the file at this item's pickup — is precisely
-three hunks, independently re-verified by `runtime-leader` reading the
-same diff directly (not my summary of it):
+three hunks, independently re-verified by `runtime-leader` reading the same
+diff directly (not my summary of it):
 
 1. The `d6_a_functionized_recursive_declaration_accepts_a_changing_
    argument_constructor` test's removal (item 13's own D2 move to
@@ -751,16 +754,16 @@ for and touches no test-content bearing on any item's domain boundary.
 in-place read of all 220 (223 including the 3 core.rs-embedded tests) at
 item 13's own D0, plus (b) this exact `git diff`, independently re-read by
 `runtime-leader`, proving the file at this item's pickup differs from that
-read by nothing that could bear on this item's domain.** This is the
-actual discharge — not the "reconciliation against an unchanged file"
-framing Addendum 3 used, which rested on a false comparison. A partial,
-properly-tooled re-read (through line ~6600/30222 of a fresh pass, all
-continuation/checked-invocation domain, zero new findings, per
-`runtime-leader`'s own instruction to run it before the diff surfaced)
-independently corroborates the same conclusion but is not itself the
-discharge and was stopped once the diff-based proof was confirmed
-(`runtime-leader`, `evt_7q9fwnzrqx4qb`) — completing it further would
-have been provably redundant.
+read by nothing that could bear on this item's domain.** This is the actual
+discharge — not the "reconciliation against an unchanged file" framing
+Addendum 3 used, which rested on a false comparison. A partial, properly-
+tooled re-read (through line ~6600/30222 of a fresh pass, all
+continuation/checked-invocation domain, zero new findings, per `runtime-
+leader`'s own instruction to run it before the diff surfaced) independently
+corroborates the same conclusion but is not itself the discharge and was
+stopped once the diff-based proof was confirmed (`runtime-leader`,
+`evt_7q9fwnzrqx4qb`) — completing it further would have been provably
+redundant.
 
 ### Addendum 7 — Architect CHANGES-REQUESTED re-cut: three findings in the
 ### scalar-merge/trap-provenance cluster, Addendum 5's MOVE set superseded
@@ -770,9 +773,9 @@ Root cause, stated once: Addenda 1/2's census enumerated direct call-sites
 and named-uses of each MOVE-set symbol, but not (a) the symbol embedded as
 a struct FIELD of a RETAINED type, or (b) a delegating/wrapper method that
 carries the symbol across the domain boundary. Both missed-site classes
-produced a false "exclusive"/"no-retained-consumer" claim, localized to
-the scalar-merge/trap-provenance cluster — confirmed NOT a wholesale
-census failure (the Architect independently re-verified `TrapIdentityMutation`
+produced a false "exclusive"/"no-retained-consumer" claim, localized to the
+scalar-merge/trap-provenance cluster — confirmed NOT a wholesale census
+failure (the Architect independently re-verified `TrapIdentityMutation`
 holds; my own re-check below of the rest of the MOVE set, widened to the
 same two missed-site classes, found no further instances). Each finding
 independently re-verified against the source before this addendum, not
@@ -788,9 +791,9 @@ same `StaticWorkerCallOutcome` shape item 13 established. `ScalarMergeKind`
 is module-private today (`mod.rs:14325`, no `pub`); hub-stays needs ZERO
 widening (movers reach it via `use super::*`, since a private parent item
 is visible to descendant modules); MOVING it would force `>=pub(super)` so
-`SourceJoinTarget` (retained) and `source.rs` (retained, cross-module)
-could still see it — a widening to make a move compile, which BANNED
-SCOPE names as a finding. RETAIN.
+`SourceJoinTarget` (retained) and `source.rs` (retained, cross-module) could
+still see it — a widening to make a move compile, which BANNED SCOPE names
+as a finding. RETAIN.
 
 **FINDING 2 (blocking, AC-1 partition gap) — two functions absent from
 the ledger entirely.** Grep-confirmed against the committed file: neither
@@ -799,65 +802,65 @@ pair` (`mod.rs:16189`) appeared in any MOVE or RETAIN list. AC-1 requires
 every declaration classified; "neither is a gap, not a non-event." Both
 independently re-verified:
 
-- `merge_planned_scalar_branch` — its own doc comment names it "a
-  **planned** join — same phase-bearing role as `Self::merge_scalar_
-  branch`, same pending boundary, named the same way" — a genuine
-  doppelganger of this item's own `merge_scalar_branch` (Addendum 1),
-  missed by name-collision risk scanning because the names differ by one
-  word. **Sole caller: `source.rs:1141`** (RETAINED, item 12's, outside
-  this item's bound files entirely) — grep-confirmed, no other caller
-  anywhere in the crate. Internally it calls `self.merge_scalar_operand`
-  (this item's own MOVE candidate) opaquely. **RETAIN** — a RETAINED
-  entry point that reaches into a mover, the same shape as `lower_expr`
-  calling `call_static_worker` in item 13.
+- `merge_planned_scalar_branch` — its own doc comment names it "a **planned**
+  join — same phase-bearing role as `Self::merge_scalar_branch`, same
+  pending boundary, named the same way" — a genuine doppelganger of this
+  item's own `merge_scalar_branch` (Addendum 1), missed by name-collision
+  risk scanning because the names differ by one word. **Sole caller:
+  `source.rs:1141`** (RETAINED, item 12's, outside this item's bound files
+  entirely) — grep-confirmed, no other caller anywhere in the crate.
+  Internally it calls `self.merge_scalar_operand` (this item's own MOVE
+  candidate) opaquely. **RETAIN** — a RETAINED entry point that reaches
+  into a mover, the same shape as `lower_expr` calling `call_static_worker`
+  in item 13.
 - `lowered_from_scalar_pair` — callers, grep-confirmed exhaustively:
-  `lower_bounded_nat_computational` (`core.rs:6077,6121` — RETAINED,
-  item 12's checked-invocation domain), `finish_planned_join`
-  (`core.rs:10332` — this item's own MOVE), `lower_dynamic_host_result_
-  match` (`core.rs:15260` — this item's own MOVE), `lower_big_int_
-  constant`/`lower_unsigned_u64_int` (`mod.rs:17718,17764` — RETAINED,
-  primitive-integer-lowering, a fourth, not-yet-split domain). **RETAIN,
-  hub-stays** — directly analogous to `NativeScalarPairV1`'s own finding
-  in Addendum 1: shared between two moving and three staying consumers,
-  no single domain owns it.
+  `lower_bounded_nat_computational` (`core.rs:6077,6121` — RETAINED, item
+  12's checked-invocation domain), `finish_planned_join` (`core.rs:10332` —
+  this item's own MOVE), `lower_dynamic_host_result_match`
+  (`core.rs:15260` — this item's own MOVE), `lower_big_int_constant`/
+  `lower_unsigned_u64_int` (`mod.rs:17718,17764` — RETAINED, primitive-
+  integer-lowering, a fourth, not-yet-split domain). **RETAIN, hub-stays**
+  — directly analogous to `NativeScalarPairV1`'s own finding in Addendum 1:
+  shared between two moving and three staying consumers, no single domain
+  owns it.
 
 **FINDING 3 (correction; RETAIN classification stands, false premise
 struck) — `PlannedTrapSeat`.** Addendum 1 stated its variants "are
 constructed ONLY inside `emit_current_trap`," which was false and is
 struck. **Independently re-verified:** `calls.rs` (item 13's own LANDED
 module) constructs all three `PlannedTrapSeat` variants too, at
-`calls.rs:1771,1786,1798` (confirmed by direct read), as the `seat:`
-field of `Px8trTrapProvenanceEvent::UnitTrapWordPropagated` — a
-**different** variant from `emit_current_trap`'s own `PlannedTrapEmitted`,
-both under `#[cfg(test)]`. `PlannedTrapSeat` is therefore straightforwardly
-part of the hub-stays `Px8trTrapProvenanceEvent` observability cluster,
-shared with an already-landed sibling — not a judgment call weighing an
-exclusive-construction site against its parent enum's declaration
-position. **RETAIN stands; the reasoning is corrected, not the verdict.**
+`calls.rs:1771,1786,1798` (confirmed by direct read), as the `seat:` field
+of `Px8trTrapProvenanceEvent::UnitTrapWordPropagated` — a **different**
+variant from `emit_current_trap`'s own `PlannedTrapEmitted`, both under
+`#[cfg(test)]`. `PlannedTrapSeat` is therefore straightforwardly part of
+the hub-stays `Px8trTrapProvenanceEvent` observability cluster, shared with
+an already-landed sibling — not a judgment call weighing an exclusive-
+construction site against its parent enum's declaration position. **RETAIN
+stands; the reasoning is corrected, not the verdict.**
 
-**Re-verification of the REST of the MOVE set against the same two
-missed-site classes (field-embedding, delegating-wrapper), per the
-Architect's re-cut instruction:** every remaining MOVE-set method
-(`carried_join_arm`, `append_planned_join_params`, `jump_planned_join_
-arm`, `finish_planned_join`, `consume_join_plan`, `consumed_join_plan_
-token`, `lower_carried_match` and its five case-dispatch siblings,
-`emit_current_trap`, `seal_source_trap_branch`, `bind_unit_trap_frame`)
-re-checked crate-wide for every call site: all are opaque `self.method(..)`
-calls from `source.rs`/`units.rs`/`core.rs`, none construct or destructure
-a MOVE-set type's internals, matching the discriminator's first (mover)
-shape, not its second (hub-stays) shape — unchanged from Addendum 1. The
+**Re-verification of the REST of the MOVE set against the same two missed-
+site classes (field-embedding, delegating-wrapper), per the Architect's
+re-cut instruction:** every remaining MOVE-set method (`carried_join_arm`,
+`append_planned_join_params`, `jump_planned_join_arm`, `finish_planned_
+join`, `consume_join_plan`, `consumed_join_plan_token`, `lower_carried_
+match` and its five case-dispatch siblings, `emit_current_trap`,
+`seal_source_trap_branch`, `bind_unit_trap_frame`) re-checked crate-wide
+for every call site: all are opaque `self.method(..)` calls from
+`source.rs`/`units.rs`/`core.rs`, none construct or destructure a MOVE-set
+type's internals, matching the discriminator's first (mover) shape, not its
+second (hub-stays) shape — unchanged from Addendum 1. The
 `DasmC2ScalarMergeObservation` cluster re-checked crate-wide (not just the
 bound files): its only consumers beyond `merge_scalar_operand` itself are
 two cross-CRATE integration tests (`ken-elaborator/tests/nc14_data_match_
 lowering.rs`, `ken-cli/tests/dasm_c2_observation_artifact_identity.rs`)
 calling the public `dasm_c2_scalar_merge_observation_scope()` entry point
-via its crate-facade path — the same re-export already named in Addendum
-4, no new field-embedding or wrapper found. `TrapIdentityMutation`
-re-checked: no field-embedding anywhere in the crate (grep-confirmed).
-**No further reclassifications.**
+via its crate-facade path — the same re-export already named in Addendum 4,
+no new field-embedding or wrapper found. `TrapIdentityMutation` re-checked:
+no field-embedding anywhere in the crate (grep-confirmed). **No further
+reclassifications.**
 
-**The corrected MOVE set, restated (supersedes Addendum 5's list, which
-is now wrong on `ScalarMergeKind` and incomplete on the two added RETAIN
+**The corrected MOVE set, restated (supersedes Addendum 5's list, which is
+now wrong on `ScalarMergeKind` and incomplete on the two added RETAIN
 functions):**
 
 **`core.rs`:** unchanged from Addendum 5 — `lower_carried_match`, `lower_
@@ -868,12 +871,13 @@ match`, `carried_join_arm`, `append_planned_join_params`, `jump_planned_
 join_arm`, `finish_planned_join`.
 
 **`mod.rs`:** `consume_join_plan`, `consumed_join_plan_token`,
-`disposition_statically_unselected_source_subtree`, `disposition_
-statically_unselected_match_cases`, `close_statically_unselected_match_
-cases`, `validate_join_plan_consumption`, `finalize_join_disposition`,
-`validate_materialized_dead_join_cfg`, `validate_materialized_dead_join_
-cfg_for`, `merge_scalar_branch`, `merge_scalar_operand`, `record_scalar_
-merge_kind`, `LoweringOperand::specialized_join_arm`, `emit_current_trap`,
+`disposition_statically_unselected_source_subtree`,
+`disposition_statically_unselected_match_cases`,
+`close_statically_unselected_match_cases`, `validate_join_plan_consumption`,
+`finalize_join_disposition`, `validate_materialized_dead_join_cfg`,
+`validate_materialized_dead_join_cfg_for`, `merge_scalar_branch`,
+`merge_scalar_operand`, `record_scalar_merge_kind`,
+`LoweringOperand::specialized_join_arm`, `emit_current_trap`,
 `seal_source_trap_branch`, `FunctionLocalRefs::bind_unit_trap_frame`,
 `TrapIdentityMutation` (enum), `TRAP_IDENTITY_MUTATION` (thread_local),
 `set_trap_identity_mutation`, `DasmC2ScalarMergeObservation` (struct),
@@ -909,21 +913,20 @@ them.
 ### `D1` executed — `lowering/joins.rs`, against the corrected Addendum 7
 ### MOVE set, base `93f2e2827`
 
-**Module name: `joins.rs`.** Not the campaign node's own words ("control and
-joins") — `control` collides with this crate's own heavily-overloaded
+**Module name: `joins.rs`.** Not the campaign node's own words ("control
+and joins") — `control` collides with this crate's own heavily-overloaded
 sense of the word (checked-invocation control, `control.rs`'s own test-file
-name) and this ledger's own naming-trap discipline (five confirmed
-instances in `D0` alone) rules it out. `joins` names the single largest,
-most cohesive cluster this owner contains (join-plan consumption,
-disposition, validation, and scalar-merge completion — 13 of the 30 moved
-items) and is the noun every other cluster (branch/match dispatch, trap
-exits, the `DasmC2` scalar-merge observability cluster) ultimately serves or
-completes into. Extends the `boundary.rs`/`source.rs`/`calls.rs` seam
-(items 11-13) exactly.
+name) and this ledger's own naming-trap discipline (five confirmed instances
+in `D0` alone) rules it out. `joins` names the single largest, most cohesive
+cluster this owner contains (join-plan consumption, disposition, validation,
+and scalar-merge completion — 13 of the 30 moved items) and is the noun
+every other cluster (branch/match dispatch, trap exits, the `DasmC2`
+scalar-merge observability cluster) ultimately serves or completes into.
+Extends the `boundary.rs`/`source.rs`/`calls.rs` seam (items 11-13) exactly.
 
-**Transport manifest — old path -> new path, full preservation, every moved
-item verbatim (doc comments, attrs, cfg gates, bodies unchanged) except the
-named `pub(super)` widenings below:**
+**Transport manifest — old path -> new path, full preservation, every
+moved item verbatim (doc comments, attrs, cfg gates, bodies unchanged)
+except the named `pub(super)` widenings below:**
 
 `core.rs` -> `joins.rs` (12 items, unchanged from Addendum 7):
 `carried_join_arm`, `append_planned_join_params`, `jump_planned_join_arm`,
@@ -934,27 +937,28 @@ nat_match`, `lower_dynamic_constructor_match`.
 
 `mod.rs` -> `joins.rs` (18 items, unchanged from Addendum 7): `consume_
 join_plan`, `consumed_join_plan_token`, `disposition_statically_unselected_
-source_subtree`, `disposition_statically_unselected_match_cases`, `close_
-statically_unselected_match_cases`, `validate_join_plan_consumption`,
+source_subtree`, `disposition_statically_unselected_match_cases`,
+`close_statically_unselected_match_cases`, `validate_join_plan_consumption`,
 `finalize_join_disposition`, `validate_materialized_dead_join_cfg`,
 `validate_materialized_dead_join_cfg_for`, `merge_scalar_branch`, `merge_
-scalar_operand`, `record_scalar_merge_kind`, `LoweringOperand::specialized_
-join_arm`, `emit_current_trap`, `seal_source_trap_branch`, `FunctionLocal
-Refs::bind_unit_trap_frame`, `TrapIdentityMutation` (enum) + `TRAP_
-IDENTITY_MUTATION` (thread_local, split out of a shared block with the
-RETAINED `STATIC_WORKER_MUTATION`/`TRAP_FRAME_BINDING_MUTATION`, which stay
-in `mod.rs`) + `set_trap_identity_mutation`, the `DasmC2ScalarMergeObser
-vation` cluster (struct + its own thread_local + `dasm_c2_record_scalar_
-merge` + `dasm_c2_take_scalar_merge_observations` + `DasmC2ScalarMerge
-ObservationScope` struct/`impl`/`impl Drop` + `dasm_c2_scalar_merge_
-observation_scope`, moved as one contiguous, already-self-contained block).
+scalar_operand`, `record_scalar_merge_kind`,
+`LoweringOperand::specialized_join_arm`, `emit_current_trap`,
+`seal_source_trap_branch`, `FunctionLocalRefs::bind_unit_trap_frame`,
+`TrapIdentityMutation` (enum) + `TRAP_IDENTITY_MUTATION` (thread_local,
+split out of a shared block with the RETAINED `STATIC_WORKER_MUTATION`/
+`TRAP_FRAME_BINDING_MUTATION`, which stay in `mod.rs`) + `set_trap_
+identity_mutation`, the `DasmC2ScalarMergeObservation` cluster (struct +
+its own thread_local + `dasm_c2_record_scalar_merge` + `dasm_c2_take_
+scalar_merge_observations` + `DasmC2ScalarMergeObservationScope` struct/
+`impl`/`impl Drop` + `dasm_c2_scalar_merge_observation_scope`, moved as one
+contiguous, already-self-contained block).
 
 **`ScalarMergeKind`, `merge_planned_scalar_branch`, `lowered_from_scalar_
 pair` did NOT move** — confirmed still declared in `mod.rs`, RETAIN per
-Addendum 7 Findings 1-2. Every moved method that references `ScalarMerge
-Kind` reaches it via `use super::*` with no visibility change, exactly as
-Addendum 7 predicted (module-private, visible to every `lowering`
-descendant without widening).
+Addendum 7 Findings 1-2. Every moved method that references
+`ScalarMergeKind` reaches it via `use super::*` with no visibility change,
+exactly as Addendum 7 predicted (module-private, visible to every
+`lowering` descendant without widening).
 
 **Widenings — `pub(super)`, each load-bearing, found by compiler-driven
 iteration (build, read every `E0624`, widen exactly the flagged item), not
@@ -991,14 +995,15 @@ re-export updated from `pub use lowering::{...}` to `pub use lowering::
 joins::{...}`, a path update only (the three names were already `pub`
 before the move, per Addendum 4's Class-1 finding).
 
-**AC-4 / AC-4b — scoped build + test, `ken-cargo` only, never `--workspace`:**
+**AC-4 / AC-4b — scoped build + test, `ken-cargo` only, never
+`--workspace`:**
 - `scripts/ken-cargo build -p ken-runtime --lib`: clean. 61 warnings, and a
   baseline build at the pre-move SHA (`93f2e2827`, stashed working tree)
   produces the identical 61 warnings at shifted line numbers — this move
   introduces zero new warnings.
-- `scripts/ken-cargo build -p ken-runtime --lib --features dasm-c2-observation`:
-  clean, confirming the re-export path update compiles under the gated
-  feature.
+- `scripts/ken-cargo build -p ken-runtime --lib --features dasm-c2-
+  observation`: clean, confirming the re-export path update compiles under
+  the gated feature.
 - `scripts/ken-cargo build -p ken-runtime --tests`: clean.
 - `scripts/ken-cargo test -p ken-runtime --lib`: **926 passed, 0 failed, 4
   ignored** — identical to the pre-move baseline (item 13's own landed
@@ -1075,6 +1080,63 @@ controls in the residual `control.rs`.**
 one candidate **only** when an exact compile or mutation-restoration dependency
 makes the pair semantically atomic — and say which it was.
 
+### `D2` executed — zero tests move, confirmed rather than assumed, base
+### `1e1eedda1`
+
+**Re-verified the empty-population conclusion at this pickup SHA, not
+inherited on faith.** `git diff 367b846d1 1e1eedda1 --
+lowering/core/tests/control.rs` (`367b846d1` is `D0`'s own pickup, the SHA
+against which `AC-2`'s emptiness was closed — Addendum 6's diff-proof, the
+Architect's ruling in Addendum 7 and again at the `D1` endorsing vote): the
+**only** delta is the three hunks `D1` itself authored — the `Census` row,
+the `BACKEND_PRODUCTION_SOURCES` row, and the declared-module-list row, all
+three already known by content (I wrote them) and already accounted for in
+`D1`'s own AC-4/4b report above. No test body, fixture, or import changed;
+no line bears on any test's domain classification. The empty-population
+conclusion **holds unchanged** at this pickup — this is the same
+diff-based discharge method Addendum 6 established and the Architect
+ratified (`D0` `AC-2` ruling, carried through both endorsing votes and
+restated in the `D1` kickoff), applied fresh at `D2`'s own pickup rather
+than assumed to still be true.
+
+**Zero tests moved.** Basis: `D0`'s own `AC-2` closure (Addendum 3's marker
+scan + name sweep, corrected by Addendum 6 to the diff-proof discharge
+after the false "byte-identical" premise was caught; the underlying
+population is the implementer's own exhaustive item-13-era read of every
+test in `control.rs`, re-confirmed empty for this item's domain) — not
+re-derived from scratch here, per the ruling's own explicit instruction.
+The three tests already known to reference this item's moved production
+surface (`typed_trap_exit_identity_and_caller_protocol_mutations_are_
+discriminating` and its siblings, shared with item 13's `calls.rs`) are
+genuinely cross-cutting/Class-4 end-to-end controls, not primarily-
+discriminated-by-this-owner tests, and stay in `control.rs` per this
+item's own `D0` ruling — unaffected by `D1`'s move since they reach
+`joins.rs`'s moved items only through the already-`pub(super)` production
+surface, exactly as before the move.
+
+**AC-4b:** no file created or enlarged by this deliverable (it moves
+nothing). `joins.rs` unchanged at 2,213 lines; `control.rs` unchanged at
+30,247 lines (D1's own housekeeping, already reported); neither newly
+approaches the 10k ceiling as a consequence of `D2`.
+
+**AC-5:** inapplicable — no adapter or facade, transitional or otherwise,
+is introduced by moving zero tests.
+
+**AC-6:** this slice's own transfer (of nothing) is complete and is
+**item 14's own end-to-end closure** — `D0` (ledger) + `D1` (production
+move) + `D2` (companion test move, confirmed empty) exhausts this item's
+scope. This is not a claim about `RT-BACKEND-MODULE-SPLIT`'s own phase
+closure, which depends on the campaign's other items.
+
+No build or test change results from this deliverable (no file touched);
+the last-known-green result is `D1`'s own 926 passed / 0 failed / 4
+ignored, unaffected by a zero-diff `D2`.
+
+Branch `wp/RT-EMITTER-CONTROL-JOINS-SPLIT`, at `1e1eedda1` (current
+`origin/main` at pickup, 0 behind) — this deliverable makes no code or
+test changes, only this ledger section. Ready for `runtime-leader`'s
+object-store verify.
+
 
 # ACCEPTANCE
 
@@ -1083,85 +1145,89 @@ first-cut acceptance did not prove the completeness or the preservation it
 claimed; what follows is the corrected bar.
 
 - **`AC-1` — an EXACT move ledger, closed over every Rust item class.**
-  > **"Record the blind spots" is honest and it does not close them.** Stage A's
-  > type selector sees 278 non-private types and does **not** see 694 `pub fn`,
-  > 25 `pub const`, 7 `pub static`, 5 `pub mod`, private items, traits, impl
-  > methods, macros, split-line declarations, or fields. A ledger built on it
-  > alone is not exact, whatever it says about its own limits.
+  > **"Record the blind spots" is honest and it does not close them.** Stage
+  > A's type selector sees 278 non-private types and does **not** see 694
+  > `pub fn`, 25 `pub const`, 7 `pub static`, 5 `pub mod`, private items,
+  > traits, impl methods, macros, split-line declarations, or fields. A ledger
+  > built on it alone is not exact, whatever it says about its own limits.
 
-  Enumerate **every** moved item class: modules and re-exports; types with their
-  fields and variants; traits, impls and methods; functions; consts and statics;
-  cfg, attributes, derive, repr and visibility; and macro-produced owned items.
-  **Each class needs its own fresh selector or syntax inventory, plus an explicit
-  manual closure for what that selector cannot see.**
+  Enumerate **every** moved item class: modules and re-exports; types with
+  their fields and variants; traits, impls and methods; functions; consts and
+  statics; cfg, attributes, derive, repr and visibility; and macro-produced
+  owned items. **Each class needs its own fresh selector or syntax inventory,
+  plus an explicit manual closure for what that selector cannot see.**
 
   **For the cfg / attribute / derive / repr / visibility class specifically:
-  this records what the moved population carries TODAY. Preservation across the
-  move is `AC-3`'s job at `D1`** — do not fold the two questions together.
+  this records what the moved population carries TODAY. Preservation across
+  the move is `AC-3`'s job at `D1`** — do not fold the two questions
+  together.
 
-  **A group label is not a ledger entry.** "ABI preflight helpers" names a set
-  without enumerating it and does not discharge "exact".
+  **A group label is not a ledger entry.** "ABI preflight helpers" names a
+  set without enumerating it and does not discharge "exact".
 
   **PARTITION every declaration in the bound file(s).** Each one is either
-  **moved to exactly one named owner**, or **EXPLICITLY RETAINED with its owning
-  domain named**. A declaration that is neither is a **gap, not a non-event**.
+  **moved to exactly one named owner**, or **EXPLICITLY RETAINED with its
+  owning domain named**. A declaration that is neither is a **gap, not a
+  non-event**.
   > **A moved-set universal is not the property that discharges "exact".** A
   > ledger can name four moved items perfectly and remain silent on the other
-  > hundred-odd in the same files. Item 4's first candidate did exactly that —
-  > 25 reconciled against 142 the selector returned — and it read as complete.
+  > hundred-odd in the same files. Item 4's first candidate did exactly that
+  > — 25 reconciled against 142 the selector returned — and it read as
+  > complete.
 
-  Research `evt_1pwq0rssre6d8`: *"A selector count plus a blind-spot paragraph
-  cannot discharge a universal."* **Declare the selector population for each
-  class AND close its blind classes.** A declared population **bounds** the
-  claim; it does not **discharge** it. Do not claim the universal on the strength
-  of the count.
-  > **The clause above is conjunctive, and the word "either" was the defect**
-  > (Architect `evt_1dh3mj0janmfp`, revising its own correction on item 4's
-  > evidence). Declaring the population is what makes "exact" a **well-formed**
-  > universal rather than an unbounded one — so it is required *as well as* the
-  > closure, never *instead of* it.
+  Research `evt_1pwq0rssre6d8`: *"A selector count plus a blind-spot
+  paragraph cannot discharge a universal."* **Declare the selector
+  population for each class AND close its blind classes.** A declared
+  population **bounds** the claim; it does not **discharge** it. Do not
+  claim the universal on the strength of the count.
+  > **The clause above is conjunctive, and the word "either" was the
+  > defect** (Architect `evt_1dh3mj0janmfp`, revising its own correction on
+  > item 4's evidence). Declaring the population is what makes "exact" a
+  > **well-formed** universal rather than an unbounded one — so it is
+  > required *as well as* the closure, never *instead of* it.
 
   **Source-text oracles and `include_str!` paths belong in the ledger** — Stage A
   found **49** such lines, and relocation can change what they mean without
   changing production behaviour.
 
 - **`AC-2` — test identity and DISCOVERY, before the mutation proof.**
-  > **Mutation restoration proves the discriminating tests that have mutations.
-  > It does not prove that every moved test is still DISCOVERED** under the same
-  > cfg and profile. A test that silently stops being collected passes every
-  > mutation check that remains.
+  > **Mutation restoration proves the discriminating tests that have
+  > mutations. It does not prove that every moved test is still DISCOVERED**
+  > under the same cfg and profile. A test that silently stops being
+  > collected passes every mutation check that remains.
 
-  Produce a **before/after test identity and discovery ledger for each relevant
-  build profile**; execute directly and record a **nonzero selected-test count**;
-  **then** the mutation proof — each moved mutation reds the **same reached
-  property**, with the same **nonzero** denominator, restored. **Enumerate any
-  source-oracle path or text rewrite as a non-move hunk.**
+  Produce a **before/after test identity and discovery ledger for each
+  relevant build profile**; execute directly and record a **nonzero selected-
+  test count**; **then** the mutation proof — each moved mutation reds the
+  **same reached property**, with the same **nonzero** denominator, restored.
+  **Enumerate any source-oracle path or text rewrite as a non-move hunk.**
 
   **Each test-ledger row carries its CLASS and its exact old/new production
   INJECTION POINT.** Research `evt_1pwq0rssre6d8`, from the program report's
-  four-way partition: **domain tests, shared fixtures, mutation controls at their
-  production injection point, and end-to-end controls crossing planning through
-  execution.**
+  four-way partition: **domain tests, shared fixtures, mutation controls at
+  their production injection point, and end-to-end controls crossing planning
+  through execution.**
   > **Class 4 legitimately REMAINS in the residual integration module.** A
-  > ledger row without a class invites an end-to-end control to be converted into
-  > a domain test, or moved by size — which is exactly what the report forbids.
+  > ledger row without a class invites an end-to-end control to be converted
+  > into a domain test, or moved by size — which is exactly what the report
+  > forbids.
 
 - **`AC-3` — a TRANSPORT MANIFEST, not a line-pairing review aid.**
   > **Pairing removed lines with added lines is not a behaviour-preservation
-  > control.** Attributes, cfg, visibility, field and variant order, derives,
-  > imports and name resolution, re-export surfaces and diagnostics can all
-  > change while every line still pairs.
+  > control.** Attributes, cfg, visibility, field and variant order,
+  > derives, imports and name resolution, re-export surfaces and diagnostics
+  > can all change while every line still pairs.
 
-  For **every** moved item record **old path, new path**, and an item comparison
-  preserving **body, attributes, cfg, repr/derive, field and variant order,
-  visibility, diagnostic text, hashes and serialization, and public/export
-  profile**.
+  For **every** moved item record **old path, new path**, and an item
+  comparison preserving **body, attributes, cfg, repr/derive, field and
+  variant order, visibility, diagnostic text, hashes and serialization, and
+  public/export profile**.
 
-  **Permitted normalization, and nothing else:** module declarations, imports and
-  path qualification, and **explicitly ledgered** adapter/re-export scaffolding.
-  **Enumerate every other hunk as a non-move. A semantic hunk hard-stops the
-  slice.** `git diff --color-moved` may support the review; **it cannot be the
-  gate.**
+  **Permitted normalization, and nothing else:** module declarations, imports
+  and path qualification, and **explicitly ledgered** adapter/re-export
+  scaffolding. **Enumerate every other hunk as a non-move. A semantic hunk
+  hard-stops the slice.** `git diff --color-moved` may support the review;
+  **it cannot be the gate.**
 
 - **`AC-4`** — the affected library configuration **and** the targeted test
   configurations both compile. **Control:** scoped `scripts/ken-cargo` runs only;
@@ -1171,69 +1237,72 @@ claimed; what follows is the corrected bar.
   Record the resulting line count of **every file this slice creates or
   enlarges**. **No move may CREATE OR ENLARGE any file past 10k**, and a move
   that would is a finding to route rather than a transfer to complete.
-  > **"Create" alone did not match this criterion's own recording obligation**,
-  > which already covers every file the slice *creates or enlarges*. The gap sat
-  > on the most likely path in the plan: `lowering/core/tests/constructors.rs`
-  > is **9,727** lines — 273 under the ceiling, in the very directory the fifteen
-  > `D2` companion-test moves deposit into, and already **+436** with no test
-  > moved yet.
+  > **"Create" alone did not match this criterion's own recording
+  > obligation**, which already covers every file the slice *creates or
+  > enlarges*. The gap sat on the most likely path in the plan:
+  > `lowering/core/tests/constructors.rs` is **9,727** lines — 273 under the
+  > ceiling, in the very directory the fifteen `D2` companion-test moves
+  > deposit into, and already **+436** with no test moved yet.
 
-  **Where a slice moves nothing this criterion is INAPPLICABLE, not satisfied**
-  — `RT-PLANNER-ROOT-CLOSURE-SPLIT` under outcome 1, and the closure node, which
-  deletes rather than moves. Restate it as inapplicable; do not tick it.
-  > Research `evt_1pwq0rssre6d8`: none of the fifteen move frames constrained the
-  > target child's size, so the phase could shrink every root while producing a
-  > fresh violation.
+  **Where a slice moves nothing this criterion is INAPPLICABLE, not
+  satisfied** — `RT-PLANNER-ROOT-CLOSURE-SPLIT` under outcome 1, and the
+  closure node, which deletes rather than moves. Restate it as inapplicable;
+  do not tick it.
+  > Research `evt_1pwq0rssre6d8`: none of the fifteen move frames
+  > constrained the target child's size, so the phase could shrink every
+  > root while producing a fresh violation.
 - **`AC-5` — the ADAPTER AND FACADE DEBT LEDGER.** Any `D1` that introduces
-  transitional scaffolding **appends an exact ledger** naming the symbol, why it
-  is temporarily required, and **the final-closure deletion obligation**.
-  > **[[RT-BACKEND-SPLIT-CLOSURE]] cannot prove it deleted "every adapter" if the
-  > earlier slices never closed the population.** This criterion is what makes
-  > that closure checkable, and it is owed by every slice that leaves scaffolding
-  > behind.
+  transitional scaffolding **appends an exact ledger** naming the symbol, why
+  it is temporarily required, and **the final-closure deletion obligation**.
+  > **[[RT-BACKEND-SPLIT-CLOSURE]] cannot prove it deleted "every adapter"
+  > if the earlier slices never closed the population.** This criterion is
+  > what makes that closure checkable, and it is owed by every slice that
+  > leaves scaffolding behind.
 
 - **`AC-6`** — this slice's own transfer is stated as complete, and **phase
-  closure is explicitly NOT claimed.** Reporting a bound file's new line count as
-  evidence the phase is done fails this criterion.
+  closure is explicitly NOT claimed.** Reporting a bound file's new line
+  count as evidence the phase is done fails this criterion.
 
 > ### LABEL THE THREE EVIDENCE SEATS IN THE LEDGER. Guardrail 7.
 >
 > **Research `evt_1pwq0rssre6d8`.** The common gate already says plans and
-> commands never count as emitted evidence. The ledger must additionally label,
-> per moved item, the **intention producer**, the **independent artifact
-> observer / evidence decoder**, and the **closeout / publication seat** —
-> **so a convenient emitter-family move cannot silently collapse them into one.**
+> commands never count as emitted evidence. The ledger must additionally
+> label, per moved item, the **intention producer**, the **independent
+> artifact observer / evidence decoder**, and the **closeout / publication
+> seat** — **so a convenient emitter-family move cannot silently collapse
+> them into one.**
 
 # THE FROZEN STAGE PREDICATE — so `D0` cannot choose the boundary opportunistically
 
-**Architect `evt_14x1bqgrj4yze`.** The per-domain symbol sets are deliberately
-**not** pre-enumerated here — that would duplicate `D0` and go stale. What is
-frozen is the total predicate:
+**Architect `evt_14x1bqgrj4yze`.** The per-domain symbol sets are
+deliberately **not** pre-enumerated here — that would duplicate `D0` and go
+stale. What is frozen is the total predicate:
 
-- **The planner owns** plan identities, minting, relation and seat construction,
-  validation and closure, and read-only projections.
-- **The emitter owns** concrete CLIF/backend mutation that consumes a validated
-  plan, and **may not mint or reshape planner identity**.
-- **Aggregate, effect, and join/trap symbols are assigned EXACTLY ONCE across
-  their planner/emitter pair.** The later `D0` **reconciles against the earlier
-  LANDED ledger, not against its frame.**
+- **The planner owns** plan identities, minting, relation and seat
+  construction, validation and closure, and read-only projections.
+- **The emitter owns** concrete CLIF/backend mutation that consumes a
+  validated plan, and **may not mint or reshape planner identity**.
+- **Aggregate, effect, and join/trap symbols are assigned EXACTLY ONCE
+  across their planner/emitter pair.** The later `D0` **reconciles against
+  the earlier LANDED ledger, not against its frame.**
 
-That settles items 7/15, 8/16 and 9/14 as a boundary question. **The exact names
-remain `D0`'s job.**
+That settles items 7/15, 8/16 and 9/14 as a boundary question. **The exact
+names remain `D0`'s job.**
 
 # BANNED SCOPE
 
-- **No semantic change of any kind.** An exposed behavioural dependency **stops
-  the move** and returns for a ruling; it is not repaired inside a pure move.
+- **No semantic change of any kind.** An exposed behavioural dependency
+  **stops the move** and returns for a ruling; it is not repaired inside a
+  pure move.
 - **No grouping with another slice to reduce node count**, and no planner or
   lowering mega-diff. A census merge permits one frame with independently
   reviewable commits — it permits nothing else.
-- **No facade that recreates the monolith**, and no widened visibility to make a
-  move compile. If a symbol must widen, that is a finding.
-- **No renaming for tidiness.** A move that also renames cannot be reviewed as a
-  move.
-- **No line-count-driven extraction.** The constraint is architectural soundness
-  with a 10k ceiling, not equal-sized files.
+- **No facade that recreates the monolith**, and no widened visibility to
+  make a move compile. If a symbol must widen, that is a finding.
+- **No renaming for tidiness.** A move that also renames cannot be reviewed
+  as a move.
+- **No line-count-driven extraction.** The constraint is architectural
+  soundness with a 10k ceiling, not equal-sized files.
 
 # CONTENTION
 
@@ -1242,44 +1311,44 @@ remain `D0`'s job.**
 
 > ### CHECK CONTENTION BY FILE INTERSECTION AT PICKUP, NOT BY THIS NODE LIST
 >
-> **Architect `evt_14x1bqgrj4yze`.** A frame that names today's live semantic
-> nodes is **deliberately perishable** — the claim was true when written and
-> decays silently.
+> **Architect `evt_14x1bqgrj4yze`.** A frame that names today's live
+> semantic nodes is **deliberately perishable** — the claim was true when
+> written and decays silently.
 >
 > **The durable rule:** a **planner** slice checks active semantic candidates
 > against `static_transition.rs` and `control.rs`; a **lowering or emitter**
-> slice checks `core.rs`, `mod.rs` and `control.rs`. **A non-empty intersection
-> holds the slice.**
+> slice checks `core.rs`, `mod.rs` and `control.rs`. **A non-empty
+> intersection holds the slice.**
 >
-> The sequencing preference stands — planner work first, lowering and emitter
-> work only after semantic work has left those files.
+> The sequencing preference stands — planner work first, lowering and
+> emitter work only after semantic work has left those files.
 
 > ### THE CHAIN'S WARRANT IS ARTIFACT DEPENDENCY, NOT SEAT COUNT
 >
-> **Corrected on the Architect's verdict.** This frame first justified the strict
-> chain partly by there being one implementer seat. **Seat count is scheduling
-> state, not architecture, and it must not be encoded as a dependency.**
+> **Corrected on the Architect's verdict.** This frame first justified the
+> strict chain partly by there being one implementer seat. **Seat count is
+> scheduling state, not architecture, and it must not be encoded as a
+> dependency.**
 >
-> **The chain is nevertheless honest, for a real reason:** every `D2` reads and
-> edits the same `lowering/core/tests/control.rs`, and each later `D0` must
-> **remeasure the tree after the preceding production and test relocation**.
-> Within the planner and the lowering/emitter groups the production roots also
-> collide.
+> **The chain is nevertheless honest, for a real reason:** every `D2` reads
+> and edits the same `lowering/core/tests/control.rs`, and each later `D0`
+> must **remeasure the tree after the preceding production and test
+> relocation**. Within the planner and the lowering/emitter groups the
+> production roots also collide.
 >
-> ⇒ **If production and test moves were ever split into independent nodes**, the
-> planner-production and lowering-production chains could **fork**, with final
-> closure joining them. **With the current frames they cannot.**
+> ⇒ **If production and test moves were ever split into independent nodes**,
+> the planner-production and lowering-production chains could **fork**, with
+> final closure joining them. **With the current frames they cannot.**
 
-**Re-derive every symbol by name at pickup**, never by line offset. `core.rs` was
-20,413 lines and `mod.rs` 21,200 at `7509c77a7`; both are under active
-pressure from this
-phase itself.
+**Re-derive every symbol by name at pickup**, never by line offset. `core.rs`
+was 20,413 lines and `mod.rs` 21,200 at `7509c77a7`; both are under active
+pressure from this phase itself.
 
 # GATES BINDING EVERY STRUCTURAL FRAME IN THIS PHASE
 
 These are not this slice's invention. They bind every child of
-[[RT-BACKEND-MODULE-SPLIT]] and are reproduced here so a pickup does not have to
-open the phase record to learn them.
+[[RT-BACKEND-MODULE-SPLIT]] and are reproduced here so a pickup does not
+have to open the phase record to learn them.
 
 - **Exact old/new symbol and test-property ledgers.**
 - **No representation, diagnostic, hash, serialization, behaviour or trust
@@ -1290,24 +1359,24 @@ open the phase record to learn them.
   **nonzero** denominator, and is restored.
 - **Plans and commands never count as emitted evidence.**
 - **Source text is a census aid, not the only semantic oracle.**
-- **Scoped local checks plus CI's workspace gate — never a local workspace run**
-  (`COORDINATION section 12`).
+- **Scoped local checks plus CI's workspace gate — never a local workspace
+  run** (`COORDINATION section 12`).
 
 > ### AN EXPOSED BEHAVIOURAL DEPENDENCY STOPS THE MOVE. It is not repaired here.
 >
-> If the move reveals that two regions are coupled by behaviour rather than by
-> namespace, **return it for a semantic ruling.** Repairing it inside a "pure
-> move" is what makes a structural slice unreviewable, because the diff then
-> contains both a relocation and a change and neither can be checked against the
-> other.
+> If the move reveals that two regions are coupled by behaviour rather than
+> by namespace, **return it for a semantic ruling.** Repairing it inside a
+> "pure move" is what makes a structural slice unreviewable, because the
+> diff then contains both a relocation and a change and neither can be
+> checked against the other.
 
 > ### THE THREE STANDING AMENDMENTS
 >
 > - **The graph foundation is not an `ids.rs` drawer.** `PredeclaredFunctionId`
 >   stays unit-owned; `StaticOriginId` and source/child correspondence stay
 >   occurrence-owned.
-> - **`boundary_value_clif.rs` is not absorbed merely for size.** Its lifecycle
->   and consumers must be proven first.
-> - **The source machine is relocation only in this phase**, never a transition
->   IR. Generated traps receive **no fabricated source origin**.
+> - **`boundary_value_clif.rs` is not absorbed merely for size.** Its
+>   lifecycle and consumers must be proven first.
+> - **The source machine is relocation only in this phase**, never a
+>   transition IR. Generated traps receive **no fabricated source origin**.
 
