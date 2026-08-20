@@ -7333,6 +7333,19 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-EMITTER-CONTROL-JOINS-SPLIT` `D1` — the control and joins
+        // emitter, moved verbatim from `core.rs`/`mod.rs`. It emits IR into
+        // the `FunctionBuilder` its caller already owns; it never mints a
+        // new defined function or data object.
+        Census {
+            file: "lowering/joins.rs",
+            source: include_str!("../../joins.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         Census {
             file: "planning.rs",
             source: include_str!("../../../planning.rs"),
@@ -7998,6 +8011,11 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     // `boundary.rs`/`source.rs` above: a production source absent from this
     // roster is invisible to every pin that iterates it.
     ("lowering/calls.rs", include_str!("../../calls.rs")),
+    // `RT-EMITTER-CONTROL-JOINS-SPLIT` `D1` — the control and joins emitter.
+    // Registered here the moment the module exists, for the same reason as
+    // `boundary.rs`/`source.rs`/`calls.rs` above: a production source absent
+    // from this roster is invisible to every pin that iterates it.
+    ("lowering/joins.rs", include_str!("../../joins.rs")),
     // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. Registered
     // here the moment the module exists, because every pin that iterates this
     // roster is closed only over the files it lists: a production emitter absent
@@ -8176,6 +8194,13 @@ fn the_backend_production_surface_inventory_is_closed() {
             // the moving methods merely manipulate stay SCC-pinned in
             // `mod.rs`.
             ("lowering/mod.rs", "calls"),
+            // `RT-EMITTER-CONTROL-JOINS-SPLIT` `D1` — the control and joins
+            // emitter (branch/match emission, join emission, block/
+            // terminator construction). A sibling of
+            // `core`/`units`/`seed_material`/`boundary`/`source`/`calls`;
+            // the types the moving methods merely manipulate
+            // (`ScalarMergeKind` and siblings) stay SCC-pinned in `mod.rs`.
+            ("lowering/mod.rs", "joins"),
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
             // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — aggregate allocation

@@ -280,6 +280,10 @@ methods above are all the first shape; the types below are the second.
   ledger did not find a precedent for in items 11-13. If the Architect
   judges the exclusive-construction-site discriminator should win here
   regardless, this is a one-line reclassification, not a re-trace.
+  **Superseded by Addendum 7** — the exclusive-construction premise above
+  is FALSE (`calls.rs`, item 13's landed module, also constructs all three
+  variants); RETAIN stands but is no longer a judgment call. Addendum 7's
+  Finding 3 is the corrected reasoning, not relied on here.
 - **`specialized_at`, `specialized_ref_at`, `effect_seat_phase`**
   (`LoweringOperand`/related methods, `mod.rs`) — general-purpose "read this
   operand's specialized template or fail closed" utilities, 12+ call sites
@@ -394,6 +398,9 @@ name — the exact discipline items 12/13 needed repeatedly:
   (already-confirmed MOVE); every use in `mod.rs` sits inside `merge_
   scalar_branch`/`merge_scalar_operand`/`record_scalar_merge_kind`
   (already-confirmed MOVE). No RETAINED consumer found anywhere.
+  **Superseded by Addendum 7** — this census missed the field-embedding
+  in the RETAINED `SourceJoinTarget` (`mod.rs:14128`); reclassified
+  MOVE -> RETAIN, hub-stays, there. Not relied on here.
 - **`DasmC2ScalarMergeObservation`, `DASM_C2_SCALAR_MERGE_OBSERVATIONS`,
   `DASM_C2_SCALAR_MERGE_OBSERVATION_ENABLED`, `dasm_c2_record_scalar_
   merge`, `dasm_c2_take_scalar_merge_observations`, `DasmC2ScalarMerge
@@ -671,7 +678,9 @@ plan_consumption`, `finalize_join_disposition`, `validate_materialized_
 dead_join_cfg`, `validate_materialized_dead_join_cfg_for`, `merge_scalar_
 branch`, `merge_scalar_operand`, `record_scalar_merge_kind`, `LoweringOperand::
 specialized_join_arm`, `emit_current_trap`, `seal_source_trap_branch`,
-`FunctionLocalRefs::bind_unit_trap_frame`, `ScalarMergeKind` (enum),
+`FunctionLocalRefs::bind_unit_trap_frame`, `ScalarMergeKind` (enum;
+**superseded by Addendum 7** — reclassified RETAIN, hub-stays, not part
+of the MOVE set; not relied on here),
 `TrapIdentityMutation` (enum), `TRAP_IDENTITY_MUTATION` (thread_local),
 `set_trap_identity_mutation`, `DasmC2ScalarMergeObservation` (struct),
 `DASM_C2_SCALAR_MERGE_OBSERVATIONS`/`DASM_C2_SCALAR_MERGE_OBSERVATION_
@@ -896,6 +905,145 @@ endorsing vote.
 Move the owner into its own child module, extending the established seam.
 Adapters are permitted **as transitional scaffolding only**, and item 18 deletes
 them.
+
+### `D1` executed — `lowering/joins.rs`, against the corrected Addendum 7
+### MOVE set, base `93f2e2827`
+
+**Module name: `joins.rs`.** Not the campaign node's own words ("control and
+joins") — `control` collides with this crate's own heavily-overloaded
+sense of the word (checked-invocation control, `control.rs`'s own test-file
+name) and this ledger's own naming-trap discipline (five confirmed
+instances in `D0` alone) rules it out. `joins` names the single largest,
+most cohesive cluster this owner contains (join-plan consumption,
+disposition, validation, and scalar-merge completion — 13 of the 30 moved
+items) and is the noun every other cluster (branch/match dispatch, trap
+exits, the `DasmC2` scalar-merge observability cluster) ultimately serves or
+completes into. Extends the `boundary.rs`/`source.rs`/`calls.rs` seam
+(items 11-13) exactly.
+
+**Transport manifest — old path -> new path, full preservation, every moved
+item verbatim (doc comments, attrs, cfg gates, bodies unchanged) except the
+named `pub(super)` widenings below:**
+
+`core.rs` -> `joins.rs` (12 items, unchanged from Addendum 7):
+`carried_join_arm`, `append_planned_join_params`, `jump_planned_join_arm`,
+`finish_planned_join`, `lower_carried_match`, `lower_nonborrowed_carried_
+match`, `lower_carried_constructor_match`, `lower_borrowed_match`, `lower_
+borrowed_option_match`, `lower_dynamic_host_result_match`, `lower_bounded_
+nat_match`, `lower_dynamic_constructor_match`.
+
+`mod.rs` -> `joins.rs` (18 items, unchanged from Addendum 7): `consume_
+join_plan`, `consumed_join_plan_token`, `disposition_statically_unselected_
+source_subtree`, `disposition_statically_unselected_match_cases`, `close_
+statically_unselected_match_cases`, `validate_join_plan_consumption`,
+`finalize_join_disposition`, `validate_materialized_dead_join_cfg`,
+`validate_materialized_dead_join_cfg_for`, `merge_scalar_branch`, `merge_
+scalar_operand`, `record_scalar_merge_kind`, `LoweringOperand::specialized_
+join_arm`, `emit_current_trap`, `seal_source_trap_branch`, `FunctionLocal
+Refs::bind_unit_trap_frame`, `TrapIdentityMutation` (enum) + `TRAP_
+IDENTITY_MUTATION` (thread_local, split out of a shared block with the
+RETAINED `STATIC_WORKER_MUTATION`/`TRAP_FRAME_BINDING_MUTATION`, which stay
+in `mod.rs`) + `set_trap_identity_mutation`, the `DasmC2ScalarMergeObser
+vation` cluster (struct + its own thread_local + `dasm_c2_record_scalar_
+merge` + `dasm_c2_take_scalar_merge_observations` + `DasmC2ScalarMerge
+ObservationScope` struct/`impl`/`impl Drop` + `dasm_c2_scalar_merge_
+observation_scope`, moved as one contiguous, already-self-contained block).
+
+**`ScalarMergeKind`, `merge_planned_scalar_branch`, `lowered_from_scalar_
+pair` did NOT move** — confirmed still declared in `mod.rs`, RETAIN per
+Addendum 7 Findings 1-2. Every moved method that references `ScalarMerge
+Kind` reaches it via `use super::*` with no visibility change, exactly as
+Addendum 7 predicted (module-private, visible to every `lowering`
+descendant without widening).
+
+**Widenings — `pub(super)`, each load-bearing, found by compiler-driven
+iteration (build, read every `E0624`, widen exactly the flagged item), not
+hand-predicted in advance:**
+- Every one of the 30 moved items above except the ones already `pub(super)`
+  from item 13's own `D1` (`carried_join_arm`, `append_planned_join_params`,
+  `finish_planned_join`) needed `pub(super)` — each has a RETAINED caller in
+  `core.rs`/`mod.rs`/`source.rs`/`units.rs` that reaches it opaquely
+  (`self.method(...)`), the ordinary cross-sibling-visibility case this
+  ledger's own hub-stays discriminator distinguishes from a true hub-stays
+  finding. `jump_planned_join_arm` in particular has retained callers
+  outside the moving match-dispatch cluster (`core.rs` sites at that SHA
+  4288/4365/4572/12244/12554), not visible from the D0 census alone.
+- `TrapIdentityMutation` and `set_trap_identity_mutation`: constructed/
+  called directly by the not-yet-moved tests in `core/tests/control.rs` (a
+  descendant of `lowering::core`, a sibling of `lowering::joins`) —
+  reachable before the move only because the callee sat in the `lowering`
+  module itself (private-to-parent is visible-to-every-descendant); as a
+  sibling module the same reachable set needs the visibility spelled out.
+  `mod.rs` re-exports both via `#[cfg(test)] use joins::{set_trap_identity_
+  mutation, TrapIdentityMutation};`, the same test-glob-chain mechanism
+  already established for `source.rs`'s and `calls.rs`'s own `#[cfg(test)]`
+  re-export blocks.
+- One REVERSE widening: `lower_computational_producer_expr` (`core.rs`,
+  item 12's checked-invocation domain, RETAIN) is called opaquely from
+  `joins.rs`'s own `lower_borrowed_match`; it was previously reachable only
+  because `core.rs` was `joins.rs`'s ancestor before the move (private
+  items reach descendants). Widened to `pub(super)` — a RETAINED item
+  reached from a new sibling, the reverse case of every widening above but
+  the same rule.
+
+**`cranelift_backend.rs:122-124`** — the `dasm-c2-observation`-gated
+re-export updated from `pub use lowering::{...}` to `pub use lowering::
+joins::{...}`, a path update only (the three names were already `pub`
+before the move, per Addendum 4's Class-1 finding).
+
+**AC-4 / AC-4b — scoped build + test, `ken-cargo` only, never `--workspace`:**
+- `scripts/ken-cargo build -p ken-runtime --lib`: clean. 61 warnings, and a
+  baseline build at the pre-move SHA (`93f2e2827`, stashed working tree)
+  produces the identical 61 warnings at shifted line numbers — this move
+  introduces zero new warnings.
+- `scripts/ken-cargo build -p ken-runtime --lib --features dasm-c2-observation`:
+  clean, confirming the re-export path update compiles under the gated
+  feature.
+- `scripts/ken-cargo build -p ken-runtime --tests`: clean.
+- `scripts/ken-cargo test -p ken-runtime --lib`: **926 passed, 0 failed, 4
+  ignored** — identical to the pre-move baseline (item 13's own landed
+  count), confirming `D1` moved production code only. Two tests initially
+  failed on first run and were fixed as part of this same `D1` changeset
+  (not deferred to `D2`, since they pin a still-resident, not-yet-moved
+  test's hardcoded inventory, not a test that itself moved):
+  `the_backend_production_surface_inventory_is_closed` and
+  `correspondence_adds_no_emitted_unit_to_the_production_census`, both in
+  `core/tests/control.rs`, both requiring a new `("lowering/mod.rs",
+  "joins")` / `("lowering/joins.rs", ...)` row — the exact `calls.rs`
+  precedent from item 13's own `D1`.
+- **AC-4b line counts:** `joins.rs` created at **2,213 lines** (well under
+  10k). `core.rs`: 15,568 -> 14,384 (shrunk). `mod.rs`: 18,067 -> 17,184
+  (shrunk). `core/tests/control.rs`: 30,222 -> 30,247 (+25 lines of
+  housekeeping — one `BACKEND_PRODUCTION_SOURCES` row, one declared-module-
+  list row, one `Census` row, each following the `calls.rs` row's exact
+  shape). `control.rs` is already far past 10k and was **before this slice
+  touched it** (`D0`'s own text above records it at 33,969 lines as of
+  `a1cf83622`, and item 9/12/13's own `D1`s already logged it there) — its
+  own decomposition is `D2`'s subject via test moves, not a condition this
+  slice's own `AC-4b` claim (which covers only what THIS slice creates or
+  enlarges: `joins.rs`, created at 2,213, and `control.rs`, enlarged by 25
+  housekeeping lines) needs to resolve.
+
+**AC-5 — adapter/facade debt ledger: empty.** No transitional adapter or
+facade was introduced. Every moved item's callers were repointed by
+`pub(super)` widening alone (compiler-driven, the same mechanism items
+11-13 used), never by a forwarding shim.
+
+**AC-6 — this slice's own claim, not a phase closure.** `D1` transfers
+production code only; the campaign's overall closure condition (every
+`RT-BACKEND-MODULE-SPLIT` item landed) is untouched by this slice. `D2`
+(the companion test move) is a separate, not-yet-started accepted partial.
+
+**Banned scope check:** no visibility widening beyond `pub(super)` was
+needed anywhere (no `pub(crate)`/`pub` escalation), no new module was
+introduced beyond the one named child, no adapter/facade was added, no
+test was moved (that is `D2`'s exclusive scope) — the two `core/tests/
+control.rs` edits above are inventory-row housekeeping in a resident test,
+not a test relocation.
+
+Branch `wp/RT-EMITTER-CONTROL-JOINS-SPLIT`, built on `93f2e2827` (current
+`origin/main` at pickup, 0 behind). Ready for `runtime-leader`'s object-
+store verify and the Architect's mandatory per-mover visibility review.
 
 # `D2` — THE COMPANION TEST MOVE. Separate accepted partial.
 
