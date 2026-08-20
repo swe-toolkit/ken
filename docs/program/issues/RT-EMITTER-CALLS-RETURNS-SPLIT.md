@@ -371,6 +371,89 @@ individually checked — this pass targeted names with real collision risk,
 not the full population. AC-1 is closer but still not exact; AC-2 remains
 the largest open piece.
 
+### Addendum 3 — AC-2, exhaustive read of `control.rs` IN PROGRESS, one
+### new finding, honest read-position marker
+
+`control.rs` holds 221 `#[test]` functions at this SHA (confirmed by
+`grep -c "#\[test\]"`; matches expectation — item 12's D2 moved 10 of the
+prior 231 out).
+
+**Marker scan first, as a lower bound only — not a certification.** A
+scripted scan against the traced MOVE-symbol list (Addenda 1-2) found only
+6 of 221 tests with a direct name-level hit: `typed_trap_exit_preserves_
+the_planner_identity_across_two_unit_calls` (~8991), `typed_trap_exit_
+rejects_a_deleted_or_root_misclassified_unit_lane` (~9022), `typed_trap_
+exit_identity_and_caller_protocol_mutations_are_discriminating` (~9048)
+— all three hit via `TrapCallerProtocolMutation`, but each ALSO exercises
+`TrapFrameBindingMutation`/`TrapIdentityMutation` over one shared "typed
+trap exit" fixture reset by one shared `TrapExitMutationReset`. Their own
+discriminated property is trap-identity fidelity across the whole
+generated-unit call chain, not declared-call emission alone — **RETAIN,
+shared/end-to-end**, though the import path for `TrapCallerProtocolMutation`
+moves out from under them at D2 and needs updating, same pattern as a
+cross-module test import elsewhere in this campaign. `governed_nested_
+brackets_n3_through_n7_emit_complete_functionized_bundles` (9998) — hits
+`recursive_position_unit_calls`; RETAIN, this is a population/route
+control over the FunctionizedUnits authority as a whole (asserts
+`declared`/`defined`/`resolved`/`recursive_calls`/`carried_unchanged`
+jointly), not a single-owner declared-call test. `d5_c4_a_duplicated_
+checked_occurrence_is_refused_after_its_lawful_first` (13695) and
+`d5_the_checked_call_closeout_rejects_omission_duplication_and_a_
+substituted_callee` (13810) — hit `D5CloseoutMutation`/`d5_emitted_
+declaration_calls`; both directly exercise `call_declared_unit_target`'s
+own closeout family named MOVE in Addendum 1 — **MOVE candidates**,
+pending the full read reaching them again in context.
+
+Per this campaign's own established bar (restated verbatim in this item's
+own kickoff, `evt_329941cn5vx2e`): **do not certify a residual population
+"empty" from zero marker hits — read it.** Zero marker hits on the other
+215 tests is not AC-2 closure. Reading exhaustively, sequentially, from
+line 1.
+
+**Read through line 11,150 of 30,289 (about 37%) so far.** Every test
+encountered classifies as RETAIN into an already-landed or explicitly
+frame-named residual domain — continuation/fusion (`d2f_*`/`r3_fused_*`),
+checked-invocation, oriented-subcontinuation (`px8j_*`/`px8ds_*`),
+planner-side (`contkey_*`, `RT-REQUIRED-CONSUMER-*`), unit-emission
+census (`b2f_*`), source-join/D8 disposition, D6a/D6b static-worker
+environment-assembly controls (D6a's own doc names the coupled types this
+item does NOT own: `StaticWorkerCallRoute` and case-environment assembly
+are the D6a/`RT-CONTSRC-PRODUCER-LOCAL` owner, already RETAIN in
+Addendum 2), or the cross-cutting census/closure class the frame itself
+names as always-residual (`the_backend_production_surface_inventory_is_
+closed`, `correspondence_adds_no_emitted_unit_to_the_production_census`,
+`the_owner_classification_has_a_closed_production_naming_inventory`, and
+siblings) — **with one exception**:
+
+- **`d6_a_functionized_recursive_declaration_accepts_a_changing_argument_
+  constructor` (control.rs:6671) — MOVE candidate, found only by the
+  exhaustive read, invisible to the marker scan.** Its own doc comment
+  states the subject directly: a functionized recursive declaration
+  "ACCEPTS a changing argument constructor through its one `ValueWord`
+  parameter" and "it reds if the declared-call path ever acquires a
+  per-constructor shape predicate." This is an end-to-end domain test for
+  this item's declared-call-emission owner — it exercises the property
+  through the full `compile_expr_into_module` pipeline rather than
+  calling any MOVE-listed function by name, which is exactly why the
+  marker scan missed it and exactly the failure mode this campaign's own
+  AC-2 discipline exists to catch (matching item 12's own two late
+  corrections, both surfaced the same way).
+
+Also in progress, not yet finished classifying: `b2f_emits_one_defined_
+target_unit_per_planned_function_unit` (9701) — read through its
+`leaf_declared`/`leaf_defined` assertions (RETAIN-leaning, unit-emission
+census domain, same class as the other `b2f_*` tests), but the read
+stopped mid-function before its `closure_declared`/`closure_defined`
+assertions and closing brace.
+
+**What is NOT yet read:** the remaining ~63% of `control.rs` (lines
+11,151-30,289), including the two D5-closeout marker hits in fuller
+context and the embedded `branched_scrutinee_unit_body_observer_tests`
+`#[cfg(test)] mod` found nested directly inside `core.rs` itself (outside
+`core/tests/` entirely, flagged as a blind spot in the first partial
+commit) — AC-2 is not closed and this addendum does not claim it is.
+Continuing the read next.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
