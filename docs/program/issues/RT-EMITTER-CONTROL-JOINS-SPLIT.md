@@ -557,8 +557,107 @@ is still required before the endorsing vote. Not decided unilaterally here.
 explicitly and moves nothing — the mirror image of item 8's own `D2`,
 which the campaign has already landed once.
 
-Continuing this D0 next — the four
-compiler-blind classes. No action needed from anyone now.
+### Addendum 4 — the four Architect-required item classes, filtered to the
+### closed MOVE set (per the standing bar set at item 13's D0)
+
+#### Class 1 — re-exports: ONE real finding, a genuine crate-external API
+
+Live crate-wide grep of every `use`/`pub use` statement for each traced
+MOVE-set name: zero hits, **except** the pinned-SHA re-export census
+(`docs/program/backend-split-census-reexports.md:245-248`), which names
+`cranelift_backend.rs:122-124`:
+
+```rust
+pub use lowering::{
+    dasm_c2_scalar_merge_observation_scope, DasmC2ScalarMergeObservation,
+    DasmC2ScalarMergeObservationScope,
+};
+```
+
+Cross-checked live against the current tree (the census is a pinned-SHA
+snapshot, confirmed still accurate): this is real, at `cranelift_backend.
+rs:122`. It also surfaced a MOVE-set member this ledger's earlier passes
+had not yet found — `dasm_c2_scalar_merge_observation_scope` (`mod.rs:
+14412`, `#[cfg(feature = "dasm-c2-observation")] pub fn`, the entry-point
+constructor for the whole `DasmC2ScalarMergeObservation` cluster's scope)
+and `impl Drop for DasmC2ScalarMergeObservationScope` (`mod.rs:14401-14406`)
+— both added to the MOVE set now. **Disposition: `D1` must update this
+facade re-export's path** from `lowering::{..}` to `lowering::<new-
+module>::{..}` once the module is named — the one real re-export
+disposition question this item's MOVE set raises, and it is a path
+update, not a widening (the names were already `pub`/crate-facade-visible
+before the move).
+
+#### Class 2 — cfg/attribute-gated items: several real surfaces, all named
+
+Scanned every MOVE-set function's own body (not just its signature) for
+internal `cfg(...)` attributes, using the same string-aware brace-matcher
+as AC-2's scan:
+
+- `carried_join_arm` — two `#[cfg(test)]` sites (a population-counter
+  increment in the `Carried` arm, another in the `Specialized` arm).
+- `lower_dynamic_host_result_match` — two `#[cfg(test)]` sites.
+- `consume_join_plan` — one `#[cfg(test)] match` block over `JoinConsumption
+  Mutation` (the hub-stays enum, Addendum 2) — carries the gate, references
+  a type that stays at the hub.
+- `disposition_statically_unselected_source_subtree` — one `#[cfg(test)]`
+  site (an early-return under `JoinConsumptionMutation::
+  IncludeStaticallyUnselected`).
+- `disposition_statically_unselected_match_cases` — one `#[cfg(test)]` site.
+- `close_statically_unselected_match_cases` — two `#[cfg(test)]` sites.
+- `finalize_join_disposition` — two `#[cfg(test)]` sites (the `LRC_D2B_
+  JOIN_OBSERVATION` recorder and the `JoinConsumptionMutation` compensating
+  branch).
+- `validate_materialized_dead_join_cfg_for` — one `#[cfg(test)]` site.
+  (`validate_materialized_dead_join_cfg`'s own grep hit was its NAME
+  containing the substring "cfg" — a false positive, verified by reading;
+  zero real cfg attributes in that function's body.)
+- `merge_scalar_operand` — two `#[cfg(any(test, feature = "dasm-c2-
+  observation"))]` sites (the `dasm_c2_record_scalar_merge` calls,
+  Addendum 2's cluster).
+- `emit_current_trap` — five sites: a `#[cfg(test)]`/`#[cfg(not(test))]`
+  pair reading `TRAP_IDENTITY_MUTATION` (production writes the exact ABI
+  word, test can zero/substitute it) plus three `#[cfg(test)] px8tr_
+  record_trap_provenance(...)` calls (into the hub-stays observability
+  type, Addendum 1) — every one of these must carry its gate exactly, and
+  the `px8tr_record_trap_provenance` calls reference a type that stays at
+  the hub, so the cross-module reference needs updating, not the gate.
+
+No `#[repr(...)]` or non-standard `#[derive(...)]` found on any MOVE-set
+type (only ordinary `Clone`/`Copy`/`Debug`/`Eq`/`PartialEq`, confirmed by
+direct reading of `TrapIdentityMutation`, `ScalarMergeKind`, `DasmC2Scalar
+MergeObservation`). No signature-level `#[cfg(...)]` parameter found on
+any MOVE-set function (unlike item 13's `launch_ingress` case) — every
+cfg site above is inside a function body, not on its signature.
+
+#### Class 3 — macro-produced owned items: CLOSED, zero found
+
+No `macro_rules!` defined in either bound file (`grep -c` confirms 0 in
+both). No MOVE-set name appears adjacent to any macro invocation beyond
+the already-covered `thread_local!` block (`TRAP_IDENTITY_MUTATION`'s own
+declaration, already named in Addendum 1).
+
+#### Class 4 — source-text oracles: CLOSED, zero symbol-name string matches
+
+Direct grep for every MOVE-set symbol name appearing as a quoted string
+literal in `core.rs`, `mod.rs`, `core/tests/control.rs`, or `core/tests/
+mod.rs`: zero hits. `BACKEND_PRODUCTION_SOURCES` (the same self-defending
+roster item 13's `D1` added `calls.rs` to) will need this item's new
+module added at `D1`, following the identical precedent — already stated
+as an anticipated non-move hunk in the blind-spots list, not a silent
+hazard (the roster's own companion assertion catches an omission loudly).
+
+**Summary for the endorsing vote**: Classes 3 and 4 are fully closed with
+zero findings. Class 1 has one real re-export (a path-update disposition,
+not a widening) that also completed the MOVE set by two more members.
+Class 2 has ten named cfg-gated sites across eight functions, all
+"carry this gate exactly at `D1`," none a new MOVE/RETAIN boundary
+finding. None of the four classes revises the boundary already closed in
+Addenda 1-3.
+
+Continuing this D0 next — assembling the closed MOVE-set summary and
+requesting `runtime-leader`'s object-store verify + the Architect's
+endorsing vote. No action needed from anyone now.
 
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
