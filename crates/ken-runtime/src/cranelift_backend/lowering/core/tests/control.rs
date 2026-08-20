@@ -7412,6 +7412,19 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-EMITTER-CALLS-RETURNS-SPLIT` `D1` — the calls and returns
+        // emitter, moved verbatim from `core.rs`/`mod.rs`. It emits IR into
+        // the `FunctionBuilder` its caller already owns; it never mints a new
+        // defined function or data object.
+        Census {
+            file: "lowering/calls.rs",
+            source: include_str!("../../calls.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         Census {
             file: "planning.rs",
             source: include_str!("../../../planning.rs"),
@@ -8072,6 +8085,11 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     // exists, for the same reason as `boundary.rs` above: a production source
     // absent from this roster is invisible to every pin that iterates it.
     ("lowering/source.rs", include_str!("../../source.rs")),
+    // `RT-EMITTER-CALLS-RETURNS-SPLIT` `D1` — the calls and returns emitter.
+    // Registered here the moment the module exists, for the same reason as
+    // `boundary.rs`/`source.rs` above: a production source absent from this
+    // roster is invisible to every pin that iterates it.
+    ("lowering/calls.rs", include_str!("../../calls.rs")),
     // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. Registered
     // here the moment the module exists, because every pin that iterates this
     // roster is closed only over the files it lists: a production emitter absent
@@ -8243,6 +8261,13 @@ fn the_backend_production_surface_inventory_is_closed() {
             // `core`/`units`/`seed_material`/`boundary`; the types the moving
             // methods merely manipulate stay SCC-pinned in `mod.rs`.
             ("lowering/mod.rs", "source"),
+            // `RT-EMITTER-CALLS-RETURNS-SPLIT` `D1` — the calls and returns
+            // emitter (declared-call emission, residual and recursor call
+            // lowering, return emission, callee-side checks). A sibling of
+            // `core`/`units`/`seed_material`/`boundary`/`source`; the types
+            // the moving methods merely manipulate stay SCC-pinned in
+            // `mod.rs`.
+            ("lowering/mod.rs", "calls"),
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
             // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — aggregate allocation
