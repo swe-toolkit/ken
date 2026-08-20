@@ -358,6 +358,49 @@ three tests + the two census functions, `the_identifier_census_...`
 folding into the same "Class 4" bucket as the other two) -- no stray
 reference anywhere else in `control.rs`'s 30k+ lines.
 
+### Cluster 2 const/static gap -- closed (the D7_PAIR_CALLEE lesson,
+### applied proactively this time)
+
+A full declaration-selector re-pass over Cluster 2 (7250-8615) --
+running functions/types/consts/statics together, not functions and
+types first with consts as an afterthought -- found four consts my
+first pass missed: `IO_ERROR_OTHER_DISCRIMINATOR` (`mod.rs:8436`),
+`RESOURCE_ERROR_MALFORMED_RESOURCE` (8443), `RESOURCE_ERROR_INVALID_
+OFFSET` (8447), `RESOURCE_ERROR_INVALID_BOUNDS` (8456). All four
+checked crate-wide: every reference sits inside `mod.rs`'s own Cluster
+2/3 functions (mine), `lower_process_host_effect` (mine), or `core/
+tests/effects.rs` (my domain test file) -- zero RETAIN callers. **MOVE**,
+all four. Cluster 1 re-swept the same way: no additional consts/statics
+found beyond what Addendum 1's first pass already recorded.
+
+### A NEW cross-file transport finding -- `CAPACITY_PHASE_DISPATCH`
+### thread_local has an out-of-scope reader in `units.rs`
+
+`CAPACITY_PHASE_DISPATCH` (`mod.rs:8575-8578` thread_local) is written
+only by my own `record_capacity_phase_dispatch` (confirmed: its three
+call sites, `core.rs:13179/13185/13190`, all sit inside `lower_process_
+host_effect`) -- so the thread_local itself is **MOVE**. But its only
+*readers* are two `#[cfg(test)]` accessor fns declared in **`units.rs`**
+(`capacity_phase_dispatch`/`reset_capacity_phase_dispatch`,
+`units.rs:5465,5470`, reached via `super::CAPACITY_PHASE_DISPATCH`) --
+`units.rs` is **outside this item's two bound files** (item 9's own
+domain, already split), so those two functions are not mine to move.
+Their own sole caller, in turn, is my own `core/tests/effects.rs`
+(`crate::cranelift_backend::lowering::units::capacity_phase_dispatch()`,
+6 call sites, 3162-3344) -- so the full producer/consumer closure is
+100% Effects, just with the accessor *body* physically parked in a
+sibling file for reasons this ledger does not need to relitigate.
+**Transport note for `D1`:** moving `CAPACITY_PHASE_DISPATCH` to
+`effects.rs` breaks `units.rs:5466,5471`'s `super::CAPACITY_PHASE_
+DISPATCH` reference -- it needs a qualified-path update
+(`super::effects::CAPACITY_PHASE_DISPATCH` or equivalent) as part of
+`D1`'s transport, even though `units.rs` itself is not a bound file and
+carries no other Effects-domain content. This is a new shape for the
+campaign: a cross-sibling reference landing in the *opposite* direction
+from every prior case (a RETAINED, out-of-scope file's own code needs a
+path fixup because of MY move, rather than my own moved code needing to
+reach back to a RETAINED type).
+
 ### Hub-struct field embedding -- resolved, not a RETAIN case
 
 **`EffectSeatLedger` IS embedded as a field of the retained `Lowering`
