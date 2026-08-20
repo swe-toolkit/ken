@@ -74,10 +74,18 @@ fn negative_occurrence_hidden_in_a_transparent_argument_stays_rejected() {
     )
     .expect("declare transparent wrapper");
 
+    let wrap_alias = declare_def(
+        &mut env,
+        vec![],
+        type_at(Level::zero().suc()),
+        Term::const_(wrap, vec![]),
+    )
+    .expect("declare a second transparent hop");
+
     let mut hidden = env.inductive(family).expect("control family").clone();
     hidden.constructors[0].args = vec![Term::app(
         Term::const_(opaque_head, vec![]),
-        Term::const_(wrap, vec![]),
+        Term::const_(wrap_alias, vec![]),
     )];
 
     assert_positivity_violation(check_positivity(&env, &hidden));
