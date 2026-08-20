@@ -17,8 +17,13 @@ pub(in crate::cranelift_backend) use super::*;
 
 mod primitive;
 
+// `RT-SOURCE-MACHINE-TYPES-SPLIT` `D2` -- `source::tests` (a sibling
+// subtree, not a descendant of `core`) reaches this module's widened
+// shared fixtures by path, so the module itself must be nameable from
+// there too; `pub(super)` alone reaches `lowering` but not a further
+// descendant, so this needs the full `lowering`-subtree qualifier.
 #[cfg(test)]
-mod tests;
+pub(in crate::cranelift_backend::lowering) mod tests;
 
 #[cfg(test)]
 thread_local! {
