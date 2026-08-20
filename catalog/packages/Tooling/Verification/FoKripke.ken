@@ -650,6 +650,60 @@ fn fok_check_tree (expected_conclusion : FokSequent) (node : FokCert) : Bool =
 fn fok_check_cert (q : FokForm) (pi : FokCert) : Bool =
   fok_check_tree (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm))) pi
 
+-- === D1a: indexed derivations (23 section 4.3) ===
+--
+-- The four constructors are the proof-relevant reflection of exactly the
+-- branches accepted by `fok_check_rule`: Init, ImpRight, and the World/Obj
+-- conclusion shapes of ForallRight. A recursive premise represents the one
+-- child required by the corresponding checker branch; Init has none. The
+-- lookup equalities expose the same selected principal occurrences, and both
+-- ForallRight constructors carry `fok_check_forall_right`'s freshness guard.
+data FokDerivation : FokSequent → Type where {
+  FokDerivInit :
+    (gamma : List FokForm)
+    → (delta : List FokForm)
+    → (left : Nat)
+    → (right : Nat)
+    → (g : FokForm)
+    → (d : FokForm)
+    → Equal (Option FokForm) (fok_nth_form gamma left) (Some FokForm g)
+    → Equal (Option FokForm) (fok_nth_form delta right) (Some FokForm d)
+    → Equal Bool (fok_form_eq g d) True
+    → FokDerivation (FokMkSequent gamma delta);
+  FokDerivImpRight :
+    (gamma : List FokForm)
+    → (delta : List FokForm)
+    → (right : Nat)
+    → (p : FokForm)
+    → (q : FokForm)
+    → Equal (Option FokForm) (fok_nth_form delta right) (Some FokForm (FokImp p q))
+    → FokDerivation
+      (FokMkSequent (fok_list_form_append_one gamma p) (fok_list_form_set_nth delta right q))
+    → FokDerivation (FokMkSequent gamma delta);
+  FokDerivForallWorldRight :
+    (gamma : List FokForm)
+    → (delta : List FokForm)
+    → (right : Nat)
+    → (eigen : FokQTerm)
+    → (body : FokForm)
+    → Equal (Option FokForm) (fok_nth_form delta right) (Some FokForm (FokForallWorld body))
+    → Equal Bool (fok_sequent_mentions_parameter (FokMkSequent gamma delta) eigen) False
+    → FokDerivation
+      (FokMkSequent gamma (fok_list_form_set_nth delta right (fok_subst0_form body eigen)))
+    → FokDerivation (FokMkSequent gamma delta);
+  FokDerivForallObjRight :
+    (gamma : List FokForm)
+    → (delta : List FokForm)
+    → (right : Nat)
+    → (eigen : FokQTerm)
+    → (body : FokForm)
+    → Equal (Option FokForm) (fok_nth_form delta right) (Some FokForm (FokForallObj body))
+    → Equal Bool (fok_sequent_mentions_parameter (FokMkSequent gamma delta) eigen) False
+    → FokDerivation
+      (FokMkSequent gamma (fok_list_form_set_nth delta right (fok_subst0_form body eigen)))
+    → FokDerivation (FokMkSequent gamma delta)
+}
+
 -- === D2: Bool-inversion infrastructure (23 section 4.3) ===
 --
 -- `checker_soundness`'s proof needs to invert the Bool verdicts
