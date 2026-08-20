@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-20 07:38:25Z — from 388 issue file(s) in `docs/program/issues/`.
+2026-08-20 09:41:29Z — from 388 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -267,7 +267,7 @@ the committed file matches the generator's output.
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
 | `RT-EMITTED-WORKER-CONSUMER-WALK` | Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition | closed | runtime | S | none | — |
 | `RT-EMITTER-AGGREGATES-SPLIT` | Move the aggregates emitter family out of the lowering files -- the emitter half of the aggregate lifecycle whose planner half item 7 already owns | draft | runtime | M | none | — |
-| `RT-EMITTER-CALLS-RETURNS-SPLIT` | Move the calls and returns emitter family out of the lowering files -- the first emitter slice, moving against the stable unit and call vocabulary item 4 established | ready | runtime | M | none | — |
+| `RT-EMITTER-CALLS-RETURNS-SPLIT` | Move the calls and returns emitter family out of the lowering files -- the first emitter slice, moving against the stable unit and call vocabulary item 4 established | active | runtime | M | none | — |
 | `RT-EMITTER-CONTROL-JOINS-SPLIT` | Move the control and joins emitter family out of the lowering files -- branch, match and join emission, against the join disposition the planner slice already owns | draft | runtime | M | none | — |
 | `RT-EMITTER-EFFECTS-SPLIT` | Move the effects emitter family out of the lowering files -- the emitter half of the effect-seat lifecycle whose planner half item 8 already owns | draft | runtime | M | none | — |
 | `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` | Move the terminals and cleanup emitter family out of the lowering files -- the last owner move in the phase, after which only closure remains | draft | runtime | M | none | — |
@@ -447,7 +447,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` — the consuming-occurrence validator refusal has four defects that must land together: the production string sits in a cfg arm no test compiles; under cfg(test) the production arm is ABSENT rather than dead so a dropped return makes the validator silently ACCEPT a mismatched occurrence; and the classifier has two messages for FIVE causes, with the body arm a catch-all over an eliminator-kind defect, an identity-match failure and an ambiguity; and the sibling function 55 lines up has the same defect over four more causes, one of which the D2k probe only just measured
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
-- `RT-EMITTER-CALLS-RETURNS-SPLIT` — Move the calls and returns emitter family out of the lowering files -- the first emitter slice, moving against the stable unit and call vocabulary item 4 established
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-RETIRED-CENSUS-ROT` — Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
@@ -496,7 +495,7 @@ is itself not yet `merged`/`closed`:
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-BACKEND-SPLIT-CLOSURE` blocked by `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` (status: draft)
 - `RT-EMITTER-AGGREGATES-SPLIT` blocked by `RT-EMITTER-CONTROL-JOINS-SPLIT` (status: draft)
-- `RT-EMITTER-CONTROL-JOINS-SPLIT` blocked by `RT-EMITTER-CALLS-RETURNS-SPLIT` (status: ready)
+- `RT-EMITTER-CONTROL-JOINS-SPLIT` blocked by `RT-EMITTER-CALLS-RETURNS-SPLIT` (status: active)
 - `RT-EMITTER-EFFECTS-SPLIT` blocked by `RT-EMITTER-AGGREGATES-SPLIT` (status: draft)
 - `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` blocked by `RT-EMITTER-EFFECTS-SPLIT` (status: draft)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
