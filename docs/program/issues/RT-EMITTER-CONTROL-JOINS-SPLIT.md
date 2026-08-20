@@ -753,6 +753,141 @@ discharge and was stopped once the diff-based proof was confirmed
 (`runtime-leader`, `evt_7q9fwnzrqx4qb`) — completing it further would
 have been provably redundant.
 
+### Addendum 7 — Architect CHANGES-REQUESTED re-cut: three findings in the
+### scalar-merge/trap-provenance cluster, Addendum 5's MOVE set superseded
+
+**Architect vote `evt_5a1c9rpf2w6ez` on `e7b4f877d`: CHANGES REQUESTED.**
+Root cause, stated once: Addenda 1/2's census enumerated direct call-sites
+and named-uses of each MOVE-set symbol, but not (a) the symbol embedded as
+a struct FIELD of a RETAINED type, or (b) a delegating/wrapper method that
+carries the symbol across the domain boundary. Both missed-site classes
+produced a false "exclusive"/"no-retained-consumer" claim, localized to
+the scalar-merge/trap-provenance cluster — confirmed NOT a wholesale
+census failure (the Architect independently re-verified `TrapIdentityMutation`
+holds; my own re-check below of the rest of the MOVE set, widened to the
+same two missed-site classes, found no further instances). Each finding
+independently re-verified against the source before this addendum, not
+taken on the Architect's word alone.
+
+**FINDING 1 (blocking) — `ScalarMergeKind` reclassified MOVE -> RETAIN,
+hub-stays.** `SourceJoinTarget<'a>` (`mod.rs:14124`, already RETAIN/item
+12's per Addendum 2) declares `required_kind: ScalarMergeKind` as a field
+(`mod.rs:14128`, verified). `source.rs` (item 12's landed module)
+constructs `SourceJoinTarget` at 6 sites. A RETAINED type embedding this
+item's candidate enum as a field is the decisive hub-stays signal — the
+same `StaticWorkerCallOutcome` shape item 13 established. `ScalarMergeKind`
+is module-private today (`mod.rs:14325`, no `pub`); hub-stays needs ZERO
+widening (movers reach it via `use super::*`, since a private parent item
+is visible to descendant modules); MOVING it would force `>=pub(super)` so
+`SourceJoinTarget` (retained) and `source.rs` (retained, cross-module)
+could still see it — a widening to make a move compile, which BANNED
+SCOPE names as a finding. RETAIN.
+
+**FINDING 2 (blocking, AC-1 partition gap) — two functions absent from
+the ledger entirely.** Grep-confirmed against the committed file: neither
+`merge_planned_scalar_branch` (`mod.rs:16173`) nor `lowered_from_scalar_
+pair` (`mod.rs:16189`) appeared in any MOVE or RETAIN list. AC-1 requires
+every declaration classified; "neither is a gap, not a non-event." Both
+independently re-verified:
+
+- `merge_planned_scalar_branch` — its own doc comment names it "a
+  **planned** join — same phase-bearing role as `Self::merge_scalar_
+  branch`, same pending boundary, named the same way" — a genuine
+  doppelganger of this item's own `merge_scalar_branch` (Addendum 1),
+  missed by name-collision risk scanning because the names differ by one
+  word. **Sole caller: `source.rs:1141`** (RETAINED, item 12's, outside
+  this item's bound files entirely) — grep-confirmed, no other caller
+  anywhere in the crate. Internally it calls `self.merge_scalar_operand`
+  (this item's own MOVE candidate) opaquely. **RETAIN** — a RETAINED
+  entry point that reaches into a mover, the same shape as `lower_expr`
+  calling `call_static_worker` in item 13.
+- `lowered_from_scalar_pair` — callers, grep-confirmed exhaustively:
+  `lower_bounded_nat_computational` (`core.rs:6077,6121` — RETAINED,
+  item 12's checked-invocation domain), `finish_planned_join`
+  (`core.rs:10332` — this item's own MOVE), `lower_dynamic_host_result_
+  match` (`core.rs:15260` — this item's own MOVE), `lower_big_int_
+  constant`/`lower_unsigned_u64_int` (`mod.rs:17718,17764` — RETAINED,
+  primitive-integer-lowering, a fourth, not-yet-split domain). **RETAIN,
+  hub-stays** — directly analogous to `NativeScalarPairV1`'s own finding
+  in Addendum 1: shared between two moving and three staying consumers,
+  no single domain owns it.
+
+**FINDING 3 (correction; RETAIN classification stands, false premise
+struck) — `PlannedTrapSeat`.** Addendum 1 stated its variants "are
+constructed ONLY inside `emit_current_trap`," which was false and is
+struck. **Independently re-verified:** `calls.rs` (item 13's own LANDED
+module) constructs all three `PlannedTrapSeat` variants too, at
+`calls.rs:1771,1786,1798` (confirmed by direct read), as the `seat:`
+field of `Px8trTrapProvenanceEvent::UnitTrapWordPropagated` — a
+**different** variant from `emit_current_trap`'s own `PlannedTrapEmitted`,
+both under `#[cfg(test)]`. `PlannedTrapSeat` is therefore straightforwardly
+part of the hub-stays `Px8trTrapProvenanceEvent` observability cluster,
+shared with an already-landed sibling — not a judgment call weighing an
+exclusive-construction site against its parent enum's declaration
+position. **RETAIN stands; the reasoning is corrected, not the verdict.**
+
+**Re-verification of the REST of the MOVE set against the same two
+missed-site classes (field-embedding, delegating-wrapper), per the
+Architect's re-cut instruction:** every remaining MOVE-set method
+(`carried_join_arm`, `append_planned_join_params`, `jump_planned_join_
+arm`, `finish_planned_join`, `consume_join_plan`, `consumed_join_plan_
+token`, `lower_carried_match` and its five case-dispatch siblings,
+`emit_current_trap`, `seal_source_trap_branch`, `bind_unit_trap_frame`)
+re-checked crate-wide for every call site: all are opaque `self.method(..)`
+calls from `source.rs`/`units.rs`/`core.rs`, none construct or destructure
+a MOVE-set type's internals, matching the discriminator's first (mover)
+shape, not its second (hub-stays) shape — unchanged from Addendum 1. The
+`DasmC2ScalarMergeObservation` cluster re-checked crate-wide (not just the
+bound files): its only consumers beyond `merge_scalar_operand` itself are
+two cross-CRATE integration tests (`ken-elaborator/tests/nc14_data_match_
+lowering.rs`, `ken-cli/tests/dasm_c2_observation_artifact_identity.rs`)
+calling the public `dasm_c2_scalar_merge_observation_scope()` entry point
+via its crate-facade path — the same re-export already named in Addendum
+4, no new field-embedding or wrapper found. `TrapIdentityMutation`
+re-checked: no field-embedding anywhere in the crate (grep-confirmed).
+**No further reclassifications.**
+
+**The corrected MOVE set, restated (supersedes Addendum 5's list, which
+is now wrong on `ScalarMergeKind` and incomplete on the two added RETAIN
+functions):**
+
+**`core.rs`:** unchanged from Addendum 5 — `lower_carried_match`, `lower_
+nonborrowed_carried_match`, `lower_carried_constructor_match`, `lower_
+borrowed_match`, `lower_borrowed_option_match`, `lower_dynamic_host_
+result_match`, `lower_bounded_nat_match`, `lower_dynamic_constructor_
+match`, `carried_join_arm`, `append_planned_join_params`, `jump_planned_
+join_arm`, `finish_planned_join`.
+
+**`mod.rs`:** `consume_join_plan`, `consumed_join_plan_token`,
+`disposition_statically_unselected_source_subtree`, `disposition_
+statically_unselected_match_cases`, `close_statically_unselected_match_
+cases`, `validate_join_plan_consumption`, `finalize_join_disposition`,
+`validate_materialized_dead_join_cfg`, `validate_materialized_dead_join_
+cfg_for`, `merge_scalar_branch`, `merge_scalar_operand`, `record_scalar_
+merge_kind`, `LoweringOperand::specialized_join_arm`, `emit_current_trap`,
+`seal_source_trap_branch`, `FunctionLocalRefs::bind_unit_trap_frame`,
+`TrapIdentityMutation` (enum), `TRAP_IDENTITY_MUTATION` (thread_local),
+`set_trap_identity_mutation`, `DasmC2ScalarMergeObservation` (struct),
+`DASM_C2_SCALAR_MERGE_OBSERVATIONS`/`DASM_C2_SCALAR_MERGE_OBSERVATION_
+ENABLED` (thread_local), `dasm_c2_record_scalar_merge`, `dasm_c2_take_
+scalar_merge_observations`, `dasm_c2_scalar_merge_observation_scope`,
+`DasmC2ScalarMergeObservationScope` (struct + `impl` + `impl Drop`).
+**`ScalarMergeKind` REMOVED** (now RETAIN, hub-stays).
+
+**RETAIN, hub-stays — additions to Addendum 1's list:** `ScalarMergeKind`
+(enum, `mod.rs:14325` — field of RETAINED `SourceJoinTarget`),
+`merge_planned_scalar_branch` (`mod.rs:16173` — sole caller `source.rs`,
+RETAINED), `lowered_from_scalar_pair` (`mod.rs:16189` — shared between two
+moving and three staying callers).
+
+**AC-2 unaffected**: Finding 1 only shrinks the MOVE set (RETAIN gains a
+member, MOVE loses one); Findings 2/3 add RETAIN members and correct a
+RETAIN finding's reasoning. No test-property implication — the AC-2
+population (empty, Addendum 3/6) does not depend on which side of the
+MOVE/RETAIN line these symbols land.
+
+Re-requesting the endorsing vote on the corrected ledger.
+
 Ready for `runtime-leader`'s object-store verify and the Architect's
 endorsing vote.
 
