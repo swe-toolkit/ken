@@ -468,7 +468,96 @@ sufficient prior, not requiring individual re-derivation of every ordinary
 RETAIN item) — this ledger states that as its own prior for the residual
 ~240, the same shape item 13's Addendum 14 used, not a fresh escalation.
 
-Continuing this D0 next — the AC-2 reconciliation pass and the four
+### Addendum 3 — AC-2 reconciliation: a marker scan plus a name sweep, both
+### zero, plus the honest gap this does NOT close
+
+**Marker scan, string/comment-aware (the same defect class item 13's own D0
+Addendum 1 first draft had, fixed here before trusting it):** scanned every
+one of `control.rs`'s 220 `#[test]` function bodies (brace-matched with a
+string/char-literal-aware tokenizer, not a naive `{`/`}` count — the naive
+version falsely inflated several spans on this exact file because of a
+`"...{...}..."` string literal inside an unrelated census test) for every
+name in this item's traced MOVE set (the join family, the ordinary match-
+dispatch family, `emit_current_trap`/`seal_source_trap_branch`/`bind_unit_
+trap_frame`, `TrapIdentityMutation`, the `DasmC2ScalarMergeObservation`
+cluster, `JoinConsumptionMutation`).
+
+**Six hits, all already accounted for and RETAIN:**
+
+- `a_trap_arm_and_its_trap_free_twin_both_functionize`,
+  `d8_dynamic_host_result_merge_enters_materialized_dead_cfg_population`,
+  `d8_every_required_join_plan_is_consumed_exactly_once` — item 9's own
+  ledger already named these three of its "6 Class-4 end-to-end controls"
+  (the other three don't hit this item's MOVE-set names at all).
+- `typed_trap_exit_preserves_the_planner_identity_across_two_unit_calls`,
+  `typed_trap_exit_rejects_a_deleted_or_root_misclassified_unit_lane`,
+  `typed_trap_exit_identity_and_caller_protocol_mutations_are_discriminating`
+  — the shared trap-exit cluster, already addressed in the reconciliation
+  section above.
+
+**Zero hits on this item's own function names** (`lower_carried_match`,
+`carried_join_arm`, `merge_scalar_operand`, and every other MOVE-set symbol
+traced in AC-1) — a genuinely different result from item 13's own AC-2,
+which found several direct hits before its one invisible-to-marker-scan
+finding. Per the standing discipline (do not certify a residual population
+empty from a marker scan alone), this is a lower bound, not a closure — so
+a second, independent check follows.
+
+**Second check: every `#[test]` whose own NAME contains "match" or "branch"
+regardless of domain tag**, to catch anything the marker scan's symbol list
+might have missed by testing the property indirectly (item 13's own
+`d6_a_functionized_recursive_declaration_accepts_a_changing_argument_
+constructor` shape — reachable through the full pipeline, naming no
+MOVE-set symbol). Found 6 real `#[test]` functions (the rest of the
+grep hits are fixture-producer helpers, not tests themselves) —
+`checked_frame_branch_scope_harness_uses_live_lowering_ledger` (ties to
+`CheckedFrameBranchScope`, already RETAIN/item 12's), `contkey_wrong_
+inner_match_eliminator_seed_is_rejected` (`contkey`-prefixed planner/
+checked-invocation domain), `distinguished_root_cannot_discharge_missing_
+match_site_marker` (the CHECKED "match site" — `NativeJoinPlanV1`'s own
+concept, already RETAIN/item 12's per `planned_join_site_for_frame`'s own
+finding above), `computational_match_declaration_ref_emits_and_runs_the_
+declaration_owned_unit` (`lower_computational_match_expr`'s own domain,
+already RETAIN/item 12's), `d9b_the_assembled_ordinary_run_matches_the_
+planner_role_sequence_by_position` ("matches" is English usage here, not
+`RuntimeExpr::Match`; `D9b`/`RT-CONTSRC-PRODUCER-LOCAL`, already known
+planner-adjacent), `refusal_pins_rehomed_computational_match_without_
+selector_exclusion` (`RT-REFUSAL-PINS-REHOMED`, `computational_match`
+ties to item 12's again). **Every one reconciles to an already-known
+RETAIN domain; none is a new finding.**
+
+**A fifth confirmed instance of the naming trap surfaced along the way:**
+`RT-MATCH-SCRUTINEE-DISPOSITION` (the domain tag on `rt_d2_trace_shows_
+the_marker_propagated_and_never_reaching_the_composed_consumer` and
+siblings) has "MATCH" in its own name but is about which ROUTE a
+RECURSOR's scrutinee takes (`rt_d2_backedge_propagations`, `active-resume`
+vocabulary) — item 12's checked-invocation/recursor domain, not this
+item's ordinary case-dispatch sense of "match."
+
+**The honest gap, stated rather than papered over:** this reconciliation
+is a marker scan (properly tooled) plus a targeted name sweep, cross-
+checked against the domain classifications from my own exhaustive,
+individual, in-place read of every one of these 220 tests during item
+13's own D0 AC-2 (completed on this exact byte-identical file). It is
+**not** a fresh line-by-line re-read performed as its own dedicated pass
+under this item's own name. The file has not changed since that read, and
+every domain this pass's two independent scans surfaced matches that
+read's own classifications exactly — but the campaign's own bar for AC-2
+is an individual read, and this ledger states plainly that the literal
+re-read has not been separately re-executed here. Given the population
+this bar would be checking is (per both independent scans) empty, and
+matches item 8's own "mirror image... zero finding" shape (item 9's
+ledger's own words for its analogous situation) — this is flagged for the
+Architect's judgment: whether the marker scan + name sweep + reconciliation
+against an already-exhaustive same-file read discharges AC-2 for a
+genuinely-empty-by-all-evidence population, or whether a literal re-read
+is still required before the endorsing vote. Not decided unilaterally here.
+
+**If the population is confirmed empty**, `D2` for this item states that
+explicitly and moves nothing — the mirror image of item 8's own `D2`,
+which the campaign has already landed once.
+
+Continuing this D0 next — the four
 compiler-blind classes. No action needed from anyone now.
 
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
