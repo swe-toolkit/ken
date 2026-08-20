@@ -487,12 +487,72 @@ only the type path qualifies.
   (flagged above) are not yet Architect-reviewed** -- carried as open
   questions for the D0 vote, not resolved unilaterally.
 
-This is Addendum 1 -- a substantial first pass across AC-1 (function/
-type population, both bound files, now close to closed after one
-in-place correction -- the `require_true`/`require_when`
-misclassification), the hub-struct embedding check (resolved), and a
-first cut at AC-2 (three specific tests independently verified; the
-full 39-test file not yet exhaustively read). Not yet a closed `D0`.
+### The closed MOVE set, restated for a single reference point
+
+**Types/enums:** `EffectSeatGroupId`, `ClaimedEffectSeat`, `EffectSeatClaimRoute`,
+`OpenEffectSeatGroup`, `CommittedEffectSeatGroup`, `EffectSeatLedger`,
+`EffectSeatClosure`, `ObservedBytesSeat`, `SiteOperandWitness`,
+`EffectSeatVisitMutation`, `EffectSeatDispatchMutation`.
+
+**Consts:** `IO_ERROR_OTHER_DISCRIMINATOR`, `RESOURCE_ERROR_MALFORMED_RESOURCE`,
+`RESOURCE_ERROR_INVALID_OFFSET`, `RESOURCE_ERROR_INVALID_BOUNDS`.
+
+**Thread_locals:** `EFFECT_SEAT_VISIT_MUTATION`, `EFFECT_SEAT_VISIT_INDEX`,
+`EFFECT_SEAT_DISPATCH_MUTATION`, `SITE_OPERAND_SUBSTITUTION_HITS`,
+`CAPACITY_PHASE_DISPATCH` (has an out-of-scope reader in `units.rs`,
+transport note above).
+
+**Functions (`mod.rs`):** `open_host_effect_seat_group`, `claim_host_effect_seat`,
+`close_host_effect_seat_group`, `effect_seat_group::mint`,
+`EffectSeatLedger::{open_group, open_group_mut, claim, close_group,
+discard_open_group_for_tests, drop_one_committed_group_for_tests,
+commit_body, close}`, `site_operand_witness`, `wire_bytes_seat`,
+`wire_bytes`, `narrow_native_int_u64`, `record_capacity_phase_dispatch`
+(both `#[cfg(test)]` twins), `observe_carried_bytes_span`, `narrow_
+carried_int_u64`, `lower_dynamic_small_int`, `set_effect_seat_visit_
+mutation`, `effect_seat_visit_mutation`, `effect_seat_next_visit_index`,
+`set_effect_seat_dispatch_mutation`, `effect_seat_dispatch_mutation`,
+`site_operand_substitution_hits`, `require_u8`, `require_true`,
+`require_when`, `mint_validated_progress_nat`, `validate_resource_io`,
+`validate_resource_error_reply`.
+
+**Functions (`core.rs`):** `lower_buffer_freeze_resource_seat`,
+`lower_process_host_effect`.
+
+**Judgment calls carried to the Architect vote, not resolved
+unilaterally:** `ClaimedEffectSeats<'a>` (+ its impl) stays RETAIN at
+the `mod.rs` hub despite being constructed only inside my own mover,
+because it's a shared parameter type reaching into item 15's already-
+moved `aggregates.rs` methods -- flag as a candidate to reconsider if
+the Architect reads the boundary differently. `SiteOperandWitness`
+moves and widens to `pub(super)` to keep serving `aggregates.rs`'s
+already-moved `SiteOperandSource::Carried` field.
+
+**RETAIN, independently confirmed this item (not exhaustive -- see
+prose above for the full reasoning per symbol):** `require_i64`,
+`require_one_of_i64`, `require_nonzero`, `lower_unsigned_u64_int`,
+`child_occurrence`, `lower_declaration_ref`, `lower_value`, `lower_seed_
+capture`, `artifact_static_payload`, `lower_ground_value`, `lower_big_
+int_constant`, `native_int_tag`, `ground_value`, `intern_result`,
+`lowered_value_kind`, `expect_two_args`, `borrowed_constructor_identity`,
+the `PX8J_*`/`PX8TR_*`/`NATIVE_INT_LOWERING_MUTATION`/`PX8DS_*`/
+`LRC_D2B_*` cluster, `ClaimedEffectSeats<'a>` (judgment call, above),
+`BoundedNatV1`/`StructuralNatV1`, the whole `emit_carrier_*`/`carrier_*`
+family, `mod safe_byte_span`, `mod ac10_production_mint_probe`,
+`DynamicConstructorV1`, `DynamicConstructorAlternativeV1`.
+
+This is Addendum 1 -- AC-1 (function/type/const/static population) is
+closed for both bound files after one in-place correction (the
+`require_true`/`require_when` misclassification) and two proactive
+re-passes (the Cluster-2 const gap, the Cluster-1/3 re-sweep that found
+nothing new). AC-2 has a mechanical population match complete (39/39
+`effects.rs` tests classified, `control.rs` swept end-to-end) but not
+yet the individual prose read items 11-15's discipline calls for. The
+hub-struct embedding check and the Class-4 source-text-oracle sweep are
+both closed. Two judgment calls are carried to the vote rather than
+resolved unilaterally. Class 1/3 compiler-blind sweeps were checked ad
+hoc (zero found) but not run as a final formal pass. Ready to request
+the Architect's D0 vote with these blind spots stated plainly.
 
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
