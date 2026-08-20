@@ -395,6 +395,81 @@ population that actually matters. `control.rs`'s zero real hits (Class 4
 above) close the other bound file. **Population: 13 moving + 1 residual,
 both fully accounted, zero blind count.**
 
+### The closed MOVE set, restated for a single reference point
+
+**`core.rs`:** none -- zero aggregate-domain declarations of its own
+(confirmed, Addendum 1); it is a caller-only file for this item via
+`lower_process_host_effect` and `transfer_constructor_operands`, both
+RETAIN.
+
+**`mod.rs`, cluster 1 (`6467-10592`):** `source_aggregate_preflight`,
+`reconcile_source_aggregate`, `child_possible_referent_owners`,
+`possible_owners_lifetime`, `lowered_aggregate_shape`,
+`call_input_transfer_origin_under_mutation`,
+`substitute_sibling_aggregate_producer`, `unit_boundary_environment_record`,
+`emit_carrier_transfer`, `aggregate_schema_origin`,
+`aggregate_carrier_authority`, `carrier_handle_disposition`,
+`carrier_immediate_tag`, `carrier_spillable_disposition`,
+`open_aggregate_events`, `commit_aggregate_events`,
+`emit_checked_aggregate_alloc`, `governed_request`,
+`record_governed_allocation`, `emit_carrier_alloc`,
+`emit_carrier_spillable_immediate`, `emit_carrier_native_int`,
+`emit_carrier_region_limbed_int`, `emit_carrier_bytes`,
+`emit_carrier_bytes_runtime_span`, `emit_carrier_store_tag_id`,
+`emit_carrier_store_scalar`, `emit_carrier_dynamic_constructor`,
+`emit_carrier_store_field`, `emit_carrier_store_name`,
+`emit_carrier_record_field`, `carrier_position_immediate`,
+`GovernedAllocationSite` (enum), `GovernedAllocationMutation` (enum) +
+`GOVERNED_ALLOCATION_MUTATION`/`GOVERNED_ALLOCATION_HITS`/
+`CARRIER_RAW_ALLOCATIONS`/`SIBLING_PRODUCER_SUBSTITUTION`/
+`SELF_AUTHORIZED_FALLBACK_REACHES`/`CALLEE_SCHEDULING_ORIGIN_USED`
+(thread_locals) + `SiblingProducerSubstitution` (struct) +
+`GovernedAllocationMutationGuard` (struct+impl+`impl Drop`) +
+`governed_allocation_hit` (fn), `CarrierAllocationRequest` (enum) + its
+`impl` (`aggregate_class`), `AggregateAllocationEvent` (struct),
+`LocalAggregateEvents` (struct, private), `AggregateAllocationLedger`
+(struct+impl), `AggregateRelationClosure` (struct). **32 named items.**
+
+**`mod.rs`, cluster 2 (`11242-11978`):** `site_operand_argument`,
+`synthesized_fixed_identity`, `synthesized_constructor`,
+`callee_scheduling_origin_under_mutation` (both `#[cfg(test)]`/
+`#[cfg(not(test))]` forms), `sibling_effect_seat_under_mutation`,
+`reconcile_declared_children`, `synthesized_dynamic_alternative`,
+`dynamic_alternatives_agree`, `reconcile_host_result_root`,
+`reconcile_dynamic_alternative`, `synthesized_io_error_alternatives`,
+`SynthesizedArgument` (enum) + `SiteOperandSource` (enum) + `impl
+SynthesizedArgument`. **13 named items.**
+
+**RETAIN, hub-stays (do not re-trace):** `transfer_into_carrier`,
+`carrier_refs`, `carrier_arena`, `carrier_identity_immediate`,
+`carrier_small_marker`, `carrier_out_slot` (judgment call, flagged),
+`BoundaryCarrierRefs`, `emit_carrier_scalar`, `emit_public_carrier_scalar`,
+`emit_carrier_immediate`, `emit_carrier_tag`, `emit_carrier_class`,
+`emit_carrier_host_success`, `emit_carrier_host_payload`,
+`emit_carrier_field_count`, `emit_carrier_field`, `carry_call_input`,
+`generated_unit_call_body_callee`, `generated_unit_call_entry_callee`,
+`ClaimedEffectSeats`.
+
+**RETAIN, other domain (do not re-trace):** `enter_source_occurrence_plan`
+(join/source), `fused_redirect_inputs` (fusion),
+`verify_emitted_continuation_calls` (continuation-specialization),
+`verify_recorded_composed_discharges` (composed-discharge), `open_host_
+effect_seat_group`/`claim_host_effect_seat`/`close_host_effect_seat_group`
+(Effects), `lower_process_host_effect` (Effects, `core.rs`),
+`transfer_constructor_operands` (general boundary-transfer, `core.rs`),
+`shifted_aggregate_ihs`/`produces_deforestable_aggregate_with_ih`/
+`produces_recursive_deforestable_aggregate`/`declaration_call_produces_
+deforestable_aggregate` (deforestation analysis, a different sense of
+"aggregate").
+
+**AC-2 population:** 13 tests move (`constructors.rs`, the `D7` cluster
+minus one), 1 stays (`RT-CLOSURE-BOUNDARY-LANE D4`'s own test, sharing
+the fixture but not the domain). Shared fixtures move with them (19
+`d7_*`-prefixed helpers, all private, zero external callers).
+
+Ready for `runtime-leader`'s object-store verify and the Architect's
+endorsing vote.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
