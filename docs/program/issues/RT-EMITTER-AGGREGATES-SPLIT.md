@@ -476,6 +476,186 @@ Move the owner into its own child module, extending the established seam.
 Adapters are permitted **as transitional scaffolding only**, and item 18 deletes
 them.
 
+### `D1` executed — `lowering/aggregates.rs`, against the merged D0 ledger,
+### base `ef04fb56a`
+
+**Module name: `aggregates.rs`.** Matches THE OWNER's own noun and item 7's
+planner-side sibling name (`planning/static_transition/aggregates.rs`) --
+no collision, different directories, and the frame's own naming
+convention ("modules own semantic lifecycles") is satisfied by both
+halves sharing the domain word. Extends the
+`boundary.rs`/`source.rs`/`calls.rs`/`joins.rs` seam.
+
+**The field-embedding carry (Architect's D0 endorsing-vote note,
+`e95b4d015`, not itself landed as its own D0 addendum -- the git_request
+for D0 was already in flight when it was written, so it is recorded here
+instead, folded into this D1 execution):** `AggregateAllocationLedger` is
+a field of the RETAINED `Lowering` hub struct
+(`mod.rs:2880` at D0 pickup, `aggregate_allocations: Option<
+AggregateAllocationLedger>`). It moves verbatim, zero widening --
+already `pub(in crate::cranelift_backend)` before the move, matching the
+precedent `units.rs`'s own moved-ledger types
+(`CheckedCallLedger`/`ContinuationCandidateLedger`/
+`ContinuationClaimLedger`/`FusionCompositionLedger`) already set as
+`Lowering` fields, qualified by their owning module
+(`units::ContinuationClaimLedger`, etc). `mod.rs`'s field is updated to
+match: `aggregate_allocations: Option<aggregates::AggregateAllocationLedger>`.
+A crate-wide field-embedding sweep (not cluster-scoped) found no other
+MOVE-type field on `Lowering` -- confirmed independently, not taken on
+the Architect's sweep alone.
+
+**Transport manifest -- old path -> new path, full preservation, every
+moved item verbatim except the named `pub(super)` widenings below:**
+
+`mod.rs` -> `aggregates.rs`, cluster 1 (32 items, unchanged from the
+closed-set restatement): `source_aggregate_preflight`,
+`reconcile_source_aggregate`, `child_possible_referent_owners`,
+`possible_owners_lifetime`, `lowered_aggregate_shape`,
+`call_input_transfer_origin_under_mutation`,
+`substitute_sibling_aggregate_producer`,
+`unit_boundary_environment_record`, `emit_carrier_transfer`,
+`aggregate_schema_origin`, `aggregate_carrier_authority`,
+`carrier_handle_disposition`, `carrier_immediate_tag`,
+`carrier_spillable_disposition`, `open_aggregate_events`,
+`commit_aggregate_events`, `emit_checked_aggregate_alloc`,
+`governed_request`, `record_governed_allocation`, `emit_carrier_alloc`,
+`emit_carrier_spillable_immediate`, `emit_carrier_native_int`,
+`emit_carrier_region_limbed_int`, `emit_carrier_bytes`,
+`emit_carrier_bytes_runtime_span`, `emit_carrier_store_tag_id`,
+`emit_carrier_store_scalar`, `emit_carrier_dynamic_constructor`,
+`emit_carrier_store_field`, `emit_carrier_store_name`,
+`emit_carrier_record_field`, `GovernedAllocationSite` (enum),
+`GovernedAllocationMutation` (enum) + its thread_local block +
+`SiblingProducerSubstitution` + `GovernedAllocationMutationGuard`
+(struct+impl+`impl Drop`) + `governed_allocation_hit`,
+`CarrierAllocationRequest` (enum) + its `impl`, `AggregateAllocationEvent`,
+`LocalAggregateEvents`, `AggregateAllocationLedger` (struct+impl),
+`AggregateRelationClosure`.
+
+`mod.rs` -> `aggregates.rs`, cluster 2 (13 items, unchanged): the whole
+former `impl<'a> Lowering<'a>` block content (`site_operand_argument`,
+`synthesized_fixed_identity`, `synthesized_constructor`,
+`callee_scheduling_origin_under_mutation` x2,
+`sibling_effect_seat_under_mutation`, `reconcile_declared_children`,
+`synthesized_dynamic_alternative`, `dynamic_alternatives_agree`,
+`reconcile_host_result_root`, `reconcile_dynamic_alternative`,
+`synthesized_io_error_alternatives`) + `SynthesizedArgument` (enum) +
+`SiteOperandSource` (enum) + `impl SynthesizedArgument` -- one contiguous
+block since D0 confirmed zero RETAIN interleaving in this cluster,
+extracted and rewrapped as one unit rather than per-method.
+
+**ONE RECLASSIFICATION found at `D1`, not predicted at `D0`:
+`carrier_position_immediate` stays RETAIN, hub-stays.** The compiler
+surfaced a caller D0's own census (scoped to the two cluster line
+ranges) never checked: `mod.rs`'s retained `emit_carrier_field` (already
+confirmed hub-stays in D0, called from `joins.rs`/`source.rs`/`core.rs`)
+calls `Self::carrier_position_immediate(...)` in its own body. Exact same
+shape the Architect confirmed for `carrier_out_slot` at the D0 vote --
+called by both the mover cluster and one RETAINED hub function, trivial
+domain-agnostic helper, moving it would force a widening for zero domain
+gain. **Moved back to `mod.rs`, adjacent to `carrier_out_slot`, for
+consistent treatment** rather than widened forward -- not a silent
+correction, recorded here as the reason.
+
+**Widenings -- `pub(super)`, each load-bearing, found by compiler-driven
+iteration across BOTH the lib and the `--tests` build (D0's own census
+was necessarily production-only; several of these needed the test
+configuration to surface):**
+- Every mover with a RETAINED opaque `self.method(...)`/`Self::method(...)`
+  caller in `core.rs`/`units.rs`/`mod.rs` itself -- the ordinary
+  cross-sibling case, exactly as items 11-14 established.
+- `GovernedAllocationSite` (enum): `core.rs`'s retained
+  `transfer_constructor_operands` constructs
+  `GovernedAllocationSite::CarriedConstructor` directly -- an
+  enum-variant construction from a retained file, the missed-site class
+  D0's own header note anticipated but the crate-wide sweep alone would
+  not have caught without the compiler (the construction site is a value
+  expression, not a call).
+- `SynthesizedArgument` (enum) + its field type `SiteOperandSource`
+  (enum): `core.rs`'s retained `lower_process_host_effect` constructs
+  `SynthesizedArgument::{Scalar,Nested,Dynamic}` directly, despite its
+  own doc comment calling it "private to synthesized construction" --
+  true of every OTHER consumer, false of this one production caller
+  outside the traced cluster. `SiteOperandSource` needed widening too
+  (a `private-type-in-public-interface` warning, not an error: one of
+  `SynthesizedArgument`'s own variant fields).
+- `AggregateAllocationLedger::close` -- `units.rs`'s retained
+  `close_aggregate_allocation_ledger` calls it directly.
+- `AggregateAllocationLedger::{open,record_event,relate,commit,
+  discard_open_body_for_tests,clear_committed_relation_for_tests}`,
+  `emit_carrier_alloc`, `CarrierAllocationRequest` (enum),
+  `SELF_AUTHORIZED_FALLBACK_REACHES` (thread_local),
+  `synthesized_fixed_identity`, `reconcile_declared_children`,
+  `dynamic_alternatives_agree` -- all reached directly by the
+  not-yet-moved `constructors.rs` `D7` test cluster (D0's own AC-2
+  population), surfaced only by the `--tests` build. Re-exported via the
+  same `#[cfg(test)]` test-glob-chain mechanism `joins.rs`'s
+  `TrapIdentityMutation` already established, plus one non-test-gated
+  re-export (`GovernedAllocationSite`, `SynthesizedArgument`,
+  `AggregateAllocationLedger`, `AggregateRelationClosure`) for the
+  production-code consumers.
+- `SELF_AUTHORIZED_FALLBACK_REACHES` specifically: `calls.rs`'s retained
+  `call_declared_unit_target` reads it directly under `#[cfg(test)]`, as
+  part of the self-authorizing-aggregate control's own measurement --
+  found only by the `--tests` build against `calls.rs`, not anticipated
+  by any D0 selector since it is a bare static read, not a call.
+
+**AC-4 / AC-4b -- scoped build + test, `ken-cargo` only, never
+`--workspace`:**
+- `scripts/ken-cargo build -p ken-runtime --lib`: clean, 61 warnings,
+  matching the pre-move baseline exactly (confirmed via a stashed
+  baseline build) -- zero new warnings.
+- `scripts/ken-cargo build -p ken-runtime --tests`: clean, after the full
+  widening pass above.
+- `scripts/ken-cargo test -p ken-runtime --lib`: **926 passed, 0 failed,
+  4 ignored** -- identical to the pre-move baseline (item 14's own landed
+  count), confirming `D1` moved production code only. One test initially
+  failed on first run (`the_backend_production_surface_inventory_is_closed`,
+  the same census pin item 14's own `D1` hit) and was fixed as part of
+  this same `D1` changeset: a new `("lowering/mod.rs", "aggregates")` /
+  `("lowering/aggregates.rs", ...)` row in `core/tests/control.rs`,
+  following the `joins.rs` precedent exactly (`Census` row +
+  `BACKEND_PRODUCTION_SOURCES` row + declared-module-list row).
+  `aggregates.rs`'s own emission-needle count confirmed all-zero by the
+  exact-syntax needle patterns (`.declare_function(` etc, not the bare
+  word "define_function" that appears three times in its own doc
+  comments -- checked with the punctuation-qualified pattern, not a
+  plain-text grep).
+- **AC-4b line counts:** `aggregates.rs` created at **3,568 lines** (well
+  under 10k). `mod.rs`: 13,824 -> shrunk from 17,184 (item 14's own
+  landed size). `core.rs`: unchanged at 14,384 (this item moves nothing
+  out of `core.rs` -- confirmed zero aggregate-domain declarations
+  there at `D0`). `core/tests/control.rs`: 30,247 -> 30,277 (+30 lines
+  of housekeeping -- the three rows above, following the exact
+  `joins.rs`/`calls.rs` row shape). `control.rs` remains far past 10k,
+  pre-existing and unrelated to this slice's own creation/enlargement
+  claim (which covers only `aggregates.rs`, created at 3,568, and
+  `control.rs`, enlarged by 30 housekeeping lines).
+
+**AC-5 -- adapter/facade debt ledger: empty.** No transitional adapter
+or facade was introduced. Every moved item's callers were repointed by
+`pub(super)` widening (or, for `carrier_position_immediate`, by moving
+it back rather than widening) -- compiler-driven, matching items 11-14.
+
+**AC-6 -- this slice's own claim, not a phase closure.** `D1` transfers
+production code only; the campaign's overall closure condition
+(`RT-BACKEND-SPLIT-CLOSURE`, item 18) is untouched. `D2` (the companion
+test move) is a separate, not-yet-started accepted partial.
+
+**Banned scope check:** no visibility widening beyond `pub(super)`
+anywhere (no `pub(crate)`/`pub` escalation on any newly-widened item; the
+three items that were ALREADY `pub(crate)`/`pub(in crate::
+cranelift_backend)` before the move kept their existing level, never
+narrowed nor further widened), no new module beyond the one named child,
+no adapter/facade, no test moved (`D2`'s exclusive scope) -- the three
+`core/tests/control.rs` edits are inventory-row housekeeping in a
+resident test, not a relocation.
+
+Branch `wp/RT-EMITTER-AGGREGATES-SPLIT`, built on `ef04fb56a` (current
+`origin/main` at pickup, 0 behind). Ready for `runtime-leader`'s
+object-store verify and the Architect's mandatory per-mover visibility
+review.
+
 # `D2` — THE COMPANION TEST MOVE. Separate accepted partial.
 
 `lowering/core/tests/control.rs` was **33,969 lines at
