@@ -36,6 +36,15 @@
 //! `D0`.
 
 use super::*;
+// The site-operand-substitution `#[cfg(test)]` mutation check reaches these
+// directly; moved to `effects.rs` at `RT-EMITTER-EFFECTS-SPLIT` `D1`.
+// (`EffectSeatLedger::commit_body`, this file's other reach into `effects`,
+// is a method call resolved through `self`/the ledger value, not a name
+// needing its own `use`.)
+#[cfg(test)]
+use super::effects::{
+    effect_seat_dispatch_mutation, EffectSeatDispatchMutation, SITE_OPERAND_SUBSTITUTION_HITS,
+};
 
 /// **`RT-DECL-CLOSURE-PORT` `D7` — the four sites that construct a governed
 /// allocation request.**

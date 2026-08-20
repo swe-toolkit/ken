@@ -56,6 +56,23 @@ pub(in crate::cranelift_backend) use crate::cranelift_backend::artifact::{
     new_object_module_for_lowering_tests as new_object_module,
 };
 
+// `RT-EMITTER-EFFECTS-SPLIT` `D1` -- these moved out of `lowering::mod` into
+// the new sibling `lowering::effects` module, so the `super::*` glob chain
+// (this file -> `core.rs` -> `mod.rs`) no longer reaches them for the
+// `effects` subject module below (39 tests) or the not-yet-moved
+// `#[cfg(test)]` mutation checks still literally in `control` (D0's own
+// lead, re-verified: two of its tests use `EffectSeatVisitMutation`, the
+// emitter's own type, not the planner's `EffectSeatPlanMutation`).
+// `mint_validated_progress_nat` is an associated fn of `Lowering` (called as
+// `Lowering::mint_validated_progress_nat(...)`), not a free item -- reached
+// through the `Lowering` type itself, already in scope, not imported here.
+pub(in crate::cranelift_backend) use super::super::effects::{
+    effect_seat_dispatch_mutation, effect_seat_visit_mutation, set_effect_seat_dispatch_mutation,
+    set_effect_seat_visit_mutation, site_operand_substitution_hits, EffectSeatDispatchMutation,
+    EffectSeatVisitMutation, RESOURCE_ERROR_INVALID_BOUNDS, RESOURCE_ERROR_MALFORMED_RESOURCE,
+    SITE_OPERAND_SUBSTITUTION_HITS,
+};
+
 // `RT-EMITTER-AGGREGATES-SPLIT` `D2` -- `aggregates::tests` reaches this
 // module's two residual shared fixtures (`d7_ownership_run`,
 // `d7_constructor_arguments`, both still used by the one D4 test that stays

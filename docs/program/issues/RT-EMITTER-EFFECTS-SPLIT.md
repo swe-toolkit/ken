@@ -583,6 +583,144 @@ Move the owner into its own child module, extending the established seam.
 Adapters are permitted **as transitional scaffolding only**, and item 18 deletes
 them.
 
+## `D1` transport manifest — executed against the endorsed D0 ledger @ `9081e56fd`
+
+**Diff scope (7 files, +90/-2900):** new `lowering/effects.rs` (2957
+lines); `lowering/mod.rs` (13826 -> 12319, -1507 net incl. new import/
+`mod effects;` lines) and `lowering/core.rs` (14384 -> 13019, -1365 net
+incl. one `pub(super)` widen) both shrink by the moved content;
+`lowering/units.rs` and `lowering/aggregates.rs` each gain one
+`#[cfg(test)]`-gated `use` (cross-sibling reach into `effects`, named
+below); `core/tests/mod.rs` gains one `use` block (the not-yet-moved
+`control`/`effects` test subjects' own reach into the moved production
+symbols); `core/tests/control.rs` gets two absolute-path `use` fixups
+inside its own two tests (`crate::…::lowering::{…}` ->
+`crate::…::lowering::effects::{…}`) plus the three Class-4 census
+additions (below); `core/tests/effects.rs` gets one analogous
+absolute-path `use` fixup, split into two statements since its
+prefix now diverges (`effects::{…}` vs `units::{…}`).
+
+**Method:** a tokenizer-driven (string/comment-aware) span extraction
+matching the exact methodology items 13-15's own D1s used (`rust_lex`
+classify + brace-depth item-boundary finder), driven by the closed
+D0 ledger's own def-line list. **One real tool bug found and fixed
+before any file was touched:** the span-finder tracked only `{`/`}`
+depth, so `validate_resource_error_reply`'s `[u64; 10]` array-type
+parameter's own internal `;` was misread as the item's top-level
+terminator, truncating its signature. Fixed to also track `(`/`[`
+depth; re-verified against every other span (all identical except the
+one corrected, confirming the fix was narrowly scoped) before
+extracting.
+
+**`impl<'a> Lowering<'a>` re-wrapping (mechanical, not part of AC-1's
+own classification).** The D0 ledger's spans covered exactly the
+closed MOVE-set *items*, each extracted independently of its
+enclosing `impl` block. Two of the four original impl-block groupings
+(the seat-group claim/close methods, and the Cluster-3/3b validation/
+byte-span family plus the two moved `core.rs` methods) needed their
+`self`-taking methods re-wrapped in a fresh `impl<'a> Lowering<'a> {
+... }` in `effects.rs` — non-method items (types, thread_locals, free
+fns, the nested `mod effect_seat_group`, `EffectSeatLedger`'s own
+already-self-contained `impl` block) needed no wrapping. This is
+mechanical re-assembly, not a design choice — matches `joins.rs`/
+`aggregates.rs`'s own "each moved method sits in its own small `impl`
+block" precedent (their headers, quoted in this file's own header).
+
+**`pub(super)` widenings, each load-bearing (compiler-backstopped
+E0624/E0425, not silent — AC-1's own "ordinary top-level RETAIN items"
+disposition, no Architect vote needed for these, only for the D0
+hub-stays judgment calls):**
+- `lower_process_host_effect`, `lower_buffer_freeze_resource_seat` —
+  sole caller `lower_expr`'s `RuntimeExpr::Effect` arm stays in the
+  retained `core.rs` (exactly as the D0 ledger and kickoff predicted).
+- `lower_dynamic_small_int` — retained `core/primitive.rs` (a
+  descendant of `core.rs`) calls it directly; **not previously traced
+  in the D0 census** (a genuine build-driven widening discovery, the
+  same class item 15's own D1 retro named).
+- `narrow_native_int_u64` — retained `calls.rs` calls it directly;
+  likewise not previously traced.
+- `observe_carried_bytes_span` — retained `aggregates.rs` calls it
+  directly (its own `commit_aggregate_events`-adjacent code path);
+  likewise not previously traced.
+- `EffectSeatLedger::close` — retained `units.rs`'s `close_host_
+  effect_seat_ledger` calls it directly.
+- `EffectSeatLedger::commit_body` — retained `aggregates.rs`'s
+  `commit_aggregate_events` calls it directly (a genuinely new
+  cross-domain coupling this item's D0 did not have visibility into,
+  since it required reading item 15's own retained code, not just this
+  item's bound files).
+- `EffectSeatLedger::drop_one_committed_group_for_tests` — retained
+  `units.rs`'s `close_host_effect_seat_ledger`'s own `#[cfg(test)]`
+  mutation check calls it directly.
+- `mint_validated_progress_nat` — the not-yet-moved `core/tests/
+  effects.rs`'s own tests call it as `Lowering::mint_validated_
+  progress_nat(...)`.
+- `EffectSeatDispatchMutation` (the enum itself, was fully private) —
+  both the not-yet-moved `control.rs` tests and `aggregates.rs`'s own
+  `#[cfg(test)]` mutation check need it.
+- `effect_seat_visit_mutation`, `effect_seat_dispatch_mutation`,
+  `site_operand_substitution_hits`, `SITE_OPERAND_SUBSTITUTION_HITS`,
+  `RESOURCE_ERROR_MALFORMED_RESOURCE`, `RESOURCE_ERROR_INVALID_BOUNDS`
+  — each needed by one or more of the same not-yet-moved test/
+  cross-sibling-production consumers above; all widened to `pub(in
+  crate::cranelift_backend)`, matching their already-`pub(in
+  crate::cranelift_backend)` siblings (`EffectSeatVisitMutation`,
+  `set_effect_seat_visit_mutation`, `set_effect_seat_dispatch_
+  mutation`) rather than inventing a narrower convention.
+- `masked_reply_response_bytes` — stays in the **retained** `core.rs`
+  (its own sibling consumer is `core/tests/constructors.rs`'s `super::
+  masked_reply_response_bytes`, item 15's own residual test), widened
+  from private to `pub(super)` so this module's `lower_process_host_
+  effect` can reach it — the one widening on the RETAIN side of the
+  seam, not the MOVE side.
+- `CAPACITY_PHASE_DISPATCH` — widened to `pub(super)` exactly as the
+  kickoff's own carried non-move transport hunk specified; `units.rs`'s
+  two accessor fns updated from `super::CAPACITY_PHASE_DISPATCH` to
+  `super::effects::CAPACITY_PHASE_DISPATCH`.
+
+**Judgment-call symbols confirmed NOT moved, exactly as the kickoff
+specified:** `ClaimedEffectSeats<'a>` and `SiteOperandWitness`/
+`site_operand_witness` both stay at the `mod.rs` hub, zero-widen.
+`EffectSeatLedger`'s field slot on the retained `Lowering` struct
+(`host_effect_seats`) stays at `mod.rs`; only its value type's path
+qualifies, to `effects::EffectSeatLedger` — the `aggregate_
+allocations`/`aggregates::AggregateAllocationLedger` precedent applied
+verbatim. `mod.rs` gained a matching `use effects::{EffectSeatClosure,
+EffectSeatLedger};` (mirroring its own existing `use aggregates::
+{AggregateAllocationLedger, AggregateRelationClosure};`) so `units.rs`'s
+retained ledger-lifecycle wrappers keep resolving these by bare name
+via the same glob-inheritance mechanism.
+
+**Class-4 (source-text oracle) updates — all three predicted `control.
+rs` locations, now actually landed, not merely predicted:**
+`correspondence_adds_no_emitted_unit_to_the_production_census` gets a
+new all-zero `Census` row for `lowering/effects.rs` (confirmed zero
+`FunctionBuilder::new`/`declare_function`/`define_function`/
+`declare_data`/`define_data` occurrences by direct grep — no `mod
+tests` block exists at `D1`, unlike `aggregates.rs`'s own D2-landed
+non-zero row); `the_backend_production_surface_inventory_is_closed`
+gets a new `("lowering/mod.rs", "effects")` row in its declared-module
+list; `the_identifier_census_survives_the_evasions_that_defeated_the_
+text_scan`'s own `BACKEND_PRODUCTION_SOURCES` list (shared by both of
+the above tests) gets a new `("lowering/effects.rs", include_str!(...))`
+entry. **All three found and fixed by running the test suite,** not
+by re-deriving from the D0 prediction alone — the first full run
+caught exactly these two failures (the third assertion shares the
+same list, so one fix closed two of the three predicted sites at once).
+
+**Gates:**
+- **AC-4/4b** — `scripts/ken-cargo build -p ken-runtime --lib` and
+  `scripts/ken-cargo test -p ken-runtime` both green: **926 passed / 0
+  failed / 4 ignored** (lib), plus 26 passed / 0 failed
+  (`value_depth_totality`) and 14 passed / 0 failed (doc-tests). New
+  file `effects.rs` is 2957 lines, well under the 10k ceiling.
+- **AC-5** — no adapters, no facades; nothing to ledger.
+- **AC-6** — this is a slice-only transfer, not a phase-closure claim;
+  item 16 remains `active` pending `D2`.
+- Banned scope respected: no semantic change (build+test green,
+  behaviour-preserving move only), no grouping, no facade, no tidiness
+  renames, no line-count-driven extraction beyond the closed D0 set.
+
 # `D2` — THE COMPANION TEST MOVE. Separate accepted partial.
 
 `lowering/core/tests/control.rs` was **33,969 lines at
