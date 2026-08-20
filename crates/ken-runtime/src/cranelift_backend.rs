@@ -119,7 +119,7 @@ pub use lowering::core::{
 pub const DASM_C2_OBSERVATION_COMPILED: bool = cfg!(feature = "dasm-c2-observation");
 
 #[cfg(feature = "dasm-c2-observation")]
-pub use lowering::{
+pub use lowering::joins::{
     dasm_c2_scalar_merge_observation_scope, DasmC2ScalarMergeObservation,
     DasmC2ScalarMergeObservationScope,
 };
