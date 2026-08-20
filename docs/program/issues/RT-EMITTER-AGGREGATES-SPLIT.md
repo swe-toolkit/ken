@@ -77,6 +77,247 @@ private types, macro-generated declarations, declarations whose visibility and
 type keyword are split across lines, traits, constants, functions, or fields.
 A ledger that does not say what its selector missed is not a ledger.
 
+## `D0` ledger — IN PROGRESS, not yet endorsed or complete
+
+### Method used
+
+Production-injection-point tracing (items 11-14's discipline): every
+candidate is classified by what its own body does and who actually calls
+it, never by name alone -- this campaign's "naming trap" has fired on
+every item so far (item 14 alone found five instances). Per
+`runtime-leader`'s explicit D0 kickoff instruction, the widened
+field-embedding + delegating-wrapper census (item 14's Architect-required
+correction) is applied from the start here, not retrofitted after a
+correction round: every candidate is checked for (a) embedding as a field
+of a RETAINED type and (b) being reached only via a RETAINED
+delegating/wrapper method, in addition to (c) its own direct callers.
+
+Pickup: `1b67144bc` (current `origin/main`, 0 behind). Bound files at this
+SHA: `lowering/core.rs` **14384** lines, `lowering/mod.rs` **17184**
+lines, `lowering/core/tests/control.rs` **30247** lines,
+`lowering/core/tests/constructors.rs` **9727** lines (re-measured
+directly, not inherited from the frame's `20413`/`21200` envelope, which
+predates items 11-14's own shrinkage).
+
+### Reconciliation against item 7's landed ledger (planner/emitter boundary)
+
+Item 7 (`RT-PLANNER-AGGREGATES-SPLIT`, merged, `docs/program/issues/
+RT-PLANNER-AGGREGATES-SPLIT.md`) already traced this boundary in detail
+and named the lowering-owned half explicitly in its own "Boundary
+proposal" section: `AggregateAllocationEvent`, `AggregateAllocationLedger`
+(`open`/`record_event`/`relate`/`commit`/`close`), `AggregateRelationClosure`,
+`LocalAggregateEvents` (private) are item 15's -- concrete, per-compilation
+emission bookkeeping consuming the planner's validated
+`PlannedAggregateOwnership` population as a read-only input, matching the
+frame's own frozen predicate exactly (`close()`'s signature is the
+predicate stated in code: `image(R) subset-of P`, never widening `P`).
+
+Item 7 separately flagged `CarrierAllocationRequest` and
+`GovernedAllocationMutation` as "a third thing entirely" -- correctly
+excluded from ITS OWN (planner) population, but not thereby assigned to
+mine. Independently re-verified here: both are D7-tagged (the same
+`RT-DECL-CLOSURE-PORT D7` checkpoint as the aggregate-allocation cluster),
+declared immediately adjacent to `AggregateAllocationEvent`/`Ledger`/
+`RelationClosure` in `mod.rs`, and `CarrierAllocationRequest::
+PlannedAggregate` is the exact request type `governed_request`/
+`record_governed_allocation` feed into the ledger. **Confirmed item 15's**
+-- this frame's own "governed-allocation surfaces" clause in THE OWNER is
+precisely this cluster.
+
+**Items 7/15 settled**, matching the frame's own frozen stage predicate.
+
+### AC-1 -- MOVE population traced so far (two clusters found in `mod.rs`;
+### `core.rs` has zero aggregate-domain DECLARATIONS of its own, confirmed
+### by a full-file struct/enum/fn selector for `[Aa]ggregate|[Cc]arrier|
+### [Gg]overned` -- core.rs only CALLS INTO the movers below)
+
+**Cluster 1 -- `mod.rs:6467-10592`, one continuous `impl<'a> Lowering<'a>`
+block plus its trailing types.** The boundary-carrier construction/
+allocation/governed-allocation-control family:
+
+`transfer_into_carrier` (6467) is the RETAINED hub entry point (called
+from `calls.rs`, `joins.rs`, `core.rs` -- confirmed genuinely multi-domain,
+not this item's) that dispatches to two movers, `source_aggregate_preflight`
+(6511) and `emit_carrier_transfer` (7752).
+
+**MOVE (this cluster, by name):** `source_aggregate_preflight`,
+`reconcile_source_aggregate` (6604), its three private helpers
+`child_possible_referent_owners` (6869) / `possible_owners_lifetime`
+(6931) / `lowered_aggregate_shape` (6940) -- all three called exclusively
+by `reconcile_source_aggregate` and each other, confirmed via exhaustive
+crate-wide caller grep -- `substitute_sibling_aggregate_producer` (7222),
+`emit_carrier_transfer`, `aggregate_schema_origin` (8110),
+`aggregate_carrier_authority` (8122), `carrier_handle_disposition`
+(8152), `carrier_immediate_tag` (8186), `carrier_spillable_disposition`
+(8216), `open_aggregate_events` (8325), `commit_aggregate_events` (8349),
+`emit_checked_aggregate_alloc` (8373), `governed_request` (8394),
+`record_governed_allocation` (8419), `emit_carrier_alloc` (8599),
+`emit_carrier_spillable_immediate` (8746), `emit_carrier_native_int`
+(8843), `emit_carrier_region_limbed_int` (8906), `emit_carrier_bytes`
+(9078), `emit_carrier_bytes_runtime_span` (9154), `emit_carrier_store_tag_id`
+(9228), `emit_carrier_store_scalar` (9245), `emit_carrier_dynamic_constructor`
+(9260), `emit_carrier_store_field` (9351), `emit_carrier_store_name`
+(9369), `emit_carrier_field_count`* (9564), `emit_carrier_record_field`
+(9618), `carrier_position_immediate` (9639), `GovernedAllocationSite`
+(enum, 10022), `GovernedAllocationMutation` (enum, `#[cfg(test)]`, 10050)
++ its thread_local + `SiblingProducerSubstitution` (struct) +
+`GovernedAllocationMutationGuard` (struct+impl+`impl Drop`) +
+`governed_allocation_hit` (fn) + the five other governed-allocation
+thread_locals (`GOVERNED_ALLOCATION_HITS`, `CARRIER_RAW_ALLOCATIONS`,
+`SIBLING_PRODUCER_SUBSTITUTION`, `SELF_AUTHORIZED_FALLBACK_REACHES`,
+`CALLEE_SCHEDULING_ORIGIN_USED`), `CarrierAllocationRequest` (enum, 10253)
++ its `impl` (`aggregate_class`), `AggregateAllocationEvent` (struct,
+10304), `LocalAggregateEvents` (struct, private, 10319),
+`AggregateAllocationLedger` (struct+impl, 10334), `AggregateRelationClosure`
+(struct, 10585). Also `call_input_transfer_origin_under_mutation` (7192)
+-- the `GovernedAllocationMutation::CallInputTransferOrigin` hook.
+
+*`emit_carrier_field_count` was initially miscounted as hub-stays on a
+first pass (its neighbours `emit_carrier_tag`/`emit_carrier_class`/
+`emit_carrier_field` genuinely are, see below) -- re-checked individually
+by caller grep, not by proximity: its 4 callers are `joins.rs`(x2),
+`source.rs`, `core.rs`, all reading a scrutinee's field COUNT during
+match dispatch, not construction. **CORRECTION pending**: re-verify this
+one against the RETAIN list below before D0 closes -- flagged here rather
+than silently resolved, since it sits exactly on the boundary between the
+"write" (construction, mine) and "read" (match-decode, hub-stays)
+families that the rest of this cluster split cleanly on.
+
+**RETAIN, hub-stays (multi-domain callers confirmed, not this item's):**
+`transfer_into_carrier` (calls.rs/joins.rs/core.rs/source.rs via
+`carry_call_input`), `carrier_refs` (also called from `observe_carried_
+bytes_span`, Effects-domain, mod.rs:16026), `carrier_arena` (also
+`source.rs:2967` and the same Effects call), `carrier_identity_immediate`
+(also `core.rs`, `joins.rs`), `carrier_small_marker` (also `joins.rs`),
+`BoundaryCarrierRefs` (struct, 3400, general vocabulary holding the
+`FuncRef`s every `emit_carrier_*` call uses), `emit_carrier_scalar`
+(pub(super) already -- called from `joins.rs`, `source.rs`, `core.rs`,
+`core/primitive.rs`, `units.rs`), `emit_public_carrier_scalar`
+(pub(super), sole external caller `units.rs`, native-Int
+export/object-launcher domain, not aggregate), `emit_carrier_immediate`
+(joins.rs, calls.rs, core.rs), `emit_carrier_tag`/`emit_carrier_class`/
+`emit_carrier_host_success`/`emit_carrier_host_payload`/`emit_carrier_field`
+(all called from `joins.rs`/`source.rs`/`core.rs`/`core/primitive.rs` --
+the general match-dispatch carrier-DECODE API, the read-side mirror of
+the construction/write-side family above), `carry_call_input` (called
+from `source.rs`/`core.rs`; its own aggregate-specific helper
+`unit_boundary_environment_record` (7037, MOVE, sole caller
+`carry_call_input`) is the one hub-stays-caller-into-a-mover case in this
+cluster), `generated_unit_call_body_callee`/`generated_unit_call_entry_callee`
+(call-input diagnostic identity, called from `source.rs`/`core.rs`, no
+aggregate type referenced), `carrier_out_slot` (JUDGMENT CALL -- called by
+both the movers above AND the RETAINED `emit_carrier_scalar`; classified
+RETAIN as a trivial, domain-agnostic stack-slot helper alongside the
+other general carrier-ABI-call primitives rather than moved with a
+widening for one hub caller -- flag if the Architect reads this
+differently).
+
+**RETAIN, other domain (checked by body, not by name -- confirmed NOT
+aggregate):** `enter_source_occurrence_plan` (6960, join/source-machine
+entry, calls the already-moved `joins::consume_join_plan` family),
+`fused_redirect_inputs` (7299, continuation-fusion domain,
+`StaticContinuationFusion`), `verify_emitted_continuation_calls` (7414,
+`RT-CONTSPEC-ACTIVATE` continuation-specialization domain),
+`verify_recorded_composed_discharges` (7531, composed-discharge/`D8j`
+domain, unrelated), `open_host_effect_seat_group`/`claim_host_effect_seat`/
+`close_host_effect_seat_group` (8453/8493/8562, Effects domain --
+confusingly also `D7`-tagged; this file reuses the `D7` tag across at
+least three unrelated checkpoints, a tag-collision trap distinct from the
+naming trap, noted here so a future reader does not assume same-tag
+implies same-domain).
+
+### Cluster 2 -- `mod.rs:11242-11978`, a SEPARATE `impl<'a> Lowering<'a>`
+### block, found only by tracing `GOVERNED_ALLOCATION_MUTATION`'s full
+### read-site list crate-wide rather than trusting cluster 1's line range
+### as exhaustive
+
+`sibling_effect_seat_under_mutation` (11468) and
+`callee_scheduling_origin_under_mutation` (11432, plus its
+`#[cfg(not(test))]` twin at 11454) are the two remaining
+`GovernedAllocationMutation` hook sites -- **not found by name** (neither
+contains "aggregate"/"carrier"/"governed"); found by grepping every
+`GOVERNED_ALLOCATION_MUTATION.with` read site crate-wide. This is the
+same naming-trap shape item 7's own ledger already flagged for
+`sibling_effect_seat` (the planner-side method) -- confirmed here on the
+lowering side too.
+
+**MOVE (this cluster):** `synthesized_fixed_identity` (11321),
+`synthesized_constructor` (11336, the actual "aggregate construction"
+entry point named in THE OWNER -- 9 external callers, all in `core.rs`'s
+`lower_process_host_effect`, see below), `callee_scheduling_origin_under_mutation`
+x2, `sibling_effect_seat_under_mutation`, `reconcile_declared_children`
+(11490+), `synthesized_dynamic_alternative`, `dynamic_alternatives_agree`,
+`reconcile_host_result_root`, `reconcile_dynamic_alternative`,
+`synthesized_io_error_alternatives`, `site_operand_argument` (11263 --
+resolves an effect-seat's operand as an EFFECTS-domain implementation
+step, but its return type `SynthesizedArgument` is doc-commented
+"Private to synthesized construction" and it has no consumer outside this
+cluster's own `synthesized_constructor` reconciliation). Also
+`SynthesizedArgument` (enum, 11151) + `SiteOperandSource` (enum, 11179) +
+`impl SynthesizedArgument` (11187) -- explicitly doc-commented as
+aggregate-construction-private.
+
+**RETAIN, other domain:** `ClaimedEffectSeats` (struct+impl, 11054-11132)
+-- also used at `mod.rs:15694`/`15746`, outside either aggregate cluster;
+genuinely general Effects-domain, not aggregate-private despite sitting
+inside this cluster's own line range.
+
+**RETAINED caller of BOTH clusters, itself NOT this item's:**
+`lower_process_host_effect` (`core.rs:12814`-`14147`, ~1330 lines,
+Effects/host-process domain, item 8/16's future territory) is the sole
+external caller of `synthesized_constructor`, `synthesized_dynamic_alternative`,
+`reconcile_host_result_root`, `synthesized_io_error_alternatives`,
+`site_operand_argument` -- all via `self.method(...)`, the ordinary
+cross-sibling case. `core.rs`'s other aggregate-adjacent caller,
+`transfer_constructor_operands` (10295), reaches
+`aggregate_carrier_authority`/`source_aggregate_preflight`/
+`emit_checked_aggregate_alloc`/`emit_carrier_store_tag_id`/
+`emit_carrier_store_field` the same way. Both are confirmed RETAIN
+(general boundary-transfer/host-effect dispatch, not aggregate
+themselves) with no aggregate-domain DECLARATIONS of their own anywhere
+in `core.rs` (confirmed above).
+
+### A DIFFERENT sense of "aggregate" -- naming trap, confirmed by body
+
+`mod.rs:14028-15656` (`shifted_aggregate_ihs`, `produces_deforestable_
+aggregate_with_ih`, `produces_recursive_deforestable_aggregate`,
+`declaration_call_produces_deforestable_aggregate`) operate on
+`RuntimeExpr`/`RuntimeExpr::Construct` -- a source-AST deforestation
+analysis (a `Construct` node "aggregating" values in the functional-
+compiler sense), unrelated to `AggregateOccurrenceId`/the allocation
+lifecycle. **Not this item's.** Confirmed by reading the bodies, not by
+the keyword.
+
+### Blind spots / NOT YET CLOSED (stated, not closed -- do not read as a
+### plan to skip them)
+
+- **`emit_carrier_field_count`'s RETAIN-vs-MOVE call is not yet final**
+  (flagged above, pending a dedicated re-check).
+- **Consts/statics, traits, cfg/attribute/derive/repr classes, macro-produced
+  items, and source-text oracles** have not yet had their own dedicated
+  selector passes for this item -- Addendum 1 traced functions/types by
+  following the `GOVERNED_ALLOCATION_MUTATION` and `Aggregate`/`Carrier`/
+  `Governed` name/body threads exhaustively, but the four Architect-required
+  compiler-blind classes (item 13's standing bar) are not yet swept.
+- **AC-2's test-property ledger is not yet built.** `constructors.rs`
+  (9727 lines, 123 `#[test]` total) -- NOT `control.rs` -- is where this
+  item's tests live: a keyword scan for the confirmed MOVE-set symbol
+  names finds a contiguous cluster at `constructors.rs:6733-8709`
+  (~15 tests, `d7_*`-prefixed shared fixtures), matching this item's own
+  `D7` tag. `control.rs` shows zero hits for the `#[cfg(test)]`
+  governed-allocation-mutation types but 2 each for
+  `AggregateAllocationLedger`/`AggregateAllocationEvent`/
+  `AggregateRelationClosure` -- likely Class-4 end-to-end, not yet read.
+  Every test in the `constructors.rs` cluster still needs individual
+  reading (this item's own version of items 12/13/14's "every `#[test]`
+  read in place" discipline), not just the keyword-hit count above.
+- **Re-verify the `carrier_out_slot` judgment call** once the Architect's
+  visibility-census reads this addendum.
+
+This is Addendum 1 -- a substantial first pass, not a closed `D0`.
+Continuing to the four compiler-blind classes and the `constructors.rs`
+test-property ledger next.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
