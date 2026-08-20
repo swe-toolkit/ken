@@ -1432,3 +1432,184 @@ pair's disposition from MOVE to RETAIN/hub-stays with the reasoning recorded
 in-line at the code and here. Scoped build and test both green (926/0/4).
 `D2` not attempted -- separate accepted partial.
 
+# `D2` LEDGER -- the companion test move, executed against `dccff792a`
+# (`origin/main` after `D1` merged). This closes item 13 end-to-end.
+
+Executed per `runtime-leader`'s kickoff (`evt_4964pdf3fcznr`), off the D0
+ledger's own AC-2 conclusion (Addendum 13): of the 224 tests individually
+read, exactly one is confirmed MOVE, two tentative MOVE candidates were
+corrected to RETAIN/shared once their full cluster context was read, and
+everything else is RETAIN across `control.rs`'s many independent
+domains.
+
+## The one MOVE, re-verified present and unchanged before moving
+
+`d6_a_functionized_recursive_declaration_accepts_a_changing_argument_
+constructor` re-confirmed at `control.rs:6671` at the `dccff792a` pickup
+SHA -- same line as at D0 pickup, since nothing touched `control.rs`
+between the D0 and D1 merges. Read the full 92-line span again before
+moving it (discovery-before-mutation): unchanged from the D0-era text.
+
+## Sanity re-read of the "shared/end-to-end" clusters -- NO FLIP FOUND
+
+Per the kickoff's explicit ask, re-read six tests across both clusters the
+D0 ledger classified RETAIN/shared with fresh eyes, checking specifically
+whether a cluster-context re-read (the mechanism that flipped Addendum 4's
+own two D5 tests) would flip anything here:
+
+- **The three `typed_trap_exit_*` tests** (`control.rs:8924-9030`). Re-read
+  all three in full. `..._preserves_the_planner_identity_across_two_unit_
+  calls` discriminates on planner/occurrence-owned trap identity, holding
+  `TrapCallerProtocolMutation::Exact` fixed throughout -- not this item's
+  axis. `..._rejects_a_deleted_or_root_misclassified_unit_lane`
+  discriminates on `TrapFrameBindingMutation` alone,
+  `TrapCallerProtocolMutation::Exact` fixed throughout -- not this item's
+  axis either.
+  `..._identity_and_caller_protocol_mutations_are_discriminating` is the
+  one genuinely exercising `TrapCallerProtocolMutation`
+  (`ReadResultBeforeTrap`, `LeaveStaleTrap`) -- but it does so ALONGSIDE
+  `TrapIdentityMutation` (`Zero`, `Substitute`) as a second axis, over one
+  shared `run_trap_exit_fixture`/`trap_exit_fixture`/
+  `TrapExitMutationReset` apparatus that resets all three trap-family
+  mutation controls jointly. Its own name states both axes; its own body
+  exercises both. **Confirmed RETAIN/shared, no flip** -- this is a genuine
+  multi-owner control over the whole generated-unit trap chain, not a
+  single-owner test for the caller-protocol mechanism alone.
+- **The two `D5` tests** (`control.rs:13628`, `13743`, Addendum 4's own
+  correction). Re-read
+  `d5_the_checked_call_closeout_rejects_omission_duplication_and_a_
+  substituted_callee` in full: its four mutation rows and its positive
+  control all key on `D5CloseoutMutation` alone -- on its own, this ONE
+  test's rows look single-owner. But its fixture apparatus
+  (`d5_mutual_compile`, `d5_mutual_plan_with`, `d5_mutual_template`, the
+  `D5_MUTUAL_*` constants) is the SAME apparatus the neighboring `d5_c2_*`/
+  `d5_c4_checked_plan_mutations_each_reach_their_own_authority` tests use
+  -- Addendum 4 already traced that shared apparatus to
+  `enter_checked_recursive_invocation` (checked-invocation, item 12's
+  landed domain, RETAIN) as a load-bearing part of what the
+  mutual-recursion fixture itself compiles, not an incidental helper.
+  **Confirmed RETAIN/shared, no flip** -- the test's ROWS are
+  single-owner, but its APPARATUS is not, and the frame's own four-way
+  AC-2 partition keys the disposition on the latter for a fixture this
+  heavily shared.
+- **`governed_nested_brackets_n3_through_n7_emit_complete_functionized_
+  bundles`** (`control.rs:9932`). Re-read in full: asserts FIVE joint
+  counters across three different owning files in one function --
+  `units::b2f_last_unit_emission`/`b2f_last_call_edge_resolution`,
+  `recursive_position_unit_calls` (this item's, now `calls.rs`), and
+  `d8_join_conversion_counts` -- every `depth` iteration. **Confirmed
+  RETAIN/shared, no flip** -- a population/route census over the whole
+  `FunctionizedUnits` authority, exactly as the D0 ledger named
+  it.
+
+**Net: nothing changed.** The re-read is stated explicitly, not silently
+reconfirmed, per the kickoff's own instruction.
+
+## Fixture LCA check
+
+The one moved test's two call-time fixtures, `new_object_module` (aliased
+from `crate::cranelift_backend::artifact::new_object_module_for_lowering_
+tests`) and `test_only_distinguished_root_join_plan` (from
+`crate::cranelift_backend::test_support`), are used **19 and 24 times
+respectively** in `control.rs` alone -- far beyond this one test. Per the
+established discipline (item 11's precedent: don't widen solely to relocate;
+item 12's: the LCA rises only if a second real consumer subtree needs it),
+**both stay at their existing declaration site** (`test_support.rs`/
+`artifact.rs`, already far above `lowering`'s own subtree).
+`compile_expr_into_module` (`core.rs`, `pub(in crate::cranelift_backend)`)
+needed no LCA change either -- it stays owned by `core.rs`; only the REACH
+changed, from free-by-descent (when `calls.rs`'s test lived inside a
+`core`-descendant) to an explicit import (now that `calls` is a sibling of
+`core`, not a descendant). None of this widened anything: all three items
+were already crate-wide visible within `cranelift_backend` before this
+move.
+
+## The move
+
+Moved verbatim into a new `#[cfg(test)] mod tests { .. }` in `calls.rs`
+(the item-11/12/13-D1 precedent -- `source.rs`'s own `tests` module is the
+closest sibling shape, five small `impl` blocks and an explicit-import
+header). `RuntimeLowerabilityStatus`/`RuntimeSymbolMetadata` needed an
+explicit import inside the `tests` module too (`core/tests/mod.rs`'s own
+AC-8-class-2 precedent: these are test-support types the production facade
+never imports, so they were never reachable via `calls.rs`'s own
+`use super::*`).
+
+**AC-3 byte-identity**: diffed the moved 92-line span (dedented) against the
+`dccff792a` blob at its original position -- **zero diff**. No rewording, no
+body change, doc comment carried verbatim including its own promise-class
+line.
+
+## AC-2 -- discovery parity and mutation-restoration proof
+
+**Discovery, by exact name** (`cargo test -- --list`, not grep): the test
+resolves at its new path,
+`cranelift_backend::lowering::calls::tests::
+d6_a_functionized_recursive_declaration_accepts_a_changing_argument_
+constructor`. `control.rs`'s own `#[test]` count: 221 -> 220 (one test
+moved out, confirmed by direct count, no hardcoded `221`/`220` assertion
+found anywhere in the corpus to update). Total suite count unchanged: 926
+passed both before and after (moving a test changes WHERE it runs, not
+whether it's collected).
+
+**Mutation-restoration proof, on the import re-point**: the move re-points
+every one of the test's five production dependencies (`compile_expr_into_
+module`, `new_object_module`, `test_only_distinguished_root_join_plan`,
+`RuntimeLowerabilityStatus`, `RuntimeSymbolMetadata`) through new `use`
+paths. Each resolves to a name with exactly one declaration site crate-wide
+(verified by grep before writing the import, not assumed), so there is no
+shadowing/wrong-item risk the proof needs to rule out -- but ran the proof
+anyway, on the production side rather than the import side, since that is
+what "reds the same reached property" actually means here: temporarily
+forced `call_declared_declaration_unit` (this item's own "SOLE place
+[declaration-call] input order is decided", the function
+`lower_declaration_ref`'s `SchedulingEntry` arm calls into for this exact
+fixture) to return an unconditional `Err`, ran the moved test in isolation
+-- **RED**, with the injected error text surfacing exactly in the test's own
+panic message, proving the test is genuinely wired to live production code
+at its new location, not silently vacuous. Reverted; ran again -- **GREEN**.
+Full suite re-confirmed green after the revert (926/0/4), and
+`git diff --stat` on `calls.rs` shows only the intended addition, no probe
+residue.
+
+## `AC-4`/`AC-4b`
+
+`scripts/ken-cargo build -p ken-runtime --tests`: clean.
+`scripts/ken-cargo test -p ken-runtime --lib`: **926 passed, 0 failed, 4
+ignored** (same as D1's post-move count -- moving a test does not change
+the total). No `--workspace` run.
+
+| file | before (D1 tip) | after | delta |
+|---|---|---|---|
+| `lowering/calls.rs` | 2,054 | 2,172 | +118 |
+| `lowering/core/tests/control.rs` | 30,314 | 30,222 | -92 |
+
+`calls.rs` stays well under the 10k ceiling. `control.rs` remains over 10k
+(this was a single-test slice, not a full companion-test-move campaign
+sweep across every emitter item) -- the frame's own text never promised D2
+alone would bring it under the ceiling, only that this item's own AC-2
+population would move; the residual reduction across the whole phase is
+`RT-BACKEND-SPLIT-CLOSURE`'s eventual concern, not this node's.
+
+## `AC-5` -- adapter/facade debt ledger: EMPTY
+
+No re-export or compatibility shim introduced for the moved test or its
+fixtures. Nothing for item 18 to delete from this deliverable.
+
+## `AC-6` -- this deliverable's own transfer is complete; ITEM 13 CLOSES
+## END-TO-END on this node, per the kickoff's own framing
+
+The calls-and-returns emitter's production code (`D1`) and its one
+exclusively-owned domain test (`D2`) have both moved. `RT-BACKEND-MODULE-
+SPLIT` PHASE closure is still not claimed by this node -- that is the
+standing phase record's own concern, separate from any one item closing.
+
+## Summary for `runtime-leader`'s object-store verify
+
+Branch `wp/RT-EMITTER-CALLS-RETURNS-SPLIT`, rebased onto `origin/main`
+`dccff792a` (the D1 merge). One test moved, byte-identical, discovered at
+its new path, mutation-restoration proof run and reverted cleanly, full
+suite green (926/0/4). Six-test sanity re-read of the shared/end-to-end
+clusters found no classification flip, stated explicitly. `AC-5` empty.
+Item 13 closes end-to-end on this deliverable.
+
