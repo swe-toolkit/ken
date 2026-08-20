@@ -7346,6 +7346,20 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-EMITTER-AGGREGATES-SPLIT` `D1` — the aggregates emitter, moved
+        // verbatim from `mod.rs`. It emits IR into the `FunctionBuilder` its
+        // caller already owns and records into the already-open
+        // `AggregateAllocationLedger`; it never mints a new defined function
+        // or data object.
+        Census {
+            file: "lowering/aggregates.rs",
+            source: include_str!("../../aggregates.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         Census {
             file: "planning.rs",
             source: include_str!("../../../planning.rs"),
@@ -8016,6 +8030,12 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     // `boundary.rs`/`source.rs`/`calls.rs` above: a production source absent
     // from this roster is invisible to every pin that iterates it.
     ("lowering/joins.rs", include_str!("../../joins.rs")),
+    // `RT-EMITTER-AGGREGATES-SPLIT` `D1` — the aggregates emitter. Registered
+    // here the moment the module exists, for the same reason as
+    // `boundary.rs`/`source.rs`/`calls.rs`/`joins.rs` above: a production
+    // source absent from this roster is invisible to every pin that
+    // iterates it.
+    ("lowering/aggregates.rs", include_str!("../../aggregates.rs")),
     // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. Registered
     // here the moment the module exists, because every pin that iterates this
     // roster is closed only over the files it lists: a production emitter absent
@@ -8201,6 +8221,16 @@ fn the_backend_production_surface_inventory_is_closed() {
             // the types the moving methods merely manipulate
             // (`ScalarMergeKind` and siblings) stay SCC-pinned in `mod.rs`.
             ("lowering/mod.rs", "joins"),
+            // `RT-EMITTER-AGGREGATES-SPLIT` `D1` — the aggregates emitter
+            // (aggregate construction and projection emission, allocation
+            // emission, governed-allocation surfaces). A sibling of
+            // `core`/`units`/`seed_material`/`boundary`/`source`/`calls`/
+            // `joins`; `AggregateAllocationLedger`/`AggregateAllocationEvent`/
+            // `AggregateRelationClosure` move with it (already
+            // `pub(in crate::cranelift_backend)`, zero widen); the planner
+            // types it merely references (`PlannedAggregateShape` and
+            // siblings) stay item 7's.
+            ("lowering/mod.rs", "aggregates"),
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
             // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — aggregate allocation
