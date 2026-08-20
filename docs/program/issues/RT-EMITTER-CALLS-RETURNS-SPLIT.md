@@ -512,6 +512,32 @@ D2 to reach the moved names cross-module, same pattern noted for
 
 **Read through line ~14,000 of 30,289 (about 46%).** Continuing next.
 
+### Addendum 5 — AC-2 progress checkpoint, no new findings, a pattern
+### has stabilized
+
+Continued the exhaustive read from line ~14,000 through line ~18,200
+(about 60%). This entire span (D5a's checkpoint-4 discriminators for
+generated continuation contexts/static-worker-call routing, D6a's eight
+upstream checked-route-composition rows, D4a/D3b/D3c producer-local and
+entry-ABI slot-position controls, D7a/D8a/D8b composed-worker-view and
+composed-call-target selector laws, effect-seat plan/visit mutations)
+classifies RETAIN, all `RT-CONTSRC-PRODUCER-LOCAL`/`RT-DECL-CLOSURE-
+PORT`/`RT-CONTINUATION-EDGE-DISPOSITION`-tagged planner-and-continuation
+domain — none of it single-owner to this item's declared-call/return
+emission.
+
+No new MOVE candidates in this span. The frame's own D0 characterization
+of `control.rs` ("planner/occurrence, continuation/fusion, function-
+state and source-machine, emitter and join/trap controls, plus cross-
+cutting census and closure tests") is bearing out directly: the
+continuation/planner-side populations are the dominant bulk of the file,
+and this item's own domain tests are comparatively sparse and mostly
+concentrated where the marker scan already found direct hits, plus the
+one exhaustive-read-only finding (`d6_a_functionized_recursive_
+declaration_accepts_a_changing_argument_constructor`, Addendum 3).
+
+**Read through line ~18,200 of 30,289 (about 60%).** Continuing next.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
