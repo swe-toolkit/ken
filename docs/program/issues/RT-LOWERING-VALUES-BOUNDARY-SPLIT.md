@@ -1,7 +1,7 @@
 ---
 id: RT-LOWERING-VALUES-BOUNDARY-SPLIT
 title: "Move the values and boundary domain out of the lowering files -- and boundary_value_clif.rs is NOT absorbed merely because it is large; its lifecycle and consumers must be proven first"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
