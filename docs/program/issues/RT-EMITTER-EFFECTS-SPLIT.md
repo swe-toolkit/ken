@@ -358,6 +358,49 @@ three tests + the two census functions, `the_identifier_census_...`
 folding into the same "Class 4" bucket as the other two) -- no stray
 reference anywhere else in `control.rs`'s 30k+ lines.
 
+### AC-2 -- `effects.rs`'s own 39 tests, program-matched against the
+### closed MOVE set (mechanical pass, not yet a full prose read of each)
+
+Every `#[test]` fn body in `core/tests/effects.rs` (39 total) matched
+against the full closed MOVE set of type/fn/const names. **8 of 39**
+name a MOVE-set symbol directly (`mint_validated_progress_nat`,
+`EffectSeatDispatchMutation`/`EffectSeatVisitMutation` +
+`set_effect_seat_*_mutation`, `capacity_phase_dispatch`/`reset_
+capacity_phase_dispatch` via the `units.rs` accessor noted above,
+`site_operand_substitution_hits`, `RESOURCE_ERROR_INVALID_BOUNDS`/
+`RESOURCE_ERROR_MALFORMED_RESOURCE`). **The other 31 name none** --
+this is expected, not a gap: they exercise the domain end-to-end
+through `RuntimeExpr::Effect`/`host_effect_operation` construction and
+compiled-output assertions, never touching the internal seat-ledger
+symbols by name, which is the ordinary shape for an integration-style
+lowering test.
+
+**One finding that bears directly on the D2 shape, not the D0
+population:** several of the 31 (`px8n_bounded_nat_observes_exact_
+zero_successor_and_recursive_order` and its siblings) test `BoundedNatV1`
+-- already independently confirmed **RETAIN** (a shared, general
+primitive, not Effects-owned). They sit in `effects.rs` because their
+fixture enters through the Effects-owned `mint_validated_progress_nat`
+(the file's own header says as much: "Bounded-Nat, host-reply, IO,
+borrowed-ingress and native-int lowering tests... assigns these
+subjects to `effects`"). **The test-FILE grouping is by fixture entry
+point, not a 1:1 mirror of the production-module boundary this ledger
+draws** -- do not read "lives in `effects.rs`" as "tests an
+Effects-owned symbol." This is consistent with, not a contradiction of,
+concluding the whole file is already the domain's test home: the file
+was assigned to this domain by an earlier initiative (`RT-SPLIT`) on
+exactly this fixture-entry-point basis, before this campaign's
+production-module boundary existed to compare it against.
+
+**Working conclusion, not yet Architect-reviewed:** `core/tests/
+effects.rs` needs no test *relocation* at `D2` -- unlike item 15's
+`constructors.rs` pattern, the test-level split already happened. `D2`
+here is more likely import-path fixups (matching whatever `D1` widens)
+than a symbol-by-symbol test move. This reverses the AC-2 emphasis for
+this item: the census work is in `control.rs` (closed above) and in
+confirming `effects.rs` compiles clean against the moved production
+module at `D1`, not in finding tests to relocate.
+
 ### Cluster 2 const/static gap -- closed (the D7_PAIR_CALLEE lesson,
 ### applied proactively this time)
 
@@ -422,23 +465,24 @@ only the type path qualifies.
 - **The four compiler-blind classes are only partially swept.** Class 2
   (cfg/attribute-gated) is implicitly covered by the `#[cfg(test)]`
   markers already named above, but not yet run as its own dedicated
-  pass. Class 1 (re-exports) and Class 3 (macro-produced) checked ad
-  hoc during the sweep above (zero found in every span checked) but not
-  yet run as a formal, closed pass. Class 4 (source-text oracles) has
-  two of an expected three `control.rs` locations found; the third is
-  not yet located.
-- **AC-2 is a first pass, not exhaustive.** Only the tests already
-  flagged by item 8's lead have been individually verified; the full 39
-  `#[test]` fns in `effects.rs` have not each been individually read
-  and matched against my closed MOVE-set symbols, and `control.rs` has
-  not been swept end-to-end for every remaining `EffectSeat*`/`wire_
-  bytes*`/`narrow_*_int_u64`/`SiteOperandWitness` reference outside the
-  three sites already found.
-- **Consts/statics/traits/repr classes** have not yet had a dedicated
-  selector pass beyond what fell out of the function/type tracing above
-  (the Cluster 3b / EOF sweep above closes most of this for `mod.rs`,
-  but the earlier clusters -- 1, 2, 3 -- have not each had an
-  independent const/static-only pass run against them).
+  pass. Class 4 (source-text oracles) is closed -- all three `control.rs`
+  locations found and confirmed (see above).
+- **AC-2's `effects.rs` pass is mechanical (symbol-matched), not yet a
+  full prose read of each of the 39 tests.** The programmatic sweep
+  above is sound for population-closure purposes (does every test that
+  names a MOVE-set symbol get accounted for) but has not been followed
+  by an individual reading of each test's own assertions the way items
+  11-15's AC-2 discipline calls for -- flagged so this is not silently
+  read as done. `control.rs` itself IS confirmed swept end-to-end (see
+  above): no `EffectSeat*`/`wire_bytes*`/`narrow_*_int_u64`/
+  `SiteOperandWitness` reference exists there outside the five sites
+  already classified.
+- **Consts/statics/traits/repr classes -- closed for `mod.rs`.** A full
+  declaration-selector re-pass (functions/types/consts/statics
+  together) run over every cluster -- 1 (404-530), 2 (7250-8615,
+  already reported above), 3 (12332-12872), and 3b/EOF (already covered)
+  -- found no further consts/statics beyond what is already recorded in
+  this ledger. `mod.rs`'s AC-1 population is now closed.
 - **The `SiteOperandWitness`/`ClaimedEffectSeats` judgment calls
   (flagged above) are not yet Architect-reviewed** -- carried as open
   questions for the D0 vote, not resolved unilaterally.
