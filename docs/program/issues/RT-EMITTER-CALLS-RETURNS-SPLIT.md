@@ -332,6 +332,45 @@ only closed one class so far). AC-2 (control.rs's exhaustive test read
 plus the in-file `core.rs` test module) remains fully open, as does the
 re-export/cfg/attr/derive/repr inventory and the source-text-oracle check.
 
+### Addendum 2 — top-level item census, first pass over the "call"-adjacent
+### names
+
+Listed all ~150 top-level `struct`/`enum`/`const`/`static`/`type` items in
+both files and checked every name plausibly call/callee/return-adjacent
+against its actual production usage (not its name):
+
+- `StaticWorkerCallRoute` (mod.rs:3937) — **RETAIN, hub-stays.** Used by
+  both this item's `call_static_worker_with_inputs`/`validate_retained_
+  callable_capture_contract` AND by RETAINED `composed_recursive_argument_
+  binding` and a RETAINED D6a-tagged struct's `members` field. Genuinely
+  shared across a moving and a staying consumer — same shape as item 12's
+  ~14 hub-stays support types. Stays at mod.rs; the moved functions
+  reference it cross-module.
+- `D8pApplicationBinding`/`D8pEmittedTarget` (+ their `D8P_APPLICATION_
+  BINDINGS`/`D8P_EMITTED_TARGETS` thread_locals and four accessors) —
+  **RETAIN**, despite naming ("application binding", "emitted target")
+  that reads exactly like this item's domain. Their sole production
+  `record_*` call site is inside `consume_checked_ih_marker_at_static_
+  worker_call`, already-confirmed checked-invocation, item 12's landed
+  domain. A third property-over-tag catch from name alone.
+- `RootTerminalAnswerAuthority`/`TerminalAnswerAuthority` (mod.rs ~15038)
+  — **RETAIN.** "Terminal Answer Authority" reads as return-domain, but
+  its own doc states it is "proof that the native lowering machine has
+  reached the checked invocation root with no semantic or control
+  continuation left to consume the value" — checked-invocation/
+  continuation-consumption proof, consumed by `mint_terminal_answer_
+  authority`/`restore_root_terminal_authority`, already classified RETAIN
+  during item 12's own D1 investigation of this same region.
+
+No new MOVE items found in this pass. The remaining ~145 top-level items
+(D2f/census/checked-frame types in core.rs; the Scale-B/effect-seat/
+D3x-D9x mutation-control families, `Lowered`/`LoweringOperand`/boundary
+vocabulary, `AggregateAllocationLedger`/`EffectSeatLedger` families, and
+the source-machine-adjacent hub-stays types in mod.rs) have NOT been
+individually checked — this pass targeted names with real collision risk,
+not the full population. AC-1 is closer but still not exact; AC-2 remains
+the largest open piece.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
