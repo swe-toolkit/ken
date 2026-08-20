@@ -394,3 +394,252 @@ open the phase record to learn them.
 > - **The source machine is relocation only in this phase**, never a transition
 >   IR. Generated traps receive **no fabricated source origin**.
 
+## D0 ledger, re-measured at `0c5bb765a`
+
+Bound files: `lowering/mod.rs` **21200** lines, `lowering/core.rs`
+**20413** lines — unchanged from item 10 (both closed with no code motion).
+SCC boundaries unchanged: `compile_expr_into_module` (`core.rs:2040-3089`)
+plus `impl<'a> Lowering<'a>` (`core.rs:3090-20330`), re-extracted fresh at
+this SHA and byte-identical to item 10's extraction. `core.rs` carries
+**zero** `Boundary`/value-vocabulary declarations of its own — the whole
+domain lives in `mod.rs`.
+
+### `boundary_value_clif.rs` — the proof comes back negative
+
+It is **not a `cranelift_backend` file at all**: `lib.rs:32` declares
+`mod boundary_value_clif;` at the **crate root**, a sibling of
+`cranelift_backend`, not a descendant of `lowering`. It is already
+under the 10k ceiling (9,116 lines), already correctly separated (its own
+module doc: *"the executable half of the boundary-value ABI"*, paired
+1:1 with `crate::boundary_value`, the constants/layout half), and consumed
+from deep inside the immovable SCC itself (`core.rs:2636`,
+`crate::boundary_value_clif::emit_boundary_value_local_graph`) plus a
+`mod.rs` struct field (`:842`) and multiple `core/tests/*` sites. Moving
+any part of it into a descendant of `lowering` would not shrink
+`mod.rs`/`core.rs` (it is not counted in either today) and would move it
+in the wrong direction — out of a stable, already-scoped, crate-root
+position and into a nested one, reversing its own module doc's stated shape
+for no size benefit.
+**Left untouched; not in the bound population.**
+
+### The domain's actual shape: a movable vocabulary half and a pinned
+### emission half
+
+"Values and boundary" splits cleanly into two halves with different
+Rust-visibility profiles, discovered by reading every candidate's own
+declared qualifier, not by assuming adjacency:
+
+- **The disposition/classification/lifecycle vocabulary** — `Lowered`'s
+  own variant tag and its static (non-emitting) properties, plus the phase
+  and policy machinery. Declared `pub(in crate::cranelift_backend)`, on both
+  the **type and every field/variant**, throughout. This qualifier is an
+  **absolute, crate-relative path** — unlike `pub(super)` (relative to
+  whichever module currently hosts the item) it names `cranelift_backend`
+  directly, so relocating a `pub(in crate::cranelift_backend)` item
+  **anywhere within `cranelift_backend`'s own subtree** (including a
+  brand-new descendant child of `lowering`) does not change what it means,
+  to any caller, anywhere in the facade — SCC included, test-tree included.
+  This is a stronger and simpler zero-widening case than item 10's
+  `pub(super)` finding: item 10 found `pub(super)` survives moving between
+  **existing siblings of the same parent**; here the qualifier is already
+  anchored to the parent two levels up and is untouched by relocation to a
+  **new** child.
+- **The carrier-emission machinery** — the CLIF-level code that actually
+  constructs and decodes a boundary word (`transfer_into_carrier` and the
+  ~30-method `emit_carrier_*`/`carrier_*` family it dispatches to). These
+  are bare-private or `pub(super)`-relative-to-`mod.rs`, and the entry
+  point (`transfer_into_carrier`) is called **directly from inside the
+  indivisible SCC** dozens of times (`core.rs:3603/3786/14506/14824/17687`,
+  plus more) and **directly from `core/tests/constructors.rs`** dozens more
+  times — both populations item 10 established as binding. This machinery is
+  pinned to the LCA the same way item 10's frame/scope family was, for the
+  same reason: it is bare-private, and both consumers (the immovable SCC
+  and the not-yet-relocated test tree) reach it today only through
+  descendant-of-`mod.rs` privilege that a new sibling of `core` does not
+  inherit.
+
+### Per-item evidence
+
+**Movable — `pub(in crate::cranelift_backend)` on type and fields/variants,
+confirmed by direct read of each declaration (not assumed from the
+qualifier on one member):**
+
+| item | kind | location |
+|---|---|---|
+| `BoundaryTransferInvokingSite` | enum (facade-qualified) | `mod.rs:2482-2609` |
+| `Lowered::variant` | method (facade-qualified; `Lowered` itself stays — method-level move, hub-stays/method-moves, per item 10's precedent) | `mod.rs:10937` |
+| `LoweredVariant` + `::ALL` const + `::boundary_disposition` | enum + const + method | `mod.rs:10794-10992`, `:11949-12133` |
+| `StaticEncodingPolicy` + `::ALL` const + `::policy` (on `BoundaryDisposition`) | enum + const + method | `mod.rs:10976-11051` |
+| `HandleIdentity` | enum | `mod.rs:11092-11116` |
+| `BoundaryOutcome` + `::permitted_by` + `::requires` + `::phase_closure` | enum + 2 impls | `mod.rs:11117-11144`, `:11349-11430`, `:11616-11713` |
+| `BoundaryInput` + `::all` + `::outcome` (+ its private helper `handle_identity`, self-contained, called only from `outcome` in the same impl block) | struct + impl | `mod.rs:11145-11348` |
+| `BoundaryDisposition` + `::policy` | enum + impl | `mod.rs:11774-11809` (decl), `:11002-11016` (impl, textually earlier in the file — forward reference, harmless) |
+| `LifecyclePhase` + `::ALL` const + `::index` | enum + impl | `mod.rs:11431-11465`, `:11466-11573` |
+| `PhaseBinding` | enum | `mod.rs:11574-11592` |
+| `PhaseClosure` + `::binding` | struct + impl | `mod.rs:11593-11615` |
+| `Lowered::boundary_disposition`, `Lowered::source_aggregate_producer`, `Lowered::boundary_transfer_admissibility` | methods only (`Lowered` the type stays pinned — SCC-consumed 238×; these three methods are individually `pub(in crate::cranelift_backend)` and need only descendant-of-`mod.rs` access to match `Lowered`'s bare-private variants, which a new child of `lowering` has) | `mod.rs:11798-11948` |
+| `impl crate::boundary_value::BoundaryEmissionPlan { fn derive() }` | inherent impl on a type declared in the **already-`pub`, crate-root** `boundary_value` module; `derive()` itself is `pub(crate)` (crate-wide, a fortiori portable); called once from the SCC (`core.rs:2627`) but the call survives relocation regardless, same absolute-qualifier reasoning | `mod.rs:21028-21120` |
+
+**Approximate moving total: ~1,576 lines** (128 + 1,355 + 93, the three
+spans above) — **not yet exact**, to be confirmed precisely at `D1`
+handback per this campaign's standing convention (item 10's own AC-4b
+note). Comparable to already-landed children of this campaign
+(`joins_traps.rs` 1,155, `effects.rs` 733) — a coherent, materially-sized
+child, not a token extraction.
+
+**Pinned by direct SCC production consumption (bare-private/`pub(super)`,
+reached today only via descendant-of-`mod.rs` privilege the SCC has and a
+sibling of `core` would not):**
+
+`Lowered` (238 hits — type stays; its facade-qualified methods above move);
+`LoweringOperand` (324 hits — type stays; its own 4-method impl block at
+`mod.rs:3971-4060`, `effect_seat_phase`/`specialized_at`/
+`specialized_join_arm`/`specialized_ref_at`, reads as
+Effects/Continuation-join territory by name, not values-boundary's to claim
+— flagged, not pursued, left with the type); `CarriedBoundaryWord` (19 hits
+— type stays, no separate methods); `transfer_into_carrier`
+(`mod.rs:6521-6529` and `:7010-7030`ish — direct SCC calls at
+`core.rs:3603/3786/14506/14824/17687`) and `emit_carrier_transfer` (its
+private recursive step, `mod.rs:8879-9002`ish); the ~30-method
+`emit_carrier_*`/`carrier_*` family it dispatches to
+(`mod.rs:9369-10780`, confirmed by grep against the freshly re-extracted
+SCC: 13 of the ~30 have direct call sites — `carrier_arena`,
+`carrier_identity_immediate`, `emit_carrier_immediate`,
+`emit_carrier_store_tag_id`, `emit_carrier_store_field`, `emit_carrier_tag`,
+`emit_carrier_class`, `emit_carrier_host_success`,
+`emit_carrier_host_payload`, `emit_carrier_scalar`,
+`emit_carrier_field_count`, `emit_carrier_field`, `emit_carrier_record_field`);
+the remaining ~17 members of that family are pinned by **internal coupling**
+to the SCC-consumed members (`carrier_refs`/`carrier_arena` are each called
+19× by their own siblings in the same impl block) or by test-tree
+consumption below, except `emit_public_carrier_scalar` (`pub(super)`
+**declared at `mod.rs`**, so its current meaning is already
+`pub(in cranelift_backend)` — but per the corrected mechanism, relocating a
+`pub(super)` item **out of the module where it is declared and into a
+child** re-anchors it to `pub(in lowering)`, which still covers its one
+real external caller `units.rs:3949`; grouped here anyway rather than split
+out, since it is one call inside a thoroughly-pinned 30-method family and
+splitting one member out is not materially different from moving it, for a
+family this tightly coupled through shared private state
+(`self.function_local.boundary_carrier`));
+`BoundaryTransferInvokingSiteGuard` + its `Drop` impl
+(`mod.rs:2610-2660`ish, constructed only inside the pinned
+`carry_call_input`) and the two thread_locals it/`transfer_into_carrier`
+read (`D2K_OWNER_TRACE`, `D2K_BOUNDARY_TRANSFER_INVOKING_SITE`,
+`mod.rs:2600-2609`ish) — test-instrumentation co-located with pinned code.
+
+**Pinned by coupling (not itself SCC-consumed, but a bare-private field
+type of a pinned struct declared in `mod.rs`):**
+
+`BoundaryCarrierRefs` (`mod.rs:3432-3450`ish, bare-private struct) is
+`FunctionLocalRefs`'s own field type (`boundary_carrier:
+Option<BoundaryCarrierRefs>`, `mod.rs:1014`, constructed at `mod.rs:908`)
+— `FunctionLocalRefs` is item 10's SCC-pinned hub-companion and stays at
+`mod.rs`; a bare-private field type it names must stay reachable **from
+`mod.rs`**, which a descendant-of-`mod.rs` sibling declaration is not
+(privacy does not flow upward from child to parent). Its own accessor,
+`fn carrier_refs(&self) -> Result<BoundaryCarrierRefs, ...>`
+(`mod.rs:9369-9376`), is the shared low-level read every member of the
+pinned carrier-emission family calls (19 internal call sites) — pinned
+twice over.
+
+**Pinned by not-yet-relocated test-tree construction, checked directly
+(second binding population, per item 10's discipline):**
+
+`emit_carrier_alloc` — bare-private, called directly from `lowering/core/
+tests/constructors.rs:7190/7206/7223`, a descendant of `core`'s own
+module, not of a prospective new sibling — pins it independently of its 9
+in-`mod.rs` callers. `transfer_into_carrier` itself — the entry point is
+called from `core/tests/constructors.rs` at more than 20 additional sites
+(`:2073, 2098, 2709, 2750, 2882, 3087, 3340, ...`), the single heaviest
+test-tree consumer found in this domain. Neither is pursued as an atomic
+`D1`+`D2` pair, for the same reason item 10 declined one: the population
+is woven through shared fixtures across the whole
+`control.rs`/`constructors.rs` test tree, and pulling it forward pre-empts
+`evt_6r403ez3m2m69`'s standing ban on ahead-of-boundary `control.rs`
+decomposition.
+
+**A confirmed-negative check, not a pin:** `BoundaryInput` was initially
+flagged a test-tree-pinning candidate (7 struct-literal constructions in
+`core/tests/control.rs:10088-10220`) — but since `BoundaryInput`'s type
+**and every field** are `pub(in crate::cranelift_backend)`, that
+construction does not pin it: the absolute qualifier reaches the new child
+regardless of where the type is declared, so those test sites keep
+compiling either way. Recorded so a future reader does not re-flag the same
+false positive.
+
+### Source-text oracle found
+
+`lowering/core/tests/control.rs:9573` reads mod.rs's own source text and
+matches the literal string
+`"fn boundary_disposition(self) -> BoundaryDisposition {"`
+via `.split_once(...)`. `Lowered::boundary_disposition` moves in this
+slice (it is one of the movable methods above); this oracle's expected
+substring must move with it, or be re-pointed at the new file, at `D1` —
+recorded here so `D1` does not discover it as a surprise
+compile-clean-but-logic-broken regression. No other
+`include_str!`/source-text-oracle hits found scoped to this domain's
+population; `include_str!` = 0 in both bound files, unchanged from item 10.
+
+### Population reconciliation
+
+**Moving to the new descendant child (facade-portable, zero widening):** 10
+types/enums + 3 consts + roughly a dozen methods, ~1,576 lines (exact count
+at `D1`).
+
+**Retained at the LCA, extending item 10's hub census (this domain's own
+companions, pinned by SCC/coupling/test-tree — not this slice's to move):**
+`Lowered`, `LoweringOperand`, `CarriedBoundaryWord`, `BoundaryCarrierRefs`,
+`BoundaryTransferInvokingSiteGuard`, `transfer_into_carrier`,
+`emit_carrier_transfer`, the ~30-method `emit_carrier_*`/`carrier_*`
+family, 2 thread_locals, `LoweringOperand`'s own 4-method impl block
+(flagged as foreign-domain-shaped, not claimed here).
+
+**Explicitly out of scope, deferred to its own claiming slice's `D0`
+(item 10 precedent — per-item attribution belongs to whichever item claims
+that domain):** every other declaration in `mod.rs`/`core.rs` not named
+above — the Effects/Aggregates/Calls/Joins/Continuations/source-machine
+method families riding on the retained `Lowering` hub (items 12-17), and
+`ProductionAnchor` (`mod.rs:11485-11573`ish, its own `derived_witness`/
+`CONTROL_CLOSED` — a phase-closure production-tracking type physically
+interleaved with this domain's vocabulary cluster but semantically a
+different, broader closure/attestation concern; not values-boundary's to
+claim, flagged rather than swept in by adjacency).
+
+### THE OUTCOME DETERMINATION, STATED EXPLICITLY
+
+**This is `OUTCOME 2`, not `OUTCOME 3`.** Unlike item 10, this domain is
+**not** wholly SCC-pinned: a genuinely facade-portable vocabulary/
+classification/lifecycle-phase sub-population exists, confirmed
+type-by-type and field-by-field (not assumed from one member's qualifier),
+and it is material — ~1,576 lines, larger than two of this campaign's own
+already-landed children. The domain's other half (the CLIF-level
+carrier-emission machinery) is genuinely pinned, by the same mechanisms
+item 10 established (direct SCC consumption, test-tree consumption,
+coupling to a pinned field type) — and it stays at the LCA alongside item
+10's retained hub, which is architecturally consistent: the low-level
+emission machinery is exactly the kind of code the indivisible SCC (a prior
+campaign's own construct) was built to hold. No hard-stop is warranted; the
+fork the frame asked me to check for (wholesale SCC-pinning, as happened to
+function-state) did not materialize here.
+
+### Test-property ledger
+
+Deferred to `D2`, per the standing rule (`control.rs` 33,969 lines,
+`evt_6r403ez3m2m69` forbids pre-emptive decomposition). The two test-tree
+findings above (`emit_carrier_alloc`'s and `transfer_into_carrier`'s
+`constructors.rs` call sites, and the `control.rs:9573` source-text oracle)
+are flagged now because they bear on **production** pinning and the oracle
+inventory, not because `D2`'s own test-classification is being pre-empted
+here.
+
+### Evidence seats
+
+**Intention producer:** this `D0` (the per-type/per-method visibility and
+consumption census above). **Independent artifact observer:** the fresh SCC
+re-extraction (byte-identical to item 10's, confirmed by `md5sum`) plus the
+whole-tree greps against the current checkout at `0c5bb765a`, not against
+any cached/stale extraction. **Closeout/publication seat:**
+runtime-leader's object-store verify, then the Architect's `D0` DESIGN
+vote.
+
