@@ -761,6 +761,147 @@ after AC-2's full closure and this top-level census, per the standing
 instruction to checkpoint and hand back rather than push an
 under-verified AC-1 claim past what was actually traced.
 
+### Addendum 15 — the four Architect-required item classes, filtered to
+### the closed MOVE set (Architect ruling `evt_1zd4j4pmn1rxn`)
+
+Per the Architect's D0 ruling: the ~245 ordinary top-level RETAIN items
+need no fresh re-trace (compiler-backstopped by `E0603` plus his own
+mandatory D1 per-mover visibility review). What is required before the
+endorsing D0 vote is four bounded item classes — re-exports, cfg/
+attribute-gated items, macro-produced items, source-text oracles —
+filtered to **this item's already-closed MOVE set** (the method
+population plus its exclusive support types), because these four are
+NOT compiler-caught: a silent over-widening or drop in any of them
+compiles green.
+
+**The MOVE set this pass filters against** (restated from Addenda 1/3
+for a single reference point):
+
+- `core.rs`: `call_declared_recursive_position_unit`,
+  `call_declared_context`, `validate_retained_callable_capture_contract`,
+  `call_static_worker`, `call_static_worker_with_inputs`,
+  `call_declaration_closure_unit`, `validate_declaration_unit_call`,
+  `RECURSIVE_POSITION_UNIT_CALLS` (thread_local),
+  `recursive_position_unit_calls`.
+- `mod.rs`: `call_declared_unit`, `call_declared_declaration_unit`,
+  `call_declared_unit_target`, `decode_direct_callee`, `emit_result`,
+  `emit_process_exit_status`, `unwrap_terminal_ret`, `transfer_unit_
+  result_into_carrier`, `select_terminal_result_origins`,
+  `D5_CLOSEOUT_MUTATION`/`D5_EMITTED_DECLARATION_CALLS` (thread_local),
+  `D5CloseoutMutation`, `with_d5_closeout_mutation`, `reset_d5_emitted_
+  declaration_calls`, `d5_emitted_declaration_calls`,
+  `TrapCallerProtocolMutation`, `set_trap_caller_protocol_mutation`,
+  `StaticWorkerCallOutcome`, `StaticWorkerEmission`.
+
+#### Class 1 — re-exports: CLOSED, zero touch this item's MOVE set
+
+Filtered the frame's own 57-statement re-export census
+(`docs/program/backend-split-census-reexports.md`) against every
+MOVE-set name above: **zero of the 57 statements name any MOVE-set
+symbol**, in any profile (default, named-feature, or test-only).
+Cross-checked live against the current tree (the census is a pinned-SHA
+snapshot, not an authority) with a direct grep for every `use` statement
+in the crate mentioning any MOVE-set name: also zero. **Disposition for
+every MOVE-set item: none are re-exported; D1 introduces no re-export
+disposition question for this class.**
+
+#### Class 2 — cfg/attribute-gated items: THREE real surfaces found, all
+#### named
+
+This is the substantive finding this pass exists for — a real, non-
+obvious over-widening hazard inside the already-closed MOVE set:
+
+1. **`RECURSIVE_POSITION_UNIT_CALLS` + `recursive_position_unit_calls`
+   (core.rs) are themselves `#[cfg(test)]`-gated**, sharing a `#[cfg(test)]
+   thread_local! { }` block with the RETAINED `C2_UNIT_EMISSION_EPOCH`/
+   `SUPPRESS_REQUIRED_CONSUMER_ROUTE`/`REQUIRED_CONSUMER_ROUTE_
+   SUPPRESSIONS` (core.rs:29-35). Already flagged as needing the LRC/CCR-
+   style block split at `D1` (Addendum 1); now confirmed the split must
+   also carry the `#[cfg(test)]` gate onto BOTH halves correctly, or
+   either half silently compiles unconditionally.
+2. **`TrapCallerProtocolMutation` + `set_trap_caller_protocol_mutation`,
+   and the `D5_CLOSEOUT_MUTATION`/`D5_EMITTED_DECLARATION_CALLS`/
+   `D5CloseoutMutation`/`with_d5_closeout_mutation`/`reset_d5_emitted_
+   declaration_calls`/`d5_emitted_declaration_calls` family, all sit
+   inside ONE shared `#[cfg(test)] thread_local! { }` block (mod.rs:1967-
+   1997)** alongside the RETAINED `STATIC_WORKER_MUTATION`/
+   `TRAP_FRAME_BINDING_MUTATION`/`TRAP_IDENTITY_MUTATION` — the same
+   split-required shape as (1), one level up: a `#[cfg(test)]`-gated
+   block containing both MOVE and RETAIN statics that D1 must split into
+   two blocks, both correctly re-gated.
+3. **`StaticWorkerCallOutcome` (mod.rs:3780) is a production enum with a
+   `#[cfg(test)]`-gated variant**, `DeferredPostField(LoweringOperand)`,
+   and both its `impl` methods (`into_operand`, `into_emitted`) match on
+   that variant behind `#[cfg(test)]` match arms. Moving the enum without
+   carrying the variant and both match arms intact silently narrows the
+   type under the test profile only — invisible to a `-p` library-only
+   build, exactly the risk class named.
+
+**Beyond the type/const declarations themselves**, several MOVE-set
+*functions'* own bodies contain `#[cfg(test)]`/`#[cfg(not(test))]`
+surfaces that must travel with them: `call_declared_unit` and
+`call_declared_unit_target` (mod.rs) both take a `#[cfg(test)] launch_
+ingress: Option<cranelift_codegen::ir::Value>` **parameter** — their
+signatures genuinely differ between profiles; `call_declared_unit_
+target`'s body has a paired `#[cfg(test)]`/`#[cfg(not(test))]` branch at
+the `AbiSlotKind::Trap` arm reading `TRAP_CALLER_PROTOCOL_MUTATION`
+(production writes a constant zero under `cfg(not(test))`, the test arm
+can write a stale-trap sentinel instead) plus a further `#[cfg(test)]`
+block at the `Result` arm; `emit_result` has two `#[cfg(test)]` blocks;
+`call_declared_recursive_position_unit` (core.rs) has five, including a
+`#[cfg(test)]`-gated argument-position swap in a called-function's
+argument list; `call_static_worker_with_inputs` has one, a `#[cfg(test)]`
+call to `lrc_d2b_record_worker_call` (a RETAINED cross-domain
+instrumentation hook called from inside a MOVE-set function). None of
+these are new domain findings — the mutation-control types they touch
+were already classified — but every one is a concrete site where D1's
+move must carry the cfg gate exactly, named here so the mover can check
+against this list rather than discover a silent narrowing after the
+fact. No `#[repr(...)]` or non-standard `#[derive(...)]` found anywhere
+in the MOVE set (only ordinary `Clone`/`Copy`/`Debug`/`Eq`/`PartialEq`).
+
+#### Class 3 — macro-produced owned items: CLOSED, zero found
+
+No `macro_rules!` is defined in either bound file. No MOVE-set symbol
+name appears adjacent to any macro invocation other than the already-
+accounted `thread_local!` blocks covered in Class 2 (direct grep for
+every MOVE-set name followed by `!(`/`![`/`!{`, excluding `thread_local!`
+itself: zero hits). Every derive on a MOVE-set type is an ordinary std
+derive, not a custom derive macro that could expand to additional owned
+items. **Nothing in this item's MOVE set is macro-produced.**
+
+#### Class 4 — source-text oracles: ONE load-bearing, self-defending
+#### surface named; zero symbol-name string matches
+
+Direct grep for every MOVE-set symbol name appearing as a quoted string
+literal anywhere in `core.rs`, `mod.rs`, `core/tests/control.rs`, or
+`core/tests/mod.rs`: **zero hits** — no census/oracle test is keyed on
+any MOVE-set symbol's exact name as text.
+
+The one real oracle surface this item's `D1` must touch is
+**`BACKEND_PRODUCTION_SOURCES`** (`control.rs:8052`), the fixed roster
+of `(path, include_str!(path))` pairs that `the_backend_production_
+surface_inventory_is_closed` and its sibling census tests iterate over.
+It already lists `("lowering/core.rs", ...)` and `("lowering/mod.rs",
+...)`; a new module `D1` creates for the MOVE set must be added to this
+same list, following the exact precedent already documented in-line for
+`boundary.rs`/`source.rs`/`units.rs`/`seed_material.rs` (each added at
+its own item's `D1`, with a comment naming the item). **This is not a
+silent hazard**: the roster carries its own companion check (`control.rs`
+~8298-8309) asserting `declared.len() + 1 == BACKEND_PRODUCTION_SOURCES.
+len()` against the file's own `mod` declarations — an omission is loudly
+caught by that assertion, not silently absorbed, provided the check
+itself isn't weakened at `D1`. Named here so the mover adds the entry as
+routine, not as a discovery.
+
+**Summary for the endorsing vote**: Class 1 and Class 3 are fully
+closed with zero findings. Class 2 has three real cfg-gated surfaces
+plus a half-dozen function-body cfg sites, all named above — none are
+new domain/MOVE-vs-RETAIN findings, all are "carry this gate exactly at
+D1" items. Class 4 has one named, self-defending roster entry to add.
+None of the four surfaces a reason to revise the MOVE/RETAIN boundary
+already closed in Addenda 1-14.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
