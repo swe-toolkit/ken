@@ -454,6 +454,64 @@ context and the embedded `branched_scrutinee_unit_body_observer_tests`
 commit) — AC-2 is not closed and this addendum does not claim it is.
 Continuing the read next.
 
+### Addendum 4 — CORRECTION to Addendum 3's tentative D5-closeout MOVE
+### call: the fuller D5 test cluster is end-to-end, not single-owner
+
+Continued the exhaustive read through line ~14,000 (about 46%). Read the
+two Addendum-3 marker hits (`d5_c4_a_duplicated_checked_occurrence_is_
+refused_after_its_lawful_first`, `d5_the_checked_call_closeout_rejects_
+omission_duplication_and_a_substituted_callee`) in their full surrounding
+context — a cluster of 7 more D5/checked-recursive-invocation tests
+(control.rs:13020-14000: `d5_c2_the_witness_reaches_the_seam_and_emits_
+the_exact_planner_target`, `d5_c2_mutual_same_scc_calls_reconcile_and_
+emit`, `d5_c4_checked_plan_mutations_each_reach_their_own_authority`,
+`d5_the_recursion_group_axis_is_inert_on_a_self_call_and_causal_on_the_
+mutual_pair`, `d5_the_closeout_planned_set_comes_from_the_plan_not_from_
+the_emissions`, plus two escape/D6 tests) all draw on the same shared
+`d5_compile`/`d5_mutual_compile` helpers and the same `D5_DECLARATION`/
+`D5_FRAME_CARRIER` fixtures, already correctly homed at the LCA hub in
+`core/tests/mod.rs`.
+
+**Traced `enter_checked_recursive_invocation` (mod.rs:15397) to settle
+which authority these tests are really about.** It validates a
+`CheckedRecursiveInvocation` marker against the plan (marker wraps
+exactly one matching `Call`, template not already consumed, affine
+push/pop via `active_recursive_invocations`) — the identical shape as
+its neighbors `enter_checked_subcontinuation_frame`/`enter_checked_
+computational_ih_invocation`, both already RETAIN in Addendum 1's
+checked-invocation cluster. **RETAIN, same cluster, item 12's landed
+domain** — not item 13's.
+
+`d5_c4_checked_plan_mutations_each_reach_their_own_authority` names its
+own "owning plane" per row explicitly as one of four *different*
+authorities: `"D5"`, `"enter_checked_recursive_invocation"`,
+`"OrientedSubcontinuationPlanV1::validate"` (planner-side, not in the
+bound files at all), and `"planning::validate_oriented_subcontinuation_
+transport"`. **This whole cluster's own stated subject is that a checked
+call is validated correctly across every one of those authorities
+together** — same-SCC membership, transport reconciliation, and (only as
+its LAST link) the closeout ledger. That is an end-to-end control over a
+multi-owner pipeline, not a single-owner domain test for this item, by
+the same reasoning that put `typed_trap_exit_*` (Addendum 3) in the
+shared/end-to-end class rather than MOVE.
+
+**Correction:** the two Addendum-3 tests are demoted from "MOVE
+candidate, pending fuller context" to **RETAIN, shared/end-to-end**,
+joining the rest of the D5 cluster — same normalized position, arrived
+at only once the surrounding rows were read rather than the two tests in
+isolation. This is exactly why AC-2 requires reading in place rather than
+snippet-by-snippet: the two hits looked like single-owner declared-call
+tests from the marker scan alone and only settled once their neighbors
+were read. `D5CloseoutMutation`/`d5_emitted_declaration_calls` themselves
+stay MOVE (Addendum 1's own trace — their production home is
+exclusively inside `call_declared_unit_target`); what moves is the
+production mechanism, not the end-to-end tests that exercise it through
+several other owners at once. Those tests' imports will need updating at
+D2 to reach the moved names cross-module, same pattern noted for
+`typed_trap_exit_*`.
+
+**Read through line ~14,000 of 30,289 (about 46%).** Continuing next.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
