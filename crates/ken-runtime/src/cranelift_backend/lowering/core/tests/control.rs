@@ -7602,6 +7602,19 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-LOWERING-VALUES-BOUNDARY-SPLIT` `D1` — the values-boundary
+        // disposition/classification/lifecycle-phase vocabulary. A pure
+        // classification module: no `FunctionBuilder`, no declared or
+        // defined function or data object.
+        Census {
+            file: "lowering/boundary.rs",
+            source: include_str!("../../boundary.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         Census {
             file: "planning.rs",
             source: include_str!("../../../planning.rs"),
@@ -8253,6 +8266,11 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
         include_str!("../primitive.rs"),
     ),
     ("lowering/mod.rs", include_str!("../../mod.rs")),
+    // `RT-LOWERING-VALUES-BOUNDARY-SPLIT` `D1` — registered the moment the
+    // module exists, for the same reason as every sibling below: a production
+    // source absent from this roster is invisible to every pin that iterates
+    // it.
+    ("lowering/boundary.rs", include_str!("../../boundary.rs")),
     // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. Registered
     // here the moment the module exists, because every pin that iterates this
     // roster is closed only over the files it lists: a production emitter absent
@@ -8413,6 +8431,12 @@ fn the_backend_production_surface_inventory_is_closed() {
             // program. Folding them into one file would put two growth axes
             // behind one census row.
             ("lowering/mod.rs", "seed_material"),
+            // `RT-LOWERING-VALUES-BOUNDARY-SPLIT` `D1` — the values-boundary
+            // disposition/classification/lifecycle-phase vocabulary. A sibling
+            // of `core`/`units`/`seed_material`: `Lowered`/`LoweringOperand`
+            // and the carrier-emission machinery that consumes this
+            // vocabulary stay SCC-pinned in `mod.rs`/`core.rs`.
+            ("lowering/mod.rs", "boundary"),
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
             // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — aggregate allocation
@@ -9568,13 +9592,16 @@ fn the_owner_classification_has_a_closed_production_naming_inventory() {
 
 #[test]
 fn b2v_ac3_the_lowered_boundary_disposition_has_no_wildcard_arm() {
-    let source = include_str!("../../mod.rs");
+    // `RT-LOWERING-VALUES-BOUNDARY-SPLIT` `D1`: `LoweredVariant` and its
+    // `boundary_disposition` moved from `mod.rs` into the sibling `boundary`
+    // module -- the oracle follows the move, unchanged otherwise.
+    let source = include_str!("../../boundary.rs");
     let region = source
         .split_once("fn boundary_disposition(self) -> BoundaryDisposition {")
         .map(|(_, after)| after)
         .and_then(|after| {
             after
-                .split_once("#[derive(Clone, Copy)]\nstruct StructuralNatV1")
+                .split_once("}\n}\n\nimpl crate::boundary_value::BoundaryEmissionPlan")
                 .map(|(body, _)| body)
         })
         .expect("AC-3: the disposition region was not found, so every check below is vacuous");
