@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-20 21:15:15Z — from 389 issue file(s) in `docs/program/issues/`.
+2026-08-20 21:54:14Z — from 389 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -131,7 +131,7 @@ the committed file matches the generator's output.
 | `LANG-COMMENT-POPULATION-PARITY` | The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home | merged | language | S | none | — |
 | `LANG-CONVOY-ENCLOSING-FIELD` | spec 34 §3.2's Boundary paragraph names the two-vector `zip` recursive step a known gap and a follow-on -- the sibling-convoy re-typing cannot distinguish a genuine outer parameter from a field the enclosing match already bound, because `outer_scope_depth` is a raw context-depth subtraction that includes both -- and the follow-on was never filed | merged | language | S | none | — |
 | `LANG-CONVOY-MATCH-FIELD-PROVENANCE` | capability 2's sibling-convoy candidate range is a positional proxy for a provenance property -- carry the match-field regions explicitly on the elaboration context and skip them, closing spec 34 section 3.2's Boundary gap without the incompleteness a positional floor would introduce | merged | language | S | none | — |
-| `LANG-CTOR-PREMISE-ELABORATION-DIVERGES` | A data constructor whose premise applies a recursive function to a telescope-bound variable diverges during elaboration -- proof-carrying inductive families are unavailable in Ken | active | kernel | L | none | — |
+| `LANG-CTOR-PREMISE-ELABORATION-DIVERGES` | A data constructor whose premise applies a recursive function to a telescope-bound variable diverges during elaboration -- proof-carrying inductive families are unavailable in Ken | merged | kernel | L | none | — |
 | `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` | `37 §2.5` defers the proof-carrying `DecEq String` / `Ord String` instances as a `tracked follow-on` because the transport needs a lawful `DecEq Char` that is not landed -- and the follow-on was never filed, so the second unowned obligation in this chapter sits in spec prose with no tracker row | draft | language | unsized | operator | — |
 | `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` | 34 §4.1 requires naming the unmatched PATTERN WITNESS, and ExhaustivenessError's payload is a single String documented as a constructor NAME -- so no change at any emission site can discharge the obligation, and it reads as satisfied today only because every landed omission test uses a zero-arity constructor where name and most-general pattern coincide | merged | language | M | none | — |
 | `LANG-FIXITY-DECL-SURFACE` | `infixl N op` / `infixr N op` / `infix N op` populate a fixity table the parser consults -- the third and last part of user-defined operators, and the only one carrying a real design call: declaration-before-use versus whole-module collection, and scoping across imports | draft | language | M | none | — |
