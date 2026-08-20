@@ -1,15 +1,30 @@
 ---
 id: RT-BACKEND-SPLIT-CLOSURE
 title: "Close the backend module split -- delete the transitional adapters, narrow the facades, run the test-root closure over control.rs, and prove all four bound files are under 10k"
-status: draft
+status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-EMITTER-TERMINALS-CLEANUP-SPLIT]
+depends_on: [RT-EMITTER-EFFECTS-SPLIT]
 blocks: []
 github: null
 origin: "Architect ruling evt_54zvaqbrm752x (2026-08-10) decomposing RT-BACKEND-MODULE-SPLIT into independently mergeable slices, cut item 18; boundary and companion-test-axis ruling evt_6r403ez3m2m69 (2026-08-18). Framed by the Steward on the operator's 2026-08-18 directive making RT-BACKEND-MODULE-SPLIT the runtime lane's priority. Binding inputs are the five Stage A inventories from RT-BACKEND-SPLIT-CENSUS (merged 8ebc2467d). Steward-filed per COORDINATION section 2."
 ---
+
+> # ITEM 17 IS ABSORBED HERE. Closure's whole-backend remeasure accounts it.
+>
+> **Architect ruling `evt_2ng0vm7h85zst`, 2026-08-20.** Item 17
+> (`RT-EMITTER-TERMINALS-CLEANUP-SPLIT`) named no distinct terminals/cleanup
+> lifecycle and folds into this node — 18 → 17 slices, no work lost. Native trap
+> emission is nonexistent (no CLIF `.ins().trap` in `lowering/`); the
+> terminals/cleanup declarations are already owned by items 9/12/13/14. This
+> node's `depends_on` therefore retargets to item 16 (`RT-EMITTER-EFFECTS-SPLIT`,
+> merged), the last real owner-move predecessor. Where the strands and `AC-6`
+> below say "items 4-17", read **items 4-16 plus the item-17 RETAIN accounting**:
+> item 17 produced no slice and no `AC-5` ledger, but the ring's item-17 RETAIN
+> accounting is carried in as an input to the whole-backend remeasure, and every
+> terminals/cleanup declaration is re-verified as correctly placed inside this
+> closure's total accounting.
 
 ## Model-capability estimate (steward.md §4h): T2 — mechanical
 

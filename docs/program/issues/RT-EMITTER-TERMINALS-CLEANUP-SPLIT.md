@@ -1,7 +1,7 @@
 ---
 id: RT-EMITTER-TERMINALS-CLEANUP-SPLIT
 title: "Move the terminals and cleanup emitter family out of the lowering files -- the last owner move in the phase, after which only closure remains"
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,26 @@ blocks: [RT-BACKEND-SPLIT-CLOSURE]
 github: null
 origin: "Architect ruling evt_54zvaqbrm752x (2026-08-10) decomposing RT-BACKEND-MODULE-SPLIT into independently mergeable slices, cut item 17; boundary and companion-test-axis ruling evt_6r403ez3m2m69 (2026-08-18). Framed by the Steward on the operator's 2026-08-18 directive making RT-BACKEND-MODULE-SPLIT the runtime lane's priority. Binding inputs are the five Stage A inventories from RT-BACKEND-SPLIT-CENSUS (merged 8ebc2467d). Steward-filed per COORDINATION section 2."
 ---
+
+> # ABSORBED INTO ITEM 18 (RT-BACKEND-SPLIT-CLOSURE) — CLOSED, no candidate.
+>
+> **Architect ruling `evt_2ng0vm7h85zst`, 2026-08-20.** Recorded here because a
+> ruling that lives only in a thread strands.
+>
+> ⇒ **Item 17 names no distinct semantic lifecycle.** The D0 census returned the
+> verdict the phase record's line-85 warning pre-authorized ("filing all sixteen
+> now would create work ahead of the evidence that sizes it"). Native trap
+> emission is nonexistent (no CLIF `.ins().trap` in `lowering/`); the
+> terminals/cleanup contents are already owned by items 9/12/13/14 and are
+> accounted in item 18's closure remeasure. This is **not** a zero-MOVE empty
+> slice and its `AC-4b` is not "INAPPLICABLE" — no owner means no slice, not an
+> empty slice-of-record. Do not write a zero-MOVE D0 for this node.
+>
+> The item-17 D0 RETAIN accounting the runtime ring produced is **not wasted** —
+> it is the terminals/cleanup input to item 18's whole-backend remeasure; the
+> ring carries it into closure. The branch `wp/RT-EMITTER-TERMINALS-CLEANUP-SPLIT`
+> @`5bc587e26` has no candidate and stands down. The prose below is the original
+> (superseded) frame, retained for the record.
 
 ## Model-capability estimate (steward.md §4h): T2 — mechanical
 
