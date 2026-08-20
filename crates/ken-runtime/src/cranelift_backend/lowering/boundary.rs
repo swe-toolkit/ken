@@ -1393,6 +1393,11 @@ impl crate::boundary_value::BoundaryEmissionPlan {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // `RT-BACKEND-SPLIT-CLOSURE` (item 18) -- needed by the relocated
+    // `refusal_pins_rehomed_computational_match_without_selector_exclusion`
+    // below; not otherwise ambient in this module.
+    use crate::cranelift_backend::lowering::core::tests::inert_test_static_origin;
+    use crate::UnsupportedLowering;
 
     // ─── RT-FNSPLIT-B2V AC-3 — the Lowered disposition is exhaustive, no wildcard ─
     //
@@ -2813,5 +2818,72 @@ mod tests {
             "RECUT 2: every owner yields the same identity, so the agreement above \
              is vacuous"
         );
+    }
+
+    // `RT-BACKEND-SPLIT-CLOSURE` (item 18) -- relocated verbatim from
+    // `control.rs` (its own discriminated property, constructing a
+    // `Lowered::ComputationalRecursorClosure` directly and asserting
+    // `boundary_transfer_admissibility`'s exact refusal, belongs to this
+    // module's own domain, matching the sibling tests immediately above).
+    /// `RT-REFUSAL-PINS-REHOMED` D1-D3: the in-flight computational capsule is
+    /// refused by its value-transfer policy without selecting either body-emission
+    /// lane.
+    ///
+    /// MEASURED: the real `boundary_transfer_admissibility` method returns the
+    /// `ComputationalMatch` refusal and its exact in-flight-activation reason.
+    /// CLAIMED: a computational recursor capsule is control state, not a
+    /// transferable value, regardless of which body-emission lane is present.
+    /// THE GAP: this pins the construct-level refusal, not the four fixture-only
+    /// programs that previously reached it through selector exclusion.
+    ///
+    /// Promise class: durable invariant. Removing the retiring lane leaves this
+    /// value-transfer rule unchanged.
+    #[test]
+    fn refusal_pins_rehomed_computational_match_without_selector_exclusion() {
+        let origin = RecursorProducerOriginId(41);
+        let capsule = Lowered::ComputationalRecursorClosure {
+            residual: Box::new(LoweringOperand::Specialized(Lowered::Trap(RuntimeTrap {
+                code: RuntimeTrapCode::ExplicitTrap,
+                message: "refusal pin inert residual".to_string(),
+            }))),
+            activation: ContinuationActivationId(43),
+            invocation: RecursorInvocationSegment::new(
+                origin,
+                0,
+                ComputationalRecursorLayer {
+                    cases: Vec::new(),
+                    default: RuntimeTrap {
+                        code: RuntimeTrapCode::ExplicitTrap,
+                        message: "refusal pin inert layer".to_string(),
+                    },
+                    outer_env: Vec::new(),
+                    static_origin: inert_test_static_origin(),
+                    provenance: RecursorFrameProvenance(44),
+                    role: RecursorLayerRole::SelectsOccurrence { origin },
+                    checked_frame_id: None,
+                    checked_invocation_id: None,
+                    checked_invocation_source: None,
+                    checked_invocation_depth: 0,
+                    semantic_pending: true,
+                },
+                RecursorUnwindStack {
+                    later_wrappers_in_construction_order: Vec::new(),
+                },
+                ContinuationCursorId(42),
+                None,
+                None,
+            ),
+        };
+
+        let refused = capsule
+            .boundary_transfer_admissibility()
+            .expect_err("an in-flight computational capsule must not be transferable");
+        assert!(matches!(
+            refused,
+            CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "ComputationalMatch",
+                reason,
+            }) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
+        ));
     }
 }
