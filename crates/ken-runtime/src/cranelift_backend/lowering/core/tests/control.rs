@@ -7653,10 +7653,16 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
         // ⛔ **`abi.rs` was not the only absence.** The frame flagged it by
         // name, it was added, and that read as the clause being discharged.
         // Re-derived here against the roster rather than against the frame's
-        // sentence: `BACKEND_PRODUCTION_SOURCES` lists **fifteen** files (the
-        // frame says thirteen — it has grown since), the census carried eight,
-        // and **seven** were still absent with no recorded exclusion. All seven
-        // measure `0/0/0/0/0`, which is why they are rows and not judgements.
+        // sentence: the frame said thirteen files, `BACKEND_PRODUCTION_
+        // SOURCES` had already grown past that by the time this was written,
+        // and it keeps growing with every later split (`D2`, `RT-EMITTER-
+        // EFFECTS-SPLIT`: dropped the literal count here rather than
+        // re-bumping it a second time — the enforced invariant is the
+        // `.len()`-based assertion below, not this sentence, and a literal
+        // count here only drifts stale again at the next split). The census
+        // carried eight of the roster at the time, and **seven** were still
+        // absent with no recorded exclusion. All seven measure `0/0/0/0/0`,
+        // which is why they are rows and not judgements.
         //
         // ⭐ **A zero row and an absent row read identically and only one of
         // them is a claim** — `AC-2`'s own words, and the reason a file that
@@ -10007,8 +10013,12 @@ pub(super) fn ac11_compiles(expr: &RuntimeExpr) -> Result<(), CraneliftBackendEr
 ///
 /// The fixture contains real host effects, so a value-mode probe would reject
 /// it before reaching the emission mechanism this control measures.
+// `RT-EMITTER-EFFECTS-SPLIT` `D2` -- `effects::tests` reaches this fixture
+// by path (`core::tests::control::recursive_port_process_compiles`) for its
+// own two relocated seat-lifecycle tests; the 38 other call sites below
+// stay local and unaffected.
 #[cfg(test)]
-fn recursive_port_process_compiles(
+pub(in crate::cranelift_backend::lowering::core::tests) fn recursive_port_process_compiles(
     expr: &RuntimeExpr,
 ) -> Result<(), CraneliftBackendError> {
     let module = new_jit_module().expect("jit module");
@@ -16697,178 +16707,6 @@ fn erasing_a_seat_key_axis_or_collapsing_the_contract_rejects() {
     // ⛔ Restored, and re-measured rather than assumed: a mutation left set
     // would make every later test in this binary run against a mutated plan.
     set_effect_seat_plan_mutation(EffectSeatPlanMutation::Exact);
-    recursive_port_process_compiles(&expr)
-        .expect("the bracket compiles again once the mutation clears");
-}
-
-/// **`RT-DECL-CLOSURE-PORT` `D7` — a visit that reads an effect occurrence
-/// incompletely is rejected as that visit, and two visits cannot cover for each
-/// other.**
-///
-/// ⭐⭐ **`OmitComplementary` is the masking discriminator, and it is the row
-/// this control exists for.** It drops a DIFFERENT slot on each successive
-/// visit, so across two visits the union of what was read is the complete
-/// planned population while neither visit read it. A ledger that accumulated
-/// claims per `(body, occurrence)` — which is exactly what `6a09ed68` did —
-/// sees that complete union and accepts. Completeness asked per visit cannot:
-/// the first incomplete visit refuses at its own close, so the union is never
-/// formed.
-///
-/// The other four rows close the lifecycle around it: a duplicate inside one
-/// visit, a group dropped instead of closed, and an observed phase reported as
-/// the opposite of what the operand actually is.
-///
-/// MEASURED: the unmutated fixture compiles; each of the four perturbations
-/// refuses it; it compiles again once the mutation clears.
-///
-/// CLAIMED: the group is the unit of completeness, its close is mandatory, and
-/// the retained observed phase is checked against the seat's own `Avail`.
-///
-/// THE GAP: the phase row proves the observation is checked at the seat. It does
-/// not prove the arm that later READS the operand is the one the claim was bound
-/// to — the arms still read the bulk vector, and that binding lands with the
-/// dispatch release.
-#[test]
-fn an_incomplete_duplicate_discarded_or_misobserved_visit_rejects() {
-    use crate::cranelift_backend::lowering::effects::{
-        set_effect_seat_visit_mutation, EffectSeatVisitMutation,
-    };
-    use crate::cranelift_backend::planning::governed_nested_resource_bracket;
-    let expr = governed_nested_resource_bracket(3);
-    set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
-    recursive_port_process_compiles(&expr)
-        .expect("the unmutated bracket compiles, so the rows below are not vacuous");
-    for mutation in [
-        EffectSeatVisitMutation::OmitComplementary,
-        EffectSeatVisitMutation::DuplicateWithinVisit,
-        EffectSeatVisitMutation::DiscardGroup,
-        EffectSeatVisitMutation::PerturbObservedPhase,
-    ] {
-        set_effect_seat_visit_mutation(mutation);
-        let refusal = recursive_port_process_compiles(&expr);
-        set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
-        let error = match refusal {
-            Ok(()) => panic!("{mutation:?} left the seat lifecycle satisfied"),
-            Err(error) => error.to_string(),
-        };
-        // The refusal must name a seat or a visit, and must never be the generic
-        // specialized-only surface's.
-        assert!(
-            error.contains("seat"),
-            "{mutation:?} was refused without naming a seat: {error}"
-        );
-        assert!(
-            !error.contains("is a specialized-only surface"),
-            "{mutation:?} fell through to the generic specialized-only refusal: {error}"
-        );
-    }
-    set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
-    recursive_port_process_compiles(&expr)
-        .expect("the bracket compiles again once the mutation clears");
-}
-
-/// **`RT-DECL-CLOSURE-PORT` `D7` — a discarded visit is refused BEFORE its body
-/// is defined, and the whole-pass backstop still fires on its own.**
-///
-/// ⭐ **The artifact is refused either way; what this control is about is
-/// WHEN.** The whole-pass close states the same law, but it runs after every
-/// `define_function` — so a body that discarded a visit's claims is already in
-/// the module when the contradiction is noticed. The body close asks the
-/// question at the one boundary all four emitters traverse after finalization
-/// and before definition.
-///
-/// ⛔ "Refused" alone would not show that. `defined == 0` is the load-bearing
-/// half: a control asserting only the refusal passes identically whether the
-/// gate sits before or after definition.
-///
-/// MEASURED: with a visit discarded the compile is refused by the body close and
-/// **zero** bodies are defined; dropping a committed group after every body
-/// close still rejects at the whole-pass close; and an unmutated compile passes
-/// the body gate with bodies defined and groups closed.
-///
-/// CLAIMED: the body close is a real pre-definition gate, and it has not made
-/// the whole-pass backstop dead.
-///
-/// ⭐ **Counterfactual, measured rather than argued:** with the `commit_body`
-/// call removed from `commit_aggregate_events` — so the discarded visit is
-/// caught only by the whole-pass backstop — this fixture defines **4** bodies
-/// before the refusal, against **0** with the gate in place. That number is what
-/// makes `defined == 0` a discrimination rather than a restatement of the
-/// refusal.
-///
-/// THE GAP: `defined == 0` is measured on this fixture, whose first emitted body
-/// contains an effect. It does not show a body with no effect in it could never
-/// be defined ahead of a later defective one.
-#[test]
-fn a_discarded_visit_refuses_before_its_body_is_defined() {
-    use crate::cranelift_backend::lowering::units::{
-        b2f_last_unit_emission, b2f_open_compile_attempt, b2f_units_declared_in_attempt,
-    };
-    use crate::cranelift_backend::lowering::effects::{
-        set_effect_seat_visit_mutation, EffectSeatVisitMutation,
-    };
-    use crate::cranelift_backend::planning::governed_nested_resource_bracket;
-    let expr = governed_nested_resource_bracket(3);
-
-    // A complete closed group passes the body gate, and bodies really are
-    // defined on this route -- so the zero below is a change, not a constant.
-    set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
-    let epoch = b2f_open_compile_attempt();
-    recursive_port_process_compiles(&expr).expect("the unmutated bracket compiles");
-    assert!(
-        b2f_units_declared_in_attempt(epoch).is_some(),
-        "the unmutated compile never reached the emission seam"
-    );
-    let (_, defined) = b2f_last_unit_emission();
-    assert!(
-        defined > 0,
-        "no body is defined on this route even unmutated, so `defined == 0` below would be \
-         vacuous"
-    );
-
-    // A discarded visit refuses AT THE BODY CLOSE, with nothing defined.
-    set_effect_seat_visit_mutation(EffectSeatVisitMutation::DiscardGroup);
-    let epoch = b2f_open_compile_attempt();
-    let refusal = recursive_port_process_compiles(&expr);
-    set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
-    let error = match refusal {
-        Ok(()) => panic!("a discarded visit was accepted"),
-        Err(error) => error.to_string(),
-    };
-    assert!(
-        error.contains("before the body was defined") || error.contains("as function"),
-        "the refusal is not the body close's: {error}"
-    );
-    assert!(
-        b2f_units_declared_in_attempt(epoch).is_some(),
-        "the discarded-visit compile never reached the emission seam, so `defined` below is a \
-         stale reading rather than this compile's"
-    );
-    assert_eq!(
-        b2f_last_unit_emission().1,
-        0,
-        "a body was defined despite the discarded visit, so the gate is not pre-definition"
-    );
-
-    // The whole-pass backstop still rejects independently.
-    set_effect_seat_visit_mutation(
-        EffectSeatVisitMutation::DropCommittedGroupBeforeGlobalClose,
-    );
-    let refusal = recursive_port_process_compiles(&expr);
-    set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
-    let error = match refusal {
-        Ok(()) => panic!(
-            "dropping a committed group after every body close was accepted, so the whole-pass \
-             backstop is dead"
-        ),
-        Err(error) => error.to_string(),
-    };
-    assert!(
-        error.contains("opened but") && error.contains("committed"),
-        "the refusal is not the whole-pass opened-equals-committed one: {error}"
-    );
-
-    set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
     recursive_port_process_compiles(&expr)
         .expect("the bracket compiles again once the mutation clears");
 }

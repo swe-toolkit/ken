@@ -794,6 +794,115 @@ makes the pair semantically atomic — and say which it was.
 > latent false-positive into a closed one. If it does not, note that it stayed
 > bare and this does not apply.
 
+## `D2` executed — off `fe498769a` (`D1` merged), item 16 closes on this
+## deliverable
+
+**The "import-path fixups only" hypothesis is REFUTED for `effects.rs`
+itself, CONFIRMED for the other 39 -- state both halves plainly, don't
+average them into "mostly right."** `core/tests/effects.rs` needed zero
+physical relocation for its own pre-existing 39 tests (the hypothesis
+holds there, exactly as D0 predicted from the RT-SPLIT provenance).
+But `control.rs` held two tests whose primary discriminated property
+is this item's own domain, and those genuinely moved -- the "no
+physical relocation" reading would have been wrong if applied to the
+whole D2, only right for the file D0 flagged.
+
+**Exhaustive individual read, not marker-sampled -- every one of the
+39 pre-existing `effects.rs` tests read in full, function by function,
+not just the ~8/39 D0's mechanical pass flagged as directly naming a
+MOVE-set symbol.** Every single one discriminates a property squarely
+inside the file's own declared scope (Bounded-Nat, host-reply, IO,
+borrowed-ingress, native-int lowering) -- zero outliers, zero
+misplaced tests found. The `px8n_bounded_nat_*`/`budget_eff_native_*`
+family tests `BoundedNatV1` (independently confirmed RETAIN at D0) but
+legitimately belongs here anyway: its fixture enters exclusively
+through the Effects-owned `mint_validated_progress_nat`, matching the
+file's own header ("assigns these subjects to `effects`" -- a
+fixture-entry-point grouping, not a strict production-module mirror,
+as flagged as a hypothesis at D0 and now confirmed by reading every
+test rather than assumed from the file's existence).
+
+**`control.rs`'s own three D0-flagged tests, re-verified independently
+at this pickup (not inherited from item 8's stale read or this item's
+own stale D0 read):**
+- `erasing_a_seat_key_axis_or_collapsing_the_contract_rejects` --
+  confirmed STAYS. Its own `use` names `planning::EffectSeatPlanMutation`,
+  the planner's type (item 8's), never `EffectSeatVisitMutation`. Item
+  8's own domain test, not touched.
+- `an_incomplete_duplicate_discarded_or_misobserved_visit_rejects` and
+  `a_discarded_visit_refuses_before_its_body_is_defined` -- confirmed
+  MOVE. Both name `lowering::effects::{set_effect_seat_visit_mutation,
+  EffectSeatVisitMutation}` directly (the second also reaches
+  `lowering::units::{...}` for its own cross-domain body-definition-
+  timing assertion -- a genuinely two-domain test, kept whole rather
+  than split, matching how several of `effects.rs`'s own pre-existing
+  tests already cross into `units.rs`). Relocated verbatim into
+  `core/tests/effects.rs` (byte-identical bodies, mechanically
+  confirmed against the pre-move extraction -- only the `use` block
+  differs, and only because it must).
+
+**Shared-fixture handling, the one non-trivial transport decision:**
+`governed_nested_resource_bracket` (planning-domain, already `pub(in
+crate::cranelift_backend)`) needed only an ordinary `use`, unaffected
+by the move. `recursive_port_process_compiles` -- declared in
+`control.rs`, 38 remaining call sites there after removing the 2 that
+moved -- stays put and widens from private to `pub(in
+crate::cranelift_backend::lowering::core::tests)`, the minimal
+qualifier reaching a sibling test module (`effects`) under the same
+`core::tests` parent; the two relocated tests reach it by the
+qualified path `crate::…::lowering::core::tests::control::
+recursive_port_process_compiles`. `set_effect_seat_visit_mutation`/
+`EffectSeatVisitMutation` needed **no** import in their new home --
+already ambient via `effects.rs`'s own ordinary `use super::*` chain
+through `core/tests/mod.rs`'s existing re-export (the same one `D1`
+already wired for this file's other tests).
+
+**The qualified-`mod tests` roster-strip risk (frame's own carried
+note, Adversary `evt_kpq5yn3w7n5d`) does NOT apply here -- checked, not
+assumed.** That risk is specifically about a PRODUCTION file minting
+its own inline `#[cfg(test)] mod tests { ... }` with a visibility
+prefix (item 15's `aggregates.rs` shape). This item's production file
+(`lowering/effects.rs`) has **no inline test module at all** -- zero
+`FunctionBuilder`/`declare_function`/`define_function` calls, confirmed
+at `D1` and unchanged here -- and its domain's tests live in the
+wholly separate, pre-existing `core/tests/effects.rs` file. No
+qualified `mod tests` header was written by this deliverable; the
+roster-strip idiom is untouched and the generalization the frame notes
+is not owed.
+
+**Gates:**
+- **AC-2** — discovery parity confirmed by exact `cargo test -- --list`
+  name: both relocated tests now discover as `cranelift_backend::
+  lowering::core::tests::effects::{name}` (previously `…::control::
+  {name}`), each exactly once. Total discovered lib test count
+  unchanged (930, matching this item's own D1 baseline) -- nothing
+  lost, nothing duplicated. Bodies byte-identical to the pre-move
+  extraction outside the `use` block (mechanically diffed, not
+  eyeballed). The two tests are themselves mutation-restoration
+  controls (`EffectSeatVisitMutation` enum-driven) and re-ran green
+  unchanged after relocation -- the oracle re-point (the widened
+  `recursive_port_process_compiles` reach) is exercised by every one of
+  their own assertions, not a separate proof.
+- **AC-3** — transport is fully named above: one visibility widening
+  (`recursive_port_process_compiles`), zero adapters, zero facades.
+- **AC-4/4b** — `scripts/ken-cargo build -p ken-runtime --lib` and
+  `test -p ken-runtime` both green: **926/0/4** (lib) + 26/0
+  (`value_depth_totality`) + 14/0 (doc-tests), re-run after the move.
+  `core/tests/effects.rs`: 4083 lines. `core/tests/control.rs`: 30155
+  lines (down from D1's unchanged baseline by exactly the two moved
+  tests' span). Both well under any created/enlarged-file ceiling
+  concern (`control.rs` shrank; `effects.rs`'s test file was already
+  large before this item and gained ~180 lines, not newly created).
+- **AC-5** — no adapters; nothing to ledger.
+- **AC-6** — **this closes item 16.** `D0`+`D1`+`D2` together are the
+  full slice-only transfer for the effects emitter family; no further
+  deliverable is owed.
+
+Banned scope respected: no semantic change (every test's own assertions
+are byte-identical), no grouping beyond the two tests whose own
+discriminated property already named this domain, no facade, no
+line-count-driven extraction.
+
 
 # ACCEPTANCE
 
