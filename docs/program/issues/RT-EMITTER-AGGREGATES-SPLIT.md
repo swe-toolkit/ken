@@ -157,7 +157,7 @@ crate-wide caller grep -- `substitute_sibling_aggregate_producer` (7222),
 (9078), `emit_carrier_bytes_runtime_span` (9154), `emit_carrier_store_tag_id`
 (9228), `emit_carrier_store_scalar` (9245), `emit_carrier_dynamic_constructor`
 (9260), `emit_carrier_store_field` (9351), `emit_carrier_store_name`
-(9369), `emit_carrier_field_count`* (9564), `emit_carrier_record_field`
+(9369), `emit_carrier_record_field`
 (9618), `carrier_position_immediate` (9639), `GovernedAllocationSite`
 (enum, 10022), `GovernedAllocationMutation` (enum, `#[cfg(test)]`, 10050)
 + its thread_local + `SiblingProducerSubstitution` (struct) +
@@ -172,17 +172,6 @@ thread_locals (`GOVERNED_ALLOCATION_HITS`, `CARRIER_RAW_ALLOCATIONS`,
 (struct, 10585). Also `call_input_transfer_origin_under_mutation` (7192)
 -- the `GovernedAllocationMutation::CallInputTransferOrigin` hook.
 
-*`emit_carrier_field_count` was initially miscounted as hub-stays on a
-first pass (its neighbours `emit_carrier_tag`/`emit_carrier_class`/
-`emit_carrier_field` genuinely are, see below) -- re-checked individually
-by caller grep, not by proximity: its 4 callers are `joins.rs`(x2),
-`source.rs`, `core.rs`, all reading a scrutinee's field COUNT during
-match dispatch, not construction. **CORRECTION pending**: re-verify this
-one against the RETAIN list below before D0 closes -- flagged here rather
-than silently resolved, since it sits exactly on the boundary between the
-"write" (construction, mine) and "read" (match-decode, hub-stays)
-families that the rest of this cluster split cleanly on.
-
 **RETAIN, hub-stays (multi-domain callers confirmed, not this item's):**
 `transfer_into_carrier` (calls.rs/joins.rs/core.rs/source.rs via
 `carry_call_input`), `carrier_refs` (also called from `observe_carried_
@@ -196,10 +185,14 @@ bytes_span`, Effects-domain, mod.rs:16026), `carrier_arena` (also
 (pub(super), sole external caller `units.rs`, native-Int
 export/object-launcher domain, not aggregate), `emit_carrier_immediate`
 (joins.rs, calls.rs, core.rs), `emit_carrier_tag`/`emit_carrier_class`/
-`emit_carrier_host_success`/`emit_carrier_host_payload`/`emit_carrier_field`
-(all called from `joins.rs`/`source.rs`/`core.rs`/`core/primitive.rs` --
-the general match-dispatch carrier-DECODE API, the read-side mirror of
-the construction/write-side family above), `carry_call_input` (called
+`emit_carrier_host_success`/`emit_carrier_host_payload`/`emit_carrier_field_
+count`/`emit_carrier_field` (all called from `joins.rs`/`source.rs`/
+`core.rs`/`core/primitive.rs` -- the general match-dispatch carrier-DECODE
+API, the read-side mirror of the construction/write-side family above;
+`emit_carrier_field_count` sits in the same "write"-shaped naming pattern
+as its construction-side siblings but its own body and all 4 external
+callers confirm it is decode-side like `emit_carrier_field`, not
+construction), `carry_call_input` (called
 from `source.rs`/`core.rs`; its own aggregate-specific helper
 `unit_boundary_environment_record` (7037, MOVE, sole caller
 `carry_call_input`) is the one hub-stays-caller-into-a-mover case in this
@@ -291,32 +284,116 @@ the keyword.
 ### Blind spots / NOT YET CLOSED (stated, not closed -- do not read as a
 ### plan to skip them)
 
-- **`emit_carrier_field_count`'s RETAIN-vs-MOVE call is not yet final**
-  (flagged above, pending a dedicated re-check).
 - **Consts/statics, traits, cfg/attribute/derive/repr classes, macro-produced
   items, and source-text oracles** have not yet had their own dedicated
   selector passes for this item -- Addendum 1 traced functions/types by
   following the `GOVERNED_ALLOCATION_MUTATION` and `Aggregate`/`Carrier`/
   `Governed` name/body threads exhaustively, but the four Architect-required
   compiler-blind classes (item 13's standing bar) are not yet swept.
-- **AC-2's test-property ledger is not yet built.** `constructors.rs`
-  (9727 lines, 123 `#[test]` total) -- NOT `control.rs` -- is where this
-  item's tests live: a keyword scan for the confirmed MOVE-set symbol
-  names finds a contiguous cluster at `constructors.rs:6733-8709`
-  (~15 tests, `d7_*`-prefixed shared fixtures), matching this item's own
-  `D7` tag. `control.rs` shows zero hits for the `#[cfg(test)]`
-  governed-allocation-mutation types but 2 each for
-  `AggregateAllocationLedger`/`AggregateAllocationEvent`/
-  `AggregateRelationClosure` -- likely Class-4 end-to-end, not yet read.
-  Every test in the `constructors.rs` cluster still needs individual
-  reading (this item's own version of items 12/13/14's "every `#[test]`
-  read in place" discipline), not just the keyword-hit count above.
 - **Re-verify the `carrier_out_slot` judgment call** once the Architect's
   visibility-census reads this addendum.
 
 This is Addendum 1 -- a substantial first pass, not a closed `D0`.
-Continuing to the four compiler-blind classes and the `constructors.rs`
-test-property ledger next.
+
+### Addendum 2 -- the four compiler-blind classes, and AC-2's test-property
+### ledger, each read individually rather than counted by keyword
+
+**Classes 2/3 (cfg/attribute-gated items; macro-produced items), filtered
+to the closed MOVE set:** every `#[cfg(...)]` attribute inside both
+cluster's line ranges (`6467-10592`, `11242-11978`) was enumerated and
+each one attributed to a function already on the MOVE or RETAIN list
+above -- no new symbol surfaced. `macro_rules!` count: **0** in both
+ranges. Class 3 CLOSED, zero.
+
+**Class 1 (re-exports):** `cranelift_backend.rs` has zero re-exports of
+any `Aggregate`/`Carrier`/`Governed`-named symbol (checked directly, not
+inherited from Stage A's census). CLOSED, zero -- unlike item 14, this
+item's `D7` cluster has no `dasm-c2-observation`-style cross-crate facade.
+
+**Class 4 (source-text oracles):** zero `include_str!` inside either
+cluster's own line range. `control.rs`'s two `AggregateAllocationLedger`/
+`AggregateAllocationEvent`/`AggregateRelationClosure` hits (flagged as
+unread in Addendum 1) are both **prose comments** describing the item
+7/15 boundary (`control.rs:7481-7482`, `:8209-8210`), not test code --
+read directly, confirmed inert. `control.rs` therefore contributes
+**zero** real test-domain hits for this item; the entire test population
+lives in `constructors.rs`. CLOSED.
+
+**AC-1 residual: consts/statics/traits.** A dedicated selector for
+`^\s*(pub(...)? )?const |^\s*static |^\s*(pub(...)? )?trait ` inside both
+cluster ranges returns **zero** hits beyond the `thread_local!` blocks
+already itemized in Addendum 1 (`GOVERNED_ALLOCATION_MUTATION` and its
+five siblings). CLOSED.
+
+**AC-2 -- `constructors.rs`'s `D7` cluster, lines `6675-8684`, every
+`#[test]` read individually in place (not keyword-sampled):**
+
+| test | class | injection point |
+|---|---|---|
+| `a_source_record_as_a_call_argument_is_marshalled_at_its_own_occurrence` | domain | `emit_carrier_transfer`'s `Record` arm / `reconcile_source_aggregate` |
+| `a_constructor_store_loop_child_reports_a_direct_boundary_transfer` | domain, transition sentinel (own promise class) | `emit_carrier_transfer`'s store-loop child path |
+| `each_governed_site_reaches_the_choke_and_cannot_bypass_it` | mutation control | `GovernedAllocationMutation::Bypass`, `governed_request` |
+| `a_sibling_effect_seats_coordinate_is_rejected_at_construction` | mutation control | `GovernedAllocationMutation::SiblingEffectSeat`, `sibling_effect_seat_under_mutation` |
+| `the_carrier_allocation_choke_refuses_both_ungoverned_requests` | mutation control (direct-API, positive+negative) | `emit_carrier_alloc` |
+| `the_aggregate_allocation_relation_holds_its_laws` | domain (drives `AggregateAllocationLedger` directly) | `AggregateAllocationLedger::{open,record_event,relate,commit,close}` |
+| `an_aggregate_at_the_callee_scheduling_fallback_authorizes_itself` | mutation control | `GovernedAllocationMutation::CalleeSchedulingOrigin`, `callee_scheduling_origin_under_mutation` |
+| `an_aggregate_with_no_producer_certificate_cannot_reach_the_carrier` | domain, durable invariant | `source_aggregate_preflight` |
+| `a_sibling_aggregates_producer_certificate_is_refused_before_any_allocation` | mutation control | `GovernedAllocationMutation::SiblingAggregateProducer`, `substitute_sibling_aggregate_producer` |
+| `a_call_use_coordinate_substitution_is_inert_for_a_self_authorizing_aggregate` | mutation control, negative result | `GovernedAllocationMutation::CallInputTransferOrigin`, `call_input_transfer_origin_under_mutation` |
+| `a_mismatch_below_every_recursive_container_is_refused_before_any_allocation` | domain, durable invariant | `source_aggregate_preflight`'s recursive-container arm |
+| `a_child_owner_set_outside_the_planned_meet_is_refused_before_any_allocation` | domain, durable invariant | `reconcile_source_aggregate` / `child_possible_referent_owners` |
+| `a_sibling_records_field_schema_is_refused_before_any_allocation` | mutation control | `GovernedAllocationMutation::SiblingAggregateProducer` (Record field-schema arm) |
+
+**13 tests classify aggregate-domain, MOVE.** Shared fixtures (all
+`d7_*`-prefixed, private, called exclusively from within this cluster --
+grepped exhaustively, zero external callers): `d7_compile_governed_sites`,
+`d7_record_as_call_argument`, `d7_transfer_a_carried_record`,
+`d7_transfer_carried_constructor_operands`, `d7_governed_sites_program`
+(6675, defined just above the cluster's first `#[test]`), `d7_pair_callee`,
+`d7_wrap`, `d7_pair_record`, `d7_named_pair_record`,
+`d7_field_identity_arguments`, `d7_ownership_recursor`,
+`d7_constructor_arguments`, `d7_record_arguments`,
+`d7_forwarded_constructor_arguments`, `d7_forwarded_pair`,
+`d7_forwarded_record_arguments`, `d7_compile_ownership`, `d7_ownership_run`,
+`d7_static_worker_with_aggregate_argument`, `d7_bare_preflight_rig`.
+
+**ONE test does NOT move, despite living inside the `d7_*`-fixture range
+and sharing this cluster's driver:**
+`a_missing_diagnostic_child_that_was_already_absent_is_not_a_mutation_hit`
+(`:8261-8318`) is tagged `RT-CLOSURE-BOUNDARY-LANE D4` in its own doc
+comment (not `RT-DECL-CLOSURE-PORT D7`) and installs a
+`CallInputCalleeDiagnosticMutationGuard` -- a DIFFERENT, already-classified
+RETAIN mutation (the `generated_unit_call_body_callee`/
+`generated_unit_call_entry_callee` diagnostic-identity hook, hub-stays per
+Addendum 1). It USES `d7_ownership_run`/`GovernedAllocationMutation::None`
+only as an unmutated driver to reach a real source-machine callee; its own
+discriminated property is the call-input-diagnostic mutation, not
+aggregate ownership. **Stays in `constructors.rs`, not moved** -- the
+shared-fixture rule moves a fixture with its sole domain user, not every
+test that happens to call the fixture.
+
+**Cluster boundary confirmed both ends by reading the surrounding text,
+not by the keyword-hit range alone:** the cluster opens at `d7_governed_
+sites_program` (6675, first `D7`-tagged item after the prior domain's own
+closing test) and closes at `a_sibling_records_field_schema_is_refused_
+before_any_allocation` (`:8684`); the very next line
+(`:8686`) is headed "`D7` checkpoint 1: the retained-callable capture
+contract" -- a DIFFERENT numbered checkpoint under the same `D7` umbrella
+tag (a tag-collision trap, not a symbol-naming one), confirmed NOT
+aggregate by reading its own subject (capture-contract phase
+preservation, unrelated).
+
+**`AC-2` discharge for this item:** every one of the 123 `#[test]`
+functions in `constructors.rs` was NOT individually read end to end (the
+file's other ~108 tests are constructor-dispatch/dynamic-constructor/
+nested-computational/heterogeneous-eliminator domain, item 12/13/14's
+already-settled territory, confirmed OUT by the keyword-hit sweep finding
+zero `Aggregate`/`Carrier`/`Governed`/`GOVERNED_ALLOCATION_MUTATION` hits
+outside the traced range) -- but the 14-test `D7` cluster itself was read
+individually in full, matching items 12-14's discipline for the
+population that actually matters. `control.rs`'s zero real hits (Class 4
+above) close the other bound file. **Population: 13 moving + 1 residual,
+both fully accounted, zero blind count.**
 
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
