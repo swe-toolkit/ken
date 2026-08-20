@@ -23,6 +23,10 @@
 
 use super::*;
 use super::core::{AmbientBodyAuthority, CheckedFrameFunctionScope};
+// `close_host_effect_seat_ledger`'s own `#[cfg(test)]` mutation check reaches
+// these directly; moved to `effects.rs` at `RT-EMITTER-EFFECTS-SPLIT` `D1`.
+#[cfg(test)]
+use super::effects::{effect_seat_visit_mutation, EffectSeatVisitMutation};
 use crate::cranelift_backend::planning::{
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization,
 };
@@ -5463,12 +5467,12 @@ pub(in crate::cranelift_backend) fn last_effect_seat_closure() -> Option<EffectS
 /// own result, and this to know which route was compiled.
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn capacity_phase_dispatch() -> (usize, usize) {
-    super::CAPACITY_PHASE_DISPATCH.with(std::cell::Cell::get)
+    super::effects::CAPACITY_PHASE_DISPATCH.with(std::cell::Cell::get)
 }
 
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn reset_capacity_phase_dispatch() {
-    super::CAPACITY_PHASE_DISPATCH.with(|cell| cell.set((0, 0)));
+    super::effects::CAPACITY_PHASE_DISPATCH.with(|cell| cell.set((0, 0)));
 }
 
 /// **`D5a` checkpoint 4 step 1 — declare every generated context into ONE

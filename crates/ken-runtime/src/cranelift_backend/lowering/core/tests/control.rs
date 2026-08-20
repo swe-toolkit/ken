@@ -7375,6 +7375,21 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-EMITTER-EFFECTS-SPLIT` `D1` — a pure lowering-emission module:
+        // it emits into a `FunctionBuilder` passed in by its caller, never
+        // creates its own. No `mod tests` block exists here at `D1` (unlike
+        // `aggregates.rs` above, whose non-zero row is entirely its own
+        // `D2`-landed test rig) — every needle is confirmed zero by direct
+        // grep, not assumed from the row shape.
+        Census {
+            file: "lowering/effects.rs",
+            source: include_str!("../../effects.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         Census {
             file: "planning.rs",
             source: include_str!("../../../planning.rs"),
@@ -8051,6 +8066,12 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     // source absent from this roster is invisible to every pin that
     // iterates it.
     ("lowering/aggregates.rs", include_str!("../../aggregates.rs")),
+    // `RT-EMITTER-EFFECTS-SPLIT` `D1` — the effects emitter. Registered here
+    // the moment the module exists, for the same reason as
+    // `boundary.rs`/`source.rs`/`calls.rs`/`joins.rs`/`aggregates.rs` above:
+    // a production source absent from this roster is invisible to every pin
+    // that iterates it.
+    ("lowering/effects.rs", include_str!("../../effects.rs")),
     // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. Registered
     // here the moment the module exists, because every pin that iterates this
     // roster is closed only over the files it lists: a production emitter absent
@@ -8246,6 +8267,16 @@ fn the_backend_production_surface_inventory_is_closed() {
             // types it merely references (`PlannedAggregateShape` and
             // siblings) stay item 7's.
             ("lowering/mod.rs", "aggregates"),
+            // `RT-EMITTER-EFFECTS-SPLIT` `D1` — the effects emitter
+            // (effect-seat emission, host-call emission, and the
+            // effect-side operand construction). A sibling of
+            // `core`/`units`/`seed_material`/`boundary`/`source`/`calls`/
+            // `joins`/`aggregates`; `EffectSeatLedger`/`EffectSeatClosure`
+            // move with it (already `pub(in crate::cranelift_backend)`,
+            // zero widen); `ClaimedEffectSeats`/`SiteOperandWitness` (the
+            // Architect's D0 corrections) and the types the moving methods
+            // merely manipulate stay at the `mod.rs` hub.
+            ("lowering/mod.rs", "effects"),
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
             // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — aggregate allocation
@@ -16699,7 +16730,7 @@ fn erasing_a_seat_key_axis_or_collapsing_the_contract_rejects() {
 /// dispatch release.
 #[test]
 fn an_incomplete_duplicate_discarded_or_misobserved_visit_rejects() {
-    use crate::cranelift_backend::lowering::{
+    use crate::cranelift_backend::lowering::effects::{
         set_effect_seat_visit_mutation, EffectSeatVisitMutation,
     };
     use crate::cranelift_backend::planning::governed_nested_resource_bracket;
@@ -16773,7 +16804,7 @@ fn a_discarded_visit_refuses_before_its_body_is_defined() {
     use crate::cranelift_backend::lowering::units::{
         b2f_last_unit_emission, b2f_open_compile_attempt, b2f_units_declared_in_attempt,
     };
-    use crate::cranelift_backend::lowering::{
+    use crate::cranelift_backend::lowering::effects::{
         set_effect_seat_visit_mutation, EffectSeatVisitMutation,
     };
     use crate::cranelift_backend::planning::governed_nested_resource_bracket;

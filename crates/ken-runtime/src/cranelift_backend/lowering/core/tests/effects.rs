@@ -2772,9 +2772,10 @@ fn repeating_a_complete_visit_is_lawful() {
 /// complementary one.
 #[test]
 fn complementary_omissions_across_two_visits_both_reject_though_their_union_is_complete() {
-    use crate::cranelift_backend::lowering::{
-        set_effect_seat_visit_mutation, units::last_effect_seat_closure, EffectSeatVisitMutation,
+    use crate::cranelift_backend::lowering::effects::{
+        set_effect_seat_visit_mutation, EffectSeatVisitMutation,
     };
+    use crate::cranelift_backend::lowering::units::last_effect_seat_closure;
     set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
     compile_b2f_process_pair_fixture().expect("the unmutated fixture compiles");
     // ⛔ The premise the discriminator rests on, asserted rather than assumed:
