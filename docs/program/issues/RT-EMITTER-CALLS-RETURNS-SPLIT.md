@@ -549,6 +549,15 @@ domain as Addendum 5 — none of it single-owner to this item.
 
 **Read through line ~21,000 of 30,289 (about 69%).** Continuing next.
 
+### Addendum 7 — AC-2 progress checkpoint, read through ~74%
+
+Continued through line ~22,500 (`D8n`/`D8o`/`D8m`: per-function checked-
+frame consumption lifetime, per-body planner-issued authority binding,
+the transported-tuple and two-occurrence checked-bridge controls). All
+RETAIN, same planner/continuation domain. No new MOVE candidates.
+
+**Read through line ~22,500 of 30,289 (about 74%).** Continuing next.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
