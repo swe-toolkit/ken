@@ -621,6 +621,70 @@ continuation/planner/occurrence domain. No new MOVE candidates.
 **Read through line ~28,900 of 30,289 (about 95%).** Continuing next;
 close to the end of the file.
 
+### Addendum 13 — AC-2's exhaustive read of `control.rs` is COMPLETE, plus
+### the embedded core.rs module; AC-2 result summarized
+
+Finished the read: lines 28,901-30,289 (`RT-LEXICAL-RECURSOR-CONSUMERS`
+`D2k-1b`/`D2k-1c-0`/`D2k-1c-1` static-worker-field conservation ledger,
+`RT-REFUSAL-PINS-REHOMED`, `RT-LEXICAL-R3-FUSION-EMITTER` `DP`/`D3`/
+`AC-D3-SELF` composition-time membership and the fusion-local
+composition ledger). All RETAIN — planner/fusion/conservation-ledger
+domain, none of it single-owner to this item.
+
+**Also read the blind spot flagged in the first partial commit**: the
+`#[cfg(test)] mod branched_scrutinee_unit_body_observer_tests` embedded
+directly inside `core.rs` (lines 1079-1111, outside `core/tests/`
+entirely) — 3 tests, all exercising
+`recursive_position_construct_argument` (direct/non-carrying source-
+constructor position resolution) and the `branched_scrutinee_unit_body`
+route1 observer bench. **RETAIN** — source-branch/eliminator-frame-
+descent domain, item 12's landed cluster (`computational-match/
+eliminator-frame descent`), not this item's declared-call/return
+domain.
+
+**AC-2 is CLOSED for the test-property ledger.** Every `#[test]` in
+`control.rs` (221 of them) and the 3 embedded in `core.rs` have been
+individually read in place, not marker-sampled. Final tally against the
+established MOVE population:
+
+- **Confirmed MOVE**: `d5_c4_a_duplicated_checked_occurrence_is_refused_
+  after_its_lawful_first` and `d5_the_checked_call_closeout_rejects_
+  omission_duplication_and_a_substituted_callee` were tentatively MOVE
+  (Addendum 3) then corrected to RETAIN/shared (Addendum 4) once their
+  full D5 cluster context was read.
+- **One genuine MOVE finding, found only by the exhaustive read**:
+  `d6_a_functionized_recursive_declaration_accepts_a_changing_argument_
+  constructor` (control.rs:6671, Addendum 3) — a declared-call-emission
+  domain test invisible to the marker scan.
+- **Everything else** (essentially the whole of `control.rs`) classifies
+  RETAIN, distributed across already-landed or explicitly frame-named
+  domains: continuation/fusion, checked-invocation, planner/occurrence
+  (`RT-CONTSRC-PRODUCER-LOCAL`'s D3-D9 families, `RT-CONTINUATION-EDGE-
+  DISPOSITION`, `RT-LEXICAL-RECURSOR-CONSUMERS`, `RT-LEXICAL-R3-FUSION-
+  EMITTER`, `RT-SRCBODY-BIND-ORDER`, `RT-CARRIED-*`,
+  `RT-SPECIALIZED-ACTIVE-RESUME`, `RT-DECL-CLOSURE-PORT`,
+  `RT-CONTSPEC-*`, `RT-FNSPLIT-B2F`, `RT-SEED-CALL-PORT`,
+  `RT-RECURSOR-TRANSPORT`, `RT-MATCH-SCRUTINEE-DISPOSITION`,
+  `RT-CALL-EDGE-EXECUTABILITY-AXIS`, `RT-REFUSAL-PINS-REHOMED`), plus
+  the frame's own named cross-cutting census/closure class. This bears
+  out the frame's own D0 characterization of `control.rs` verbatim: it
+  holds several independent populations, of which this item's own
+  domain is a small, mostly-already-marker-findable fraction.
+- **Shared/end-to-end class** (Addendum 3/4): the `typed_trap_exit_*`
+  cluster and the D5 checked-recursive-invocation cluster both touch
+  this item's moved mechanism from outside, alongside other owners'
+  mechanisms, and stay in residual `control.rs` per the frame's own
+  four-way AC-2 partition.
+
+**What AC-2 does NOT yet close**: the D2 test-move plan itself (which
+shared fixtures need widening, where the moved tests land in the new
+module) is not drafted — that is `D2`'s own work once `D1` lands the
+production move. AC-1's top-level item sweep (~485 items, per Addendum
+2, only ~20-25 collision-risk names individually checked) remains the
+largest open piece of this D0. Re-exports/cfg/attr/derive/repr
+inventory and source-text-oracle checks (AC-1's other item classes)
+remain untouched, as stated since the first partial commit.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
