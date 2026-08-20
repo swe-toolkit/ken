@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-20 17:47:42Z — from 388 issue file(s) in `docs/program/issues/`.
+2026-08-20 19:01:03Z — from 389 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -67,6 +67,7 @@ the committed file matches the generator's output.
 | `CI-ROW-CLAIM-NAMESPACE` | verify-row-claims hardcodes surface/ in both its claim and heading patterns, so eight of the nine conformance namespaces are structurally invisible to it -- a claim it cannot see is indistinguishable from a claim that does not exist | merged | verify | S | none | — |
 | `CI-SKIPPED-NATIVE-TESTS` | Restore rt_parity_native — dedicated CI job, outlier not fixed | merged | verify | S | none | — |
 | `CI-TRACKER-GATE` | Wire the issue-tracker schema + regeneration gate into CI | closed | operator | S | none | 804 |
+| `CI-Z3-BASE-IMAGE` | Bake z3 into a digest-pinned ghcr base image and run the restored z3-process-adapter job in it, so the flaky apt-get-install-z3 step leaves CI's critical path | active | verify | S | none | — |
 | `CONF-BLOCKER-MARKER-RECONCILE` | Three landed `BLOCKED-ON-` markers say 'no blocker node exists' and two of them are now false, while seven other blocked rows name their blockers in prose that no grep can find -- reconcile the corpus against the tracker and adjudicate the one blocker still unowned | merged | spec-enclave | S | none | — |
 | `CONF-BLOCKER-OWNER-RESOLVABILITY` | 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all | ready | spec-enclave | M | none | — |
 | `CONF-EVAL-COMPUTED-BOOL-ELIM` | The conformance matrix does not state that a closed computed Bool consumed by the Bool eliminator selects the same method as the corresponding constructor -- the two runtime representations reach the eliminator by independent index derivations and nothing ties them together | merged | spec-enclave | S | none | — |
