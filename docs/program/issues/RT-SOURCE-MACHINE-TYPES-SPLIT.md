@@ -85,6 +85,187 @@ private types, macro-generated declarations, declarations whose visibility and
 type keyword are split across lines, traits, constants, functions, or fields.
 A ledger that does not say what its selector missed is not a ledger.
 
+## `D0` ledger — committed, Architect-endorsed (`evt_2fmyp9r7wvm5y`)
+
+Measured at `840baf6cd` (origin/main at pickup, 0 behind). No code moved in
+this deliverable; this section is the ledger `D1`/`D2` execute against.
+
+### Scope correction (endorsed, not a fork)
+
+The frame's own CONTENTION section already reads "Bound files: `core.rs` and
+`mod.rs`" (quoting the durable rule in Architect `evt_14x1bqgrj4yze`); the
+perishable singular top-line above is superseded by the frame's own design.
+`mod.rs` holds not only the four core state types but real control: an
+11-method cluster in its own `impl<'a> Lowering<'a>` block. Verified: all four
+core state types (`SourceMachineState`, `SourceContinuation`,
+`SourceContinuationTerminal`, `SourceCallOutcome`) are touched by no file
+outside `cranelift_backend/lowering/` (`core.rs`, `mod.rs`, the lowering test
+tree only) — genuinely lowering-domain, movable to a lowering child with the
+item-11 descendant-visibility zero-widening property.
+
+### AC-1 — the move population, by production-injection-point tracing
+
+Every item below is grounded by tracing its actual non-test callers, not by
+name or textual adjacency.
+
+**MOVE (`core.rs`, `impl<'a> Lowering<'a>` at 3097-20335, contiguous
+6649-10091 span):** `lower_source_machine`,
+`lower_source_machine_with_continuation`(`_inner`),
+`lower_source_bounded_nat_match`, `lower_forked_branch`,
+`lower_source_dynamic_bool_match`, `lower_source_dynamic_host_result_match`,
+`source_carried_descriptors`, `source_carried_case_is_emitted`,
+`lower_source_carried_leaf`, `lower_source_carried_match`,
+`lower_source_{dynamic,nested_dynamic,planned_dynamic}_constructor_match`,
+`source_call_state`, `machine_body_occurrence`, `owned_child_occurrence`,
+`owned_case_body_occurrence` (18 methods). Pre-impl vocabulary at 3000-3096:
+`SourceCarriedControlMutation`(+`Guard`), `with_source_carried_control_mutation`,
+`source_carried_control_refusal`, `CARRIED_REPRESENTATION_MISMATCH_STATUS`,
+`SourceCarriedCase`. Free functions `rt_continuation_kinds`,
+`rt_operand_desc` (called only from the cluster). Mutation-control bundles
+whose true injection point (traced to the underlying `thread_local` set/read,
+not just the accessor name) lands inside the cluster: `LrcD2bLetDisposition`
++ accessors, `LRC_D2A_BACKEDGE_{ARRIVALS,FORWARDS}` + accessors +
+`LRC_D2A_SUPPRESS_FORWARD`, `D8F_DECLINED_CALL_CLAIMS` + accessors
+(`RT_D2_BACKEDGE_PROPAGATIONS` by contrast injects into the SHARED
+`resume_active_continuation` — retained, see below).
+
+**MOVE (`mod.rs`):** the 4 core types above; the `SourcePrefixTemplate`/
+`SourcePrefixTerminal`/`SourcePredecessorEdge`/`SourceJoinTarget`-manipulating
+cluster in the 15522-19852 `impl` block — `source_terminal_join`,
+`discard_source_prefix`, `replace_source_terminal_with_unwind`,
+`split_source_prefix`, `instantiate_source_prefix_template`,
+`mint_source_predecessor`, `planned_active_scalar_cut`,
+`finish_source_constructor`, `install_recursor_invocation` (every production
+call site of each lands exclusively inside the `core.rs` cluster above; sole
+production def of `install_recursor_invocation` @`mod.rs:17562`); plus
+`record_source_machine_computational_match_selection` and
+`carry_source_call_inputs` from the 6507-10786 block (same evidence).
+Confirmed anchors: `lower_source_machine` @`core.rs:6649`, `source_call_state`
+@`core.rs:9812`.
+
+**EXPLICITLY RETAINED, named domain, reason** (property-over-tag/adjacency,
+matching item 11's precedent):
+
+- `lower_computational_{match_expr,producer_expr,match_value_composed}`,
+  `lower_bounded_nat_computational`, `materialize_eliminator_frame_env`,
+  `lower_recursor_residual_call`, `take_fused_region_at`,
+  `lower_fused_producer_through_suffix`, `resume_active_continuation`,
+  `reject_carried_residual_arguments` — "computational-match / eliminator-frame
+  descent" (a different, not-yet-split mechanism the source machine's case
+  bodies call OUT of, not INTO; textually adjacent, tagged with 8+ distinct
+  other-WP citations, own doc explicitly contrasts itself with "the machine").
+- The continuation/fusion cluster (`settle_continuation_candidate` through
+  `dispatch_fused_consuming_call`, 10157-13354) — `RT-LEXICAL-R3-FUSION-EMITTER`
+  / `RT-CONTSRC-PRODUCER-LOCAL` tagged, zero source-type touches.
+- The "carried_match"/static-worker/recursor-position-unit cluster
+  (14426-16086) — function-state domain (`RT-MATCH-RECURSOR-CONSUMERS`/
+  `RT-DECL-CLOSURE-PORT`/`RT-RECURSOR-TRANSPORT` tagged), a likely-future item.
+- `lower_expr` (16536-17907) — the lowering-wide top dispatcher every domain
+  routes through, including source-machine (`ComputationalMatch` is its one
+  documented special case); moving it recreates the monolith (banned scope).
+- Generic occurrence helpers (`retained_body_occurrence`, `child_occurrence`,
+  `case_body_occurrence`, `OwnedSourceOccurrence`,
+  `disposition_statically_unselected_source_subtree`,
+  `enter_source_occurrence_plan`, `SourceComputationalAnswerRoute`,
+  `SourceSelectedContinuation`) — used by both the moving cluster and retained
+  domains; the standing amendment ("source/child correspondence stay
+  occurrence-owned") plus direct shared-call-site evidence confirm these stay
+  at the LCA, not moved.
+- `seal_source_trap_branch`/`emit_current_trap` — shared trap-sealing helper,
+  call sites in 6+ different domains including source-machine; stays.
+- `mod.rs` blocks 4822-6492 (constructor-field/static-worker-disposition) and
+  12376-13334 (declared-children reconciliation) — zero source-machine touch,
+  fully other-domain.
+- `mod.rs` block 6507-10786 minus the two MOVE methods above — the
+  carrier/aggregate emission and join-disposition domain
+  (`RT-CARRIER-BYTESPAN-OBSERVE`/`RT-CONTINUATION-EDGE-DISPOSITION`/
+  `RT-DECL-CLOSURE-PORT` tagged).
+- `compile_expr_into_module` and its 4 siblings, plus the `CheckedFrame*`/
+  `AmbientBodyAuthority`/D2f-D8n mutation-control families whose traced
+  injection points land in retained methods (Ccr/Coc/Sar →
+  `lower_computational_match_value_composed`; D8m →
+  `lower_computational_producer_expr`; D8n → `CheckedFrameFunctionScope`;
+  `RT_D2_BACKEDGE_PROPAGATIONS` → `resume_active_continuation`).
+
+**Frozen stage predicate** (items 7/15, 8/16, 9/14): not implicated. Nothing
+in the moving population is an aggregate/effect/join-trap symbol; the moving
+type names appear nowhere in the planner `static_transition` tree (verified
+empty); the aggregate/carrier/join-disposition code traced through is
+retained, unmoved, unrenamed.
+
+**Blind spots** (stated, not closed): macro-generated items (none found
+manually, not exhaustively swept by a macro-expansion tool); split-line
+declarations (manual read only, no separate selector run); cfg/attr/derive/
+repr inventory not yet separately tabulated per moved item (owed at `D1` per
+the frame — preservation across the move is `AC-3`'s job, recorded here as
+still open); `mod.rs`'s own top-of-file items before line 4822 not yet
+censused (types-only region by spot check, not fully swept — `D1` also owes
+closing this).
+
+### AC-2 — test ledger, closed by exhaustive read (231/231, not marker-sampled)
+
+231 `#[test]` in `control.rs` at `840baf6cd`. The leader's push-back was
+correct: "N tests show zero marker hits" is evidence about the markers tried,
+not proof the population is empty ("an enumeration needs a proven closure, not
+a better grep") — so every one of the 231 was individually read, not sampled.
+
+**Class 3 (mutation controls at production injection point) — 10 confirmed
+MOVE:**
+`d8f_the_declined_call_does_not_answer_for_the_checked_identity`;
+`lrc_d2a_forwards_each_arrival_and_excludes_projection_owned_early_refusals`;
+`d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_it`;
+`d2b_capability_gate_the_two_position_shape_refuses_before_its_case_body`;
+`d2b_row_b_a_live_nonbackedge_let_runs_its_body_and_consumes_its_join`;
+`px8j_source_machine_install_rejects_repeated_scope_identity`;
+`px8j_source_machine_install_rejects_wrong_control_roles_and_origins`;
+`px8j_source_machine_install_accepts_valid_unchecked_segment`;
+`oriented_edge_mutations_reject_in_the_source_machine_consumer` (control.rs:822
+— its helper `run_px8ds_source_consumer` calls `install_recursor_invocation`
+directly; surfaced only by the full read, not the original marker pass);
+`d6b_calling_the_selected_recursive_argument_in_the_ordinary_unit_copy_fails_closed_at_the_carrier`
+(control.rs:25768 — its refusal string `"a source-machine call's callee"`
+matches `core.rs:9824` verbatim, inside `source_call_state`; also surfaced
+only by the full read).
+
+**Class 1 (domain tests, source-machine's own dispatch/recognition) —
+confirmed EMPTY**, by exhaustive read rather than absence-of-marker. No test's
+own discriminated property is source-machine's internal Eval/Value state
+stepping, backedge propagation, or arm-selection logic outside the class-3
+population above.
+
+**Class 2 (shared fixtures) / Class 4 (end-to-end, legitimately residual) —
+the remaining 221, RETAIN**, each grounded in a read production call or type
+traced to a specific other domain: computational-match/eliminator-frame
+descent, continuation/fusion (`RT-LEXICAL-R3-FUSION-EMITTER`,
+`RT-CONTSRC-PRODUCER-LOCAL`), checked-invocation/oriented-subcontinuation-plan
+(PX8-DS, root-authority), function-state (carried-match, static-worker,
+recursor-position-unit, `RT-DECL-CLOSURE-PORT`), planner/join-disposition
+(`NativeJoinPlanV1`, `ContinuationClaimLedger`,
+`RT-CONTINUATION-EDGE-DISPOSITION`), declared-unit/seed-material/B2F,
+trap-exit/`RT-FNSPLIT-B2O`, and source-text census infrastructure
+(`RT-FNSPLIT-B2A-C`/`B2A-S`) unrelated to any production domain.
+
+Three clusters deliberately flagged as heavy-but-not-owned — they touch
+source-machine's own state deeply without being ITS property (item-11
+property-over-tag precedent, verified by tracing each producer to its actual
+injection site):
+
+- Px8jProducerPath tests (`Composed`/`DeferredConstructor`/`SourceMachine`
+  variants) — 3 distinct production sites in 3 different domains; only
+  `SourceMachine`'s is in-cluster.
+- The D6a-upstream 8-test cluster (`D6aConsumerSeat::{Composed,
+  SourceMachine}`) — a carried-match consumer's join tested against TWO
+  producers, one of which is source-machine's own recursor-layer marker; the
+  test's subject is the consumer's join law, not either producer alone.
+- The 3 `d8e_*` tests — D8e's static-worker-binding consumer, exercised (and
+  in one case deliberately routed OFF) via source-machine's `Call` arm;
+  subject is the consumer, confirmed by the test that removes the
+  source-machine path and shows the consumer's behavior changes for a
+  different, D8d-owned reason.
+
+**Final AC-2 population for `D1`/`D2`:** 10 tests move with the production
+cluster; 221 stay in the residual `control.rs`.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
