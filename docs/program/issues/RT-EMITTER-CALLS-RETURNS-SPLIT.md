@@ -600,6 +600,16 @@ everything read so far, but still not this item's.
 
 **Read through line ~26,600 of 30,289 (about 88%).** Continuing next.
 
+### Addendum 11 — AC-2 progress checkpoint, read through ~91%
+
+Continued through line ~27,700 (`RT-SRCBODY-BIND-ORDER` remainder,
+`RT-PRODUCER-MATCH-PORT`, `RT-CARRIED-CONTINUATION-RESUME`,
+`RT-CARRIED-ORDINARY-COMPOSITION`, `RT-SPECIALIZED-ACTIVE-RESUME`,
+`RT-CONTINUATION-EDGE-DISPOSITION` D1-D3). All RETAIN — join/candidate/
+continuation-route domain, no new MOVE candidates.
+
+**Read through line ~27,700 of 30,289 (about 91%).** Continuing next.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
