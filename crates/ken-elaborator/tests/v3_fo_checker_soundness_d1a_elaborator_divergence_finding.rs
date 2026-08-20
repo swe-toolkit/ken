@@ -6,52 +6,18 @@
 //! validate -- same premises, same conclusion sequent shape, same
 //! eigenparameter freshness condition (`AC-2`).
 //!
-//! **Before D2, this could not be completed.** Every one of `FokDerivation`'s required
-//! constructors needs a premise of the shape `Equal <T> (<recursive fn> <free
-//! vars>) <value>` -- e.g. `Equal (Option FokForm) (fok_nth_form gamma left)
-//! (Some FokForm g)`, transcribing `fok_check_rule`'s own guards. Attempting
-//! to elaborate `FokDerivation` with any such constructor causes the
-//! elaborator to diverge: unbounded, still-growing memory use (observed
-//! >10 GiB RSS and climbing after ~100s before being killed to protect the
-//! shared box -- COORDINATION §12), not a legitimate deep-but-finite
-//! computation, and not fixed by a larger test-thread stack (the
-//! `run_with_big_stack` remedy this node family has used successfully for
-//! every prior deep-computation issue does NOT help here).
+//! Before D2, every required constructor premise of the shape
+//! `Equal <T> (<recursive fn> <free vars>) <value>` diverged during positivity
+//! admission. The process exceeded 10 GiB RSS and a larger test-thread stack
+//! did not help. Two single-factor controls isolated the conjunction: the same
+//! recursive application in an ordinary `fn` parameter was instant, as was a
+//! constructor premise using a non-recursive function.
 //!
-//! **Root cause, bisected empirically (this file's own method, not read off
-//! the elaborator source) down to one precise axis:**
-//!
-//! | shape | data ctor telescope | `fn`/`theorem` parameter |
-//! |---|---|---|
-//! | non-recursive fn applied to abstract var | elaborates instantly | (not tested; irrelevant) |
-//! | RECURSIVE fn applied to abstract var (even the smallest one, `fok_nat_eq`, two non-nested match arms) | **DIVERGES** | elaborates instantly |
-//!
-//! Indexing and self-reference are NOT implicated -- a trivial, non-indexed,
-//! non-self-referential `data DummyNat : Type where { ... }` with a single
-//! `Equal Bool (fok_nat_eq a b) True` premise diverges identically to
-//! `FokDerivation` itself. The IDENTICAL premise, as an ordinary `fn`
-//! parameter (not inside any `data` constructor), elaborates immediately.
-//!
-//! ⇒ **`data ... where` constructor-telescope elaboration takes a
-//! qualitatively different code path than ordinary Pi-binder (`fn`/
-//! `theorem`) parameter checking, and that path diverges on ANY premise
-//! whose type applies a recursive user-defined function to a non-concrete
-//! (abstract, constructor-telescope-bound) argument.** No inductive family
-//! in this repository's existing test corpus (`explicit_data_elaboration.rs`'s
-//! `Vector`/`CheckedSource` etc.) has a proof-carrying constructor of this
-//! shape -- every existing example either has no premise argument at all, or
-//! a nullary "proof marker" constructor (`SourceLengthOk : SourceLength bs
-//! len`) rather than a computed `Equal`-typed hypothesis. This node is the
-//! first to need it.
-//!
-//! **This is a hard stop for `D1a`, not a licence to patch the language or
-//! restructure around it.** `AC-2` requires `FokDerivation`'s premises to be
-//! the SAME checks `fok_check_rule` performs; there is no way to express
-//! "`gamma[left] = Some g`" or "`fok_form_eq g d = True`" without applying a
-//! recursive function to the constructor-bound `gamma`/`left`/`g`/`d`, so no
-//! restructuring of `FokDerivation`'s signature avoids the pathological
-//! shape (unlike the `D0`-derisked Bool-inversion restructuring, which
-//! genuinely had an alternative signature).
+//! The minimal failing declaration was non-indexed and non-self-referential,
+//! so neither indexing nor recursive-family occurrence caused the runaway.
+//! Full normalization of the computed premise did: it descended into every
+//! child of a stuck eliminator and attempted to materialize an irrelevant full
+//! normal form before positivity inspected the type.
 //!
 //! D2 replaces full normalization in strict positivity with WHNF-on-demand
 //! plus delta-aware no-occurrence guards. The former hazardous rows now run in
@@ -61,8 +27,7 @@
 //! No touch to `fok_check_cert`/the checker/`attempt_fo`, no FO `Proved`, no
 //! primitive/postulate/axiom/trusted-base addition, no
 //! `embedding_adequacy`/`denote`/`Carriers`/`AtomEnv`, no slice widening, no
-//! sort validation. `FoKripke.ken` is unchanged by this file (confirmed by
-//! `git diff --stat` showing only this new test file).
+//! sort validation. `FoKripke.ken` remains unchanged.
 
 use std::collections::BTreeSet;
 
