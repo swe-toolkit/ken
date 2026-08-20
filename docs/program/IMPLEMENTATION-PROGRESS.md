@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-20 04:52:53Z — from 388 issue file(s) in `docs/program/issues/`.
+2026-08-20 05:45:01Z — from 388 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -351,7 +351,7 @@ the committed file matches the generator's output.
 | `RT-SECOND-RECOGNITION-ERASURE` | Determine whether the depth-2/3 static-worker rebind is a succession of one obligation or two distinct ones, and select the disposition on that fact -- erasure is REFUTED and is no longer this node's deliverable | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2377 |
 | `RT-SEED-CALL-PORT` | Seed-closure call port — a Call whose callee is the retained non-lexical closure form routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-SITEOP-CARRIED-WITNESS` | Site-bound operand reader cannot witness a carried value — a synthesized SiteOperand demands a compile-time Lowered template from the same seat byte-span activation wants carried | merged | runtime | M | none | — |
-| `RT-SOURCE-MACHINE-TYPES-SPLIT` | Relocate the existing source-machine types and control into their own child -- relocation ONLY, and explicitly not the transition IR, which is deferred to its own semantic node after this phase closes | ready | runtime | M | none | — |
+| `RT-SOURCE-MACHINE-TYPES-SPLIT` | Relocate the existing source-machine types and control into their own child -- relocation ONLY, and explicitly not the transition IR, which is deferred to its own semantic node after this phase closes | active | runtime | M | none | — |
 | `RT-SPECIALIZED-ACTIVE-RESUME` | A live specialized value with an Active frame is refused by a constructor-only destructure — Active resume does not require constructor shape | merged | runtime | S | none | — |
 | `RT-SPECIALIZED-MATCH-ATTRIBUTION` | A Match scrutinee arriving as a Specialized operand falls to the remainder arm, and neither the stage nor the seat says which Lowered class | merged | runtime | S | none | — |
 | `RT-SPLIT` | decompose cranelift_backend.rs | merged | runtime | L | none | — |
@@ -450,7 +450,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-RETIRED-CENSUS-ROT` — Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
-- `RT-SOURCE-MACHINE-TYPES-SPLIT` — Relocate the existing source-machine types and control into their own child -- relocation ONLY, and explicitly not the transition IR, which is deferred to its own semantic node after this phase closes
 - `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` — Find one Ken SOURCE program that reaches the StaticWorkerBinding conservation arm specifically -- the existing bound is a search over hand-authored fixtures, and the six ignored ken-cli tests are NOT a ready-made corpus because they fail upstream at the sibling Closure arm
 - `RT-UNSUPPORTED-BINDING-ON-REFUSAL` — A compile that refuses a construct owes a 48 section 5.4 native-artifact binding with status unsupported, and today yields none at all -- the construct half of the lane was named as RuntimeIrConstruct and left with zero producers
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
@@ -496,7 +495,7 @@ is itself not yet `merged`/`closed`:
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-BACKEND-SPLIT-CLOSURE` blocked by `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` (status: draft)
 - `RT-EMITTER-AGGREGATES-SPLIT` blocked by `RT-EMITTER-CONTROL-JOINS-SPLIT` (status: draft)
-- `RT-EMITTER-CALLS-RETURNS-SPLIT` blocked by `RT-SOURCE-MACHINE-TYPES-SPLIT` (status: ready)
+- `RT-EMITTER-CALLS-RETURNS-SPLIT` blocked by `RT-SOURCE-MACHINE-TYPES-SPLIT` (status: active)
 - `RT-EMITTER-CONTROL-JOINS-SPLIT` blocked by `RT-EMITTER-CALLS-RETURNS-SPLIT` (status: draft)
 - `RT-EMITTER-EFFECTS-SPLIT` blocked by `RT-EMITTER-AGGREGATES-SPLIT` (status: draft)
 - `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` blocked by `RT-EMITTER-EFFECTS-SPLIT` (status: draft)

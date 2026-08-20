@@ -1,7 +1,7 @@
 ---
 id: RT-SOURCE-MACHINE-TYPES-SPLIT
 title: "Relocate the existing source-machine types and control into their own child -- relocation ONLY, and explicitly not the transition IR, which is deferred to its own semantic node after this phase closes"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
