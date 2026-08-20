@@ -339,9 +339,24 @@ that "the emitter-owned half (`EffectSeatGroupId`/`EffectSeatLedger`/
 `EffectSeatClosure`) stays in `lowering/mod.rs`" -- literally describing
 my own item's pre-`D1` state) and `the_backend_production_surface_
 inventory_is_closed` (`control.rs:8162`, its own `("planning/static_
-transition.rs", "effects")` row at 8279, same comment content). **Item
-8's ledger said "3-location"; only these two are located so far** --
-the third is an open blind spot, not yet found.
+transition.rs", "effects")` row at 8279, same comment content), and
+`the_identifier_census_survives_the_evasions_that_defeated_the_text_
+scan` (`control.rs:7974`) -- a THIRD kind of oracle, keyed by **file
+path** rather than domain label: it lists `("lowering/core.rs", ...)`,
+`("lowering/core/primitive.rs", ...)`, `("lowering/mod.rs", ...)` and
+`("planning/static_transition/effects.rs", ...)` as its census inputs
+(8023-8110). Once `D1` creates `lowering/effects.rs`, this list needs a
+new `("lowering/effects.rs", include_str!("../../effects.rs"))` entry,
+mirroring the existing `core.rs`/`mod.rs` rows. **Item 8's "3-location"
+prediction is now fully located and closed**, all three confirmed at
+this item's own pickup SHA, not inherited from item 8's stale read.
+
+**`control.rs`'s own MOVE-set population is confirmed CLOSED**: a
+symbol-by-symbol sweep of every type/fn name in the closed MOVE set
+against the whole file found hits only at the five sites above (the
+three tests + the two census functions, `the_identifier_census_...`
+folding into the same "Class 4" bucket as the other two) -- no stray
+reference anywhere else in `control.rs`'s 30k+ lines.
 
 ### Hub-struct field embedding -- resolved, not a RETAIN case
 
