@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-20 09:41:29Z — from 388 issue file(s) in `docs/program/issues/`.
+2026-08-20 12:49:49Z — from 388 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -267,7 +267,7 @@ the committed file matches the generator's output.
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
 | `RT-EMITTED-WORKER-CONSUMER-WALK` | Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition | closed | runtime | S | none | — |
 | `RT-EMITTER-AGGREGATES-SPLIT` | Move the aggregates emitter family out of the lowering files -- the emitter half of the aggregate lifecycle whose planner half item 7 already owns | draft | runtime | M | none | — |
-| `RT-EMITTER-CALLS-RETURNS-SPLIT` | Move the calls and returns emitter family out of the lowering files -- the first emitter slice, moving against the stable unit and call vocabulary item 4 established | active | runtime | M | none | — |
+| `RT-EMITTER-CALLS-RETURNS-SPLIT` | Move the calls and returns emitter family out of the lowering files -- the first emitter slice, moving against the stable unit and call vocabulary item 4 established | merged | runtime | M | none | — |
 | `RT-EMITTER-CONTROL-JOINS-SPLIT` | Move the control and joins emitter family out of the lowering files -- branch, match and join emission, against the join disposition the planner slice already owns | draft | runtime | M | none | — |
 | `RT-EMITTER-EFFECTS-SPLIT` | Move the effects emitter family out of the lowering files -- the emitter half of the effect-seat lifecycle whose planner half item 8 already owns | draft | runtime | M | none | — |
 | `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` | Move the terminals and cleanup emitter family out of the lowering files -- the last owner move in the phase, after which only closure remains | draft | runtime | M | none | — |
@@ -495,7 +495,6 @@ is itself not yet `merged`/`closed`:
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-BACKEND-SPLIT-CLOSURE` blocked by `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` (status: draft)
 - `RT-EMITTER-AGGREGATES-SPLIT` blocked by `RT-EMITTER-CONTROL-JOINS-SPLIT` (status: draft)
-- `RT-EMITTER-CONTROL-JOINS-SPLIT` blocked by `RT-EMITTER-CALLS-RETURNS-SPLIT` (status: active)
 - `RT-EMITTER-EFFECTS-SPLIT` blocked by `RT-EMITTER-AGGREGATES-SPLIT` (status: draft)
 - `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` blocked by `RT-EMITTER-EFFECTS-SPLIT` (status: draft)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
