@@ -598,7 +598,7 @@ earlier item's own count:**
 | file | lines |
 |---|---|
 | `lowering/core/tests/control.rs` | **30,099** (post strand-1/3 edits; was 30,161 at pickup) |
-| `lowering/core.rs` | **13,019** |
+| `lowering/core.rs` | **13,029** (post the doc-erratum header rewrite; was 13,019 at pickup) |
 | `lowering/mod.rs` | **12,323** (post strand-1 narrowing; was 12,319 at pickup) |
 | `planning/static_transition/continuations.rs` | 9,768 |
 | `lowering/core/tests/constructors.rs` | 7,813 |
@@ -619,7 +619,7 @@ FINDING and phase closure remains OPEN, requiring a named successor slice"
 **this closure item does NOT force these three down**, and states each
 one's own owner analysis rather than ticking the box:
 
-- **`control.rs` (30,155 lines).** Strand 3's own classification is the
+- **`control.rs` (30,099 lines).** Strand 3's own classification is the
   owner analysis: the large majority of its population is genuine
   class-4 end-to-end control, which the frame's own guidance says
   belongs here. This is **not** "an unclaimed domain hiding at scale"
@@ -633,7 +633,7 @@ one's own owner analysis rather than ticking the box:
   end-to-end vs. effect/host-call end-to-end vs. census/inventory
   self-checks) -- is the correctly-scoped next slice, not a domain
   extraction from this campaign's own owner list.
-- **`core.rs` (13,019 lines) and `mod.rs` (12,331 lines).** These are
+- **`core.rs` (13,029 lines) and `mod.rs` (12,323 lines).** These are
   the two files 13 of this phase's 17 items have already extracted
   from (`core.rs` was 20,413 lines and `mod.rs` 21,200 at `7509c77a7`,
   the frame's own cited baseline -- now down to 63.8%/58.2% of that).
