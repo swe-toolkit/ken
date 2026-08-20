@@ -112,6 +112,23 @@ controls in the residual `control.rs`.**
 one candidate **only** when an exact compile or mutation-restoration dependency
 makes the pair semantically atomic — and say which it was.
 
+> ### If `D2` mints a qualified `mod tests`, generalize the roster-strip idiom
+>
+> **Adversary latent finding on item 15 D2 (`evt_kpq5yn3w7n5d`), which this
+> slice may re-trigger.** When a residual cross-subtree test must reach the
+> moved cluster by path, `D2` writes a **qualified** module header
+> (`pub(in crate::...) mod tests {`) rather than the bare `mod tests {` every
+> other lowering file uses. The federation's test-region strip is a literal
+> `.split_once("\n#[cfg(test)]\nmod tests {")`: a visibility qualifier between
+> `#[cfg(test)]` and `mod tests {` defeats it, so the strip silently no-ops and
+> the roster-iterating inventory pins fall back to the whole file. It was
+> harmless on item 15 only because that test region named none of the guarded
+> identifiers. **If this slice writes a qualified `mod tests`, generalize the
+> strip to match `\n#[cfg(test)]\n` then `mod tests {` on the next line
+> regardless of a visibility prefix** — a cheap owning-team fix that converts a
+> latent false-positive into a closed one. If it does not, note that it stayed
+> bare and this does not apply.
+
 
 # ACCEPTANCE
 
