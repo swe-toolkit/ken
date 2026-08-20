@@ -90,6 +90,18 @@ scaffolding and proves the operator's constraint is met.
 4. **Measure the output tree** — see the boundary rule below, which is the part
    most likely to be got wrong.
 
+> ### DOC ERRATUM TO RECONCILE AT CLOSURE: core.rs's "indivisible SCC" header
+>
+> **Items 11-12 falsified core.rs's own module header.** It still calls the impl
+> the "indivisible lowering SCC" (RT-SPLIT §10.1/§10.2), but item 11
+> (values-boundary) and item 12 (source-machine) relocated whole method families
+> out to sibling modules (`boundary.rs`, `source.rs`) via `pub(super)`, with the
+> struct and its field-ownership retained at the LCA. **On closure, rewrite that
+> header** to state the realized structure — type/field-ownership is LCA-pinned
+> in core.rs; method families relocate to sibling modules via `pub(super)`. A
+> comment reconciliation, not a code move; grounded by Architect
+> `evt_4x0gdq2vmyz8j`, which ruled core.rs IS reducible.
+
 > # MEASURE THE COMPLETE RESULTING FILE POPULATION, NOT THE FOUR ORIGINAL ROOTS
 >
 > **This is the Architect's sharpest correction and it closes a real hole.**
