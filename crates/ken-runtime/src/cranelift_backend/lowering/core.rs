@@ -8,6 +8,13 @@
 // same names; a private `use` cannot be re-globbed by a descendant.
 pub(in crate::cranelift_backend) use super::*;
 
+// `RT-LOWERING-VALUES-BOUNDARY-SPLIT` `D1` — `LoweredVariant`,
+// `BoundaryDisposition` and (under `#[cfg(test)]`) `BoundaryTransferInvokingSite`
+// arrive via `use super::*` above (`mod.rs` needs them directly and
+// re-exports them there). The rest of the `boundary` vocabulary has no
+// production caller in this file -- only its `tests` subtree does -- so it
+// is imported in `tests/mod.rs` instead (AC-8 class 2), not here.
+
 mod primitive;
 
 #[cfg(test)]
