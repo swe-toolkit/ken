@@ -77,8 +77,28 @@ complete for its named transfer, independently reviewable and mergeable, and
 | 14 | [[RT-EMITTER-CONTROL-JOINS-SPLIT]] |  yes |
 | 15 | [[RT-EMITTER-AGGREGATES-SPLIT]] |  yes |
 | 16 | [[RT-EMITTER-EFFECTS-SPLIT]] |  yes |
-| 17 | [[RT-EMITTER-TERMINALS-CLEANUP-SPLIT]] |  yes |
-| 18 | [[RT-BACKEND-SPLIT-CLOSURE]] — delete adapters, narrow facades, remeasure |  yes |
+| 17 | [[RT-EMITTER-TERMINALS-CLEANUP-SPLIT]] — **ABSORBED into 18** (`evt_2ng0vm7h85zst`): no distinct terminals/cleanup lifecycle | absorbed |
+| 18 | [[RT-BACKEND-SPLIT-CLOSURE]] — delete adapters, narrow facades, remeasure (**absorbs item 17**) |  yes |
+
+> # ITEM 17 ABSORBED — THE CUT IS NOW SEVENTEEN SLICES.
+>
+> **Architect ruling `evt_2ng0vm7h85zst`, 2026-08-20.** Recorded here because a
+> ruling that lives only in a thread strands.
+>
+> ⇒ **Item 17 (`RT-EMITTER-TERMINALS-CLEANUP-SPLIT`) names no distinct semantic
+> lifecycle and folds into item 18 (`RT-BACKEND-SPLIT-CLOSURE`).** Its row was a
+> provisional census sizing — line 85's warning that "filing all sixteen now
+> would create work ahead of the evidence that sizes it" is exactly the outcome
+> the item-17 D0 census returned. Native trap emission is nonexistent (no CLIF
+> `.ins().trap` in `lowering/`); the terminals/cleanup contents are already owned
+> by items 9/12/13/14 and are accounted in item 18's closure remeasure. This is
+> **not** a zero-MOVE empty slice — no owner means no slice, not an empty
+> slice-of-record. Two independent methods converge: the a-priori 13-owner frame
+> map (traps ruled a cross-cutting concern, not a module) and the a-posteriori
+> code census (zero orphans; every terminals/cleanup declaration attributes to an
+> earlier named lifecycle). Item 18's `depends_on` retargets to item 16; the
+> item-17 branch (`wp/RT-EMITTER-TERMINALS-CLEANUP-SPLIT` @`5bc587e26`) has no
+> candidate and stands down. **18 → 17 slices, no work lost.**
 
 > # THE OPERATOR'S ONLY REQUIREMENT — 2026-08-18. Read this before the prose below.
 >

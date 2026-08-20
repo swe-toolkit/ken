@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-20 20:37:12Z — from 389 issue file(s) in `docs/program/issues/`.
+2026-08-20 21:15:15Z — from 389 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -214,7 +214,7 @@ the committed file matches the generator's output.
 | `RT-BACKEND-MODULE-SPLIT` | Split the oversized ken-runtime backend files into modules — the follow-on to the recursive-descent retirement, not an interlude in it | draft | runtime | M | none | — |
 | `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` | Move the primitive-lowering family to its own module — the first production slice of the backend split, and the architectural release point for NATIVE-HANDLE-CARRIER | merged | runtime | M | none | — |
 | `RT-BACKEND-SPLIT-CENSUS` | Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves | merged | runtime | M | none | — |
-| `RT-BACKEND-SPLIT-CLOSURE` | Close the backend module split -- delete the transitional adapters, narrow the facades, run the test-root closure over control.rs, and prove all four bound files are under 10k | draft | runtime | M | none | — |
+| `RT-BACKEND-SPLIT-CLOSURE` | Close the backend module split -- delete the transitional adapters, narrow the facades, run the test-root closure over control.rs, and prove all four bound files are under 10k | active | runtime | M | none | — |
 | `RT-BODY-OCCURRENCE-PROVENANCE` | Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree | merged | runtime | M | none | — |
 | `RT-BOUNDARY-IGNORED-CORPUS-MEASURE` | Read unit_boundary_environment_fields on the six ignored closure-at-boundary tests, the population the merged measurement's own selection rule excluded | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2381 |
 | `RT-BRANCH-LOCAL-DECLARED-CALLABLE` | recursive_position_unit_body returns one Option<StaticOriginId> for the whole source, so whole-source agreement is too coarse for a Match whose arms differ -- the cut is constructor-and-recursive-position-specific callable authority installed inside the already-selected constructor case, which eliminates the closure crossing rather than opening a durable closure lane | ready | runtime | L | none | — |
@@ -271,7 +271,7 @@ the committed file matches the generator's output.
 | `RT-EMITTER-CALLS-RETURNS-SPLIT` | Move the calls and returns emitter family out of the lowering files -- the first emitter slice, moving against the stable unit and call vocabulary item 4 established | merged | runtime | M | none | — |
 | `RT-EMITTER-CONTROL-JOINS-SPLIT` | Move the control and joins emitter family out of the lowering files -- branch, match and join emission, against the join disposition the planner slice already owns | merged | runtime | M | none | — |
 | `RT-EMITTER-EFFECTS-SPLIT` | Move the effects emitter family out of the lowering files -- the emitter half of the effect-seat lifecycle whose planner half item 8 already owns | merged | runtime | M | none | — |
-| `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` | Move the terminals and cleanup emitter family out of the lowering files -- the last owner move in the phase, after which only closure remains | active | runtime | M | none | — |
+| `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` | Move the terminals and cleanup emitter family out of the lowering files -- the last owner move in the phase, after which only closure remains | closed | runtime | M | none | — |
 | `RT-ENTRY-TRAP-254` | public_source_observes_raw_argv_environment_cwd_bytes_in_field_order exits 1 with an explicit entry trap where it expects 254 — branch-introduced, and the only tip failure that is not the byte-span gap | closed | runtime | M | none | — |
 | `RT-ENTRY-TRAP-PX7O` | px7o heterogeneous eliminator frames: native traps at the explicit entry (RuntimeTrap(4), exit 1) where the interpreter returns exit 7 -- the entry-trap family the de Bruijn repair did NOT clear | closed | runtime | TBD | none | — |
 | `RT-ESCAPE` | escaping a second Resource through a bracket fails native lowering | merged | runtime | M | none | PR #911 @ 238a5c5d (origin/main 4ac9141e, CI green) |
@@ -493,7 +493,6 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
-- `RT-BACKEND-SPLIT-CLOSURE` blocked by `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
