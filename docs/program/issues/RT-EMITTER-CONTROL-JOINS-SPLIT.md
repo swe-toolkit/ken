@@ -1,7 +1,7 @@
 ---
 id: RT-EMITTER-CONTROL-JOINS-SPLIT
 title: "Move the control and joins emitter family out of the lowering files -- branch, match and join emission, against the join disposition the planner slice already owns"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none

@@ -469,6 +469,7 @@ need at the point of use; do not work from memory of it.
 | The daily briefing flush, delegated to a T2 subagent | `steward/briefing-flush.md` |
 | The watchdog and the comms-drop backstop | `steward/watchdog.md` |
 | Hard-stop escalation, symptom inventory, the 60-minute WIP audit | `steward/escalation.md` |
+| Adding an agent to the fleet: provision, credential, seat | `steward/add-agent.md` |
 
 The pipeline is **Steward (frame) → spec-leader (elaborate) → build team
 (execute)**, each T1 layer adding rigor before the T2 build team receives it.
