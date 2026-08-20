@@ -1174,3 +1174,261 @@ open the phase record to learn them.
 > - **The source machine is relocation only in this phase**, never a transition
 >   IR. Generated traps receive **no fabricated source origin**.
 
+# `D1` LEDGER -- the move executed, against `35a2997b6` (rebased tip after the
+# D0 merge landed at `origin/main` `83d199f4f`)
+
+Executed per `runtime-leader`'s kickoff (`evt_7t9ryq8pbmndv`), against the
+Architect-approved D0 boundary (`dec_3gnfwhxw1sm7k`, verdict `evt_60pj00z2jnve1`).
+Re-derived every MOVE-set symbol's current line position by name at pickup
+(the contention section's own rule), not from the D0 ledger's line offsets --
+the tree had not moved since D0 was docs-only, and the re-derived positions
+matched Addendum 15's within a handful of lines.
+
+## New module: `cranelift_backend/lowering/calls.rs`
+
+2,054 lines (`AC-4b`: well under the 10k ceiling; no other file this slice
+touches crosses a ceiling it was not already over -- see the line-count table
+below). Extends the `boundary.rs`/`source.rs` seam (items 11/12): a sibling of
+`core`/`units`/`seed_material`/`boundary`/`source`, all children of
+`lowering`/`mod.rs`. Declared via
+`pub(in crate::cranelift_backend) mod calls;` in `mod.rs`, following the exact
+precedent shape (doc comment + declaration, positioned after the `source`
+block).
+
+Every moved method sits in its own small `impl<'a> Lowering<'a> { .. }` block
+-- `source.rs`'s own shape (it has five such blocks). This is not a semantic
+change: Rust does not require a type's inherent methods to share one `impl`
+block, and method-call resolution (`self.foo()`) is unaffected by which block
+or file supplies the definition, provided visibility allows the call site to
+reach it.
+
+## The MOVE
+
+Every symbol from Addendum 1/15's list moved, verbatim:
+
+**From `core.rs`:** `call_static_worker`, `call_static_worker_with_inputs`,
+`validate_retained_callable_capture_contract`,
+`call_declared_recursive_position_unit`, `call_declared_context`,
+`call_declaration_closure_unit`, `validate_declaration_unit_call`,
+`RECURSIVE_POSITION_UNIT_CALLS` (thread_local, split out of the shared
+`#[cfg(test)]` block it sat in), `recursive_position_unit_calls` (accessor).
+
+**From `mod.rs`:** `TrapCallerProtocolMutation`, `D5CloseoutMutation`,
+`with_d5_closeout_mutation`, `reset_d5_emitted_declaration_calls`,
+`d5_emitted_declaration_calls`, `set_trap_caller_protocol_mutation`,
+`transfer_unit_result_into_carrier`, `select_terminal_result_origins`,
+`call_declared_unit`, `call_declared_declaration_unit`,
+`call_declared_unit_target`, `decode_direct_callee`, `unwrap_terminal_ret`,
+`emit_result`, `emit_process_exit_status`.
+
+**Verified byte-identical** (`AC-3`) by dedenting the moved text and diffing
+against the pre-move blob at each item's original span: spot-checked the
+largest item from each source file (`call_static_worker_with_inputs`, 331
+lines, zero diff; `call_declared_unit_target`, 297 lines, diff shows exactly
+the two intentional changes below and nothing else) -- both the extraction
+script's mechanical slicing and the compiler (a clean `cargo build`/`cargo
+test` after the move, below) corroborate the same conclusion from two
+independent angles.
+
+## A GENUINE D0 GAP FOUND AND CLOSED AT EXECUTION: `StaticWorkerEmission` /
+## `StaticWorkerCallOutcome` are hub-stays, NOT movers
+
+Addendum 1 recorded these two as "exclusive to `call_static_worker`/
+`call_static_worker_with_inputs`". Moving them and building surfaced two
+RETAINED consumers the D0 ledger's tracing missed:
+`dispatch_fused_consuming_call` (core.rs, already confirmed RETAIN in
+Addendum 1's own "other domain" list, continuation/fusion) constructs
+`StaticWorkerCallOutcome::Emitted`/`::DeferredPostField` directly, and
+`claim_composed_discharge` (core.rs, `pub(super)`, RETAINED) destructures
+`StaticWorkerEmission`'s fields directly.
+
+This is exactly the standing carry from item 12's own retro (`runtime-
+implementer` evt_sa23ftgphwd6, `agent/memory/teams/runtime/`): *"treat a D0
+ledger's silence on a manipulated type's own disposition as an unclosed AC-1
+gap to close by usage-tracing at execution time... default to hub-stays/
+methods-move when tracing shows sharing."* Applied here: both types moved
+back to the `mod.rs` hub (their original declaration site), with an in-line
+comment recording why (quoted above) so a future reader does not re-trace the
+same ground. `call_static_worker`/`call_static_worker_with_inputs` (which DO
+move) reach them via `calls.rs`'s own `use super::*;` -- no import needed,
+since they are hub types the whole subtree already inherits.
+
+**Net effect on the MOVE set:** these two names are struck from it. Everything
+else in Addendum 1/15's list moved as ledgered.
+
+## Visibility changes (`AC-3`'s public/export-profile clause)
+
+**Eleven items widened from private to `pub(super)`** on the move (all in the
+new `calls.rs`), each because a RETAINED caller reached them only because the
+callee used to sit in an ANCESTOR module (`lowering` or `lowering::core`,
+whose privacy is visible to every descendant); as a SIBLING module the same
+reachable set requires the visibility spelled out rather than inherited by
+descent. The reachable population is unchanged -- this is the ordinary
+sibling-module visibility recompute item 11/12 also needed on their own moves,
+not new scaffolding, so **no `AC-5` ledger entry**:
+
+| symbol | RETAINED caller found by compiler-driven trace |
+|---|---|
+| `call_static_worker` | `lower_expr` (core.rs, the banned-from-splitting monolith) |
+| `validate_retained_callable_capture_contract` | `construct_static_worker_binding`, `lower_expr` (core.rs) |
+| `call_declared_unit_target` | `dispatch_fusion_owned_outer_realization`, `claim_and_call_resolved_continuation_inner`, `dispatch_fused_consuming_call`, `lower_expr` (core.rs) |
+| `call_declared_declaration_unit` | `lower_declaration_ref` (core.rs -- its `SchedulingEntry`-class arm) |
+| `decode_direct_callee` | `verify_emitted_continuation_calls`, `verify_recorded_composed_discharges` (mod.rs) |
+| `unwrap_terminal_ret` | `merge_scalar_operand` (mod.rs) |
+| `emit_process_exit_status` | `merge_scalar_operand` (mod.rs), `carried_join_arm` (core.rs) |
+| `RECURSIVE_POSITION_UNIT_CALLS` (static) | `compile_expr_into_module`'s inline reset (core.rs, `RETAINED`, touches the raw static, not an accessor -- kept verbatim per the D0 ledger's own note that converting it to an accessor call would be a semantic change beyond a pure move) |
+| `recursive_position_unit_calls` | the `core/tests/control.rs` test-glob chain |
+| `TrapCallerProtocolMutation` (enum) | the `core/tests/control.rs` test-glob chain |
+| `set_trap_caller_protocol_mutation` | the `core/tests/control.rs` test-glob chain |
+
+**Three additional RETAINED methods widened from private to `pub(super)`**
+(in `core.rs`, where they stay) because a MOVING method now calls them as a
+cross-sibling-module `self.` dispatch: `child_occurrence`, `dispatch_
+fused_consuming_call`, `resolve_context_capture_claim`. Same reasoning,
+opposite direction -- the reachable population (which movers can call which
+retained helpers) is unchanged.
+
+Everything already `pub(super)` from item 12 (`call_declared_recursive_
+position_unit`, `call_static_worker_with_inputs`, `call_declaration_closure_
+unit`, `call_declared_unit`, `transfer_unit_result_into_carrier`, `select_
+terminal_result_origins`, `emit_result`) and everything already `pub(in
+crate::cranelift_backend)` (`D5CloseoutMutation`, `with_d5_closeout_mutation`,
+`reset_d5_emitted_declaration_calls`, `d5_emitted_declaration_calls`) carried
+across unchanged -- no widening needed, matching the D0 ledger's own note that
+these were "already pub(super) from item 12" or wider.
+
+Everything else in the MOVE set stayed at its original visibility (private):
+`call_declared_context`, `validate_declaration_unit_call`, `decode_direct_
+callee`'s two RETAINED callers turned out to both be usable via widening
+already covered above -- no further items needed it.
+
+## The two named `#[cfg(test)]` `thread_local!` block splits (carry
+## obligations 1 and 2), executed exactly as scoped
+
+1. `core.rs`'s block (`C2_UNIT_EMISSION_EPOCH`/`RECURSIVE_POSITION_UNIT_
+   CALLS`/`SUPPRESS_REQUIRED_CONSUMER_ROUTE`/`REQUIRED_CONSUMER_ROUTE_
+   SUPPRESSIONS`) split: `RECURSIVE_POSITION_UNIT_CALLS` moved into its own
+   `#[cfg(test)] thread_local! { pub(super) static RECURSIVE_POSITION_UNIT_
+   CALLS: .. }` block in `calls.rs`; the other three stayed in `core.rs`'s
+   block, re-gated `#[cfg(test)]` exactly as before (the block shrank by one
+   static, nothing else changed).
+2. `mod.rs`:1967-1997's shared block split: `TRAP_CALLER_PROTOCOL_MUTATION`/
+   `D5_CLOSEOUT_MUTATION`/`D5_EMITTED_DECLARATION_CALLS` (plus their doc
+   comments, carried verbatim including the pre-existing out-of-order
+   doc-comment placement -- not "fixed", since that would be a hunk outside
+   the move) moved into their own `#[cfg(test)] thread_local! { .. }` block in
+   `calls.rs`; `STATIC_WORKER_MUTATION`/`TRAP_FRAME_BINDING_MUTATION`/
+   `TRAP_IDENTITY_MUTATION` stayed in `mod.rs`'s block, re-gated `#[cfg(test)]`
+   exactly as before.
+
+Both moved statics stayed **private** in `calls.rs` (their only touch sites --
+`with_d5_closeout_mutation`, the D5-closeout accessors, `set_trap_caller_
+protocol_mutation`, and `call_declared_unit_target`'s cfg(test) branch -- all
+moved into the same file), except `RECURSIVE_POSITION_UNIT_CALLS`, which needs
+`pub(super)` per the table above.
+
+## Carry obligation 3: `StaticWorkerCallOutcome`'s `#[cfg(test)]`
+## `DeferredPostField` variant -- moot, per the hub-stays correction above
+
+Since the type itself stayed at the `mod.rs` hub rather than moving, the
+variant and its two `#[cfg(test)]` match arms in `into_operand`/`into_emitted`
+never left `mod.rs` -- carried by NOT moving, which discharges the same
+concern the obligation named (a silent narrowing under the test profile) more
+directly than carrying it across a move would have.
+
+## Carry obligation 4: `BACKEND_PRODUCTION_SOURCES` roster addition, executed
+
+Added `("lowering/calls.rs", include_str!("../../calls.rs"))` to
+`core/tests/control.rs`'s `BACKEND_PRODUCTION_SOURCES` (control.rs:8075-ish),
+immediately after the `source.rs` entry, following the documented `boundary.
+rs`/`source.rs`/`units.rs`/`seed_material.rs` precedent. The roster's own
+self-defending assertion (`the_backend_production_surface_inventory_is_
+closed`) required a matching `("lowering/mod.rs", "calls")` entry in its
+hardcoded `declared` list (the new `mod calls;` line in `mod.rs` is exactly
+the kind of declaration that test parses out of the roster's source text) --
+added, and the test passes.
+
+**One further roster-adjacent fix the addition surfaced, not separately
+scoped in the kickoff:** `correspondence_adds_no_emitted_unit_to_the_
+production_census` (a companion, DIFFERENT census over the same roster,
+counting builders/definitions/declarations/data objects per file) failed once
+`calls.rs` joined `BACKEND_PRODUCTION_SOURCES` with no row of its own. Added
+an explicit all-zero `Census` row for `lowering/calls.rs`, matching `source.
+rs`'s own row and its own stated reason verbatim: the moved methods emit IR
+into the `FunctionBuilder` their caller already owns; they never mint a new
+defined function or data object. This is the same "self-defending census
+needs its new row" mechanic the `BACKEND_PRODUCTION_SOURCES` addition itself
+already required, just a second, independent roster over the same file list.
+
+## `AC-3` -- line-count transport table
+
+| file | before | after | delta |
+|---|---|---|---|
+| `lowering/core.rs` | 16,698 | 15,568 | -1,130 |
+| `lowering/mod.rs` | 18,854 | 18,067 | -787 |
+| `lowering/calls.rs` (new) | -- | 2,054 | +2,054 |
+| `lowering/core/tests/control.rs` | 30,289 | 30,314 | +25 (roster + two census rows; a companion-test-move slice, not this one -- see below) |
+
+`control.rs` was already **30,289 lines, well past the 10k ceiling**, before
+this slice touched it. `AC-4b`'s ceiling binds files this slice *creates or
+enlarges past 10k*; `control.rs` was already past it, and the +25 lines are
+the exact same required-housekeeping category (`BACKEND_PRODUCTION_SOURCES` +
+census rows) that items 11/12's own `D1`s also added to `control.rs`, not
+test-content growth -- `D2` (a separate accepted partial, per this frame's own
+rule) is what brings `control.rs` down, not this slice.
+
+## `AC-4`/`AC-4b` -- compiles and tests, scoped only
+
+`scripts/ken-cargo build -p ken-runtime --lib`: clean (0 errors; 61
+pre-existing-shape warnings, none newly failing -- see below).
+`scripts/ken-cargo build -p ken-runtime --tests`: clean.
+`scripts/ken-cargo test -p ken-runtime --lib`: **926 passed, 0 failed, 4
+ignored** (925 passed before the census-row fix above; the one failure was
+the census gap, now closed). No `--workspace` run anywhere, per `COORDINATION
+section 12` -- CI holds the workspace gate.
+
+**One observed, non-blocking lint-warning class**: `mod.rs`'s single shared
+facade `use super::planning::{ .. }` block (~50 names, imported once and
+re-exported to the whole `lowering` subtree via the glob chain) now shows six
+names (`AbiCarrier`, `AbiOwnership`, `ContinuationCallView`, `Continuation
+UnitView`, `EffectSeatOperation`, `FusionCompositionLayer`) as `unused_
+imports` in `mod.rs`'s own scope, because their sole real consumer moved from
+living directly in `mod.rs`'s body to living in a child module's body
+(`calls.rs`, reached via the same glob chain that already re-exports these
+names to every other child). Confirmed non-regressive: `AbiCarrier`/`Abi
+Ownership` genuinely ARE used, in `calls.rs`; this is a known Rust lint
+imprecision around glob re-exports crossing a module boundary, not a
+correctness issue, and it does not fail any `AC` -- `AC-3`'s diagnostic-
+preservation clause is about a MOVED ITEM's own emitted diagnostic text, not
+about `cargo build`'s internal lint count on unrelated shared import blocks.
+Not fixed here to keep this slice's diff to the ledgered move plus the four
+carry obligations plus the one genuine D0 gap; a future slice may narrow this
+import block if it becomes a recurring pattern.
+
+## `AC-5` -- adapter/facade debt ledger: EMPTY, no scaffolding introduced
+
+No re-export or compatibility shim was left at the old location for any moved
+symbol. The `use calls::{..}` lines in `mod.rs` and `use super::calls::{..}`
+in `core.rs` are ordinary cross-sibling-module imports needed for the moved
+items' own callers to keep compiling -- not transitional facades standing in
+for a not-yet-deleted old path. Nothing for item 18 to delete from this slice.
+
+## `AC-6` -- this slice's own transfer only; phase closure NOT claimed
+
+The calls-and-returns emitter owner has moved. `RT-BACKEND-MODULE-SPLIT`
+phase closure is not claimed by this node and is not evidenced by any line
+count reported above. `D2` (the companion test move, a separate accepted
+partial by default per this frame's own rule) has not been attempted.
+
+## Summary for `runtime-leader`'s object-store verify
+
+Branch: `wp/RT-EMITTER-CALLS-RETURNS-SPLIT`, rebased onto `origin/main`
+`83d199f4f` (the D0 merge), current diff: `core.rs`/`mod.rs`/`core/tests/
+control.rs` modified, `lowering/calls.rs` new (untracked until this commit).
+All four named carry obligations executed exactly as scoped; one genuine D0
+gap (`StaticWorkerEmission`/`StaticWorkerCallOutcome`) found and closed by
+usage-tracing at execution time per the standing carry, reversing that one
+pair's disposition from MOVE to RETAIN/hub-stays with the reasoning recorded
+in-line at the code and here. Scoped build and test both green (926/0/4).
+`D2` not attempted -- separate accepted partial.
+

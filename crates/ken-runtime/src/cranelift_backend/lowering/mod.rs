@@ -72,6 +72,25 @@ use source::SourceContinuation;
 #[cfg(test)]
 use source::{SourceCarriedControlMutation, SourceContinuationTerminal, with_source_carried_control_mutation};
 
+// `RT-EMITTER-CALLS-RETURNS-SPLIT` `D1` — the calls and returns emitter:
+// declared-call emission, residual and recursor call lowering, return
+// emission, and the callee-side checks. A sibling of
+// `core`/`units`/`seed_material`/`boundary`/`source` rather than a region
+// inside any of them, matching how the earlier emitter/vocabulary slices
+// left their hub types here and moved only the mutating methods.
+pub(in crate::cranelift_backend) mod calls;
+
+// The test-glob chain (`core.rs`'s `use super::*`, then `core/tests/mod.rs`'s
+// own `use super::*`) re-exports these downward to `core/tests/control.rs`,
+// which references each by bare name — the same mechanism the `source`
+// imports above already rely on.
+#[cfg(test)]
+use calls::{
+    d5_emitted_declaration_calls, reset_d5_emitted_declaration_calls,
+    set_trap_caller_protocol_mutation, with_d5_closeout_mutation, D5CloseoutMutation,
+    TrapCallerProtocolMutation,
+};
+
 // --- external dependencies -------------------------------------------------
 pub(in crate::cranelift_backend) use std::collections::{BTreeMap, BTreeSet};
 
@@ -1366,13 +1385,6 @@ enum TrapIdentityMutation {
     Substitute,
 }
 
-#[cfg(test)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum TrapCallerProtocolMutation {
-    Exact,
-    LeaveStaleTrap,
-    ReadResultBeforeTrap,
-}
 
 /// **`RT-CONTSPEC-ACTIVATE` `D4` — the three executable controls for the
 /// continuation emission seam.**
@@ -1972,59 +1984,9 @@ thread_local! {
         const { std::cell::Cell::new(TrapFrameBindingMutation::Exact) };
     static TRAP_IDENTITY_MUTATION: std::cell::Cell<TrapIdentityMutation> =
         const { std::cell::Cell::new(TrapIdentityMutation::Exact) };
-    static TRAP_CALLER_PROTOCOL_MUTATION: std::cell::Cell<TrapCallerProtocolMutation> =
-        const { std::cell::Cell::new(TrapCallerProtocolMutation::Exact) };
-    /// **`RT-DECL-CLOSURE-PORT` `D5` — every declaration-owned unit call this
-    /// thread actually emitted**, as `(reference occurrence, target origin,
-    /// emitted callee)`.
-    ///
-    /// ⛔ Appended at the emission site from the emitted `Inst` itself. Its
-    /// point is to be an authority *independent of* `declaration_calls`, so a
-    /// control can compare the planner-resolved target against what was really
-    /// called. ⚠ It accumulates across a thread, so read it through
-    /// [`d5_emitted_declaration_calls`] after
-    /// [`reset_d5_emitted_declaration_calls`] — a bare read attributes an
-    /// earlier compile's calls to the current one.
-    /// **`RT-DECL-CLOSURE-PORT` `D5`** — the causal controls on the checked-call
-    /// closeout. Each defeats exactly one of the three things the closeout
-    /// claims: that every lawful emission is recorded, that no template records
-    /// twice, and that the recorded callee is the one actually emitted.
-    static D5_CLOSEOUT_MUTATION: std::cell::Cell<D5CloseoutMutation> =
-        const { std::cell::Cell::new(D5CloseoutMutation::Exact) };
-    static D5_EMITTED_DECLARATION_CALLS: std::cell::RefCell<
-        Vec<(StaticOriginId, StaticOriginId, cranelift_codegen::ir::FuncRef)>,
-    > = const { std::cell::RefCell::new(Vec::new()) };
 }
 
-#[cfg(test)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::cranelift_backend) enum D5CloseoutMutation {
-    Exact,
-    /// Emit the lawful call, then suppress its ledger entry.
-    SuppressLedgerEntry,
-    /// Record the entry twice under one template.
-    DuplicateLedgerEntry,
-    /// Record an entry under a template the plan never issued.
-    ExtraLedgerEntry,
-    /// Record a callee that is not the one the instruction actually calls.
-    SubstituteEmittedCallee,
-}
 
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn with_d5_closeout_mutation<T>(
-    mutation: D5CloseoutMutation,
-    body: impl FnOnce() -> T,
-) -> T {
-    struct Restore;
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            D5_CLOSEOUT_MUTATION.with(|cell| cell.set(D5CloseoutMutation::Exact));
-        }
-    }
-    D5_CLOSEOUT_MUTATION.with(|cell| cell.set(mutation));
-    let _restore = Restore;
-    body()
-}
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a` — the outcome-complete localization trace.**
 ///
@@ -2724,16 +2686,7 @@ pub(in crate::cranelift_backend) fn take_d5a_trace() -> Vec<String> {
     D5A_TRACE.with(|trace| trace.borrow().clone())
 }
 
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn reset_d5_emitted_declaration_calls() {
-    D5_EMITTED_DECLARATION_CALLS.with(|calls| calls.borrow_mut().clear());
-}
 
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn d5_emitted_declaration_calls()
--> Vec<(StaticOriginId, StaticOriginId, cranelift_codegen::ir::FuncRef)> {
-    D5_EMITTED_DECLARATION_CALLS.with(|calls| calls.borrow().clone())
-}
 
 #[cfg(test)]
 fn set_trap_frame_binding_mutation(mutation: TrapFrameBindingMutation) {
@@ -2745,10 +2698,6 @@ fn set_trap_identity_mutation(mutation: TrapIdentityMutation) {
     TRAP_IDENTITY_MUTATION.with(|cell| cell.set(mutation));
 }
 
-#[cfg(test)]
-fn set_trap_caller_protocol_mutation(mutation: TrapCallerProtocolMutation) {
-    TRAP_CALLER_PROTOCOL_MUTATION.with(|cell| cell.set(mutation));
-}
 
 struct Lowering<'a> {
     seed_env: &'a NativeSeedEnvironment,
@@ -3757,6 +3706,20 @@ struct PendingCheckedIhCall {
     application_origin: StaticOriginId,
 }
 
+
+
+
+// `RT-EMITTER-CALLS-RETURNS-SPLIT` `D1` — RETAINED at the hub, not moved to
+// `calls`. The D0 ledger traced these as "exclusive to `call_static_worker`/
+// `call_static_worker_with_inputs`" (both of which DO move); execution-time
+// tracing found that RETAINED `dispatch_fused_consuming_call` also
+// constructs `StaticWorkerCallOutcome` directly and RETAINED
+// `claim_composed_discharge` destructures `StaticWorkerEmission`'s fields
+// directly — genuinely shared between a moving and a staying consumer, the
+// same hub-stays/methods-move shape item 12 established, not the exclusive
+// population the ledger recorded. Corrected here per the standing carry
+// (treat a D0 ledger's silence on a manipulated type's own disposition as an
+// unclosed AC-1 gap, closed by usage-tracing at `D1` execution).
 /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8j` — what the shared static-worker emitter
 /// hands back beside the call's value.**
 ///
@@ -7017,51 +6980,7 @@ impl<'a> Lowering<'a> {
         }
     }
 
-    /// Transfer the terminal value returned by one declared generated unit.
-    ///
-    /// Process exit constructors are the one result-edge representation that
-    /// differs from their nested carrier form: the root consumes a closed
-    /// `ImmediateExitStatus`, not a constructor node. Keeping the conversion at
-    /// this result surface prevents an ordinary nested exit-shaped constructor
-    /// from being mistaken for the process answer.
-    pub(super) fn transfer_unit_result_into_carrier(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        origin: StaticOriginId,
-        value: &Lowered,
-    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
-        #[cfg(test)]
-        d5a_trace(format!(
-            "  UNIT-RESULT transfer origin={origin:?} value={}",
-            lowered_value_kind(value)
-        ));
-        let process_exit = self.process_object
-            && matches!(
-                value,
-                Lowered::Constructor { constructor, .. }
-                    if constructor == &self.process_symbols.exit_success
-                        || constructor == &self.process_symbols.exit_failure
-            );
-        if process_exit {
-            let status = self.emit_process_exit_status(builder, value.clone());
-            self.emit_carrier_immediate(builder, BoundaryTag::ImmediateExitStatus, status)
-        } else {
-            self.transfer_into_carrier(builder, origin, value)
-        }
-    }
 
-    /// Select the exact source occurrences evaluated in result position for
-    /// the generated unit currently being defined.
-    pub(super) fn select_terminal_result_origins(
-        &mut self,
-        origin: StaticOriginId,
-        _expr: &RuntimeExpr,
-    ) -> Result<(), CraneliftBackendError> {
-        self.function_local.terminal_result_origins = self
-            .static_transition_plan
-            .source_result_origins_in_owner_subtree(origin)?;
-        Ok(())
-    }
 
     /// Take the pre-emission result contract for this exact source join.
     ///
@@ -7831,62 +7750,6 @@ impl<'a> Lowering<'a> {
         inputs
     }
 
-    pub(super) fn call_declared_unit(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        body_origin: StaticOriginId,
-        inputs: &[LoweringOperand],
-        #[cfg(test)] launch_ingress: Option<cranelift_codegen::ir::Value>,
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
-        let target = self
-            .function_local
-            .unit_calls
-            .get(&body_origin)
-            .cloned()
-            .ok_or_else(|| {
-                backend_module(format!(
-                    "retained body {body_origin:?} has no graph-derived call target in this unit"
-                ))
-            })?;
-        // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — the redirected invocation's
-        // EXTRA operands.
-        //
-        // The fused frame is the producer's parameter run **plus** the
-        // consumer's ordered continuation inputs, because the suffix now runs
-        // inside the callee and needs the environment it used to have in the
-        // caller. The source invocation passes only the producer's run, so the
-        // remainder is supplied here — at the one seat that knows the call was
-        // redirected.
-        //
-        // `None` is the ordinary path and is not the same as `Some(vec![])`:
-        // the first means this seat has no fused region, the second means it has
-        // one whose suffix needs nothing beyond the producer's operands. Both
-        // occur, and collapsing them would let a claim's arity failure read as
-        // an unfused call.
-        match self.fused_redirect_inputs(body_origin)? {
-            None => self
-                .call_declared_unit_target(
-                    builder,
-                    target,
-                    inputs,
-                    #[cfg(test)]
-                    launch_ingress,
-                )
-                .map(|(operand, _inst)| operand),
-            Some(continuation_inputs) => {
-                let mut all = inputs.to_vec();
-                all.extend(continuation_inputs);
-                self.call_declared_unit_target(
-                    builder,
-                    target,
-                    &all,
-                    #[cfg(test)]
-                    launch_ingress,
-                )
-                .map(|(operand, _inst)| operand)
-            }
-        }
-    }
 
     /// **`D2f` — the ordered continuation-input operands one redirected
     /// invocation must append, resolved in the caller being defined.**
@@ -7989,482 +7852,8 @@ impl<'a> Lowering<'a> {
         Ok(Some(resolved))
     }
 
-    /// **`RT-DECL-CLOSURE-PORT` `D4` — the call at a `DeclarationRef`, with its
-    /// real inputs.**
-    ///
-    /// ⭐ `inputs` is the caller's ordered slice: the declaration's actual
-    /// arguments in **parameter order**, followed by its retained captures in
-    /// `D3` order. It is passed straight to the descriptor-driven emission
-    /// below, which remains the sole authority for the exact
-    /// `Parameter` + `Capture` slot run and rejects a slice that does not match
-    /// it in either direction.
-    ///
-    /// ⛔ Nothing here re-derives the target: no callable identity word, no
-    /// runtime lookup, no name parsing. The reference occurrence selects a
-    /// record the planner already resolved and the bundle already declared.
-    fn call_declared_declaration_unit(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        reference_origin: StaticOriginId,
-        inputs: &[LoweringOperand],
-        checked_template: Option<u64>,
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
-        let target = self
-            .function_local
-            .declaration_calls
-            .get(&reference_origin)
-            .cloned()
-            .ok_or_else(|| {
-                backend_module(
-                    "DeclarationRef has no planner-derived declaration call target".to_string(),
-                )
-            })?;
-        let target_origin = target.origin;
-        let target_function = target.function;
-        let (operand, call) = self.call_declared_unit_target(
-            builder,
-            target,
-            inputs,
-            #[cfg(test)]
-            None,
-        )?;
-        // `RT-DECL-CLOSURE-PORT` `D5` — the emitted-target oracle.
-        //
-        // ⭐ The callee is read back out of the **instruction that was actually
-        // emitted**, not out of the declared map a second time. A control that
-        // compared two reads of `declaration_calls` would agree with itself
-        // whatever the emitter did; this disagrees the moment the emitted call
-        // and the planner-resolved target diverge.
-        // ⛔⛔ The callee is decoded out of the instruction that was ACTUALLY
-        // emitted, never read back out of the declared map. That is what makes
-        // the closeout's target comparison a comparison of two independently
-        // produced facts.
-        let emitted_callee = match builder.func.dfg.insts[call] {
-            cranelift_codegen::ir::InstructionData::Call { func_ref, .. } => func_ref,
-            _ => {
-                return Err(backend_module(
-                    "a declared unit call was not emitted as a direct call instruction".to_string(),
-                ));
-            }
-        };
-        #[cfg(test)]
-        D5_EMITTED_DECLARATION_CALLS.with(|calls| {
-            calls
-                .borrow_mut()
-                .push((reference_origin, target_origin, emitted_callee))
-        });
-        // `RT-DECL-CLOSURE-PORT` `D5` — one ledger entry per CHECKED call,
-        // keyed by its template and bound to the exact reference occurrence and
-        // resolved target. ⚠ An unchecked entry call carries no template id and
-        // is deliberately outside this set.
-        if let Some(call_template_id) = checked_template {
-            #[cfg(test)]
-            let mutation = D5_CLOSEOUT_MUTATION.with(std::cell::Cell::get);
-            #[cfg(test)]
-            if mutation == D5CloseoutMutation::SuppressLedgerEntry {
-                // ⛔ The call itself is already emitted and lawful; only its
-                // record is withheld. That is the whole point — the closeout
-                // must notice a real call that no entry accounts for.
-                return Ok(operand);
-            }
-            let ledger = self.checked_call_ledger.as_mut().ok_or_else(|| {
-                backend_module(
-                    "a checked declaration-unit call was emitted outside the unit bundle pass"
-                        .to_string(),
-                )
-            })?;
-            #[cfg(test)]
-            let record = units::CheckedCallRecord {
-                reference: reference_origin,
-                target: target_origin,
-                callee: if mutation == D5CloseoutMutation::SubstituteEmittedCallee {
-                    target_function
-                } else {
-                    emitted_callee
-                },
-                resolved: if mutation == D5CloseoutMutation::SubstituteEmittedCallee {
-                    // A ref this function certainly did not call.
-                    builder
-                        .func
-                        .dfg
-                        .ext_funcs
-                        .keys()
-                        .find(|candidate| *candidate != emitted_callee)
-                        .unwrap_or(target_function)
-                } else {
-                    target_function
-                },
-            };
-            #[cfg(not(test))]
-            let record = units::CheckedCallRecord {
-                reference: reference_origin,
-                target: target_origin,
-                callee: emitted_callee,
-                resolved: target_function,
-            };
-            ledger.record_emitted(call_template_id, record)?;
-            #[cfg(test)]
-            match mutation {
-                D5CloseoutMutation::DuplicateLedgerEntry => {
-                    ledger.record_emitted(call_template_id, record)?;
-                }
-                D5CloseoutMutation::ExtraLedgerEntry => {
-                    // ⚠ Keyed off the real template so each call site adds a
-                    // DISTINCT unplanned entry. A single shared key would trip
-                    // the duplicate check at the second call site instead, and
-                    // this row would measure duplication rather than the
-                    // planned-set membership it names.
-                    ledger.record_emitted(call_template_id ^ u64::MAX, record)?;
-                }
-                D5CloseoutMutation::Exact
-                | D5CloseoutMutation::SuppressLedgerEntry
-                | D5CloseoutMutation::SubstituteEmittedCallee => {}
-            }
-        }
-        Ok(operand)
-    }
 
-    /// Emit the direct call to a declared unit target.
-    ///
-    /// Returns the produced operand **and the exact `Inst` emitted for the
-    /// call**. ⭐ The `Inst` is returned rather than kept in a `last_call` field
-    /// (see also [`D5_EMITTED_DECLARATION_CALLS`])
-    /// so that a caller which needs to attribute the emitted instruction has to
-    /// take it from the emission itself; a stale side-channel would attribute
-    /// one call site's instruction to another's token.
-    fn call_declared_unit_target(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        target: units::DeclaredUnitCall,
-        inputs: &[LoweringOperand],
-        #[cfg(test)] launch_ingress: Option<cranelift_codegen::ir::Value>,
-    ) -> Result<(LoweringOperand, cranelift_codegen::ir::Inst), CraneliftBackendError> {
-        let payload = builder.create_sized_stack_slot(StackSlotData::new(
-            StackSlotKind::ExplicitSlot,
-            target.header.frame_bytes,
-            3,
-        ));
-        let mut input = 0usize;
-        let mut result_offset = None;
-        let mut trap_offset = None;
-        for (slot, offset) in target.slots.iter().zip(&target.offsets) {
-            let offset = i32::try_from(*offset).map_err(|_| {
-                backend_module("callee slot offset exceeds addressable range".to_string())
-            })?;
-            match slot.kind {
-                AbiSlotKind::Parameter | AbiSlotKind::Capture => {
-                    let value = inputs.get(input).ok_or_else(|| {
-                        backend_module("callee frame is missing a declared input".to_string())
-                    })?;
-                    let word = match value {
-                        LoweringOperand::Carried(word) => word.word,
-                        LoweringOperand::Specialized(value) => {
-                            // ⚠ **`target.origin` is the CALLEE's scheduling
-                            // entry**, and what still arrives specialized here
-                            // is what no earlier crossing took.
-                            //
-                            // ⛔ **The two earlier crossings are NOT the same
-                            // mechanism, and conflating them is what this
-                            // comment used to do.** `lower_expr`'s
-                            // direct-closure-callee arm carries each input at
-                            // its exact caller-side occurrence. The source
-                            // machine's call path carries its inputs at ONE
-                            // common transfer coordinate with no per-argument
-                            // pairing — inert, because an aggregate carries and
-                            // is preflighted against its own producer
-                            // authority, and a non-aggregate queries no
-                            // aggregate ownership.
-                            //
-                            // MEASURED after both, `--nocapture
-                            // --test-threads=1` over the whole suite: 137
-                            // `BorrowedNativeValue`, 137 `CapabilityToken`, 42
-                            // `Int` and 1 `Bool` `Parameter`s, plus 55 `Int`
-                            // `Capture`s — all non-aggregate, so a
-                            // `NonAggregate` request takes the caller's tag,
-                            // consults no planned record and enters neither `E`
-                            // nor `R`. The origin is not load-bearing for any
-                            // of them. **No aggregate `Capture` reaches here at
-                            // all**, so the capture-authority witness does not
-                            // exist.
-                            //
-                            // ⛔ The one remaining aggregate population is
-                            // **`Constructor` `Parameter`s from
-                            // `call_static_worker`** (traced by backtrace, not
-                            // inferred). They reach this fallback and
-                            // **self-authorize**: each carries its own producer
-                            // occurrence, so the coordinate below is not the
-                            // authority its ownership record is resolved at.
-                            //
-                            // ⚠ No guard here refusing aggregates: measured, it
-                            // would refuse those 97 inputs, which compile today.
-                            #[cfg(test)]
-                            if value.source_aggregate_producer().is_some() {
-                                SELF_AUTHORIZED_FALLBACK_REACHES
-                                    .with(|n| n.set(n.get().saturating_add(1)));
-                            }
-                            self.transfer_into_carrier(
-                                builder,
-                                self.callee_scheduling_origin_under_mutation(target.origin),
-                                value,
-                            )?
-                            .word
-                        }
-                    };
-                    builder.ins().stack_store(word, payload, offset);
-                    input += 1;
-                }
-                AbiSlotKind::Control | AbiSlotKind::Store => {
-                    let zero = builder.ins().iconst(types::I64, 0);
-                    builder.ins().stack_store(zero, payload, offset);
-                }
-                AbiSlotKind::Trap => {
-                    #[cfg(test)]
-                    let zero = match TRAP_CALLER_PROTOCOL_MUTATION
-                        .with(std::cell::Cell::get)
-                    {
-                        TrapCallerProtocolMutation::LeaveStaleTrap => {
-                            builder.ins().iconst(types::I64, 1)
-                        }
-                        TrapCallerProtocolMutation::Exact
-                        | TrapCallerProtocolMutation::ReadResultBeforeTrap => {
-                            builder.ins().iconst(types::I64, 0)
-                        }
-                    };
-                    #[cfg(not(test))]
-                    let zero = builder.ins().iconst(types::I64, 0);
-                    builder.ins().stack_store(zero, payload, offset);
-                    trap_offset = Some(offset);
-                }
-                AbiSlotKind::Result => {
-                    #[cfg(test)]
-                    if TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get)
-                        == TrapCallerProtocolMutation::ReadResultBeforeTrap
-                    {
-                        let false_word = builder.ins().iconst(types::I64, 0);
-                        builder.ins().stack_store(false_word, payload, offset);
-                    }
-                    result_offset = Some(offset);
-                }
-            }
-        }
-        if input != inputs.len() {
-            return Err(backend_module(
-                "caller supplied inputs absent from the callee descriptor".to_string(),
-            ));
-        }
-        let pointer_type = builder.func.dfg.value_type(
-            self.function_local
-                .services_pointer
-                .ok_or_else(|| backend_module("unit call has no services pointer".to_string()))?,
-        );
-        let slots = builder.ins().stack_addr(pointer_type, payload, 0);
-        let envelope = builder.create_sized_stack_slot(StackSlotData::new(
-            StackSlotKind::ExplicitSlot,
-            u32::try_from(crate::activation_services::UNIT_CALL_FRAME_BYTES)
-                .expect("unit call frame byte count fits u32"),
-            3,
-        ));
-        builder.ins().stack_store(
-            slots,
-            envelope,
-            crate::activation_services::UNIT_CALL_FRAME_SLOTS,
-        );
-        let services = self
-            .function_local
-            .services_pointer
-            .expect("services pointer checked above");
-        let exact_host_dispatch_context =
-            self.function_local.host_dispatch_context.ok_or_else(|| {
-                backend_module("unit call has no direct host-dispatch context".to_string())
-            })?;
-        #[cfg(test)]
-        let host_dispatch_context = if launch_ingress.is_some()
-            && PROCESS_SLOT_MUTATION.with(std::cell::Cell::get)
-                == ProcessSlotMutation::ReintroduceLaunchIngress
-        {
-            // This is the deliberately forbidden half of the AC-14 control:
-            // unlike the retained direct context, this value is explicitly
-            // sourced from the root adapter's launch-ingress parameter.
-            launch_ingress.expect("the root adapter supplied launch ingress")
-        } else {
-            HOST_CONTEXT_PROPAGATION_MUTATION.with(|cell| match cell.get() {
-                HostContextPropagationMutation::Exact => exact_host_dispatch_context,
-                HostContextPropagationMutation::ServicesPointer if launch_ingress.is_none() => {
-                    services
-                }
-                HostContextPropagationMutation::NativeIntArena if launch_ingress.is_none() => self
-                    .function_local
-                    .native_int_arena
-                    .expect("unit native-int arena is bound"),
-                HostContextPropagationMutation::BoundaryArena if launch_ingress.is_none() => self
-                    .function_local
-                    .boundary_arena
-                    .expect("unit boundary arena is bound"),
-                HostContextPropagationMutation::Null if launch_ingress.is_none() => {
-                    builder.ins().iconst(pointer_type, 0)
-                }
-                HostContextPropagationMutation::LaunchIngress => {
-                    launch_ingress.unwrap_or(exact_host_dispatch_context)
-                }
-                HostContextPropagationMutation::ServicesPointer
-                | HostContextPropagationMutation::NativeIntArena
-                | HostContextPropagationMutation::BoundaryArena
-                | HostContextPropagationMutation::Null => exact_host_dispatch_context,
-            })
-        };
-        #[cfg(not(test))]
-        let host_dispatch_context = exact_host_dispatch_context;
-        builder.ins().stack_store(
-            host_dispatch_context,
-            envelope,
-            crate::activation_services::UNIT_CALL_FRAME_HOST_DISPATCH_CONTEXT,
-        );
-        let envelope = builder.ins().stack_addr(pointer_type, envelope, 0);
-        let call = builder.ins().call(target.function, &[envelope, services]);
-        let [unit_status] = builder.inst_results(call) else {
-            return Err(backend_module(
-                "internal unit call did not return exactly one word".to_string(),
-            ));
-        };
-        let unit_status = *unit_status;
-        let failed = builder.ins().icmp_imm(
-            cranelift_codegen::ir::condcodes::IntCC::NotEqual,
-            unit_status,
-            0,
-        );
-        let failure_block = builder.create_block();
-        let trap_check_block = builder.create_block();
-        builder
-            .ins()
-            .brif(failed, failure_block, &[], trap_check_block, &[]);
-        builder.switch_to_block(failure_block);
-        builder.ins().return_(&[unit_status]);
-        builder.seal_block(failure_block);
-        builder.switch_to_block(trap_check_block);
-        builder.seal_block(trap_check_block);
-        let trap_offset = trap_offset.ok_or_else(|| {
-            backend_module("callee frame declares no trap slot".to_string())
-        })?;
-        let result_offset = result_offset.ok_or_else(|| {
-            backend_module("callee frame declares no result slot".to_string())
-        })?;
-        #[cfg(test)]
-        if TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get)
-            == TrapCallerProtocolMutation::ReadResultBeforeTrap
-        {
-            let word = builder.ins().stack_load(types::I64, payload, result_offset);
-            return Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), call));
-        }
-        let trap_word = builder.ins().stack_load(types::I64, payload, trap_offset);
-        let trapped = builder.ins().icmp_imm(
-            cranelift_codegen::ir::condcodes::IntCC::NotEqual,
-            trap_word,
-            0,
-        );
-        let trap_block = builder.create_block();
-        let result_block = builder.create_block();
-        builder.ins().brif(trapped, trap_block, &[], result_block, &[]);
-        builder.switch_to_block(trap_block);
-        match self.function_local.trap_exit {
-            Some(TrapExitAuthority::UnitFrame { slots, trap_offset }) => {
-                #[cfg(test)]
-                px8tr_record_trap_provenance(Px8trTrapProvenanceEvent::UnitTrapWordPropagated {
-                    seat: PlannedTrapSeat::UnitTrapWord,
-                    identity_preserved: true,
-                });
-                builder
-                    .ins()
-                    .store(MemFlags::trusted(), trap_word, slots, trap_offset);
-                let no_result = builder.ins().iconst(types::I64, 0);
-                builder.ins().return_(&[no_result]);
-            }
-            Some(TrapExitAuthority::Root {
-                process_sentinel: true,
-                ..
-            }) => {
-                #[cfg(test)]
-                px8tr_record_trap_provenance(Px8trTrapProvenanceEvent::UnitTrapWordPropagated {
-                    seat: PlannedTrapSeat::RootProcessSentinel,
-                    identity_preserved: false,
-                });
-                let process_trap = builder.ins().iconst(types::I64, -4);
-                builder.ins().return_(&[process_trap]);
-            }
-            Some(TrapExitAuthority::Root {
-                process_sentinel: false,
-                ..
-            }) => {
-                #[cfg(test)]
-                px8tr_record_trap_provenance(Px8trTrapProvenanceEvent::UnitTrapWordPropagated {
-                    seat: PlannedTrapSeat::RootTrapToken,
-                    identity_preserved: true,
-                });
-                let shifted = builder.ins().ishl_imm(
-                    trap_word,
-                    crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT,
-                );
-                let root_token = builder.ins().bor_imm(
-                    shifted,
-                    crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG,
-                );
-                builder.ins().return_(&[root_token]);
-            }
-            None => {
-                return Err(backend_module(
-                    "trap branch has no generated-unit TrapWord lane".to_string(),
-                ));
-            }
-        }
-        builder.seal_block(trap_block);
-        builder.switch_to_block(result_block);
-        builder.seal_block(result_block);
-        let word = builder.ins().stack_load(types::I64, payload, result_offset);
-        Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), call))
-    }
 
-    /// **`RT-CONTSPEC-ACTIVATE` `4b` — decode the callee of an emitted direct
-    /// call out of the finished CLIF.**
-    ///
-    /// ⭐ **This is the independent side of the emission gate.** It reads the
-    /// instruction stream that was actually built: the instruction's
-    /// `func_ref`, that ref's `ExtFuncData` name, and the function's own
-    /// imported-user-name table, which `Module::declare_func_in_func` populates
-    /// with `UserExternalName { namespace: 0, index: func_id }`. ⛔ Nothing here
-    /// consults `continuation_calls`, the claim ledger's `resolved` map, or the
-    /// `DeclaredUnitCall` that was handed to the emitter -- those are all
-    /// downstream of the same resolution and comparing against one of them
-    /// would be a re-run of the builder under test.
-    ///
-    /// ⛔ A non-direct call, a non-user name, or a foreign namespace is a
-    /// rejection rather than a skip: an unattributable callee must not read as
-    /// agreement.
-    fn decode_direct_callee(
-        func: &Function,
-        inst: cranelift_codegen::ir::Inst,
-    ) -> Result<FuncId, CraneliftBackendError> {
-        let cranelift_codegen::ir::InstructionData::Call { func_ref, .. } = func.dfg.insts[inst]
-        else {
-            return Err(backend_module(
-                "an emitted continuation call site does not hold a direct call instruction"
-                    .to_string(),
-            ));
-        };
-        let cranelift_codegen::ir::ExternalName::User(name_ref) = func.dfg.ext_funcs[func_ref].name
-        else {
-            return Err(backend_module(
-                "an emitted continuation call names a callee that is not a user function"
-                    .to_string(),
-            ));
-        };
-        let user = &func.params.user_named_funcs()[name_ref];
-        if user.namespace != 0 {
-            return Err(backend_module(
-                "an emitted continuation call names a callee outside the module function namespace"
-                    .to_string(),
-            ));
-        }
-        Ok(FuncId::from_u32(user.index))
-    }
 
     /// **`RT-CONTSPEC-ACTIVATE` `4b` — the emission-seam equality gate for one
     /// generated function.**
@@ -16773,59 +16162,6 @@ impl<'a> Lowering<'a> {
         Ok(TerminalAnswerAuthority)
     }
 
-    fn unwrap_terminal_ret(mut lowered: Lowered) -> Lowered {
-        loop {
-            match lowered {
-                Lowered::Constructor {
-                    constructor,
-                    mut args,
-                    synthesized_identity,
-                    occurrence,
-                } if constructor.ends_with("::ITree::Ret") && args.len() == 1 => {
-                    match args.remove(0) {
-                        ConstructorField::Specialized(inner) => lowered = inner,
-                        // This function is infallible, so it cannot refuse; the
-                        // decision it CAN take is to leave the wrapper on and
-                        // keep the refusal with a consumer that is able to make
-                        // one. Unwrapping would hand a caller expecting a value
-                        // something with no value representation.
-                        //
-                        // **Re-derived now that a worker really can arrive
-                        // here.** The original justification was that the read
-                        // was infallible because nothing constructed a worker;
-                        // that premise is gone, so the claim has to rest on
-                        // where the intact constructor actually lands. Both
-                        // reachable consumers fail closed on it:
-                        // `emit_process_exit_status` answers its `-3`
-                        // malformed-payload sentinel, and the scalar-pair join
-                        // either routes into that same decoder or refuses with
-                        // *"dynamic native arms must produce scalar Int
-                        // values"*. Neither can mistake the wrapper for a
-                        // value, which is what makes handing it back the
-                        // conservative move rather than merely the unchanged
-                        // one.
-                        //
-                        // **And the conservation close is behind both of
-                        // them.** A worker field that nothing rebinds refuses
-                        // before the root answer is emitted, so an intact
-                        // wrapper carrying an unconsumed worker cannot appear
-                        // in a shipped object at all — the two decoder
-                        // refusals above are what happens on the way there,
-                        // not the last line of defence.
-                        field @ ConstructorField::StaticWorker { .. } => {
-                            return Lowered::Constructor {
-                                constructor,
-                                synthesized_identity,
-                                occurrence,
-                                args: vec![field],
-                            };
-                        }
-                    }
-                }
-                lowered => return lowered,
-            }
-        }
-    }
 
     /// Scalarize only under the answer kind carried by an already-consumed
     /// checked join site. In particular, process-object mode is not evidence
@@ -18449,130 +17785,7 @@ impl<'a> Lowering<'a> {
     }
 
 
-    pub(super) fn emit_result(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        value: Lowered,
-    ) -> Result<(cranelift_codegen::ir::Value, ResultDecoder), CraneliftBackendError> {
-        if self.process_object {
-            let _authority = self.mint_terminal_answer_authority()?;
-            let value = Self::unwrap_terminal_ret(value);
-            let value = match value {
-                Lowered::ProcessExitStatus { value } => value,
-                value => self.emit_process_exit_status(builder, value),
-            };
-            return Ok((value, ResultDecoder::ProcessStatus));
-        }
-        match value {
-            Lowered::Int { value, known } => {
-                let tag = self.native_int_tag(builder, value, known)?;
-                let arena = self.function_local.native_int_arena.ok_or_else(|| {
-                    unsupported("NativeResult", "Int result has no invocation arena")
-                })?;
-                let export = self.function_local.native_int_export.ok_or_else(|| {
-                    unsupported("NativeResult", "Int result has no export support function")
-                })?;
-                #[cfg(test)]
-                if self.native_int_mutation == NativeIntLoweringMutation::SuppressTerminalExport {
-                    return Ok((value, ResultDecoder::Int));
-                }
-                let call = builder.ins().call(export, &[arena, tag, value]);
-                Self::require_i64(builder, builder.inst_results(call)[0], 0);
-                #[cfg(test)]
-                if self.native_int_mutation == NativeIntLoweringMutation::CorruptTerminalExport {
-                    let invalid = builder.ins().iconst(types::I64, 7);
-                    builder.ins().store(
-                        MemFlags::trusted(),
-                        invalid,
-                        arena,
-                        crate::native_int_clif::ARENA_FINAL_TAG,
-                    );
-                }
-                Ok((value, ResultDecoder::Int))
-            }
-            Lowered::Bool { value, .. } => Ok((value, ResultDecoder::Bool)),
-            value => {
-                let ground = self.ground_value(value)?;
-                let token = self.intern_result(ground);
-                Ok((
-                    builder.ins().iconst(types::I64, token),
-                    ResultDecoder::Table,
-                ))
-            }
-        }
-    }
 
-    fn emit_process_exit_status(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        value: Lowered,
-    ) -> cranelift_codegen::ir::Value {
-        let Lowered::Constructor {
-            constructor, args, ..
-        } = value
-        else {
-            return builder.ins().iconst(types::I64, -2);
-        };
-        if constructor == self.process_symbols.exit_success {
-            return if args.is_empty() {
-                builder.ins().iconst(types::I64, 0)
-            } else {
-                builder.ins().iconst(types::I64, -2)
-            };
-        }
-        if constructor != self.process_symbols.exit_failure {
-            return builder.ins().iconst(types::I64, -2);
-        }
-        // A worker field joins the malformed-payload sentinel rather than
-        // getting its own: this decoder answers with a status word and has no
-        // way to refuse, so the conservative move is the value that already
-        // means "this is not a decodable exit status".
-        let Ok(args) = specialized_fields_at(&args, "an exit status payload field") else {
-            return builder.ins().iconst(types::I64, -3);
-        };
-        let Ok([payload]) = <Vec<Lowered> as TryInto<[Lowered; 1]>>::try_into(args) else {
-            return builder.ins().iconst(types::I64, -3);
-        };
-        let Lowered::Int { known, .. } = &payload else {
-            return builder.ins().iconst(types::I64, -3);
-        };
-        if let Some(code) = *known {
-            let mapping = crate::process_exit_status(crate::ProcessExitCode::Failure(code));
-            return builder.ins().iconst(
-                types::I64,
-                if mapping.trap_report.is_some() {
-                    -3
-                } else {
-                    i64::from(mapping.status)
-                },
-            );
-        }
-        let Ok((value, valid_int)) = self.narrow_native_int_u64(builder, &payload) else {
-            return builder.ins().iconst(types::I64, -3);
-        };
-        let zero = builder.ins().iconst(types::I64, 0);
-        let one = builder.ins().iconst(types::I64, 1);
-        let max = builder.ins().iconst(types::I64, 255);
-        let malformed = builder.ins().iconst(types::I64, -3);
-        let is_zero =
-            builder
-                .ins()
-                .icmp(cranelift_codegen::ir::condcodes::IntCC::Equal, value, zero);
-        let positive = builder.ins().icmp(
-            cranelift_codegen::ir::condcodes::IntCC::UnsignedGreaterThan,
-            value,
-            zero,
-        );
-        let within_max = builder.ins().icmp(
-            cranelift_codegen::ir::condcodes::IntCC::UnsignedLessThanOrEqual,
-            value,
-            max,
-        );
-        let valid = builder.ins().band(valid_int, positive);
-        let valid = builder.ins().band(valid, within_max);
-        let nonzero = builder.ins().select(valid, value, malformed);
-        builder.ins().select(is_zero, one, nonzero)
-    }
 
     /// ⛔ **A typed boundary: raw [`Lowered`] only, and STRUCTURALLY so**
     /// (`RT-FNSPLIT-C1` frame `§2h` ¶2).
