@@ -1,0 +1,39 @@
+name: Build CI Z3 base image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/swe-toolkit/ken/ci-z3
+  TAG: rust-1.79-bookworm
+
+jobs:
+  build:
+    name: Build and publish CI Z3 base image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push image
+        id: image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}
+      - name: Print immutable image digest
+        run: echo "${IMAGE}@${{ steps.image.outputs.digest }}"
