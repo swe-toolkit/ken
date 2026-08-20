@@ -570,6 +570,17 @@ same checked-invocation domain as the rest of the D5-D8 family (item
 
 **Read through line ~24,000 of 30,289 (about 79%).** Continuing next.
 
+### Addendum 9 — AC-2 progress checkpoint, read through ~84%
+
+Continued through line ~25,500 (`D8f` remaining checked-marker
+refusals, `D8g` functionized/composed table-and-suffix binding at the
+shared emitter, `D6b` mixed-pair/table-agreement correspondence, `D6c`
+pre-emission selection refusals). All RETAIN, same
+`RT-CONTSRC-PRODUCER-LOCAL` planner/continuation/static-worker-route
+domain. No new MOVE candidates.
+
+**Read through line ~25,500 of 30,289 (about 84%).** Continuing next.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
