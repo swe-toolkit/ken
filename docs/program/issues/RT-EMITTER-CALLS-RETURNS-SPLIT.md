@@ -77,6 +77,185 @@ private types, macro-generated declarations, declarations whose visibility and
 type keyword are split across lines, traits, constants, functions, or fields.
 A ledger that does not say what its selector missed is not a ledger.
 
+## `D0` ledger — IN PROGRESS, not yet endorsed or complete
+
+Measured at `edb69247e` (origin/main at pickup, 0 behind). No code moved.
+**This section is NOT a closed ledger.** It records grounded findings as they
+are traced, exactly as posted to convo (`evt_773wce3gwj0rk`, `evt_f4g7f5tr8mh8`)
+so the work survives a compaction or a hand-back — it does not yet discharge
+AC-1 or AC-2, and no D1 may execute against it until both are closed and it
+carries an Architect vote, per this campaign's own durability lesson (item 12's
+D0 ledger was ruled non-durable living only in chat).
+
+### Method used
+
+Production-injection-point tracing (item 11/12's discipline), reconciled
+against item 12's LANDED ledger for domains it already settled (continuation/
+fusion, checked-invocation, computational-match/eliminator-frame descent,
+generic occurrence helpers, aggregate/carrier emission, static-worker/
+constructor-field disposition) rather than re-deriving them. A name match to
+"call"/"callee"/"return" is never sufficient by itself — several genuine
+matches traced to a DIFFERENT, already-landed domain (see below).
+
+**New discipline this node adds, not needed by item 12:** a mutation-control
+static's accessor function can sit anywhere, but its TRUE production
+injection point (the `.with(|cell| cell.set(...))` call) can land either (a)
+inside a separately-defined, movable method, or (b) inside `lower_expr`'s own
+~1,373-line body (core.rs 12814-14186) — the banned-from-splitting monolith
+dispatcher. Case (a) moves with its owning method; case (b) is trapped and
+stays with `lower_expr` regardless of what domain its NAME suggests, because
+extracting it would split `lower_expr`, which the banned-scope section
+forbids outright. `SEED_CALLEE_UNIT_PORTS` is the first example found (below).
+
+### AC-1 — MOVE population traced so far (core.rs)
+
+- `call_declared_recursive_position_unit` (11957, already `pub(super)` from
+  item 12), `call_declared_context` (12074 — its sole caller is the former;
+  despite `ContinuationContextId`/`ContinuationSpecialization` vocabulary it
+  is the "retarget to a specialized context" arm of the SAME declared-call
+  dispatch, not the continuation/fusion cluster), `validate_retained_callable_
+  capture_contract` (10205 — a callee's capture-contract check before
+  invocation), `call_static_worker` (9683), `call_static_worker_with_inputs`
+  (9730, already `pub(super)`, called from `source.rs`'s D8e consumer per
+  item 12), `call_declaration_closure_unit` (15721, already `pub(super)`),
+  `validate_declaration_unit_call` (15838).
+- `RECURSIVE_POSITION_UNIT_CALLS` (thread_local, core.rs:32-35 — shares a
+  block with `C2_UNIT_EMISSION_EPOCH`/`SUPPRESS_REQUIRED_CONSUMER_ROUTE`/
+  `REQUIRED_CONSUMER_ROUTE_SUPPRESSIONS`, none of which move — this block
+  needs the SAME kind of split item 12's LRC/CCR block needed) +
+  `recursive_position_unit_calls` (1585) accessor. Its mutation site (12063)
+  is inside `call_declared_recursive_position_unit`'s own body, confirming
+  the move; its reset call is inlined directly in `compile_expr_into_module`
+  (core.rs ~2110, a RETAINED top-level function) rather than through a named
+  reset accessor — a cross-module reference to update at `D1`, not a blocker.
+
+### AC-1 — MOVE population traced so far (mod.rs)
+
+- `call_declared_unit` (7834, already `pub(super)`), `call_declared_
+  declaration_unit` (8005), `call_declared_unit_target` (8135 — emits the
+  actual Cranelift call `Inst` plus the callee-failure/trap early-return
+  protocol; confirms "callee-side checks" and "return emission" are the SAME
+  early-return machinery at a declared call's own site, not separate), `decode_
+  direct_callee` (8441), `emit_result` (18452, already `pub(super)` — converts
+  a `Lowered` value to its return representation; called from `units.rs`,
+  outside the bound files, so external reachability is a path-update concern
+  only), `emit_process_exit_status` (18505), `unwrap_terminal_ret` (16776).
+- The declared-call closeout family: the shared thread_local block holding
+  `D5_CLOSEOUT_MUTATION`/`D5_EMITTED_DECLARATION_CALLS` (both exclusive to
+  `call_declared_unit_target` and its neighbor — moves wholesale, no split
+  needed), `D5CloseoutMutation` enum, `with_d5_closeout_mutation`, `reset_d5_
+  emitted_declaration_calls`, `d5_emitted_declaration_calls`.
+- `TrapCallerProtocolMutation` enum + its thread_local + `set_trap_caller_
+  protocol_mutation` (exclusive to `call_declared_unit_target`; its sibling
+  `TrapIdentityMutation` is a DIFFERENT, RETAINED control used only by
+  `emit_current_trap`, checked and excluded).
+- `StaticWorkerCallOutcome` + `StaticWorkerEmission` (exclusive to
+  `call_static_worker`/`call_static_worker_with_inputs`).
+
+### CONFIRMED RETAIN, other domain (checked by production-injection-point,
+### not by name) — recorded so the same name is not re-traced
+
+- `claim_and_call_continuation`, `claim_and_call_resolved_continuation`
+  (+`_inner`), `assemble_continuation_call_operands`, `compose_continuation_
+  locally`, `realize_required_consumer_locally`, `dispatch_fused_consuming_
+  call`, `settle_continuation_candidate`, `dispatch_fusion_owned_outer_
+  realization`, `resolve_direct_emission_claim`, `resolve_context_capture_
+  claim`, `verify_entry_frame`, `eliminate_detached_producer_continuation`,
+  `d3_raw_settled`, `d3_raw_pending_composed`, `continuation_candidate_is_
+  consumed` (`ContinuationCallIdentity`-typed), `verify_emitted_continuation_
+  calls`, `call_declared_context`'s neighbor `note_consuming_call` — this last
+  is `StaticWorkerFieldLedger`'s own method (checked the enclosing `impl`
+  block, not `Lowering`'s), constructor-field/static-worker-disposition
+  domain, item 12's other RETAIN citation — all continuation/fusion or
+  checked-invocation, item 12's landed domains.
+- `lower_recursor_residual_call` — despite matching "residual and recursor
+  call lowering" by name, its own role is eliminator-frame-descent
+  orchestration that calls OUT to `call_declared_recursive_position_unit`
+  (this item's), never the reverse; stays with computational-match/
+  eliminator-frame descent, item 12's landed RETAIN domain.
+- `recursive_position_unit_body` / `resolve_recursive_unit_body` (+ their
+  own helpers `recursive_position_construct_argument`, `agreeing_recursive_
+  body_unit`) — their names echo `call_declared_recursive_position_unit`
+  closely; traced to their actual caller inside the checked-invocation/
+  computational-recursor construction (`make_computational_recursor`'s
+  caller), not this item's declared-call dispatch.
+- `lower_declaration_ref` — its own text states "evaluating the naked
+  `DeclarationRef` never calls the unit"; produces a compiler-only callable
+  BINDING (closure construction), a different mechanism from calling one.
+  `lower_binder` is the same closure/binder-construction domain.
+- `transfer_constructor_operands`, `transfer_carried_failure_exit_status` —
+  aggregate/carrier allocation emission (`aggregate_carrier_authority`,
+  `emit_checked_aggregate_alloc`), item 12's RETAIN category, not calls.
+- `carry_call_input`, `generated_unit_call_body_callee`, `generated_unit_
+  call_entry_callee`, `call_input_transfer_origin_under_mutation`, `callee_
+  scheduling_origin_used`, `callee_scheduling_origin_under_mutation` (both
+  `#[cfg(test)]`/`#[cfg(not(test))]` forms) — all trace to
+  `GOVERNED_ALLOCATION_MUTATION`/aggregate scheduling despite "call"/"callee"
+  in their names; property-over-tag, aggregate domain (a different
+  frozen-predicate item, not this one).
+- `SEED_CALLEE_UNIT_PORTS` (+ `reset_seed_callee_unit_ports`, `seed_callee_
+  unit_ports`) — semantically about a callee handoff to `call_declared_unit`,
+  but its mutation site (core.rs:13835) is embedded directly inside
+  `lower_expr`'s own `Closure`-callee arm, not in a separately movable
+  method. Stays with `lower_expr` under the same banned-scope clause that
+  keeps `lower_expr` itself in place — the first instance of the injection-
+  inside-the-monolith case this node's method section names above.
+- `D2fWorkerBodyMutation`, `D2fConsumingCallMutation`, `D2fCallBuildMutation`,
+  `D2fPostFieldDirectCallMutation` (+`Scope`/its accessors), `D2fOuterClaim
+  StateMutation`, `D2fCaptureProjectionMutation`, and their `fusion_*`
+  accessors (`fusion_outer_claim_is_outstanding`, `fusion_capture_projection_
+  is_exact`, `fusion_target_carries_claim_authority`) — despite "Call"/
+  "DirectCall" in several type names, every accessor is `fusion_`-prefixed;
+  this is the `RT-LEXICAL-R3-FUSION-EMITTER` continuation/fusion domain,
+  item 12's landed RETAIN, not this item's. A second property-over-tag catch.
+- `lower_borrowed_match`, `lower_borrowed_option_match`, `lower_dynamic_host_
+  result_match`, `lower_bounded_nat_match`, `lower_dynamic_constructor_match`
+  — match-lowering domain (case dispatch over match variants), unrelated to
+  calls/returns; a different, not-yet-split item's territory.
+- `mrc_census_begin/validator/selector`, `ChildCensusSession` — match-
+  recursor-census, item 12's landed "carried_match/static-worker/recursor-
+  position-unit cluster."
+- `D2fEmitterTestArm` and its RAII family, `record_branched_scrutinee_unit_
+  body_*` family — unrelated instrumentation (unit-emission and branched-
+  scrutinee domains respectively), confirmed by their own production
+  injection sites, not this item's.
+- `NativeIntLoweringMutation` — crate-wide shared across five files
+  including two entirely outside the bound files (`object_linker_
+  packaging.rs`, `core/primitive.rs`); moving it is out of this slice's
+  reach regardless of domain.
+- `ResultDecoder` — not declared in the bound files at all (it is
+  `cranelift_backend/compiled.rs`'s); cross-module reference only, no
+  MOVE/RETAIN call to make for this ledger.
+
+### Blind spots / NOT YET CLOSED (stated, not closed — do not read as a plan
+### to skip them)
+
+- **The bulk of the population is unswept.** A full method-level census
+  measured 88 method-level `fn` in core.rs and 228 in mod.rs (316 total,
+  plus roughly 485 top-level items across both files at this SHA); this
+  ledger has traced roughly two dozen by name-collision risk and production
+  injection point. The remainder is NOT yet individually traced — most are
+  believed by domain-pattern to belong to continuation/fusion, checked-
+  invocation, aggregate/carrier-emission, occurrence, or computational-
+  match/eliminator clusters already landed or traced elsewhere in this
+  campaign, but "believed by pattern" does not discharge AC-1; each needs
+  its own production-injection-point check before this ledger can claim
+  the universal.
+- **AC-2 (test-property ledger) has not started.** `core/tests/control.rs`
+  is 30289 lines at this SHA; per this campaign's own established bar
+  (item 12's D0, twice validated) it must be read exhaustively, not
+  marker-sampled. Additionally: this node found at least one `#[cfg(test)]`
+  `mod` embedded DIRECTLY inside `core.rs` itself
+  (`branched_scrutinee_unit_body_observer_tests`, core.rs:1079) — a test
+  population outside `core/tests/` entirely. AC-2's sweep must cover any
+  such in-file test modules in both bound files, not just `control.rs`.
+- **Re-exports, cfg/attr/derive/repr inventory, and macro-produced items**
+  — not yet separately tabulated for any of the traced population, let
+  alone the untraced remainder.
+- **Source-text oracles / `include_str!` paths** — not yet checked for
+  this item's population (Stage A found 49 crate-wide; none yet attributed
+  to this owner or ruled out).
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
