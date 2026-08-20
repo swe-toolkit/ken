@@ -581,6 +581,25 @@ domain. No new MOVE candidates.
 
 **Read through line ~25,500 of 30,289 (about 84%).** Continuing next.
 
+### Addendum 10 — AC-2 progress checkpoint, read through ~88%, domain
+### transition noted
+
+Continued through line ~26,600: closed out `D6c` (sealed binder-run
+shape refusals) and `D9b` (ordinary-run assembly, planner role
+sequence), both RETAIN, same `RT-CONTSRC-PRODUCER-LOCAL` cluster.
+
+The file then transitions to `RT-SRCBODY-BIND-ORDER` `D3` (control
+1-4): whether a `CallableDeclaration`/`ClosureBody`'s own parameters
+bind into its semantic environment in de-Bruijn (reversed) or
+descriptor order, and whether the process root and a generated-context
+seat obey the same law. **RETAIN** — this is the callee's own
+environment-construction mechanism (what order a declaration body's
+*own* parameters resolve to inside that body), not the call-emission or
+return-emission mechanism this item owns. A different domain from
+everything read so far, but still not this item's.
+
+**Read through line ~26,600 of 30,289 (about 88%).** Continuing next.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
