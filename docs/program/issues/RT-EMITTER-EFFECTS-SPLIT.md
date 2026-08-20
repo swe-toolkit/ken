@@ -1,7 +1,7 @@
 ---
 id: RT-EMITTER-EFFECTS-SPLIT
 title: "Move the effects emitter family out of the lowering files -- the emitter half of the effect-seat lifecycle whose planner half item 8 already owns"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
