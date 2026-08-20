@@ -139,14 +139,16 @@ use aggregates::SynthesizedArgument;
 // `source` imports above.
 use aggregates::{AggregateAllocationLedger, AggregateRelationClosure};
 
-// The not-yet-moved tests in `core/tests/constructors.rs` construct
-// `GovernedAllocationMutation`/`CarrierAllocationRequest` and call
-// `GovernedAllocationMutationGuard::install` directly; the same
+// `core/tests/constructors.rs`'s residual `d7_ownership_run` (the one
+// multi-leaf fixture that stays there, `RT-EMITTER-AGGREGATES-SPLIT` `D2`)
+// names `GovernedAllocationMutation`/`GovernedAllocationMutationGuard`/
+// `SiblingProducerSubstitution` in its own signature and body; the same
 // test-glob-chain mechanism as `joins`'s own `#[cfg(test)]` re-export above.
+// `CarrierAllocationRequest` no longer needs re-exporting here: its only
+// test consumer moved into `aggregates::tests` itself at `D2`.
 #[cfg(test)]
 use aggregates::{
-    CarrierAllocationRequest, GovernedAllocationMutation, GovernedAllocationMutationGuard,
-    SiblingProducerSubstitution,
+    GovernedAllocationMutation, GovernedAllocationMutationGuard, SiblingProducerSubstitution,
 };
 
 // `calls.rs`'s retained `call_declared_unit_target` reads

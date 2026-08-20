@@ -56,7 +56,13 @@ pub(in crate::cranelift_backend) use crate::cranelift_backend::artifact::{
     new_object_module_for_lowering_tests as new_object_module,
 };
 
-mod constructors;
+// `RT-EMITTER-AGGREGATES-SPLIT` `D2` -- `aggregates::tests` reaches this
+// module's two residual shared fixtures (`d7_ownership_run`,
+// `d7_constructor_arguments`, both still used by the one D4 test that stays
+// here) by path (`core::tests::constructors::name`), so the module itself
+// must be nameable from that sibling subtree too -- the same precedent
+// `control`'s own widening below already set for `source::tests`.
+pub(in crate::cranelift_backend::lowering) mod constructors;
 // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D2` -- `source::tests` reaches this
 // module's shared fixtures by path (`core::tests::control::name`), so the
 // module itself must be nameable from that sibling subtree too.
@@ -99,8 +105,13 @@ fn inert_test_plan() -> StaticTransitionPlan<'static> {
 /// that a test *cannot* fabricate an origin even if it wanted to:
 /// `StaticOriginId`'s ordinal stays planner-private, so the only origins in
 /// existence anywhere are the ones the planner issued.
+///
+/// `RT-EMITTER-AGGREGATES-SPLIT` `D2` -- `pub(in ...lowering)`, not private:
+/// `aggregates::tests` (a sibling subtree, not a descendant of `core::tests`)
+/// now reaches this by path too, the same cross-subtree shape `control`'s
+/// own module widening above already established for `source::tests`.
 #[cfg(test)]
-fn planned_root_occurrence<'src>(
+pub(in crate::cranelift_backend::lowering) fn planned_root_occurrence<'src>(
     expr: &'src RuntimeExpr,
 ) -> (StaticTransitionPlan<'src>, StaticOriginId) {
     let plan =
