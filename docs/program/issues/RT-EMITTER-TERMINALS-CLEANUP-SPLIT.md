@@ -1,7 +1,7 @@
 ---
 id: RT-EMITTER-TERMINALS-CLEANUP-SPLIT
 title: "Move the terminals and cleanup emitter family out of the lowering files -- the last owner move in the phase, after which only closure remains"
-status: draft
+status: active
 owner: runtime
 size: M
 gate: none
