@@ -431,14 +431,22 @@ fn transparent_aliases_preserve_former_topology_and_fail_closed_otherwise() {
         0,
         "definitionally equal recursive indices must have identical topology",
     );
-    assert_eq!(
-        recursive_shapes(&env, &beta_index, d, 0).expect("beta-normalized direct index")[0]
-            .shape
-            .as_legacy(),
-        recursive_shapes(&env, &direct_index, d, 0).expect("normal direct index")[0]
-            .shape
-            .as_legacy(),
-        "the descriptor stores recursive indices in full normal form"
+    let (_, beta_indices) = recursive_shapes(&env, &beta_index, d, 0)
+        .expect("demand-driven direct index")[0]
+        .shape
+        .as_legacy()
+        .expect("direct shape");
+    let (_, direct_indices) = recursive_shapes(&env, &direct_index, d, 0).expect("direct index")[0]
+        .shape
+        .as_legacy()
+        .expect("direct shape");
+    assert_eq!(beta_indices.len(), direct_indices.len());
+    assert!(
+        beta_indices
+            .iter()
+            .zip(&direct_indices)
+            .all(|(left, right)| convert_type(&env, &Context::new(), left, right)),
+        "retained recursive indices need only be definitionally equal"
     );
 
     let direct_pi = constructor(vec![Term::pi(ty0(), former(d))]);
@@ -451,14 +459,23 @@ fn transparent_aliases_preserve_former_topology_and_fail_closed_otherwise() {
         0,
         "definitionally equal branching domains must have identical topology",
     );
-    assert_eq!(
-        recursive_shapes(&env, &beta_pi, d, 0).expect("beta-normalized Pi domain")[0]
-            .shape
-            .as_legacy(),
-        recursive_shapes(&env, &direct_pi, d, 0).expect("normal Pi domain")[0]
-            .shape
-            .as_legacy(),
-        "the descriptor stores branching domains in full normal form"
+    let (beta_domains, _) = recursive_shapes(&env, &beta_pi, d, 0)
+        .expect("demand-driven Pi domain")[0]
+        .shape
+        .as_legacy()
+        .expect("Pi shape");
+    let (direct_domains, _) = recursive_shapes(&env, &direct_pi, d, 0).expect("direct Pi domain")
+        [0]
+    .shape
+    .as_legacy()
+    .expect("Pi shape");
+    assert_eq!(beta_domains.len(), direct_domains.len());
+    assert!(
+        beta_domains
+            .iter()
+            .zip(&direct_domains)
+            .all(|(left, right)| convert_type(&env, &Context::new(), left, right)),
+        "retained branching domains need only be definitionally equal"
     );
 
     let opaque = constructor(vec![Term::app(
