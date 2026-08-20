@@ -7653,10 +7653,16 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
         // ⛔ **`abi.rs` was not the only absence.** The frame flagged it by
         // name, it was added, and that read as the clause being discharged.
         // Re-derived here against the roster rather than against the frame's
-        // sentence: `BACKEND_PRODUCTION_SOURCES` lists **fifteen** files (the
-        // frame says thirteen — it has grown since), the census carried eight,
-        // and **seven** were still absent with no recorded exclusion. All seven
-        // measure `0/0/0/0/0`, which is why they are rows and not judgements.
+        // sentence: the frame said thirteen files, `BACKEND_PRODUCTION_
+        // SOURCES` had already grown past that by the time this was written,
+        // and it keeps growing with every later split (`D2`, `RT-EMITTER-
+        // EFFECTS-SPLIT`: dropped the literal count here rather than
+        // re-bumping it a second time — the enforced invariant is the
+        // `.len()`-based assertion below, not this sentence, and a literal
+        // count here only drifts stale again at the next split). The census
+        // carried eight of the roster at the time, and **seven** were still
+        // absent with no recorded exclusion. All seven measure `0/0/0/0/0`,
+        // which is why they are rows and not judgements.
         //
         // ⭐ **A zero row and an absent row read identically and only one of
         // them is a claim** — `AC-2`'s own words, and the reason a file that
