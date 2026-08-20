@@ -1,7 +1,7 @@
 ---
 id: LANG-CTOR-PREMISE-ELABORATION-DIVERGES
 title: "A data constructor whose premise applies a recursive function to a telescope-bound variable diverges during elaboration -- proof-carrying inductive families are unavailable in Ken"
-status: ready
+status: active
 owner: kernel
 size: L
 gate: none
