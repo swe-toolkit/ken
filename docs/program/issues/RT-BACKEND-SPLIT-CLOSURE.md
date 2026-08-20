@@ -1,7 +1,7 @@
 ---
 id: RT-BACKEND-SPLIT-CLOSURE
 title: "Close the backend module split -- delete the transitional adapters, narrow the facades, run the test-root closure over control.rs, and prove all four bound files are under 10k"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
