@@ -610,6 +610,17 @@ continuation-route domain, no new MOVE candidates.
 
 **Read through line ~27,700 of 30,289 (about 91%).** Continuing next.
 
+### Addendum 12 — AC-2 progress checkpoint, read through ~95%
+
+Continued through line ~28,900 (`RT-CONTINUATION-EDGE-DISPOSITION` D3's
+five mutation rows and their cross-arm non-collapse proof,
+`RT-CALL-EDGE-EXECUTABILITY-AXIS`'s boundary sentinel,
+`RT-LEXICAL-RECURSOR-CONSUMERS` D2b/D2k-1b-i). All RETAIN — same
+continuation/planner/occurrence domain. No new MOVE candidates.
+
+**Read through line ~28,900 of 30,289 (about 95%).** Continuing next;
+close to the end of the file.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
