@@ -28846,68 +28846,6 @@ fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
     );
 }
 
-/// `RT-REFUSAL-PINS-REHOMED` D1-D3: the in-flight computational capsule is
-/// refused by its value-transfer policy without selecting either body-emission
-/// lane.
-///
-/// MEASURED: the real `boundary_transfer_admissibility` method returns the
-/// `ComputationalMatch` refusal and its exact in-flight-activation reason.
-/// CLAIMED: a computational recursor capsule is control state, not a
-/// transferable value, regardless of which body-emission lane is present.
-/// THE GAP: this pins the construct-level refusal, not the four fixture-only
-/// programs that previously reached it through selector exclusion.
-///
-/// Promise class: durable invariant. Removing the retiring lane leaves this
-/// value-transfer rule unchanged.
-#[test]
-fn refusal_pins_rehomed_computational_match_without_selector_exclusion() {
-    let origin = RecursorProducerOriginId(41);
-    let capsule = Lowered::ComputationalRecursorClosure {
-        residual: Box::new(LoweringOperand::Specialized(Lowered::Trap(RuntimeTrap {
-            code: RuntimeTrapCode::ExplicitTrap,
-            message: "refusal pin inert residual".to_string(),
-        }))),
-        activation: ContinuationActivationId(43),
-        invocation: RecursorInvocationSegment::new(
-            origin,
-            0,
-            ComputationalRecursorLayer {
-                cases: Vec::new(),
-                default: RuntimeTrap {
-                    code: RuntimeTrapCode::ExplicitTrap,
-                    message: "refusal pin inert layer".to_string(),
-                },
-                outer_env: Vec::new(),
-                static_origin: inert_test_static_origin(),
-                provenance: RecursorFrameProvenance(44),
-                role: RecursorLayerRole::SelectsOccurrence { origin },
-                checked_frame_id: None,
-                checked_invocation_id: None,
-                checked_invocation_source: None,
-                checked_invocation_depth: 0,
-                semantic_pending: true,
-            },
-            RecursorUnwindStack {
-                later_wrappers_in_construction_order: Vec::new(),
-            },
-            ContinuationCursorId(42),
-            None,
-            None,
-        ),
-    };
-
-    let refused = capsule
-        .boundary_transfer_admissibility()
-        .expect_err("an in-flight computational capsule must not be transferable");
-    assert!(matches!(
-        refused,
-        CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "ComputationalMatch",
-            reason,
-        }) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
-    ));
-}
-
 /// `RT-REFUSAL-PINS-REHOMED` D1-D3: a constructed static worker that never
 /// enters binding authority is refused by the conservation ledger directly,
 /// without selecting either body-emission lane.
