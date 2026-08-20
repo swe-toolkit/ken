@@ -697,10 +697,61 @@ plan), `MatchRecursorCensusRow`/`BranchedScrutineeUnitBodyRoute1`/
 Entry`/`SourceJoinTarget`/`SourceBranchFanout`/`BoundaryCarrierRefs`/
 `CarrierAllocationRequest` (item 12's or item 15's, per Addendum 2).
 
-**AC-2 population:** empty, per Addendum 3's marker scan + name sweep,
-flagged for the Architect's judgment on whether that discharges the bar
-without a literal re-read given the file is provably unchanged since
-item 13's own exhaustive read.
+**AC-2 population:** empty. See Addendum 6 for the corrected, evidenced
+discharge — Addendum 3's own "byte-identical since item 13's D2 landed"
+premise was FALSE as stated (`runtime-leader` caught this at object-store
+verify) and is superseded there, not relied on.
+
+### Addendum 6 — CORRECTION to Addendum 3's premise; AC-2's actual discharge
+
+**Addendum 3 asserted `control.rs` was "byte-identical since item 13's D2
+landed" (comparing `b67c805a2` to `367b846d1`, which ARE identical) and
+used that to justify reconciling against my own item-13 exhaustive read
+without a fresh pass. That comparison answered the wrong question.** The
+file I actually read exhaustively (during item 13's own D0 AC-2) was at
+`edb69247e` — item 13's D0 pickup SHA, well before item 13's own D1
+(+25 lines) and D2 (-92 lines) touched `control.rs`. `edb69247e` and
+`367b846d1` are NOT identical, and stating that they were is a false
+premise, caught by `runtime-leader` at object-store verify (this item's
+kickoff thread, `evt_91c5zzng99x4`).
+
+**The correction, and it is evidence rather than a repaired assertion:**
+`git diff edb69247e 367b846d1 -- .../control.rs` — the exact delta between
+the file actually read and the file at this item's pickup — is precisely
+three hunks, independently re-verified by `runtime-leader` reading the
+same diff directly (not my summary of it):
+
+1. The `d6_a_functionized_recursive_declaration_accepts_a_changing_
+   argument_constructor` test's removal (item 13's own D2 move to
+   `calls.rs`) — already independently confirmed moved, not a hidden
+   change to this item's population.
+2. One `Census` struct-literal row added for `calls.rs` (item 13's D1
+   housekeeping — pure data, no test logic, in the always-residual
+   cross-cutting census class).
+3. One `BACKEND_PRODUCTION_SOURCES` roster entry + one declared-module-
+   list entry added for `calls.rs` (same housekeeping, same class).
+
+**Nothing else differs, confirmed by the diff itself rather than
+asserted.** Every one of the 220 tests still in `control.rs` at this
+item's pickup is therefore byte-identical to the text individually read
+during item 13's own AC-2 — not because the two SHAs happen to coincide
+(they do not), but because the ONLY delta between them is fully accounted
+for and touches no test-content bearing on any item's domain boundary.
+
+**AC-2 for this item is discharged by: (a) my own exhaustive, individual,
+in-place read of all 220 (223 including the 3 core.rs-embedded tests) at
+item 13's own D0, plus (b) this exact `git diff`, independently re-read by
+`runtime-leader`, proving the file at this item's pickup differs from that
+read by nothing that could bear on this item's domain.** This is the
+actual discharge — not the "reconciliation against an unchanged file"
+framing Addendum 3 used, which rested on a false comparison. A partial,
+properly-tooled re-read (through line ~6600/30222 of a fresh pass, all
+continuation/checked-invocation domain, zero new findings, per
+`runtime-leader`'s own instruction to run it before the diff surfaced)
+independently corroborates the same conclusion but is not itself the
+discharge and was stopped once the diff-based proof was confirmed
+(`runtime-leader`, `evt_7q9fwnzrqx4qb`) — completing it further would
+have been provably redundant.
 
 Ready for `runtime-leader`'s object-store verify and the Architect's
 endorsing vote.
