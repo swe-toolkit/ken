@@ -2052,3 +2052,121 @@ impl<'a> Lowering<'a> {
             builder.ins().select(is_zero, one, nonzero)
         }
 }
+
+#[cfg(test)]
+mod tests {
+    //! `RT-EMITTER-CALLS-RETURNS-SPLIT` `D2` -- the companion test move. This
+    //! one test's primary discriminated property is the declared-call
+    //! emission this file owns (D0 ledger AC-2, Addendum 13,
+    //! `docs/program/issues/RT-EMITTER-CALLS-RETURNS-SPLIT.md`); moved here
+    //! verbatim from `core/tests/control.rs`, item-11/12/13-D1's precedent.
+    //! Its two fixtures (`new_object_module`, `test_only_distinguished_root_
+    //! join_plan`) are shared far beyond this one test -- 19 and 24 call
+    //! sites in `control.rs` alone -- so per the established discipline they
+    //! stay at their existing LCA (`crate::cranelift_backend::artifact`/
+    //! `test_support`) rather than moving or widening; this module names its
+    //! own dependency on them explicitly (AC-8 class 2), the same shape
+    //! `core/tests/mod.rs` and `source.rs`'s own `tests` module already use.
+    //! `compile_expr_into_module` is imported the same way -- it stays owned
+    //! by `core.rs`, a sibling module now rather than an ancestor, so the
+    //! reach that used to come free by descent needs spelling out.
+
+    use super::*;
+    use crate::cranelift_backend::artifact::new_object_module_for_lowering_tests as new_object_module;
+    use crate::cranelift_backend::lowering::core::compile_expr_into_module;
+    use crate::cranelift_backend::test_support::test_only_distinguished_root_join_plan;
+    use crate::{RuntimeLowerabilityStatus, RuntimeSymbolMetadata};
+
+    /// **`RT-DECL-CLOSURE-PORT` `D6` — a functionized recursive declaration ACCEPTS
+    /// a changing argument constructor through its one `ValueWord` parameter.**
+    ///
+    /// ⭐⭐ **This row was `recursive_declaration_shape_change_hits_typed_boundary`,
+    /// a negative, and `D6` inverted it — under the frame's explicit direction, not
+    /// as a convenience.** The fixture calls a recursive transparent declaration
+    /// with `Option::None` at the entry and `Option::Some(Int)` at the recursive
+    /// site.
+    ///
+    /// The retired same-function CFG route required one fixed run of specialized
+    /// block parameters to represent every loop iteration. A functionized call
+    /// holds a different representation contract:
+    /// every declared parameter is one `AbiSlotKind::Parameter` with
+    /// `AbiCarrier::ValueWord`, the descriptor is independent of the particular
+    /// runtime constructor, and each actual argument is transferred through the
+    /// boundary encoder at the call. ⇒ `None` and `Some(Int)` are **two lawful
+    /// values of one declared slot**, not an ABI shape disagreement.
+    ///
+    /// The retired route's representation guard is deliberately not carried into
+    /// the declared-call path. The separate negative the frame requires — a
+    /// genuinely non-transferable value graph — is retained and unaffected:
+    /// `c1_d5_a_closure_is_inadmissible_at_the_root_and_at_every_depth` here, and
+    /// the root/depth admission rows in `constructors.rs`. This row proves the
+    /// restriction was an implementation artefact of the retired lane; those prove
+    /// the real boundary still refuses.
+    ///
+    /// **Promise class: durable invariant.** The subject is that one declared
+    /// `ValueWord` slot admits two constructors of one type. It reds if the
+    /// declared-call path ever acquires a per-constructor shape predicate.
+    #[test]
+    fn d6_a_functionized_recursive_declaration_accepts_a_changing_argument_constructor() {
+        let symbol = "decl:fixture::Loop::run".to_string();
+        let declaration = RuntimeDeclaration {
+            symbol: symbol.clone(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::Closure {
+                    captures: Vec::new(),
+                    params: vec!["state".to_string()],
+                    body: Box::new(RuntimeExpr::Call {
+                        callee: Box::new(RuntimeExpr::DeclarationRef {
+                            symbol: symbol.clone(),
+                        }),
+                        args: vec![RuntimeExpr::Construct {
+                            constructor: "ctor:fixture::Option::Some".to_string(),
+                            args: vec![RuntimeExpr::Value(RuntimeValue::Int((1).into()))],
+                        }],
+                    }),
+                },
+            },
+            metadata: RuntimeSymbolMetadata {
+                lowerability: Some(RuntimeLowerabilityStatus::Supported),
+                ..RuntimeSymbolMetadata::empty()
+            },
+        };
+        let entry = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::DeclarationRef {
+                symbol: symbol.clone(),
+            }),
+            args: vec![RuntimeExpr::Construct {
+                constructor: "ctor:fixture::Option::None".to_string(),
+                args: Vec::new(),
+            }],
+        };
+        let declarations = BTreeMap::from([(symbol.as_str(), &declaration)]);
+        let result = compile_expr_into_module(
+            new_object_module("px8l-recursive-shape").unwrap(),
+            "ken_px8l_recursive_shape",
+            Linkage::Export,
+            &entry,
+            &NativeSeedEnvironment::empty(),
+            declarations,
+            None,
+            true,
+            None,
+            Some(test_only_distinguished_root_join_plan()),
+            None,
+        );
+        // ⚠ Reported with the error attached rather than as a bare `is_ok`: this
+        // fixture could fail closed for several reasons upstream of the one the row
+        // is about, and "it still refuses" and "it refuses for a NEW reason" are
+        // different findings that an unadorned assertion would merge.
+        if let Err(error) = &result {
+            panic!(
+                "D6: a functionized recursive declaration must accept `None` at the entry and \
+                 `Some(Int)` at the recursive site -- they are two lawful values of one declared \
+                 `ValueWord` slot. If this is the old `changes its native argument representation` \
+                 refusal, the declaration has regressed to the retired monolithic contract. \
+                 If it is anything else, it is a new refusal on the \
+                 declared-call path and must be reported, not accommodated: {error:?}"
+            );
+        }
+    }
+}
