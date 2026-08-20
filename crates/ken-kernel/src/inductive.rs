@@ -31,6 +31,7 @@ use crate::env::{
 use crate::error::{KernelError, KernelResult};
 use crate::subst::{apply_args, shift, subst_levels, subst_outer, subst_tel, weaken};
 use crate::term::{GlobalId, Level, LevelVar, Term};
+use std::collections::HashSet;
 /// Does the inductive former `d` occur anywhere in `t` (syntactic sub-term)?
 /// Used by the positivity guards (`14 §8`). de Bruijn indices make this
 /// unambiguous: a former is a `Term::IndFormer { id, .. }` node.
@@ -45,16 +46,21 @@ pub fn occurs(d: GlobalId, t: &Term) -> bool {
 /// transparent definition? The global environment is acyclic, so this closure
 /// terminates.
 fn occurs_delta(env: &GlobalEnv, d: GlobalId, t: &Term) -> bool {
-    match t {
-        Term::IndFormer { id, .. } => *id == d,
-        Term::Const { id, .. } => env
-            .transparent_body(*id)
-            .is_some_and(|(_, body)| occurs_delta(env, d, &body)),
-        _ => t
-            .children()
-            .iter()
-            .any(|child| occurs_delta(env, d, child)),
+    fn go(env: &GlobalEnv, d: GlobalId, t: &Term, seen: &mut HashSet<GlobalId>) -> bool {
+        match t {
+            Term::IndFormer { id, .. } => *id == d,
+            Term::Const { id, .. } => {
+                if !seen.insert(*id) {
+                    return false;
+                }
+                env.transparent_body(*id)
+                    .is_some_and(|(_, body)| go(env, d, &body, seen))
+            }
+            _ => t.children().iter().any(|child| go(env, d, child, seen)),
+        }
     }
+
+    go(env, d, t, &mut HashSet::new())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -143,14 +149,10 @@ fn check_pos_arg_normalized(
                 Term::IndFormer { id, .. } if id == d => {
                     // Recursive occurrence `D Δ_p t̄`: positive polarity, and
                     // `D` must not occur in the (index) arguments.
-                    pol == Pol::Plus
-                        && args.iter().all(|x| !occurs_delta(env, d, x))
+                    pol == Pol::Plus && args.iter().all(|x| !occurs_delta(env, d, x))
                 }
                 Term::IndFormer { id, .. } => {
-                    if args
-                        .iter()
-                        .all(|argument| !occurs_delta(env, d, argument))
-                    {
+                    if args.iter().all(|argument| !occurs_delta(env, d, argument)) {
                         return true;
                     }
                     if env.is_terminal_support(id) && !allow_terminal_supports {
@@ -175,8 +177,7 @@ fn check_pos_arg_normalized(
                 Term::Const { .. } | Term::Constructor { .. } | Term::Var(_) => {
                     // An unresolved application head has no checked parameter
                     // polarity. Every argument therefore remains guarded.
-                    args.iter()
-                        .all(|argument| !occurs_delta(env, d, argument))
+                    args.iter().all(|argument| !occurs_delta(env, d, argument))
                 }
                 Term::Type(_) => {
                     // `Type ℓ` applied is ill-formed as a type; conservatively
