@@ -23,8 +23,10 @@
 //! `check_no_pi_bound_recursive` is retired; strict positivity (`14 §8.2`) is
 //! the sole structural admission test. The eliminator and ι handle the
 //! Π-abstracted IH and the λ-threaded recursive call (`14 §3.1`, `14 §7.7`).
+use std::collections::HashSet;
+
 use crate::check::{infer_motive_level, Sort};
-use crate::conv::normalize;
+use crate::conv::{normalize, whnf};
 use crate::env::{
     AllSupportSort, ConstructorDecl, Context, GlobalEnv, InductiveDecl, ParameterPolarity,
 };
@@ -39,6 +41,27 @@ pub fn occurs(d: GlobalId, t: &Term) -> bool {
         Term::IndFormer { id, .. } => *id == d,
         _ => t.children().iter().any(|c| occurs(d, c)),
     }
+}
+
+/// Does `d` occur syntactically in `t` or in a transitively unfolded
+/// transparent definition? The global environment is acyclic, so this closure
+/// terminates.
+fn occurs_delta(env: &GlobalEnv, d: GlobalId, t: &Term) -> bool {
+    fn go(env: &GlobalEnv, d: GlobalId, t: &Term, seen: &mut HashSet<GlobalId>) -> bool {
+        match t {
+            Term::IndFormer { id, .. } => *id == d,
+            Term::Const { id, .. } => {
+                if !seen.insert(*id) {
+                    return false;
+                }
+                env.transparent_body(*id)
+                    .is_some_and(|(_, body)| go(env, d, &body, seen))
+            }
+            _ => t.children().iter().any(|child| go(env, d, child, seen)),
+        }
+    }
+
+    go(env, d, t, &mut HashSet::new())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -94,8 +117,10 @@ fn check_pos_arg(
     a: &Term,
     allow_terminal_supports: bool,
 ) -> bool {
-    let normalized = normalize(env, &Context::new(), a);
-    check_pos_arg_normalized(env, d, pol, &normalized, allow_terminal_supports)
+    // WHNF exposes each head on demand; δ-aware guards close occurrences hidden
+    // behind transparent definitions without materializing a full normal form.
+    let head = whnf(env, &Context::new(), a);
+    check_pos_arg_normalized(env, d, pol, &head, allow_terminal_supports)
 }
 
 fn check_pos_arg_normalized(
@@ -115,7 +140,8 @@ fn check_pos_arg_normalized(
                 && check_pos_arg(env, d, pol, cod, allow_terminal_supports)
         }
         Term::Lam(domain, body) => {
-            !occurs(d, domain) && check_pos_arg(env, d, pol, body, allow_terminal_supports)
+            !occurs_delta(env, d, domain)
+                && check_pos_arg(env, d, pol, body, allow_terminal_supports)
         }
         Term::App(_, _) => {
             // `C u` (or `D Δ_p t̄` if the head is `D`).
@@ -124,10 +150,10 @@ fn check_pos_arg_normalized(
                 Term::IndFormer { id, .. } if id == d => {
                     // Recursive occurrence `D Δ_p t̄`: positive polarity, and
                     // `D` must not occur in the (index) arguments.
-                    pol == Pol::Plus && args.iter().all(|x| !occurs(d, x))
+                    pol == Pol::Plus && args.iter().all(|x| !occurs_delta(env, d, x))
                 }
                 Term::IndFormer { id, .. } => {
-                    if args.iter().all(|argument| !occurs(d, argument)) {
+                    if args.iter().all(|argument| !occurs_delta(env, d, argument)) {
                         return true;
                     }
                     if env.is_terminal_support(id) && !allow_terminal_supports {
@@ -140,7 +166,7 @@ fn check_pos_arg_normalized(
                         return false;
                     };
                     args.iter().enumerate().all(|(position, argument)| {
-                        if !occurs(d, argument) {
+                        if !occurs_delta(env, d, argument) {
                             return true;
                         }
                         position < former.params.len()
@@ -152,16 +178,16 @@ fn check_pos_arg_normalized(
                 Term::Const { .. } | Term::Constructor { .. } | Term::Var(_) => {
                     // An unresolved application head has no checked parameter
                     // polarity. Every argument therefore remains guarded.
-                    args.iter().all(|argument| !occurs(d, argument))
+                    args.iter().all(|argument| !occurs_delta(env, d, argument))
                 }
                 Term::Type(_) => {
                     // `Type ℓ` applied is ill-formed as a type; conservatively
                     // reject if `D` lurks anywhere.
-                    args.is_empty() || !occurs(d, a)
+                    args.is_empty() || !occurs_delta(env, d, a)
                 }
                 _ => {
                     // Pi/Sigma/Lam/... applied: ill-formed; conservative reject.
-                    !occurs(d, a)
+                    !occurs_delta(env, d, a)
                 }
             }
         }
@@ -172,10 +198,10 @@ fn check_pos_arg_normalized(
         }
         Term::IndFormer { .. } | Term::Const { .. } | Term::Constructor { .. } | Term::Var(_) => {
             // Bare `X` — a parameter or other type; reject if `D` occurs within.
-            !occurs(d, a)
+            !occurs_delta(env, d, a)
         }
         // Anything else as a type is ill-formed; conservatively reject if D hides.
-        _ => !occurs(d, a),
+        _ => !occurs_delta(env, d, a),
     }
 }
 
@@ -424,14 +450,14 @@ fn check_positivity_inner(
         ));
     }
     for p in &ind.params {
-        if occurs(d, p) {
+        if occurs_delta(env, d, p) {
             return Err(KernelError::PositivityViolation(
                 "D occurs in its own parameter telescope".into(),
             ));
         }
     }
     for ix in &ind.indices {
-        if occurs(d, ix) {
+        if occurs_delta(env, d, ix) {
             return Err(KernelError::PositivityViolation(
                 "D occurs in its own index telescope".into(),
             ));
@@ -447,7 +473,7 @@ fn check_positivity_inner(
             }
         }
         for (j, ix) in c.target_indices.iter().enumerate() {
-            if occurs(d, ix) {
+            if occurs_delta(env, d, ix) {
                 return Err(KernelError::PositivityViolation(format!(
                     "D occurs in constructor {:?} target index {j}",
                     c.id
