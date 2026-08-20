@@ -23,6 +23,8 @@
 //! `check_no_pi_bound_recursive` is retired; strict positivity (`14 §8.2`) is
 //! the sole structural admission test. The eliminator and ι handle the
 //! Π-abstracted IH and the λ-threaded recursive call (`14 §3.1`, `14 §7.7`).
+use std::collections::HashSet;
+
 use crate::check::{infer_motive_level, Sort};
 use crate::conv::{normalize, whnf};
 use crate::env::{
@@ -31,7 +33,6 @@ use crate::env::{
 use crate::error::{KernelError, KernelResult};
 use crate::subst::{apply_args, shift, subst_levels, subst_outer, subst_tel, weaken};
 use crate::term::{GlobalId, Level, LevelVar, Term};
-use std::collections::HashSet;
 /// Does the inductive former `d` occur anywhere in `t` (syntactic sub-term)?
 /// Used by the positivity guards (`14 §8`). de Bruijn indices make this
 /// unambiguous: a former is a `Term::IndFormer { id, .. }` node.
