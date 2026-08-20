@@ -538,6 +538,17 @@ declaration_accepts_a_changing_argument_constructor`, Addendum 3).
 
 **Read through line ~18,200 of 30,289 (about 60%).** Continuing next.
 
+### Addendum 6 — AC-2 progress checkpoint, read through ~69%, still no
+### new findings
+
+Continued through line ~21,000 (`RT-CONTSRC-PRODUCER-LOCAL` `D8a`
+through `D8n`: composed-call-target minting/discharge/partition laws,
+the ordinary-envelope source-position repair, the checked-bridge
+source-frame-identity survival). All RETAIN, same planner/continuation
+domain as Addendum 5 — none of it single-owner to this item.
+
+**Read through line ~21,000 of 30,289 (about 69%).** Continuing next.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
