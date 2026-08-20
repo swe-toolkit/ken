@@ -685,6 +685,82 @@ largest open piece of this D0. Re-exports/cfg/attr/derive/repr
 inventory and source-text-oracle checks (AC-1's other item classes)
 remain untouched, as stated since the first partial commit.
 
+### Addendum 14 — AC-1 top-level item sweep, by production census and
+### domain-cluster attribution rather than name-by-name re-derivation
+
+Ran a full top-level-item census over both bound files (regex over
+`struct`/`enum`/`const`/`static`/`type`/`trait`/`thread_local!`
+declarations, distinct from the method-level census in Addendum 2):
+**46 items in `core.rs`, 205 in `mod.rs`** (251 total — the earlier
+"~485" figure from Addendum 1 mixed in the 316 method-level items
+already closed there; this pass is top-level items only).
+
+**Method used, stated honestly.** Individually re-deriving all 251 by
+fresh production-injection tracing would duplicate work already done:
+the AC-2 exhaustive test read (Addenda 3-13) traced the PRODUCTION ROLE
+of every `D2f`/`D3b`/`D3c`/`D4a`/`D4b`/`D5`/`D5a`/`D6a`/`D6b`/`D6c`/
+`D8*`/`D9*`-prefixed mutation-control type while reading the tests that
+exercise it — each one was pinned to a specific domain (fusion,
+producer-local continuation, checked-invocation, static-worker-route,
+composed-call-target/discharge, envelope assembly) via its own doc
+comments and the test bodies that construct/consume it. That population
+— the large majority of the 251 — is attributed here by that established
+tracing, not re-traced fresh. What IS newly, individually checked in
+this pass is every name in the census not already covered by that
+tracing or by Addenda 1-2's earlier passes:
+
+- **`SourceCallee`** (mod.rs:14681, enum) — the one name this pass
+  flagged as needing a fresh check: "callee" in the name, and its own
+  doc comment cites `D8e`/`D8p` (checked-invocation). Traced its sole
+  consumer: `grep` found every construction/match site exclusively in
+  `source.rs` (`source_call_state`, item 12's already-moved,
+  out-of-bound-files module) — none in `core.rs`/`mod.rs` itself.
+  **RETAIN** — same `D8e`/`D8p` checked-invocation cluster already
+  established RETAIN throughout the AC-2 read, despite sitting
+  declared in `mod.rs` while used only by `source.rs`. (Whether item
+  12's own D1 should have carried this type with it is a question about
+  item 12, not this D0's boundary call — noted, not adjudicated here.)
+- **`Lowering<'a>`** (mod.rs:2753) and **`Lowered`** (mod.rs:3194) — the
+  central lowering-state struct and the central value-representation
+  enum. Confirmed by inspection: both are used throughout the whole
+  `core.rs`/`mod.rs` pair, including by item 13's own MOVE-listed
+  methods (`call_declared_unit_target` takes `&mut Lowering`, returns
+  `Lowered`). **RETAIN, hub-stays** — shared infrastructure no single
+  domain owns, same shape as item 12's own ~14 hub-stays support types.
+- **`StaticWorkerEmission`/`StaticWorkerCallOutcome`** (mod.rs:3768,
+  3780) — cross-checked against the interim posts already folded into
+  Addendum 1: confirmed MOVE there ("used exclusively by
+  `call_static_worker`/`call_static_worker_with_inputs`"), consistent
+  with this pass's finding of no other consumers.
+
+No new MOVE candidates surfaced by this census beyond what Addenda 1-3
+already found. The remaining ~245 items are attributed to their
+domain-cluster by name-prefix and doc-comment reading (D2f fusion,
+D3b/D3c producer-local slot resolution, D4a/D4b generated-context
+seats, D5/D5a checked-IH/generated-context, D6a/D6b/D6c static-worker
+route and selection, D8*/D9* composed-call-target/discharge/envelope,
+Px8j/Px8tr source-machine and trap-provenance, effect-seat/aggregate-
+allocation, bounded-nat/dynamic-constructor encoding, checked/oriented
+continuation frame types) — **this is domain-cluster attribution
+grounded in the AC-2 read's own tracing, not a fresh independent trace
+of each of the 245**, and is stated as such rather than claimed as
+individually exact. AC-1's own bar ("each class needs its own fresh
+selector... plus explicit manual closure for what it cannot see")
+is not yet fully met by this pass for the top-level-item class; a
+reviewer wanting per-item exactness should treat this addendum as a
+strong prior, not a substitute for a fresh independent census.
+
+**Still fully untouched, stated again for the handback:** the
+cfg/attribute/derive/repr/visibility inventory, re-exports, macro-
+produced items, and source-text-oracle checks AC-1 also requires;
+D2's own test-move plan; the `RECURSIVE_POSITION_UNIT_CALLS`
+thread_local-block split owed at `D1`.
+
+Handing back here — this is a natural, well-documented stopping point
+after AC-2's full closure and this top-level census, per the standing
+instruction to checkpoint and hand back rather than push an
+under-verified AC-1 claim past what was actually traced.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
