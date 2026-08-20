@@ -96,7 +96,7 @@ pub(in crate::cranelift_backend) fn set_effect_seat_visit_mutation(
     EFFECT_SEAT_VISIT_INDEX.with(|cell| cell.set(0));
 }
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn effect_seat_visit_mutation() -> EffectSeatVisitMutation {
+pub(super) fn effect_seat_visit_mutation() -> EffectSeatVisitMutation {
     EFFECT_SEAT_VISIT_MUTATION.with(std::cell::Cell::get)
 }
 #[cfg(test)]
@@ -115,7 +115,7 @@ fn effect_seat_next_visit_index() -> usize {
 /// one the frame names rather than any refusal.
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::cranelift_backend) enum EffectSeatDispatchMutation {
+pub(super) enum EffectSeatDispatchMutation {
     Exact,
     /// Delete the carried arm of the capacity seat, leaving the specialized
     /// read the whole route -- the state that produced the exact
@@ -154,7 +154,7 @@ pub(in crate::cranelift_backend) enum EffectSeatDispatchMutation {
 thread_local! {
     static EFFECT_SEAT_DISPATCH_MUTATION: std::cell::Cell<EffectSeatDispatchMutation> =
         const { std::cell::Cell::new(EffectSeatDispatchMutation::Exact) };
-    pub(in crate::cranelift_backend) static SITE_OPERAND_SUBSTITUTION_HITS: std::cell::Cell<usize> =
+    pub(super) static SITE_OPERAND_SUBSTITUTION_HITS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
 }
 #[cfg(test)]
@@ -165,11 +165,11 @@ pub(in crate::cranelift_backend) fn set_effect_seat_dispatch_mutation(
     SITE_OPERAND_SUBSTITUTION_HITS.with(|cell| cell.set(0));
 }
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn effect_seat_dispatch_mutation() -> EffectSeatDispatchMutation {
+pub(super) fn effect_seat_dispatch_mutation() -> EffectSeatDispatchMutation {
     EFFECT_SEAT_DISPATCH_MUTATION.with(std::cell::Cell::get)
 }
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn site_operand_substitution_hits() -> usize {
+pub(super) fn site_operand_substitution_hits() -> usize {
     SITE_OPERAND_SUBSTITUTION_HITS.with(std::cell::Cell::get)
 }
 
@@ -577,7 +577,7 @@ impl EffectSeatLedger {
     /// `opened = committed` backstop can be asked whether it still fires on its
     /// own. No production path does this either.
     #[cfg(test)]
-    pub(in crate::cranelift_backend) fn drop_one_committed_group_for_tests(&mut self) {
+    pub(super) fn drop_one_committed_group_for_tests(&mut self) {
         if let Some(id) = self.committed.keys().next().copied() {
             self.committed.remove(&id);
         }
@@ -703,7 +703,7 @@ const IO_ERROR_OTHER_DISCRIMINATOR: i64 = 11;
 ///
 /// **`RT-CARRIER-BYTESPAN-OBSERVE` `D5`** uses it for a carried word that never
 /// denoted a viewable byte span — the observer's outcome `2`.
-pub(in crate::cranelift_backend) const RESOURCE_ERROR_MALFORMED_RESOURCE: i64 = 1;
+pub(super) const RESOURCE_ERROR_MALFORMED_RESOURCE: i64 = 1;
 /// `ResourceErrorV1::InvalidOffset`, as the wire reply's `detail` field spells
 /// it. Named here rather than written as a bare `6` at its call site.
 const RESOURCE_ERROR_INVALID_OFFSET: i64 = 6;
@@ -714,7 +714,7 @@ const RESOURCE_ERROR_INVALID_OFFSET: i64 = 6;
 /// that failed a containment rule — the observer's outcome `1`. That is the
 /// same answer an out-of-range narrowing already gives, and it is the correct
 /// one: the value is a real span whose extent is not admissible.
-pub(in crate::cranelift_backend) const RESOURCE_ERROR_INVALID_BOUNDS: i64 = 7;
+pub(super) const RESOURCE_ERROR_INVALID_BOUNDS: i64 = 7;
 /// **`RT-CARRIER-BYTESPAN-OBSERVE` `D5` — one byte-span seat, read in whichever
 /// phase its operand actually arrived in.**
 ///
@@ -1335,7 +1335,7 @@ impl<'a> Lowering<'a> {
     /// carried in the reply; range/no-wrap/span-containment and `remaining`
     /// are all derived from it, and `0 < count <= effective_request <=
     /// request_length` is asserted before minting.
-    pub(in crate::cranelift_backend) fn mint_validated_progress_nat(
+    pub(super) fn mint_validated_progress_nat(
         builder: &mut FunctionBuilder<'_>,
         success: cranelift_codegen::ir::Value,
         count: cranelift_codegen::ir::Value,

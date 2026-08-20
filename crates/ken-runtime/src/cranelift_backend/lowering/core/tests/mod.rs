@@ -66,7 +66,7 @@ pub(in crate::cranelift_backend) use crate::cranelift_backend::artifact::{
 // `mint_validated_progress_nat` is an associated fn of `Lowering` (called as
 // `Lowering::mint_validated_progress_nat(...)`), not a free item -- reached
 // through the `Lowering` type itself, already in scope, not imported here.
-pub(in crate::cranelift_backend) use super::super::effects::{
+pub(in crate::cranelift_backend::lowering) use super::super::effects::{
     effect_seat_dispatch_mutation, effect_seat_visit_mutation, set_effect_seat_dispatch_mutation,
     set_effect_seat_visit_mutation, site_operand_substitution_hits, EffectSeatDispatchMutation,
     EffectSeatVisitMutation, RESOURCE_ERROR_INVALID_BOUNDS, RESOURCE_ERROR_MALFORMED_RESOURCE,

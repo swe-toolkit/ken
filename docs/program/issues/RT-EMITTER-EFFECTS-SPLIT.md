@@ -662,11 +662,37 @@ hub-stays judgment calls):**
   `site_operand_substitution_hits`, `SITE_OPERAND_SUBSTITUTION_HITS`,
   `RESOURCE_ERROR_MALFORMED_RESOURCE`, `RESOURCE_ERROR_INVALID_BOUNDS`
   — each needed by one or more of the same not-yet-moved test/
-  cross-sibling-production consumers above; all widened to `pub(in
+  cross-sibling-production consumers above; all widened to `pub(super)`
+  -- **corrected by the Architect's D1 vote** (`evt_7m85d3q5sd4px`),
+  independently re-verified before applying: my first pass widened
+  these (plus `EffectSeatDispatchMutation`, `drop_one_committed_group_
+  for_tests`, `mint_validated_progress_nat` above) to `pub(in
   crate::cranelift_backend)`, matching their already-`pub(in
   crate::cranelift_backend)` siblings (`EffectSeatVisitMutation`,
   `set_effect_seat_visit_mutation`, `set_effect_seat_dispatch_
-  mutation`) rather than inventing a narrower convention.
+  mutation`) -- but "matching a landed convention" was the wrong
+  instinct here: those siblings' own wide visibility is itself a
+  pre-existing over-widening (their only out-of-`lowering` reference is
+  a `//!` doc-comment mention, which needs no visibility at all), and
+  copying it onto genuinely new widenings propagates the over-widening
+  rather than applying the minimal-sufficient rule fresh. **A
+  crate-wide grep for every one of the 9 confirms zero real-code
+  consumers outside `lowering/`** (the sole out-of-`lowering` hit,
+  `EffectSeatDispatchMutation` in a `planning/static_transition/
+  effects.rs` doc comment, is prose, not code) -- `pub(super)` is
+  strictly wider than the private-at-base visibility every one of these
+  9 already compiled under before the move, so the narrowing cannot
+  break a consumer. The pre-existing `pub(in crate::cranelift_backend)`
+  siblings are correctly left as-is (verbatim-moved, zero-widen, out of
+  this slice's scope to re-narrow) -- the family is now
+  intentionally mixed-visibility, which is correct, not an
+  inconsistency to paper over. **Downstream consequence of the
+  narrowing:** `core/tests/mod.rs`'s own re-export of these 9 (for
+  `control`/`effects`'s benefit) had to narrow its own qualifier in
+  lockstep, from `pub(in crate::cranelift_backend)` to `pub(in
+  crate::cranelift_backend::lowering)` -- Rust rejects a re-export
+  wider than the item's own visibility (E0364/E0365), caught
+  immediately by the scoped test build.
 - `masked_reply_response_bytes` — stays in the **retained** `core.rs`
   (its own sibling consumer is `core/tests/constructors.rs`'s `super::
   masked_reply_response_bytes`, item 15's own residual test), widened
