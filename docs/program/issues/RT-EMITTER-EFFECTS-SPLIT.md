@@ -163,17 +163,37 @@ group_for_tests`, `commit_body`, `close`), `ObservedBytesSeat`
 (8482-8493ish, zero external consumer -- the return type of `observe_
 carried_bytes_span`, declared far from where it's used, matching this
 campaign's established "type declared far from its use" pattern),
-`SiteOperandWitness` (enum, 8592) + `site_operand_witness` (fn, 8602).
-
-**`SiteOperandWitness` needs a widening this item's own cluster
-requires, not a hub-stays reclassification:** it is embedded as a field
-of `aggregates.rs`'s own (already-MOVED, item 15's) `SiteOperandSource::
-Carried { word, projected: SiteOperandWitness }`. This is NOT the
-item-14 hub-stays shape (a RETAINED type anchoring the field) -- the
-embedding type already moved to a sibling slice. Ordinary cross-sibling
-consumption: `SiteOperandWitness` stays this item's own MOVE candidate,
-widened to `pub(super)` once it moves to `effects.rs` so `aggregates.rs`
-can still name it in that field's type position.
+**`SiteOperandWitness` (enum, 8592) + `site_operand_witness` (fn,
+8602) -- RETAIN at the `mod.rs` hub, corrected by the Architect's D0
+vote (`evt_7nzxad9y75crk`), independently re-verified.** My first read
+called this MOVE + widen-to-`pub(super)` on the theory that field
+embedding in an already-moved sibling type is ordinary cross-sibling
+consumption, not hub-stays -- **wrong application of the right
+principle.** A crate-wide re-check (both symbols) finds **zero Effects
+consumers**: `site_operand_witness`'s only callers are `aggregates.rs:
+2878,3229,3230,3231,3238`, and the type's only embedding is
+`aggregates.rs:672`'s `SiteOperandSource::Carried { projected:
+SiteOperandWitness }` -- both entirely within item 15's already-landed
+domain, none in `lower_process_host_effect` or any Cluster-1/2/3
+mover. **The discriminator I mis-applied:** a type embedded as a field
+of a sibling type and consumed ONLY by that sibling IS the hub-stays
+signal (zero widening required, since `aggregates.rs` already reaches
+it via ordinary descendant visibility from `mod.rs`) -- my prior
+`SiteOperandWitness` reasoning inverted this by treating "the embedding
+type already moved" as disqualifying hub-stays, when what actually
+matters is which domain the CONSUMER evidence names, not which domain
+the SYMBOL's name suggests ("site operand" reads Effects-adjacent but
+the actual consumer is aggregates' synthesized-argument substitution).
+Moving it would have forced exactly the widening BANNED SCOPE forbids
+to make a move compile (`pub(super)` on a private-in-effects type
+embedded in `aggregates.rs`'s own `pub(super)` struct triggers E0446)
+-- the move would have manufactured the finding, not discovered one.
+**Disposition: stays at the `mod.rs` hub, lowering-private, reached by
+`aggregates.rs` via descendant visibility, zero widening.** (Non-
+blocking note carried from the Architect, not part of this fix: the
+tightest domain home is arguably `aggregates.rs` itself, since it is
+the sole consumer -- out of this item's scope, since that would reopen
+item 15's already-landed slice; a candidate for a future cleanup.)
 
 **`ClaimedEffectSeats<'a>` (struct, 8501ish) + `impl<'a>
 ClaimedEffectSeats<'a>` -- RETAIN, hub-stays, re-confirmed independently
@@ -483,16 +503,21 @@ only the type path qualifies.
   already reported above), 3 (12332-12872), and 3b/EOF (already covered)
   -- found no further consts/statics beyond what is already recorded in
   this ledger. `mod.rs`'s AC-1 population is now closed.
-- **The `SiteOperandWitness`/`ClaimedEffectSeats` judgment calls
-  (flagged above) are not yet Architect-reviewed** -- carried as open
-  questions for the D0 vote, not resolved unilaterally.
+- **`ClaimedEffectSeats<'a>` RETAIN-at-hub -- Architect-affirmed**
+  (`evt_7nzxad9y75crk`), independently re-verified: produced in Effects
+  (`core.rs:12921`) and consumed by Effects' own `wire_bytes_seat`
+  (`mod.rs:12388`), by `aggregates.rs` (6 param sites), and by item 15's
+  `constructors.rs` tests (`::none()`, 4 sites) -- genuinely shared
+  across effects.rs(new)+aggregates.rs+constructors.rs, LCA is `mod.rs`,
+  zero-widening RETAIN.
 
 ### The closed MOVE set, restated for a single reference point
 
 **Types/enums:** `EffectSeatGroupId`, `ClaimedEffectSeat`, `EffectSeatClaimRoute`,
 `OpenEffectSeatGroup`, `CommittedEffectSeatGroup`, `EffectSeatLedger`,
-`EffectSeatClosure`, `ObservedBytesSeat`, `SiteOperandWitness`,
-`EffectSeatVisitMutation`, `EffectSeatDispatchMutation`.
+`EffectSeatClosure`, `ObservedBytesSeat`, `EffectSeatVisitMutation`,
+`EffectSeatDispatchMutation`. (`SiteOperandWitness` corrected OUT --
+see RETAIN list below.)
 
 **Consts:** `IO_ERROR_OTHER_DISCRIMINATOR`, `RESOURCE_ERROR_MALFORMED_RESOURCE`,
 `RESOURCE_ERROR_INVALID_OFFSET`, `RESOURCE_ERROR_INVALID_BOUNDS`.
@@ -506,7 +531,7 @@ transport note above).
 `close_host_effect_seat_group`, `effect_seat_group::mint`,
 `EffectSeatLedger::{open_group, open_group_mut, claim, close_group,
 discard_open_group_for_tests, drop_one_committed_group_for_tests,
-commit_body, close}`, `site_operand_witness`, `wire_bytes_seat`,
+commit_body, close}`, `wire_bytes_seat`,
 `wire_bytes`, `narrow_native_int_u64`, `record_capacity_phase_dispatch`
 (both `#[cfg(test)]` twins), `observe_carried_bytes_span`, `narrow_
 carried_int_u64`, `lower_dynamic_small_int`, `set_effect_seat_visit_
@@ -514,19 +539,11 @@ mutation`, `effect_seat_visit_mutation`, `effect_seat_next_visit_index`,
 `set_effect_seat_dispatch_mutation`, `effect_seat_dispatch_mutation`,
 `site_operand_substitution_hits`, `require_u8`, `require_true`,
 `require_when`, `mint_validated_progress_nat`, `validate_resource_io`,
-`validate_resource_error_reply`.
+`validate_resource_error_reply`. (`site_operand_witness` corrected OUT --
+see RETAIN list below.)
 
 **Functions (`core.rs`):** `lower_buffer_freeze_resource_seat`,
 `lower_process_host_effect`.
-
-**Judgment calls carried to the Architect vote, not resolved
-unilaterally:** `ClaimedEffectSeats<'a>` (+ its impl) stays RETAIN at
-the `mod.rs` hub despite being constructed only inside my own mover,
-because it's a shared parameter type reaching into item 15's already-
-moved `aggregates.rs` methods -- flag as a candidate to reconsider if
-the Architect reads the boundary differently. `SiteOperandWitness`
-moves and widens to `pub(super)` to keep serving `aggregates.rs`'s
-already-moved `SiteOperandSource::Carried` field.
 
 **RETAIN, independently confirmed this item (not exhaustive -- see
 prose above for the full reasoning per symbol):** `require_i64`,
@@ -536,23 +553,29 @@ capture`, `artifact_static_payload`, `lower_ground_value`, `lower_big_
 int_constant`, `native_int_tag`, `ground_value`, `intern_result`,
 `lowered_value_kind`, `expect_two_args`, `borrowed_constructor_identity`,
 the `PX8J_*`/`PX8TR_*`/`NATIVE_INT_LOWERING_MUTATION`/`PX8DS_*`/
-`LRC_D2B_*` cluster, `ClaimedEffectSeats<'a>` (judgment call, above),
-`BoundedNatV1`/`StructuralNatV1`, the whole `emit_carrier_*`/`carrier_*`
-family, `mod safe_byte_span`, `mod ac10_production_mint_probe`,
-`DynamicConstructorV1`, `DynamicConstructorAlternativeV1`.
+`LRC_D2B_*` cluster, `ClaimedEffectSeats<'a>` (Architect-affirmed,
+above), `SiteOperandWitness`/`site_operand_witness` (Architect-
+corrected from MOVE, above -- zero Effects consumers, sole
+consumer/embedding is `aggregates.rs`), `BoundedNatV1`/`StructuralNatV1`,
+the whole `emit_carrier_*`/`carrier_*` family, `mod safe_byte_span`,
+`mod ac10_production_mint_probe`, `DynamicConstructorV1`,
+`DynamicConstructorAlternativeV1`.
 
-This is Addendum 1 -- AC-1 (function/type/const/static population) is
-closed for both bound files after one in-place correction (the
-`require_true`/`require_when` misclassification) and two proactive
-re-passes (the Cluster-2 const gap, the Cluster-1/3 re-sweep that found
-nothing new). AC-2 has a mechanical population match complete (39/39
-`effects.rs` tests classified, `control.rs` swept end-to-end) but not
-yet the individual prose read items 11-15's discipline calls for. The
-hub-struct embedding check and the Class-4 source-text-oracle sweep are
-both closed. Two judgment calls are carried to the vote rather than
-resolved unilaterally. Class 1/3 compiler-blind sweeps were checked ad
-hoc (zero found) but not run as a final formal pass. Ready to request
-the Architect's D0 vote with these blind spots stated plainly.
+This is Addendum 1, corrected once by the Architect's D0 vote
+(`evt_7nzxad9y75crk`, `SiteOperandWitness` MOVE -> RETAIN-at-hub --
+applied and independently re-verified above; `ClaimedEffectSeats`
+affirmed as-is). AC-1 (function/type/const/static population) is closed
+for both bound files after two in-place corrections of my own (the
+`require_true`/`require_when` misclassification, and this
+`SiteOperandWitness` one) and two proactive re-passes (the Cluster-2
+const gap, the Cluster-1/3 re-sweep that found nothing new). AC-2 has a
+mechanical population match complete (39/39 `effects.rs` tests
+classified, `control.rs` swept end-to-end) but not yet the individual
+prose read items 11-15's discipline calls for. The hub-struct embedding
+check and the Class-4 source-text-oracle sweep are both closed. Class
+1/3 compiler-blind sweeps were checked ad hoc (zero found) but not run
+as a final formal pass. Ready to re-request the Architect's D0
+endorsement.
 
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
