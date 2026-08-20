@@ -57,7 +57,10 @@ pub(in crate::cranelift_backend) use crate::cranelift_backend::artifact::{
 };
 
 mod constructors;
-mod control;
+// `RT-SOURCE-MACHINE-TYPES-SPLIT` `D2` -- `source::tests` reaches this
+// module's shared fixtures by path (`core::tests::control::name`), so the
+// module itself must be nameable from that sibling subtree too.
+pub(in crate::cranelift_backend::lowering) mod control;
 mod effects;
 
 /// A real, planner-issued origin for a hand-built frame or layer that carries
@@ -68,7 +71,7 @@ mod effects;
 /// because it has none — and if a test ever did derive one, the positional
 /// lookup would fail loudly rather than return a plausible neighbour.
 #[cfg(test)]
-fn inert_test_static_origin() -> StaticOriginId {
+pub(in crate::cranelift_backend::lowering) fn inert_test_static_origin() -> StaticOriginId {
     planned_root_occurrence(&RuntimeExpr::Var(0)).1
 }
 
@@ -307,7 +310,7 @@ fn constructor_field_aggregate() -> RuntimeExpr {
 }
 
 #[cfg(test)]
-fn host_result_closure_match(argument: RuntimeExpr) -> RuntimeExpr {
+pub(in crate::cranelift_backend::lowering) fn host_result_closure_match(argument: RuntimeExpr) -> RuntimeExpr {
     let exit_success = || RuntimeExpr::Construct {
         constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
         args: Vec::new(),
