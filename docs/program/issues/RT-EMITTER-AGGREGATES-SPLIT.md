@@ -686,6 +686,181 @@ controls in the residual `control.rs`.**
 one candidate **only** when an exact compile or mutation-restoration dependency
 makes the pair semantically atomic — and say which it was.
 
+### `D2` executed — the `constructors.rs` `D7` cluster moved into
+### `aggregates.rs`'s own `mod tests`, base `c7f071bcb`
+
+**Population re-verified fresh at this pickup**, not inherited from `D0`:
+`constructors.rs` unchanged since `D0`'s own pickup (`D1` never touches
+test files) -- `d7_governed_sites_program` still opens the cluster at
+line 6675, `a_sibling_records_field_schema_is_refused_before_any_
+allocation` still closes it at line 8684, matching `D0`'s own Addendum 2
+table exactly. 13 tests move; `a_missing_diagnostic_child_that_was_
+already_absent_is_not_a_mutation_hit` stays (discriminates the
+already-RETAIN `RT-CLOSURE-BOUNDARY-LANE` `D4` mutation, not this
+item's own `D7`).
+
+**One item `D0`'s own census missed: `const D7_PAIR_CALLEE`** (a
+module-level `const`, `constructors.rs:7486` at `D0` pickup) --
+`D0`'s AC-1 population trace covered functions/types/thread_locals but
+never ran a dedicated `const` selector over `constructors.rs` itself
+(only over `mod.rs`). Found here by reading the section-header comment
+immediately preceding the cluster's fixture block; its 4 use sites are
+all inside moving fixtures, confirmed by grep before moving it. No
+other missed item classes found on a fresh sweep of the same range.
+
+**The real structural finding this `D2`: two of the 19 shared fixtures
+have a genuinely CROSS-DOMAIN consumer, discovered only by the
+compiler, not by any `D0` selector.** `d7_ownership_run` and
+`d7_constructor_arguments` are each called by BOTH several of the 13
+moving tests AND the one staying `D4` test -- a multi-leaf fixture
+whose two consumer sets now live in different subtrees entirely
+(`lowering::aggregates::tests` vs `lowering::core::tests::
+constructors`), not siblings under one common test-file parent the way
+every prior item's shared fixtures were. First attempt (holding the two
+functions back in `constructors.rs`, widened for `aggregates::tests` to
+reach) failed to compile: `d7_constructor_arguments` itself calls
+`d7_ownership_recursor`/`d7_wrap` (moving), and `d7_ownership_run` calls
+`d7_compile_ownership` (moving) -- holding back the fixture without its
+own transitive dependents just relocates the same problem one level
+deeper. **Corrected: moved BOTH functions into `aggregates::tests` with
+the rest of the `D7` family** (dominant use, 11+ call sites between the
+two vs. 2 in the one staying test), and the one staying `D4` test
+reaches them back by an explicit qualified-path `use`.
+
+**Five more `constructors.rs`-local general helpers needed the same
+cross-subtree reach**, found only by building the moved test code and
+reading each `cannot find function` error's own site (not predictable
+from `D0`'s ledger, which only traced `D7`-domain items):
+`bind_bare_test_trap_lane`, `bare_carrier_test_lowering`,
+`heterogeneous_eliminator_fixture`, `ac_c7_trap`, `first_effect_seat`.
+Each independently confirmed to have OTHER, non-`D7` callers still
+resident in `constructors.rs` (2-10 total call sites each) before
+widening -- genuinely multi-leaf shared infrastructure, not `D7`-private,
+so they stay at their dominant-use file rather than moving or
+duplicating. `planned_root_occurrence` (`core/tests/mod.rs`'s own
+general fixture) and `host_result_closure_match` needed the same
+treatment for the same reason (shared across every lowering test
+subject, not `D7`-specific).
+
+**The cross-subtree visibility mechanism, both directions:**
+- `core/tests/mod.rs`'s `mod constructors;` widened to `pub(in crate::
+  cranelift_backend::lowering)`, matching the EXACT precedent `mod
+  control;` already set immediately below it in the same file (with the
+  identical rationale already documented there: `source::tests` reaches
+  `core::tests::control`'s fixtures the same way).
+- `aggregates.rs`'s own `mod tests` widened to the same level, for the
+  reverse direction (`constructors.rs`'s one residual test reaching
+  `d7_ownership_run`/`d7_constructor_arguments`).
+- Each of the 7 named cross-subtree items (`d7_ownership_run`,
+  `d7_constructor_arguments`, `bind_bare_test_trap_lane`,
+  `bare_carrier_test_lowering`, `heterogeneous_eliminator_fixture`,
+  `ac_c7_trap`, `first_effect_seat`, `planned_root_occurrence`) widened
+  individually to `pub(in crate::cranelift_backend::lowering)` --
+  8 items, not 7, correcting the count as written: `d7_ownership_run`
+  and `d7_constructor_arguments` are the two moving the OTHER direction
+  (`aggregates::tests` -> `constructors.rs`), the other six stay at
+  `constructors.rs`/`core/tests/mod.rs` and are reached FROM
+  `aggregates::tests`.
+- `aggregates::tests`'s own imports for genuinely crate-backend-wide (or
+  wider) test infrastructure (`emit_process_entrypoint_object_with_
+  cranelift`, `compile_expr_into_module`, `new_jit_module`/
+  `new_object_module` aliases, `test_only_distinguished_root_join_plan`,
+  `UnsupportedLowering`) sourced directly from their true declaration
+  site rather than through `core/tests/mod.rs`'s own re-export/alias
+  layer, which `aggregates::tests` -- not being a descendant of
+  `core::tests` -- does not inherit. Ruled test module, `use` permitted
+  (`AC-8` class 2, the same permission `core/tests/mod.rs`'s own header
+  comment already documents and this addendum's imports mirror).
+
+**Visibility narrowing (the Architect's/Adversary's `D1` forward
+note) -- verified crate-wide before narrowing, not assumed from the `D1`
+citation alone:** of the six `pub(super)` symbols named at `D1`
+(`record_event`, `reconcile_declared_children`, `dynamic_alternatives_
+agree`, `synthesized_fixed_identity`, `clear_committed_relation_for_
+tests`, `discard_open_body_for_tests`), only **three** had zero
+surviving external caller once the `D7` cluster moved in:
+`record_event`, `clear_committed_relation_for_tests`,
+`discard_open_body_for_tests` -- narrowed to private. The other
+**three** (`reconcile_declared_children`, `dynamic_alternatives_agree`,
+`synthesized_fixed_identity`) each have a REAL caller in a *different*,
+non-`D7` `constructors.rs` test that was never part of this item's own
+population (grep-confirmed at `core/tests/constructors.rs:2671`
+(`synthesized_fixed_identity`), `:6425` (`reconcile_declared_children`),
+`:6624`/`:6645` (`dynamic_alternatives_agree`)) -- these **stay**
+`pub(super)`, and narrowing them would have broken that unrelated test.
+Two more `D1`-only widenings similarly resolved: `CarrierAllocationRequest`
+(enum) and `emit_carrier_alloc` had zero remaining external references
+once the `D7` cluster moved in -- narrowed to private, and the now-dead
+`CarrierAllocationRequest` entry removed from `mod.rs`'s `#[cfg(test)]`
+re-export block. `SELF_AUTHORIZED_FALLBACK_REACHES` stays `pub(super)`
+(a genuine, permanent `calls.rs` production-adjacent test consumer, not
+`D7`-cluster-related at all).
+
+**AC-2 -- discovery parity, exact `cargo test -- --list` names:**
+`scripts/ken-cargo test -p ken-runtime --lib -- --list` confirms exactly
+13 tests at `cranelift_backend::lowering::aggregates::tests::<name>`,
+each name matching the `D0` ledger's own table verbatim, plus the one
+residual test still at `cranelift_backend::lowering::core::tests::
+constructors::a_missing_diagnostic_child_that_was_already_absent_is_
+not_a_mutation_hit`. Total lib test count unchanged (926 -- `D2` moves
+tests, adds and removes none). No mutation-restoration re-proof needed:
+every moved test's own body, assertions and injection point are
+byte-identical (verified via the extraction script's own sanity
+asserts + the full green suite below), and none of them is a
+source-oracle/text re-point (`AC-2`'s own "enumerate any source-oracle
+path or text rewrite as a non-move hunk" clause -- inapplicable, zero
+such hunks in this move).
+
+**The census/strip-scanner asymmetry, forward-parked by the Adversary
+at `D1`, went live exactly as flagged:** `aggregates.rs` now carries its
+first inline `#[cfg(test)] mod tests`, and `correspondence_adds_no_
+emitted_unit_to_the_production_census`'s needle scan
+(`str::matches("FunctionBuilder::new(")` etc.) is a naive full-text
+scan over `include_str!` of the WHOLE file, not `cfg`-aware. Four `D7`
+direct-API tests build a bare-rig `FunctionBuilder` (2 also
+`.declare_function(` a probe target) to test `emit_carrier_alloc`/
+`source_aggregate_preflight` below the full compile pipeline --
+confirmed by reading each of the 6 hit sites directly, all inside `mod
+tests`. `aggregates.rs`'s `Census` row updated from all-zero to
+`builders: 4, declarations: 2` (the other three needles stay zero) --
+not a defect, a fact about which fixtures this item's own moved tests
+happen to use; `calls.rs`'s own `D2` test module routes entirely
+through the shared `compile_expr_into_module`/`new_jit_module` harness
+instead and never tripped this needle, which is why the asymmetry
+stayed dormant through items 12-15's `D1`s.
+
+**AC-4 / AC-4b -- scoped build + test, `ken-cargo` only:**
+- `scripts/ken-cargo build -p ken-runtime --lib`: clean.
+- `scripts/ken-cargo build -p ken-runtime --tests`: clean, after the
+  full cross-subtree widening + import pass above.
+- `scripts/ken-cargo test -p ken-runtime --lib`: **926 passed, 0
+  failed, 4 ignored** -- identical to `D1`'s own landed count. One test
+  failed on first run (`correspondence_adds_no_emitted_unit_to_the_
+  production_census`, the census/strip-scanner asymmetry above) and was
+  fixed as part of this same `D2` changeset.
+- **Line counts:** `aggregates.rs`: 3,568 -> **5,572** (well under
+  10k). `constructors.rs`: 9,727 -> **7,813** (net -1,914: the 13 tests
+  + 19 fixtures + the const move out; the 8 cross-subtree widenings and
+  one new `use` block partially offset it). `control.rs`: +25 lines
+  (the `Census` row's count correction, from an already-landed `D1`
+  row, not a new row -- `BACKEND_PRODUCTION_SOURCES`/declared-module-
+  list rows are unchanged, already correct since `D1`).
+
+**AC-5 -- adapter/facade debt ledger: empty.** No transitional adapter
+or facade. Every cross-subtree reach is a direct, explicit `use` of a
+production-adjacent test item at the visibility level it actually
+needs -- the "ruled test module" pattern `core/tests/mod.rs` already
+established, not a new mechanism.
+
+**AC-6 -- item 15 closes end-to-end on this deliverable.** `D0`
+(ledger) + `D1` (production move) + `D2` (companion test move) exhausts
+this item's own scope. Not a claim about `RT-BACKEND-MODULE-SPLIT`'s
+own phase closure.
+
+Branch `wp/RT-EMITTER-AGGREGATES-SPLIT`, built on `c7f071bcb` (current
+`origin/main` at pickup, 0 behind). Ready for `runtime-leader`'s
+object-store verify.
+
 
 # ACCEPTANCE
 

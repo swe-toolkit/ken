@@ -7346,17 +7346,32 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
-        // `RT-EMITTER-AGGREGATES-SPLIT` `D1` — the aggregates emitter, moved
-        // verbatim from `mod.rs`. It emits IR into the `FunctionBuilder` its
-        // caller already owns and records into the already-open
-        // `AggregateAllocationLedger`; it never mints a new defined function
-        // or data object.
+        // `RT-EMITTER-AGGREGATES-SPLIT` `D1` — the aggregates emitter's
+        // PRODUCTION code, moved verbatim from `mod.rs`, emits IR into the
+        // `FunctionBuilder` its caller already owns and records into the
+        // already-open `AggregateAllocationLedger`; it never mints a new
+        // defined function or data object -- zero on all five needles.
+        //
+        // `D2` moved the `D7` cluster's TEST code into this same file's own
+        // `#[cfg(test)] mod tests`, and this needle scan is a naive
+        // full-text `str::matches`, not `cfg`-aware (`control.rs`'s own
+        // `correspondence_adds_no_emitted_unit_to_the_production_census`
+        // scans `include_str!` of the whole file). Several `D7` direct-API
+        // tests build a bare rig `FunctionBuilder`/declare a probe function
+        // to test `emit_carrier_alloc`/`source_aggregate_preflight` below
+        // the full compile pipeline -- 4 `builders` + 2 `declarations`,
+        // confirmed by reading each site directly, all inside `mod tests`.
+        // `calls.rs`'s own `D2` test module happens to route entirely
+        // through the shared `compile_expr_into_module`/`new_jit_module`
+        // harness instead, so it never tripped this same needle -- not a
+        // rule that test code must avoid these calls, just a fact about
+        // which fixtures each item's own moved tests happened to use.
         Census {
             file: "lowering/aggregates.rs",
             source: include_str!("../../aggregates.rs"),
-            builders: 0,
+            builders: 4,
             definitions: 0,
-            declarations: 0,
+            declarations: 2,
             data_declarations: 0,
             data_definitions: 0,
         },
