@@ -256,6 +256,82 @@ forbids outright. `SEED_CALLEE_UNIT_PORTS` is the first example found (below).
   this item's population (Stage A found 49 crate-wide; none yet attributed
   to this owner or ruled out).
 
+### Addendum — full method census swept for both files, AC-1 near-closed
+### for the method-level population
+
+Went through every one of the 88 core.rs and 228 mod.rs method-level `fn`
+defs (the full census from the previous section) individually, checking
+each unclassified name against its enclosing `impl`/type and, where
+ambiguous, its actual callers — not stopping at domain-pattern belief.
+
+**New MOVE found (return-emission domain, mod.rs):**
+
+- `transfer_unit_result_into_carrier` (mod.rs — "Transfer the terminal
+  value returned by one declared generated unit"; calls `emit_process_exit_
+  status` directly, already-confirmed MOVE) and `select_terminal_result_
+  origins` (mod.rs, `pub(super)`, called from `units.rs:6137` immediately
+  before a unit's result is finalized — the same external-caller pattern
+  as `emit_result`). Both write/read the shared `terminal_result_origins`
+  field on `FunctionLocalRefs`/`FunctionLocal` (mod.rs-declared, hub-pinned,
+  RETAINED — a RETAINED join-disposition read site at core.rs:10774 also
+  touches this same field, so the FIELD stays at the hub while these two
+  METHODS move, the same hub-stays/methods-move shape item 12 established).
+
+**Every other candidate checked this pass confirmed RETAIN**, each by
+production-injection-point or enclosing-`impl` check, not by name:
+`OwnedSourceOccurrence::cloned`, `ArtifactHelpers::declare_in_func`,
+`FunctionLocalRefs::bind_unit_trap_frame`, `CallInputCalleeDiagnosticMutation
+Guard::install` (aggregate call-input-diagnostic family, same domain as
+`carry_call_input`), `BoundaryTransferInvokingSiteGuard::enter` (item 11's
+boundary domain), `LoweringEnvironmentBinding::value_at`,
+`LoweringOperand::effect_seat_phase`/`specialized_at`/`specialized_join_arm`/
+`specialized_ref_at`, `ConstructorField::specialized`/`static_worker_refusal`/
+`specialized_at`/`into_specialized_at` (constructor-field/static-worker-
+disposition, item 12's landed citation), `StaticWorkerCallOutcome::into_
+operand`/`into_emitted` + `StaticWorkerEmission` (already MOVE — these two
+ARE this item's, tied to `call_static_worker`, not a new finding but
+confirmed here), `unit_boundary_environment_record` (exclusive helper of
+the already-RETAINED `carry_call_input`), `verify_recorded_composed_
+discharges` (D8j composed-discharge domain, checked-invocation),
+`child_possible_referent_owners`/`possible_owners_lifetime`/`lowered_
+aggregate_shape` (aggregate/carrier-allocation ownership), `fused_redirect_
+inputs` (continuation/fusion — calls `resolve_context_capture_claim`
+directly), the whole `AggregateAllocationLedger` impl (`open`/`open_body`/
+`record_event`/`relate`/`commit`/`open_group`/`claim`/`close_group`/etc.,
+mod.rs ~11438-12015), the `D2fPostFieldDirectCallScope`/`D2fGateArrival`/
+`D2fGateObservationScope` RAII families (core.rs pre-impl region,
+`fusion_`-prefixed accessors confirm the already-landed continuation/
+fusion domain), and every method in mod.rs's `12376-13334` block
+(`reconcile_declared_children`, `synthesized_dynamic_alternative`,
+`dynamic_alternatives_agree`, `reconcile_host_result_root`, `reconcile_
+dynamic_alternative`, `synthesized_io_error_alternatives`, and their
+enclosing type's constructor/accessor methods) — item 12's own landed
+"declared-children reconciliation" domain citation, confirmed by spot
+check, not re-derived from scratch.
+
+**Net effect:** AC-1's method-level population for both bound files is now
+believed closed modulo the top-level item sweep below (not yet claimed
+exact — see the next blind spot). The full MOVE list stands at: `core.rs`
+— `call_declared_recursive_position_unit`, `call_declared_context`,
+`validate_retained_callable_capture_contract`, `call_static_worker`,
+`call_static_worker_with_inputs`, `call_declaration_closure_unit`,
+`validate_declaration_unit_call`, plus `RECURSIVE_POSITION_UNIT_CALLS` and
+its accessor; `mod.rs` — `call_declared_unit`, `call_declared_declaration_
+unit`, `call_declared_unit_target`, `decode_direct_callee`, `emit_result`,
+`emit_process_exit_status`, `unwrap_terminal_ret`, `transfer_unit_result_
+into_carrier`, `select_terminal_result_origins`, plus the D5 closeout
+family, `TrapCallerProtocolMutation` family, and `StaticWorkerCallOutcome`/
+`StaticWorkerEmission`.
+
+**Still blind:** the ~485 top-level items (types/consts/statics/traits,
+not method-level `fn`) have not been sample-checked the same way as the
+methods above — the method sweep does not discharge the top-level-item
+class, per AC-1's own conjunctive requirement (declaring a population
+bounds the claim, closing every class discharges it, and this ledger has
+only closed one class so far). AC-2 (control.rs's exhaustive test read
+plus the in-file `core.rs` test module) remains fully open, as does the
+re-export/cfg/attr/derive/repr inventory and the source-text-oracle check.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
