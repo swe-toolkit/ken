@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-20 23:00:05Z — from 390 issue file(s) in `docs/program/issues/`.
+2026-08-20 23:28:21Z — from 391 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -245,6 +245,7 @@ the committed file matches the generator's output.
 | `RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED` | consuming_occurrence carries two fields and only one of them is checked -- eliminator_origin is copied into the re-derivation before the comparison, so AC-1's assert is x == x on that field, and AC-2's mutation perturbs only the field that was already independent, leaving step 1 never fired | merged | runtime | XS | none | — |
 | `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` | the consuming-occurrence validator refusal has four defects that must land together: the production string sits in a cfg arm no test compiles; under cfg(test) the production arm is ABSENT rather than dead so a dropped return makes the validator silently ACCEPT a mismatched occurrence; and the classifier has two messages for FIVE causes, with the body arm a catch-all over an eliminator-kind defect, an identity-match failure and an ambiguity; and the sibling function 55 lines up has the same defect over four more causes, one of which the D2k probe only just measured | ready | runtime | S | none | — |
 | `RT-CONTKEY-ROUTE-CLOSURE-PROBE` | the one question the carry merge deliberately did not answer: with required_consuming_occurrence now available at depths 2 and 3, does the D2k-1c route repair close row 4, or does it still refuse at the next boundary -- a measured-and-reverted probe that authors no candidate, because both ways forward from a residual cross a banned surface and the choice between them is the Architect's | merged | runtime | S | none | — |
+| `RT-CONTROL-INTEGRATION-TESTS-SPLIT` | Cut control.rs's residual integration-test root below 10k by integration-test OWNERSHIP seam -- the named successor RT-BACKEND-SPLIT-CLOSURE left open, a fresh test-ownership axis, not a missed production owner | active | runtime | M | none | — |
 | `RT-CONTSPEC-ABI` | ContinuationSpecialization slice 2 — land the explicit unit/descriptor projection and the ABI, owner/lifetime/affinity and zero-allocation negative gates, still DORMANT | merged | runtime | M | none | — |
 | `RT-CONTSPEC-ACTIVATE` | ContinuationSpecialization seam 2 — lowering activation and exact-use consumption: direct call before the identity-erasing join, active emitted owner, affine call occurrence, JoinArm consumption, gating the 37-row lower-owned population | merged | runtime | L | none | — |
 | `RT-CONTSPEC-ASSEMBLY` | ContinuationSpecialization seam 1 — the lawful assembly: extract the accepted branch-scope helper and its feature-gated harness onto the landed slice 0-2 blobs, unactivated, and prove the prior-slice surfaces are untouched | merged | runtime | M | none | — |
