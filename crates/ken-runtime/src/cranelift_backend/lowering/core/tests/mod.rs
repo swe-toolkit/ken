@@ -37,15 +37,6 @@ pub(in crate::cranelift_backend) use crate::{
     RuntimeSymbolMetadata, UnsupportedLowering,
 };
 
-// `RT-LOWERING-VALUES-BOUNDARY-SPLIT` `D1` — the values-boundary vocabulary
-// `core.rs` itself never names; only these subject tests construct/match it.
-// Ruled test module, a `use` is permitted here (AC-8 class 2).
-pub(in crate::cranelift_backend) use super::super::boundary::{
-    AdoptionPartition, BoundaryInput, BoundaryOutcome, HandleIdentity, LifecyclePhase,
-    MagnitudePartition, PhaseBinding, ProductionAnchor, ReachabilityPartition,
-    StaticEncodingPolicy,
-};
-
 // Ruled test module: a `use` is permitted here (AC-8 class 2).
 pub(in crate::cranelift_backend) use crate::cranelift_backend::test_support::{
     test_only_distinguished_root_join_plan, total_primitive,
