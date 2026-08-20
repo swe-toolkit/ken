@@ -76,6 +76,322 @@ private types, macro-generated declarations, declarations whose visibility and
 type keyword are split across lines, traits, constants, functions, or fields.
 A ledger that does not say what its selector missed is not a ledger.
 
+## `D0` ledger — IN PROGRESS, not yet endorsed or complete
+
+### Method used
+
+Production-injection-point tracing (items 11-15's discipline), widened
+field-embedding + delegating-wrapper census from the start (item 14's
+Architect-required correction, now standing bar). Pickup: `ceac66c25`
+(current `origin/main`, 0 behind). Bound files at this SHA: `lowering/
+core.rs` **14384** lines, `lowering/mod.rs` **13826** lines, `lowering/
+core/tests/control.rs` **30292** lines (re-measured directly, not
+inherited from any prior item's own count).
+
+### Reconciliation against item 8's landed ledger (planner/emitter boundary)
+
+Item 8 (`RT-PLANNER-EFFECTS-SPLIT`, merged, `docs/program/issues/
+RT-PLANNER-EFFECTS-SPLIT.md`) explicitly named the emitter-owned half in
+its own "Boundary proposal" section: `EffectSeatGroupId`,
+`EffectSeatLedger`, `EffectSeatClosure`, `EffectSeatVisitMutation`,
+`EffectSeatDispatchMutation` -- "all live in `lowering/mod.rs` already,
+all consume a validated `PlannedEffectSeat` population by claiming/
+closing seats, and none of them mint or reshape a seat's identity" --
+this item's territory, confirmed independently below. **Items 8/16
+settled**, matching the frame's own frozen stage predicate.
+
+### AC-1 -- MOVE population traced so far (THREE separate clusters found
+### in `mod.rs`, plus TWO functions in `core.rs` -- the largest single
+### item this campaign has moved, `lower_process_host_effect`, is one of
+### them)
+
+**A major structural finding not anticipated by item 8's own line-count
+estimate (which only covered types/statics/small methods visible from
+the PLANNER's own bound file, `static_transition.rs`):**
+`lower_process_host_effect` (`core.rs:12806-14145`, **1,340 lines**) is
+`core.rs`'s own top-level dispatch entry for `RuntimeExpr::Effect`
+occurrences -- structurally the exact same shape as item 14's
+`lower_carried_match`/`lower_dynamic_constructor_match` family, which
+moved to `joins.rs` as this campaign's established precedent for "a
+`core.rs` dispatch entry for one expression kind moves with its own
+domain." Confirmed by tracing every mutation-hook read inside it
+(`effect_seat_visit_mutation()`, `effect_seat_dispatch_mutation()`,
+`effect_seat_next_visit_index()` -- all called only from here) and by
+its own sole call site (`core.rs:12761`, inside `core.rs`'s general
+expression-dispatch match, the same calling shape `lower_carried_match`
+had before item 14's `D1`).
+
+**Cluster 1 -- `mod.rs:404-530`, the two test-mutation families.**
+`EffectSeatVisitMutation` (enum, `#[cfg(test)]`, `pub(in crate::
+cranelift_backend)`) + its thread_local (`EFFECT_SEAT_VISIT_MUTATION`,
+`EFFECT_SEAT_VISIT_INDEX`) + `set_effect_seat_visit_mutation` +
+`effect_seat_visit_mutation` + `effect_seat_next_visit_index`;
+`EffectSeatDispatchMutation` (enum, `#[cfg(test)]`) + its thread_local
+(`EFFECT_SEAT_DISPATCH_MUTATION`, `SITE_OPERAND_SUBSTITUTION_HITS`) +
+`set_effect_seat_dispatch_mutation` + `effect_seat_dispatch_mutation` +
+`site_operand_substitution_hits`. Bounded before by the unrelated
+`scale_b_record_*` family (`ScaleBEmitter` domain) and after by
+`BoundedNatLoweringMutation` (bounded-nat domain) -- both confirmed
+different domains by reading, not by proximity. The `use crate::
+cranelift_backend::planning::CRANELIFT_HOST_EFFECT_CONSUMERS_V1;`
+import immediately preceding this cluster is a re-export of the
+PLANNER's own (item 8's, already-moved) admitted-operation const --
+stays as an import, not a moved item itself, associated with wherever
+`host_effect_operation`'s admission check consumes it.
+
+**Cluster 2 -- `mod.rs:7255-8610`, the seat-group claim/close methods
+plus the `EffectSeatLedger` type family.** `open_host_effect_seat_group`
+(7255-7288), `claim_host_effect_seat` (7290-7372), `close_host_effect_
+seat_group` (7374-7391) -- all three confirmed sole-called from
+`lower_process_host_effect` (core.rs), zero other callers crate-wide.
+Then, after the already-established RETAIN carrier/emit_carrier family
+(`carrier_identity_immediate`/`carrier_out_slot`/`carrier_position_
+immediate`/`emit_carrier_*`, items 14/15's own hub-stays findings,
+re-confirmed unchanged here) and the RETAIN `impl Lowered { first_
+boundary_closure_path }` (boundary/value domain) and RETAIN `Structural
+NatV1`/`BoundedNatV1`/`mod safe_byte_span`/`mod ac10_production_mint_
+probe`/`DynamicConstructorV1`/`DynamicConstructorAlternativeV1`
+(all different, already-established or independently-confirmed
+domains): `mod effect_seat_group { pub(super) fn mint(...) ->
+EffectSeatGroupId }` (8041-8057), `ClaimedEffectSeat` (8060-8072),
+`EffectSeatClaimRoute` (8074-8084), `OpenEffectSeatGroup` (8086-8103),
+`CommittedEffectSeatGroup` (8105-8111), `EffectSeatLedger` struct
+(8113-8134), `EffectSeatClosure` (8136-8151), `impl EffectSeatLedger`
+(8153-8427, 8 methods: `open_group`, `open_group_mut`, `claim`,
+`close_group`, `discard_open_group_for_tests`, `drop_one_committed_
+group_for_tests`, `commit_body`, `close`), `ObservedBytesSeat`
+(8482-8493ish, zero external consumer -- the return type of `observe_
+carried_bytes_span`, declared far from where it's used, matching this
+campaign's established "type declared far from its use" pattern),
+`SiteOperandWitness` (enum, 8592) + `site_operand_witness` (fn, 8602).
+
+**`SiteOperandWitness` needs a widening this item's own cluster
+requires, not a hub-stays reclassification:** it is embedded as a field
+of `aggregates.rs`'s own (already-MOVED, item 15's) `SiteOperandSource::
+Carried { word, projected: SiteOperandWitness }`. This is NOT the
+item-14 hub-stays shape (a RETAINED type anchoring the field) -- the
+embedding type already moved to a sibling slice. Ordinary cross-sibling
+consumption: `SiteOperandWitness` stays this item's own MOVE candidate,
+widened to `pub(super)` once it moves to `effects.rs` so `aggregates.rs`
+can still name it in that field's type position.
+
+**`ClaimedEffectSeats<'a>` (struct, 8501ish) + `impl<'a>
+ClaimedEffectSeats<'a>` -- RETAIN, hub-stays, re-confirmed independently
+rather than inherited from item 15's own "RETAIN, other domain"
+verdict.** `core.rs:12921` constructs its fields DIRECTLY (`let seats =
+ClaimedEffectSeats { claimed: &claimed, capability: ..., arguments: ...
+}`, inside `lower_process_host_effect` itself) and `aggregates.rs` (6
+sites) takes it as a parameter type. A RETAINED... except here the
+"RETAINED" file doing the direct field construction is `core.rs`'s own
+`lower_process_host_effect` -- which is THIS item's own mover. Re-examined
+closely: `lower_process_host_effect` constructs `ClaimedEffectSeats`
+directly as a **local, throwaway value** to pass to the (already-moved,
+item 15's) `aggregates.rs` methods it calls (`site_operand_argument` and
+five siblings) -- the type's OWN "home" is genuinely a shared parameter
+type between this item's dispatcher and item 15's synthesized-argument
+methods, constructed at the call boundary rather than owned by either
+side's internal state. Kept RETAIN at the `mod.rs` hub (moving it would
+force widening for the `aggregates.rs` reach either way, and it carries
+no domain-specific behavior of its own beyond three trivial accessor
+methods) -- flagged as a judgment call, the same class `carrier_out_slot`
+was at item 15's own D0, for the Architect's read.
+
+**Cluster 3 -- `mod.rs:12332-12872`, the byte-span/narrowing helper
+family, all sole-called from `lower_process_host_effect`:** `wire_bytes_
+seat` (12332-12439), `wire_bytes` (12441-12493), `narrow_native_int_u64`
+(12495-12527), `record_capacity_phase_dispatch` `#[cfg(test)]`
+(12529-12580 -- **NB: this span includes a pre-existing, misattributed
+doc comment that reads as `narrow_carried_int_u64`'s own documentation
+["the CARRIED exact-`Int` narrowing..."] but sits directly, with no
+blank-line separation, above `record_capacity_phase_dispatch`'s own
+`#[cfg(test)]` attribute; confirmed by reading, not assumed -- `narrow_
+carried_int_u64`'s own declaration at 12748 has no doc comment of its
+own. This is pre-existing source content, preserved verbatim at `D1`
+exactly as it sits today; not something this transport-only move may
+correct**), `record_capacity_phase_dispatch` `#[cfg(not(test))]`
+(12582-12583), `observe_carried_bytes_span` (12585-12746, its OWN
+correctly-attached doc comment), `narrow_carried_int_u64` (12748-12860,
+bare, no doc comment -- see the note above), `lower_dynamic_small_int`
+(12862-12872).
+
+**`require_one_of_i64` (`mod.rs:12893-12919`) -- RETAIN, hub-stays,
+independently confirmed (corrects a wrong first read).** Located and
+traced crate-wide: called from `core/primitive.rs:354,418` (a genuinely
+different domain, direct `Self::require_one_of_i64` calls with no
+Effects involvement at all), from `lower_unsigned_u64_int` (`mod.rs:
+13515`, itself RETAIN -- see below), and from my own `validate_resource_
+io`/`validate_resource_error_reply`/`lower_process_host_effect`. Two
+independent non-Effects call paths (primitive.rs direct, and via the
+RETAIN `lower_unsigned_u64_int`) settle it RETAIN, grouped with its
+siblings `require_i64`/`require_nonzero` (also confirmed RETAIN, used by
+every sibling module: source/joins/aggregates/calls/units, fresh
+crate-wide sweep, not inherited).
+
+**Cluster 3b -- `mod.rs:12934-13235`, a validation-and-progress-minting
+family, discovered only by exhaustively walking the file past what
+Cluster 3's first pass covered (this is corrected scope, not new
+territory: Cluster 3 previously stopped at 12872 without checking what
+followed).** `require_u8` (12934-12948, sole caller `validate_resource_
+error_reply`, mine), `require_true` (12949-12958) and `require_when`
+(12959-12979) -- **re-examined and corrected**: my first pass called
+these RETAIN on the theory that two call sites meant two domains, but
+both call sites for each are themselves inside MY OWN candidates
+(`mint_validated_progress_nat` and `validate_resource_error_reply`/
+`lower_process_host_effect`) -- zero non-Effects callers exist for
+either, so both are **MOVE**, not RETAIN. `mint_validated_progress_nat`
+(12980-13047, sole caller `lower_process_host_effect`, plus the domain
+test file `core/tests/effects.rs:151` -- internally calls the RETAIN
+`BoundedNatV1::mint_after_reply_validation`, an ordinary cross-sibling
+reference once it moves, no reclassification of `BoundedNatV1` itself).
+`validate_resource_io` (13048-13076, sole caller `validate_resource_
+error_reply`, mine) and `validate_resource_error_reply` (13077-13235,
+sole caller `lower_process_host_effect`, mine) -- both newly found MOVE
+candidates this file's own dispatcher calls, entirely missed by the
+keyword sweep (neither name contains "effect"/"host_effect"/
+"resource_seat" as a distinguishing token the way the rest of the
+cluster's names do; "resource" alone is not Effects-distinguishing, and
+this is the same naming-trap shape already flagged three times this
+campaign).
+
+**`mod.rs:13236-13826` (end of file) -- traced in full, ALL RETAIN,
+different domain(s), zero Effects content.** A "value materialization"
+cluster (`lower_value` 13236, `lower_seed_capture` 13296, `artifact_
+static_payload` 13358, `lower_ground_value` 13374, `lower_big_int_
+constant` 13422, `lower_unsigned_u64_int` 13483, `native_int_tag` 13526,
+`ground_value` 13576, `intern_result` 13653) -- each independently
+confirmed via a crate-wide caller grep to have at least one caller
+outside `lower_process_host_effect`/Effects entirely (`lower_value`:
+source.rs/units.rs/core.rs:11420 inside the general `lower_expr`
+dispatcher; `lower_seed_capture`: called from `lower_expr` itself,
+twice, plus `lower_declaration_ref`, see below; `native_int_tag`:
+joins.rs/calls.rs/aggregates.rs/primitive.rs; `ground_value`/`intern_
+result`: calls.rs; `lower_unsigned_u64_int`: core/primitive.rs). Then a
+free-function classification cluster (`lowered_value_kind` 13672 --
+called from essentially every sibling file, the most cross-domain
+symbol found this item; `expect_two_args` 13697 -- sole external caller
+`core/primitive.rs`, a different domain; `borrowed_constructor_identity`
+13709 -- sole external callers joins.rs/source.rs). Then a thread-local
++ free-fn cluster with zero Effects-span callers at all (`PX8J_SOURCE_
+TRACE`/`PX8J_DELETE_OWNED_SELECTED_SCOPE`/`PX8TR_TRAP_PROVENANCE`/
+`PX8TR_DISABLE_DEFORESTED_ANSWER_ROUTE`/`NATIVE_INT_LOWERING_MUTATION`/
+`PX8DS_RETIRED_FLAT_ORDER`/`LRC_D2B_*` thread_locals and their `lrc_d2b_
+*` accessor fns, 13728-13826) -- consumed by test_objects.rs, calls.rs,
+source.rs, `core/primitive/tests.rs`, `control.rs`, `constructors.rs`;
+zero hits inside `lower_process_host_effect`'s own span, confirmed by
+direct grep. **`mod.rs`'s own population is now closed to the end of
+the file** -- no further un-swept region remains after 13826 (EOF).
+
+**`core.rs`'s own population -- CLOSED, not merely the keyword-sweep
+result previously flagged as open.** The naming-trap check flagged as
+outstanding is now run: `lower_declaration_ref` (`core.rs:14147-14384`,
+end of file) sits immediately after `lower_process_host_effect` and
+contains `child_occurrence`/`lower_seed_capture` calls that a first
+`self.method()` sweep of my own function's body could not see (they sit
+past 14145, outside my own function's true end). Its sole caller is
+`core.rs:12262`, inside `lower_expr` (the general expression
+dispatcher, `pub(super)`, RETAIN by definition) -- `lower_declaration_
+ref` is a general declaration/symbol-reference lowering routine, RETAIN,
+different domain, not Effects. `core.rs`'s Effects population is
+confirmed closed at exactly two functions: `lower_buffer_freeze_
+resource_seat` (12780-12804) and `lower_process_host_effect`
+(12806-14145).
+
+### AC-2 -- test-property ledger, first pass (topology differs from item
+### 15 -- state this plainly, don't force the constructors.rs template)
+
+**`core/tests/effects.rs` already exists (3901 lines, 39 `#[test]`
+fns) -- this is NOT item 15's shape.** Item 15 had to discover and move
+tests INTO a newly-created inline `mod tests` inside its new production
+file. Here, a prior initiative (its own header cites "RT-SPLIT slice 7"
+and "RT-SPLIT §10.2 assigns these subjects to `effects`", and `core/
+tests/mod.rs:3` says "Slice 4 populates `control`, `effects` and
+`constructors`") already split the TEST tree, well before this
+production-code campaign reached item 16. `effects.rs` reaches the
+not-yet-moved production symbols via `use super::*` today; once `D1`
+creates `lowering/effects.rs` and moves the production symbols there,
+this test file's own `D2` need may be small (import-path fixups) rather
+than a symbol-by-symbol test relocation -- **stated as a hypothesis to
+verify at `D1`/`D2` time, not yet proven.**
+
+**`control.rs` still holds the three tests item 8's own D2 flagged, all
+independently re-verified at THIS item's pickup SHA (not inherited from
+item 8's stale `34c0ef97a`):**
+- `erasing_a_seat_key_axis_or_collapsing_the_contract_rejects`
+  (`control.rs:16632`) -- uses `EffectSeatPlanMutation` exclusively (a
+  **different, planner-owned** type from my own `EffectSeatVisitMutation`/
+  `EffectSeatDispatchMutation`; the frozen stage predicate's "plan
+  identities/validation" is exactly this). **Confirmed item 8's own
+  domain, stays. Class 4/control-domain, not mine.**
+- `an_incomplete_duplicate_discarded_or_misobserved_visit_rejects`
+  (`control.rs:16701`) and `a_discarded_visit_refuses_before_its_body_
+  is_defined` (`control.rs:16772`) -- both use `EffectSeatVisitMutation`
+  (18 hits across the pair, `control.rs:16703-16840`), my own Cluster-1
+  type. **Confirmed item 16's own domain -- movers**, matching item 8's
+  lead, now independently re-verified rather than trusted.
+
+**Two Class-4 (source-text oracle) sites in `control.rs` independently
+confirmed, matching item 8's own D0 prediction of an anticipated
+"effects" row addition at `D1` time (items 4-7's precedent):**
+`correspondence_adds_no_emitted_unit_to_the_production_census`
+(`control.rs:7243`, its own `Census { file: "planning/static_
+transition/effects.rs", ... }` entry at 7549-7550 documents in-comment
+that "the emitter-owned half (`EffectSeatGroupId`/`EffectSeatLedger`/
+`EffectSeatClosure`) stays in `lowering/mod.rs`" -- literally describing
+my own item's pre-`D1` state) and `the_backend_production_surface_
+inventory_is_closed` (`control.rs:8162`, its own `("planning/static_
+transition.rs", "effects")` row at 8279, same comment content). **Item
+8's ledger said "3-location"; only these two are located so far** --
+the third is an open blind spot, not yet found.
+
+### Hub-struct field embedding -- resolved, not a RETAIN case
+
+**`EffectSeatLedger` IS embedded as a field of the retained `Lowering`
+struct** (`mod.rs:2931`: `host_effect_seats: Option<EffectSeatLedger>`)
+-- exactly the check the kickoff required. **This does not reclassify
+it RETAIN.** The adjacent field one line above it, `aggregate_
+allocations: Option<aggregates::AggregateAllocationLedger>`
+(`mod.rs:2927`), is item 15's own already-moved type, referenced via
+its **qualified module path** -- proving the precedent directly rather
+than by analogy. `EffectSeatLedger` moves with the rest of its own
+cluster; at `D1` the `host_effect_seats` field's value type becomes
+`effects::EffectSeatLedger`, mirroring `aggregate_allocations` exactly.
+The `Lowering` struct itself (and the field slot) stays in `mod.rs` --
+only the type path qualifies.
+
+### Blind spots / NOT YET CLOSED (stated, not closed -- do not read as a
+### plan to skip them)
+
+- **The four compiler-blind classes are only partially swept.** Class 2
+  (cfg/attribute-gated) is implicitly covered by the `#[cfg(test)]`
+  markers already named above, but not yet run as its own dedicated
+  pass. Class 1 (re-exports) and Class 3 (macro-produced) checked ad
+  hoc during the sweep above (zero found in every span checked) but not
+  yet run as a formal, closed pass. Class 4 (source-text oracles) has
+  two of an expected three `control.rs` locations found; the third is
+  not yet located.
+- **AC-2 is a first pass, not exhaustive.** Only the tests already
+  flagged by item 8's lead have been individually verified; the full 39
+  `#[test]` fns in `effects.rs` have not each been individually read
+  and matched against my closed MOVE-set symbols, and `control.rs` has
+  not been swept end-to-end for every remaining `EffectSeat*`/`wire_
+  bytes*`/`narrow_*_int_u64`/`SiteOperandWitness` reference outside the
+  three sites already found.
+- **Consts/statics/traits/repr classes** have not yet had a dedicated
+  selector pass beyond what fell out of the function/type tracing above
+  (the Cluster 3b / EOF sweep above closes most of this for `mod.rs`,
+  but the earlier clusters -- 1, 2, 3 -- have not each had an
+  independent const/static-only pass run against them).
+- **The `SiteOperandWitness`/`ClaimedEffectSeats` judgment calls
+  (flagged above) are not yet Architect-reviewed** -- carried as open
+  questions for the D0 vote, not resolved unilaterally.
+
+This is Addendum 1 -- a substantial first pass across AC-1 (function/
+type population, both bound files, now close to closed after one
+in-place correction -- the `require_true`/`require_when`
+misclassification), the hub-struct embedding check (resolved), and a
+first cut at AC-2 (three specific tests independently verified; the
+full 39-test file not yet exhaustively read). Not yet a closed `D0`.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
