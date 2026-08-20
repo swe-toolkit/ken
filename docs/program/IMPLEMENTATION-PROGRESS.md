@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-20 19:01:03Z — from 389 issue file(s) in `docs/program/issues/`.
+2026-08-20 19:13:23Z — from 389 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -131,7 +131,7 @@ the committed file matches the generator's output.
 | `LANG-COMMENT-POPULATION-PARITY` | The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home | merged | language | S | none | — |
 | `LANG-CONVOY-ENCLOSING-FIELD` | spec 34 §3.2's Boundary paragraph names the two-vector `zip` recursive step a known gap and a follow-on -- the sibling-convoy re-typing cannot distinguish a genuine outer parameter from a field the enclosing match already bound, because `outer_scope_depth` is a raw context-depth subtraction that includes both -- and the follow-on was never filed | merged | language | S | none | — |
 | `LANG-CONVOY-MATCH-FIELD-PROVENANCE` | capability 2's sibling-convoy candidate range is a positional proxy for a provenance property -- carry the match-field regions explicitly on the elaboration context and skip them, closing spec 34 section 3.2's Boundary gap without the incompleteness a positional floor would introduce | merged | language | S | none | — |
-| `LANG-CTOR-PREMISE-ELABORATION-DIVERGES` | A data constructor whose premise applies a recursive function to a telescope-bound variable diverges during elaboration -- proof-carrying inductive families are unavailable in Ken | ready | kernel | L | none | — |
+| `LANG-CTOR-PREMISE-ELABORATION-DIVERGES` | A data constructor whose premise applies a recursive function to a telescope-bound variable diverges during elaboration -- proof-carrying inductive families are unavailable in Ken | active | kernel | L | none | — |
 | `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` | `37 §2.5` defers the proof-carrying `DecEq String` / `Ord String` instances as a `tracked follow-on` because the transport needs a lawful `DecEq Char` that is not landed -- and the follow-on was never filed, so the second unowned obligation in this chapter sits in spec prose with no tracker row | draft | language | unsized | operator | — |
 | `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` | 34 §4.1 requires naming the unmatched PATTERN WITNESS, and ExhaustivenessError's payload is a single String documented as a constructor NAME -- so no change at any emission site can discharge the obligation, and it reads as satisfied today only because every landed omission test uses a zero-arity constructor where name and most-general pattern coincide | merged | language | M | none | — |
 | `LANG-FIXITY-DECL-SURFACE` | `infixl N op` / `infixr N op` / `infix N op` populate a fixity table the parser consults -- the third and last part of user-defined operators, and the only one carrying a real design call: declaration-before-use versus whole-module collection, and scoping across imports | draft | language | M | none | — |
@@ -435,7 +435,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
-- `LANG-CTOR-PREMISE-ELABORATION-DIVERGES` — A data constructor whose premise applies a recursive function to a telescope-bound variable diverges during elaboration -- proof-carrying inductive families are unavailable in Ken
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
 - `LANG-SYMBOLIC-OPERATOR-NAMES` — `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined
