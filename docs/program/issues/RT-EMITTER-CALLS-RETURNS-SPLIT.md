@@ -1,7 +1,7 @@
 ---
 id: RT-EMITTER-CALLS-RETURNS-SPLIT
 title: "Move the calls and returns emitter family out of the lowering files -- the first emitter slice, moving against the stable unit and call vocabulary item 4 established"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
