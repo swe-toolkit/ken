@@ -79,20 +79,21 @@ pub(in crate::cranelift_backend) use continuations::{
     D3bFinalizationPerturbation, d3b_refinalize, d3b_publish_without_finalization, ComposedCallTargetDefect, set_composed_call_target_defect, RequiredConsumerProjectionDisposition, ContinuationRequiredConsumerObservation, RequiredConsumerProjectionMutation, with_required_consumer_projection_mutation, take_continuation_required_consumer_observations, with_continuation_consuming_occurrence_seed_mutated, with_continuation_consuming_eliminator_seed_mutated, EnvelopeDefect, set_envelope_defect, set_primary_fusion_key_derivation_mutated, set_binder_body_resolution_suppressed, set_static_body_triple_duplicated, set_post_specialization_descent_suppressed, set_continuation_descent_owner_duplication, FusionClaimParameterMutation, FusionProducerCaptureMutation, with_fusion_producer_capture_mutation, with_fusion_claim_parameter_mutation, reset_r3_fusion_claim_consumptions, r3_fusion_claim_consumptions,
 };
 use continuations::{PlannedContinuationSpecialization, PlannedContinuationSpecializationCall};
-#[cfg(test)]
-use continuations::{
-    validate_continuation_specialization_closure,
-};
 
 #[cfg(test)]
 #[allow(unused_imports)]
 use continuations::{
     CONTINUATION_INTERN_MUTATION, CONTINUATION_PRODUCTION_MUTATION, COMPOSED_CALL_TARGET_DEFECT, WEAKEN_CONTINUATION_DECREASING_MEASURE, SUPPRESS_POST_SPECIALIZATION_DESCENT, DUPLICATE_STATIC_BODY_TRIPLE, ENVELOPE_DEFECT,
 };
+// `RT-BACKEND-SPLIT-CLOSURE` (item 18): `validate_continuation_specialization_
+// closure`/`ContinuationProjectionOmission`/`ContinuationInternMutation`
+// narrowed away here -- compiler-flagged unused, independently re-verified
+// crate-wide (including the `lowering/` tree, not just this file) before
+// narrowing: neither is consumed anywhere outside `construction.rs`/
+// `closure.rs`'s own direct declaration/use, and `planning.rs` does not
+// re-export either. `ContinuationProductionMutation` alone stays.
 #[cfg(test)]
-use continuations::{
-    ContinuationProjectionOmission, ContinuationInternMutation, ContinuationProductionMutation,
-};
+use continuations::ContinuationProductionMutation;
 
 // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — the aggregates domain's cross-boundary
 // surface: `lowering` and `planning`'s own re-export both reach these through
