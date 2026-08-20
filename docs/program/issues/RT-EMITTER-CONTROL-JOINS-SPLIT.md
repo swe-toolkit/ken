@@ -77,6 +77,297 @@ private types, macro-generated declarations, declarations whose visibility and
 type keyword are split across lines, traits, constants, functions, or fields.
 A ledger that does not say what its selector missed is not a ledger.
 
+
+## `D0` ledger — IN PROGRESS, not yet endorsed or complete
+
+Measured at `367b846d1` (origin/main at pickup, 0 behind). No code moved. This
+section records grounded findings as they are traced, per the campaign's own
+durability lesson (item 12's/13's D0 ledgers were built the same way, in
+multiple addenda, and this file is the durable artifact if a hand-back is
+needed before the ledger closes). Bound files at this SHA: `core.rs` 15,568
+lines, `mod.rs` 18,067 lines (both re-measured directly, not inherited from
+any prior item's frame or census row — both shrank again under item 13).
+
+### Method used
+
+Production-injection-point tracing (items 11/12/13's discipline), reconciled
+against the two nearest LANDED ledgers rather than re-deriving their domains:
+item 13's own landed D0/D1 ledger (`docs/program/issues/RT-EMITTER-CALLS-
+RETURNS-SPLIT.md`, the calls-and-returns emitter, merged immediately before
+this item) and item 9's landed D0 ledger (`docs/program/issues/RT-PLANNER-
+JOINS-TRAPS-SPLIT.md`, the joins/traps planner half, merged earlier). Item
+9's own ledger explicitly pre-identifies several pieces of this item's
+boundary (see "reconciliation against item 9" below) — a genuine head start,
+used as a starting hypothesis and independently re-verified against the
+current tree, not taken on faith.
+
+**`control.rs` is byte-identical since item 13's D2 landed** (`git diff
+b67c805a2 origin/main -- .../control.rs` is empty at this pickup) — so this
+item's AC-2 can reconcile against my own exhaustive item-13 AC-2 read of the
+exact same 30,222-line file (all 220 `#[test]` functions individually read
+in place during that item's own D0), rather than re-reading it blind. AC-2's
+own reconciliation section below states this explicitly and names what
+still needs a fresh look.
+
+### Reconciliation against item 9's landed ledger (planner/emitter boundary)
+
+Item 9's own D0 (`de402e255`) resolved the frame's own "planned trap seats,
+trap provenance events" prose as **not planner-owned at all** — both live in
+`lowering/mod.rs` already, zero presence in `static_transition.rs`. Item 9
+explicitly named this as "the emitter's half of the pair (item 14's, per the
+frozen predicate)" and flagged three specific `control.rs` tests as
+"emitter-owned... item 14's, not this slice's domain":
+`typed_trap_exit_preserves_the_planner_identity_across_two_unit_calls`,
+`typed_trap_exit_rejects_a_deleted_or_root_misclassified_unit_lane`,
+`typed_trap_exit_identity_and_caller_protocol_mutations_are_discriminating`
+(all three re-verified present at their item-13-era positions, `control.rs`
+being byte-identical since).
+
+**Independently re-traced, not taken on item 9's word alone** (see the
+test-property section): the first two are genuinely mixed/shared once their
+full apparatus is read (already established during item 13's own D2 sanity
+re-read, which this item's AC-2 reconciles against rather than repeating
+blind) — the third crosses into item 13's own `TrapCallerProtocolMutation`
+axis, already moved to `calls.rs`, so it stays a shared/end-to-end control
+regardless of which single item's perspective reads it. Item 9's "item 14's,
+not [item 9's]" framing is correct in the planner-vs-emitter sense; it is not
+itself a single-owner-to-item-14 verdict, and this ledger does not read it as
+one.
+
+Item 9's ledger also named the exact emitter-side consumption sites for the
+planner-owned `StaticTransitionPlan` join/trap accessors it retained
+(`join_plan_token`, `join_plan_token_if_planned`, `required_join_origins`,
+`source_join_origins_in_owner_subtree`, `trap_identity`, `trap_catalog`) —
+each at a `lowering/mod.rs`/`lowering/core.rs` line number from its own pickup
+SHA. Re-derived those call sites fresh in this item's own trace below (not
+copied forward) since both files have shrunk since item 9's `de402e255`.
+
+### AC-1 — MOVE population traced so far
+
+**Join emission and disposition (`mod.rs`, unless noted):**
+
+- `carried_join_arm` (`core.rs`, already `pub(super)`) — emits a join
+  predecessor's carrier-word value at a carried match's merge; calls
+  `self.transfer_into_carrier`/`self.emit_process_exit_status` (item 13's,
+  already `pub(super)`) and `self.emit_carrier_immediate` (RETAIN, item 15's
+  aggregate/carrier domain, cross-module call).
+- `append_planned_join_params` (`core.rs`, already `pub(super)`) — appends
+  CLIF block params to an already-created merge block from a `JoinPlanToken`.
+- `jump_planned_join_arm` (`core.rs`, private) — emits `builder.ins().jump`
+  into the merge, dispatching on `JoinResultRepresentation`.
+- `finish_planned_join` (`core.rs`, already `pub(super)`) — switches to the
+  merge block and recovers the typed result after every predecessor has run.
+- `consume_join_plan`, `consumed_join_plan_token` (`mod.rs`, private) —
+  mint/reborrow a `JoinPlanToken` at emission time, from `self.static_
+  transition_plan.join_plan_token(origin)` (item 9's landed planner
+  accessor, cross-module call, unchanged).
+- `disposition_statically_unselected_source_subtree`,
+  `disposition_statically_unselected_match_cases`,
+  `close_statically_unselected_match_cases` (`mod.rs`, private) — mark a
+  statically-dead branch/case's joins and match-case selections as
+  dispositioned rather than emitted, calling `self.static_transition_plan.
+  source_join_origins_in_owner_subtree`/`source_match_case_body_origins`
+  (item 9's/planner's, cross-module, unchanged).
+- `validate_join_plan_consumption`, `finalize_join_disposition`,
+  `validate_materialized_dead_join_cfg`, `validate_materialized_dead_join_
+  cfg_for` (`mod.rs`, private) — the generated-function-boundary closure
+  proving every planned join was either emitted or dispositioned, and that
+  every dead-classified merge block is genuinely CFG-unreachable.
+- `merge_scalar_branch`, `merge_scalar_operand` (`mod.rs`, private) — the
+  native-scalar-pair join-merge consumer (as distinct from the carrier-word
+  merge `carried_join_arm` handles); calls `Self::unwrap_terminal_ret`
+  (item 13's, already `pub(super)`) and `lowered.specialized_join_arm`
+  (below).
+- `record_scalar_merge_kind` (`mod.rs`, private, associated fn on
+  `Lowering`) — the one-shot "every dynamic arm agrees on result kind"
+  check shared by both merge consumers above.
+- `LoweringOperand::specialized_join_arm` (`mod.rs`, private method on
+  `LoweringOperand`, not `Lowering`) — "every call is an inventory entry for
+  the join work" per its own doc comment; **sole caller is `merge_scalar_
+  operand`** (grep-confirmed, 1 call site crate-wide), unlike its siblings
+  `specialized_at`/`specialized_ref_at`/`effect_seat_phase` (12+ call sites
+  spanning many domains — those stay hub-stays, see RETAIN below).
+
+**Branch and match emission (`core.rs` unless noted):**
+
+- `lower_carried_match`, `lower_nonborrowed_carried_match`,
+  `lower_carried_constructor_match`, `lower_borrowed_match`,
+  `lower_borrowed_option_match`, `lower_dynamic_host_result_match`,
+  `lower_bounded_nat_match`, `lower_dynamic_constructor_match` — the
+  ordinary (non-checked-invocation) match-case dispatch family: constructor-
+  tag comparison chains (`builder.ins().icmp`/`.brif`), per-case block
+  creation, and per-arm join-arm emission via the join-family functions
+  above. `lower_borrowed_match`/`lower_borrowed_option_match`/`lower_
+  dynamic_host_result_match`/`lower_bounded_nat_match`/`lower_dynamic_
+  constructor_match` were already individually traced and confirmed NOT
+  item 13's during that item's own D0 ("match-lowering domain..., a
+  different, not-yet-split item's territory") — that finding reconciles
+  cleanly into this item's own MOVE set.
+
+**Trap-exit machinery — methods MOVE, most of the surrounding vocabulary
+RETAINS (see the hub-stays findings below):**
+
+- `emit_current_trap` (`mod.rs`, private) — the sole production site that
+  materializes a `RuntimeTrap`'s identity as a CLIF value at a trap exit
+  (unit-frame TrapWord store, root process-sentinel, or root trap token).
+  Cross-file RETAINED callers exist in `units.rs` (4 sites, opaque method
+  calls — same shape as item 13's widely-called movers, not a hub-stays
+  case; see the discriminator below).
+- `seal_source_trap_branch` (`mod.rs`, private) — "does this branch resolve
+  to a trap; if so, emit it and return instead of joining." Called from
+  `core.rs` (many of the match functions above, both this item's and item
+  12's computational-match family) and from `source.rs` (item 12's landed
+  module, 7 sites) — widely shared, opaque method calls only.
+- `bind_unit_trap_frame` (`FunctionLocalRefs::`, `mod.rs`, private) — binds
+  the one `TrapExitAuthority::UnitFrame` a generated unit gets; refuses a
+  double bind. Callers are exclusively in `units.rs` (4 sites) and `core/
+  tests/constructors.rs` (2 sites, direct test construction) — zero callers
+  within `core.rs`/`mod.rs` itself today.
+- `TrapIdentityMutation` (enum), `TRAP_IDENTITY_MUTATION` (`#[cfg(test)]`
+  static), `set_trap_identity_mutation` (fn) — **exclusive to `emit_
+  current_trap`** (the sole production touch site, grep-confirmed against
+  the whole crate); moves with it.
+
+**The discriminator used above, stated once so it is not re-derived per
+symbol:** a RETAINED file that calls a mover **opaquely** (`x.method(...)`,
+never touching the callee's internals) does not make the callee hub-stays —
+that is the ordinary cross-sibling-visibility case item 13 resolved
+repeatedly with `pub(super)` widening. A RETAINED file that **constructs or
+matches a type's own variants/fields directly** is the hub-stays case
+(item 13's `StaticWorkerEmission`/`StaticWorkerCallOutcome` precedent). The
+methods above are all the first shape; the types below are the second.
+
+### RETAIN, hub-stays — types genuinely shared across a moving and a staying
+### consumer, checked by direct construction/match, not by call count
+
+- **`TrapExitAuthority`** (enum, `mod.rs`) — `units.rs` directly constructs
+  `TrapExitAuthority::Root { .. }` (2 sites) and matches
+  `TrapFrameBindingMutation`'s variants to decide which `TrapExitAuthority`
+  variant to build (`units.rs:5770`). Stays at the hub; `emit_current_trap`/
+  `bind_unit_trap_frame` (moving) reference it via `use super::*`.
+- **`TrapFrameBindingMutation`** (enum), **`TRAP_FRAME_BINDING_MUTATION`**
+  (`#[cfg(test)]` static), **`set_trap_frame_binding_mutation`** (fn) —
+  `units.rs` reads the static directly (`units.rs:5921`) and matches the
+  enum's variants directly (`units.rs:5770,5774`) to decide whether to call
+  `bind_unit_trap_frame` at all. **Zero production consumer inside `core.rs`/
+  `mod.rs` itself** — the real "does this unit get a trap frame" decision is
+  entirely `units.rs`'s (item 8's/`RT-FNSPLIT-B2F`'s territory, a different,
+  already-completed campaign, outside this slice's bound files). This is not
+  this item's owner ("branch/match/join/terminator emission on the emitter
+  side") so much as it is a unit-emission concern that happens to be
+  declared in the shared `mod.rs` hub. Stays put.
+- **`Px8trTrapProvenanceEvent`** (enum), **`px8tr_record_trap_provenance`**
+  (fn), **`PX8TR_TRAP_PROVENANCE`** (`pub(super)` static) — a generic
+  cross-domain trap-provenance observability log. Its variants are
+  constructed from FOUR different files/domains: `emit_current_trap`
+  (`PlannedTrapEmitted`, this item's own candidate), `lower_carried_
+  computational_match_inner` (`CarriedAnswerRouteEmitted`, item 12's
+  checked-invocation domain, `core.rs`), `source.rs` twice
+  (`CheckedRecursorDefault`/`DeforestedAnswerResumed`, item 12's landed
+  module), and `units.rs` once (`FinalProcessObjectTrap`). Unambiguously
+  shared observability infrastructure, not owned by any one emitter slice.
+  Stays at the hub.
+- **`PlannedTrapSeat`** (enum) — a judgment call, flagged for the
+  Architect: its own three variants are constructed ONLY inside `emit_
+  current_trap` (this item's own mover) today, which would make it a clean
+  MOVE candidate on the discriminator above. It is kept RETAIN here instead
+  because it is a field type inside `Px8trTrapProvenanceEvent::
+  PlannedTrapEmitted` (hub-stays, per the previous bullet) and is declared
+  immediately adjacent to it (`mod.rs:664`, right after `Px8trTrapProvenance
+  Event` at `:574`) as part of the same trap-provenance vocabulary cluster
+  — moving it alone would leave the hub-owned enum's own variant referencing
+  a child module's type, an unusual parent-references-child shape this
+  ledger did not find a precedent for in items 11-13. If the Architect
+  judges the exclusive-construction-site discriminator should win here
+  regardless, this is a one-line reclassification, not a re-trace.
+- **`specialized_at`, `specialized_ref_at`, `effect_seat_phase`**
+  (`LoweringOperand`/related methods, `mod.rs`) — general-purpose "read this
+  operand's specialized template or fail closed" utilities, 12+ call sites
+  each spanning calls/returns (item 13, already-moved), match/join (this
+  item), and other not-yet-split domains. RETAIN, hub-stays — confirmed by
+  call-site breadth, the same test item 13 applied to its own `specialized_
+  at`-adjacent methods.
+
+### RETAIN, other domain (checked by production role, not by name) —
+### recorded so the same names are not re-traced
+
+- **The `emit_carrier_*` family** (`mod.rs`, ~20 methods: `emit_carrier_
+  transfer`, `_alloc`, `_immediate`, `_spillable_immediate`, `_native_int`,
+  `_region_limbed_int`, `_bytes`, `_bytes_runtime_span`, `_store_tag_id`,
+  `_store_scalar`, `_dynamic_constructor`, `_store_field`, `_store_name`,
+  `_tag`, `_class`, `_host_success`, `_host_payload`, `_scalar`,
+  `_field_count`, `_field`, `_record_field`) — boundary-carrier value
+  construction/allocation, item 15's (`RT-EMITTER-AGGREGATES-SPLIT`, "the
+  emitter half of the aggregate lifecycle", explicitly this item's own
+  `blocks:` successor per the frontmatter) territory, not this item's. This
+  item's own moving functions call several of these cross-module
+  (`carried_join_arm` calls `emit_carrier_immediate`/`emit_carrier_scalar`
+  via `transfer_into_carrier`; `lower_carried_constructor_match` calls
+  `emit_carrier_tag`/`emit_carrier_field_count`) — ordinary cross-domain
+  calls, not a reason to reclassify either side.
+- **`lower_computational_match_expr`, `lower_computational_producer_expr`,
+  `lower_computational_match_value_composed`, `lower_carried_computational_
+  match`, `lower_carried_computational_match_inner`** (`core.rs`) — despite
+  "match" in every name, all operate on `EliminatorFrame`/`Computational
+  EliminatorFrame`/`checked_computational_frame`/`mint_recursor_frame_
+  provenance`/`active_carried_computational_eliminations` — the checked-
+  invocation/eliminator-frame descent machinery, item 12's landed domain
+  (confirmed: `lower_computational_match_value_composed` cites `RT-LEXICAL-
+  R3-FUSION-EMITTER` and `Architect evt_43ng4f578mdvv` directly in its own
+  comment; `lower_carried_computational_match_inner` emits `D6aRouteEvent`,
+  already classified `RT-CONTSRC-PRODUCER-LOCAL`/item-12-adjacent during
+  item 13's own D0). A second confirmed instance of the "carried"/
+  "computational" naming trap items 11-13 have each hit at least once —
+  the discriminator is the SUBJECT (checked-invocation elimination vs.
+  ordinary value-representation match dispatch), not the presence of CLIF
+  emission primitives in the body (both domains use `builder.ins()`/
+  `builder.create_block()` identically).
+- **`planned_join_site_for_frame`, `require_complete_join_plan_
+  consumption`** (`mod.rs`) — despite "join" in both names, these operate
+  on `native_join_plan`/`NativeJoinPlanV1`/`active_join_site`/`consumed_
+  join_sites` — the CHECKED join-plan bookkeeping for oriented-
+  subcontinuation validation, a different "join" concept from `JoinPlanToken`/
+  `JoinResultRepresentation` (this item's). Confirmed by caller: `planned_
+  join_site_for_frame`'s only callers are in `source.rs` (item 12's landed
+  module); `require_complete_join_plan_consumption`'s sole caller sits
+  beside `require_complete_dynamic_splice_edge_consumption` in `compile_
+  expr_into_module`'s own checked-plan closeout sequence (`core.rs:2787`,
+  RETAINED top-level orchestrator). RETAIN, item 12's territory.
+
+### Blind spots / NOT YET CLOSED (stated, not closed — do not read as a
+### plan to skip them)
+
+- **The bulk of the top-level item population is unswept.** A full
+  top-level census (types/consts/statics/traits, matching item 13's
+  Addendum 2/14 method) measured 49 items in `core.rs`, 203 in `mod.rs`
+  (252 total) and a full method-level census measured 90 in `core.rs`, 222
+  in `mod.rs` (312 total). This ledger has traced roughly three dozen
+  methods and a dozen types by name-collision risk and production-
+  injection-point tracing. The remainder is NOT yet individually traced.
+- **AC-2 (test-property ledger) has not started its own fresh pass.**
+  `control.rs` is byte-identical to the file exhaustively read during item
+  13's own D0 AC-2 (all 220 `#[test]` fns individually read in place at
+  that time) — this item's AC-2 will reconcile against that read rather
+  than re-reading blind, but the reconciliation itself (which of the
+  already-classified RETAIN tests are actually THIS item's domain,
+  distinct from item 13's) has not been done yet, beyond the three
+  `typed_trap_exit_*` tests item 9 flagged (addressed above).
+- **The four Architect-required compiler-blind classes** (re-exports,
+  cfg/attribute-gated items, macro-produced items, source-text oracles) —
+  not yet swept for this item's MOVE set, per the standing bar the
+  Architect set at item 13's D0 and the leader's kickoff restated as
+  binding for every item in this phase.
+- **`BACKEND_PRODUCTION_SOURCES`/the companion census's own row for a new
+  child module** — anticipated, not yet needed until `D1`.
+- **Anticipated child module name** — not yet decided; the frame's own
+  "modules own semantic lifecycles, do not name a permanent module after a
+  temporary campaign node" rule applies. A name capturing "branch/match/join/
+  terminator emission" is `D1`'s call once the full population is closed,
+  matching how `calls.rs`'s name was settled at that item's own D1, not D0.
+
+Continuing this D0 next — the top-level item sweep, the AC-2 reconciliation
+pass, and the four compiler-blind classes. No action needed from anyone now.
+
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
 Move the owner into its own child module, extending the established seam.
