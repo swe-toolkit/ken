@@ -1,7 +1,7 @@
 ---
 id: RT-EMITTER-AGGREGATES-SPLIT
 title: "Move the aggregates emitter family out of the lowering files -- the emitter half of the aggregate lifecycle whose planner half item 7 already owns"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
