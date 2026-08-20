@@ -337,13 +337,6 @@ methods above are all the first shape; the types below are the second.
 ### Blind spots / NOT YET CLOSED (stated, not closed — do not read as a
 ### plan to skip them)
 
-- **The bulk of the top-level item population is unswept.** A full
-  top-level census (types/consts/statics/traits, matching item 13's
-  Addendum 2/14 method) measured 49 items in `core.rs`, 203 in `mod.rs`
-  (252 total) and a full method-level census measured 90 in `core.rs`, 222
-  in `mod.rs` (312 total). This ledger has traced roughly three dozen
-  methods and a dozen types by name-collision risk and production-
-  injection-point tracing. The remainder is NOT yet individually traced.
 - **AC-2 (test-property ledger) has not started its own fresh pass.**
   `control.rs` is byte-identical to the file exhaustively read during item
   13's own D0 AC-2 (all 220 `#[test]` fns individually read in place at
@@ -365,8 +358,118 @@ methods above are all the first shape; the types below are the second.
   terminator emission" is `D1`'s call once the full population is closed,
   matching how `calls.rs`'s name was settled at that item's own D1, not D0.
 
-Continuing this D0 next — the top-level item sweep, the AC-2 reconciliation
-pass, and the four compiler-blind classes. No action needed from anyone now.
+### Addendum 2 — top-level item census, the collision-risk names individually
+### checked
+
+A full top-level census (types/consts/statics/traits, matching item 13's
+Addendum 2/14 method — regex over `struct`/`enum`/`const`/`static`/`type`/
+`trait`/`thread_local!` declarations, distinct from the method-level census
+above) measured **49 items in `core.rs`, 203 in `mod.rs`** (252 total).
+Checked every name plausibly join/match/branch/block/terminator/trap/
+carrier/control/scalar-adjacent against its actual production role, not its
+name — the exact discipline items 12/13 needed repeatedly:
+
+**core.rs (3 checked, all RETAIN, item 12's):**
+
+- `MatchRecursorCensusRow` (+ `MRC_CENSUS`, `with_match_recursor_census`) —
+  the `mrc_census_begin`/`RT-MATCH-RECURSOR-CONSUMERS` census family,
+  already named RETAIN/item-12's in item 13's own D0 ("match-recursor-
+  census, item 12's landed 'carried_match/static-worker/recursor-position-
+  unit cluster'"). Confirmed again here despite "Match" in the name.
+- `BranchedScrutineeUnitBodyRoute1` (+ its RAII/recorder family) — the
+  `branched_scrutinee_unit_body_observer_tests` domain, confirmed RETAIN
+  during item 13's own exhaustive AC-2 read ("source-branch/eliminator-
+  frame-descent domain, item 12's landed cluster"). "Branched" is not
+  this item's "branch".
+- `CheckedFrameBranchScope` — sole consumer is `source.rs` (4 direct
+  `CheckedFrameBranchScope::capture`/argument sites, item 12's landed
+  module), already named in `source.rs`'s own header comment as staying at
+  the `core` hub. "Branch" in the name is again a different sense
+  (checked-invocation frame scoping, not CFG branching).
+
+**mod.rs (9 checked; 2 new MOVE findings, 7 RETAIN):**
+
+- **`ScalarMergeKind`** (enum) — **MOVE.** Every use site in `core.rs` sits
+  inside `carried_join_arm`/`jump_planned_join_arm`/`finish_planned_join`
+  (already-confirmed MOVE); every use in `mod.rs` sits inside `merge_
+  scalar_branch`/`merge_scalar_operand`/`record_scalar_merge_kind`
+  (already-confirmed MOVE). No RETAINED consumer found anywhere.
+- **`DasmC2ScalarMergeObservation`, `DASM_C2_SCALAR_MERGE_OBSERVATIONS`,
+  `DASM_C2_SCALAR_MERGE_OBSERVATION_ENABLED`, `dasm_c2_record_scalar_
+  merge`, `dasm_c2_take_scalar_merge_observations`, `DasmC2ScalarMerge
+  ObservationScope`** — **MOVE.** The "`RT-DYNAMIC-ARM-SCALAR-MERGE`"
+  diagnostic-observation cluster for the scalar-merge decision;
+  `dasm_c2_record_scalar_merge`'s sole call site is inside `merge_scalar_
+  operand` (already-confirmed MOVE), grep-confirmed against the whole
+  crate. **Flagged for `D1`'s care, not a `D0` blocker**: `DasmC2ScalarMerge
+  Observation`/`DasmC2ScalarMergeObservationScope` are `pub`/`#[doc(hidden)]`
+  under `#[cfg(any(test, feature = "dasm-c2-observation"))]`/
+  `#[cfg(feature = "dasm-c2-observation")]` respectively — a crate-external
+  diagnostic surface (the doc comment names "the real D5 package path"),
+  so `D1` must re-derive its actual external consumer(s) before moving it,
+  the same care item 13 gave `RECURSIVE_POSITION_UNIT_CALLS`'s cfg-gating.
+- `JoinConsumptionMutation` (enum) — **RETAIN, hub-stays.** Matched
+  directly both inside this item's own MOVE-set functions (`mod.rs`, the
+  `consume_join_plan`/`finalize_join_disposition` family, and `core.rs`'s
+  `lower_dynamic_host_result_match`, already MOVE) AND directly inside
+  `source.rs` (`source.rs:457`, matching `OmitSourceMachineComputational
+  MatchSelection` by name) — the `StaticWorkerCallOutcome` hub-stays shape
+  exactly: a moving consumer and a staying consumer both directly match
+  the enum's own variants.
+- `NativeScalarPairV1` (struct) — **RETAIN, hub-stays.** Directly
+  constructed (struct-literal) from FOUR different production sites
+  spanning three domains: `finish_planned_join`/`lower_dynamic_host_
+  result_match` (this item's, MOVE), `lower_bounded_nat_computational`
+  (item 12's checked-invocation/eliminator-frame domain, confirmed by its
+  own body's `EliminatorFrame::Computational`/`EliminatorFrame::Active`/
+  `resume_active_continuation` machinery — a sibling of `lower_bounded_
+  nat_match`, item 14's, but a genuinely different function), and `lower_
+  big_int_constant`/`lower_unsigned_u64_int` (primitive-integer lowering,
+  a fourth, not-yet-split domain). A shared native-scalar-pair ABI
+  encoding used by whichever domain happens to produce a scalar value —
+  not owned by any one emitter slice.
+- `OpenControlObligation`, `OrientedControlLedgerEntry` — **RETAIN,
+  item 12's.** Despite "Control" in both names, both operate on
+  `RecursorUnwindStack`/`ComputationalRecursorLayer`/`CheckedRecursive
+  InvocationInstance`/`AffineSpliceCapability`/"OrientedSubcontinuation" —
+  checked-invocation control-EXTENT bookkeeping (a continuation/effect
+  sense of "control"), not CFG control-flow (this item's sense). A fourth
+  instance of "control"/"branch"/"join" being heavily overloaded across
+  this codebase's two "control" senses, confirmed only by reading the
+  body, never by the name.
+- `SourceJoinTarget`, `SourceBranchFanout` — **RETAIN, item 12's.** Part of
+  the source-machine's own checked-invocation join/branch-fanout
+  vocabulary (`SourcePredecessorEdge`, `SourcePrefixTemplate`,
+  `ContinuationCursorId`, `EliminatorFrame` all appear directly in their
+  own field types) — the source machine's OWN notion of a "join target"/
+  "branch fan-out" during checked-continuation evaluation, a different
+  concept from `JoinPlanToken`'s ordinary CFG merge (this item's). Matches
+  `source.rs`'s own header comment naming `SourceControl` (their sibling,
+  already known RETAIN) as staying at the `mod.rs` hub "shared with
+  retained checked-invocation/continuation-frame machinery." "Join" and
+  "Branch" in both names are the third and fourth instances of this exact
+  naming trap found in this single top-level pass.
+- `BoundaryCarrierRefs`, `CarrierAllocationRequest` — **RETAIN, item 15's**
+  (the boundary-carrier/aggregate-allocation domain, same territory as the
+  `emit_carrier_*` family already named RETAIN above).
+
+**Net for this pass:** two new MOVE findings (`ScalarMergeKind`,
+the `DasmC2ScalarMergeObservation*` cluster), zero reclassifications of
+anything already traced, and four more confirmed instances of the
+"control"/"branch"/"join"/"match" naming trap — the discriminating read is
+always the body, never the identifier.
+
+**Still not individually re-traced:** the remaining ~240 top-level items in
+the two files not flagged by the collision-risk name scan above. Per the
+Architect's item-13 ruling (ordinary RETAIN items are compiler-backstopped
+by `E0603` plus his own mandatory `D1` per-mover visibility review, and
+domain-cluster attribution grounded in this pass's own tracing is a
+sufficient prior, not requiring individual re-derivation of every ordinary
+RETAIN item) — this ledger states that as its own prior for the residual
+~240, the same shape item 13's Addendum 14 used, not a fresh escalation.
+
+Continuing this D0 next — the AC-2 reconciliation pass and the four
+compiler-blind classes. No action needed from anyone now.
 
 # `D1` — THE MOVE. Behaviour-preserving, and reviewable as a relocation.
 
