@@ -1256,16 +1256,16 @@ fn derive_recursive_shape(
     d: GlobalId,
     parameter_count: usize,
 ) -> KernelResult<ShapeDerivation> {
-    let normalized = normalize(env, &Context::new(), term);
-    let term = &normalized;
-    if !occurs(d, term) {
+    let head = whnf(env, &Context::new(), term);
+    let term = &head;
+    if !occurs_delta(env, d, term) {
         return Ok(ShapeDerivation::DFree);
     }
 
     match term {
         Term::Pi(_, _) => {
             let (domains, body) = peel_pi(term);
-            if domains.iter().any(|domain| occurs(d, domain)) {
+            if domains.iter().any(|domain| occurs_delta(env, d, domain)) {
                 return Err(unsupported_recursive_shape(
                     "recursive occurrence in a Pi domain is not positive",
                 ));
@@ -1301,7 +1301,9 @@ fn derive_recursive_shape(
             match head {
                 Term::IndFormer { id, level_args: _ } if id == d => {
                     if arguments.len() < parameter_count
-                        || arguments.iter().any(|argument| occurs(d, argument))
+                        || arguments
+                            .iter()
+                            .any(|argument| occurs_delta(env, d, argument))
                     {
                         return Err(unsupported_recursive_shape(
                             "recursive family parameters or indices contain the family",
@@ -1330,7 +1332,7 @@ fn derive_recursive_shape(
 
                     let mut shaped_arguments = Vec::with_capacity(arguments.len());
                     for (position, argument) in arguments.into_iter().enumerate() {
-                        let shape = if occurs(d, &argument) {
+                        let shape = if occurs_delta(env, d, &argument) {
                             if position >= former.params.len()
                                 || former.parameter_polarities.get(position)
                                     != Some(&ParameterPolarity::StrictlyPositive)
@@ -1536,6 +1538,27 @@ fn intrinsic_former_lift_type(
     pack_component_types(components)
 }
 
+/// Expose exactly one Π layer at a time until the retained skeleton's group is
+/// complete. A codomain may reveal the next layer only after δ/β reduction, so
+/// a single WHNF followed by a syntactic [`peel_pi`] can under-count the group.
+fn whnf_pi_spine(env: &GlobalEnv, field_type: &Term, expected_domains: usize) -> (Vec<Term>, Term) {
+    let mut actual_domains = Vec::with_capacity(expected_domains);
+    let mut actual_body = field_type.clone();
+    while actual_domains.len() < expected_domains {
+        match whnf(env, &Context::new(), &actual_body) {
+            Term::Pi(domain, body) => {
+                actual_domains.push(*domain);
+                actual_body = *body;
+            }
+            exposed => {
+                actual_body = exposed;
+                break;
+            }
+        }
+    }
+    (actual_domains, actual_body)
+}
+
 /// Build `Lift_D(M, A, a)` from the D3a skeleton (`14 §3.2`).
 ///
 /// `field_type`, `value`, and `motive` are already instantiated in one common
@@ -1552,7 +1575,7 @@ fn structured_lift_type(
     parameter_count: usize,
     guest_level_args: &[Level],
 ) -> KernelResult<Term> {
-    let field_type = normalize(env, &Context::new(), field_type);
+    let field_type = whnf(env, &Context::new(), field_type);
     match shape {
         RecursiveShape::Direct { .. } => {
             let (head, arguments) = peel_app(&field_type);
@@ -1566,7 +1589,7 @@ fn structured_lift_type(
             }
         }
         RecursiveShape::Pi { domains, body } => {
-            let (actual_domains, actual_body) = peel_pi(&field_type);
+            let (actual_domains, actual_body) = whnf_pi_spine(env, &field_type, domains.len());
             if actual_domains.len() != domains.len() {
                 return Err(unsupported_recursive_shape(
                     "Pi lift skeleton and normalized field arity disagree",
@@ -1694,7 +1717,7 @@ fn structured_lift_term(
     level_args: &[Level],
     params: &[Term],
 ) -> KernelResult<Term> {
-    let field_type = normalize(env, &Context::new(), field_type);
+    let field_type = whnf(env, &Context::new(), field_type);
     match shape {
         RecursiveShape::Direct { .. } => {
             let (head, arguments) = peel_app(&field_type);
@@ -1716,7 +1739,7 @@ fn structured_lift_term(
             }
         }
         RecursiveShape::Pi { domains, body } => {
-            let (actual_domains, actual_body) = peel_pi(&field_type);
+            let (actual_domains, actual_body) = whnf_pi_spine(env, &field_type, domains.len());
             if actual_domains.len() != domains.len() {
                 return Err(unsupported_recursive_shape(
                     "Pi lifted term skeleton and normalized field arity disagree",
