@@ -13,7 +13,7 @@ permissions:
 
 env:
   IMAGE: ghcr.io/swe-toolkit/ken/ci-z3
-  TAG: rust-1.79-bookworm
+  TAG: rust-1.97-bookworm
 
 jobs:
   build:
