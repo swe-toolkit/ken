@@ -6,10 +6,35 @@ owner: runtime
 size: L
 gate: none
 depends_on: [RT-CAPTURE-SUPPLY-DECLARED-INPUTS]
-blocks: [NATIVE-HANDLE-CARRIER, PX8-F-CAP-41]
+blocks: []
 github: null
 origin: "Architect open-door ruling on RT-CAPTURE-SUPPLY-DECLARED-INPUTS D0 (evt_6f4708amnwr4p). That D0 (e8fd40787) found capture supply inexpressible UNDER THE CURRENT CAPTURE PLAN, not under the invariant -- the closing deliverable (extending the entry-source enumeration so a producer-local value becomes a real entry-ABI member) was never attempted, so the node is non-total, not uncloseable. The Architect ruled the widening route genuinely open (not proven closed), named it, and ruled it a SUCCESSOR node beside the merged RT-CONTSRC-PRODUCER-LOCAL campaign -- NOT RT-CAPTURE-SUPPLY's D1. Steward-filed per COORDINATION section 2; framed but the feasibility/soundness fork is the D0's to measure, routed to the Architect."
 ---
+
+# D0 OUTCOME AND DISPOSITION (Steward, 2026-08-21)
+
+D0 (087849760, Architect-approved evt_37mt6t65vvw39) measured the widening route
+**OPEN** -- all 25 producer-local captures are widenable on both axes (liveness
+25/25, ABI/identity-preserving 25/25) -- **but widening every one greens ZERO of
+the 16 witnesses**: the owning context's capture plan holds at most 2 claims
+against a source capture set of 3-5, and claim-count reaches capture-count in 0 of
+25 closures. So a D1 here (extend the entry-source enumeration) is **sound and
+buildable but witness-inert** -- it unblocks neither dependant for the current
+population. The Architect's soundness ruling on the widening (evt_37mt6t65vvw39:
+the closed "invent an ABI position" exit is OWNER-scoped; the generated context is
+a distinct frame, so seating a producer-local as a real member of the context's
+entry-source enumeration is extend-membership, not relax-guard) STANDS and is
+recorded in the D0 body below.
+
+**Disposition: closed at D0 as a bounded result. D1 is NOT released.** Building a
+sound-but-inert enumeration extension would be a fourth consecutive provenance
+refinement that greens zero; it stays buildable-on-demand if the cardinality gap
+later produces producer-local claims that need it. The `blocks` edge for
+[[NATIVE-HANDLE-CARRIER]] / [[PX8-F-CAP-41]] moves to the successor
+[[RT-CAPTURE-CARDINALITY-GAP]], which attacks the real remaining gate: **why the
+planner's capture projection (<=2 claims) is smaller than the closure's declared
+capture set (3-5)** -- the 1-3 captures per closure that carry no planner claim of
+any class at all.
 
 # WHY THIS NODE EXISTS
 
