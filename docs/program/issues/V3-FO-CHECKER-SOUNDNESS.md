@@ -5,7 +5,7 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, LANG-INDEXED-RECURSIVE-IH-DISCHARGE]
 blocks: []
 github: null
 origin: "Steward, 2026-08-16, discharging section 4e on the merge of V3-FO-KEN-LEVEL-CHECKER-AUTHORING (D4+D5, PR #2421). That node's own banned scope names this work: 'Proving embedding_adequacy or checker_soundness. Unfiled successors.' Every coordinate below re-verified against origin/main 5aae7a454 before filing. Steward-filed per COORDINATION section 2."
