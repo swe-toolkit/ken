@@ -6,7 +6,7 @@ owner: runtime
 size: L
 gate: none
 depends_on: []
-blocks: [NATIVE-HANDLE-CARRIER, PX8-F-CAP-41]
+blocks: []
 github: null
 origin: "Architect D0 approval of RT-BRANCH-LOCAL-DECLARED-CALLABLE at f6b7f0473 (evt_6n9byepz6wzgt, point 3) measured the branch-local partition necessary but NOT sufficient: all 16 witnesses' residual blocker is capture supply, outside RT-BRANCH's scope. The Architect then delivered the fork ruling evt_sjjmcap9293y (grounded on origin/main f5c006ab; the seam files are unchanged since D0 base 6f86c9449), settling all three sub-questions and fixing the node's shape as D0-first. Steward-filed per COORDINATION section 2 and framed to that ruling."
 ---
@@ -82,7 +82,7 @@ the carried word. Classify each witness:
 - **planner-recoverable** (ALL captures resolve to a planner-owned claim) =>
   mechanism-ownable (a D1 target);
 - **word-only** (ANY capture reachable only through the carried word) => intended
-  refusal, fails closed, out of scope forever under the invariant.
+  refusal, fails closed, out of scope under the current capture plan.
 
 This is a NEW measurement: RT-BRANCH's D0 measured capture COUNT (3-5) and that
 `captures.is_empty()` fails; it did NOT measure planner-recoverability. The two
@@ -295,12 +295,17 @@ different route; if it may, the widening is a new node, not this one's D1.
 
 # THE BOUNDED-NON-CLOSURE OUTCOME (a first-class result)
 
-If D0 finds **zero** planner-recoverable witnesses, capture supply for the
-carried word is **inexpressible under the invariant**: the node closes as a
-bounded non-closure, and [[NATIVE-HANDLE-CARRIER]] / [[PX8-F-CAP-41]] need a
-DIFFERENT route for this population. Per the Architect, this is a first-class
-result, not a failure -- and D0 is exactly the measurement that decides it, which
-is why it runs before any D1 is attempted.
+D0 found **zero** planner-recoverable witnesses (all 16 word-only). Per the
+Architect's open-door ruling (evt_6f4708amnwr4p), capture supply for these
+witnesses is **inexpressible under the CURRENT capture plan** -- NOT "under the
+invariant." The closing deliverable (extending the entry-source enumeration so a
+producer-local value becomes a real entry-ABI member) was never attempted, so
+this is a **non-total** bounded non-closure, not an uncloseable one. The named
+forward route is the successor [[RT-CONTSRC-ENTRY-FRAME-WIDEN]], which now carries
+the `blocks` edge for [[NATIVE-HANDLE-CARRIER]] / [[PX8-F-CAP-41]]; those
+dependants are gated on that widening's feasibility+soundness D0, not on a wholly
+different route. This is a first-class result, and D0 is the measurement that
+produced it.
 
 # BANNED SCOPE
 
