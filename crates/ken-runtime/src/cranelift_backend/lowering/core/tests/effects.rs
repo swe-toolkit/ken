@@ -99,6 +99,7 @@ fn run_checked_bounded_nat_fixture(
             context_calls: BTreeMap::new(),
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
+            constructed_context_frame: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
             host_dispatch_context: None,

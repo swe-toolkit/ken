@@ -774,7 +774,13 @@ impl<'a> Lowering<'a> {
                 }
             ));
             let result = match context {
-                Some(context) => self.call_declared_context(builder, context, body_origin, inputs)?,
+                Some(context) => self.call_declared_context(
+                    builder,
+                    context,
+                    body_origin,
+                    inputs,
+                    coordinates,
+                )?,
                 None => self.call_declared_unit(
                     builder,
                     body_origin,
@@ -803,6 +809,11 @@ impl<'a> Lowering<'a> {
             context: ContinuationContextId,
             body_origin: StaticOriginId,
             inputs: &[LoweringOperand],
+            // `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- the planner-issued
+            // coordinates this retarget was resolved by, carried through so the
+            // constructed frame is matched on the same complete key the binding
+            // itself was, never on the body origin alone.
+            coordinates: Option<CarriedInvocationCoordinates>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
             let target = self
                 .function_local
@@ -844,6 +855,143 @@ impl<'a> Lowering<'a> {
                 )
             })?;
             let mut inputs = inputs.to_vec();
+            // **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- CONSUME THE FRAME
+            // CONSTRUCTED AT THE CREATION SITE, when this retarget is the one it
+            // was built for.**
+            //
+            // **Matched on the COMPLETE planner-issued key** -- continuation
+            // origin, recursive position, and worker body -- exactly the key the
+            // binding above was resolved by. One function can hold two retargets
+            // over one body origin, and a frame consumed at the wrong one is an
+            // arity-correct call carrying another occurrence's values: the silent
+            // shape, not a loud one. A frame that does not match is not used, and
+            // this falls through to the gather below unchanged.
+            //
+            // **Two runs, because the retarget can supply neither.** The
+            // carried invocation carries the raw body's DECLARED ARGUMENTS only,
+            // so the selected closure's captures -- the tail of the context's
+            // `Parameter` run -- are appended here; the context's own `Capture`
+            // run follows, in the planner's ordinal order. Both were assembled at
+            // the creation site from the producer's live environment through the
+            // planner's own projections.
+            //
+            // **The declared frame header is re-checked here, and it is what
+            // makes this supply-not-relax.** The two cardinalities are verified
+            // against the context's OWN header before a single operand is used,
+            // so a short, long, or mis-ordered frame refuses at this call rather
+            // than filling a frame that happened to be big enough to absorb it.
+            // The context body still walks its declared run through the unchanged
+            // membership and slot re-derivation guard.
+            //
+            // **TAKEN ONLY WHERE THE GATHER BELOW STRUCTURALLY CANNOT SERVE.**
+            // This is not an optimization; it is what makes the route an
+            // ADDITION rather than a substitution.
+            //
+            // The gather appends the context's `Capture` run to the operands the
+            // retarget already carries, and that is a COMPLETE call exactly when
+            // the selected worker has no captures -- so the declared arguments
+            // already fill the `Parameter` run -- and every claim is resolvable
+            // where the gather reads. Wherever that holds, the gather has been
+            // emitting the right call all along, and the two routes would source
+            // the same values through DIFFERENT environments: the creation
+            // site's `producer_env` here, this frame's ABI operand run there.
+            // Preferring this route there would silently re-source operands on
+            // paths that are already correct, and any disagreement between the
+            // two environments would surface as changed behaviour instead of as
+            // a refusal.
+            //
+            // So the condition names the two ways the gather falls short and
+            // nothing else: a `Parameter` run the retarget cannot fill, and a
+            // claim with no context-capture availability for the gather to read.
+            let claims = view.captures()?;
+            let header = view.header();
+            let gather_cannot_serve = |worker_captures: &[LoweringOperand]| {
+                !worker_captures.is_empty()
+                    || claims
+                        .iter()
+                        .any(|claim| claim.availability.context_capture.is_none())
+            };
+            let constructed = self
+                .function_local
+                .constructed_context_frame
+                .as_ref()
+                .filter(|frame| {
+                    coordinates.is_some_and(|coordinates| {
+                        frame.continuation_origin == coordinates.continuation_origin
+                            && frame.recursive_position == coordinates.recursive_position
+                    }) && frame.worker_body_origin == body_origin
+                        && gather_cannot_serve(&frame.worker_captures)
+                })
+                .map(|frame| (frame.worker_captures.clone(), frame.context_captures.clone()));
+            if let Some((worker_captures, context_captures)) = constructed {
+                // `claims` above is claimed even though this route does not READ
+                // it for operands. `captures()` is where the projection is
+                // checked against its validated ABI input authority, and that
+                // check is about the PLAN, not about which route consumes it.
+                // Reaching it on only one route would make the other the one
+                // path on which a plan that disagrees with itself is never
+                // noticed.
+                // Both authorities, not one. `header` is the declared frame
+                // and `claims` is the ordered projection; checking the
+                // constructed run against each separately is what makes a
+                // disagreement BETWEEN them visible here rather than absorbed.
+                if claims.len() != context_captures.len() {
+                    return Err(unsupported(
+                        "ContinuationSpecialization",
+                        format!(
+                            "a constructed context frame supplies {} captures, but the context \
+                             bound to body {body_origin:?} projects {} continuation inputs",
+                            context_captures.len(),
+                            claims.len()
+                        ),
+                    ));
+                }
+                let declared_arguments = inputs.len();
+                let parameters = declared_arguments
+                    .checked_add(worker_captures.len())
+                    .ok_or_else(|| {
+                        unsupported(
+                            "ContinuationSpecialization",
+                            "a constructed context frame's parameter run exceeded addressable width",
+                        )
+                    })?;
+                if u32::try_from(parameters).ok() != Some(header.parameters) {
+                    return Err(unsupported(
+                        "ContinuationSpecialization",
+                        format!(
+                            "a constructed context frame supplies {declared_arguments} declared \
+                             arguments and {} worker captures, but the context bound to body \
+                             {body_origin:?} declares a {}-slot Parameter run; a call assembled \
+                             from a run of the wrong length fills declared parameters with values \
+                             that are not theirs",
+                            worker_captures.len(),
+                            header.parameters
+                        ),
+                    ));
+                }
+                if u32::try_from(context_captures.len()).ok() != Some(header.captures) {
+                    return Err(unsupported(
+                        "ContinuationSpecialization",
+                        format!(
+                            "a constructed context frame supplies {} captures, but the context \
+                             bound to body {body_origin:?} declares a {}-slot Capture run",
+                            context_captures.len(),
+                            header.captures
+                        ),
+                    ));
+                }
+                inputs.extend(worker_captures);
+                inputs.extend(context_captures);
+                return self
+                    .call_declared_unit_target(
+                        builder,
+                        target,
+                        &inputs,
+                        #[cfg(test)]
+                        None,
+                    )
+                    .map(|(operand, _inst)| operand);
+            }
             for capture in view.captures()? {
                 // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — present a producer-local
                 // coordinate to this seam, so its refusal is measured rather than
