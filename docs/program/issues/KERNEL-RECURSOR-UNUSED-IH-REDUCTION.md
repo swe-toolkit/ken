@@ -1,7 +1,7 @@
 ---
 id: KERNEL-RECURSOR-UNUSED-IH-REDUCTION
 title: "The recursor's iota-rule forces an induction hypothesis for every recursive argument eagerly, so a non-recursive match on a recursive inductive does not reduce at an abstract recursive field -- repair iota_reduct to skip an IH whose method binder does not occur, the reduction-time enabler V3-FO-CHECKER-SOUNDNESS D3 is blocked on"
-status: draft
+status: active
 owner: kernel
 size: M
 gate: operator
@@ -147,13 +147,14 @@ only; the full-workspace and conformance runs are CI's.
 
 ## Sequencing
 
-**Framed, not released -- `gate: operator`.** This modifies the trusted
-reduction engine (`iota_reduct`). The Architect ruled operator authorization
-warranted and release held for the operator (evt_1r4fw67tzqszt). The Steward
-holds release: on the operator's return (~11:30 UTC 2026-08-21) surface it for
-authorization, then flip `ready` -> `active`, release to the kernel ring, and
-kick. The soundness obligation is one stateable sentence (above), so the
-authorization ask is exact.
+**AUTHORIZED and released -- 2026-08-21 (operator, "approve decision 1").** This
+modifies the trusted reduction engine (`iota_reduct`); the Architect ruled
+operator authorization warranted (evt_1r4fw67tzqszt) and the Steward held release
+for the operator's return. The operator authorized it on return; `status`
+flipped to `active` and released to the kernel ring. `gate: operator` is retained
+as the record of the requirement; it is satisfied. The soundness obligation is
+the one stateable sentence above (over-approximate use; if in doubt, build the
+IH).
 
 **Owner: kernel ring.** Author = `kernel-implementer` (T1 -- soundness-bearing
 reduction-engine work), independent soundness review = Architect (the author is

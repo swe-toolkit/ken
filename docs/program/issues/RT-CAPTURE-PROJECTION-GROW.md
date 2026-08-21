@@ -1,15 +1,45 @@
 ---
 id: RT-CAPTURE-PROJECTION-GROW
 title: "green the ten populated recursive-position witnesses by growing the planner's capture projection to cover the closure's declared, body-referenced captures (D1) and seating the resulting producer-local claims in the generated context's entry-source enumeration (D2, the revived RT-CONTSRC-ENTRY-FRAME-WIDEN widening). The cardinality-gap D0 measured all-H1: every unclaimed capture is a genuine value the projection drops because continuations.rs:6075 clones the context's capture set from the enclosing specialization's continuation_inputs, a different population than the closure's declared set. This is the closing deliverable for the population -- the two steps compose, D2 is non-inert only because D1 supplies the claims."
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
 depends_on: [RT-CAPTURE-CARDINALITY-GAP]
-blocks: [NATIVE-HANDLE-CARRIER, PX8-F-CAP-41]
+blocks: []
 github: null
 origin: "Steward disposition of RT-CAPTURE-CARDINALITY-GAP's all-H1 D0 (43044dbcd, Architect-approved evt_20d4h0xvd5wya). The D0 classified all 22 unclaimed captures across the 10 populated witnesses as H1 (planner under-projection), zero H2 (elaborator over-capture): every capture is referenced by the body, none is spurious. Per the cardinality-gap frame's own routing, all-H1 means the fix grows the projection and revives the parked RT-CONTSRC-ENTRY-FRAME-WIDEN widening, and the two compose. Node scoping is the Steward's (COORDINATION section 3); the D0's disposition drives the cut and this is that cut."
 ---
+
+# DISPOSITION (Steward, 2026-08-21) -- landed partial, closing deliverable moved
+
+This node advanced the chain and is closed as a LANDED PARTIAL. It did NOT green
+the ten-witness population; the sufficient closure moved to the framed successor
+[[RT-CAPTURE-CONTEXT-FRAME-EMIT]], which now carries the `blocks` edge to
+[[NATIVE-HANDLE-CARRIER]] and [[PX8-F-CAP-41]] and the composed-green AC.
+
+- `D1` (grow the planner projection / mint the claims) LANDED `9ab12ca97`.
+- `D3` (admission-gate widen to "captures all planner-recoverable", fail-closed,
+  inert until seated) LANDED `38ced327a` -- blob-audited and adversary-hunted
+  clean.
+- The `D2` route was RULED sound over six measured findings (Architect,
+  evt_7cr5znpqzxsxf emission-ownership retarget; evt_7ps5s2e8f3y82 homogenize to
+  the single emitter; evt_28pfs66gmth9a the physical-frame emission is the
+  structural closure), with two section-1a research advisories in hand
+  (evt_12s51d8b4snkf, evt_63pqpmfn3vrez). The fully-exposed root: the generated
+  context was retargeted by LABEL at successively finer grain but never
+  PHYSICALLY INSTANTIATED as its own emitted frame.
+- The seam-(i) measurement (runtime-leader evt_77tdvcap4067t) discriminated the
+  Steward's fold-vs-successor fork decisively -- PERSIST, and the context-body
+  push executes ZERO times for the population, so the closure is causing that
+  emission plus creation-site frame construction: substantial new wiring, cut to
+  the successor per COORDINATION section 3 (Architect concurred,
+  evt_4ewqakf8c7aq8). Seam (i) is BUILT at `c0d0a2451` and preserved as the
+  successor's `D1`.
+
+Everything below is the original framing, retained as the record of what this
+node set out to do; `AC-1`'s composed green is now the successor's, not this
+node's.
 
 # WHY THIS NODE EXISTS
 
