@@ -207,7 +207,14 @@ fn polymorphic_former_transport_preserves_guest_levels() {
     assert_eq!(wrap_domains.len(), 2, "field and Former lift binders");
     let wrap_method = Term::lam(
         wrap_domains[0].clone(),
-        Term::lam(wrap_domains[1].clone(), Term::Type(Level::zero())),
+        Term::lam(
+            wrap_domains[1].clone(),
+            Term::Let {
+                ty: Box::new(ken_kernel::subst::weaken(&wrap_domains[1], 1)),
+                val: Box::new(Term::var(0)),
+                body: Box::new(Term::Type(Level::zero())),
+            },
+        ),
     );
     check(
         &env,
@@ -475,13 +482,18 @@ fn declared_positive_former_lift_builds_dependent_host_evidence() {
         method_type(&env, declaration, 1, &motive, &[], &[]).expect("Former method lift");
     let (wrap_domains, _) = peel_pi(&wrap_method_type);
     assert_eq!(wrap_domains.len(), 2);
+    let wrap_result = Term::pair(Term::Refl(Box::new(Term::var(1))), constructor(leaf));
     let methods = vec![
         Term::pair(ken_kernel::obs::tt_term(&env), constructor(leaf)),
         Term::lam(
             wrap_domains[0].clone(),
             Term::lam(
                 wrap_domains[1].clone(),
-                Term::pair(Term::Refl(Box::new(Term::var(1))), constructor(leaf)),
+                Term::Let {
+                    ty: Box::new(ken_kernel::subst::weaken(&wrap_domains[1], 1)),
+                    val: Box::new(Term::var(0)),
+                    body: Box::new(ken_kernel::subst::weaken(&wrap_result, 1)),
+                },
             ),
         ),
     ];

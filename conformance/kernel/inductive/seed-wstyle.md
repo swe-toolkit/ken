@@ -304,3 +304,36 @@ Spec: `14 §3.1`, `36 §2`.
   eliminator (`36 §2`), total by `§9.4` without SCT. The kernel-side counterpart
   of L5's surface seed `eff-bind-is-tree-grafting`. AC5 (the high-fan-out
   unblock the frame's risk level rests on).
+
+---
+
+## AC6 — dead IHs do not block iota; live IHs remain unchanged
+
+Spec: `14 §3.1`, `§7.3`, `§7.7`.
+
+### kernel/inductive/dead-ih-reduces-at-abstract-recursive-field
+
+- spec: `14 §7.3`, `§7.7`
+- given: apply a non-recursive `FokCert` match method to
+  `FokMkCert (FokMkSequent gamma delta) rule children`, where `children` is an
+  abstract `List FokCert` and the method's generated child-IH binder does not
+  occur in its body
+- expect: **reduces-to** the same method body with the constructor fields
+  substituted; it is convertible by `Refl` to the IH-stripped view without
+  reducing or otherwise inspecting `children`
+- why: the unused binder discards its argument by beta, so constructing the
+  neutral structured child IH cannot affect the reduct. Eagerly constructing
+  it leaves the recursor stuck; skipping only this proven-dead argument exposes
+  the existing iota result without changing its observation.
+
+### kernel/inductive/live-ih-structural-fold-unchanged
+
+- spec: `14 §3.1`, `§7.7`, `§9.4`
+- given: the `Tree` fold from `wstyle-elim-uses-ih-flips`, whose node method
+  computes `suc (ih true)` and whose child function returns `leaf`
+- expect: **reduces-to** `suc zero`, while the otherwise identical method that
+  discards its IH reduces to `zero`
+- why: an occurrence of the method's IH binder must conservatively keep the
+  ordinary W-style recursive call. Treating this live binder as unused changes
+  `suc zero` to a stuck or ill-typed result and violates subject reduction; the
+  existing `suc zero` versus `zero` discriminator pins the safe direction.
