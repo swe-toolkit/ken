@@ -351,14 +351,19 @@ jobs:
       - name: Test
         run: cargo nextest run --locked -p ken-cli --test rt_parity_native
 
-  # The `optional z3 process adapter` job (the v3_z3_process_adapter test) was
-  # REMOVED from CI 2026-08-19 (operator): the z3 process adapter is an
-  # incomplete feature and its test was pathologically slow — a single run at
-  # ~38min, dominating total CI wall-clock while the sharded lane sits at
-  # ~12-14min. To restore it when the adapter is completed: re-add the
-  # `z3-process-adapter` job here AND re-list it in `build-test`'s `needs` and
-  # its result-check loop below (both places, per the warning on that job).
-  # z3-emission-control (the fast, passing `--lib` half) stays.
+  z3-process-adapter:
+    name: optional z3 process adapter
+    runs-on: ubuntu-latest
+    container: ghcr.io/swe-toolkit/ken/ci-z3@sha256:4043afa445489c19fa9b6628258134225953354e2bf1766d996558cdf73e38da
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Z3
+        run: z3 -version
+      - name: Test feature-on adapter
+        run: >-
+          cargo test --locked -p ken-elaborator --features z3-process
+          --test v3_z3_process_adapter
+
   z3-emission-control:
     name: z3 emission control
     runs-on: ubuntu-latest
@@ -392,6 +397,7 @@ jobs:
       - native-write-partition
       - native-buffer
       - native-rt-parity
+      - z3-process-adapter
       - z3-emission-control
       - ignored-row-sweep
     # `always()` so this reports a definite conclusion even when a job fails
@@ -405,12 +411,14 @@ jobs:
           write='${{ needs.native-write-partition.result }}'
           buffer='${{ needs.native-buffer.result }}'
           rt_parity='${{ needs.native-rt-parity.result }}'
+          z3_adapter='${{ needs.z3-process-adapter.result }}'
           z3_emission='${{ needs.z3-emission-control.result }}'
           ignored_sweep='${{ needs.ignored-row-sweep.result }}'
           echo "test-shard matrix:      $shards"
           echo "native-write-partition: $write"
           echo "native-buffer:          $buffer"
           echo "native-rt-parity:       $rt_parity"
+          echo "z3-process-adapter:     $z3_adapter"
           echo "z3-emission-control:    $z3_emission"
           echo "ignored-row-sweep:      $ignored_sweep"
           failed=0
@@ -418,6 +426,7 @@ jobs:
                       "native-write-partition:$write" \
                       "native-buffer:$buffer" \
                       "native-rt-parity:$rt_parity" \
+                      "z3-process-adapter:$z3_adapter" \
                       "z3-emission-control:$z3_emission" \
                       "ignored-row-sweep:$ignored_sweep"; do
             name="${pair%:*}"; result="${pair##*:}"
