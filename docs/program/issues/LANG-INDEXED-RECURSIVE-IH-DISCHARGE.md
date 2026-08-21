@@ -1,6 +1,6 @@
 ---
 id: LANG-INDEXED-RECURSIVE-IH-DISCHARGE
-title: "Transport the mutual-recursion sibling-call result along the dependent-match refinement equality at the elaboration boundary, so the source branch reconciles a recursive-group call's concrete indexed result with the refined motive index -- route (c) genuine J/cast transport over a PROPOSITIONAL equality, NOT the reflexive same-owner discharge; the elaborator prerequisite V3-FO-CHECKER-SOUNDNESS D3 is blocked on, measure-first between exposing the equality for the proof (c-proof) and elaborator auto-transport (c-elab)"
+title: "Transport the mutual-recursion sibling-call result along the dependent-match refinement equality at the elaboration boundary, so the source branch reconciles a recursive-group call's concrete indexed result with the refined motive index -- route (c) genuine J/cast transport over a PROPOSITIONAL equality via c-elab roster-aware auto-transport (the c-proof/c-elab fork RESOLVED to c-elab: D0 measured no lawful existing source carrier), surfacing the recursive-group roster into ElabCtx and inserting the transport at the equality-holding seam, NOT the reflexive same-owner discharge and NOT a new source-language carrier; the elaborator prerequisite V3-FO-CHECKER-SOUNDNESS D3 is blocked on"
 status: ready
 owner: language
 size: M
@@ -87,56 +87,78 @@ equality/transport." **No new research pull** (this is hard-stop 4; the existing
 advisory already covers route (c), and the §1a research re-trigger is the 6th
 hard-stop). The work is applying the covered route at the correct locus.
 
-# THE FIX -- route (c) transport, with a MEASURE-FIRST sub-fork
+# THE FIX -- route (c), c-elab (roster-aware auto-transport). SUB-FORK RESOLVED.
 
-Two seams could carry the fix: **A** = the IH-slot / branch-body boundary
-(`elab.rs:2302` + `2389-2453`); **B** = the recursive-call site, which would need
-a mutual-group roster surfaced into `ElabCtx`. Prefer the MORE BOUNDED path and
-**measure before committing** (the entry-3 miss is the lesson -- do not guess the
-mechanism):
+The c-proof/c-elab sub-fork is CLOSED: the D0/AC-0 measurement came back
+definitively **NO** (below), and the Architect ruled (evt_2md0cx2817yhn,
+hard-stop 5) that **the absence of a lawful existing surface carrier SELECTS
+c-elab.** Do NOT introduce a new source-language carrier.
 
-- **(c-proof) -- the bounded path.** The elaborator EXPOSES the refinement
-  equality as a source-nameable hypothesis; the D3 proof applies the explicit
-  J/cast transport of the child result itself. This avoids adding a mutual-group
-  roster and auto-transport to the delicate dependent-match core -- smaller,
-  auditable, conservative (`docs/PRINCIPLES.md`: small auditable TCB,
-  subsume-don't-proliferate). The elaborator change, if any, is only to cleanly
-  expose/name the equality.
-- **(c-elab) -- the fallback.** The elaborator gains mutual-group awareness (a
-  roster in `ElabCtx`) and AUTO-transports the recursive-group call's result
-  along the refinement equality (Seam A/B). Bigger; matches mature-system
-  ergonomics. Take it only if (c-proof) is infeasible.
+Why c-elab, not a new source carrier (Architect design authority): a new
+selector/modifier exposing the refinement premise would LEAK the internal
+Fording/index-refinement encoding into the SURFACE language (reflect-don't-extend
+and honesty-about-the-boundary run backwards); it PROLIFERATES surface where the
+need is SUBSUMED into elaboration; and it would REVERSE a deliberate existing
+boundary -- `selected_recursive_result` refusing to expose a hidden method binder
+(the measured `StructuralResultOutOfScope`) is that boundary being ENFORCED, not a
+bug to tear down for one proof. Mature systems agree (research evt_3jdqjhds50z35):
+Lean pre-specializes the IH, Agda refines the branch by unification -- neither
+makes the source author thread refinement equalities by hand. And the authority
+boundary is cleaner: a new source carrier is a surface-contract decision that
+routes to Spec (section 4); c-elab is a purely internal elaboration mechanism --
+component-design, no Spec surface ruling.
+
+**Mechanism boundary for D1 (Architect):**
+
+- **Surface the recursive-GROUP roster into `ElabCtx`** -- today it carries only
+  `owner_label: String` (`elab.rs:314`), so a call to a mutual SIBLING in the
+  recursive group is not recognizable, only the single owner. The roster makes
+  sibling-group calls recognizable.
+- **Insert the transport at the seam that HOLDS the equality.** At the
+  branch-body / IH-slot boundary (Seam A, `elab.rs:2302` + `2389-2453`, which
+  already has the motive + refinement equality in scope), when a recursive-group
+  call's result sits at a CONCRETE index while the slot expects the REFINED index,
+  insert a GENUINE J/cast transport along the in-scope propositional refinement
+  equality (the IH's own equality premise / the `INDEX_REFINEMENT_SENTINEL` binder
+  bridging the child's concrete index and the refined index). Do NOT thread it to
+  the bare call-site arm (Seam B) if Seam A already holds the evidence -- prefer
+  the seam with the evidence, and **pin the exact seam by measurement during D1,
+  do not hard-code it blind** (the entry-3 miss is the lesson).
 
 # DELIVERABLES
 
-**`D0` -- the deciding measurement (measure-first; picks the sub-fork, gives QA
-its control).** Determine: **can the source branch body currently NAME and APPLY
-the in-scope refinement equality** (the IH equality premise / the
-`INDEX_REFINEMENT_SENTINEL` binders) **to transport the sibling call's result?**
+**`D0` -- the deciding measurement. RESOLVED = NO (recorded, selects c-elab).**
+The question was: can the source branch body currently NAME and APPLY the
+in-scope refinement equality (the IH equality premise / the
+`INDEX_REFINEMENT_SENTINEL` binders) to transport the sibling call's result? The
+implementer measured it (evt_1jh2b72g1w6t3 / evt_4ynhyk6xq9vtx): **NO.** The two
+existing carriers cannot express it -- `match ... eqn: h` binds scrutinee
+equality on the flat-nullary no-refinement path, not the method/result-index
+premise; and the existing `recursive result for child` selector REJECTS the exact
+held child with `StructuralResultOutOfScope` (selector span 53154..53182, child
+53154 area), because `selected_recursive_result` deliberately declines to expose a
+hidden method binder. So no lawful existing surface carrier exists, and (per the
+FIX section) the fix is c-elab, NOT a new source carrier. This D0 is DONE; D1 may
+proceed.
 
-- If **YES** -> **(c-proof)** is the bounded fix. The elaborator change, if any,
-  is only to cleanly expose/name the equality for the proof to apply; the D3
-  proof carries the explicit transport.
-- If **NO** -> the elaborator must at minimum EXPOSE the equality (a source-usable
-  hypothesis -- smaller than full auto-transport). **(c-elab)** auto-transport is
-  the fallback only if exposing-for-proof-use is itself infeasible.
-
-Record the measurement and the chosen sub-fork before authoring `D1`.
-
-**`D1` -- the route-(c) transport at the corrected locus.** Per D0's sub-fork:
-expose (and, for c-elab, auto-transport) the dependent-match refinement equality
-so a mutual-recursion sibling call's concrete indexed result reconciles with the
-refined motive index, via explicit J/cast over the propositional equality. The
-`b89b4a2cf` reflexive helper is RETAINED unchanged as a sound building block for
-the definitionally-reflexive same-owner self-call case. If (c-elab) is chosen,
-the `ElabCtx` mutual-group-roster addition is scoped explicitly here. No kernel,
-checker, reference, verdict, proposition, trust, or D3-proposition change.
+**`D1` -- c-elab roster-aware auto-transport at the corrected locus.** Add the
+recursive-GROUP roster to `ElabCtx` (explicit deliverable) so mutual-sibling calls
+are recognizable, and at the equality-holding seam (prefer Seam A, pinned by
+measurement in D1) insert the GENUINE J/cast transport of the sibling-call's
+concrete indexed result along the propositional refinement equality, so it
+reconciles with the refined motive index. The `b89b4a2cf` reflexive helper is
+RETAINED unchanged as the sound path for the definitionally-reflexive same-owner
+self-call case. **The held D3 source stays UNCHANGED -- no new source carrier, no
+proof rework; that the source needs no new surface is the whole point of c-elab.**
+No kernel, checker, reference, verdict, proposition, trust, surface-syntax, Spec,
+or D3-proposition change.
 
 # ACCEPTANCE CRITERIA
 
-**`AC-0` (the D0 sub-fork discriminator).** The deciding measurement above is
-recorded and names the chosen sub-fork (c-proof / c-elab), with the evidence
-(whether the branch body can name+apply the in-scope refinement equality).
+**`AC-0` (D0 recorded -- SATISFIED).** The deciding measurement is recorded as
+NO (no lawful existing surface carrier; the `StructuralResultOutOfScope` probe is
+the decisive evidence), selecting c-elab per the Architect's ruling. D1 delivers
+the `ElabCtx` recursive-group roster as an explicit, reviewable addition.
 
 **`AC-REAL` (the real-family control the AC-7 gap demanded).** A FokDerivation /
 mutual-recursion consumer control -- the sibling-edge result-refinement shape,
@@ -180,9 +202,14 @@ targeted `ken-elaborator` / `ken-kernel` validation locally, never `--workspace`
 - **Any kernel change.** The kernel's IH contract and reductions are correct and
   backstop the emitted transport. A kernel conversion-completeness gap is a
   SEPARATE node routed through the Steward, not in scope here.
+- **Any new source-language carrier** (a new selector / modifier / `eqn:`-style
+  binder exposing the refinement premise to the surface). Ruled out by the
+  Architect: it would leak the internal index-refinement encoding into the
+  surface and is a Spec surface-contract decision, out of this node's authority.
+  The transport is internal (c-elab); the held source is untouched.
 - **Any checker / reference / verdict / trust / proposition / semantic / D3-proof
-  change.** Those belong to D3's proof scope. If (c-proof) is chosen, the D3-side
-  transport application is authored on the D3 node after this lands, not here.
+  change.** Those belong to D3's proof scope; the held source stays unchanged
+  (c-elab needs no source-side transport).
 - **A point-fix for the single `FokDerivImpRight` edge.** The transport must be
   structural over the mutual-recursion result-refinement presentation, not a
   per-call-site patch.
@@ -192,20 +219,24 @@ targeted `ken-elaborator` / `ken-kernel` validation locally, never `--workspace`
 Prerequisite AHEAD of `V3-FO-CHECKER-SOUNDNESS` D3. `blocks:
 [V3-FO-CHECKER-SOUNDNESS]`; D3 stays HELD (language-implementer at
 `a84d7100561a89f3ded6300fbb4fb4b45b947888`) until this lands, then rebases onto
-it and authors the proof against a transport-aware IH (applying the explicit
-transport itself if the sub-fork is c-proof). `depends_on` empty -- grounds on
-current `main`. `gate: none` -- elaborator-scoped, kernel-backstopped, not TCB,
+it and authors the proof against a transport-aware IH (the elaborator carries the
+transport under c-elab; the source needs no new carrier). `depends_on` empty --
+grounds on current `main`. `gate: none` -- elaborator-scoped, kernel-backstopped,
+not TCB,
 not operator-gated. **Owner: language ring.** Author = `language-implementer`;
-independent design/soundness review = Architect (author is not reviewer). First
-move on pickup is the **D0 deciding measurement**, NOT further implementation.
-Tier **T1** -- a dependent-elaboration transport that must hold the
-propositional-vs-definitional line and be measured, not guessed.
+independent design/soundness review = Architect (author is not reviewer). D0 is
+recorded (NO -> c-elab); first move is **D1 authoring** -- the `ElabCtx` roster +
+the Seam-A transport, pinning the exact seam by measurement. Tier **T1** -- a
+dependent-elaboration transport that must hold the propositional-vs-definitional
+line and be measured, not guessed.
 
-**Bookkeeping (Architect, evt_349bjakvjj9yp).** Hard-stop 4 of the D3 chain.
-Entry-4 inventory of `V3-FO-CHECKER-SOUNDNESS`'s section-1b area: entry 2 (kernel
-`iota_reduct` unused-IH, the reduction face) LANDED as
-`KERNEL-RECURSOR-UNUSED-IH-REDUCTION`; entry 3's FIRST locus prediction (same-owner
-reflexive discharge) was sound-but-off-path -- the real locus is this
-mutual-recursion result-refinement transport. `§1a`'s next research re-trigger is
-the 6th hard-stop; this is the 4th, and the existing route-(c) advisory covers
-it, so no new research pull.
+**Bookkeeping (Architect, evt_349bjakvjj9yp re-rule + evt_2md0cx2817yhn c-elab
+finalization).** Hard-stops 4 and 5 of the D3 chain. Entry-4 inventory of
+`V3-FO-CHECKER-SOUNDNESS`'s section-1b area: entry 2 (kernel `iota_reduct`
+unused-IH, the reduction face) LANDED as `KERNEL-RECURSOR-UNUSED-IH-REDUCTION`;
+entry 3's FIRST locus prediction (same-owner reflexive discharge) was
+sound-but-off-path -- the real locus is this mutual-recursion result-refinement
+transport, and hard-stop 5 resolved its c-proof/c-elab sub-fork to c-elab (D0
+measured no lawful existing source carrier). `§1a`'s next research re-trigger is
+the 6th hard-stop; hard-stops 4 and 5 are covered by the existing route-(c)
+advisory, so no new research pull.
