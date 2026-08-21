@@ -8212,6 +8212,55 @@ impl<'a> Lowering<'a> {
                 "a continuation capture input"
             })?.clone());
         }
+        // **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- CONSTRUCT THE GENERATED
+        // CONTEXT'S FRAME, HERE, WHERE ITS FREE VARIABLES ARE LIVE.**
+        //
+        // This is the closure conversion the Architect ruled
+        // (`evt_7vh5nccb9gcqy`) and the piece six prior point-fixes each
+        // missed. A carried recursive-position invocation of this worker is
+        // retargeted onto the generated context that executes it, and that
+        // context declares `Parameter` + `Capture` runs the retarget site
+        // cannot fill:
+        //
+        // - the retarget supplies only the raw body's DECLARED ARGUMENTS, so
+        //   the selected closure's capture run -- the tail of the context's
+        //   `Parameter` run -- is absent there entirely;
+        // - the context's own `Capture` run is this specialization's
+        //   continuation inputs, whose producer-local members are values in the
+        //   producer's SEMANTIC environment. `defining_abi_operands` is an ABI
+        //   operand run and structurally cannot hold them, which is the whole
+        //   of the six-hard-stop chain rather than a bug in any one consumer.
+        //
+        // **Both runs are already assembled above, and neither is
+        // re-derived here.** `selected_captures` is the selected closure's own
+        // ordered capture vector, checked against the planner's worker facts
+        // -- closure occurrence, declared arity, and capture count -- BEFORE
+        // any capture was read from it. `continuation_inputs` is the planner's
+        // ordered projection, each member resolved through
+        // `resolve_direct_emission_claim` against `producer_env` and checked
+        // for slot injectivity. This carries those two runs to the retarget; it
+        // does not compute a third one.
+        //
+        // **Written at the ONE seat every route passes through.** The direct
+        // call, the fusion-local composition and the required-consumer
+        // realization all assemble their operands here, so a frame written here
+        // is available to whichever of them reached it. Writing it at a
+        // consumer instead is the shape this node has already paid for four
+        // times: an instrument placed at one consumer, blind to another
+        // arriving at the same machinery by a different route.
+        //
+        // **This supplies members and relaxes nothing.** The consumer
+        // re-checks both cardinalities against the context's own declared frame
+        // header before using the operands, and the context body still walks
+        // its own declared run through the unchanged membership and slot
+        // re-derivation guard.
+        self.function_local.constructed_context_frame = Some(ConstructedContextFrame {
+            continuation_origin: unit.continuation_origin(),
+            recursive_position: unit.recursive_position(),
+            worker_body_origin: unit.worker_body_origin(),
+            worker_captures: selected_captures.clone(),
+            context_captures: continuation_inputs.clone(),
+        });
         Ok(ContinuationCallOperands {
             body: super::units::ContinuationSelectedCaseBody {
                 id: unit.id(),
@@ -10866,6 +10915,39 @@ impl<'a> Lowering<'a> {
             return Ok(false);
         }
         let claims = context.captures()?;
+        // **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- the SECOND admission
+        // route: this frame has already CONSTRUCTED the context's environment.**
+        //
+        // **An addition beside the route below, never a widening of it.** The
+        // `D3` route asks whether the PLANNER can recover each capture at the
+        // consuming seat, and it still refuses exactly what it refused before.
+        // This route asks a different and strictly stronger question: has the
+        // creation site, running in this very function with the producer's
+        // environment live, already materialized one operand for every member of
+        // both of the context's declared runs? That is a construction that has
+        // happened, not an availability that might resolve.
+        //
+        // **The two routes count DIFFERENT populations, and this must not be
+        // read as a restatement of the one below.** `captures` is the selected
+        // closure's capture count, whose operands are the tail of the context's
+        // `Parameter` run; `claims` is the context's own `Capture` run, the
+        // enclosing specialization's continuation inputs. This arm checks one
+        // constructed run against each of them separately, which is why it names
+        // both.
+        //
+        // Admission here is a PERMISSION, not the authority. The consumer
+        // re-matches the frame on the complete planner-issued coordinate key and
+        // re-checks both cardinalities against the context's own declared frame
+        // header, so a frame admitted here and wrong there refuses at the call.
+        // The two cannot disagree silently.
+        if let Some(frame) = self.function_local.constructed_context_frame.as_ref() {
+            if frame.worker_body_origin == body_origin
+                && frame.worker_captures.len() == captures
+                && frame.context_captures.len() == claims.len()
+            {
+                return Ok(true);
+            }
+        }
         if claims.len() != captures {
             // ⛔ Cardinality is part of the predicate, not a detail. A plan that
             // covers only some captures cannot supply the rest, and admitting on

@@ -920,6 +920,7 @@ impl ArtifactHelpers<'_> {
             #[cfg(test)]
             defining_abi_slot_kinds: Vec::new(),
             generated_context_captures: None,
+            constructed_context_frame: None,
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
             pending_composed_discharges: Vec::new(),
@@ -986,6 +987,56 @@ enum TrapExitAuthority {
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a`** -- the continuation-input operands one
 /// enclosing specialization passes across a retargeted worker call.
+/// **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- the generated context's own frame,
+/// CONSTRUCTED at the creation site from the producer's live environment.**
+///
+/// The closure conversion the Architect ruled (`evt_7vh5nccb9gcqy`). A carried
+/// recursive-position invocation retargeted onto a generated context must
+/// supply that context's whole declared frame, and two of its runs cannot be
+/// gathered where the retarget happens:
+///
+/// - the **worker-capture tail of the `Parameter` run** -- the carried
+///   invocation supplies only the raw body's declared arguments, so the
+///   selected closure's captures are simply absent there;
+/// - the **`Capture` run** -- the enclosing specialization's continuation
+///   inputs, whose producer-local members live in the producer's semantic
+///   environment and are **not ABI operands at all**, so
+///   `function_local.defining_abi_operands` structurally cannot hold them.
+///
+/// Both runs ARE in hand at `assemble_continuation_call_operands`, which runs
+/// in the enclosing function's body with `producer_env` live and resolves every
+/// member through the planner's own projections. This carries them from there
+/// to the retarget, so the frame is **materialized where its free variables are
+/// live** rather than re-derived where they are not.
+///
+/// **This supplies members; it relaxes no check.** The operands are presented
+/// in the context's declared order and the consumer re-verifies both
+/// cardinalities against the context's own frame header before using them, so a
+/// mis-ordered or mis-counted frame still refuses. `verify_entry_frame`'s
+/// membership and slot re-derivation guard is untouched: the context body still
+/// walks its own declared run.
+///
+/// Keyed by the **complete planner-issued coordinate triple**, never by body
+/// origin alone. One function can reach two retargets over one body, and a
+/// frame consumed at the wrong one would be an arity-correct call carrying
+/// another occurrence's values -- the exact silent shape `D6a` and
+/// `generated_context_captures` both guard against by retaining their key.
+struct ConstructedContextFrame {
+    /// The eliminator occurrence whose recursive position this frame serves.
+    continuation_origin: StaticOriginId,
+    /// That position, as the planner issued it.
+    recursive_position: u32,
+    /// The selected worker body the context executes.
+    worker_body_origin: StaticOriginId,
+    /// The selected closure's captures, in **capture-ordinal** order -- the
+    /// tail of the context's `Parameter` run, after the declared arguments the
+    /// carried invocation itself supplies.
+    worker_captures: Vec<LoweringOperand>,
+    /// The enclosing specialization's continuation inputs, in ordinal order --
+    /// the context's own `Capture` run.
+    context_captures: Vec<LoweringOperand>,
+}
+
 struct GeneratedContextCaptures {
     /// The exact worker body origin whose call carries this suffix.
     worker_body_origin: StaticOriginId,
@@ -1141,6 +1192,12 @@ struct FunctionLocalRefs {
     /// implicit: a suffix appended to the wrong worker call would be a silent
     /// arity error at a frame that happened to be big enough.
     generated_context_captures: Option<GeneratedContextCaptures>,
+    /// **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2`** -- see
+    /// [`ConstructedContextFrame`]. Written at the creation site, consumed at
+    /// the carried-invocation retarget, and per-function for the same reason
+    /// `generated_context_captures` is: the operands are `ir::Value`s of this
+    /// Function.
+    constructed_context_frame: Option<ConstructedContextFrame>,
     /// **`RT-CONTSPEC-ACTIVATE` `D3`** -- this Function's own `FuncRef` per
     /// causal token it owns, keyed by the complete four-field identity.
     /// Minted into this `Function`; never passed across functions.

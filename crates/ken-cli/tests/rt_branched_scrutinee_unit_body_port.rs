@@ -124,11 +124,37 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
     );
     let error = result.expect_err("D2 exposes the next refusal");
     eprintln!("RT_BRANCHED_SCRUTINEE_UNIT_BODY_D2_ADVANCED {error:?}");
+    // AMENDED by `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2`.
+    //
+    // This clause pinned the BoundaryCarrier refusal as the state this witness
+    // advanced *to*. That was correct while the recursive position had no
+    // declared callable to resolve to. `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2`
+    // constructs the generated context's frame at the creation site and
+    // supplies it at the retarget, so the position now resolves and the call is
+    // emitted — the carried-residual guard is no longer reached at all.
+    //
+    // The pin's PROPERTY is unchanged and is the reason it is amended rather
+    // than deleted: this witness advances past route 1, walks both arms, and
+    // then refuses. What moved is only which refusal is the terminal one, and
+    // it moved because a stop was CLEARED. Asserting the absence keeps the
+    // "advanced past" claim as an absence, which is what it always meant.
+    let reason = format!("{error:?}");
     assert!(
-        format!("{error:?}").contains(
-            "BoundaryCarrier: a carried recursive hypothesis is an eliminated value, not a callable, so it takes no arguments, but the call provides 1"
-        ),
-        "D2 must advance to the BoundaryCarrier refusal: {error:?}"
+        !reason.contains("a carried recursive hypothesis is an eliminated value, not a callable"),
+        "the carried-residual guard must no longer be this witness's stop — the \
+         recursive position resolves to a declared callable now: {error:?}"
+    );
+    // TRANSITION SENTINEL. The terminal state is now a host-effect seat
+    // refusal, in a different subsystem and under a different law: `D2` supplies
+    // the callee's frame and says nothing about the phase of the call's RESULT,
+    // which crosses a function boundary and carries only the word. Designed to
+    // go red when THAT boundary is addressed; the deliverable then is to
+    // re-measure the terminal state, not to widen this clause.
+    assert!(
+        reason.contains("needs ConstructorTag, which it cannot observe in CarriedWord"),
+        "the expected terminal state after `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` is the \
+         host-effect seat refusal, which is what keeps the absence above non-vacuous: \
+         {error:?}"
     );
 }
 

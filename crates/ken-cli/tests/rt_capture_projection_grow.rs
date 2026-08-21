@@ -154,14 +154,61 @@ fn the_conditional_join_grows_the_projection_and_records_every_deferral() {
          `reached`; this is the planner veto the unconditional form produced: {error}"
     );
 
-    // ⛔ And the expected terminal state, which is what makes the assertion
-    // above non-vacuous: D1 mints claims but does not seat them, so this
-    // witness still refuses at the UNCHANGED carried-residual guard. If this
-    // ever reports success, D2 has landed and this expectation is what should
-    // be revisited — not deleted silently.
+    // The terminal state, AMENDED by `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2`.
+    //
+    // This clause used to read "the expected terminal state is the unchanged
+    // BoundaryCarrier refusal", and it said in its own comment that if that
+    // ever stopped holding, the expectation was to be **revisited, not deleted
+    // silently**. `D2` is that event, and this is the revision.
+    //
+    // `D2` constructs the generated context's frame at the creation site and
+    // supplies it at the carried-invocation retarget. That clears **two**
+    // refusals this witness used to stop at, and the two are asserted
+    // separately because they are two distinct claims about what `D2` did:
+    //
+    // 1. the carried-residual guard no longer fires, because the
+    //    recursive-position body now resolves to a declared callable;
+    // 2. the generated-context capture gather no longer fires, because the
+    //    context's `Capture` run is supplied from the producer's live
+    //    environment rather than looked for in an ABI operand run that
+    //    structurally cannot hold it.
+    //
+    // Asserted as ABSENCES of two exact refusals rather than as the presence
+    // of one new string. An absence is what "`D2` cleared this stop" actually
+    // means, and it stays true however the deeper boundary is later resolved.
     assert!(
-        error.contains("a carried recursive hypothesis is an eliminated value, not a callable"),
-        "D1 alone greens no witness by design; the expected terminal state is the \
-         unchanged BoundaryCarrier refusal: {error}"
+        !error.contains("a carried recursive hypothesis is an eliminated value, not a callable"),
+        "`D2` resolves this witness's recursive position to a declared callable, so the \
+         carried-residual guard must no longer be the stop: {error}"
+    );
+    assert!(
+        !error.contains("carries no context-capture availability claim"),
+        "`D2` supplies the context's Capture run from the producer environment, so the \
+         context capture gather must no longer be the stop: {error}"
+    );
+
+    // **TRANSITION SENTINEL, and named for its boundary rather than its
+    // text.** `D2` supplies the callee's frame; it says nothing about the phase
+    // of the call's RESULT, which crosses a function boundary and therefore
+    // carries only the word. This witness now advances into host-effect seat
+    // dispatch and stops where a seat needs structure a carried word does not
+    // have. That is a different subsystem and a different law.
+    //
+    // **This assertion is designed to go red when that boundary is addressed**,
+    // and the red is its purpose: it is the event that says the witness got
+    // further still, and the deliverable then is to re-measure what the new
+    // terminal state is — not to widen this clause. Do not satisfy it by
+    // deleting it.
+    assert!(
+        !result.is_ok(),
+        "`D2` seats the context frame; it does not green this witness. A success here \
+         means the effect-seat boundary below was closed too, and this sentinel is the \
+         thing to re-measure rather than remove: {error}"
+    );
+    assert!(
+        error.contains("needs ConstructorTag, which it cannot observe in CarriedWord"),
+        "the expected terminal state after `D2` is the host-effect seat refusal, which \
+         is what makes the two absences above non-vacuous — without it they would also \
+         hold on a compile that failed for some unrelated earlier reason: {error}"
     );
 }
