@@ -10822,6 +10822,62 @@ impl<'a> Lowering<'a> {
         self.resolve_recursive_unit_body(scrutinee.static_origin, position, selected_constructor)
     }
 
+
+    /// **`RT-CAPTURE-PROJECTION-GROW` `D3` — is every capture of this
+    /// recursive-position closure supplied by a RESOLVABLE planner claim?**
+    ///
+    /// Lineage: this is the widening
+    /// [`RT-CAPTURE-SUPPLY-DECLARED-INPUTS`]'s `D1` spec described — the gate
+    /// condition moves from *captures empty* to *captures all
+    /// planner-recoverable*. `D1`'s projection growth is what makes it
+    /// satisfiable at all; before that, every capture-bearing closure was
+    /// word-only and the predicate below was false for the whole population.
+    ///
+    /// ⛔ **STRICTLY-JUSTIFIED, FAIL-CLOSED, AND NEVER A RELAXATION.** A capture
+    /// set is admitted only when the generated context owning this body declares
+    /// a claim for EVERY capture and every one of those claims is resolvable —
+    /// `availability.context_capture` present. A set with even one
+    /// unrecoverable capture still refuses, exactly as before. Nothing here
+    /// admits a capture the planner cannot supply, and nothing reads the carried
+    /// word.
+    ///
+    /// ⛔ `context_capture` is the field `resolve_context_capture_claim`
+    /// consumes; a `None` there is precisely the refusal this gate must respect
+    /// rather than route around. `CurrentLexical` is deliberately NOT accepted
+    /// as evidence: it locates a value in a semantic environment the capture
+    /// consumer does not hold, which is why that consumer refuses it.
+    fn recursive_position_captures_all_planner_recoverable(
+        &self,
+        body_origin: StaticOriginId,
+        captures: usize,
+    ) -> Result<bool, CraneliftBackendError> {
+        let contexts = self.static_transition_plan.continuation_contexts()?;
+        let mut owning = contexts
+            .iter()
+            .filter(|context| context.worker_body_origin() == body_origin);
+        let Some(context) = owning.next() else {
+            // No generated context owns this body, so there is no capture plan
+            // to supply anything: refuse, as before.
+            return Ok(false);
+        };
+        if owning.next().is_some() {
+            // Two contexts for one body is an ambiguity this gate refuses rather
+            // than resolving by taking the first.
+            return Ok(false);
+        }
+        let claims = context.captures()?;
+        if claims.len() != captures {
+            // ⛔ Cardinality is part of the predicate, not a detail. A plan that
+            // covers only some captures cannot supply the rest, and admitting on
+            // a partial plan is exactly the unsound accept this gate exists to
+            // prevent.
+            return Ok(false);
+        }
+        Ok(claims
+            .iter()
+            .all(|claim| claim.availability.context_capture.is_some()))
+    }
+
     fn resolve_recursive_unit_body(
         &self,
         source_origin: StaticOriginId,
@@ -10884,10 +10940,31 @@ impl<'a> Lowering<'a> {
         };
         let argument = self.child_occurrence(source_origin, position, argument)?;
         match argument.expr {
+            // ⭐ The zero-capture fast path, kept: nothing to claim, so the
+            // widened predicate below is trivially true and this avoids asking
+            // the planner about a body with no captures at all.
             RuntimeExpr::LexicalClosure { captures, body, .. } if captures.is_empty() => Ok(Some(
                 self.child_occurrence(argument.static_origin, 0, body)?
                     .static_origin,
             )),
+            // ⭐⭐ `RT-CAPTURE-PROJECTION-GROW` `D3` — captures all
+            // planner-recoverable. See the predicate's own doc for the lineage
+            // and the fail-closed posture; a set that is not fully recoverable
+            // falls through to the refusing arm below, unchanged.
+            RuntimeExpr::LexicalClosure { captures, body, .. }
+                if {
+                    let body_origin = self.child_occurrence(argument.static_origin, 0, body)?;
+                    self.recursive_position_captures_all_planner_recoverable(
+                        body_origin.static_origin,
+                        captures.len(),
+                    )?
+                } =>
+            {
+                Ok(Some(
+                    self.child_occurrence(argument.static_origin, 0, body)?
+                        .static_origin,
+                ))
+            }
             RuntimeExpr::Closure { body, .. } => Ok(Some(
                 self.child_occurrence(argument.static_origin, 0, body)?
                     .static_origin,
