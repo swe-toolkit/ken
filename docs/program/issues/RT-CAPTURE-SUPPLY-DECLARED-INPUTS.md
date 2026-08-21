@@ -1,7 +1,7 @@
 ---
 id: RT-CAPTURE-SUPPLY-DECLARED-INPUTS
 title: "the branch-local callable-authority cut is necessary but not sufficient -- every witness's residual blocker is capture supply; a capture-bearing LexicalClosure at a recursive position can present its captures as planner-owned declared inputs ONLY if every capture's value is recoverable as a planner-assigned ABI operand with zero read of the carried word -- D0 measures that per witness before any implementation"
-status: ready
+status: merged
 owner: runtime
 size: L
 gate: none
