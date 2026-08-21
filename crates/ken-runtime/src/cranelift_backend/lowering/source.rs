@@ -4868,12 +4868,15 @@ mod tests {
     use super::*;
     use crate::cranelift_backend::UnsupportedLowering;
     use crate::cranelift_backend::lowering::core::tests::{
-        host_result_closure_match, inert_test_static_origin,
+        host_result_closure_match, inert_test_static_origin, px8j_layered_recursive_result,
     };
     use crate::cranelift_backend::lowering::core::tests::control::{
-        d8f_compile, d8n_compile, oriented_dynamic_sibling_fixture, px8j_aggregate_result,
-        px8j_capture_source_trace, px8j_layered_recursive_result, px8j_recursive_sibling_result,
-        px8j_scope_chain_observation_result, root_authority_test_lowering, Px8dsEdgeMutation,
+        oriented_dynamic_sibling_fixture, px8j_aggregate_result, px8j_capture_source_trace,
+        px8j_recursive_sibling_result, px8j_scope_chain_observation_result,
+        root_authority_test_lowering, Px8dsEdgeMutation,
+    };
+    use crate::cranelift_backend::lowering::core::tests::source_frame_bridge::{
+        d8f_compile, d8n_compile,
     };
 
     #[derive(Clone, Copy)]

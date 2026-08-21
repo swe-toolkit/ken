@@ -33,8 +33,8 @@ pub(in crate::cranelift_backend) use super::super::super::{
 
 // Crate-root items the subject tests assert against.
 pub(in crate::cranelift_backend) use crate::{
-    CraneliftObjectArtifact, RuntimeExample, RuntimeLowerabilityStatus, RuntimeObservation,
-    RuntimeSymbolMetadata, UnsupportedLowering,
+    CraneliftObjectArtifact, CraneliftRunReport, RuntimeExample, RuntimeLowerabilityStatus,
+    RuntimeObservation, RuntimeSymbolMetadata, UnsupportedLowering,
 };
 
 // Ruled test module: a `use` is permitted here (AC-8 class 2).
@@ -90,9 +90,15 @@ pub(in crate::cranelift_backend::lowering) mod constructors;
 // module itself must be nameable from that sibling subtree too.
 pub(in crate::cranelift_backend::lowering) mod control;
 mod effects;
-// `RT-CONTROL-INTEGRATION-TESTS-SPLIT` D1 module 1 of 5, split from
-// `control.rs`.
+// `RT-CONTROL-INTEGRATION-TESTS-SPLIT` D1, modules 1-5 of 5, split from
+// `control.rs`. `source_frame_bridge` carries `d8n_compile` and the `d8f_*`
+// family, which `source::tests` reaches by path (same precedent as
+// `control` above), so it needs the same widened module visibility.
 mod recursor_fusion;
+mod host_call_carrier;
+mod specialization_binding;
+pub(in crate::cranelift_backend::lowering) mod source_frame_bridge;
+mod positional_candidate_settlement;
 
 /// A real, planner-issued origin for a hand-built frame or layer that carries
 /// **no** syntax children (an empty `cases` list, a childless residual).
@@ -801,11 +807,12 @@ fn d5_c4_a_retargeted_declaration_call_is_refused_before_emission() {
 // ── RT-PLANNER-OCCURRENCES-SPLIT D2: occurrence-classified tests moved ──
 // up from control.rs to the LCA. Multi-leaf fixtures stay in control.rs and
 // are reached here through `use control::{...}` (they are pub(super) there).
+// `ac11_compiles`/`contspec_emission_witness`/`expression_children`/
+// `one_child_record` were promoted into this file directly at
+// `RT-CONTROL-INTEGRATION-TESTS-SPLIT` D1 -- no longer imported, they are
+// now local declarations.
 
-use control::{
-    ac11_compiles, contspec_emission_witness, declaration_span, declared_fields,
-    expression_children, is_bare_source_term_field, one_child_record,
-};
+use control::{declaration_span, declared_fields, is_bare_source_term_field};
 
 /// One planned instance of **every** `RuntimeExpr` variant, each carrying at
 /// least one expression-typed field where the variant has any, so a dropped
@@ -1804,3 +1811,1680 @@ fn every_origin_to_expression_resolution_goes_through_the_single_route() {
          invocations."
     );
 }
+
+// `RT-CONTROL-INTEGRATION-TESTS-SPLIT` D1: promoted from `control.rs`
+// (module-private there, several needed by 2+ of the new integration-test
+// modules below) -- hoisted here rather than widened in place, per the
+// phase's banned-scope rule against widening a symbol's visibility just
+// to make a test move compile.
+fn px8j_deferred_recursive_field_fixture() -> RuntimeExpr {
+    let wrap = "ctor:fixture::PX8JDeferred::Wrap";
+    let done = "ctor:fixture::PX8JDeferred::Done";
+    RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(RuntimeExpr::Construct {
+            constructor: wrap.to_string(),
+            args: vec![
+                RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["unit".to_string()],
+                    body: Box::new(RuntimeExpr::Construct {
+                        constructor: done.to_string(),
+                        args: Vec::new(),
+                    }),
+                },
+                constructor_field_aggregate(),
+            ],
+        }),
+        cases: vec![
+            crate::RuntimeComputationalMatchCase {
+                constructor: wrap.to_string(),
+                argument_binders: 2,
+                recursive_positions: vec![0],
+                body: RuntimeExpr::Match {
+                    scrutinee: Box::new(RuntimeExpr::Var(2)),
+                    cases: ["ctor:prelude::Result::Err", "ctor:prelude::Result::Ok"]
+                        .into_iter()
+                        .map(|constructor| RuntimeMatchCase {
+                            constructor: constructor.to_string(),
+                            binders: 1,
+                            body: RuntimeExpr::Call {
+                                callee: Box::new(RuntimeExpr::Var(1)),
+                                args: vec![RuntimeExpr::Construct {
+                                    constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+                                    args: Vec::new(),
+                                }],
+                            },
+                        })
+                        .collect(),
+                    default: RuntimeTrap {
+                        code: RuntimeTrapCode::PatternMatchFailure,
+                        message: "PX8-J deferred selected-field default".to_string(),
+                    },
+                },
+            },
+            crate::RuntimeComputationalMatchCase {
+                constructor: done.to_string(),
+                argument_binders: 0,
+                recursive_positions: Vec::new(),
+                body: RuntimeExpr::Construct {
+                    constructor: "ctor:prelude::Result::Ok".to_string(),
+                    args: vec![RuntimeExpr::Construct {
+                        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+                        args: Vec::new(),
+                    }],
+                },
+            },
+        ],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "PX8-J deferred outer default".to_string(),
+        },
+    }
+}
+pub(in crate::cranelift_backend::lowering) fn px8j_layered_recursive_result(transform_layers: usize, input_depth: usize) -> RuntimeExpr {
+    let tree_constructor =
+        |layer: usize, constructor: &str| format!("ctor:fixture::PX8JTree{layer}::{constructor}");
+    let unit = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+        args: Vec::new(),
+    };
+    let aggregate = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Result::Ok".to_string(),
+        args: vec![unit()],
+    };
+    fn child(depth: usize, node: &str, leaf: &str) -> RuntimeExpr {
+        RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: vec!["unit".to_string()],
+            body: Box::new(if depth == 0 {
+                RuntimeExpr::Construct {
+                    constructor: leaf.to_string(),
+                    args: Vec::new(),
+                }
+            } else {
+                RuntimeExpr::Construct {
+                    constructor: node.to_string(),
+                    args: vec![child(depth - 1, node, leaf)],
+                }
+            }),
+        }
+    }
+    let input_node = tree_constructor(0, "Node");
+    let input_leaf = tree_constructor(0, "Leaf");
+    let mut producer = RuntimeExpr::Construct {
+        constructor: input_node.clone(),
+        args: vec![child(input_depth, &input_node, &input_leaf)],
+    };
+    for layer in 0..transform_layers {
+        producer = RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(producer),
+            cases: vec![
+                crate::RuntimeComputationalMatchCase {
+                    constructor: tree_constructor(layer, "Node"),
+                    argument_binders: 1,
+                    recursive_positions: vec![0],
+                    body: RuntimeExpr::Construct {
+                        constructor: tree_constructor(layer + 1, "Node"),
+                        args: vec![RuntimeExpr::Var(0)],
+                    },
+                },
+                crate::RuntimeComputationalMatchCase {
+                    constructor: tree_constructor(layer, "Leaf"),
+                    argument_binders: 0,
+                    recursive_positions: Vec::new(),
+                    body: RuntimeExpr::Construct {
+                        constructor: tree_constructor(layer + 1, "Leaf"),
+                        args: Vec::new(),
+                    },
+                },
+            ],
+            default: RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: format!("PX8-J transform {layer} default"),
+            },
+        };
+    }
+    RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(producer),
+        cases: vec![
+            crate::RuntimeComputationalMatchCase {
+                constructor: tree_constructor(transform_layers, "Node"),
+                argument_binders: 1,
+                recursive_positions: vec![0],
+                body: RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::Var(0)),
+                    args: vec![unit()],
+                },
+            },
+            crate::RuntimeComputationalMatchCase {
+                constructor: tree_constructor(transform_layers, "Leaf"),
+                argument_binders: 0,
+                recursive_positions: Vec::new(),
+                body: aggregate(),
+            },
+        ],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "PX8-J terminal transform default".to_string(),
+        },
+    }
+}
+#[cfg(test)]
+fn oriented_test_ih_plan() -> crate::OrientedSubcontinuationPlanV1 {
+    let mut plan = oriented_test_plan();
+    for frame_id in 0..=2 {
+        let slot_template_id = 200 + frame_id;
+        let mut slot = crate::CheckedComputationalIHSlotTemplateV1 {
+            slot_template_id,
+            declaration: "decl:fixture::oriented".to_string(),
+            checked_match_ordinal: frame_id,
+            checked_occurrence_path: vec![20, frame_id],
+            frame_template_id: frame_id,
+            constructor: format!("Ctor{frame_id}"),
+            recursive_position: 0,
+            method_binder_ordinal: 0,
+            local_telescope: Vec::new(),
+            ih_interface: oriented_test_interface(frame_id as u8),
+            segment_site_id: 9,
+            frame_templates: vec![frame_id],
+            input_interface: oriented_test_interface(frame_id as u8),
+            output_interface: oriented_test_interface(frame_id as u8 + 1),
+            runtime_marker_locations: vec![crate::CheckedRuntimeMarkerLocationV1 {
+                declaration: "decl:fixture::oriented".to_string(),
+                runtime_path: vec![0, frame_id],
+            }],
+            occurrence_binding_fingerprint: 0,
+        };
+        slot.occurrence_binding_fingerprint =
+            crate::compiler_private_computational_ih_slot_binding_fingerprint(&slot);
+        plan.computational_ih_slots.push(slot);
+
+        let mut call = crate::CheckedComputationalIHCallTemplateV1 {
+            call_template_id: 100 + frame_id,
+            declaration: "decl:fixture::oriented".to_string(),
+            checked_occurrence_path: vec![30, frame_id],
+            slot_template_id,
+            arity: 1,
+            local_telescope: Vec::new(),
+            result_interface: oriented_test_interface(frame_id as u8 + 1),
+            callee_segment_site_id: 9,
+            callee_frame_templates: vec![frame_id],
+            composed_frame_templates: Vec::new(),
+            parent_frame_template_id: Some(frame_id),
+            parent_segment_site_id: Some(9),
+            caller_interface: oriented_test_interface(frame_id as u8 + 1),
+            runtime_marker_locations: vec![crate::CheckedRuntimeMarkerLocationV1 {
+                declaration: "decl:fixture::oriented".to_string(),
+                runtime_path: vec![1, frame_id],
+            }],
+            occurrence_binding_fingerprint: 0,
+        };
+        call.occurrence_binding_fingerprint =
+            crate::compiler_private_computational_ih_call_binding_fingerprint(&call);
+        plan.computational_ih_calls.push(call);
+    }
+    plan.validate().unwrap();
+    plan
+}
+#[cfg(test)]
+fn oriented_test_instance_layer(
+    frame_id: u64,
+    invocation_id: u64,
+    semantic_depth: usize,
+    semantic_pending: bool,
+    role: RecursorLayerRole,
+) -> ComputationalRecursorLayer {
+    let mut layer = oriented_test_layer(frame_id, role);
+    layer.checked_invocation_id = Some(invocation_id);
+    layer.checked_invocation_source =
+        Some(InvocationTemplateRef::ComputationalIHCall(100 + frame_id));
+    layer.checked_invocation_depth = semantic_depth;
+    layer.semantic_pending = semantic_pending;
+    layer
+}
+#[cfg(test)]
+fn oriented_test_layer(frame_id: u64, role: RecursorLayerRole) -> ComputationalRecursorLayer {
+    ComputationalRecursorLayer {
+        cases: Vec::new(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::ExplicitTrap,
+            message: format!("oriented frame {frame_id}"),
+        },
+        outer_env: Vec::new(),
+        static_origin: inert_test_static_origin(),
+        provenance: RecursorFrameProvenance(frame_id),
+        role,
+        checked_frame_id: Some(frame_id),
+        checked_invocation_id: Some(0),
+        checked_invocation_source: None,
+        checked_invocation_depth: 0,
+        semantic_pending: true,
+    }
+}
+#[cfg(test)]
+fn oriented_test_plan() -> crate::OrientedSubcontinuationPlanV1 {
+    crate::OrientedSubcontinuationPlanV1 {
+        representation_rule_version:
+            crate::OrientedSubcontinuationPlanV1::REPRESENTATION_RULE_VERSION,
+        // Checked postorder is p2, p1, p0 even though control returns
+        // through o0, o4, o3 below.
+        frames: vec![
+            oriented_test_frame(0, 2, 2, 3, None),
+            oriented_test_frame(1, 1, 1, 2, Some(0)),
+            oriented_test_frame(2, 0, 0, 1, Some(1)),
+        ],
+        recursive_calls: Vec::new(),
+        computational_ih_slots: Vec::new(),
+        computational_ih_calls: Vec::new(),
+    }
+}
+#[cfg(test)]
+#[derive(Clone, Copy, Debug)]
+enum Px8jDirectRecursorConsumer {
+    PendingLetProducer,
+    ProducerCall,
+    OrdinaryCall,
+}
+#[cfg(test)]
+#[derive(Clone, Copy, Debug)]
+enum Px8jRecursorMalformation {
+    SelectionRole,
+    RepeatedScopeIdentity,
+    BrokenScopeParent,
+}
+
+fn occurrence_exact_marker_fixture(
+    duplicate_call: bool,
+    duplicate_slot: bool,
+) -> (
+    RuntimeExpr,
+    RuntimeDeclaration,
+    crate::OrientedSubcontinuationPlanV1,
+) {
+    let declaration = "decl:fixture::PX8TA::markers".to_string();
+    let slot_marker = RuntimeExpr::CheckedComputationalIHSlots {
+        slot_template_ids: vec![200],
+        checked_occurrence_paths: vec![vec![20]],
+        body: Box::new(RuntimeExpr::Value(RuntimeValue::Int((1).into()))),
+    };
+    let call_marker = RuntimeExpr::CheckedComputationalIHInvocation {
+        call_template_id: 100,
+        checked_occurrence_path: vec![30],
+        body: Box::new(RuntimeExpr::Value(RuntimeValue::Int((2).into()))),
+    };
+    let slot_value = if duplicate_slot {
+        RuntimeExpr::Construct {
+            constructor: "ctor:fixture::Pair".to_string(),
+            args: vec![slot_marker.clone(), slot_marker],
+        }
+    } else {
+        slot_marker
+    };
+    let call_body = if duplicate_call {
+        RuntimeExpr::Construct {
+            constructor: "ctor:fixture::Pair".to_string(),
+            args: vec![call_marker.clone(), call_marker],
+        }
+    } else {
+        call_marker
+    };
+    let cases = vec![crate::RuntimeComputationalMatchCase {
+        constructor: "ctor:fixture::Only".to_string(),
+        argument_binders: 0,
+        recursive_positions: Vec::new(),
+        body: RuntimeExpr::Let {
+            value: Box::new(slot_value),
+            body: Box::new(call_body),
+        },
+    }];
+    let default = RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "PX8-TA marker fixture default".to_string(),
+    };
+    let runtime_frame_fingerprint =
+        crate::compiler_private_computational_match_frame_fingerprint(&cases, &default);
+    let body = RuntimeExpr::CheckedSubcontinuationFrame {
+        frame_id: 0,
+        body: Box::new(RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::Only".to_string(),
+                args: Vec::new(),
+            }),
+            cases,
+            default,
+        }),
+    };
+    let runtime_declaration = RuntimeDeclaration {
+        symbol: declaration.clone(),
+        kind: RuntimeDeclarationKind::Transparent { body },
+        metadata: RuntimeSymbolMetadata::empty(),
+    };
+    let mut frame = crate::OrientedSubcontinuationFramePlanV1 {
+        frame_id: 0,
+        segment_site_id: 9,
+        declaration: declaration.clone(),
+        checked_occurrence_path: vec![10],
+        semantic_position: 0,
+        input_interface: oriented_test_interface(0),
+        output_interface: oriented_test_interface(1),
+        runtime_frame_fingerprint,
+        occurrence_binding_fingerprint: 0,
+        control_witness: crate::OrientedControlWitnessV1::DistinguishedRoot,
+    };
+    frame.occurrence_binding_fingerprint =
+        crate::compiler_private_oriented_occurrence_binding_fingerprint(&frame);
+    let mut slot = crate::CheckedComputationalIHSlotTemplateV1 {
+        slot_template_id: 200,
+        declaration: declaration.clone(),
+        checked_match_ordinal: 0,
+        checked_occurrence_path: vec![20],
+        frame_template_id: 0,
+        constructor: "ctor:fixture::Only".to_string(),
+        recursive_position: 0,
+        method_binder_ordinal: 0,
+        local_telescope: Vec::new(),
+        ih_interface: oriented_test_interface(0),
+        segment_site_id: 9,
+        frame_templates: vec![0],
+        input_interface: oriented_test_interface(0),
+        output_interface: oriented_test_interface(1),
+        runtime_marker_locations: vec![crate::CheckedRuntimeMarkerLocationV1 {
+            declaration: declaration.clone(),
+            runtime_path: vec![0, 1, 0],
+        }],
+        occurrence_binding_fingerprint: 0,
+    };
+    slot.occurrence_binding_fingerprint =
+        crate::compiler_private_computational_ih_slot_binding_fingerprint(&slot);
+    let mut call = crate::CheckedComputationalIHCallTemplateV1 {
+        call_template_id: 100,
+        declaration: declaration.clone(),
+        checked_occurrence_path: vec![30],
+        slot_template_id: 200,
+        arity: 1,
+        local_telescope: Vec::new(),
+        result_interface: oriented_test_interface(1),
+        callee_segment_site_id: 9,
+        callee_frame_templates: vec![0],
+        composed_frame_templates: Vec::new(),
+        parent_frame_template_id: Some(0),
+        parent_segment_site_id: Some(9),
+        caller_interface: oriented_test_interface(1),
+        runtime_marker_locations: vec![crate::CheckedRuntimeMarkerLocationV1 {
+            declaration,
+            runtime_path: vec![0, 1, 1],
+        }],
+        occurrence_binding_fingerprint: 0,
+    };
+    call.occurrence_binding_fingerprint =
+        crate::compiler_private_computational_ih_call_binding_fingerprint(&call);
+    (
+        RuntimeExpr::Value(RuntimeValue::Int((0).into())),
+        runtime_declaration,
+        crate::OrientedSubcontinuationPlanV1 {
+            representation_rule_version:
+                crate::OrientedSubcontinuationPlanV1::REPRESENTATION_RULE_VERSION,
+            frames: vec![frame],
+            recursive_calls: Vec::new(),
+            computational_ih_slots: vec![slot],
+            computational_ih_calls: vec![call],
+        },
+    )
+}
+
+// ── RT-SPLIT slice 7, rule 8 finalization ─────────────────────────────────
+// Residual facade test fixtures whose final-user LCA is this module. Facade
+// file scope was a TRANSITIONAL zero-widening holding position, never final
+// ownership (Architect `evt_h69xwchqqxmj`); slice 7 discharges it. Moved
+// verbatim -- ordered item-level identity, no body edits.
+
+#[cfg(test)]
+fn self_consistent_root_join_site(site_id: u64) -> crate::NativeJoinPlanSiteV1 {
+    let declaration = "decl:fixture::PX8H::main".to_string();
+    let checked_occurrence_path = vec![0];
+    let checked_result_type_fingerprint = 19;
+    crate::NativeJoinPlanSiteV1 {
+        site_id,
+        occurrence_binding_fingerprint: crate::compiler_private_join_occurrence_binding_fingerprint(
+            site_id,
+            &declaration,
+            &checked_occurrence_path,
+            checked_result_type_fingerprint,
+        ),
+        declaration,
+        checked_occurrence_path,
+        checked_result_type_fingerprint,
+        runtime_frame_fingerprint: crate::NATIVE_JOIN_INVOCATION_RETURN_FRAME_V1,
+        answer_kind: crate::NativeJoinAnswerKindV1::ExitCode,
+    }
+}
+
+
+#[cfg(test)]
+fn oriented_test_frame(
+    frame_id: u64,
+    semantic_position: u64,
+    input: u8,
+    output: u8,
+    parent: Option<u64>,
+) -> crate::OrientedSubcontinuationFramePlanV1 {
+    let mut frame = crate::OrientedSubcontinuationFramePlanV1 {
+        frame_id,
+        segment_site_id: 9,
+        declaration: "decl:fixture::oriented".to_string(),
+        checked_occurrence_path: vec![frame_id],
+        semantic_position,
+        input_interface: oriented_test_interface(input),
+        output_interface: oriented_test_interface(output),
+        runtime_frame_fingerprint: frame_id + 100,
+        occurrence_binding_fingerprint: 0,
+        control_witness: parent.map_or(
+            crate::OrientedControlWitnessV1::DistinguishedRoot,
+            crate::OrientedControlWitnessV1::ParentFrame,
+        ),
+    };
+    frame.occurrence_binding_fingerprint =
+        crate::compiler_private_oriented_occurrence_binding_fingerprint(&frame);
+    frame
+}
+
+#[cfg(test)]
+fn self_consistent_join_site(
+    site_id: u64,
+    runtime_frame_fingerprint: u64,
+) -> crate::NativeJoinPlanSiteV1 {
+    let declaration = "decl:fixture::PX8H::main".to_string();
+    let checked_occurrence_path = vec![1, site_id];
+    let checked_result_type_fingerprint = 17;
+    crate::NativeJoinPlanSiteV1 {
+        site_id,
+        occurrence_binding_fingerprint: crate::compiler_private_join_occurrence_binding_fingerprint(
+            site_id,
+            &declaration,
+            &checked_occurrence_path,
+            checked_result_type_fingerprint,
+        ),
+        declaration,
+        checked_occurrence_path,
+        checked_result_type_fingerprint,
+        runtime_frame_fingerprint,
+        answer_kind: crate::NativeJoinAnswerKindV1::Int,
+    }
+}
+
+// ─── RT-FNSPLIT-B2A-C D5 — the coverage guard ─────────────────────────────
+//
+// ⭐ This is the deliverable with the longest half-life in the chain: it is what
+// stops inventory entry 3 recurring the next time `RuntimeExpr` grows a field.
+// It has TWO independent failure modes, and the first is a COMPILE error rather
+// than an assertion, which is strictly stronger:
+//
+//  1. `expression_children` below matches every `RuntimeExpr` variant with its
+//     fields spelled out and **no `..` and no `_ =>` arm**. Add a field to any
+//     variant and this stops compiling (E0027 "pattern does not mention field");
+//     add a variant and it stops compiling (E0004). A wildcard here is what
+//     would let a new expression-typed field become silently originless, so the
+//     absence of one is the mechanism, not a style preference.
+//  2. Even with the pattern updated, the guard asserts that the plane holds
+//     **exactly** the enumerated children for a planned instance of every
+//     variant — no more, no fewer — so a field that is enumerated here but not
+//     planned, or planned but not enumerated, is still red.
+//
+// ⛔ A test that merely enumerates today's variants and passes is NOT this
+// guard (AC-3). The demonstration that it reddens on an *added* field is in the
+// handoff.
+
+/// Every expression-typed field of one occurrence, **in the planner's child
+/// order** — the order of the `children` slice handed to `expression_node` /
+/// `expression_seed`, which is what the positional child-origin range is laid
+/// out against.
+///
+/// ⚠ Two variants order their children differently from their declaration:
+/// `LexicalClosure` plans **body first** (position 0) with capture *i* at
+/// `1 + i`, and `Effect` gives position 0 to `capability.value` **only when it
+/// is present**, shifting every argument by one.
+#[cfg(test)]
+pub(super) fn expression_children(expr: &RuntimeExpr) -> Vec<&RuntimeExpr> {
+    match expr {
+        RuntimeExpr::CheckedJoinSite { site_id: _, body } => vec![body],
+        RuntimeExpr::CheckedSubcontinuationFrame { frame_id: _, body } => vec![body],
+        RuntimeExpr::CheckedRecursiveInvocation {
+            call_template_id: _,
+            checked_occurrence_path: _,
+            body,
+        } => vec![body],
+        RuntimeExpr::CheckedComputationalIHSlots {
+            slot_template_ids: _,
+            checked_occurrence_paths: _,
+            body,
+        } => vec![body],
+        RuntimeExpr::CheckedComputationalIHInvocation {
+            call_template_id: _,
+            checked_occurrence_path: _,
+            body,
+        } => vec![body],
+        RuntimeExpr::Value(_) => Vec::new(),
+        RuntimeExpr::Var(_) => Vec::new(),
+        RuntimeExpr::Let { value, body } => vec![value, body],
+        RuntimeExpr::If {
+            scrutinee,
+            then_expr,
+            else_expr,
+        } => vec![scrutinee, then_expr, else_expr],
+        RuntimeExpr::PrimitiveCall { primitive: _, args } => args.iter().collect(),
+        RuntimeExpr::Construct {
+            constructor: _,
+            args,
+        } => args.iter().collect(),
+        RuntimeExpr::Match {
+            scrutinee,
+            cases,
+            default: _,
+        } => std::iter::once(scrutinee.as_ref())
+            .chain(cases.iter().map(|case| &case.body))
+            .collect(),
+        RuntimeExpr::ComputationalMatch {
+            scrutinee,
+            cases,
+            default: _,
+        } => std::iter::once(scrutinee.as_ref())
+            .chain(cases.iter().map(|case| &case.body))
+            .collect(),
+        RuntimeExpr::Record { fields } => fields.iter().map(|(_, value)| value).collect(),
+        RuntimeExpr::Project { record, field: _ } => vec![record],
+        RuntimeExpr::Closure {
+            captures: _,
+            params: _,
+            body,
+        } => vec![body],
+        RuntimeExpr::LexicalClosure {
+            captures,
+            params: _,
+            body,
+        } => std::iter::once(body.as_ref())
+            .chain(captures.iter())
+            .collect(),
+        RuntimeExpr::DeclarationRef { symbol: _ } => Vec::new(),
+        RuntimeExpr::ImportedDeclarationRef {
+            symbol: _,
+            dependency: _,
+            dependency_semantic_hash: _,
+        } => Vec::new(),
+        RuntimeExpr::Call { callee, args } => std::iter::once(callee.as_ref())
+            .chain(args.iter())
+            .collect(),
+        RuntimeExpr::Effect {
+            family: _,
+            operation: _,
+            capability,
+            args,
+        } => capability
+            .iter()
+            .map(|capability| capability.value.as_ref())
+            .chain(args.iter())
+            .collect(),
+        RuntimeExpr::Trap(_) => Vec::new(),
+    }
+}
+
+
+
+// ─── RT-FNSPLIT-B2A-C AC-4/AC-6 — the positional-derivation controls ──────
+//
+// ★ AC-4's second control is the chain's own predicate as an executable test:
+// if identity moves when only the ADDRESS moved, the tag is not authoritative.
+
+/// Two same-shaped children distinguishable **only** by how many children they
+/// themselves have — so which one a position resolves to is observable through
+/// the positional accessor alone, with no origin→expression lookup (N3).
+#[cfg(test)]
+pub(super) fn one_child_record() -> RuntimeExpr {
+    RuntimeExpr::Record {
+        fields: vec![(
+            "l".to_string(),
+            RuntimeExpr::Value(RuntimeValue::Bool(true)),
+        )],
+    }
+}
+
+
+
+
+/// An imported reference — the one shape with no admitted carrier.
+#[cfg(test)]
+fn ac11_imported() -> RuntimeExpr {
+    RuntimeExpr::ImportedDeclarationRef {
+        symbol: "other::v".to_string(),
+        dependency: "other".to_string(),
+        dependency_semantic_hash: "hash".to_string(),
+    }
+}
+
+/// Compile `expr` and report only whether it was accepted.
+///
+/// ⚠ The closure is **called** in every fixture below, not returned: a closure
+/// is not an observable ground value at the root, so a fixture that merely
+/// mentions one is rejected for an unrelated reason and would look like a
+/// working discriminator while measuring nothing.
+#[cfg(test)]
+pub(super) fn ac11_compiles(expr: &RuntimeExpr) -> Result<(), CraneliftBackendError> {
+    let module = new_jit_module().expect("jit module");
+    compile_expr_into_module(
+        module,
+        "b2f_ac11_probe",
+        Linkage::Local,
+        expr,
+        &NativeSeedEnvironment::empty(),
+        BTreeMap::new(),
+        None,
+        false,
+        None,
+        None,
+        None,
+    )
+    .map(|_| ())
+}
+
+/// Compile the exact governed bracket source as a process object.
+///
+/// The fixture contains real host effects, so a value-mode probe would reject
+/// it before reaching the emission mechanism this control measures.
+// `RT-EMITTER-EFFECTS-SPLIT` `D2` -- `effects::tests` reaches this fixture
+// by path (`core::tests::control::recursive_port_process_compiles`) for its
+// own two relocated seat-lifecycle tests; the 38 other call sites below
+// stay local and unaffected.
+#[cfg(test)]
+pub(in crate::cranelift_backend::lowering::core::tests) fn recursive_port_process_compiles(
+    expr: &RuntimeExpr,
+) -> Result<(), CraneliftBackendError> {
+    let module = new_jit_module().expect("jit module");
+    let process_symbols = crate::NativeProcessSymbols::legacy_prelude();
+    compile_expr_into_module(
+        module,
+        "recursive_port_probe",
+        Linkage::Local,
+        expr,
+        &NativeSeedEnvironment::empty(),
+        BTreeMap::new(),
+        None,
+        true,
+        Some(&process_symbols),
+        Some(test_only_distinguished_root_join_plan()),
+        None,
+    )
+    .map(|_| ())
+}
+
+/// **The one program in this suite that reaches
+/// `claim_and_call_continuation`.**
+///
+/// A `ComputationalMatch` whose scrutinee is `Node(closure)` and whose `Node`
+/// case declares `recursive_positions: vec![0]`, so the planner mints one
+/// causal continuation token; the case body applies the induction hypothesis
+/// against `Unit`, which is the producer occurrence that claims and calls it.
+///
+/// ⭐ **Named here rather than copied.** It was previously inline in the `AC-4`
+/// route census, which is why exactly one test in the suite drove the emission
+/// seam and no control could reach it. Both consumers now build the same value,
+/// so a change to one cannot silently diverge from the other.
+///
+/// ⛔ Not a new fixture and not fixture search: this is the identical
+/// expression the census already compiled, moved so it can be named.
+pub(super) fn contspec_emission_witness() -> RuntimeExpr {
+    RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(RuntimeExpr::Construct {
+            constructor: "ctor:fixture::ac4::Node".to_string(),
+            args: vec![RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["unit".to_string()],
+                body: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::ac4::Leaf".to_string(),
+                    args: Vec::new(),
+                }),
+            }],
+        }),
+        cases: vec![
+            crate::RuntimeComputationalMatchCase {
+                constructor: "ctor:fixture::ac4::Node".to_string(),
+                argument_binders: 1,
+                recursive_positions: vec![0],
+                body: RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::Var(0)),
+                    args: vec![RuntimeExpr::Construct {
+                        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+                        args: Vec::new(),
+                    }],
+                },
+            },
+            crate::RuntimeComputationalMatchCase {
+                constructor: "ctor:fixture::ac4::Leaf".to_string(),
+                argument_binders: 0,
+                recursive_positions: Vec::new(),
+                body: RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::ac4::Leaf".to_string(),
+                    args: Vec::new(),
+                },
+            },
+        ],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "ac4 recursor fixture is total".to_string(),
+        },
+    }
+}
+
+/// Runs `body` with a continuation-emission mutation installed, restoring
+/// `Exact` afterwards **even if `body` panics**, so one failing control cannot
+/// leak a mutation into every later test in the thread.
+fn with_continuation_emission_mutation<T>(
+    mutation: ContinuationEmissionMutation,
+    body: impl FnOnce() -> T,
+) -> T {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_continuation_emission_mutation(ContinuationEmissionMutation::Exact);
+        }
+    }
+    set_continuation_emission_mutation(mutation);
+    let _restore = Restore;
+    body()
+}
+
+/// Asserts the witness is green, then red under `mutation` for a reason whose
+/// text contains `because`, then green again.
+///
+/// ⭐ **The positive control runs first, every time.** A mutation that reds a
+/// program which was never green proves nothing about the mutation, and the
+/// trailing re-run is what shows the mutation was scoped rather than
+/// permanent.
+///
+/// ⚠ **A green mutation is a reach question before it is a defect.** If one of
+/// these ever passes, diagnose whether the seam was entered at all before
+/// concluding the control failed — that discrimination is what the earlier
+/// same-shaped redirect lacked, and it is why that control looked like a
+/// control for two checkpoints while refusing before the call.
+fn assert_emission_mutation_reds(mutation: ContinuationEmissionMutation, because: &str) {
+    let witness = contspec_emission_witness();
+    assert!(
+        ac11_compiles(&witness).is_ok(),
+        "the witness must be green at the seam the mutation reddens"
+    );
+    let error = with_continuation_emission_mutation(mutation, || ac11_compiles(&witness).err())
+        .unwrap_or_else(|| panic!("{mutation:?} must red the emission witness"));
+    let rendered = format!("{error:?}");
+    assert!(
+        rendered.contains(because),
+        "{mutation:?} must red for its own reason, not somewhere else. \
+         expected to contain {because:?}, got: {rendered}"
+    );
+    assert!(
+        ac11_compiles(&witness).is_ok(),
+        "the mutation must not leak past its scope"
+    );
+}
+
+/// **`AC-2` positive control 2 — every variant is reachable by the
+/// instrument.**
+///
+/// A variant no program reaches is a reportable gap in the measurement, not a
+/// variant that does not fire. Each SURVIVING variant is named with the witness
+/// that exhibits it, and the loop below is that list -- so the count lives in
+/// the code rather than in this sentence, where it has now gone stale twice.
+#[cfg(test)]
+const SEED_CALL_PORT_SOME: &str = "ctor:fixture::Core::Option::Some";
+
+#[cfg(test)]
+fn seed_call_port_producer_match_example() -> RuntimeExample {
+    RuntimeExample {
+        name: "seed-call-port-producer-match".to_string(),
+        checked_core_shape: "match ((\\x . Some x) 4) with Some y => y".to_string(),
+        ir: RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Call {
+                callee: Box::new(RuntimeExpr::Closure {
+                    captures: Vec::new(),
+                    params: vec!["x".to_string()],
+                    body: Box::new(RuntimeExpr::Construct {
+                        constructor: SEED_CALL_PORT_SOME.to_string(),
+                        args: vec![RuntimeExpr::Var(0)],
+                    }),
+                }),
+                args: vec![RuntimeExpr::Value(RuntimeValue::Int((4).into()))],
+            }),
+            cases: vec![RuntimeMatchCase {
+                constructor: SEED_CALL_PORT_SOME.to_string(),
+                binders: 1,
+                body: RuntimeExpr::Var(0),
+            }],
+            default: RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: "seed-call-port d1a fixture".to_string(),
+            },
+        },
+        observation: RuntimeObservation::Returned(RuntimeGroundValue::Int((4).into())),
+    }
+}
+
+/// **`RT-SEED-CALL-PORT` `D3` — THE POST-CONDITION, and the sentinel `D1` left
+/// for exactly this moment.**
+///
+/// At `D1` this row asserted `{SeedClosureCall}` and was labelled a transition
+/// sentinel naming `D3` as its retiring event. `D3` is that event, so the row is
+/// inverted rather than deleted: the same program, the same production entry,
+/// the opposite answer.
+///
+/// It asserts all three halves of the post-condition at once, on the exact
+/// program `D1` named as firing the class:
+///
+/// 1. the selector reports `FunctionizedUnits` (`AC-1a`);
+/// 2. the object builds and runs, reaching its declared observation (`AC-1b`);
+/// 3. the enumeration reports **no** `SeedClosureCall` -- asserted as the EMPTY
+///    set, not merely the variant's absence, so a reclassification into some
+///    other variant reds this instead of passing.
+///
+/// The port count is the fourth thing and it is what makes this an activation
+/// rather than a deletion: the program reaches the ported arm's handoff with no
+/// witness IN THE TREE at all. `D2` could only demonstrate that under a
+/// test-only selector mask; `D3` deleted the mask along with the variant, so
+/// there is nothing left to arm or disarm.
+///
+/// **Promise class: durable invariant.** The class is retired and this program
+/// compiles through the functionized lane. No planned extension re-fires it.
+#[cfg(test)]
+fn d2_run_ported(
+    example: &RuntimeExample,
+    seed_env: &NativeSeedEnvironment,
+) -> (Result<CraneliftRunReport, CraneliftBackendError>, usize) {
+    reset_seed_callee_unit_ports();
+    let outcome = run_example_with_seed_observation(example, seed_env);
+    (outcome, seed_callee_unit_ports())
+}
+
+/// A direct seed closure computing `argument - capture`, called with `5` against
+/// the `nc5` seed capture `y = 2`.
+///
+/// `AC-6`'s third control exists because the canonical seed computes `5 + 2` and
+/// **addition is commutative**, so it returns `7` whether the port passes
+/// `Parameter ++ Capture` or `Capture ++ Parameter`. Subtraction is not: the
+/// ruled order gives `5 - 2 = 3` and a swap gives `2 - 5 = -3`. Same shape, same
+/// arity, same values -- only the order is observable.
+#[cfg(test)]
+fn d2_order_sensitive_example() -> RuntimeExample {
+    RuntimeExample {
+        name: "seed-call-port-d2-order-sensitive".to_string(),
+        checked_core_shape: "let y = 2 in (\\x . sub_int x y) 5".to_string(),
+        ir: RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::Closure {
+                captures: vec!["decl:fixture::Local::y".to_string()],
+                params: vec!["x".to_string()],
+                body: Box::new(RuntimeExpr::PrimitiveCall {
+                    primitive: RuntimePrimitive {
+                        symbol: "sub_int".to_string(),
+                        partiality: RuntimePartiality::Total,
+                    },
+                    args: vec![RuntimeExpr::Var(0), RuntimeExpr::Var(1)],
+                }),
+            }),
+            args: vec![RuntimeExpr::Value(RuntimeValue::Int((5).into()))],
+        },
+        observation: RuntimeObservation::Returned(RuntimeGroundValue::Int((3).into())),
+    }
+}
+
+/// Plan the `px8tr_nested_post_effect` witness and hand its
+/// [`StaticTransitionPlan`] to `f`.
+///
+/// ⭐ The plan is built here **independently of any emission run**. That is what
+/// makes the rows below oracles rather than echoes: a claim read off a
+/// successful compile cannot distinguish "the planner recorded this" from
+/// "lowering happened not to need it".
+fn with_d5a_witness_plan<T>(f: impl FnOnce(&StaticTransitionPlan<'_>) -> T) -> T {
+    let (entry_expr, declarations) =
+        crate::cranelift_backend::test_objects::px8tr_nested_post_effect_planning_inputs();
+    let declarations = declarations
+        .iter()
+        .map(|declaration| (declaration.symbol.as_str(), declaration))
+        .collect::<BTreeMap<_, _>>();
+    let plan = plan_static_transition_graph_with_symbols(
+        &entry_expr,
+        &declarations,
+        &crate::NativeProcessSymbols::legacy_prelude(),
+        AbiRootIngress::Value,
+        true,
+    )
+    .expect("the witness plans; a planning failure here is a regression, not a checkpoint");
+    f(&plan)
+}
+
+/// The witness program, parameterised by the two axes its controls move.
+///
+/// `callee_index` is the de Bruijn index the bridge case body calls.
+/// `computational_bridge` selects whether the immediate-binder eliminator is a
+/// `ComputationalMatch` (whose case bodies are lowered by the source machine) or
+/// a `Match` (whose case bodies are lowered by `lower_expr`). ⛔ The two bridges
+/// install IDENTICALLY -- the `D8d` binding is materialized by the outer frame
+/// either way -- so the axis isolates the consumer and nothing else.
+#[cfg(test)]
+fn d8e_witness_declaration(
+    symbol: &str,
+    callee_index: u32,
+    computational_bridge: bool,
+) -> RuntimeDeclaration {
+    let wrap = "ctor:fixture::D8EWitness::Wrap";
+    let done = "ctor:fixture::D8EWitness::Done";
+    let unit = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+        args: Vec::new(),
+    };
+    let ok_unit = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Result::Ok".to_string(),
+        args: vec![unit()],
+    };
+    let call = || RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::Var(callee_index)),
+        args: vec![unit()],
+    };
+    let bridge_default = RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "D8e witness bridge default".to_string(),
+    };
+    let bridge = if computational_bridge {
+        RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Var(2)),
+            cases: ["ctor:prelude::Result::Err", "ctor:prelude::Result::Ok"]
+                .into_iter()
+                .map(|constructor| crate::RuntimeComputationalMatchCase {
+                    constructor: constructor.to_string(),
+                    argument_binders: 1,
+                    recursive_positions: vec![0],
+                    body: call(),
+                })
+                .collect(),
+            default: bridge_default,
+        }
+    } else {
+        RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Var(2)),
+            cases: ["ctor:prelude::Result::Err", "ctor:prelude::Result::Ok"]
+                .into_iter()
+                .map(|constructor| RuntimeMatchCase {
+                    constructor: constructor.to_string(),
+                    binders: 1,
+                    body: call(),
+                })
+                .collect(),
+            default: bridge_default,
+        }
+    };
+    // The selected constructor field: a `Match`, so
+    // `requires_heterogeneous_deforestation` holds, on a compile-time
+    // constructor, so exactly one arm is lowered and no join is merged.
+    let selected_field = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Bool::True".to_string(),
+            args: Vec::new(),
+        }),
+        cases: [
+            ("ctor:prelude::Bool::True", "ctor:prelude::Result::Ok"),
+            ("ctor:prelude::Bool::False", "ctor:prelude::Result::Err"),
+        ]
+        .into_iter()
+        .map(|(constructor, result)| RuntimeMatchCase {
+            constructor: constructor.to_string(),
+            binders: 0,
+            body: RuntimeExpr::Construct {
+                constructor: result.to_string(),
+                args: vec![unit()],
+            },
+        })
+        .collect(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "D8e witness selected-field default".to_string(),
+        },
+    };
+    let eliminator = RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(RuntimeExpr::Construct {
+            constructor: wrap.to_string(),
+            args: vec![
+                // The worker the `D8a` selector's provenance names: a capture-free
+                // closure at the producer's recursive position.
+                RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["unit".to_string()],
+                    body: Box::new(ok_unit()),
+                },
+                selected_field,
+            ],
+        }),
+        cases: vec![
+            crate::RuntimeComputationalMatchCase {
+                constructor: wrap.to_string(),
+                argument_binders: 2,
+                recursive_positions: vec![0],
+                body: bridge,
+            },
+            crate::RuntimeComputationalMatchCase {
+                constructor: done.to_string(),
+                argument_binders: 0,
+                recursive_positions: Vec::new(),
+                body: ok_unit(),
+            },
+        ],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "D8e witness eliminator default".to_string(),
+        },
+    };
+    RuntimeDeclaration {
+        symbol: symbol.to_string(),
+        kind: RuntimeDeclarationKind::Transparent {
+            // ⛔ The `Let` is not decoration -- see the header. It is what puts
+            // the unit's source root above its own continuation.
+            body: RuntimeExpr::Closure {
+                captures: Vec::new(),
+                params: vec!["state".to_string()],
+                body: Box::new(RuntimeExpr::Let {
+                    value: Box::new(eliminator),
+                    body: Box::new(RuntimeExpr::Var(0)),
+                }),
+            },
+        },
+        metadata: RuntimeSymbolMetadata {
+            lowerability: Some(RuntimeLowerabilityStatus::Supported),
+            ..RuntimeSymbolMetadata::empty()
+        },
+    }
+}
+
+/// Compile the witness and return the outcome beside the three `D8d`/`D8e`
+/// counters and the emitted static-worker call log.
+#[cfg(test)]
+fn d8e_witness_compile(
+    label: &str,
+    callee_index: u32,
+    computational_bridge: bool,
+) -> (
+    Option<CraneliftBackendError>,
+    (usize, usize, usize),
+    Vec<D5aMarkerEvent>,
+) {
+    use crate::cranelift_backend::lowering::{
+        d5a_marker_events, d8d_bindings, d8d_recursive_sites, d8e_consumptions,
+        reset_d5a_marker_events, reset_d8d_bindings,
+    };
+    let symbol = format!("decl:fixture::d8e::{label}");
+    let declaration = d8e_witness_declaration(&symbol, callee_index, computational_bridge);
+    let entry = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::DeclarationRef {
+            symbol: symbol.clone(),
+        }),
+        args: vec![RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+            args: Vec::new(),
+        }],
+    };
+    let declarations = BTreeMap::from([(symbol.as_str(), &declaration)]);
+    reset_d8d_bindings();
+    reset_d5a_marker_events();
+    let outcome = compile_expr_into_module(
+        new_object_module(label).expect("the object module builds"),
+        &format!("ken_{label}"),
+        Linkage::Export,
+        &entry,
+        &NativeSeedEnvironment::empty(),
+        declarations,
+        None,
+        true,
+        None,
+        Some(test_only_distinguished_root_join_plan()),
+        None,
+    );
+    (
+        outcome.err(),
+        (d8d_recursive_sites(), d8d_bindings(), d8e_consumptions()),
+        d5a_marker_events(),
+    )
+}
+
+/// The `D8e` witness as a planned graph, for reading its target population
+/// directly. Mirrors [`with_d5a_witness_plan`] over this node's own witness.
+#[cfg(test)]
+fn with_d8e_witness_plan<T>(f: impl FnOnce(&StaticTransitionPlan<'_>) -> T) -> T {
+    let symbol = "decl:fixture::d8e::d8i_plan".to_string();
+    let declaration = d8e_witness_declaration(&symbol, 3, true);
+    let entry = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::DeclarationRef {
+            symbol: symbol.clone(),
+        }),
+        args: vec![RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+            args: Vec::new(),
+        }],
+    };
+    let declarations = BTreeMap::from([(symbol.as_str(), &declaration)]);
+    let plan = plan_static_transition_graph_with_symbols(
+        &entry,
+        &declarations,
+        &crate::NativeProcessSymbols::legacy_prelude(),
+        AbiRootIngress::Value,
+        true,
+    )
+    .expect("the D8e witness plans");
+    f(&plan)
+}
+
+/// **`RT-CONTSRC-PRODUCER-LOCAL` `D8j` — the root-owned composed witness.**
+///
+/// `D8e`'s witness puts the composed elimination in a declaration-owned unit,
+/// where the `D5a` detached-result seat refuses **before** the function is
+/// finalized -- so its CLIF is never built and verifications 3, 4 and 5 have
+/// nothing to read. That refusal is the `89e36ec1` finding and is not this
+/// checkpoint's to repair.
+///
+/// ⭐ **The root unit is the lawful way past it, and it is production's own
+/// rule, not a workaround.** `define_unit_body` applies the detached-result
+/// seat on the non-root path only -- a root owning an undischarged projected
+/// call is left to the whole-pass claim closure -- so a root-owned composed
+/// producer finalizes its function, and the `D8j` gate runs on a real
+/// instruction stream.
+///
+/// ⚠ The program still does not compile: it stops LATER, in the specialization
+/// emission, at an unrelated ordinary-envelope refusal. The discharge relation
+/// is populated before that, which is what these rows measure, and the row says
+/// so rather than implying a compiling program.
+///
+/// **Two recursive positions**, and that is the whole reason this fixture is
+/// not `d8e_witness_declaration` reused: the planner interns one specialization
+/// per position, so the plan carries **two** targets at one producer
+/// `Construct` -- one constructor symbol, two identities. That is exactly the
+/// population a same-symbol shortcut would confuse, and without it the
+/// substitution discriminator has nothing lawful to substitute.
+#[cfg(test)]
+fn d8j_root_witness_entry() -> RuntimeExpr {
+    let wrap = "ctor:fixture::D8JWitness::Wrap";
+    let done = "ctor:fixture::D8JWitness::Done";
+    let unit = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+        args: Vec::new(),
+    };
+    let ok_unit = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Result::Ok".to_string(),
+        args: vec![unit()],
+    };
+    let worker = || RuntimeExpr::LexicalClosure {
+        captures: Vec::new(),
+        params: vec!["unit".to_string()],
+        body: Box::new(ok_unit()),
+    };
+    // The bridge: a computational eliminator over the selected field, so its
+    // case bodies are lowered by the source machine -- `D8e`'s seat.
+    //
+    // Environment inside a bridge case body:
+    //   0 bridge IH, 1 payload, 2 outer IH(1), 3 outer IH(0),
+    //   4 static worker(0), 5 static worker(1), 6 selected field, ...
+    let bridge = RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(RuntimeExpr::Var(4)),
+        cases: ["ctor:prelude::Result::Err", "ctor:prelude::Result::Ok"]
+            .into_iter()
+            .map(|constructor| crate::RuntimeComputationalMatchCase {
+                constructor: constructor.to_string(),
+                argument_binders: 1,
+                recursive_positions: vec![0],
+                body: RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::Var(4)),
+                    args: vec![unit()],
+                },
+            })
+            .collect(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "D8j witness bridge default".to_string(),
+        },
+    };
+    let selected_field = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Bool::True".to_string(),
+            args: Vec::new(),
+        }),
+        cases: [
+            ("ctor:prelude::Bool::True", "ctor:prelude::Result::Ok"),
+            ("ctor:prelude::Bool::False", "ctor:prelude::Result::Err"),
+        ]
+        .into_iter()
+        .map(|(constructor, result)| RuntimeMatchCase {
+            constructor: constructor.to_string(),
+            binders: 0,
+            body: RuntimeExpr::Construct {
+                constructor: result.to_string(),
+                args: vec![unit()],
+            },
+        })
+        .collect(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "D8j witness selected-field default".to_string(),
+        },
+    };
+    RuntimeExpr::Let {
+        value: Box::new(RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: wrap.to_string(),
+                args: vec![worker(), worker(), selected_field],
+            }),
+            cases: vec![
+                crate::RuntimeComputationalMatchCase {
+                    constructor: wrap.to_string(),
+                    argument_binders: 3,
+                    recursive_positions: vec![0, 1],
+                    body: bridge,
+                },
+                crate::RuntimeComputationalMatchCase {
+                    constructor: done.to_string(),
+                    argument_binders: 0,
+                    recursive_positions: Vec::new(),
+                    body: ok_unit(),
+                },
+            ],
+            default: RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: "D8j witness eliminator default".to_string(),
+            },
+        }),
+        body: Box::new(RuntimeExpr::Var(0)),
+    }
+}
+
+/// Compile the `D8j` root witness under one mutation and report what the
+/// composed relation ended up holding.
+#[cfg(test)]
+fn d8j_root_witness_compile(
+    label: &str,
+    mutation: crate::cranelift_backend::lowering::D8jMutation,
+) -> (
+    Option<CraneliftBackendError>,
+    usize,
+    (usize, usize),
+    Vec<crate::cranelift_backend::planning::ContinuationCallIdentity>,
+) {
+    use crate::cranelift_backend::lowering::{
+        d8d_bindings, d8e_consumptions, d8j_discharged, reset_d8d_bindings, reset_d8j_discharged,
+        set_d8j_mutation, D8jMutation,
+    };
+    let entry = d8j_root_witness_entry();
+    reset_d8j_discharged();
+    reset_d8d_bindings();
+    set_d8j_mutation(mutation);
+    let error = compile_expr_into_module(
+        new_object_module(label).expect("the object module builds"),
+        &format!("ken_{label}"),
+        Linkage::Export,
+        &entry,
+        &NativeSeedEnvironment::empty(),
+        BTreeMap::new(),
+        None,
+        true,
+        None,
+        Some(test_only_distinguished_root_join_plan()),
+        None,
+    )
+    .err();
+    set_d8j_mutation(D8jMutation::Exact);
+    (
+        error,
+        d8j_discharged().len(),
+        (d8d_bindings(), d8e_consumptions()),
+        d8j_discharged(),
+    )
+}
+
+/// A composed witness whose producer `Construct` has `fields` fields with the
+/// selected recursive position at `recursive`, so the ordinary envelope's
+/// source-position population can be read for every orientation.
+#[cfg(test)]
+fn d8l2_envelope_witness(fields: usize, recursive: usize) -> RuntimeExpr {
+    assert!(fields >= 2 && recursive < fields);
+    let wrap = "ctor:fixture::D8L2::Wrap";
+    let done = "ctor:fixture::D8L2::Done";
+    let unit = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+        args: Vec::new(),
+    };
+    let ok_unit = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Result::Ok".to_string(),
+        args: vec![unit()],
+    };
+    // The selected field: deforestable, and statically resolvable so no join is
+    // merged (see the D8e fixture header for why that matters).
+    let deforestable = |tag: i64| RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Bool::True".to_string(),
+            args: Vec::new(),
+        }),
+        cases: [
+            ("ctor:prelude::Bool::True", "ctor:prelude::Result::Ok"),
+            ("ctor:prelude::Bool::False", "ctor:prelude::Result::Err"),
+        ]
+        .into_iter()
+        .map(|(constructor, result)| RuntimeMatchCase {
+            constructor: constructor.to_string(),
+            binders: 0,
+            body: RuntimeExpr::Construct {
+                constructor: result.to_string(),
+                // ⭐ Distinguishable per field, so an envelope that read the
+                // wrong source position would carry a different value.
+                args: vec![RuntimeExpr::Value(RuntimeValue::Int(tag.into()))],
+            },
+        })
+        .collect(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: format!("d8l2 field {tag} default"),
+        },
+    };
+    let worker = RuntimeExpr::LexicalClosure {
+        captures: Vec::new(),
+        params: vec!["unit".to_string()],
+        body: Box::new(ok_unit()),
+    };
+    // The bridge eliminates the FIRST nonrecursive field; every other
+    // nonrecursive field is an ordinary envelope member that nothing consumes,
+    // which is exactly the population under test.
+    let selected_field = (0..fields).find(|position| *position != recursive).expect("one");
+    let mut args = Vec::with_capacity(fields);
+    for position in 0..fields {
+        if position == recursive {
+            args.push(worker.clone());
+        } else {
+            args.push(deforestable(7 + position as i64));
+        }
+    }
+    let binder_offset = 1; // one recursive position
+    let bridge = RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(RuntimeExpr::Var((binder_offset + selected_field) as u32)),
+        cases: ["ctor:prelude::Result::Err", "ctor:prelude::Result::Ok"]
+            .into_iter()
+            .map(|constructor| crate::RuntimeComputationalMatchCase {
+                constructor: constructor.to_string(),
+                argument_binders: 1,
+                recursive_positions: vec![0],
+                // The composed call: 2 bridge binders + the outer run, whose
+                // static worker sits at `1 + recursive` inside it.
+                body: RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::Var((2 + binder_offset + recursive) as u32)),
+                    args: vec![unit()],
+                },
+            })
+            .collect(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "d8l2 bridge default".to_string(),
+        },
+    };
+    RuntimeExpr::Let {
+        value: Box::new(RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: wrap.to_string(),
+                args,
+            }),
+            cases: vec![
+                crate::RuntimeComputationalMatchCase {
+                    constructor: wrap.to_string(),
+                    argument_binders: fields,
+                    recursive_positions: vec![recursive],
+                    body: bridge,
+                },
+                crate::RuntimeComputationalMatchCase {
+                    constructor: done.to_string(),
+                    argument_binders: 0,
+                    recursive_positions: Vec::new(),
+                    body: ok_unit(),
+                },
+            ],
+            default: RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: "d8l2 eliminator default".to_string(),
+            },
+        }),
+        body: Box::new(RuntimeExpr::Var(0)),
+    }
+}
+
+#[cfg(test)]
+fn d8l2_envelope_positions(fields: usize, recursive: usize) -> Vec<Vec<u32>> {
+    let entry = d8l2_envelope_witness(fields, recursive);
+    let plan = plan_static_transition_graph_with_symbols(
+        &entry,
+        &BTreeMap::new(),
+        &crate::NativeProcessSymbols::legacy_prelude(),
+        AbiRootIngress::Value,
+        true,
+    )
+    .expect("the envelope witness plans");
+    plan.continuation_units()
+        .expect("units")
+        .iter()
+        .map(|unit| {
+            unit.ordinary_envelope()
+                .expect("the envelope builds")
+                .into_iter()
+                .filter_map(|role| match role {
+                    crate::cranelift_backend::planning::ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
+                        source_position,
+                    } => Some(source_position),
+                    _ => None,
+                })
+                .collect()
+        })
+        .collect()
+}
+
+#[cfg(test)]
+fn d8l2_compile(fields: usize, recursive: usize) -> Option<CraneliftBackendError> {
+    let entry = d8l2_envelope_witness(fields, recursive);
+    compile_expr_into_module(
+        new_object_module("d8l2-envelope").expect("module"),
+        "ken_d8l2_envelope",
+        Linkage::Export,
+        &entry,
+        &NativeSeedEnvironment::empty(),
+        BTreeMap::new(),
+        None,
+        true,
+        None,
+        Some(test_only_distinguished_root_join_plan()),
+        None,
+    )
+    .err()
+}
+
+/// A composed witness whose worker RETURNS the ordinary payload the bridge
+/// matched, so the payload is consumed by the real composed call and reaches
+/// the program's answer.
+#[cfg(test)]
+fn d8l2_payload_witness(worker_last: bool, payload: i64) -> RuntimeExpr {
+    let wrap = "ctor:fixture::D8L2P::Wrap";
+    let done = "ctor:fixture::D8L2P::Done";
+    let unit = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+        args: Vec::new(),
+    };
+    // ⭐ The worker returns its argument, so the payload is CONSUMED -- passed
+    // through the composed call and observable in the answer -- rather than
+    // merely carried in the envelope or used to choose a case.
+    let worker = RuntimeExpr::LexicalClosure {
+        captures: Vec::new(),
+        params: vec!["carried".to_string()],
+        body: Box::new(RuntimeExpr::Var(0)),
+    };
+    let selected_field = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Bool::True".to_string(),
+            args: Vec::new(),
+        }),
+        cases: [
+            ("ctor:prelude::Bool::True", "ctor:prelude::Result::Ok"),
+            ("ctor:prelude::Bool::False", "ctor:prelude::Result::Err"),
+        ]
+        .into_iter()
+        .map(|(constructor, result)| RuntimeMatchCase {
+            constructor: constructor.to_string(),
+            binders: 0,
+            body: RuntimeExpr::Construct {
+                constructor: result.to_string(),
+                args: vec![RuntimeExpr::Value(RuntimeValue::Int(payload.into()))],
+            },
+        })
+        .collect(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "d8l2 payload field default".to_string(),
+        },
+    };
+    let (args, recursive_positions, scrutinee_var, callee_var) = if worker_last {
+        (vec![selected_field, worker], vec![1usize], 1u32, 4u32)
+    } else {
+        (vec![worker, selected_field], vec![0usize], 2u32, 3u32)
+    };
+    let bridge = RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(RuntimeExpr::Var(scrutinee_var)),
+        cases: ["ctor:prelude::Result::Err", "ctor:prelude::Result::Ok"]
+            .into_iter()
+            .map(|constructor| crate::RuntimeComputationalMatchCase {
+                constructor: constructor.to_string(),
+                argument_binders: 1,
+                recursive_positions: vec![0],
+                body: RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::Var(callee_var)),
+                    args: vec![RuntimeExpr::Var(1)],
+                },
+            })
+            .collect(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "d8l2 payload bridge default".to_string(),
+        },
+    };
+    RuntimeExpr::Let {
+        value: Box::new(RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: wrap.to_string(),
+                args,
+            }),
+            cases: vec![
+                crate::RuntimeComputationalMatchCase {
+                    constructor: wrap.to_string(),
+                    argument_binders: 2,
+                    recursive_positions,
+                    body: bridge,
+                },
+                crate::RuntimeComputationalMatchCase {
+                    constructor: done.to_string(),
+                    argument_binders: 0,
+                    recursive_positions: Vec::new(),
+                    body: unit(),
+                },
+            ],
+            default: RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: "d8l2 payload eliminator default".to_string(),
+            },
+        }),
+        body: Box::new(RuntimeExpr::Var(0)),
+    }
+}
+
+#[cfg(test)]
+fn d8l2_capture_witness(worker_last: bool) -> RuntimeExpr {
+    let wrap = "ctor:fixture::D8L2C::Wrap";
+    let done = "ctor:fixture::D8L2C::Done";
+    let unit = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+        args: Vec::new(),
+    };
+    let worker = RuntimeExpr::LexicalClosure {
+        captures: vec![
+            RuntimeExpr::Value(RuntimeValue::Int((11).into())),
+            RuntimeExpr::Value(RuntimeValue::Int((12).into())),
+        ],
+        params: vec!["carried".to_string()],
+        body: Box::new(RuntimeExpr::Var(0)),
+    };
+    let selected_field = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Bool::True".to_string(),
+            args: Vec::new(),
+        }),
+        cases: [
+            ("ctor:prelude::Bool::True", "ctor:prelude::Result::Ok"),
+            ("ctor:prelude::Bool::False", "ctor:prelude::Result::Err"),
+        ]
+        .into_iter()
+        .map(|(constructor, result)| RuntimeMatchCase {
+            constructor: constructor.to_string(),
+            binders: 0,
+            body: RuntimeExpr::Construct {
+                constructor: result.to_string(),
+                args: vec![RuntimeExpr::Value(RuntimeValue::Int((41).into()))],
+            },
+        })
+        .collect(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "d8l2 capture field default".to_string(),
+        },
+    };
+    let (args, recursive_positions, scrutinee_var, callee_var) = if worker_last {
+        (vec![selected_field, worker], vec![1usize], 1u32, 4u32)
+    } else {
+        (vec![worker, selected_field], vec![0usize], 2u32, 3u32)
+    };
+    let bridge = RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(RuntimeExpr::Var(scrutinee_var)),
+        cases: ["ctor:prelude::Result::Err", "ctor:prelude::Result::Ok"]
+            .into_iter()
+            .map(|constructor| crate::RuntimeComputationalMatchCase {
+                constructor: constructor.to_string(),
+                argument_binders: 1,
+                recursive_positions: vec![0],
+                body: RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::Var(callee_var)),
+                    args: vec![RuntimeExpr::Var(1)],
+                },
+            })
+            .collect(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "d8l2 capture bridge default".to_string(),
+        },
+    };
+    RuntimeExpr::Let {
+        value: Box::new(RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: wrap.to_string(),
+                args,
+            }),
+            cases: vec![
+                crate::RuntimeComputationalMatchCase {
+                    constructor: wrap.to_string(),
+                    argument_binders: 2,
+                    recursive_positions,
+                    body: bridge,
+                },
+                crate::RuntimeComputationalMatchCase {
+                    constructor: done.to_string(),
+                    argument_binders: 0,
+                    recursive_positions: Vec::new(),
+                    body: unit(),
+                },
+            ],
+            default: RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: "d8l2 capture eliminator default".to_string(),
+            },
+        }),
+        body: Box::new(RuntimeExpr::Var(0)),
+    }
+}
+
+

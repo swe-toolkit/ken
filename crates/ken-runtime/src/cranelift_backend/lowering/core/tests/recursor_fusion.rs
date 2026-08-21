@@ -5,10 +5,7 @@
 //! `planned_closure_preexistence_*`, `missing_call_input_*`).
 
 use super::*;
-use super::control::{
-    px8j_capture_source_trace, px8j_layered_recursive_result,
-    px8j_scope_chain_observation_result,
-};
+use super::control::{px8j_capture_source_trace, px8j_scope_chain_observation_result};
 
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — a PRODUCTION compile builds the
 /// fusion identity plane, and before this it never did.**
