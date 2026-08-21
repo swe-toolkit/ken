@@ -129,6 +129,170 @@ one still refuses), if D0 finds a non-empty planner-recoverable subset.
 **`AC-4` -- no-regression** in CI (`COORDINATION §12`). Targeted local validation
 only.
 
+# `D0` PROVENANCE CLASSIFICATION at base `6eb90cfa80dc792295bad0545939543fba8619d6`
+
+**Result: zero of the sixteen witnesses is planner-recoverable. All sixteen are
+word-only.** The bounded-non-closure outcome below is therefore the one this D0
+returns — reported as the frame defines it, a first-class result, not a failure,
+and not forced in either direction. **One door this measurement does NOT close
+is named at the end; it is a design question for the Architect, not something
+D0 may decide.**
+
+## What a capture actually is — the structural finding the rest rests on
+
+`RuntimeExpr::LexicalClosure` declares `captures: Vec<RuntimeExpr>`
+(`ir.rs:618-622`). **A capture is a source EXPRESSION evaluated in the enclosing
+lexical environment, not an already-lowered value.** Measured across the whole
+population: **all 108 captures in all 25 recursive-position closures are
+`Var(i)`, forming a contiguous `Var(0)..Var(n-1)` prefix** of the producer's
+environment. None is a literal `Value`, which would have been trivially
+compiler-owned and needed no frame at all.
+
+This is precisely why the two "precedent" seam sites do not transfer, and it
+confirms the fork ruling's Sub-Q3 from the other side: at `core.rs:12741` and
+`source.rs:3947` the captures are `Lowered::*` operands the compiler already
+holds, whereas here they are unevaluated `Var` references into an environment
+the consumer does not have.
+
+## The instrument, and the positive control that is internal to the population
+
+The measurement reads the planner's own answer rather than inferring one. For
+each recursive-position capture-bearing `LexicalClosure`, it resolves the
+closure's body origin, finds every generated continuation context whose
+`worker_body_origin()` is that body, and reads that context's `captures()` view
+— each capture's `coordinate` and its `availability.context_capture`, which is
+exactly the field `resolve_context_capture_claim` (`core.rs:7064`) consumes.
+
+That function is the authority on recoverability, and it refuses on **both** of
+its non-`EntryFrame` paths:
+
+- `views.context_capture == None` — "nothing says where this frame holds
+  {coordinate}";
+- `ContinuationEnvironmentClaim::CurrentLexical` — "presented to the entry-frame
+  capture consumer, which holds an ABI operand run and no semantic environment;
+  a nearest-alias lexical index is not a frame slot".
+
+Only `ContinuationEnvironmentClaim::EntryFrame { frame, declared_slot }`
+resolves, and then only after `verify_entry_frame` confirms membership.
+
+**The instrument is not uniformly blind, and the proof is inside the measured
+population.** Across all 30 planner claims observed:
+
+| claim coordinate | `context_capture` | count | resolves? |
+| --- | --- | --- | --- |
+| `EntryAbi { source: Parameter, .. }` | `Some(EntryFrame { .. })` | 5 | **yes** |
+| `ProducerLocal { binding, locator }` | `None` | 25 | no |
+
+Zero exceptions in either direction. So the measurement **does** return
+"recoverable" for the recoverable kind — it simply never returns it for enough
+captures. That correspondence is the real boundary this node was asked to find:
+**a capture whose value originates as an entry-ABI position of the emitting
+function is planner-recoverable; a capture whose value originates as a
+producer-local binding is not**, and a `ProducerLocal` coordinate names a
+`ProducerLocalLocator { environment_origin, environment_index }` — an index into
+a producer-side lexical environment, which is the very thing the consumer's
+frame does not hold.
+
+## Per-witness classification
+
+Every row fails the "ALL captures planner-recoverable" predicate on **two
+independent grounds**, and the first does not depend on the claim-kind analysis
+above at all:
+
+1. **Cardinality.** The owning context's capture plan has **at most 2** entries
+   against **3 to 5** source captures. Even if every planned capture carried an
+   `EntryFrame` claim, the plan cannot cover the closure's capture set.
+2. **Kind.** Where claims exist, 25 of 30 are `ProducerLocal` with no
+   context-capture claim, which `resolve_context_capture_claim` refuses.
+
+| Witness | Source captures | Closures at the position | Contexts owning the body | Planner claims | Claims resolving (`EntryFrame`) | Disposition |
+| --- | --- | --- | --- | --- | --- | --- |
+| `px7f_resource_native.rs :: linked_public_right_denial_preserves_exact_masks` | 5 (`Var(0..4)`) | 1 | 1 | 2 | 0 | **word-only, intended refusal** — no resolving claim |
+| `px7f_resource_native.rs :: linked_public_second_release_is_closed_and_the_handle_closes_once` | 5 (`Var(0..4)`) | 1 | 1 | 2 | 0 | **word-only, intended refusal** — no resolving claim |
+| `px7l_checked_host_recursive_bind.rs :: delayed_capturing_generic_bind_agrees_across_real_executors` | 3 (`Var(0..2)`) | 3 | **0** | 0 | 0 | **word-only, intended refusal** — no context owns the body at all |
+| `px7l_checked_host_recursive_bind.rs :: runtime_selected_non_unit_response_is_consumed_across_real_executors` | 3 (`Var(0..2)`) | 3 | **0** | 0 | 0 | **word-only, intended refusal** — no context owns the body at all |
+| `px7m_hostresult_computational_match.rs :: dynamic_ok_payload_selects_a_multistep_tree_across_real_executors` | 4 (`Var(0..3)`) | 4 | 1 | 2 | 1 | **word-only, intended refusal** — 1 of 4 captures resolvable |
+| `px7m_hostresult_computational_match.rs :: dynamic_err_payload_selects_a_multistep_tree_across_real_executors` | 5 (`Var(0..4)`) | 3 | 1 | 2 | 0 | **word-only, intended refusal** — no resolving claim |
+| `px8ta_oriented_subcontinuation.rs :: public_one_level_bracket_finishes_and_releases` | 5 (`Var(0..4)`) | 1 | **0** | 0 | 0 | **word-only, intended refusal** — no context owns the body at all |
+| `px8ta_oriented_subcontinuation.rs :: px8ds_real_same_depth_path_rejects_flat_order_and_runs_exact_edges` | 4 (`Var(0..3)`) | 1 | 1 | 2 | 1 | **word-only, intended refusal** — 1 of 4 captures resolvable |
+| `px8x_single_schema_observation.rs :: linked_route_exposes_real_ordered_bindings_and_filters_reserved_input` | 5 (`Var(0..4)`) | 1 | **0** | 0 | 0 | **word-only, intended refusal** — no context owns the body at all |
+| `rt_escape_second_resource_native.rs :: escape_resource_plus_plain_matches_interpreter` | 5 (`Var(0..4)`) | 1 | **0** | 0 | 0 | **word-only, intended refusal** — no context owns the body at all |
+| `rt_escape_second_resource_native.rs :: escaped_buffer_used_by_fanning_host_op_matches_interpreter` | 5 (`Var(0..4)`) | 1 | 1 | 2 | 0 | **word-only, intended refusal** — no resolving claim |
+| `rt_parity_native.rs :: buffer_allocate_malformed_capacity_narrows_to_invalid_bounds` | 5 (`Var(0..4)`) | 1 | **0** | 0 | 0 | **word-only, intended refusal** — no context owns the body at all |
+| `rt_parity_native.rs :: fs_read_at_malformed_offset_narrows_to_invalid_offset` | 5 (`Var(0..4)`) | 1 | 1 | 2 | 0 | **word-only, intended refusal** — no resolving claim |
+| `rt_parity_native.rs :: fs_read_at_malformed_window_narrows_to_invalid_bounds` | 5 (`Var(0..4)`) | 1 | 1 | 2 | 0 | **word-only, intended refusal** — no resolving claim |
+| `rt_parity_native.rs :: fs_read_at_malformed_offset_without_read_right_narrows_to_invalid_offset` | 5 (`Var(0..4)`) | 1 | 1 | 2 | 0 | **word-only, intended refusal** — no resolving claim |
+| `rt_parity_native.rs :: fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset` | 5 (`Var(0..4)`) | 1 | 1 | 2 | 0 | **word-only, intended refusal** — no resolving claim |
+
+**Totals: 25 recursive-position closures, 108 captures, 30 planner claims, 5
+resolving claims, 0 planner-recoverable witnesses.**
+
+Six witnesses have **no generated continuation context owning the closure body
+at all**, so for them there is not even a capture plan to interrogate — the
+strongest form of the same answer.
+
+## `AC-0` — the invariant audit on the measurement itself
+
+The measurement was taken with a temporary, env-gated (`KEN_D0_PROBE`),
+**uncommitted** probe. Its reads were audited mechanically over the added lines,
+and they are confined to compiler-owned and planner-owned state:
+
+- retained-source structure — `argument.expr`, the `captures` list, and
+  `case_body_occurrence` / `child_occurrence` origin threading. Reading the
+  capture STRUCTURE from the retained-source occurrence is explicitly the
+  compiler-owned side of the invariant;
+- planner state — `static_transition_plan.continuation_contexts()`,
+  `ctx.worker_body_origin()`, `ctx.captures()`, `cap.coordinate`,
+  `cap.availability`.
+
+**Zero reads of the carried word.** The audit greps the probe's added lines for
+`Carried`, `carrier_field`, `emit_carrier`, and `word`, and matches nothing —
+no capture VALUE is sourced from the carried word at any point, which is the
+one inviolable line. The three touched files were then restored and verified
+**byte-identical by blob hash** to their base objects (`core.rs a616117a`,
+`source.rs 7cf81a35`, `calls.rs 5e1c460e`) with a clean `git status`. D0 remains
+measurement-only.
+
+Reproduction:
+
+```sh
+scripts/ken-cargo build -p ken-runtime --lib          # materialize libken_runtime.a first
+KEN_D0_PROBE=1 scripts/ken-cargo test -p ken-cli --test <file> \
+    -- --ignored --nocapture --test-threads=1 <test-name>
+```
+
+The probe dumps, per recursive-position capture-bearing `LexicalClosure`: the
+capture expression kinds, the owning contexts, and each planner claim's
+coordinate and `availability.context_capture`. One caveat worth carrying: for
+the twelve witnesses whose whole-source resolution short-circuits at the
+missing-position veto, **production never inspects the capture-bearing arm**, so
+the measurement needs a read-only walk over every arm to reach it. A probe
+placed only on the production path returns nothing and reads as "no captures
+found" rather than "not reached".
+
+## THE ONE DOOR THIS MEASUREMENT DOES NOT CLOSE
+
+**Measured:** under the planner's *current* capture plan, no witness's captures
+are recoverable as planner-assigned ABI operands, so supplying them at the
+consumer's frame would require reading the carried word, which the invariant
+bars. That is the D0 answer and it is why the bounded-non-closure outcome fires.
+
+**NOT measured, and it is a genuine question rather than a hedge:** whether the
+planner *could* widen a generated context's entry frame so that today's
+`ProducerLocal` bindings are passed as additional entry-ABI positions. The
+`EntryAbi`/`ProducerLocal` correspondence above shows the mechanism already does
+exactly this for parameter-origin captures, and doing so would source the value
+from the producer side **at context entry** rather than from the carried word —
+so it is not obviously an invariant breach.
+
+**This is not D0's to decide, and D0 does not propose it.** It is recorded
+because the difference between "inexpressible under the invariant" and
+"inexpressible under the current capture plan" changes what
+[[NATIVE-HANDLE-CARRIER]] and [[PX8-F-CAP-41]] should do next, and only the
+Architect rules that. If the answer is that the plan may not widen, this node
+closes as a bounded non-closure exactly as framed and those dependants need a
+different route; if it may, the widening is a new node, not this one's D1.
+
 # THE BOUNDED-NON-CLOSURE OUTCOME (a first-class result)
 
 If D0 finds **zero** planner-recoverable witnesses, capture supply for the
