@@ -1,7 +1,7 @@
 ---
 id: RT-CONTROL-INTEGRATION-TESTS-SPLIT
 title: "Cut control.rs's residual integration-test root below 10k by integration-test OWNERSHIP seam -- the named successor RT-BACKEND-SPLIT-CLOSURE left open, a fresh test-ownership axis, not a missed production owner"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
