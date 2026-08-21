@@ -6,7 +6,7 @@ owner: runtime
 size: L
 gate: none
 depends_on: [RT-RECURSIVE-POSITION-ARM-ARITY]
-blocks: [NATIVE-HANDLE-CARRIER, PX8-F-CAP-41]
+blocks: []
 github: null
 origin: "Architect ruling evt_7aeb7hqrykgpz, Decision dec_7aajmm0eac45c, resolved 2026-08-18. Cut by the Steward on that ruling's explicit instruction to frame the branch-local design capability separately from the rejected D1 AC-3 recut. Surfaced by RT-RECURSIVE-POSITION-ARM-ARITY D1, whose repair moved the governed rows onto the BoundaryCarrier refusal. Steward-filed per COORDINATION section 2."
 ---
@@ -431,7 +431,13 @@ row is promoted.**
    the same planner-owned append that `call_declared_context` already performs,
    and to which the two specialized-`Closure` seam sites are the standing
    precedent — is a **separate design question**, and it, not this cut, is what
-   gates [[NATIVE-HANDLE-CARRIER]] and [[PX8-F-CAP-41]] for this population.
+   gates [[NATIVE-HANDLE-CARRIER]] and [[PX8-F-CAP-41]] for this population. That
+   question is now framed as [[RT-CAPTURE-SUPPLY-DECLARED-INPUTS]] (Architect
+   fork ruling evt_sjjmcap9293y), which carries the `blocks` edge for those two
+   dependants; this node's `blocks` is therefore empty. The chain is dependants
+   ← capture-supply ← this node's seam (a prose sequencing edge — the
+   capture-supply `D0` measurement is grounded on the current tree and does not
+   wait on this node, only its `D1` needs the seam).
 3. **`AC-5` is unchanged and this strengthens it.** `D0` does not close the node
    and does not unblock the dependants; the measurement above is what tells the
    post-`D0` cut that unblocking them needs the capture question answered first.
