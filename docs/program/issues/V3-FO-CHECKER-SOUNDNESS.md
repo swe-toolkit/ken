@@ -204,6 +204,19 @@ the only non-structural check in the checker, and it is the only place a
 > ordinary `Bool` hypothesis rather than by a fork in the data. Record so the D3
 > candidate is reviewed against this interface, not a restricted-type variant.
 
+> ### D3 HARD-STOP SYMPTOM INVENTORY — append as symptoms surface (Architect).
+>
+> Symptoms the D3 authoring is expected to hit, recorded so a hard stop is a
+> known result rather than a surprise (`AC-5`):
+>
+> - **Symptom 1 — the `Option` `eqn:` restriction.** Sugar cannot bind a payload
+>   `Option`'s equation for a `Type`-sorted constructor. The discriminator is
+>   whether a hand-written, equation-carrying dependent `Option` motive
+>   elaborates: if it does, the restriction is sugar-only and D3 routes around it
+>   by writing the motive by hand; if it does not, the restriction lives in the
+>   elaborator and is a genuine hard stop for that shape (a complete result under
+>   `AC-5`, to be reported, not worked around).
+
 **`D5` — state the theorem's reach honestly.** Which rules are covered, which
 are not, and whether the composed discharge in `23 §4.4` is now one theorem
 short or two. **A partial fragment is a result; a fragment reported as the whole
