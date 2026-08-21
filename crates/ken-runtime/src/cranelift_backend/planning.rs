@@ -13,6 +13,9 @@ use crate::{RuntimeDeclaration, RuntimeDeclarationKind, RuntimeExpr, RuntimeProg
 
 mod static_transition;
 
+#[cfg(feature = "px8-ds-test-support")]
+pub use static_transition::{with_worker_prefix_deferrals, WorkerPrefixDeferral};
+
 pub(super) use static_transition::build_static_continuation_fusion_plan;
 pub(in crate::cranelift_backend) use static_transition::{
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,

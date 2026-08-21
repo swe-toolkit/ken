@@ -2264,10 +2264,27 @@ fn producer_binder_depth(
 #[cfg(any(test, feature = "px8-ds-test-support"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WorkerPrefixDeferral {
-    pub producer_construct_origin: StaticOriginId,
+    /// ⚠ Crate-visible, not `pub`: `StaticOriginId` is private to this crate, so
+    /// a `pub` field of that type cannot be read by a consumer at all. Consumers
+    /// identify the edge through [`WorkerPrefixDeferral::edge`], which commits
+    /// them to no id value.
+    pub(crate) producer_construct_origin: StaticOriginId,
     pub depth: usize,
     pub demand: usize,
     pub reached: usize,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+impl WorkerPrefixDeferral {
+    /// The deferred edge's identity, as an opaque string.
+    ///
+    /// ⭐ Deliberately opaque. It is enough to ask whether two rows name the
+    /// same edge, which is the only question a consumer has, and it commits no
+    /// caller to a planner-assigned ordinal that legitimately moves when an
+    /// unrelated binding renumbers the occurrence table.
+    pub fn edge(&self) -> String {
+        format!("{:?}", self.producer_construct_origin)
+    }
 }
 
 #[cfg(any(test, feature = "px8-ds-test-support"))]
