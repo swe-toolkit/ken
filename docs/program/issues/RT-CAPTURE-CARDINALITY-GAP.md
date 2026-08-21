@@ -1,7 +1,7 @@
 ---
 id: RT-CAPTURE-CARDINALITY-GAP
 title: "the recursive-position witnesses stay word-only because 1-3 captures per closure carry NO planner claim of any class -- the planner's capture projection (<=2 claims) is smaller than the closure's declared capture set (3-5). Three consecutive results (RT-BRANCH partition, RT-CAPTURE-SUPPLY provenance, RT-CONTSRC-ENTRY-FRAME-WIDEN widening) each refined the provenance of the claims the planner PRODUCES and each greened zero; this node attacks the projection gap itself. D0-first: measure the CAUSE of each unclaimed capture -- planner under-projection (grow the projection) vs elaborator over-capture (prune the declared set) -- two hypotheses with OPPOSITE fixes"
-status: ready
+status: merged
 owner: runtime
 size: L
 gate: none
