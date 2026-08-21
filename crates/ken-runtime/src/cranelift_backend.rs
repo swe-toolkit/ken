@@ -86,6 +86,10 @@ pub use lowering::with_px8ds_retired_flat_order;
 // `lib.rs`. Same reachability caveat as the item above -- only a consumer can
 // observe a break in this path, so the `ken-cli`/`ken-verify`/`ken-elaborator`
 // census suites are what keep it honest.
+// `RT-CAPTURE-PROJECTION-GROW` `D1` — the worker-prefix deferral ledger.
+#[cfg(feature = "px8-ds-test-support")]
+pub use planning::{with_worker_prefix_deferrals, WorkerPrefixDeferral};
+
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::core::{
     with_branched_scrutinee_unit_body_match_branch_entry_suppressed,

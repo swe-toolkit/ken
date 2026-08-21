@@ -16,6 +16,13 @@ mod occurrences;
 mod semantic_ir;
 mod units;
 
+// `RT-CAPTURE-PROJECTION-GROW` `D1` — the deferral ledger's cross-crate surface,
+// reached as `ken_runtime::{with_worker_prefix_deferrals, WorkerPrefixDeferral}`.
+// Same reachability caveat as the sibling observers: only a consumer can observe
+// a break in this path, so the `ken-cli` control is what keeps it honest.
+#[cfg(feature = "px8-ds-test-support")]
+pub use continuations::{with_worker_prefix_deferrals, WorkerPrefixDeferral};
+
 use std::collections::BTreeMap;
 #[cfg_attr(not(test), allow(unused_imports))]
 use std::collections::BTreeSet;
@@ -884,6 +891,7 @@ pub(in crate::cranelift_backend) use tests::{
 
 #[cfg(test)]
 mod tests {
+
 
     /// `D2g` — the `R3` shape, in an unmarked and a checked-transport form.
     ///
