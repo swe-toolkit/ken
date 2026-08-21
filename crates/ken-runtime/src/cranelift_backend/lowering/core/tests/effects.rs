@@ -3908,11 +3908,11 @@ fn d5_the_two_byte_span_refusals_are_distinct_typed_values_without_dispatch() {
 // own type, not the planner's `EffectSeatPlanMutation`).
 // `governed_nested_resource_bracket` stays an explicit import (a
 // planning-domain fixture, not otherwise ambient here);
-// `recursive_port_process_compiles` reaches back to `control` by qualified
-// path -- it has 38 other call sites there and stays put; `set_effect_seat_
-// visit_mutation`/`EffectSeatVisitMutation` need no import, already ambient
-// via this file's own `use super::*` chain, same as every other test below
-// that already names them.
+// `recursive_port_process_compiles` reaches `core::tests` (promoted from
+// `control` at `RT-CONTROL-INTEGRATION-TESTS-SPLIT` D1) by qualified path;
+// `set_effect_seat_visit_mutation`/`EffectSeatVisitMutation` need no import,
+// already ambient via this file's own `use super::*` chain, same as every
+// other test below that already names them.
 
 /// **`RT-DECL-CLOSURE-PORT` `D7` — a visit that reads an effect occurrence
 /// incompletely is rejected as that visit, and two visits cannot cover for each
@@ -3943,7 +3943,7 @@ fn d5_the_two_byte_span_refusals_are_distinct_typed_values_without_dispatch() {
 /// dispatch release.
 #[test]
 fn an_incomplete_duplicate_discarded_or_misobserved_visit_rejects() {
-    use crate::cranelift_backend::lowering::core::tests::control::recursive_port_process_compiles;
+    use crate::cranelift_backend::lowering::core::tests::recursive_port_process_compiles;
     use crate::cranelift_backend::planning::governed_nested_resource_bracket;
     let expr = governed_nested_resource_bracket(3);
     set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
@@ -4012,7 +4012,7 @@ fn an_incomplete_duplicate_discarded_or_misobserved_visit_rejects() {
 /// be defined ahead of a later defective one.
 #[test]
 fn a_discarded_visit_refuses_before_its_body_is_defined() {
-    use crate::cranelift_backend::lowering::core::tests::control::recursive_port_process_compiles;
+    use crate::cranelift_backend::lowering::core::tests::recursive_port_process_compiles;
     use crate::cranelift_backend::lowering::units::{
         b2f_last_unit_emission, b2f_open_compile_attempt, b2f_units_declared_in_attempt,
     };
