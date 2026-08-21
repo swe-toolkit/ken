@@ -2835,9 +2835,37 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 let word = builder
                     .ins()
                     .load(types::I64, MemFlags::trusted(), frame, offset);
-                let binding = LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
-                    CarriedBoundaryWord { word },
-                ));
+                let operand = LoweringOperand::Carried(CarriedBoundaryWord { word });
+                // RT-CAPTURE-PROJECTION-GROW D2 seam (i) -- record the SAME
+                // operand by ABI position, mirroring the ordinary-unit push.
+                //
+                // The context body loads its parameter-then-capture run from its
+                // own frame, but until now nothing wrote that run into
+                // function_local.defining_abi_operands -- the vector every
+                // capture-gather indexes. A gather reached under a context body
+                // therefore read whatever run the enclosing function had left
+                // there, which is the measured "slot 2 outside the emitting
+                // function's 2 ABI operands".
+                //
+                // Pushed from THIS walk rather than rebuilt, so "index i is ABI
+                // position i" holds by construction rather than by two walks
+                // agreeing -- the same reason the ordinary-unit push is sited in
+                // its walk.
+                //
+                // In DESCRIPTOR order, before any binding-order conversion: the
+                // conversion below reorders the semantic environment only. That
+                // separation is RT-SRCBODY-BIND-ORDER D1's invariant about this
+                // exact vector, and it is preserved here rather than restated.
+                compiler
+                    .function_local
+                    .defining_abi_operands
+                    .push(operand.clone());
+                #[cfg(test)]
+                compiler
+                    .function_local
+                    .defining_abi_slot_kinds
+                    .push(slot.kind);
+                let binding = LoweringEnvironmentBinding::Value(operand);
                 match slot.kind {
                     AbiSlotKind::Parameter => {
                         #[cfg(test)]
