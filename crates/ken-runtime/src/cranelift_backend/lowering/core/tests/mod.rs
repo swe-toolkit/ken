@@ -90,6 +90,9 @@ pub(in crate::cranelift_backend::lowering) mod constructors;
 // module itself must be nameable from that sibling subtree too.
 pub(in crate::cranelift_backend::lowering) mod control;
 mod effects;
+// `RT-CONTROL-INTEGRATION-TESTS-SPLIT` D1 module 1 of 5, split from
+// `control.rs`.
+mod recursor_fusion;
 
 /// A real, planner-issued origin for a hand-built frame or layer that carries
 /// **no** syntax children (an empty `cases` list, a childless residual).
