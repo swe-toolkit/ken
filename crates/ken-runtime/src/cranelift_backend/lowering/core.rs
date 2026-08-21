@@ -10787,16 +10787,28 @@ impl<'a> Lowering<'a> {
 
 
     /// Resolve the declared body unit of a callable recursive position in the
-    /// source form that owns the carried child.
+    /// source form that owns the carried child, **within the already-selected
+    /// constructor's bucket**.
     ///
     /// Structural-data recursive positions return `None`; they resume the
     /// eliminator directly and take no arguments. A lexical closure with
     /// captures also returns `None` because its carried value does not expose
     /// those capture operands to a generated call frame.
+    ///
+    /// ⭐⭐ **`RT-BRANCH-LOCAL-DECLARED-CALLABLE` `D1` — the branch-local cut.**
+    /// Authority is resolved against the producer arms that construct
+    /// `selected_constructor`, not against the whole source. Whole-source
+    /// agreement was too coarse for a `Match` whose arms differ: on the
+    /// `Ret`/`Vis` shape, `Ret` carries no recursive position and vetoed the
+    /// resolution for the `Vis` case, which cannot observe a `Ret` child at
+    /// all. ⛔ This is a partition, **not** a relaxation — every rule that
+    /// applies inside the bucket is unchanged, and an empty bucket yields
+    /// `None` rather than an unwitnessed unit.
     fn recursive_position_unit_body(
         &self,
         eliminator_origin: StaticOriginId,
         position: usize,
+        selected_constructor: &RuntimeSymbol,
     ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
         #[cfg(any(test, feature = "px8-ds-test-support"))]
         record_branched_scrutinee_unit_body_entry();
@@ -10807,13 +10819,14 @@ impl<'a> Lowering<'a> {
             ));
         };
         let scrutinee = self.child_occurrence(eliminator_origin, 0, scrutinee)?;
-        self.resolve_recursive_unit_body(scrutinee.static_origin, position)
+        self.resolve_recursive_unit_body(scrutinee.static_origin, position, selected_constructor)
     }
 
     fn resolve_recursive_unit_body(
         &self,
         source_origin: StaticOriginId,
         position: usize,
+        selected_constructor: &RuntimeSymbol,
     ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
         let source = self.retained_body_occurrence(source_origin)?;
         let RuntimeExpr::Construct { args, .. } = source.expr else {
@@ -10829,12 +10842,33 @@ impl<'a> Lowering<'a> {
                     let body = self.case_body_occurrence(source_origin, case_index, &case.body)?;
                     #[cfg(any(test, feature = "px8-ds-test-support"))]
                     record_branched_scrutinee_unit_body_match_arm_walked();
-                    if let RuntimeExpr::Construct { args, .. } = body.expr {
+                    if let RuntimeExpr::Construct { constructor, args } = body.expr {
+                        // ⭐⭐ `D1` — THE BUCKET. An arm that constructs a
+                        // different constructor cannot be the producer of the
+                        // child this case is eliminating, so it is not evidence
+                        // about this case's authority and does not veto it.
+                        //
+                        // ⛔ Skipping is sound only because the key is the
+                        // constructor the arm CONSTRUCTS, not the constructor it
+                        // matches on: if the scrutinee took this arm, the value
+                        // is that other constructor and the selected case is
+                        // never entered.
+                        if constructor != selected_constructor {
+                            continue;
+                        }
+                        // ⛔ Unchanged INSIDE the bucket — an arm that really
+                        // does construct the selected constructor must carry the
+                        // position (`RT-RECURSIVE-POSITION-ARM-ARITY`'s rule).
                         if recursive_position_construct_argument(args, position, true)?.is_none() {
                             return Ok(None);
                         }
                     }
-                    let Some(unit) = self.resolve_recursive_unit_body(body.static_origin, position)? else {
+                    let Some(unit) = self.resolve_recursive_unit_body(
+                        body.static_origin,
+                        position,
+                        selected_constructor,
+                    )?
+                    else {
                         return Ok(None);
                     };
                     declared_units.push(unit);
@@ -11111,7 +11145,11 @@ impl<'a> Lowering<'a> {
                         cursor,
                         splice_caller,
                         None,
-                        self.recursive_position_unit_body(eliminator.static_origin, position)?,
+                        self.recursive_position_unit_body(
+                            eliminator.static_origin,
+                            position,
+                            &case.constructor,
+                        )?,
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(Px8jProducerPath::Composed, &induction_hypothesis);

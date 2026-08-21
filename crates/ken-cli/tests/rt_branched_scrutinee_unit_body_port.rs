@@ -3,8 +3,15 @@
 //! MEASURED: the observer records resolver entry, plain-Match branch entry, successful
 //! plain-Match arm-body lookup, and the direct non-`Construct` route-1 return
 //! while this checked Ken source lowers.
-//! CLAIMED: D2 enters the carried child's owning plain `Match`, walks its first
-//! arm, then advances past route 1.
+//! CLAIMED: D2 enters the carried child's owning plain `Match`, walks its arms,
+//! then advances past route 1.
+//!
+//! ⭐ **Updated by `RT-BRANCH-LOCAL-DECLARED-CALLABLE` `D1`.** Before that cut
+//! the walk STOPPED at arm 0, because arm 0 constructs a different constructor
+//! than the selected case and its missing recursive position vetoed the whole
+//! source. The branch-local partition makes an out-of-bucket arm non-vetoing, so
+//! the walk now reaches arm 1. The number below is that property, not a
+//! snapshot: it goes back to 1 exactly if the partition is reverted.
 
 #![cfg(target_os = "linux")]
 
@@ -98,9 +105,16 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
         route1[0].match_branch_entered,
         "D2 must enter the plain Match branch"
     );
+    // `RT-BRANCH-LOCAL-DECLARED-CALLABLE` `D1`: both arms are walked. Measured
+    // at the bucket filter, arm 0 constructs `ITree::Ret` while the selected
+    // case is `ITree::Vis` — the exact `Ret`/`Vis` asymmetry the node was cut
+    // for. `Ret` is out of the bucket, so its missing recursive position no
+    // longer vetoes, and arm 1 (`ITree::Vis`, in the bucket) is reached. A
+    // revert of the partition returns this to 1, which is what makes the
+    // assertion discriminating rather than decorative.
     assert_eq!(
-        route1[0].match_arms_walked, 1,
-        "D4 must walk arm 0 after entering the plain Match: {route1:?}"
+        route1[0].match_arms_walked, 2,
+        "D1 must walk past the out-of-bucket arm 0 and reach arm 1: {route1:?}"
     );
     eprintln!(
         "RT_BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1 entered={} route1={} match_arms_walked={}",
