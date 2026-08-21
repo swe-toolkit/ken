@@ -1,7 +1,7 @@
 ---
 id: RT-BRANCH-LOCAL-DECLARED-CALLABLE
 title: "recursive_position_unit_body returns one Option<StaticOriginId> for the whole source, so whole-source agreement is too coarse for a Match whose arms differ -- the cut is constructor-and-recursive-position-specific callable authority installed inside the already-selected constructor case, which eliminates the closure crossing rather than opening a durable closure lane"
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
