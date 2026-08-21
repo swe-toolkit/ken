@@ -6,10 +6,25 @@ owner: runtime
 size: L
 gate: none
 depends_on: [RT-CONTSRC-ENTRY-FRAME-WIDEN]
-blocks: [NATIVE-HANDLE-CARRIER, PX8-F-CAP-41]
+blocks: []
 github: null
 origin: "Steward scope-consequence call on RT-CONTSRC-ENTRY-FRAME-WIDEN D0 (087849760, Architect-approved evt_37mt6t65vvw39, Steward disposition evt_2emh7rzd9zb1h). That D0 measured the entry-frame widening route sound and OPEN yet witness-inert (0 of 16 greened): the decisive arithmetic is at-most-2 planner claims against 3-5 source captures, claim-count reaching capture-count in 0 of 25 closures. The Architect's read (and the Steward's): the three necessary-but-not-sufficient results all attacked the provenance/resolution of the claims the planner PRODUCES, while the witnesses are blocked by 1-3 captures per closure that produce no planner claim of any class -- a structurally different question. Node scoping is the Steward's per COORDINATION section 3; the feasibility/cause fork is the D0's to measure, routed to the Architect."
 ---
+
+# DISPOSITION (Steward, 2026-08-21)
+
+Closed at D0. The measurement came back **all-H1, zero-H2**: every unclaimed
+capture across the 10 populated witnesses is a genuine, body-referenced value the
+planner never projects, dropped at `continuations.rs:6075` (the context's capture
+set is cloned from the enclosing specialization's `continuation_inputs`, a
+different population than the closure's declared set). Per this frame's own
+routing, all-H1 means the fix **grows the projection** and revives the parked
+RT-CONTSRC-ENTRY-FRAME-WIDEN widening, and the two compose. That fix is framed as
+the successor [[RT-CAPTURE-PROJECTION-GROW]], which now carries the `blocks` edge
+to [[NATIVE-HANDLE-CARRIER]] and [[PX8-F-CAP-41]]. The elaborator over-capture
+route (H2, `erasure.rs:2210`) is a real latent defect but greens none of this
+population; it is not on this critical path. The 6 empty-population witnesses stay
+reached-not-at-all, a separate successor only if a measurement demands one.
 
 # WHY THIS NODE EXISTS
 
