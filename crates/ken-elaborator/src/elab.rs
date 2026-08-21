@@ -4,7 +4,7 @@
 //! `declare_postulate`, honesty guard via `GlobalEnv::trusted_base()`, refinement
 //! lowering to carrier, `prove`/`law` declaration elaboration, `old` elaboration.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use ken_kernel::{
     check as kernel_check, convert, convert_type, declare_def, declare_postulate,
@@ -312,6 +312,10 @@ struct ElabCtx<'e> {
     /// through this context. The non-optional type makes missing attribution
     /// unrepresentable; labels are provenance and may legitimately repeat.
     owner_label: String,
+    /// Globals admitted as one recursive SCC. Empty outside a mutual group.
+    /// This stays elaborator-internal: it recognizes sibling calls without
+    /// exposing the generated recursion/refinement encoding at the surface.
+    recursive_group: HashSet<GlobalId>,
     ctx: Context,
     metas: MetaCtx,
     globals: &'e HashMap<String, GlobalId>,
@@ -361,6 +365,12 @@ struct ElabCtx<'e> {
     /// Source values paired with kernel-generated lifted evidence. A support
     /// id marks residual `All`; `None` marks a directly consumable motive leaf.
     lift_bindings: HashMap<usize, LiftBinding>,
+    /// Branch-local propositional equalities that relate a concrete matched
+    /// constructor to the outer scrutinee. A recursive-group call may use one
+    /// to transport its concrete indexed result to the refined expected index.
+    /// The proof itself is an index-refinement sentinel until the completed
+    /// method is wrapped by `finalize_refined_body`.
+    result_refinements: Vec<ResultRefinement>,
     /// The stable bottom-relative position of the state binder plus the
     /// declared cell types while elaborating one space-operation continuation.
     space_state: Option<(usize, Vec<Term>)>,
@@ -380,6 +390,7 @@ impl<'e> ElabCtx<'e> {
         Self {
             env,
             owner_label: owner_label.into(),
+            recursive_group: HashSet::new(),
             ctx: Context::new(),
             metas: MetaCtx::default(),
             globals,
@@ -393,6 +404,7 @@ impl<'e> ElabCtx<'e> {
             match_field_regions: Vec::new(),
             hidden_positions: Vec::new(),
             lift_bindings: HashMap::new(),
+            result_refinements: Vec::new(),
             space_state: None,
             space_pre_state: None,
         }
@@ -444,6 +456,11 @@ impl<'e> ElabCtx<'e> {
         self
     }
 
+    fn with_recursive_group(mut self, recursive_group: &HashSet<GlobalId>) -> Self {
+        self.recursive_group = recursive_group.clone();
+        self
+    }
+
     fn with_local_dicts(mut self, local_dicts: &HashMap<String, (Term, Term, usize)>) -> Self {
         self.local_dicts = local_dicts.clone();
         self
@@ -459,6 +476,15 @@ struct LiftBinding {
     evidence_position: usize,
     recursive_result_position: Option<usize>,
     support: Option<GlobalId>,
+}
+
+#[derive(Clone, Debug)]
+struct ResultRefinement {
+    index_ty: Term,
+    concrete_index: Term,
+    refined_index: Term,
+    premise_slot: usize,
+    install_depth: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -999,6 +1025,26 @@ fn check_pair_or_record(
     }
 }
 
+#[inline(never)]
+fn check_inferred_with_group_transport(
+    cx: &mut ElabCtx,
+    expr: &RExpr,
+    expected: &Term,
+) -> Result<Term, ElabError> {
+    let (core, inferred_ty) = infer(cx, expr)?;
+    if let Some((transported, _)) = transport_recursive_group_call_result(
+        cx,
+        expr,
+        core.clone(),
+        inferred_ty.clone(),
+        expected,
+    )? {
+        return Ok(transported);
+    }
+    unify_types(&mut cx.metas, expected, &inferred_ty);
+    Ok(core)
+}
+
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
     // FRAME BUDGET: this match is reached by every checked expression in
     // every compile, and in an unoptimized build a new arm's locals are paid
@@ -1249,11 +1295,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                 Ok(core)
             }
         }
-        _ => {
-            let (core, inferred_ty) = infer(cx, expr)?;
-            unify_types(&mut cx.metas, expected, &inferred_ty);
-            Ok(core)
-        }
+        _ => check_inferred_with_group_transport(cx, expr, expected),
     }
 }
 
@@ -1535,6 +1577,105 @@ fn discharge_reflexive_recursive_ih_evidence(
         if convert_type(env, ctx, &specialized_ty, source_result_ty) {
             return Ok((specialized, specialized_ty));
         }
+    }
+}
+
+fn term_mentions_family_indexed_by(
+    env: &GlobalEnv,
+    ctx: &Context,
+    term: &Term,
+    index_ty: &Term,
+) -> bool {
+    let (head, _) = peel_app(term);
+    if let Term::IndFormer { id, .. } = head {
+        if env.inductive(id).is_some_and(|ind| {
+            ind.indices
+                .iter()
+                .any(|candidate| convert_type(env, ctx, candidate, index_ty))
+        }) {
+            return true;
+        }
+    }
+    term.children()
+        .into_iter()
+        .any(|child| term_mentions_family_indexed_by(env, ctx, child, index_ty))
+}
+
+fn expression_mentions_recursive_group(cx: &ElabCtx, expr: &RExpr) -> bool {
+    cx.globals.iter().any(|(name, id)| {
+        cx.recursive_group.contains(id) && rexpr_mentions_name(expr, name)
+    })
+}
+
+fn recursive_group_call_id(cx: &ElabCtx, expr: &RExpr) -> Option<GlobalId> {
+    let mut head = expr;
+    while let RExpr::RApp(function, _, _) = head {
+        head = function.as_ref();
+    }
+    let RExpr::RCon(name, _) = head else {
+        return None;
+    };
+    let id = cx.globals.get(name).copied()?;
+    cx.recursive_group.contains(&id).then_some(id)
+}
+
+/// Transport a recursive-group sibling call from the concrete constructor
+/// index produced by its declared result to the refined index expected inside
+/// the current dependent-match method. The bridge is the method's own hidden
+/// propositional equality premise, represented by a sentinel until method
+/// finalization. No `Refl` is synthesized here: `try_reindex_cast` builds a
+/// genuine equality-of-types proof by `J`, and the kernel re-checks the `Cast`.
+fn transport_recursive_group_call_result(
+    cx: &ElabCtx,
+    expr: &RExpr,
+    core: Term,
+    inferred_ty: Term,
+    expected: &Term,
+) -> Result<Option<(Term, Term)>, ElabError> {
+    if recursive_group_call_id(cx, expr).is_none()
+        || convert_type(cx.env, &cx.ctx, &inferred_ty, expected)
+    {
+        return Ok(None);
+    }
+
+    let mut transported = core;
+    let mut transported_ty = inferred_ty;
+    let mut changed = false;
+    for refinement in cx.result_refinements.iter().rev() {
+        let growth = cx.ctx.len().checked_sub(refinement.install_depth).ok_or_else(|| {
+            ElabError::Internal("result refinement escaped its branch context".into())
+        })? as i64;
+        let index_ty = weaken(&refinement.index_ty, growth);
+        let concrete_index = weaken(&refinement.concrete_index, growth);
+        let refined_index = weaken(&refinement.refined_index, growth);
+        // The placeholder is embedded at the current source-binder depth so
+        // `finalize_refined_body` can recover its canonical premise slot.
+        let proof = Term::var(
+            INDEX_REFINEMENT_SENTINEL_BASE + refinement.premise_slot + growth as usize,
+        );
+        if let Some((cast, cast_ty)) = try_reindex_cast(
+            cx.env,
+            &cx.ctx,
+            &index_ty,
+            &concrete_index,
+            &refined_index,
+            &transported_ty,
+            transported.clone(),
+            proof,
+        )? {
+            transported = cast;
+            transported_ty = cast_ty;
+            changed = true;
+            if convert_type(cx.env, &cx.ctx, &transported_ty, expected) {
+                return Ok(Some((transported, transported_ty)));
+            }
+        }
+    }
+
+    if changed && convert_type(cx.env, &cx.ctx, &transported_ty, expected) {
+        Ok(Some((transported, transported_ty)))
+    } else {
+        Ok(None)
     }
 }
 
@@ -2140,6 +2281,25 @@ fn check_match_dependent(
         &weaken(&scrut_core, motive_base_depth as i64),
         &Term::var(0),
     );
+    let hidden_group_result_refinement = equation.is_none()
+        && !cx.recursive_group.is_empty()
+        && ind.indices.is_empty()
+        // The matched carrier must itself be an index domain of the result
+        // family. This excludes unrelated control matches (for example Bool
+        // guards around a FokSequent-indexed derivation), preserving their
+        // original definitional computation and SCT presentation.
+        && term_mentions_family_indexed_by(cx.env, &cx.ctx, expected, &scrut_ty)
+        // A whole-scrutinee equation is a lawful hidden result refinement only
+        // for non-recursive matches. On a recursive family it would also alter
+        // each IH from `M child` to `child = parent -> M child`, an unusable and
+        // false premise. Recursive IH slots retain their existing index-only
+        // refinement machinery.
+        && ind.constructors.iter().all(|ctor| {
+            recursive_shapes(cx.env, ctor, d_id, m).is_ok_and(|shapes| shapes.is_empty())
+        })
+        && arms
+            .iter()
+            .any(|arm| expression_mentions_recursive_group(cx, &arm.body));
     if equation.is_some() {
         // The eliminator returns a function over the branch equation.  Its
         // methods can therefore bind the surface `eqn:` name, while applying
@@ -2148,6 +2308,17 @@ fn check_match_dependent(
             Box::new(weaken(&scrut_ty, 1)),
             Box::new(weaken(&scrut_core, 1)),
             Box::new(Term::var(0)),
+        );
+        motive_user_body = Term::pi(eq_dom, weaken(&motive_user_body, 1));
+    } else if hidden_group_result_refinement {
+        // Keep the matched scrutinee's propositional refinement internal. The
+        // method receives `concrete = outer`; recursive-group calls may use its
+        // symmetric direction to transport a concrete indexed result back to
+        // the outer refined index. The completed eliminator supplies `Refl`.
+        let eq_dom = Term::Eq(
+            Box::new(weaken(&scrut_ty, motive_base_depth as i64)),
+            Box::new(Term::var(0)),
+            Box::new(weaken(&scrut_core, motive_base_depth as i64)),
         );
         motive_user_body = Term::pi(eq_dom, weaken(&motive_user_body, 1));
     }
@@ -2258,8 +2429,19 @@ fn check_match_dependent(
             &weaken(&scrut_core, n as i64),
             &concrete,
         );
-        let premise_domains =
+        let mut premise_domains =
             method_index_premises(&ind, &params_terms, &target_indices, &scrut_indices, n);
+        let hidden_result_premise_slot = if hidden_group_result_refinement {
+            let slot = premise_domains.len();
+            premise_domains.push(Term::Eq(
+                Box::new(weaken(&scrut_ty, n as i64)),
+                Box::new(concrete.clone()),
+                Box::new(weaken(&scrut_core, n as i64)),
+            ));
+            Some(slot)
+        } else {
+            None
+        };
         let method = if let Some(arm_idx) = arm_idx {
             let arm = &arms[arm_idx];
             if equation.is_some() {
@@ -2300,7 +2482,7 @@ fn check_match_dependent(
                 let field_region = outer_scope_depth..cx.ctx.len();
                 cx.match_field_regions.push(field_region);
                 let premise_count = premise_domains.len();
-                let installed_refinements = install_index_refinements(
+                let mut installed_refinements = install_index_refinements(
                     cx,
                     &ind,
                     &params_terms,
@@ -2309,6 +2491,16 @@ fn check_match_dependent(
                     n,
                     outer_scope_depth,
                 )?;
+                if let Some(premise_slot) = hidden_result_premise_slot {
+                    installed_refinements.extend(install_hidden_result_variable_refinements(
+                        cx,
+                        &weaken(&scrut_ty, n as i64),
+                        &concrete,
+                        &weaken(&scrut_core, n as i64),
+                        premise_slot,
+                        outer_scope_depth,
+                    )?);
+                }
                 // Capability 3 (goal refinement) and capability 1/2 (var
                 // refinement) solve overlapping cases in OPPOSITE directions —
                 // capability 1 makes an existing field/sibling look like the
@@ -2346,6 +2538,16 @@ fn check_match_dependent(
                 } else {
                     simplify_branch_goal(cx.env, &cx.ctx, &expected_here)
                 };
+                let result_refinement_base = cx.result_refinements.len();
+                if let Some(premise_slot) = hidden_result_premise_slot {
+                    cx.result_refinements.push(ResultRefinement {
+                        index_ty: weaken(&scrut_ty, n as i64),
+                        concrete_index: concrete.clone(),
+                        refined_index: weaken(&scrut_core, n as i64),
+                        premise_slot,
+                        install_depth: cx.ctx.len(),
+                    });
+                }
                 let obl_snapshot = cx.obligations.len();
                 // Try the UNREFINED goal first — sufficient whenever capability
                 // 1/2 already resolve every reference the body makes (`tail`,
@@ -2382,7 +2584,7 @@ fn check_match_dependent(
                     },
                 );
                 let body_core = match attempt {
-                    Ok(body_core_checked) => body_core_checked,
+                    Ok(body_core_checked) => Ok(body_core_checked),
                     Err(_) => {
                         cx.obligations.truncate(obl_snapshot);
                         // Moved to `check_match_dependent_refined_fallback`
@@ -2397,9 +2599,11 @@ fn check_match_dependent(
                             &scrut_indices,
                             n,
                             &expected_here,
-                        )?
+                        )
                     }
                 };
+                cx.result_refinements.truncate(result_refinement_base);
+                let body_core = body_core?;
                 for pos in installed_refinements {
                     cx.var_refinements.remove(&pos);
                 }
@@ -2555,7 +2759,7 @@ fn check_match_dependent(
         let proof = synth_generated_index_evidence(cx.env, &cx.ctx, premise, span)?;
         elim = Term::app(elim, proof);
     }
-    if equation.is_some() {
+    if equation.is_some() || hidden_group_result_refinement {
         elim = Term::app(elim, Term::Refl(Box::new(scrut_core.clone())));
         let zonked_ctx = Context {
             types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
@@ -2910,14 +3114,15 @@ fn try_reindex_cast(
         ))
     })?;
     let level = match whnf(env, ctx, &level_ty) {
-        Term::Type(l) => l,
+        Term::Type(level) => level,
         other => {
             return Err(ElabError::Internal(format!(
                 "index refinement: re-indexed position is not classified by a Type universe, found {other:?}"
             )))
         }
     };
-    let (e, new_ty) = build_index_type_cong(env, ctx, idx_ty, old_idx, new_idx, cur_ty, level, h);
+    let (e, new_ty) =
+        build_index_type_cong(env, ctx, idx_ty, old_idx, new_idx, cur_ty, level, h);
     let cast = Term::Cast(
         Box::new(cur_ty.clone()),
         Box::new(new_ty.clone()),
@@ -3013,6 +3218,89 @@ fn refine_branch_goal(
 /// branch body has been checked. Each proof embedded into a `var_refinements`
 /// entry references its premise via an `INDEX_REFINEMENT_SENTINEL_BASE`-
 /// tagged placeholder that `finalize_refined_body` resolves afterward.
+fn install_hidden_result_variable_refinements(
+    cx: &mut ElabCtx,
+    index_ty: &Term,
+    concrete_index: &Term,
+    refined_index: &Term,
+    premise_slot: usize,
+    outer_scope_depth: usize,
+) -> Result<Vec<usize>, ElabError> {
+    if outer_scope_depth == 0 {
+        return Ok(Vec::new());
+    }
+    let zonked_ctx = Context {
+        types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
+    };
+    let index_ty = cx.metas.zonk_term(index_ty);
+    let concrete_index = cx.metas.zonk_term(concrete_index);
+    let refined_index = cx.metas.zonk_term(refined_index);
+    let index_level_ty = kernel_infer(cx.env, &zonked_ctx, &index_ty).map_err(|error| {
+        ElabError::Internal(format!(
+            "result refinement: could not classify the matched type: {error:?}"
+        ))
+    })?;
+    let index_level = match whnf(cx.env, &zonked_ctx, &index_level_ty) {
+        Term::Type(level) => level,
+        other => {
+            return Err(ElabError::Internal(format!(
+                "result refinement: matched type is not classified by Type, found {other:?}"
+            )))
+        }
+    };
+    let proof = Term::var(INDEX_REFINEMENT_SENTINEL_BASE + premise_slot);
+    let proof_sym = build_sym(
+        cx.env,
+        &zonked_ctx,
+        &index_ty,
+        index_level,
+        &concrete_index,
+        proof,
+    );
+    let mut installed = Vec::new();
+    for position in 0..outer_scope_depth {
+        if cx.match_field_regions.iter().any(|region| region.contains(&position))
+            || cx.var_refinements.contains_key(&position)
+        {
+            continue;
+        }
+        let index = cx.ctx.len() - 1 - position;
+        let outer_ty = cx.metas.zonk_term(&weaken(
+            cx.ctx.lookup(index).expect("outer result-refinement position in range"),
+            (index + 1) as i64,
+        ));
+        if !matches!(
+            whnf(
+                cx.env,
+                &zonked_ctx,
+                &kernel_infer(cx.env, &zonked_ctx, &outer_ty).map_err(|error| {
+                    ElabError::Internal(format!(
+                        "result refinement: could not classify an outer binding: {error:?}"
+                    ))
+                })?
+            ),
+            Term::Type(_)
+        ) {
+            continue;
+        }
+        if let Some((cast, cast_ty)) = try_reindex_cast(
+            cx.env,
+            &zonked_ctx,
+            &index_ty,
+            &refined_index,
+            &concrete_index,
+            &outer_ty,
+            Term::var(index),
+            proof_sym.clone(),
+        )? {
+            cx.var_refinements
+                .insert(position, (cast, cast_ty, cx.ctx.len()));
+            installed.push(position);
+        }
+    }
+    Ok(installed)
+}
+
 fn install_index_refinements(
     cx: &mut ElabCtx,
     ind: &InductiveDecl,
@@ -7435,12 +7723,14 @@ pub fn elaborate_mutual_group(
 
     // 3. Elaborate each body checked against its own type (every sibling
     // name, including self, already resolves via `globals` from step 2).
+    let recursive_group = ids.iter().copied().collect::<HashSet<_>>();
     let mut bodies: Vec<Term> = Vec::with_capacity(members.len());
     let mut all_obligations: Vec<Vec<Obligation>> = Vec::with_capacity(members.len());
     let elab_err = (|| -> Result<(), ElabError> {
         for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env);
+                .with_classes(class_env)
+                .with_recursive_group(&recursive_group);
             let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
             let obligations = std::mem::take(&mut cx.obligations);
             bodies.push(cx.metas.zonk_term(&body_c));
