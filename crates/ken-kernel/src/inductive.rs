@@ -2225,6 +2225,66 @@ pub fn method_type(
     Ok(ty)
 }
 
+/// Conservatively classify which recursive-IH binders occur in a method.
+///
+/// A method has the shape `λ args. λ ihs. body`. If its syntax does not expose
+/// that complete lambda prefix, every IH is treated as used: over-building is only
+/// a reduction loss, while skipping a live IH would be unsound.
+fn method_ih_usage(method: &Term, argument_count: usize, ih_count: usize) -> Vec<bool> {
+    let mut cursor = method.clone();
+    for _ in 0..argument_count {
+        let Term::Lam(_, body) = cursor else {
+            return vec![true; ih_count];
+        };
+        cursor = *body;
+    }
+
+    let mut usage = Vec::with_capacity(ih_count);
+    for _ in 0..ih_count {
+        let Term::Lam(_, body) = cursor else {
+            return vec![true; ih_count];
+        };
+        usage.push(occurs_context_var(&body, 0, 0));
+        cursor = *body;
+    }
+    usage
+}
+
+/// Remove only IH lambdas proven dead by [`method_ih_usage`]. The `subst0`
+/// argument is never observed: the occurrence proof establishes that index 0
+/// is absent, so this operation only closes the binder and shifts outer indices.
+fn prune_unused_method_ihs(
+    method: &Term,
+    argument_count: usize,
+    ih_usage: &[bool],
+) -> Option<Term> {
+    fn go(term: Term, arguments: usize, usage: &[bool]) -> Option<Term> {
+        if arguments > 0 {
+            let Term::Lam(domain, body) = term else {
+                return None;
+            };
+            return Some(Term::Lam(
+                domain,
+                Box::new(go(*body, arguments - 1, usage)?),
+            ));
+        }
+        let Some((&used, remaining)) = usage.split_first() else {
+            return Some(term);
+        };
+        let Term::Lam(domain, body) = term else {
+            return None;
+        };
+        let body = go(*body, 0, remaining)?;
+        if used {
+            Some(Term::Lam(domain, Box::new(body)))
+        } else {
+            Some(crate::subst::subst0(&body, &Term::Type(Level::zero())))
+        }
+    }
+
+    go(method.clone(), argument_count, ih_usage)
+}
+
 /// The ι-reduct of an eliminator applied to a constructor-headed scrutinee
 /// (`14 §7.3`): `elim_D p̄ M m̄ i̅ (cₖ p̄ ā) ⇝ mₖ ā [IHs]`.
 ///
@@ -2280,11 +2340,27 @@ pub fn iota_reduct(
     let method = &methods[k];
 
     let rec = recursive_shapes(env, c, ind.id, m)?;
+    let mut ih_usage = method_ih_usage(method, n, rec.len());
+    let reduced_method = if ih_usage.iter().any(|used| !used) {
+        match prune_unused_method_ihs(method, n, &ih_usage) {
+            Some(method) => method,
+            None => {
+                // Any shape uncertainty takes the conservative path.
+                ih_usage.fill(true);
+                method.clone()
+            }
+        }
+    } else {
+        method.clone()
+    };
     // Induction hypotheses for each recursive arg (`14 §7.3`, `14 §7.7`):
     //   - Direct (nb=0):    `elim_D p̄ M m̄ idx(a_j) a_j`
     //   - W-style (nb≥1):  `λ(b₁:B₁)...(b_{nb}:B_{nb}). elim_D p̄ M m̄ idx(a_j b₁..b_{nb}) (a_j b₁..b_{nb})`
     let mut ihs: Vec<Term> = Vec::new();
-    for argument in &rec {
+    for (argument, used) in rec.iter().zip(ih_usage) {
+        if !used {
+            continue;
+        }
         let pos = argument.position;
         let field_type = subst_levels(
             &subst_tel(
@@ -2311,7 +2387,7 @@ pub fn iota_reduct(
     // `mₖ ā [IHs]` — method applied to the constructor args then the IHs.
     let mut full_args = ctor_args.to_vec();
     full_args.extend(ihs);
-    Ok(apply_args(method.clone(), &full_args))
+    Ok(apply_args(reduced_method, &full_args))
 }
 
 #[cfg(test)]
@@ -2330,6 +2406,25 @@ mod tests {
         let t = Term::app(Term::indformer(d(0), vec![]), Term::indformer(d(0), vec![]));
         assert!(occurs(d(0), &t));
         assert!(!occurs(d(1), &t));
+    }
+
+    #[test]
+    fn method_ih_usage_tracks_each_binder_under_later_lambdas() {
+        // λarg. λih1. λih2. λx. ih1: ih1 is index 2 in the final body.
+        let ty = Term::Type(Level::zero());
+        let method = Term::lam(
+            ty.clone(),
+            Term::lam(
+                ty.clone(),
+                Term::lam(ty.clone(), Term::lam(ty, Term::var(2))),
+            ),
+        );
+        assert_eq!(method_ih_usage(&method, 1, 2), vec![true, false]);
+    }
+
+    #[test]
+    fn method_ih_usage_treats_an_unexposed_method_as_all_live() {
+        assert_eq!(method_ih_usage(&Term::var(0), 1, 2), vec![true, true]);
     }
 
     #[test]
