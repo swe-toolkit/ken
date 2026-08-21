@@ -1,7 +1,7 @@
 ---
 id: RT-CAPTURE-CONTEXT-FRAME-EMIT
 title: "physically emit the producer-local worker's continuation through the generated context's OWN emitted frame (define_continuation_context_bodies), so its capture-gather reads the context's own (parameters+captures) ABI operand run instead of the enclosing function's 2-operand run -- the sufficient closure for the 10 populated recursive-position witnesses that all six RT-CAPTURE-PROJECTION-GROW findings pointed at. Measured decisive (runtime-leader evt_77tdvcap4067t): seam (i) alone PERSISTS and the context-body defining_abi_operands push executes ZERO times compiling px7f -- the context body is not emitted for this population at all, so the closure is CAUSING that emission plus constructing the context frame at the producer point, substantial new wiring, not existing-path completion."
-status: ready
+status: merged
 owner: runtime
 size: L
 gate: none
