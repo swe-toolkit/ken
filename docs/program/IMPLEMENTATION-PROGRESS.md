@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-21 16:35:46Z — from 398 issue file(s) in `docs/program/issues/`.
+2026-08-21 17:41:51Z — from 403 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -55,8 +55,13 @@ the committed file matches the generator's output.
 | `ABI-S6` | ordinary anonymous and file-backed mappings as opaque runtime-owned regions and bounded byte views | draft | runtime | L | none | — |
 | `BUDGET-EFF` | TransferCount.remaining must be bounded by the effective request | merged | verify | M | none | — |
 | `BUDGET-EXHAUST` | transfer-budget bound checks are fail-open on variant extension | merged | verify | S | none | — |
+| `CAT-BSEARCH` | Decidable ordered search — Algorithm/Searching: membership over a sorted List returning a Dec proof, target 3 of the Foundation expressibility trial | ready | foundation | M | none | — |
 | `CAT-C2` | Localized Map/Set key-interface split: a non-canonical carrier becomes a lawful Map/Set key under a weaker key-order dictionary while staying an unlawful Ord key wherever antisym concludes kernel Equal | draft | spec-enclave | M | none | — |
 | `CAT-CAPEX` | catalog exhibits no checked capability/authority exemplar — write one against the landed Cap/Auth surface | merged | ergo | M | none | — |
+| `CAT-DEQUE` | Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial | ready | foundation | M | none | — |
+| `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | ready | foundation | M | none | — |
+| `CAT-SORT` | Verified insertion sort — Algorithm/Sorting: sort an Ord-ordered List with the Sorted and Permutation laws proved, the simplest-first anchor of the Foundation expressibility trial | ready | foundation | M | none | — |
+| `CAT-VEC` | Length-indexed Vector — Data/Vector: Vec n a with total head/index/zip/map and the length laws, the deliberate fully-dependent probe of the Foundation expressibility trial | ready | foundation | M | none | — |
 | `CB-HYGIENE` | cranelift_backend facade: strip WP-token narration, separate test material from implementation | merged | runtime | S | none | — |
 | `CI-ASSERTIONLESS-L1` | Four registered conformance claims whose only cover does not check them — l1_acceptance.rs, three ignored and one live, green, and counted as cover | merged | verify | S | none | — |
 | `CI-DOCTEST-UNEXECUTED` | CI runs no --doc step on a premise that is false -- doctests are collected but never executed, and the positive control for a 20-block compile_fail set is among the dead ones | merged | verify | S | none | — |
@@ -442,6 +447,11 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `CAT-BSEARCH` — Decidable ordered search — Algorithm/Searching: membership over a sorted List returning a Dec proof, target 3 of the Foundation expressibility trial
+- `CAT-DEQUE` — Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial
+- `CAT-GCD` — Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe
+- `CAT-SORT` — Verified insertion sort — Algorithm/Sorting: sort an Ord-ordered List with the Sorted and Permutation laws proved, the simplest-first anchor of the Foundation expressibility trial
+- `CAT-VEC` — Length-indexed Vector — Data/Vector: Vec n a with total head/index/zip/map and the length laws, the deliberate fully-dependent probe of the Foundation expressibility trial
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` — Transport the mutual-recursion sibling-call result along the dependent-match refinement equality at the elaboration boundary, so the source branch reconciles a recursive-group call's concrete indexed result with the refined motive index -- route (c) genuine J/cast transport over a PROPOSITIONAL equality via c-elab roster-aware auto-transport (the c-proof/c-elab fork RESOLVED to c-elab: D0 measured no lawful existing source carrier), surfacing the recursive-group roster into ElabCtx and inserting the transport at the equality-holding seam, NOT the reflexive same-owner discharge and NOT a new source-language carrier; the elaborator prerequisite V3-FO-CHECKER-SOUNDNESS D3 is blocked on
