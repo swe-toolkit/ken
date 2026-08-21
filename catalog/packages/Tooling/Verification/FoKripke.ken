@@ -704,6 +704,14 @@ data FokDerivation : FokSequent → Type where {
     → FokDerivation (FokMkSequent gamma delta)
 }
 
+-- The proof-relevant rule tree lives in `Type`; its propositional reflection
+-- is the truncation required by 23 section 4.3. Classical validity means
+-- derivability from the empty antecedent to the singleton conclusion.
+fn fok_derives (s : FokSequent) : Omega = ‖FokDerivation s‖
+
+fn fok_classically_valid (q : FokForm) : Omega =
+  fok_derives (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm)))
+
 -- === D2: Bool-inversion infrastructure (23 section 4.3) ===
 --
 -- `checker_soundness`'s proof needs to invert the Bool verdicts
