@@ -2227,16 +2227,11 @@ pub fn method_type(
 
 /// Conservatively classify which recursive-IH binders occur in a method.
 ///
-/// A method has the shape `λ args. λ ihs. body`. If WHNF does not expose that
-/// complete lambda prefix, every IH is treated as used: over-building is only
+/// A method has the shape `λ args. λ ihs. body`. If its syntax does not expose
+/// that complete lambda prefix, every IH is treated as used: over-building is only
 /// a reduction loss, while skipping a live IH would be unsound.
-fn method_ih_usage(
-    env: &GlobalEnv,
-    method: &Term,
-    argument_count: usize,
-    ih_count: usize,
-) -> Vec<bool> {
-    let mut cursor = whnf(env, &Context::new(), method);
+fn method_ih_usage(method: &Term, argument_count: usize, ih_count: usize) -> Vec<bool> {
+    let mut cursor = method.clone();
     for _ in 0..argument_count {
         let Term::Lam(_, body) = cursor else {
             return vec![true; ih_count];
@@ -2259,7 +2254,6 @@ fn method_ih_usage(
 /// argument is never observed: the occurrence proof establishes that index 0
 /// is absent, so this operation only closes the binder and shifts outer indices.
 fn prune_unused_method_ihs(
-    env: &GlobalEnv,
     method: &Term,
     argument_count: usize,
     ih_usage: &[bool],
@@ -2288,7 +2282,7 @@ fn prune_unused_method_ihs(
         }
     }
 
-    go(whnf(env, &Context::new(), method), argument_count, ih_usage)
+    go(method.clone(), argument_count, ih_usage)
 }
 
 /// The ι-reduct of an eliminator applied to a constructor-headed scrutinee
@@ -2346,9 +2340,9 @@ pub fn iota_reduct(
     let method = &methods[k];
 
     let rec = recursive_shapes(env, c, ind.id, m)?;
-    let mut ih_usage = method_ih_usage(env, method, n, rec.len());
+    let mut ih_usage = method_ih_usage(method, n, rec.len());
     let reduced_method = if ih_usage.iter().any(|used| !used) {
-        match prune_unused_method_ihs(env, method, n, &ih_usage) {
+        match prune_unused_method_ihs(method, n, &ih_usage) {
             Some(method) => method,
             None => {
                 // Any shape uncertainty takes the conservative path.
@@ -2425,18 +2419,12 @@ mod tests {
                 Term::lam(ty.clone(), Term::lam(ty, Term::var(2))),
             ),
         );
-        assert_eq!(
-            method_ih_usage(&GlobalEnv::new(), &method, 1, 2),
-            vec![true, false]
-        );
+        assert_eq!(method_ih_usage(&method, 1, 2), vec![true, false]);
     }
 
     #[test]
     fn method_ih_usage_treats_an_unexposed_method_as_all_live() {
-        assert_eq!(
-            method_ih_usage(&GlobalEnv::new(), &Term::var(0), 1, 2),
-            vec![true, true]
-        );
+        assert_eq!(method_ih_usage(&Term::var(0), 1, 2), vec![true, true]);
     }
 
     #[test]
