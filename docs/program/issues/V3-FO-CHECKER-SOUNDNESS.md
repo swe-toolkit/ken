@@ -216,6 +216,14 @@ the only non-structural check in the checker, and it is the only place a
 >   by writing the motive by hand; if it does not, the restriction lives in the
 >   elaborator and is a genuine hard stop for that shape (a complete result under
 >   `AC-5`, to be reported, not worked around).
+> - **Symptom 2 — the tree guard is not conversion-invertible.**
+>   `fok_check_tree`'s non-recursive outer `FokCert` match compiles to a
+>   recursor, leaving a stuck child-IH at abstract children — so the structural
+>   tree guard does not invert under conversion. The keyed discriminator is
+>   whether surface non-recursive matching reaches a case eliminator: if it does,
+>   the guard is invertible; if the match lowers to a recursor with a stuck
+>   child-IH, it is not, and that is the hard stop for the tree-guard step. (The
+>   implementing probe is in progress at record time.)
 
 **`D5` — state the theorem's reach honestly.** Which rules are covered, which
 are not, and whether the composed discharge in `23 §4.4` is now one theorem
