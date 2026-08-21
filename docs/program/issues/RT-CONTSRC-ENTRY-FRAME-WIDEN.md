@@ -1,7 +1,7 @@
 ---
 id: RT-CONTSRC-ENTRY-FRAME-WIDEN
 title: "capture supply for the recursive-position closures is inexpressible under the CURRENT capture plan (RT-CAPTURE-SUPPLY D0: all 16 word-only, the boundary is entry-ABI-origin recoverable vs producer-local-origin not) -- the named route is to EXTEND the entry-source enumeration so a live producer-local value becomes a real entry-ABI member, never RELAX verify_entry_frame's membership guard; D0 measures liveness + soundness feasibility before any implementation"
-status: ready
+status: merged
 owner: runtime
 size: L
 gate: none
