@@ -222,8 +222,20 @@ the only non-structural check in the checker, and it is the only place a
 >   tree guard does not invert under conversion. The keyed discriminator is
 >   whether surface non-recursive matching reaches a case eliminator: if it does,
 >   the guard is invertible; if the match lowers to a recursor with a stuck
->   child-IH, it is not, and that is the hard stop for the tree-guard step. (The
->   implementing probe is in progress at record time.)
+>   child-IH, it is not, and that is the hard stop for the tree-guard step.
+>
+> **Terminal determination (Architect fork ruling evt_1r4fw67tzqszt).** The probe
+> resolved Symptom 2 as measured: the non-recursive `FokCert` match lowers to the
+> recursor and leaves a stuck child-IH at abstract children, so the tree guard is
+> not conversion-invertible — a genuine hard stop, not a proof-side defect. This
+> is the terminal characterization of the D3 hard stop (no third stop, no `§1a`
+> research trigger). The Architect ruled the fix a recursor-reduction repair,
+> framed as [[KERNEL-RECURSOR-UNUSED-IH-REDUCTION]] (kernel ring; repair
+> `iota_reduct` to build an IH only for a recursive argument whose method binder
+> occurs in the body — no new eliminator, elaborator untouched). It is `gate:
+> operator` (it touches trusted reduction) and is held for operator
+> authorization. **D3 resumes on its landing with no proof re-authoring**
+> (Architect and language-leader concur); D3 is blocked, not stalled.
 
 **`D5` — state the theorem's reach honestly.** Which rules are covered, which
 are not, and whether the composed discharge in `23 §4.4` is now one theorem
