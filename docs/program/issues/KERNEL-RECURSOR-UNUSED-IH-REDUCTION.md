@@ -1,7 +1,7 @@
 ---
 id: KERNEL-RECURSOR-UNUSED-IH-REDUCTION
 title: "The recursor's iota-rule forces an induction hypothesis for every recursive argument eagerly, so a non-recursive match on a recursive inductive does not reduce at an abstract recursive field -- repair iota_reduct to skip an IH whose method binder does not occur, the reduction-time enabler V3-FO-CHECKER-SOUNDNESS D3 is blocked on"
-status: active
+status: merged
 owner: kernel
 size: M
 gate: operator
