@@ -1,7 +1,7 @@
 ---
 id: CI-Z3-BASE-IMAGE
 title: "Bake z3 into a digest-pinned ghcr base image and run the restored z3-process-adapter job in it, so the flaky apt-get-install-z3 step leaves CI's critical path"
-status: active
+status: merged
 owner: verify
 size: S
 gate: none
