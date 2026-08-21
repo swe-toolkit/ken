@@ -183,6 +183,27 @@ eigenparameter freshness are the hard case — `fok_check_forall_right` `:550` i
 the only non-structural check in the checker, and it is the only place a
 `Bound`/`Parameter` distinction is semantic.
 
+> ### D3/D4 INTERFACE RULING — Architect 2026-08-21. Binds the D3 candidate.
+>
+> **The D3/D4 partition is a hypothesis on the certificate, not a second
+> certificate type.** D3 proves `fok_checker_soundness` for the fragment
+> witnessed by a **structural, full-tree `Bool` predicate over `FokCert`** that:
+>
+> - **excludes exactly the two `ForallRight` constructors**, and
+> - **propagates through children** — it holds of a cert iff it holds of every
+>   sub-cert, so it characterises whole trees with no `ForallRight` anywhere.
+>
+> D3's theorem carries "this predicate is `True`" as a hypothesis. **D4 removes
+> that hypothesis** by proving the `ForallRight` arms, composing to the full
+> theorem.
+>
+> **Why this shape.** It avoids introducing a *parallel restricted certificate
+> type* (a second `FokCert`-without-quantifiers datatype and its own checker),
+> which would duplicate the relation and force a conversion. The predicate keeps
+> **the checker relation direct** — one `FokCert`, one checker, D3/D4 split by an
+> ordinary `Bool` hypothesis rather than by a fork in the data. Record so the D3
+> candidate is reviewed against this interface, not a restricted-type variant.
+
 **`D5` — state the theorem's reach honestly.** Which rules are covered, which
 are not, and whether the composed discharge in `23 §4.4` is now one theorem
 short or two. **A partial fragment is a result; a fragment reported as the whole
