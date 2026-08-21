@@ -330,10 +330,11 @@ Spec: `14 §3.1`, `§7.3`, `§7.7`.
 
 - spec: `14 §3.1`, `§7.7`, `§9.4`
 - given: the `Tree` fold from `wstyle-elim-uses-ih-flips`, whose node method
-  computes `suc (ih true)` and whose child function returns `leaf`
-- expect: **reduces-to** `suc zero`, while the otherwise identical method that
-  discards its IH reduces to `zero`
+  computes `add (ih true) (ih false)`, whose child function returns `leaf`, and
+  whose leaf method returns `1`
+- expect: **reduces-to** `2`, while the otherwise identical method that discards
+  its IH reduces to `1`
 - why: an occurrence of the method's IH binder must conservatively keep the
-  ordinary W-style recursive call. Treating this live binder as unused changes
-  `suc zero` to a stuck or ill-typed result and violates subject reduction; the
-  existing `suc zero` versus `zero` discriminator pins the safe direction.
+  ordinary W-style recursive calls. Treating this live binder as unused changes
+  the result or leaves it stuck and violates subject reduction; the existing
+  `2` versus `1` discriminator pins the safe direction.
