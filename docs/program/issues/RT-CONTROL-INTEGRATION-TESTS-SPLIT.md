@@ -231,6 +231,72 @@ Handing back for the Architect's vote on the module boundaries above
 (both the five-module structure and the two flagged soft boundaries)
 before any `D1` cut executes.
 
+## `D1` -- executed, Architect-approved (`evt_7krzgphp0ssba`)
+
+**Module 1** (`recursor_fusion.rs`, 25 tests) landed first as a clean
+contiguous block (`b488ed26f`), with one self-correction (`d736e33d7`):
+two control.rs-private fixtures were briefly widened to `pub(super)` to
+let the new file reach them, which is exactly what this frame's banned
+scope forbids; the fix was to relocate both into `core/tests/mod.rs` as
+plain module-private items instead (the same mechanism the two D0-named
+shared helpers already used, applied here for the first time).
+
+**Modules 2-5** (`0e1897ee5`) landed as one combined candidate rather than
+four separate ones. The 192 remaining tests are scattered (not
+contiguous), and the full per-test re-audit D0 flagged as owed found
+**~30 private helpers reaching across the name-prefix module boundaries**
+-- several in chains D0's summary table never named at all (a 13-member
+`RTFP_*`/`rtfp_*` fixture family; an 8-member `px8j_*`/`oriented_test_*`
+family; a 14-member `d8f_*` family entangled with `source_frame_bridge.rs`'s
+own `d8m_*`/`d8n_*` content; several smaller pairs). Splitting the commit
+by module would have meant reopening already-landed files repeatedly as
+each new module surfaced another shared dependency on it. Classification
+was delegated (every unnamed-pattern "sibling" test and every wave-split
+body-read), then mechanically verified as an exact 192-test partition
+before any file was touched.
+
+Resolution mechanism, applied uniformly per the banned-scope rule ("a
+symbol needing widening is a finding to route, not a move to complete"):
+already-sufficient visibility (`pub(in ...lowering)`/`pub(super)`) stayed
+put, reached by qualified path; private-and-single-consumer relocated
+bodily; private-and-multi-consumer promoted into `core/tests/mod.rs` as a
+plain module-private item; the two deeply mutually-recursive chains
+(`d8l2_envelope_*`, `d8f_*`/`d8m_*`/`d8n_*`) were kept whole in
+`source_frame_bridge.rs` with external callers (one in
+`positional_candidate_settlement.rs`, one in `source.rs`'s own inline test
+module -- a production file entirely outside this subtree) reaching them
+by qualified path instead.
+
+The `d5_c2_*`/`d5_c4_*`/`d5_the_*` checkpoint: read in full -- all seven
+assert a `CheckedRecursiveInvocation` resolving against a
+declaration-owned callable unit, none touch fusion-plane/continuation-key
+counters. Default confirmed; all seven stayed in `host_call_carrier.rs`.
+
+**AC-1**: control.rs 4797, recursor_fusion.rs 3795, host_call_carrier.rs
+4455, specialization_binding.rs 5254, source_frame_bridge.rs 5734,
+positional_candidate_settlement.rs 4376, mod.rs 3490 -- all under 10k.
+
+**AC-2**: discovery parity exact both before and after -- 217 total,
+split 46/25/47/48/22/29 across control/recursor_fusion/host_call_carrier/
+specialization_binding/source_frame_bridge/positional_candidate_settlement,
+matching the approved D0 counts exactly.
+
+**AC-3**: 8 relocated test bodies spot-checked character-for-character
+against the pre-D1 tree (`d736e33d7`) -- all identical. Only
+relocation-provenance comments and `use` lines were added anywhere.
+
+**AC-4/AC-6**: `scripts/ken-cargo build -p ken-runtime --lib`/`--tests`
+clean; `scripts/ken-cargo test -p ken-runtime --lib`: 926 passed, 0
+failed, 4 ignored -- identical to the pre-D1 baseline.
+
+**AC-5**: every relocated test's body is unchanged; none was rewritten
+into a domain/mutation test.
+
+**Reconciliation**: pre-D1 control.rs (30099) + mod.rs (1707) = 31806.
+Post: 4797+3795+4455+5254+5734+4376+3490 = 31901. The +95 delta is
+entirely relocation-provenance comments and `use`-import lines added
+across the six touched files.
+
 ## Acceptance criteria -- the phase gates bind here, restated
 
 - **`AC-1` — control.rs and every module this node creates land below 10k**,
