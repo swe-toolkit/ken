@@ -4795,3 +4795,144 @@ fn refusal_pins_rehomed_static_worker_without_selector_exclusion() {
     ));
 }
 
+
+// ── `RT-BRANCH-LOCAL-DECLARED-CALLABLE` `D1` — AC-1, the seam property ────────
+//
+// ⭐⭐ These are PROPERTY-LEVEL IR FIXTURES, and that is not a convenience.
+// A capture-free lambda at a nested recursive position is **not authorable from
+// surface Ken**: the elaborator gives every expression-position lambda
+// `captures: (0..runtime_depth).map(Var)` — the whole enclosing environment,
+// with no free-variable analysis (`ken-elaborator/src/erasure.rs:2210`, `2513`,
+// `4441`), so a continuation that references nothing still captures its depth.
+// Measured on a purpose-built Ken program whose continuation ignores its
+// argument and names only a top-level `proc`: still `captures = 5`. The
+// unconditionally-admitted `RuntimeExpr::Closure { captures: vec![] }` is only
+// ever emitted as a DECLARATION body (`erasure.rs:283`, `2150`, `4068`), never
+// at a constructor argument. ⇒ The IR is the only layer at which this property
+// has a witness at all.
+//
+// ⛔ The two tests are a PAIR on a shared producer shape, and the pair is the
+// point: they differ in the capture list and nothing else, so a partition that
+// widened into the capture-bearing case would flip the second while leaving the
+// first green.
+
+/// `Ret`/`Vis` over a shared producer, parameterised only by the recursive
+/// position's capture list.
+///
+/// Arm 0 constructs `Ret` with **one** argument, so position 1 is absent from
+/// it — that is precisely the whole-source veto this node was cut to remove.
+/// Arm 1 constructs `Vis`, the selected constructor, and carries the position.
+#[cfg(test)]
+fn d1_ret_vis_producer(captures: Vec<RuntimeExpr>) -> RuntimeExpr {
+    let ret = "ctor:fixture::ITree::Ret";
+    let vis = "ctor:fixture::ITree::Vis";
+    RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Var(0)),
+            cases: vec![
+                RuntimeMatchCase {
+                    constructor: "ctor:fixture::Result::Err".to_string(),
+                    binders: 1,
+                    body: RuntimeExpr::Construct {
+                        constructor: ret.to_string(),
+                        args: vec![RuntimeExpr::Value(RuntimeValue::Int(0.into()))],
+                    },
+                },
+                RuntimeMatchCase {
+                    constructor: "ctor:fixture::Result::Ok".to_string(),
+                    binders: 1,
+                    body: RuntimeExpr::Construct {
+                        constructor: vis.to_string(),
+                        args: vec![
+                            RuntimeExpr::Value(RuntimeValue::Int(1.into())),
+                            RuntimeExpr::LexicalClosure {
+                                captures,
+                                params: vec!["arg0".to_string()],
+                                body: Box::new(RuntimeExpr::Value(RuntimeValue::Int(7.into()))),
+                            },
+                        ],
+                    },
+                },
+            ],
+            default: RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: "d1 producer default".to_string(),
+            },
+        }),
+        cases: vec![crate::RuntimeComputationalMatchCase {
+            constructor: vis.to_string(),
+            argument_binders: 2,
+            recursive_positions: vec![1],
+            body: RuntimeExpr::Var(0),
+        }],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "d1 eliminator default".to_string(),
+        },
+    }
+}
+
+#[test]
+fn the_branch_local_partition_mints_a_declared_body_for_a_capture_free_recursive_position() {
+    let fixture = d1_ret_vis_producer(Vec::new());
+    let seed_env = NativeSeedEnvironment::empty();
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let mut lowering = root_authority_test_lowering(&seed_env);
+    lowering.static_transition_plan = plan;
+
+    let minted = lowering
+        .recursive_position_unit_body(root, 1, &"ctor:fixture::ITree::Vis".to_string())
+        .expect("the fixture is plannable and the resolver must not error");
+
+    // ⭐ The MINTING path, not merely a lifted veto. Before the partition this
+    // was `None`, because arm 0 constructs `Ret` and lacks position 1.
+    let minted = minted.expect(
+        "the branch-local partition must mint a declared body for the in-bucket \
+         capture-free recursive position",
+    );
+
+    // ⛔ It must be the CLOSURE'S BODY, not merely some origin. An assertion of
+    // `is_some()` alone would pass on any origin the resolver happened to hold.
+    let scrutinee = lowering
+        .static_transition_plan
+        .child_static_origin(root, 0)
+        .expect("the eliminator's scrutinee has a planned origin");
+    let ok_arm = lowering
+        .static_transition_plan
+        .child_static_origin(scrutinee, 2)
+        .expect("the producer's second arm has a planned origin");
+    let closure = lowering
+        .static_transition_plan
+        .child_static_origin(ok_arm, 1)
+        .expect("the Vis constructor's recursive position has a planned origin");
+    let closure_body = lowering
+        .static_transition_plan
+        .child_static_origin(closure, 0)
+        .expect("the closure's body has a planned origin");
+    assert_eq!(
+        minted, closure_body,
+        "the minted unit must be the in-bucket closure's own body"
+    );
+}
+
+#[test]
+fn the_partition_still_refuses_a_capture_bearing_recursive_position() {
+    // The discriminating half of the pair: identical in every respect except a
+    // non-empty capture list. This is the case all sixteen RT-BRANCH witnesses
+    // are in, and RT-CAPTURE-SUPPLY closed as word-only.
+    let fixture = d1_ret_vis_producer(vec![RuntimeExpr::Var(0)]);
+    let seed_env = NativeSeedEnvironment::empty();
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let mut lowering = root_authority_test_lowering(&seed_env);
+    lowering.static_transition_plan = plan;
+
+    let minted = lowering
+        .recursive_position_unit_body(root, 1, &"ctor:fixture::ITree::Vis".to_string())
+        .expect("the fixture is plannable and the resolver must not error");
+
+    assert!(
+        minted.is_none(),
+        "a capture-bearing LexicalClosure must still refuse — the partition is a \
+         bucket cut, never a relaxation of the capture condition"
+    );
+}
