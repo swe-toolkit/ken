@@ -2169,6 +2169,145 @@ pub(super) struct PlannedContinuationSpecializationCall {
 /// The exact result-position population below `root`, bounded to its source
 /// owner. Ordinary `Match` branches are selected only through Slice 0's D1
 /// verdicts; owner and lifetime checks come only from Slice 0's D2 population.
+
+/// **`RT-CAPTURE-PROJECTION-GROW` `D1` — the binder depth from a producer result
+/// root down to one of its result origins.**
+///
+/// ⭐ The recursive-position worker closure is a DIRECT CHILD of the producer
+/// `Construct`, so no binder separates the two. The binders that matter sit
+/// **above** the construct — the producer `Match` arm whose body it is — which
+/// is why a walk from the closure to the construct is structurally always zero
+/// and the depth has to be measured on this path instead.
+///
+/// ⛔ The descent mirrors [`continuation_result_origins`]' child threading and
+/// the binder arities mirror `shift_runtime_vars`, so no binding form is crossed
+/// silently. A closure is a LEAF here: the walk never descends through one, so
+/// a construct inside a closure body returns `None` rather than a depth that
+/// ignored the closure's own binders.
+///
+/// ⛔ `None` means "not found on a binder-bearing path" and callers must treat
+/// it as *do not join*, never as depth zero — joining at a wrong-but-small depth
+/// inflates the demand and can veto the whole continuation.
+fn producer_binder_depth(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+    target: StaticOriginId,
+    depth: usize,
+) -> Result<Option<usize>, CraneliftBackendError> {
+    if origin == target {
+        return Ok(Some(depth));
+    }
+    let expr = plan.planned_occurrence_expr(origin)?;
+    let child = |position| plan.semantic.child_origin(origin, position);
+    match expr {
+        RuntimeExpr::CheckedJoinSite { .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { .. } => {
+            producer_binder_depth(plan, child(0)?, target, depth)
+        }
+        RuntimeExpr::Let { .. } => producer_binder_depth(plan, child(1)?, target, depth + 1),
+        RuntimeExpr::If { .. } => {
+            if let Some(found) = producer_binder_depth(plan, child(1)?, target, depth)? {
+                return Ok(Some(found));
+            }
+            producer_binder_depth(plan, child(2)?, target, depth)
+        }
+        RuntimeExpr::Match { cases, .. } => {
+            for (index, case) in cases.iter().enumerate() {
+                if let Some(found) =
+                    producer_binder_depth(plan, child(1 + index)?, target, depth + case.binders)?
+                {
+                    return Ok(Some(found));
+                }
+            }
+            Ok(None)
+        }
+        RuntimeExpr::ComputationalMatch { cases, .. } => {
+            for (index, case) in cases.iter().enumerate() {
+                let binders = case
+                    .argument_binders
+                    .checked_add(case.recursive_positions.len())
+                    .ok_or_else(|| planner_capacity_error("producer binder depth exhausted"))?;
+                if let Some(found) =
+                    producer_binder_depth(plan, child(1 + index)?, target, depth + binders)?
+                {
+                    return Ok(Some(found));
+                }
+            }
+            Ok(None)
+        }
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::Var(_)
+        | RuntimeExpr::PrimitiveCall { .. }
+        | RuntimeExpr::Construct { .. }
+        | RuntimeExpr::Record { .. }
+        | RuntimeExpr::Project { .. }
+        | RuntimeExpr::Closure { .. }
+        | RuntimeExpr::LexicalClosure { .. }
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Call { .. }
+        | RuntimeExpr::Effect { .. }
+        | RuntimeExpr::Trap(_) => Ok(None),
+    }
+}
+
+
+/// **`RT-CAPTURE-PROJECTION-GROW` `D1` — one edge whose worker prefix was NOT
+/// joined, with the numbers that explain why.**
+///
+/// A deferral is a `D2` handoff, not a silent drop: the worker references values
+/// outside the continuation's entry environment, which is the producer-local
+/// population the entry-frame widening exists to seat.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WorkerPrefixDeferral {
+    pub producer_construct_origin: StaticOriginId,
+    pub depth: usize,
+    pub demand: usize,
+    pub reached: usize,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static WORKER_PREFIX_DEFERRALS: std::cell::RefCell<Option<Vec<WorkerPrefixDeferral>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Run `body` while recording every deferred worker prefix on this thread.
+///
+/// Hidden and default-off: inert unless a scope installs the ledger, and it does
+/// not affect the projection it observes.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn with_worker_prefix_deferrals<R>(body: impl FnOnce() -> R) -> (R, Vec<WorkerPrefixDeferral>) {
+    struct Restore(Option<Vec<WorkerPrefixDeferral>>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            WORKER_PREFIX_DEFERRALS.with(|cell| *cell.borrow_mut() = self.0.take());
+        }
+    }
+    let previous = WORKER_PREFIX_DEFERRALS.with(|cell| cell.borrow_mut().replace(Vec::new()));
+    let restore = Restore(previous);
+    let value = body();
+    let rows = WORKER_PREFIX_DEFERRALS
+        .with(|cell| cell.borrow_mut().take())
+        .unwrap_or_default();
+    drop(restore);
+    (value, rows)
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_worker_prefix_deferral(row: WorkerPrefixDeferral) {
+    WORKER_PREFIX_DEFERRALS.with(|cell| {
+        if let Some(rows) = cell.borrow_mut().as_mut() {
+            rows.push(row);
+        }
+    });
+}
+
 pub(super) fn continuation_result_origins(
     plan: &StaticTransitionPlan<'_>,
     root: StaticOriginId,
@@ -3329,6 +3468,69 @@ pub(super) fn exact_continuation_source_environment(
             &case.body,
             binders,
         )?);
+    }
+    // ⭐⭐ `RT-CAPTURE-PROJECTION-GROW` `D1` — THE WORKER CLOSURE'S OWN PREFIX,
+    // JOINED CONDITIONALLY, PER EDGE.
+    //
+    // The loop above ranges over the ELIMINATOR's case bodies. The
+    // recursive-position worker closure is a separate node in the PRODUCER's
+    // `Construct`, outside every one of those cases, so nothing above ever
+    // counted its captures — measured at `<=2` against a 3-5 capture set
+    // (`RT-CAPTURE-CARDINALITY-GAP` `D0`).
+    //
+    // ⛔ **The join is CONDITIONAL and it must be.** `required_input_count` is a
+    // single max for the WHOLE continuation gating a fail-closed refusal, so
+    // joining an edge whose worker demands more than `reached` supplies does not
+    // just fail that edge — it vetoes the continuation and takes down edges that
+    // were coverable. Measured on `px7f`: one edge fits at 4 while a sibling
+    // demands 6 against `reached = 4`; an unconditional join refuses both.
+    //
+    // ⛔ Never force `required_input_count > reached.len()`.
+    //
+    // ⛔ Positions are read in the SELECTED CONSTRUCTOR'S bucket only.
+    // `recursive_positions` index the ELIMINATOR case's constructor while `args`
+    // belongs to the PRODUCER's construct; indexing one with the other is
+    // meaningful only when they are the same constructor — the same rule
+    // `RT-BRANCH-LOCAL-DECLARED-CALLABLE` `D1` established one layer up.
+    // Measured: without this guard an unrelated argument was read at the
+    // eliminator's position.
+    let producer_construct = plan.planned_occurrence_expr(producer_construct_origin)?;
+    if let RuntimeExpr::Construct {
+        constructor: produced,
+        args,
+    } = producer_construct
+    {
+        if let Some(depth) =
+            producer_binder_depth(plan, producer_result_origin, producer_construct_origin, 0)?
+        {
+            for case in cases {
+                if case.constructor != *produced {
+                    continue;
+                }
+                for position in &case.recursive_positions {
+                    let Some(argument) = args.get(*position) else {
+                        continue;
+                    };
+                    let demand = required_surrounding_environment_prefix(argument, depth)?;
+                    if demand <= reached.len() {
+                        required_input_count = required_input_count.max(demand);
+                    } else {
+                        // DEFERRED to `D2`, not dropped. The worker references
+                        // values outside the continuation's entry environment —
+                        // the producer-local population — which the entry-frame
+                        // widening is what seats. Recorded so `D2` can assert
+                        // this edge greens once that lands.
+                        #[cfg(any(test, feature = "px8-ds-test-support"))]
+                        record_worker_prefix_deferral(WorkerPrefixDeferral {
+                            producer_construct_origin,
+                            depth,
+                            demand,
+                            reached: reached.len(),
+                        });
+                    }
+                }
+            }
+        }
     }
     #[cfg(test)]
     let required_input_count = if CONTINUATION_PRODUCTION_MUTATION.with(Cell::get)
