@@ -2447,14 +2447,6 @@ fn oriented_segment_keeps_semantic_and_control_axes_independent() {
         "delimiter order remains independently o0, o4, o3"
     );
 }
-// `RT-CONTROL-INTEGRATION-TESTS-SPLIT` D1: widened from module-private to
-// `pub(super)` -- `recursor_fusion.rs` (a sibling under `core::tests`) is
-// now a caller.
-#[derive(Clone, Copy)]
-pub(super) enum Px8jSelectedScopePlacement {
-    BeforeReturnHole,
-    AfterReturnHole,
-}
 pub(in crate::cranelift_backend::lowering) fn px8j_aggregate_result() -> RuntimeExpr {
     RuntimeExpr::Construct {
         constructor: "ctor:prelude::Result::Ok".to_string(),
@@ -2646,92 +2638,6 @@ pub(in crate::cranelift_backend::lowering) fn px8j_layered_recursive_result(tran
         default: RuntimeTrap {
             code: RuntimeTrapCode::PatternMatchFailure,
             message: "PX8-J terminal transform default".to_string(),
-        },
-    }
-}
-// `RT-CONTROL-INTEGRATION-TESTS-SPLIT` D1: widened from module-private to
-// `pub(super)` -- `recursor_fusion.rs` (a sibling under `core::tests`) is
-// now a caller.
-pub(super) fn px8j_equal_payload_hole_placement(placement: Px8jSelectedScopePlacement) -> RuntimeExpr {
-    let input_node = "ctor:fixture::PX8JHoleInput::Node";
-    let input_leaf = "ctor:fixture::PX8JHoleInput::Leaf";
-    let output_node = "ctor:fixture::PX8JHoleOutput::Node";
-    let output_leaf = "ctor:fixture::PX8JHoleOutput::Leaf";
-    let unit = || RuntimeExpr::Construct {
-        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
-        args: Vec::new(),
-    };
-    let recursive_child = || RuntimeExpr::LexicalClosure {
-        captures: Vec::new(),
-        params: vec!["unit".to_string()],
-        body: Box::new(RuntimeExpr::Construct {
-            constructor: input_leaf.to_string(),
-            args: Vec::new(),
-        }),
-    };
-    let scoped_payload = || RuntimeExpr::ComputationalMatch {
-        scrutinee: Box::new(RuntimeExpr::Construct {
-            constructor: input_node.to_string(),
-            args: vec![recursive_child()],
-        }),
-        cases: vec![
-            crate::RuntimeComputationalMatchCase {
-                constructor: input_node.to_string(),
-                argument_binders: 1,
-                recursive_positions: vec![0],
-                body: RuntimeExpr::Construct {
-                    constructor: output_node.to_string(),
-                    args: vec![RuntimeExpr::Var(0)],
-                },
-            },
-            crate::RuntimeComputationalMatchCase {
-                constructor: input_leaf.to_string(),
-                argument_binders: 0,
-                recursive_positions: Vec::new(),
-                body: RuntimeExpr::Construct {
-                    constructor: output_leaf.to_string(),
-                    args: Vec::new(),
-                },
-            },
-        ],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "PX8-J equal-payload inner default".to_string(),
-        },
-    };
-    let outer_scrutinee = match placement {
-        Px8jSelectedScopePlacement::BeforeReturnHole => RuntimeExpr::Construct {
-            constructor: output_node.to_string(),
-            args: vec![RuntimeExpr::LexicalClosure {
-                captures: Vec::new(),
-                params: vec!["unit".to_string()],
-                body: Box::new(scoped_payload()),
-            }],
-        },
-        Px8jSelectedScopePlacement::AfterReturnHole => scoped_payload(),
-    };
-    RuntimeExpr::ComputationalMatch {
-        scrutinee: Box::new(outer_scrutinee),
-        cases: vec![
-            crate::RuntimeComputationalMatchCase {
-                constructor: output_node.to_string(),
-                argument_binders: 1,
-                recursive_positions: vec![0],
-                body: RuntimeExpr::Call {
-                    callee: Box::new(RuntimeExpr::Var(0)),
-                    args: vec![unit()],
-                },
-            },
-            crate::RuntimeComputationalMatchCase {
-                constructor: output_leaf.to_string(),
-                argument_binders: 0,
-                recursive_positions: Vec::new(),
-                body: px8j_aggregate_result(),
-            },
-        ],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "PX8-J equal-payload outer default".to_string(),
         },
     }
 }

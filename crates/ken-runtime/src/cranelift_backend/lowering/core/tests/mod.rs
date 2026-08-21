@@ -374,6 +374,102 @@ pub(in crate::cranelift_backend::lowering) fn host_result_closure_match(argument
     }
 }
 
+// `RT-CONTROL-INTEGRATION-TESTS-SPLIT` D1: promoted from `control.rs`
+// (module-private there) -- needed by both `control.rs`'s own residual
+// tests and `recursor_fusion.rs`; hoisted here (plain module-private,
+// same as this file's other shared fixtures) rather than widened in
+// place, per the phase's banned-scope rule against widening a symbol's
+// visibility just to make a test move compile.
+#[derive(Clone, Copy)]
+enum Px8jSelectedScopePlacement {
+    BeforeReturnHole,
+    AfterReturnHole,
+}
+
+fn px8j_equal_payload_hole_placement(placement: Px8jSelectedScopePlacement) -> RuntimeExpr {
+    let input_node = "ctor:fixture::PX8JHoleInput::Node";
+    let input_leaf = "ctor:fixture::PX8JHoleInput::Leaf";
+    let output_node = "ctor:fixture::PX8JHoleOutput::Node";
+    let output_leaf = "ctor:fixture::PX8JHoleOutput::Leaf";
+    let unit = || RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+        args: Vec::new(),
+    };
+    let recursive_child = || RuntimeExpr::LexicalClosure {
+        captures: Vec::new(),
+        params: vec!["unit".to_string()],
+        body: Box::new(RuntimeExpr::Construct {
+            constructor: input_leaf.to_string(),
+            args: Vec::new(),
+        }),
+    };
+    let scoped_payload = || RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(RuntimeExpr::Construct {
+            constructor: input_node.to_string(),
+            args: vec![recursive_child()],
+        }),
+        cases: vec![
+            crate::RuntimeComputationalMatchCase {
+                constructor: input_node.to_string(),
+                argument_binders: 1,
+                recursive_positions: vec![0],
+                body: RuntimeExpr::Construct {
+                    constructor: output_node.to_string(),
+                    args: vec![RuntimeExpr::Var(0)],
+                },
+            },
+            crate::RuntimeComputationalMatchCase {
+                constructor: input_leaf.to_string(),
+                argument_binders: 0,
+                recursive_positions: Vec::new(),
+                body: RuntimeExpr::Construct {
+                    constructor: output_leaf.to_string(),
+                    args: Vec::new(),
+                },
+            },
+        ],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "PX8-J equal-payload inner default".to_string(),
+        },
+    };
+    let outer_scrutinee = match placement {
+        Px8jSelectedScopePlacement::BeforeReturnHole => RuntimeExpr::Construct {
+            constructor: output_node.to_string(),
+            args: vec![RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["unit".to_string()],
+                body: Box::new(scoped_payload()),
+            }],
+        },
+        Px8jSelectedScopePlacement::AfterReturnHole => scoped_payload(),
+    };
+    RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(outer_scrutinee),
+        cases: vec![
+            crate::RuntimeComputationalMatchCase {
+                constructor: output_node.to_string(),
+                argument_binders: 1,
+                recursive_positions: vec![0],
+                body: RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::Var(0)),
+                    args: vec![unit()],
+                },
+            },
+            crate::RuntimeComputationalMatchCase {
+                constructor: output_leaf.to_string(),
+                argument_binders: 0,
+                recursive_positions: Vec::new(),
+                body: control::px8j_aggregate_result(),
+            },
+        ],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "PX8-J equal-payload outer default".to_string(),
+        },
+    }
+}
+
 #[cfg(test)]
 pub(super) fn big(sign: crate::Sign, limbs: &[u64]) -> RuntimeExpr {
     RuntimeExpr::Value(RuntimeValue::Int(crate::RuntimeIntV1::Big {

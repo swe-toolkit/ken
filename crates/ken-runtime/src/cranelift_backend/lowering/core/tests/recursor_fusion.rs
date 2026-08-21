@@ -6,9 +6,8 @@
 
 use super::*;
 use super::control::{
-    px8j_capture_source_trace, px8j_equal_payload_hole_placement,
-    px8j_layered_recursive_result, px8j_scope_chain_observation_result,
-    Px8jSelectedScopePlacement,
+    px8j_capture_source_trace, px8j_layered_recursive_result,
+    px8j_scope_chain_observation_result,
 };
 
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — a PRODUCTION compile builds the
