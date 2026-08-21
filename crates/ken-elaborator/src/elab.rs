@@ -7,8 +7,8 @@
 use std::collections::HashMap;
 
 use ken_kernel::{
-    check as kernel_check, convert, declare_def, declare_postulate, declare_primitive,
-    declare_recursive_group,
+    check as kernel_check, convert, convert_type, declare_def, declare_postulate,
+    declare_primitive, declare_recursive_group,
     env::PrimReduction,
     inductive::{
         all_support_evidence_positions, method_type, peel_app, peel_pi, recursive_shapes,
@@ -1487,6 +1487,55 @@ fn support_head(env: &GlobalEnv, ctx: &Context, ty: &Term) -> Option<GlobalId> {
         return None;
     };
     env.all_support_origin(id).is_some().then_some(id)
+}
+
+/// Specialize the generated recursive-IH evidence before source arguments.
+///
+/// D0 normalized the held D3 mismatch from
+/// `((λ index. λ _ : index = index. FokDerivation index) expected) Refl`
+/// versus `FokDerivation concrete_child_sequent` to, respectively,
+/// `FokDerivation expected` and `FokDerivation concrete_child_sequent`.
+/// Reduction already fired; the source's concrete sequent had been consumed at
+/// the generated equality position instead of the first ordinary-argument
+/// position. This helper closes that elaborator-side ordering gap.
+///
+/// It applies only leading equality premises whose endpoints convert, and only
+/// until the result type converts to the declared source-call result. A neutral
+/// or non-reflexive premise returns the original evidence unchanged so the
+/// ordinary path retains the explicit equality/transport rather than inventing
+/// `Refl` or erasing a Pi.
+fn discharge_reflexive_recursive_ih_evidence(
+    env: &GlobalEnv,
+    ctx: &Context,
+    evidence: Term,
+    evidence_ty: Term,
+    source_result_ty: &Term,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    if convert_type(env, ctx, &evidence_ty, source_result_ty) {
+        return Ok((evidence, evidence_ty));
+    }
+
+    let original = (evidence.clone(), evidence_ty.clone());
+    let mut specialized = evidence;
+    let mut specialized_ty = evidence_ty;
+    loop {
+        let Term::Pi(domain, codomain) = whnf(env, ctx, &specialized_ty) else {
+            return Ok(original);
+        };
+        let Term::Eq(eq_ty, left, right) = domain.as_ref() else {
+            return Ok(original);
+        };
+        if !convert(env, ctx, eq_ty, left, right) {
+            return Ok(original);
+        }
+        let proof = synth_generated_index_evidence(env, ctx, &domain, span)?;
+        specialized_ty = subst0(&codomain, &proof);
+        specialized = Term::app(specialized, proof);
+        if convert_type(env, ctx, &specialized_ty, source_result_ty) {
+            return Ok((specialized, specialized_ty));
+        }
+    }
 }
 
 fn install_lift_binding(
@@ -3561,17 +3610,75 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         }
 
         RExpr::RApp(f, a, span) => {
-            // A structural self-call on a child exposed by a generated `All`
-            // match consumes the exact motive instance paired with that child.
-            // No general recursive-call rewrite is performed: residual `All`
-            // bindings and ordinary arguments continue through the SCT path.
-            if let (RExpr::RCon(name, _), RExpr::RVar(index, _, _)) = (&**f, &**a) {
+            // A structural self-call may carry ordinary source arguments after
+            // the recursive child. Resolve the whole application spine here so
+            // generated index-equality evidence is discharged before those
+            // arguments are consumed. Falling through preserves the ordinary
+            // application path for neutral/non-reflexive evidence.
+            let mut head = expr;
+            let mut arguments = Vec::new();
+            while let RExpr::RApp(function, argument, _) = head {
+                arguments.push(argument.as_ref());
+                head = function.as_ref();
+            }
+            arguments.reverse();
+            if let (RExpr::RCon(name, _), Some(RExpr::RVar(index, _, _))) =
+                (head, arguments.first().copied())
+            {
                 if name == &cx.owner_label {
                     if let Some((position, _)) = cx.surface_var(*index) {
                         if let Some(binding) = cx.lift_bindings.get(&position) {
                             if binding.support.is_none() {
-                                if let Some(evidence) = cx.binding_term(binding.evidence_position) {
-                                    return Ok(evidence);
+                                if let Some((evidence, evidence_ty)) =
+                                    cx.binding_term(binding.evidence_position)
+                                {
+                                    let owner_id =
+                                        cx.globals.get(name).copied().ok_or_else(|| {
+                                            ElabError::UnresolvedCon {
+                                                name: name.clone(),
+                                                span: span.clone(),
+                                            }
+                                        })?;
+                                    let (_, owner_ty) =
+                                        cx.env.const_type(owner_id).ok_or_else(|| {
+                                            ElabError::Internal(format!(
+                                                "no type for recursive owner '{name}'"
+                                            ))
+                                        })?;
+                                    let Term::Pi(child_domain, owner_codomain) =
+                                        whnf(cx.env, &cx.ctx, &owner_ty)
+                                    else {
+                                        return Err(ElabError::NotAFunction { span: span.clone() });
+                                    };
+                                    let child_core = check(cx, arguments[0], &child_domain, span)?;
+                                    let source_result_ty = subst0(&owner_codomain, &child_core);
+                                    let (mut call, mut call_ty) =
+                                        discharge_reflexive_recursive_ih_evidence(
+                                            cx.env,
+                                            &cx.ctx,
+                                            evidence,
+                                            evidence_ty,
+                                            &source_result_ty,
+                                            span,
+                                        )?;
+                                    if convert_type(cx.env, &cx.ctx, &call_ty, &source_result_ty) {
+                                        for argument in arguments.iter().skip(1) {
+                                            let Term::Pi(domain, codomain) =
+                                                whnf(cx.env, &cx.ctx, &call_ty)
+                                            else {
+                                                return Err(ElabError::NotAFunction {
+                                                    span: span.clone(),
+                                                });
+                                            };
+                                            let argument_core = check(cx, argument, &domain, span)?;
+                                            call_ty = subst0(&codomain, &argument_core);
+                                            call = Term::app(call, argument_core);
+                                        }
+                                        return Ok((call, call_ty));
+                                    }
+                                    if arguments.len() == 1 {
+                                        return Ok((call, call_ty));
+                                    }
                                 }
                             }
                         }
@@ -8989,11 +9096,15 @@ mod nested_lift_association_tests {
         resolve::{resolve_expr_standalone, RExpr},
         ElabEnv,
     };
-    use ken_kernel::{KernelError, Level, Term};
+    use ken_kernel::{
+        check as kernel_check, declare_postulate, infer as kernel_infer, Context, KernelError,
+        Level, Term,
+    };
 
     use super::{
-        infer, lift_association_error, validate_lift_associations, ElabCtx, ElabError, GlobalId,
-        HashMap, LiftAssociationFailure, LiftBinding, Span,
+        discharge_reflexive_recursive_ih_evidence, infer, lift_association_error,
+        validate_lift_associations, ElabCtx, ElabError, GlobalId, HashMap, LiftAssociationFailure,
+        LiftBinding, Span,
     };
 
     fn binding(
@@ -9006,6 +9117,232 @@ mod nested_lift_association_tests {
             recursive_result_position,
             support,
         }
+    }
+
+    // LANG-INDEXED-RECURSIVE-IH-DISCHARGE AC-1..AC-6 controls.
+    // Promise class: durable invariant. Intended extensions may add indexed
+    // families, constructors, and ordinary arguments while preserving the
+    // reflexive-only discharge boundary; changing equality orientation,
+    // evidence order, or neutral transport must make these controls red.
+    fn nat_terms(env: &ElabEnv) -> (Term, Term, Term) {
+        let nat = Term::IndFormer {
+            id: env.globals["Nat"],
+            level_args: vec![],
+        };
+        let zero = Term::Constructor {
+            id: env.globals["Zero"],
+            level_args: vec![],
+        };
+        let suc_zero = Term::app(
+            Term::Constructor {
+                id: env.globals["Suc"],
+                level_args: vec![],
+            },
+            zero.clone(),
+        );
+        (nat, zero, suc_zero)
+    }
+
+    #[test]
+    fn recursive_ih_reflexive_index_evidence_is_applied_before_source_arguments() {
+        // MEASURED: one reflexive leading equality is consumed and the emitted
+        // term kernel-infers at the declared source-result type. CLAIMED: a
+        // generated reflexive premise is discharged rather than leaked. THE
+        // GAP: application-spine ordering is exercised separately below.
+        let env = ElabEnv::new().unwrap();
+        let (nat, zero, _) = nat_terms(&env);
+        let equality = Term::Eq(
+            Box::new(nat.clone()),
+            Box::new(zero.clone()),
+            Box::new(zero),
+        );
+        let evidence_ty = Term::pi(equality, nat.clone());
+        let mut ctx = Context::new();
+        ctx.push(evidence_ty.clone());
+
+        let (specialized, specialized_ty) = discharge_reflexive_recursive_ih_evidence(
+            &env.env,
+            &ctx,
+            Term::var(0),
+            evidence_ty,
+            &nat,
+            &Span::new(0, 0),
+        )
+        .unwrap();
+
+        assert_eq!(specialized_ty, nat);
+        assert!(matches!(specialized, Term::App(_, _)));
+        assert_eq!(
+            kernel_infer(&env.env, &ctx, &specialized).unwrap(),
+            specialized_ty
+        );
+    }
+
+    #[test]
+    fn recursive_ih_multiple_index_evidence_is_applied_once_in_telescope_order() {
+        // MEASURED: two leading premises produce exactly two nested
+        // applications in telescope order. CLAIMED: every generated index
+        // premise is discharged once. THE GAP: equal-looking premises do not
+        // distinguish semantic index identities; kernel typing and the
+        // source-result conversion gate enforce their positional order.
+        let env = ElabEnv::new().unwrap();
+        let (nat, zero, _) = nat_terms(&env);
+        let equality = Term::Eq(
+            Box::new(nat.clone()),
+            Box::new(zero.clone()),
+            Box::new(zero),
+        );
+        let evidence_ty = Term::pi(equality.clone(), Term::pi(equality, nat.clone()));
+        let mut ctx = Context::new();
+        ctx.push(evidence_ty.clone());
+
+        let (specialized, specialized_ty) = discharge_reflexive_recursive_ih_evidence(
+            &env.env,
+            &ctx,
+            Term::var(0),
+            evidence_ty,
+            &nat,
+            &Span::new(0, 0),
+        )
+        .unwrap();
+
+        assert_eq!(specialized_ty, nat);
+        let Term::App(first_application, _) = specialized else {
+            panic!("second generated equality must be applied");
+        };
+        assert!(matches!(*first_application, Term::App(_, _)));
+    }
+
+    fn assert_recursive_self_call_spine_discharge(recursive_result_position: Option<usize>) {
+        let mut env = ElabEnv::new().unwrap();
+        let (nat, zero, _) = nat_terms(&env);
+        let owner_ty = Term::pi(nat.clone(), Term::pi(nat.clone(), nat.clone()));
+        let owner_id = declare_postulate(
+            &mut env.env,
+            "recursive-ih-spine-owner".to_string(),
+            vec![],
+            owner_ty,
+        )
+        .unwrap();
+        env.globals.insert("recursiveOwner".into(), owner_id);
+
+        let equality = Term::Eq(
+            Box::new(nat.clone()),
+            Box::new(zero.clone()),
+            Box::new(zero.clone()),
+        );
+        let evidence_ty = Term::pi(equality, Term::pi(nat.clone(), nat.clone()));
+        let span = Span::new(0, 0);
+        let expression = RExpr::RApp(
+            Box::new(RExpr::RApp(
+                Box::new(RExpr::RCon("recursiveOwner".into(), span.clone())),
+                Box::new(RExpr::RVar(0, "child".into(), span.clone())),
+                span.clone(),
+            )),
+            Box::new(RExpr::RCon("Zero".into(), span.clone())),
+            span.clone(),
+        );
+
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "recursiveOwner",
+        );
+        cx.ctx.push(nat.clone());
+        cx.ctx.push(evidence_ty.clone());
+        cx.hidden_positions.push(1);
+        cx.lift_bindings
+            .insert(0, binding(1, recursive_result_position, None));
+
+        let (core, ty) = infer(&mut cx, &expression).unwrap();
+        assert_eq!(ty, nat);
+        assert_eq!(kernel_infer(cx.env, &cx.ctx, &core).unwrap(), ty);
+        let Term::App(specialized, ordinary_argument) = core else {
+            panic!("ordinary source argument must remain the outer application");
+        };
+        assert_eq!(*ordinary_argument, zero.clone());
+        let Term::App(raw_evidence, _) = *specialized else {
+            panic!("generated equality evidence must be applied exactly once first");
+        };
+        assert_eq!(*raw_evidence, Term::var(0));
+
+        assert!(
+            kernel_infer(cx.env, &cx.ctx, &Term::app(Term::var(0), zero),).is_err(),
+            "leaving the equality Pi unapplied must reproduce the wrong-position mismatch"
+        );
+    }
+
+    #[test]
+    fn direct_recursive_ih_self_call_discharges_before_ordinary_arguments() {
+        // MEASURED: the emitted spine is evidence, generated proof, then the
+        // ordinary source argument; the un-specialized mutation is rejected.
+        // CLAIMED: source arguments never occupy generated equality slots.
+        // THE GAP: this synthetic direct association does not itself traverse
+        // a generated nested-All support; the next control uses that metadata.
+        assert_recursive_self_call_spine_discharge(None);
+    }
+
+    #[test]
+    fn nested_all_leaf_self_call_uses_the_same_specialized_contract() {
+        // MEASURED: a binding carrying a nested recursive-result position emits
+        // the same checked application spine as the direct binding. CLAIMED:
+        // direct and nested-All leaves share one specialized contract. THE GAP:
+        // support-family construction remains covered by the structural-result
+        // integration suite, while this pin isolates leaf presentation.
+        assert_recursive_self_call_spine_discharge(Some(2));
+    }
+
+    #[test]
+    fn recursive_ih_neutral_or_unequal_index_evidence_is_preserved() {
+        // MEASURED: unequal evidence remains a Pi, an explicit proof applies,
+        // and an invented Refl is kernel-rejected. CLAIMED: discharge never
+        // makes neutral or non-reflexive transport definitional. THE GAP: this
+        // pin supplies an assumed local proof rather than constructing a J;
+        // existing convoy tests cover J/cast construction itself.
+        let env = ElabEnv::new().unwrap();
+        let (nat, zero, suc_zero) = nat_terms(&env);
+        let unequal = Term::Eq(
+            Box::new(nat.clone()),
+            Box::new(zero.clone()),
+            Box::new(suc_zero.clone()),
+        );
+        let evidence_ty = Term::pi(unequal.clone(), nat.clone());
+        let mut ctx = Context::new();
+        ctx.push(evidence_ty.clone());
+
+        let original = Term::var(0);
+        let result = discharge_reflexive_recursive_ih_evidence(
+            &env.env,
+            &ctx,
+            original.clone(),
+            evidence_ty.clone(),
+            &nat,
+            &Span::new(0, 0),
+        )
+        .unwrap();
+        assert_eq!(result, (original, evidence_ty.clone()));
+
+        let mut explicit_ctx = Context::new();
+        explicit_ctx.push(unequal.clone());
+        explicit_ctx.push(evidence_ty);
+        let explicitly_transported = Term::app(Term::var(0), Term::var(1));
+        assert_eq!(
+            kernel_infer(&env.env, &explicit_ctx, &explicitly_transported).unwrap(),
+            nat,
+            "neutral evidence must remain an explicit argument rather than becoming definitional",
+        );
+        assert!(
+            kernel_check(
+                &env.env,
+                &Context::new(),
+                &Term::Refl(Box::new(zero)),
+                &unequal,
+            )
+            .is_err(),
+            "Refl at unequal endpoints must remain kernel-rejected"
+        );
     }
 
     #[test]
