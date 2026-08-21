@@ -1,7 +1,7 @@
 ---
 id: KERNEL-ELIM-SHAPE-NORMALIZE-DIVERGES
 title: "Eliminator/recursor shape derivation over a proof-carrying inductive family diverges -- derive_recursive_shape and structured_lift normalize a constructor premise before the occurrence test, the elimination-time twin of LANG-CTOR-PREMISE-ELABORATION-DIVERGES"
-status: active
+status: merged
 owner: kernel
 size: M
 gate: none
