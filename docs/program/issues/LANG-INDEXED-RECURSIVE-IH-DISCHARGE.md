@@ -1,6 +1,6 @@
 ---
 id: LANG-INDEXED-RECURSIVE-IH-DISCHARGE
-title: "Discharge the generated index-equality evidence at the dependent-match elaboration boundary so the source branch sees the recursive IH already specialized at the recursive value and its constructor-determined indices -- the elaborator prerequisite V3-FO-CHECKER-SOUNDNESS D3 is blocked on, structural over every rule/constructor of the family, not a point-fix for FokDerivImpRight"
+title: "Transport the mutual-recursion sibling-call result along the dependent-match refinement equality at the elaboration boundary, so the source branch reconciles a recursive-group call's concrete indexed result with the refined motive index -- route (c) genuine J/cast transport over a PROPOSITIONAL equality, NOT the reflexive same-owner discharge; the elaborator prerequisite V3-FO-CHECKER-SOUNDNESS D3 is blocked on, measure-first between exposing the equality for the proof (c-proof) and elaborator auto-transport (c-elab)"
 status: ready
 owner: language
 size: M
@@ -8,166 +8,204 @@ gate: none
 depends_on: []
 blocks: [V3-FO-CHECKER-SOUNDNESS]
 github: null
-origin: "Steward, 2026-08-21, on the Architect's D3 ruling evt_n4q1da1qp68 (with research advisory evt_3jdqjhds50z35 in hand). V3-FO-CHECKER-SOUNDNESS D3 hit its 3rd hard-stop in the abstract-certificate elimination chain (language-implementer, thr_13q5, holding at clean non-candidate a84d7100561a89f3ded6300fbb4fb4b45b947888). The Architect ruled the defect is elaborator-side, NOT kernel and NOT a missing conversion law: Ken's kernel recursor-IH contract is already correct and its whnf/j_reduce already fire; the elaborator's dependent-match layer wraps the direct IH with generated index-equality premises and its structural self-call shortcut fails to discharge them for constructed-argument self-calls, leaking an undischarged leading equality Pi into the source branch. Scope routed to the Steward per COORDINATION section 2; this is the runtime-chain prerequisite-node pattern applied to the language proof chain. Elaborator-scoped + kernel-backstopped (the kernel re-checks and rejects any ill-typed refl/transport), so NOT a TCB change. Estimated tier T1 (soundness-adjacent dependent-elaboration completeness repair; reasoning-dense, must be structural)."
+origin: "Steward, 2026-08-21. RE-FRAMED on the Architect's RE-RULE evt_349bjakvjj9yp (hard-stop 4 of the D3 chain, grounded via a full locus map of check_match_dependent). The node's first framing (on ruling evt_n4q1da1qp68) targeted the same-owner reflexive-discharge case; the language-implementer built that mechanism (candidate b89b4a2cf) and the Architect APPROVED it as sound (soundness line + application-spine boundary correct), but the AC-7 real-family control REDDED honestly: the held-D3 consumer (a84d7100561a89f3ded6300fbb4fb4b45b947888) stays kernel-rejected because its recursive call crosses a MUTUAL-RECURSION helper edge (callee != owner_label) and the leading equality is a dependent-match RESULT REFINEMENT, not bare same-owner-child evidence -- so the reflexive helper is by-design dead on this path. Architect's corrected locus + soundness frame below: the equality is PROPOSITIONAL, the fix is a genuine J/cast transport (route c). The reflexive helper is RETAINED as a sound building block. Elaborator-scoped + kernel-backstopped (the kernel re-checks and rejects any ill-typed transport), so NOT a TCB change and NOT operator-gated. Scope routed to the Steward per COORDINATION section 2. Estimated tier T1 (soundness-adjacent dependent-elaboration transport; reasoning-dense, must hold the propositional-vs-definitional line and be measured, not guessed)."
 ---
 
-# WHY THIS NODE EXISTS
+# WHY THIS NODE EXISTS (re-framed -- hard-stop 4)
 
 `V3-FO-CHECKER-SOUNDNESS` D3 (the propositional `checker_soundness` proof)
-hard-stopped a third time, and the language-implementer correctly declined a
-fourth proof-architecture guess. Every proof-side transport it tried -- direct
-`Cons child rest` / `rest = Nil` site, the recursive soundness function passed
-unapplied to a nonrecursive builder, an isolated exact-index `FokDerivImpRight`
-builder, a named recursor -- reached the **identical** mismatch, because a proof
-helper cannot erase an equality Pi that the elaborator generates internally and
-leaves undischarged. The Architect ruled the locus (evt_n4q1da1qp68) grounded in
-Ken source, and research supplied the prior art (evt_3jdqjhds50z35): the fix is
-in the elaborator's presentation of the recursive IH, not in the kernel and not
-in a new conversion law.
+hard-stopped a fourth time. The node's FIRST framing targeted the wrong seam of
+the same defect: it ruled the fix was the same-owner reflexive-IH discharge at
+`check_match_dependent`'s structural self-call shortcut. The language-implementer
+built exactly that (candidate `b89b4a2cf`, single file `elab.rs`), the Architect
+reviewed it and confirmed the MECHANISM is sound and faithful -- the discharge
+gates on the kernel's definitional `convert` of the equality endpoints, retains
+the `Pi` on non-reflexive premises, and never manufactures `Refl`. But the
+**AC-7 real-family control redded**: the exact held-D3 source `a84d71005`, run
+through `b89b4a2cf`, stays kernel-rejected with the identical mismatch, and the
+required unapplied-`Pi` mutation stayed GREEN -- proving the reflexive helper is
+never reached on this path. The implementer reported the exact failure rather
+than papering it with a proxy control (the right call), and the Architect
+re-ruled the locus from a full map of `check_match_dependent` rather than a fifth
+guess. **The reflexive helper is sound and is kept; it is simply not sufficient,
+because the held consumer takes a different presentation path.**
 
-# LOCUS -- Architect ruling `evt_n4q1da1qp68`
+# CORRECTED LOCUS -- Architect re-rule `evt_349bjakvjj9yp` (definitive, grounded)
 
-**The kernel is correct; do not touch it.** Ken's normative recursor-IH contract
-already matches Lean: `spec/10-kernel/14-inductive.md` section 3 gives the direct
-IH as `M idxs recursive_value` and section 3.2 gives the nested-`All` leaf as
-`lambda x. Lift_D(M, A, x)` -- no equality telescope is part of the public IH
-contract. The kernel producer emits exactly that (`crates/ken-kernel/src/inductive.rs`,
-`method_type` -> `structured_lift_type`, direct arm `apply_motive(motive, recursive
-indices, recursive value)`). Ken's `whnf` already beta-reduces head lambda
-applications (`conv.rs:49-72`) and `obs::j_reduce` already reduces `J P d refl`
-to `d` (`obs.rs:645-661`). The reduction face of this area landed in
-`KERNEL-RECURSOR-UNUSED-IH-REDUCTION`; this node is the **presentation** face.
+The held-D3 mismatch is a **result-refinement gap on the MUTUAL-RECURSION edge**,
+not the direct-self-call reflexive-discharge case:
 
-**The defect is elaborator-side.** In `check_match_dependent`:
+- **The recursive call crosses a sibling edge.** `fok_prop_imp_children_sound ->
+  fok_prop_check_tree_sound_by_cert` is a call to a *sibling* in the recursive
+  group. `ElabCtx` carries only `owner_label: String` (`elab.rs:314`) +
+  `lift_bindings` -- there is NO mutual-group roster. The owner-label self-call
+  fast path (~`elab.rs:3526-3538`, the `return Ok(evidence)`) requires
+  `name == owner_label` plus a bare `RVar` child; a sibling call fails that guard
+  and falls through to the GENERIC application arm (~`elab.rs:3539-3545`): an
+  ordinary global-constant `Pi`-application whose result sits at the CONCRETE
+  child sequent, with no access to the match refinement / motive / roster.
+- **The leading `Equal FokSequent @8 @0` is the dependent-match RESULT
+  REFINEMENT** -- the motive/IH equality premise minted by `motive_index_premises`
+  (`elab.rs:2635`) / `method_index_premises` at the IH slot (`elab.rs:2408-2410`),
+  wrapped by `wrap_premise_pis` (`elab.rs:3220`), around the indexed
+  `FokDerivation` result. The three existing result-side transports --
+  `install_index_refinements` (`2953`), the sibling-convoy (`3029-3084`),
+  `refine_branch_goal` (`2880`) -> `check_match_dependent_refined_fallback`
+  (`1943`) -- ALL key on the branch's own FIELDS, an OUTER binder, or the GOAL.
+  **None transports a CALL's result.** So nothing reconciles
+  `FokDerivation (concrete child sequent)` (found) with the refined
+  `FokDerivation @7` (expected).
 
-- IH-slot construction wraps the direct IH with generated index-equality
-  premises: `wrap_premise_pis(ih_body, method_index_premises(...))`
-  (`crates/ken-elaborator/src/elab.rs` ~2360-2432, the premise wrap ~2405-2410),
-  so the exposed IH type is `Pi (e : idx = target). M idxs field`.
-- the structural self-call shortcut (`elab.rs:3522-3575`) discharges the paired
-  evidence ONLY for the bare `owner child_var` form -- its guard is
-  `if let (RExpr::RCon(name, _), RExpr::RVar(index, _, _)) = (&**f, &**a)`.
-  `FokDerivImpRight`'s recursive premise self-call applies a **constructed**
-  sequent plus extra arguments (`owner child (FokMkSequent ...) frag accepted`),
-  so the shortcut does not fire; the generic application arm exposes the
-  equality-premise IH to the source branch WITHOUT discharging the equality. The
-  branch's ordinary arguments are then consumed at the equality-premise position,
-  and the kernel correctly rejects (`Pi e : i = j. B` is not `B`; `refl` is not
-  manufactured).
+# THE SOUNDNESS FRAME -- route (c), a GENUINE transport over a PROPOSITIONAL equality
 
-That producer split is exactly why every proof-side rearrangement reached the
-same mismatch.
-
-# THE FIX -- direction (b), structural
-
-Expose the recursive IH **already specialized** at the recursive value and its
-constructor-determined indices: discharge the generated index-equality evidence
-at the elaboration boundary -- applied exactly once, BEFORE any ordinary
-recursive-function arguments -- so the source branch sees the direct
-`M idxs field`, matching Ken's kernel contract and Lean's `C (indices of u) u`.
-
-**This must be a STRUCTURAL closure over the elaborator's indexed-recursive-IH
-presentation** -- every rule and constructor of the family, direct recursive
-fields AND nested-`All` leaves -- NOT a point-fix for `FokDerivImpRight`. A
-point-fix makes the chain reappear per rule.
-
-> ## THE ONE SOUNDNESS-CRITICAL LINE. Discharge is valid ONLY when the equality is DEFINITIONALLY reflexive.
+> ## THE ONE SOUNDNESS-CRITICAL LINE. This equality is PROPOSITIONAL, so the fix
+> is a REAL transport -- never Refl.
 >
-> Constructor-determined indices make the index equality definitionally reflexive
-> -- `refl` is well-typed and beta/J yields the direct IH, so discharge is sound.
-> For a genuinely propositional or neutral index equality, the elaborator MUST
-> emit an explicit `J`/cast transport (route c); the residual transport is real.
-> **NEVER erase the equality Pi, NEVER assume `Refl` for non-convertible
-> endpoints, NEVER use proof irrelevance to identify a function type with its
-> result.** Soundness is kernel-backstopped -- the kernel re-checks and rejects
-> any ill-typed `refl`/transport -- so this is a completeness/correctness change,
-> elaborator-scoped, not a TCB change. But a wrong discharge that the kernel then
-> rejects reintroduces the hard-stop; a wrong discharge the kernel accepts is the
-> unsound direction and is what AC-6 exists to catch.
+> The index equality `@7 = child_sequent` is **propositional, not definitionally
+> reflexive.** `@7` is the abstract motive/refinement index; the sibling call
+> returns at the child's *concrete* sequent; the two are bridged only by
+> propositional evidence (the IH's own equality premise / the sub-derivation's
+> index). The reconciliation is therefore a **genuine J/Cast transport along that
+> propositional equality -- route (c), NOT a reflexive discharge.** This is why
+> the reflexive helper (`b89b4a2cf`) is dead here: its endpoints do not convert,
+> so it correctly declines, AC-7 stays red, and its unapplied-`Pi` mutation stays
+> green.
+>
+> **NEVER erase the equality `Pi`, NEVER assume `Refl` for the non-convertible
+> endpoints, NEVER use proof irrelevance to identify the function type with its
+> result.** The kernel backstops the emitted transport -- it re-checks and
+> rejects any ill-typed `J`/cast -- so this is a completeness/correctness change,
+> elaborator-scoped, NOT a TCB change. But a wrong transport the kernel rejects
+> reintroduces the hard-stop; a wrong transport the kernel accepts is the unsound
+> direction, which AC-SOUND below exists to catch.
+
+This is squarely research's Agda with-abstraction case (advisory
+evt_3jdqjhds50z35): "a later abstraction can change the type of an
+already-computed recursive call; the repair is to abstract the recursive result
+before the generalization so its type is preserved -- otherwise an explicit
+equality/transport." **No new research pull** (this is hard-stop 4; the existing
+advisory already covers route (c), and the §1a research re-trigger is the 6th
+hard-stop). The work is applying the covered route at the correct locus.
+
+# THE FIX -- route (c) transport, with a MEASURE-FIRST sub-fork
+
+Two seams could carry the fix: **A** = the IH-slot / branch-body boundary
+(`elab.rs:2302` + `2389-2453`); **B** = the recursive-call site, which would need
+a mutual-group roster surfaced into `ElabCtx`. Prefer the MORE BOUNDED path and
+**measure before committing** (the entry-3 miss is the lesson -- do not guess the
+mechanism):
+
+- **(c-proof) -- the bounded path.** The elaborator EXPOSES the refinement
+  equality as a source-nameable hypothesis; the D3 proof applies the explicit
+  J/cast transport of the child result itself. This avoids adding a mutual-group
+  roster and auto-transport to the delicate dependent-match core -- smaller,
+  auditable, conservative (`docs/PRINCIPLES.md`: small auditable TCB,
+  subsume-don't-proliferate). The elaborator change, if any, is only to cleanly
+  expose/name the equality.
+- **(c-elab) -- the fallback.** The elaborator gains mutual-group awareness (a
+  roster in `ElabCtx`) and AUTO-transports the recursive-group call's result
+  along the refinement equality (Seam A/B). Bigger; matches mature-system
+  ergonomics. Take it only if (c-proof) is infeasible.
 
 # DELIVERABLES
 
-**`D0` -- the discriminating measurement (measure-first; pins the locus, gives QA
-its control).** Normalize the exact expected type at the mismatch. If it whnf's
-to a literal `(lambda e. B) refl` or `J P d refl` with definitionally-equal
-endpoints, the reduction already exists and the gap is a narrow KERNEL
-conversion-completeness defect -- STOP and escalate to the kernel ring via the
-Steward (this node's premise is then wrong). If it shows an unapplied
-`Pi e : i = j. B`, a `refl` at non-convertible endpoints, or the equality
-consumed at the wrong application position, the kernel is correct and the fix is
-elaborator-side per below. Source evidence favors the latter; verify by
-normalizing, do not assume.
+**`D0` -- the deciding measurement (measure-first; picks the sub-fork, gives QA
+its control).** Determine: **can the source branch body currently NAME and APPLY
+the in-scope refinement equality** (the IH equality premise / the
+`INDEX_REFINEMENT_SENTINEL` binders) **to transport the sibling call's result?**
 
-**`D1` -- the structural elaborator fix.** In `check_match_dependent`'s IH-slot
-construction (`elab.rs:2360-2432`) and the self-call discharge
-(`elab.rs:3522-3575`): discharge the generated index-equality evidence at the
-elaboration boundary for every rule/constructor of the family, direct fields and
-nested-`All` leaves alike, with `J`/cast transport preserved for non-reflexive
-equality. No kernel, checker, reference, verdict, proposition, or spec change.
+- If **YES** -> **(c-proof)** is the bounded fix. The elaborator change, if any,
+  is only to cleanly expose/name the equality for the proof to apply; the D3
+  proof carries the explicit transport.
+- If **NO** -> the elaborator must at minimum EXPOSE the equality (a source-usable
+  hypothesis -- smaller than full auto-transport). **(c-elab)** auto-transport is
+  the fallback only if exposing-for-proof-use is itself infeasible.
 
-# ACCEPTANCE CRITERIA -- research's six controls (evt_3jdqjhds50z35) are binding
+Record the measurement and the chosen sub-fork before authoring `D1`.
 
-**`AC-0` (the D0 discriminator).** The normalization measurement above is recorded
-and shows the elaborator-side shape (unapplied `Pi e:i=j.B` / wrong-position
-consumption), confirming the elaborator locus. If it shows the kernel shape,
-this node stops and re-routes.
+**`D1` -- the route-(c) transport at the corrected locus.** Per D0's sub-fork:
+expose (and, for c-elab, auto-transport) the dependent-match refinement equality
+so a mutual-recursion sibling call's concrete indexed result reconciles with the
+refined motive index, via explicit J/cast over the propositional equality. The
+`b89b4a2cf` reflexive helper is RETAINED unchanged as a sound building block for
+the definitionally-reflexive same-owner self-call case. If (c-elab) is chosen,
+the `ElabCtx` mutual-group-roster addition is scoped explicitly here. No kernel,
+checker, reference, verdict, proposition, trust, or D3-proposition change.
 
-**`AC-1` (orientation).** Equality orientation and target-index order match the
-method telescope.
+# ACCEPTANCE CRITERIA
 
-**`AC-2` (uniform contract).** Nested-`All` leaves and direct recursive fields
-expose the SAME specialized-motive contract.
+**`AC-0` (the D0 sub-fork discriminator).** The deciding measurement above is
+recorded and names the chosen sub-fork (c-proof / c-elab), with the evidence
+(whether the branch body can name+apply the in-scope refinement equality).
 
-**`AC-3` (applied once, in order).** Generated evidence is applied exactly once,
-BEFORE ordinary recursive-function arguments.
+**`AC-REAL` (the real-family control the AC-7 gap demanded).** A FokDerivation /
+mutual-recursion consumer control -- the sibling-edge result-refinement shape,
+NOT a synthetic Nat -- that is RED without the fix and GREEN with it, and whose
+discriminating mutation (drop the transport / leave the refinement equality
+unapplied) goes RED. The implementer correctly refused to accept a proxy that
+stayed green under its own mutation; this control must genuinely reach the
+transport.
 
-**`AC-4` (transport preserved).** Neutral / non-reflexive equality remains an
-explicit `J`/cast transport, never made definitional.
+**`AC-7` (the decisive buildability gate -- the held-D3 consumer).** The exact
+held checkpoint `a84d71005`, rebased onto this node, ELABORATES and
+KERNEL-CHECKS through `D1`: the `FokDerivImpRight` mutual-recursion premise
+self-call (`owner child (FokMkSequent ...) frag accepted`, crossing
+`fok_prop_imp_children_sound -> fok_prop_check_tree_sound_by_cert`) type-checks,
+and the no-`ForallRight` theorem goes through. This is the control that matters
+most (Architect): synthetic green must NOT stand in for real-family
+buildability. It gates the close.
 
-**`AC-5` (discriminating negative).** A mutation that leaves the equality Pi
-unapplied reproduces THIS mismatch -- the control that proves the discharge is
-what fixed it.
+**`AC-SOUND` (soundness negative).** A mutation substituting `Refl` / erasing the
+`Pi` for the non-convertible propositional endpoints is REJECTED by the kernel.
+The transport is applied only over the actual propositional evidence; the
+definitional-vs-propositional line holds.
 
-**`AC-6` (soundness negative).** A mutation that substitutes `Refl` for unequal
-endpoints is REJECTED. This is the control that proves the discharge did not take
-the unsound direction.
+**`AC-REFLEX` (the retained helper stays sound).** The `b89b4a2cf` reflexive
+same-owner discharge is unchanged and its existing controls (one reflexive
+premise; multiple premises; full spine ordering; direct vs nested-All) stay
+green. This node ADDS the transport path; it does not weaken the reflexive path.
 
-**`AC-7` (the D3 unblock).** With the discharge in place, the
-`FokDerivImpRight` recursive-premise self-call type-checks and the language ring's
-held D3 checkpoint `a84d71005` rebases onto this node and resumes with a
-discharge-aware IH -- no kernel/checker/proposition change on the D3 side.
-
-**`AC-8` (no-regression).** CI whole-suite green (COORDINATION section 12);
+**`AC-8` (no-regression).** CI whole-suite green (`COORDINATION section 12`);
 targeted `ken-elaborator` / `ken-kernel` validation locally, never `--workspace`.
 
 # BANNED SCOPE
 
-- **Any kernel change** -- the kernel IH contract and its reductions are correct;
-  this is elaborator-side. If D0 shows a kernel conversion-completeness gap,
-  that is a SEPARATE kernel node routed through the Steward, not in scope here.
-- **Erasing the equality Pi, assuming `Refl` for non-convertible endpoints, or
-  proof-irrelevance-identifying a function type with its result.** The unsound
-  direction; AC-6 forbids it.
-- **A point-fix for `FokDerivImpRight`.** The fix is structural over the whole
-  family; a per-rule patch reintroduces the chain.
-- **Any checker / reference / verdict / trust / proposition / semantic change**
-  -- those belong to D3's proof scope, not here.
+- **Assuming `Refl`, erasing the equality `Pi`, or proof-irrelevance-identifying
+  the function type with its result** for the propositional endpoints. The
+  unsound direction; AC-SOUND forbids it. The equality here is propositional --
+  it needs a real transport, not a discharge.
+- **Removing or weakening the `b89b4a2cf` reflexive helper.** It correctly handles
+  the definitionally-reflexive same-owner self-call case and is a retained
+  building block (AC-REFLEX).
+- **Any kernel change.** The kernel's IH contract and reductions are correct and
+  backstop the emitted transport. A kernel conversion-completeness gap is a
+  SEPARATE node routed through the Steward, not in scope here.
+- **Any checker / reference / verdict / trust / proposition / semantic / D3-proof
+  change.** Those belong to D3's proof scope. If (c-proof) is chosen, the D3-side
+  transport application is authored on the D3 node after this lands, not here.
+- **A point-fix for the single `FokDerivImpRight` edge.** The transport must be
+  structural over the mutual-recursion result-refinement presentation, not a
+  per-call-site patch.
 
 # SEQUENCING
 
-Prerequisite AHEAD of `V3-FO-CHECKER-SOUNDNESS` D3. `blocks: [V3-FO-CHECKER-SOUNDNESS]`;
-D3 stays HELD (language-implementer at `a84d71005`) until this lands, then rebases
-onto it and authors the proof against a discharge-aware IH. `depends_on` empty --
-the reduction prerequisite (`KERNEL-RECURSOR-UNUSED-IH-REDUCTION`) already landed
-(main `89dafc8c5`); this presentation-face repair grounds on current main.
-`gate: none` -- elaborator-scoped, kernel-backstopped, not TCB. **Owner: language
-ring.** Author = `language-implementer`; independent review = Architect (the
-author is not the reviewer). Tier **T1** -- a dependent-elaboration completeness
-repair that must be structural and must hold the one soundness-critical line
-(discharge only on definitional reflexivity, else transport).
+Prerequisite AHEAD of `V3-FO-CHECKER-SOUNDNESS` D3. `blocks:
+[V3-FO-CHECKER-SOUNDNESS]`; D3 stays HELD (language-implementer at
+`a84d7100561a89f3ded6300fbb4fb4b45b947888`) until this lands, then rebases onto
+it and authors the proof against a transport-aware IH (applying the explicit
+transport itself if the sub-fork is c-proof). `depends_on` empty -- grounds on
+current `main`. `gate: none` -- elaborator-scoped, kernel-backstopped, not TCB,
+not operator-gated. **Owner: language ring.** Author = `language-implementer`;
+independent design/soundness review = Architect (author is not reviewer). First
+move on pickup is the **D0 deciding measurement**, NOT further implementation.
+Tier **T1** -- a dependent-elaboration transport that must hold the
+propositional-vs-definitional line and be measured, not guessed.
 
-**Bookkeeping (Architect, evt_n4q1da1qp68).** `V3-FO-CHECKER-SOUNDNESS`'s
-section-1b area splits into two DIFFERENT layers with DIFFERENT repairs, not one
-closure: the ML iota-reduction face landed as `KERNEL-RECURSOR-UNUSED-IH-REDUCTION`
-(entry 2), and this elaborator IH-presentation face is entry 3. Within entry 3
-the fix is a structural closure over the elaborator layer.
+**Bookkeeping (Architect, evt_349bjakvjj9yp).** Hard-stop 4 of the D3 chain.
+Entry-4 inventory of `V3-FO-CHECKER-SOUNDNESS`'s section-1b area: entry 2 (kernel
+`iota_reduct` unused-IH, the reduction face) LANDED as
+`KERNEL-RECURSOR-UNUSED-IH-REDUCTION`; entry 3's FIRST locus prediction (same-owner
+reflexive discharge) was sound-but-off-path -- the real locus is this
+mutual-recursion result-refinement transport. `§1a`'s next research re-trigger is
+the 6th hard-stop; this is the 4th, and the existing route-(c) advisory covers
+it, so no new research pull.
