@@ -159,11 +159,19 @@ fn the_positioned_int_seats_decode_carried_and_stop_at_the_next_distinct_blocker
 
     // The measured next distinct blocker, which is what keeps the absences
     // above non-vacuous: without it they would also hold on a compile that
-    // failed for some unrelated earlier reason. This is a DIFFERENT need on a
-    // different reader, owned by RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL.
+    // failed for some unrelated earlier reason.
+    //
+    // REPOINTED by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`. The old terminal was
+    // the Arg(2) gate this very node removes -- named above as the next node's
+    // to remove, and this candidate is that node -- so the witness advances past
+    // its own former stop and the move is downstream by construction. The new
+    // terminal is a different subsystem again: the checked-IH nullary force of
+    // an ESCAPING functional IH, a deferred capability gap owned by
+    // `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`.
     assert!(
-        error.contains("seat Argument(2) of FsReadAt needs ResourceScalar"),
-        "the expected terminal after this node is the FsReadAt Arg(2) buffer reply-path \
-         gate -- a different need and reader, and the next node's to remove: {error}"
+        error.contains("static worker expects 1 arguments but call provides 0"),
+        "the expected terminal after this node is the checked-IH nullary force of an \
+         escaping functional IH -- a different need and reader again, and a deferred \
+         capability gap: {error}"
     );
 }

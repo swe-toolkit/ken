@@ -204,8 +204,15 @@ fn the_carried_resource_route_observes_resource_scalar_and_still_refuses_a_diffe
     // carried seat each route through their OWN decoder -- rather than this
     // vanishing-contrast shape, which is inherently fragile precisely because
     // it is spent the moment the contrasting need is closed.
+    // REPOINTED by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`, and the direction is
+    // the licence: the old terminal was the Arg(2) gate that THIS node removes,
+    // named directly above as this row's restoration home. The witness advances
+    // past its own former stop into a strictly deeper one -- the checked-IH
+    // nullary force of an ESCAPING functional IH, a deferred capability gap
+    // owned by `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`. Downstream by
+    // construction, not by assertion.
     assert!(
-        error.contains("seat Argument(2) of FsReadAt needs ResourceScalar"),
+        error.contains("static worker expects 1 arguments but call provides 0"),
         "the compile must still stop at the measured later blocker, so the absence above is \
          not satisfied vacuously by a failure upstream of the route: {error}"
     );
