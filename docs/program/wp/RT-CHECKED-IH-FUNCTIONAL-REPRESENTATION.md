@@ -86,9 +86,15 @@ states the authoritative list. In brief:
   defunctionalized object; the arity-1 worker is never called with zero args;
   the escaped value is constructed and applied honestly across the constructor
   boundary; no closure boundary is crossed illegitimately and no arity gate is
-  weakened or relabeled. Control (Adversary): a boundary crossing dressed as
-  the new representation, or a relabeled/weakened arity gate, must be
-  detectable and is a reject.
+  weakened or relabeled. The apply dispatcher is exhaustive over the enumerated
+  code identities with NO wildcard/fallback arm; an unenumerated identity is a
+  BUILD ERROR, not a runtime path — so deliverable 1's enumerability precondition
+  becomes a durable compile-time invariant forcing any future apply site back
+  through the gate (the ABI-R3 next_in_inventory discipline; freeze a predicate,
+  not a roster). That converts the gate from a reading into an enforcement.
+  Control (Adversary): a boundary crossing dressed as the new representation, a
+  relabeled/weakened arity gate, or a dispatcher widened with a wildcard arm,
+  must be detectable and is a reject. (Architect fold-in evt_3wb4cy7f7aj50.)
 - **AC-REENUM.** Rerun report-2's checked-family runner end-to-end. Both
   checked-family programs green => the family is bounded; re-point both runner
   tables from the advancing-refusal pins to green. Any FURTHER refusal => STOP

@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION
 title: "Give Ken a first-class representation for an ESCAPING functional induction hypothesis, so the nullary_force of a checked computational IH whose realized value is stored into a constructor (escapes its frame) can be lowered honestly. The decisive escape measurement (runtime-implementer evt_79jd1nxamqd95) proved the realized IH value's immediate parent is a Construct on both checked-family programs -- it is stored straight into a constructor field, so the non-escaping use-site-specialization remedy cannot apply (no in-frame application site, no response argument at the use). Ken has no first-class functional-IH value: StaticWorkerBinding is compiler metadata with no runtime word/tag/layout/env-pointer/callable identity (lowering/mod.rs:3578-3603), LoweringOperand is exactly {Specialized(Lowered), Carried(CarriedBoundaryWord)} with no closure/worker arm, and an ordinary carried word cannot hold `lambda response. rec (k response)`. This node introduces the genuine new representation. It carries a design D0 the Architect rules before build: materialized closure value vs defunctionalized carried tag (code identity + environment + apply dispatcher). Successor to the closed RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT."
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
@@ -126,6 +126,13 @@ node's owner at framing per COORDINATION section 9a.
   the arity-1 worker is never called with zero args; the escaped value is
   constructed and applied honestly across the constructor boundary; no closure
   boundary is crossed illegitimately and no arity gate is weakened or relabeled.
+  The apply dispatcher is exhaustive over the enumerated code identities with NO
+  wildcard/fallback arm; an unenumerated identity is a BUILD ERROR, not a runtime
+  path — so the deliverable-1 enumerability precondition becomes a durable
+  compile-time invariant that forces any future apply site back through the gate
+  (the ABI-R3 next_in_inventory discipline; freeze a predicate, not a roster).
+  This is an enforcement, not just a one-time reading. (Architect fold-in
+  evt_3wb4cy7f7aj50.)
 - **AC-REENUM (terminal; was shared with [[RT-IH-MARKER-PRODUCER-COMPLETE]]).**
   Rerun report-2's checked-family runner end-to-end. Both checked-family programs
   green ⇒ the family is bounded; re-point both runner tables from the
