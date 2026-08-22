@@ -683,7 +683,15 @@ fn buffer_allocate_malformed_capacity_narrows_to_invalid_bounds() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
+//
+// RT-DEAD-ARM-EFFECT-LOWERING: the reason below was STALE and is corrected
+// here. It named the carried-recursive-hypothesis refusal, which
+// RT-CAPTURE-CONTEXT-FRAME-EMIT (c7f462857) had already cleared -- that string
+// appeared ZERO times in the measured run. This node then cleared the
+// dead-arm refusals in front of it. The terminal state below is the one
+// MEASURED after both, and it is a LIVE refusal on this row's own path, not a
+// dead arm: it is the deferred (A)-family carried-observation work.
+#[ignore = "RT-DEAD-ARM-EFFECT-LOWERING: dead-arm refusals no longer fail emission; this row now advances to a LIVE blocker -- seat Argument(0) of ResourceRelease needs ResourceScalar, which it cannot observe in CarriedWord (the deferred carried-observation route)"]
 fn fs_read_at_malformed_offset_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-read-offset", || {
         assert_narrowed_alike(

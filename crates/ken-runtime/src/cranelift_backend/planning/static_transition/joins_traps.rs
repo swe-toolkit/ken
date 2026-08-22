@@ -31,6 +31,30 @@ use crate::{RuntimeExpr, RuntimePartiality, RuntimeTrap, RuntimeTrapCode};
 /// This is deliberately a two-way type rather than a phase bit threaded through
 /// lowering.  In particular, lowering cannot add a third representation or
 /// select one from an emitted predecessor.
+/// **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the ONE dead-arm trap, built by the
+/// one function both sides call.**
+///
+/// A `RuntimeTrap` is only emittable if the planner INTERNED it, and identity
+/// is by VALUE (`trap_identity` searches the catalog for an equal trap). So the
+/// planner and the lowering must produce a byte-identical trap for the same
+/// occurrence, and the only way to guarantee that is for neither to spell it.
+/// Two copies of this message would compile, intern one value, look up another,
+/// and fail as "no planner-bound identity" -- at emission, on a program that
+/// had already passed every earlier gate.
+pub(in crate::cranelift_backend) fn dead_arm_effect_trap(
+    family: &str,
+    operation: ken_host::HostOpV1,
+) -> RuntimeTrap {
+    RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: format!(
+            "unreachable {family}.{} arm: this arm's request constructor is neither constructed \
+             by the program nor producible by the runtime, so no execution selects it",
+            operation as u16
+        ),
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum JoinResultRepresentation {
     NativeScalarPair,

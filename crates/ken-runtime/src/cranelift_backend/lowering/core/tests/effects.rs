@@ -4082,3 +4082,144 @@ fn a_discarded_visit_refuses_before_its_body_is_defined() {
     recursive_port_process_compiles(&expr)
         .expect("the bracket compiles again once the mutation clears");
 }
+
+/// **`RT-DEAD-ARM-EFFECT-LOWERING` `AC-4` -- the MANDATORY negative control, as
+/// a non-degenerate PAIR.**
+///
+/// The pair is the whole point. One fixture showing "a dead arm compiles" is
+/// green-vs-green under the mutation this exists to catch: a predicate that
+/// answered DEAD for everything would pass it. These two programs are
+/// **structurally identical and differ in exactly one constructor SYMBOL** --
+/// the `Let` value in the sibling arm names either the refusing arm's own
+/// constructor or an unrelated one -- so a predicate that stopped
+/// discriminating inverts BOTH rows rather than neither.
+///
+/// The refusing arm holds a represented-unavailable-lane effect. That is one of
+/// the two sites this node gates, and both consult the identical
+/// `effect_arm_is_provably_dead`, so this pair exercises the predicate that
+/// governs both.
+///
+/// **Dispatched through a CALLED CLOSURE, and that is a measured necessity
+/// rather than a stylistic choice.** With the match applied to a scrutinee
+/// lowering can resolve statically, the unselected arm is folded and its effect
+/// is never lowered at all -- instrumenting `lower_process_host_effect` on an
+/// earlier draft showed only the `BufferAllocate` calls and no `FsRename`
+/// whatever. Both rows then compiled for the same trivial reason and the
+/// control proved nothing. Routing the value through a closure parameter forces
+/// the runtime tag dispatch that lowers EVERY arm, which is the shape the real
+/// `FSOp` request handler has.
+#[cfg(test)]
+fn dead_arm_pair_program(request_is_constructed: bool) -> RuntimeExpr {
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    const REQUEST: &str = "ctor:fixture::DeadArmRequest::Rename";
+    const SIBLING: &str = "ctor:fixture::DeadArmRequest::Other";
+    const UNRELATED: &str = "ctor:fixture::DeadArmRequest::Unrelated";
+    let exit_success = || RuntimeExpr::Construct {
+        constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
+        args: Vec::new(),
+    };
+    let trap = || RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "dead-arm pair default".to_string(),
+    };
+    // THE ONE DIFFERENCE between the two programs.
+    let constructed = RuntimeExpr::Construct {
+        constructor: if request_is_constructed {
+            REQUEST.to_string()
+        } else {
+            UNRELATED.to_string()
+        },
+        args: Vec::new(),
+    };
+    // A runtime-chosen request. Neither branch names `REQUEST`, which is what
+    // leaves its arm dead in the baseline while the arm is still lowered.
+    let dynamic_request = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Effect {
+            family: "FS".to_string(),
+            operation: ken_host::HostOpV1::BufferAllocate,
+            capability: None,
+            args: vec![RuntimeExpr::Value(RuntimeValue::Int((4).into()))],
+        }),
+        cases: vec![
+            RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: RuntimeExpr::Construct {
+                    constructor: SIBLING.to_string(),
+                    args: Vec::new(),
+                },
+            },
+            RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: RuntimeExpr::Construct {
+                    constructor: UNRELATED.to_string(),
+                    args: Vec::new(),
+                },
+            },
+        ],
+        default: trap(),
+    };
+    RuntimeExpr::Call {
+        callee: Box::new(ordinary_match_closure(
+            vec![
+                RuntimeMatchCase {
+                    constructor: REQUEST.to_string(),
+                    binders: 0,
+                    body: RuntimeExpr::Effect {
+                        family: "FS".to_string(),
+                        operation: ken_host::HostOpV1::FsRename,
+                        capability: None,
+                        args: vec![
+                            RuntimeExpr::Value(RuntimeValue::Bytes(b"from".to_vec())),
+                            RuntimeExpr::Value(RuntimeValue::Bytes(b"to".to_vec())),
+                        ],
+                    },
+                },
+                RuntimeMatchCase {
+                    constructor: SIBLING.to_string(),
+                    binders: 0,
+                    body: RuntimeExpr::Let {
+                        value: Box::new(constructed),
+                        body: Box::new(exit_success()),
+                    },
+                },
+                RuntimeMatchCase {
+                    constructor: UNRELATED.to_string(),
+                    binders: 0,
+                    body: exit_success(),
+                },
+            ],
+            trap(),
+        )),
+        args: vec![dynamic_request],
+    }
+}
+
+/// `AC-4`: the trap fires ONLY on a provably-dead arm, and the strict refusal
+/// SURVIVES the moment the same arm becomes reachable.
+#[test]
+fn a_dead_arm_traps_while_the_same_arm_constructed_still_refuses_strictly() {
+    // LIVE: the program constructs the request, so the arm can be selected and
+    // the unavailable-lane refusal must stand, loud and unchanged.
+    let refusal = match recursive_port_process_compiles(&dead_arm_pair_program(true)) {
+        Ok(()) => panic!(
+            "a reachable arm was trapped into a false pass: constructing the request must leave \
+             the strict refusal in place, or the deadness analysis has stopped discriminating"
+        ),
+        Err(error) => error.to_string(),
+    };
+    assert!(
+        refusal.contains("represented unavailable lane"),
+        "the surviving refusal must be the ORIGINAL one, naming the lane rather than some later \
+         failure that would mask a lost refusal: {refusal}"
+    );
+
+    // DEAD: the identical program, differing only in which constructor the
+    // sibling arm's `Let` names, lowers -- the arm is proven unreachable, so its
+    // refusing effect becomes a trap instead of failing object emission.
+    recursive_port_process_compiles(&dead_arm_pair_program(false)).expect(
+        "the same program with the request never constructed must lower: its arm is provably \
+         dead, so its refusing effect is a trap rather than an emission failure",
+    );
+}

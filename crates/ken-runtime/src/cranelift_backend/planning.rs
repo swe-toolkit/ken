@@ -57,6 +57,7 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{
     planned_partiality_trap, CaseEmissionStatus, ConstructorIdentity, DeclarationCallTargetClass,
     JoinPlanToken,
+    dead_arm_effect_trap,
     JoinResultRepresentation, StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
     SynthesizedFixedConstructorRole,
 };

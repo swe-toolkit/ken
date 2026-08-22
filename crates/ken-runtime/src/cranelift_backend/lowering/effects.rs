@@ -173,6 +173,117 @@ pub(super) fn site_operand_substitution_hits() -> usize {
     SITE_OPERAND_SUBSTITUTION_HITS.with(std::cell::Cell::get)
 }
 
+/// **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` conjunct (2) -- every constructor the
+/// RUNTIME can produce, as opposed to the program's own syntax.**
+///
+/// This is the set whose absence made the first cut of the deadness predicate
+/// unsound in the LIVE direction (Architect `evt_4hcny7ae7h9sb`): an effect
+/// RESPONSE such as `Result::Ok` is synthesized by the host, appears in no
+/// `Construct` and in no literal, and so read as never-constructed. Unioned in
+/// as LIVE, it keeps the program-constructed `FSOp` REQUEST arms provably dead
+/// while the host-produced response arms stay strict.
+///
+/// **EXHAUSTIVE BY CONSTRUCTION, and that is the soundness gate, not a style
+/// choice** (`COORDINATION` section 7). The struct is destructured with NO
+/// `..` rest pattern, so a symbol added to the runtime's vocabulary is a
+/// COMPILE ERROR here until someone classifies it. The alternative -- a field
+/// list that silently omits a new origin -- would trap a live path, which is a
+/// working program broken, and is exactly the regression conjunct (2) exists to
+/// prevent. Do not add a rest pattern to make this compile.
+fn runtime_producible_constructors(
+    symbols: &crate::NativeProcessSymbols,
+) -> BTreeSet<crate::RuntimeSymbol> {
+    let crate::NativeProcessSymbols {
+        process_input,
+        list_nil,
+        list_cons,
+        prod,
+        exit_success,
+        exit_failure,
+        result_err,
+        result_ok,
+        option_some,
+        file_error,
+        file_operation_read,
+        file_operation_write,
+        file_operation_change_mode,
+        io_errors,
+        resource_host_io,
+        resource_closed,
+        resource_malformed,
+        resource_right_not_held,
+        resource_release_failed,
+        resource_kind_mismatch,
+        resource_buffer_limit,
+        resource_allocation_failed,
+        resource_invalid_offset,
+        resource_invalid_bounds,
+        resource_no_progress,
+        resource_kind_fs_handle,
+        resource_kind_buffer,
+        resource_trace_identity,
+        nat_zero,
+        nat_suc,
+        private_buffer_span,
+        private_transfer_count,
+        read_some,
+        read_eof,
+        wrote,
+        unit,
+        bool_false,
+        bool_true,
+    } = symbols;
+    // Every field is a constructor the native runtime can put in front of a
+    // match: host-effect responses, process-entry inputs, and the primitive
+    // result vocabulary alike. None is classified as program-only.
+    let mut producible = [
+        process_input,
+        list_nil,
+        list_cons,
+        prod,
+        exit_success,
+        exit_failure,
+        result_err,
+        result_ok,
+        option_some,
+        file_error,
+        file_operation_read,
+        file_operation_write,
+        file_operation_change_mode,
+        resource_host_io,
+        resource_closed,
+        resource_malformed,
+        resource_right_not_held,
+        resource_release_failed,
+        resource_kind_mismatch,
+        resource_buffer_limit,
+        resource_allocation_failed,
+        resource_invalid_offset,
+        resource_invalid_bounds,
+        resource_no_progress,
+        resource_kind_fs_handle,
+        resource_kind_buffer,
+        resource_trace_identity,
+        nat_zero,
+        nat_suc,
+        private_buffer_span,
+        private_transfer_count,
+        read_some,
+        read_eof,
+        wrote,
+        unit,
+        bool_false,
+        bool_true,
+    ]
+    .into_iter()
+    .cloned()
+    .collect::<BTreeSet<_>>();
+    // The `IOError` alternatives are a run rather than a single field, and the
+    // whole run is host-produced.
+    producible.extend(io_errors.iter().cloned());
+    producible
+}
+
 /// **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- what claiming one seat produced.**
 ///
 /// Two outcomes rather than a `Result` with a stringly-matched error, because
@@ -239,6 +350,25 @@ impl<'a> Lowering<'a> {
     /// the operation-specific ARM that performs the read needs the arms to take
     /// the claim in place of the bulk conversion, which is the next release —
     /// today the claim is made and the arms still read the bulk vector.
+    /// **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the ONE deadness question, asked
+    /// identically at every refusal site.**
+    ///
+    /// There are two sites that fail object emission on an arm no execution
+    /// reaches -- the seat's `Need`-subset-`Avail` membership test, and the
+    /// represented-unavailable-lane check at the top of
+    /// `lower_process_host_effect`. Both consult THIS, so the predicate cannot
+    /// drift between them and there is exactly one place it can be wrong
+    /// (Architect `evt_4hcny7ae7h9sb`: compute once, consult at each site).
+    fn effect_arm_is_provably_dead(
+        &self,
+        effect_origin: StaticOriginId,
+    ) -> Result<bool, CraneliftBackendError> {
+        self.static_transition_plan.origin_is_in_provably_dead_arm(
+            effect_origin,
+            &runtime_producible_constructors(&self.process_symbols),
+        )
+    }
+
     fn claim_host_effect_seat(
         &mut self,
         group: Option<EffectSeatGroupId>,
@@ -310,10 +440,7 @@ impl<'a> Lowering<'a> {
             // The predicate is conservative in the safe direction: an arm not
             // PROVEN never-constructed answers `false` and takes the refusal
             // below, unchanged.
-            if self
-                .static_transition_plan
-                .origin_is_in_provably_dead_arm(effect_origin)?
-            {
+            if self.effect_arm_is_provably_dead(effect_origin)? {
                 if let (Some(group), Some(ledger)) = (group, self.host_effect_seats.as_mut()) {
                     ledger.record_unreachable_seat(group, slot)?;
                 }
@@ -1729,6 +1856,25 @@ impl<'a> Lowering<'a> {
         env: &[LoweringEnvironmentBinding],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation) {
+            // `RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the SECOND refusal site, and
+            // the same question as the seat's.
+            //
+            // A total handler names every operation of its request type, so an
+            // arm for an operation this backend does not represent refuses here
+            // BEFORE any seat is claimed. On a provably dead arm that refusal
+            // fails the whole object emission for a lane no execution reaches --
+            // the identical defect, one check earlier. Measured on the governed
+            // fixtures: seven arms (FsAppendFile, FsMetadata, FsReadDirectory,
+            // FsCreateDirectory, FsRemoveFile, FsRemoveDirectory, FsRename).
+            //
+            // Same fail-closed substitute for the same reason: an arm wrongly
+            // proven dead HALTS rather than issuing an operation this backend
+            // cannot represent.
+            if self.effect_arm_is_provably_dead(static_origin)? {
+                return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                    dead_arm_effect_trap(family, operation),
+                )));
+            }
             return Err(unsupported(
                 "Effect",
                 format!(
@@ -1855,14 +2001,9 @@ impl<'a> Lowering<'a> {
         // halts instead of issuing a host operation it could not observe a seat
         // for.
         if unreachable_arm {
-            return Ok(LoweringOperand::Specialized(Lowered::Trap(RuntimeTrap {
-                code: RuntimeTrapCode::PatternMatchFailure,
-                message: format!(
-                    "unreachable {family}.{} arm: its request constructor is never constructed in \
-                     this program, and a seat of it cannot be observed in the phase it arrives in",
-                    operation as u16
-                ),
-            })));
+            return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                dead_arm_effect_trap(family, operation),
+            )));
         }
         // ⭐ **The bulk pre-operation conversion is gone.** It crossed every
         // operand to a specialized template BEFORE the operation was known, so a

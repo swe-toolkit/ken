@@ -394,18 +394,28 @@ impl<'src> StaticTransitionPlan<'src> {
     /// enclosing arms can only help. Asking for the innermost would add a
     /// nesting order this predicate does not need and could get wrong.
     ///
-    /// **Sound in the conservative direction.** The census over-approximates
-    /// constructions (it counts every `Construct` the plan holds), so this
-    /// under-approximates deadness: an arm is reported dead only when NO
-    /// construction of its constructor exists anywhere in the plan. Anything
-    /// not proven dead answers `false` and keeps today's strict behaviour.
+    /// **TWO CONJUNCTS, and the second is the correction.** An arm is dead only
+    /// when its constructor is BOTH (1) never built by program syntax AND (2)
+    /// not producible by the runtime. Architect `evt_4hcny7ae7h9sb`.
     ///
-    /// Values constructed outside the plan's view -- across the
-    /// checked-continuation boundary, or by the host -- are the residual this
-    /// predicate cannot see, and they are exactly why the substitute at the
-    /// consumer is a TRAP: an arm wrongly reported dead HALTS rather than
-    /// yielding a wrong result. Census incompleteness costs liveness, never
-    /// correctness.
+    /// The first cut had only (1) and was **unsound in the LIVE direction**: it
+    /// proved `ctor:prelude::Result::Ok` dead, because an effect RESPONSE is
+    /// synthesized by the host and appears in no `Construct` and no literal. It
+    /// would have trapped the success continuation of every effect. The
+    /// request/response axis is what decides whether a syntactic census is
+    /// sound at all: an `FSOp` REQUEST is program-built and stays in (1)'s
+    /// scope; a RESPONSE is runtime-built and only (2) can see it.
+    ///
+    /// `runtime_producible` is supplied by the consumer because the runtime's
+    /// symbol vocabulary lives there, and it is enumerated
+    /// exhaustively-by-construction so a symbol added to that vocabulary is a
+    /// COMPILE error until it is classified rather than a silent unsound trap.
+    ///
+    /// **Conservative direction.** Both conjuncts over-approximate liveness, so
+    /// this under-approximates deadness: anything not proven dead answers
+    /// `false` and keeps today's strict behaviour. The residual it still cannot
+    /// see is why the substitute at the consumer is a TRAP -- an arm wrongly
+    /// reported dead HALTS rather than yielding a wrong result.
     ///
     /// Walked on demand rather than cached. This runs only on a path that is
     /// already failing today, so the cost is paid once per refusal and there is
@@ -413,6 +423,7 @@ impl<'src> StaticTransitionPlan<'src> {
     pub(in crate::cranelift_backend) fn origin_is_in_provably_dead_arm(
         &self,
         needle: StaticOriginId,
+        runtime_producible: &BTreeSet<crate::RuntimeSymbol>,
     ) -> Result<bool, CraneliftBackendError> {
         for occurrence in self.source_occurrences.iter().flatten() {
             let cases = match occurrence.expr {
@@ -434,6 +445,18 @@ impl<'src> StaticTransitionPlan<'src> {
                 continue;
             };
             for (index, constructor) in cases.into_iter().enumerate() {
+                // CONJUNCT (2), and it is the one whose absence refuted the
+                // first cut. A constructor the RUNTIME can produce is live no
+                // matter what the program's syntax does: an effect RESPONSE
+                // like `Result::Ok` is synthesized by the host, reaches the
+                // scrutinee, and selects this arm without any `Construct` or
+                // literal anywhere in the program. Checked FIRST because it is
+                // the cheaper test and because it is the one that must never be
+                // skipped.
+                if runtime_producible.contains(constructor) {
+                    continue;
+                }
+                // CONJUNCT (1): not built by program syntax either.
                 if self.constructor_is_ever_constructed(constructor) {
                     continue;
                 }
