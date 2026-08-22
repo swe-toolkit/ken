@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-TRACK0-REARM
 title: "Track 0 of the native carried-value program — un-ignore the stale first-order native rows, re-measure, and re-arm the vacuous native CI jobs (decision-4 de-vacuuming), using the workspace ignored-sweep as the oracle"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,17 @@ blocks: []
 github: null
 origin: "Steward, 2026-08-22, filing Track 0 of [[RT-NATIVE-CARRIED-VALUE]] from the Architect's program frame (evt_9kat78d438cb). Shovel-ready: no new mechanism, the (need,phase) route protocol it relies on is already merged. Steward-filed per COORDINATION section 2."
 ---
+
+> # MERGED 2026-08-22 — reduced (hygiene-only) scope, PR #2796
+>
+> Squash-merged as origin/main tip e415be765 (landed tree c6bcd39c6 == checked
+> tree 32fac5327). Delivered scope = pure hygiene (re-label the stale native
+> `#[ignore]` reasons to their measured blockers); AC-2 was STRUCK and
+> deliverables 3/4 (CI re-arm + decision-4 de-vacuuming) did NOT proceed — they
+> re-home to Track 1 (rows un-ignore only when the Track-1 D0 greens them). QA
+> final APPROVE evt_6njzs2xqp86cy + Architect APPROVE on the exact SHA;
+> Decisions dec_3zjq8c48mphza / dec_4tsbqd0xbasc7 resolved. See the CORRECTED
+> banner below for the falsification that reduced the scope.
 
 > # SHOVEL-READY — Track 0 of [[RT-NATIVE-CARRIED-VALUE]]. No new mechanism.
 >
