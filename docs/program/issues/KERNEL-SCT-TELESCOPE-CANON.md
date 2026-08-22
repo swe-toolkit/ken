@@ -1,7 +1,7 @@
 ---
 id: KERNEL-SCT-TELESCOPE-CANON
 title: "The SCT gate derives each group member's arity by counting leading Lam binders in the elaborated body (count_params, sct.rs:623), so once the c-elab result-refinement transport wraps a mutual-recursion body the leading-Lam count diverges from the declared arity, skip_lams skips the wrong number, the size-change matrices are mis-dimensioned, and a terminating transport-carrying clique wrongly reds NotTerminating -- repair the arity to the DECLARED Pi telescope (route A, telescope-canonicalization) with admit==analyze on the same eta-long body, the SCT-pass enabler LANG-INDEXED full admission and V3-FO-CHECKER-SOUNDNESS D3 are blocked on"
-status: ready
+status: closed
 owner: kernel
 size: M
 gate: operator
@@ -10,6 +10,29 @@ blocks: [V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY]
 github: null
 origin: "Steward, 2026-08-22, on the operator's authorization (\"tcb change authorized. proceed.\") of the route-A kernel SCT successor that LANG-INDEXED-RECURSIVE-IH-DISCHARGE and V3-FO-CHECKER-SOUNDNESS D3 name as their SCT-pass gate. The c-elab result-refinement transport landed (LANG-INDEXED accepted partial, squash 93d82a398): the narrowed AC-7 -- held-D3 bodies ELABORATE + pass kernel_check -- is met, but FULL admission is kernel_check AND SCT-pass, and the transport-carrying mutual-recursion clique reds the SCT gate. Route A (SCT arity from the declared Pi telescope, not the deep-lambda body heuristic) was specified in-thread by the Architect + research and is captured durably at D0 (an in-thread ruling is not a durable deliverable). TCB change: it modifies the trusted size-change termination gate (crates/ken-kernel/src/sct.rs). gate: operator, and the operator's authorization above satisfies it. Steward-filed per COORDINATION section 2. Estimated capability tier: T1 (soundness-bearing termination-gate change; the arity widening must not admit a nonterminating recursion -- the negative control below is mandatory)."
 ---
+
+# CLOSED -- 2026-08-22. Merged `ea9e5c14f` (candidate `bd0ac4c5`).
+
+D1 delivered: route-A arity fix (`27a84fcc`) + synthetic arity-isolation
+consumer (`bd0ac4c5`), three kernel paths (+259/-29). Gates: Kernel QA APPROVE
+`evt_3t5f06yyasvvh`; Architect required soundness APPROVE `evt_4xbrdeey44mew`
+(deep as-implemented trust-root pass — all six D0 conditions verified by direct
+read; strict-decrease / `compose_ord` / closure / `size_rel` unchanged);
+merge Decision `dec_26c9nn62gempr` resolved APPROVE. Closes on its arity ACs
+(AC-TELESCOPE/AC-ADMIT-EQ-ANALYZE/AC-NEG/AC-NO-REGRESSION) + the synthetic
+consumer, per the final ruling below.
+
+Two post-merge items from the Architect's APPROVE (evt_4xbrdeey44mew), tracked
+so they are not dropped:
+- AC-REVIEW adversary half: the adversary hunt on the LANDED code (the
+  admitted-nonterminating over-accept hole) is dispatched by the Steward as
+  post-merge verification (parallel to RT-EXACTINT's pattern). A finding would
+  open a fresh soundness node, not reopen this one.
+- AC-REVIEW conformance disposition: the verdict-flip pair is realized as the
+  kernel-test accept/reject pair in `k2c_conversion.rs` (synthetic accept +
+  AC-NEG `NotTerminating` reject), which is correct for this node; the SURFACE
+  conformance seed for the real FoKripke consumer lives on the successor
+  `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY`, not here.
 
 # FINAL RULING -- 2026-08-22 (Architect, evt_1gtmndpzh3xda): route A is correct, this node CLOSES on a SYNTHETIC consumer, the real FoKripke clique moves to the successor
 
@@ -317,11 +340,16 @@ clique remains the close gate of `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` (full
 admission = `kernel_check` AND `sct_check`), not lost.
 
 **`AC-REVIEW` (control 4 -- adversary + conformance).** The Architect is the
-required soundness reviewer (author is not reviewer). The Adversary hunts the
-landed code for an admitted-nonterminating over-accept hole (the arity-widening
-failure mode). A conformance seed exercises both directions: a terminating
-transport-carrying clique ACCEPTED and the `AC-NEG` nonterminating
-hidden-return-Pi group REJECTED, verdict-flip discriminating.
+required soundness reviewer (author is not reviewer) -- DONE, APPROVE
+`evt_4xbrdeey44mew`. The Adversary hunts the landed code for an
+admitted-nonterminating over-accept hole (the arity-widening failure mode) --
+dispatched by the Steward as post-merge verification. The verdict-flip pair is
+realized as the kernel-test accept/reject pair in `k2c_conversion.rs` (synthetic
+clique ACCEPTED + `AC-NEG` nonterminating hidden-return-Pi group REJECTED),
+which is the correct form for this node; the SURFACE conformance seed for the
+real FoKripke consumer lives on the successor `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY`
+(the real clique + its rotation residual moved there per the final ruling), not
+here.
 
 **`AC-NO-REGRESSION`.** Every SCT case already on `main` keeps its verdict --
 the existing `sct_completeness_repro`, `sct_reconstruction_descent`, and the
