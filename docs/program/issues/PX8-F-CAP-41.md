@@ -1,7 +1,7 @@
 ---
 id: PX8-F-CAP-41
 title: "PX8 clause-(a) behavior blocker — closed buffer endpoint (start==capacity) must derive zero-effective ReadEof, not host-reject"
-status: draft
+status: closed
 owner: foundation
 size: M
 gate: none
@@ -10,6 +10,17 @@ blocks: [PX8]
 github: 41
 origin: charter backlog (#41); RE-GROUNDED as a live PX8 clause-(a) blocker by architect verdict evt_163mfgjs7fkh8 (2026-07-23); RE-SCOPED spec-first by architect ruling evt_xnkrzjy1c8br (2026-07-23)
 ---
+
+> CLOSED 2026-08-22 — both phases complete except the checked-IH row. Phase 1
+> (spec) merged @ 8ebe370a; Phase 2 (impl) landed via the
+> [[NATIVE-HANDLE-CARRIER]] co-land and was verified GREEN by the Architect's
+> D-final six-axis oracle on main=cbac30826 (evt_32gfvvpfe63c8): the
+> closed-endpoint ReadEof admission ladder and all four cap41_* two-engine
+> acceptance rows pass, both absence axes carry positive red controls. The sole
+> exception is the checked-IH escaping-family row — a deferred capability gap
+> carried by [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]]. The 2026-08-17
+> "Phase 2 blocked / startable / unpaired" sections below are SUPERSEDED by
+> D-final and retained as the reasoning record. HS 5.
 
 # THE FOUR `cap41_*` ROWS ARE THIS NODE'S, AND THEY COME BACK HERE — 2026-08-17
 
