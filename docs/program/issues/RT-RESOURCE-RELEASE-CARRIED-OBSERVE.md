@@ -1,7 +1,7 @@
 ---
 id: RT-RESOURCE-RELEASE-CARRIED-OBSERVE
-title: "A genuinely-live ResourceRelease effect seat (Argument(0) needs ResourceScalar) cannot observe its need in the CarriedWord phase, so the withResource path fails object emission -- the (A)-family carried-observation route: observe the need in the carried phase on the lower_buffer_freeze_resource_seat EITHER_PHASE precedent, WITHOUT widening the seat's direct Need-subset-Avail partition"
-status: ready
+title: "Genuinely-live effect seats needing ResourceScalar cannot observe their need in the CarriedWord phase, so the withResource path fails object emission -- the (A)-family carried-observation CLOSURE over the ResourceScalar need (ResourceRelease/FsHandleMetadata/FsReadAt Argument(0)): observe the need in the carried phase on the lower_buffer_freeze_resource_seat EITHER_PHASE precedent, keyed (need=ResourceScalar, phase=Carried), WITHOUT widening the seat's direct Need-subset-Avail partition"
+status: active
 owner: runtime
 size: M
 gate: none
@@ -13,15 +13,35 @@ origin: "Architect ruling evt_4hcny7ae7h9sb (thr_3r6wv5net6s61, 2026-08-22), the
 
 # WHAT THIS NODE IS
 
-The concrete first instance of the deferred (A)-family carried-observation
-route. A genuinely-LIVE effect seat -- `ResourceRelease` `Argument(0)` needs
-`ResourceScalar` -- cannot observe its need in the `CarriedWord` phase, so the
-`withResource` path fails object emission. Unlike the sibling
+The (A)-family carried-observation CLOSURE over the `ResourceScalar` need. A
+genuinely-LIVE effect seat needing `ResourceScalar` -- `ResourceRelease`
+`Argument(0)`, and the two structural siblings `FsHandleMetadata` `Argument(0)`
+and `FsReadAt` `Argument(0)` -- cannot observe its need in the `CarriedWord`
+phase, so the `withResource` path fails object emission. Unlike the sibling
 [[RT-DEAD-ARM-EFFECT-LOWERING]] fixture (a dead arm the program never enters),
 this arm is REACHED: the program uses `withResource`. So the fix is not a trap;
 it is a real lowering route that observes the need in the carried phase.
 
-**This is the ResourceRelease/ResourceScalar (A) instance only.** The
+## SCOPE WIDENED TO THE ResourceScalar FAMILY (D1 measurement + Steward ruling)
+
+Framed as the ResourceRelease instance; widened at D1 to the ResourceScalar-need
+CLOSURE. The runtime-implementer measured (`evt_2drwk6kh3d9xv`) that guard
+uniformity is STRUCTURAL, not sampled: a `Lowered`'s boundary tag/class is chosen
+by one `match` on its `LoweredVariant` (`boundary.rs`), with no consuming
+operation in scope, so the tag is a function of the value's variant, not of the
+seat that later reads it. The Architect ruled the KEY width theirs and widened it
+to `(need=ResourceScalar, phase=Carried)` (`evt_3dnd21pjg193g`), rejecting the
+enumerate-one-operation-at-a-time shape as an unbounded chain of near-identical
+rulings for one predicate; the Architect ruled the node-scope call the Steward's.
+
+**Steward ruling (`evt_5xq3hw23kamrd`): FAMILY CLOSURE, do not narrow.** One
+structural predicate is one node (subsume-don't-proliferate); three near-identical
+nodes for one guard is the proliferation `docs/PRINCIPLES.md` forbids. The
+boundary is the NEED: this node covers `ResourceScalar` and terminates at the
+`ExactIntU64` sibling, which is a different need with its own `carried_exact_int`
+precedent -- correctly out (below).
+
+**Still the (A) family only, not a general carried-need closure.** The
 ConstructorTag/FsWriteFile (A) instance stays DEFERRED (its arm is dead in the
 current fixtures, handled by [[RT-DEAD-ARM-EFFECT-LOWERING]]); do not fold it in
 here.
@@ -105,11 +125,19 @@ widening; the seat's membership test stays strict.
 
 # ACCEPTANCE
 
-- **AC-1 (the live seat is claimable).** The `ResourceRelease` `Argument(0)`
-  `ResourceScalar` seat no longer refuses on the `withResource` path; the
-  `cap41_*` rows advance past this blocker. Report the full per-row disposition;
-  a further distinct blocker exposed behind this one is a measurement to report
-  and cut, not a failure of this node.
+- **AC-1 (the live seats are claimable).** No `ResourceScalar` seat in the
+  family -- `ResourceRelease` `Argument(0)`, `FsHandleMetadata` `Argument(0)`,
+  `FsReadAt` `Argument(0)` -- refuses on the `withResource` path; the `cap41_*`
+  rows advance past all three. Report the full per-row, per-seat disposition;
+  the expected terminal is the `ExactIntU64` sibling (`FsReadAt` `Argument(1)`),
+  a distinct need scoped OUT of this node. A further distinct blocker exposed
+  behind the terminal is a measurement to report and cut, not a failure here.
+- **AC-1b (positioned-resource arm folded in).** The positioned-resource arm
+  (`FsReadAt` / `FsWriteAt`) resource reads (file, buffer, span origin) that were
+  specialized-only now go through the same shared guarded carried observation.
+  With the widened key those seats can be claimed carried, so a specialized-only
+  read would leave the claim ADMITTED and the read REFUSING -- moving the refusal
+  rather than closing it. State that no such moved-refusal remains.
 - **AC-2 (observability, not relaxation).** The route PROVES the need is
   observable in the carried phase; it does NOT widen the seat's direct
   `Need`-subset-`Avail` partition. State the soundness argument: the gate stays
@@ -131,10 +159,17 @@ widening; the seat's membership test stays strict.
 - **The ConstructorTag/FsWriteFile (A) instance** -- still deferred; its arm is
   dead in the current fixtures ([[RT-DEAD-ARM-EFFECT-LOWERING]] handles it).
 - **Any dead-arm census / trap work** -- that is the sibling node.
+- **The `ExactIntU64` sibling** (`FsReadAt` `Argument(1)`, which cannot observe
+  `ExactIntU64` in `CarriedWord`). A DIFFERENT need with its own existing carried
+  precedent (`carried_exact_int`, `EITHER_PHASE`, already used by
+  `BufferAllocate` 0). It is the measured terminal of this node's rows and is its
+  own future cut if/when lane-1 reaches it -- NOT authorized by this node. Leave
+  it refusing at the terminal.
 - **Any `Avail` partition change** or a general (A)-family closure over every
-  carried need. This is the ResourceRelease/ResourceScalar instance, scoped to
-  the withResource fixtures (Architect section 1b family predicate: this is the
-  REACHABLE, runtime-varying case, which is (A)).
+  carried need. The closure here is bounded to the `ResourceScalar` NEED (keyed
+  `(need=ResourceScalar, phase=Carried)`), scoped to the withResource fixtures
+  (Architect section 1b family predicate: the REACHABLE, runtime-varying case,
+  which is (A)). `Avail` stays byte-untouched.
 - **Any kernel / TCB edit.**
 
 # CONTENTION

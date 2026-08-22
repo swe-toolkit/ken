@@ -46,34 +46,38 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `569ba3d0d`.** Tree clean; no publisher running. Watchdog re-armed
-@1800s; the CronCreate daily briefing-flush schedule (`7d029bbf`, 09:37 —
-session-only) survived the compaction, confirmed present.
+**`main` = `69df7e775`.** Tree clean; no publisher running. Watchdog armed
+@1800s (interval survived the compaction, firing); the CronCreate daily
+briefing-flush schedule (`7d029bbf`, 09:37 — session-only) present.
 
 **ONE LANE — runtime (operator, 2026-08-17; `steward.md` §0).** Lane 2
 (language + verify) is retired. Finished work still merges, filings queue behind
 the lane; framing for lane 1 is lane work.
 
-### Runtime (lane 1) — RT-DEAD-ARM MERGED; RT-RESOURCE-RELEASE released next
+### Runtime (lane 1) — RT-DEAD-ARM MERGED; RT-RESOURCE-RELEASE ACTIVE at D1
 
-- RT-DEAD-ARM-EFFECT-LOWERING MERGED (`55c7f51de` -> main `569ba3d0d`, Decision
+- RT-DEAD-ARM-EFFECT-LOWERING MERGED (`55c7f51de` -> main `69df7e775`, Decision
   `dec_4p9n9a0b0rfqq`, Architect APPROVE + differential re-APPROVE, QA passed).
   Corrected two-conjunct deadness predicate ((1) never program-constructed AND
   (2) not runtime-producible via the sealed `NativeProcessSymbols` destructure)
   closed the D1 hard-stop hole; both refusal sites gated on one shared predicate;
-  trap single-sourced; ledger keeps `claims` truthful. AC-1 (narrowed) met per
-  row: all five governed rows advance to the same live ResourceRelease/
-  ResourceScalar blocker. One benign CI-red round (two ken-cli transition
-  sentinels the advance moved; Architect censused, implementer repointed;
-  gate-gap retro = respin gate is `-p ken-runtime` all-binaries + ken-cli +
-  ken-verify).
-- RT-RESOURCE-RELEASE-CARRIED-OBSERVE RELEASED to the ring (was `ready`, kicked
-  on RT-DEAD-ARM landing). The (A)-family carried-observation route for the live
-  ResourceRelease Arg(0)/ResourceScalar refusal on the `lower_buffer_freeze_
-  resource_seat` EITHER_PHASE precedent, no Avail widening. D0 grounds the
-  ResourceScalar mechanism + any bounded Spec contract question (constant-vs-
-  varying first, routed through me as lane-1 input if varying). Architect
-  rules the specific mechanism at D0 and is required reviewer.
+  trap single-sourced; ledger keeps `claims` truthful. One benign CI-red round
+  (two ken-cli transition sentinels the advance moved; repointed downstream).
+- RT-RESOURCE-RELEASE-CARRIED-OBSERVE ACTIVE at D1. The ring measured guard
+  uniformity STRUCTURAL (tag/class is a function of `LoweredVariant`, not the
+  consumer — `boundary.rs`). Architect widened the KEY to `(need=ResourceScalar,
+  phase=Carried)` (`evt_3dnd21pjg193g`), rejecting enumerate-one-at-a-time.
+  STEWARD SCOPE RULING (`evt_5xq3hw23kamrd`): FAMILY CLOSURE over the
+  ResourceScalar need (ResourceRelease/FsHandleMetadata/FsReadAt Arg(0)), do not
+  narrow — one structural predicate is one node. Node text widened to match.
+  Boundary = the need: rows terminate at the `ExactIntU64` sibling (FsReadAt
+  Arg(1)), a distinct need with its own `carried_exact_int` precedent, scoped
+  OUT (its own future cut, NOT authorized now). Specialized-only positioned-
+  resource arm (FsReadAt/FsWriteAt) folded into the shared guarded observation
+  (else the refusal moves rather than closes). No Avail change; no TCB. Still
+  owed to handback: AC-2 runtime discriminator (malformed-carried-word negative
+  expressible vs defensive-unreachable), gate re-run on the widened code.
+  Architect required reviewer; Adversary hunts the landed route.
 - CARRY CUT: RT-NATIVE-VOCAB-STRUCTURAL-COMPLETENESS (`draft`, queued, NOT
   released) — make conjunct-(2) completeness structural (route minting sites
   through `NativeProcessSymbols`, or a test asserting every module-level

@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 03:49:53Z — from 406 issue file(s) in `docs/program/issues/`.
+2026-08-22 04:27:28Z — from 406 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -356,7 +356,7 @@ the committed file matches the generator's output.
 | `RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT` | For every refusal still holding the RecursiveDescent retirement, exhibit a Ken source program that reaches it or establish that none exists -- and record the ones with none as compiler invariants | merged | runtime | L | none | https://github.com/swe-toolkit/ken/pull/2440 |
 | `RT-REQUIRED-CONSUMER-REACH-CENSUS` | The projection mints an entry only where required differs from source, so row 4 depth 1 is excluded from the new surface BY CONSTRUCTION -- census which rows the surface reaches, and attribute by SENTENCE the Closure refusal depths 2 and 3 now sit at | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2305 |
 | `RT-REQUIRED-OCCURRENCE-PROJECTION` | Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier | merged | runtime | M | none | — |
-| `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` | A genuinely-live ResourceRelease effect seat (Argument(0) needs ResourceScalar) cannot observe its need in the CarriedWord phase, so the withResource path fails object emission -- the (A)-family carried-observation route: observe the need in the carried phase on the lower_buffer_freeze_resource_seat EITHER_PHASE precedent, WITHOUT widening the seat's direct Need-subset-Avail partition | ready | runtime | M | none | — |
+| `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` | Genuinely-live effect seats needing ResourceScalar cannot observe their need in the CarriedWord phase, so the withResource path fails object emission -- the (A)-family carried-observation CLOSURE over the ResourceScalar need (ResourceRelease/FsHandleMetadata/FsReadAt Argument(0)): observe the need in the carried phase on the lower_buffer_freeze_resource_seat EITHER_PHASE precedent, keyed (need=ResourceScalar, phase=Carried), WITHOUT widening the seat's direct Need-subset-Avail partition | active | runtime | M | none | — |
 | `RT-RETIRED-CENSUS-ROT` | Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement | ready | runtime | S | none | — |
 | `RT-ROOT-AUTHORITY-BLAME-DOMAIN` | The three root-authority guards report a compiler-owned invariant failure through the unsupported-construct channel, which reverses the fault domain -- and the correct arm, BackendFailure::PlannerInvariant, already exists with 40 producers in the same crate | merged | runtime | M | none | — |
 | `RT-ROOT-AUTHORITY-REACHABILITY-WITNESS` | ANSWERED, bounded negative on all three guards: three Ken-source programs attacking absence-at-consumption, wrong-outer-cursor and duplication all built and exited 0, so no language restriction is triggered -- three stress shapes are a search, not a proof of unreachability | closed | runtime | M | none | — |
@@ -469,7 +469,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
-- `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` — A genuinely-live ResourceRelease effect seat (Argument(0) needs ResourceScalar) cannot observe its need in the CarriedWord phase, so the withResource path fails object emission -- the (A)-family carried-observation route: observe the need in the carried phase on the lower_buffer_freeze_resource_seat EITHER_PHASE precedent, WITHOUT widening the seat's direct Need-subset-Avail partition
 - `RT-RETIRED-CENSUS-ROT` — Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` — Find one Ken SOURCE program that reaches the StaticWorkerBinding conservation arm specifically -- the existing bound is a search over hand-authored fixtures, and the six ignored ken-cli tests are NOT a ready-made corpus because they fail upstream at the sibling Closure arm
@@ -501,7 +500,7 @@ is itself not yet `merged`/`closed`:
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
 - `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: draft)
 - `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: ready)
-- `NATIVE-HANDLE-CARRIER` blocked by `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` (status: ready)
+- `NATIVE-HANDLE-CARRIER` blocked by `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` (status: active)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)
 - `PX10` blocked by `ABI-S5` (status: draft)
