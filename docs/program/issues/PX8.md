@@ -6,7 +6,7 @@ owner: runtime
 size: L
 gate: none
 depends_on: [PX8-F-CAP-41, PX8-WROTE-ABS, PX8-ERRID-SCOPE]
-blocks: [ABI-R3, PX9]
+blocks: [PX9]
 github: null
 origin: docs/program/09-posix-linux-abi-campaign.md (charter, PX-C phase); closure condition added 2026-07-22 (operator-approved)
 ---

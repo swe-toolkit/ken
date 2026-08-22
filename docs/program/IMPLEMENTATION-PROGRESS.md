@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 17:27:51Z — from 418 issue file(s) in `docs/program/issues/`.
+2026-08-22 18:19:44Z — from 418 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -45,7 +45,7 @@ the committed file matches the generator's output.
 | `ABI-M1` | manifest v2 — family-scoped, versioned, generated from family schemas | draft | runtime | L | none | — |
 | `ABI-M2` | runtime facility/operation probes, distinct from build-time facts | draft | runtime | M | none | — |
 | `ABI-R1` | correct stale filesystem capability prose — scoped roots, rights, symlink policy and no-follow resolution have landed | closed | foundation | S | none | — |
-| `ABI-R3` | generated operation inventory derived from catalog structure — a new operation must be a build break | draft | runtime | M | none | — |
+| `ABI-R3` | generated operation inventory derived from catalog structure — a new operation must be a build break | ready | runtime | M | none | — |
 | `ABI-REVOKE` | runtime revocation membrane — the deferred runtime face of 62 §4 | draft | runtime | TBD | none | — |
 | `ABI-S1` | descriptor completion — seek, truncate, sync/data-sync, flags, duplication under explicit inheritance policy | draft | runtime | M | none | — |
 | `ABI-S2` | directory streaming — supersedes whole-directory read where streaming is the honest shape | draft | runtime | M | none | — |
@@ -462,6 +462,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `ABI-R3` — generated operation inventory derived from catalog structure — a new operation must be a build break
 - `CAT-BSEARCH` — Decidable ordered search — Algorithm/Searching: membership over a sorted List returning a Dec proof, target 3 of the Foundation expressibility trial
 - `CAT-DEQUE` — Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial
 - `CAT-GCD-REFACTOR` — Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last)
@@ -497,11 +498,10 @@ is itself not yet `merged`/`closed`:
 - `ABI-A1` blocked by `ABI-REVOKE` (status: draft)
 - `ABI-A2` blocked by `ABI-REVOKE` (status: draft)
 - `ABI-A3` blocked by `ABI-REVOKE` (status: draft)
-- `ABI-A3` blocked by `ABI-R3` (status: draft)
-- `ABI-M1` blocked by `ABI-R3` (status: draft)
+- `ABI-A3` blocked by `ABI-R3` (status: ready)
+- `ABI-M1` blocked by `ABI-R3` (status: ready)
 - `ABI-M2` blocked by `ABI-M1` (status: draft)
-- `ABI-R3` blocked by `PX8` (status: draft)
-- `ABI-REVOKE` blocked by `ABI-R3` (status: draft)
+- `ABI-REVOKE` blocked by `ABI-R3` (status: ready)
 - `ABI-S1` blocked by `PX9` (status: draft)
 - `ABI-S2` blocked by `ABI-A3` (status: draft)
 - `ABI-S4` blocked by `ABI-M1` (status: draft)
