@@ -212,6 +212,15 @@ eigenparameter freshness are the hard case — `fok_check_forall_right` `:550` i
 the only non-structural check in the checker, and it is the only place a
 `Bound`/`Parameter` distinction is semantic.
 
+> **D4 obligation from the D3 retro (made durable here, 2026-08-22).** When D4
+> removes the fragment hypothesis it MUST retire or replace the labelled
+> theorem-application sentinel that D3 left in place — D3's exact four-argument
+> theorem application was honestly labelled a transition sentinel precisely
+> because D4 changes that interface, so it is not a durable invariant. The nested
+> World/Object full-tree exclusion controls, by contrast, REMAIN as durable
+> classification checks. (Language-leader/implementer D3 retro,
+> thr_yexnesyatn88.)
+
 > ### D3/D4 INTERFACE RULING — Architect 2026-08-21. Binds the D3 candidate.
 >
 > **The D3/D4 partition is a hypothesis on the certificate, not a second
