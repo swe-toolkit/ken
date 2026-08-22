@@ -6,10 +6,64 @@ owner: kernel
 size: M
 gate: operator
 depends_on: []
-blocks: [V3-FO-CHECKER-SOUNDNESS]
+blocks: [V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY]
 github: null
 origin: "Steward, 2026-08-22, on the operator's authorization (\"tcb change authorized. proceed.\") of the route-A kernel SCT successor that LANG-INDEXED-RECURSIVE-IH-DISCHARGE and V3-FO-CHECKER-SOUNDNESS D3 name as their SCT-pass gate. The c-elab result-refinement transport landed (LANG-INDEXED accepted partial, squash 93d82a398): the narrowed AC-7 -- held-D3 bodies ELABORATE + pass kernel_check -- is met, but FULL admission is kernel_check AND SCT-pass, and the transport-carrying mutual-recursion clique reds the SCT gate. Route A (SCT arity from the declared Pi telescope, not the deep-lambda body heuristic) was specified in-thread by the Architect + research and is captured durably at D0 (an in-thread ruling is not a durable deliverable). TCB change: it modifies the trusted size-change termination gate (crates/ken-kernel/src/sct.rs). gate: operator, and the operator's authorization above satisfies it. Steward-filed per COORDINATION section 2. Estimated capability tier: T1 (soundness-bearing termination-gate change; the arity widening must not admit a nonterminating recursion -- the negative control below is mandatory)."
 ---
+
+# FINAL RULING -- 2026-08-22 (Architect, evt_1gtmndpzh3xda): route A is correct, this node CLOSES on a SYNTHETIC consumer, the real FoKripke clique moves to the successor
+
+The D1 hard-stop (HS=1) ran the one discriminating measurement on the exact
+`AC-CONSUMER` clique (`a84d71005`), and the Architect converted his conditional
+into a final ruling. Three firm conclusions govern this node now:
+
+1. **Route A is correct, necessary, and COMPLETE FOR THE ARITY DEFECT.** With
+   `WIP 27a84fcc5a94` the matrices are correctly dimensioned and the descent is
+   read as real bare-`Var` matched-field structural descent (`0.p6 ↓→ 8.p0` =
+   `@2 child`). That WIP is the deliverable value; the strict-decrease gate was
+   never weakened.
+2. **The Cast/J transport-opacity arm is REFUTED.** The measurement found ZERO
+   of the 50 descending call arguments are `Term::Cast` or `Term::J` (the `J`s
+   surround call *results*, not recursion arguments). So the conditionally-scoped
+   successor `KERNEL-SCT-TRANSPORT-TRANSPARENT` does **not** fire and was **not**
+   cut.
+3. **The real `AC-CONSUMER` (FoKripke) has a SECOND, independent blocker that is
+   neither arity nor Cast/J -- and the Architect's CORRECTION (evt_134z6mr80ymqp,
+   amending FIRM 3's cause + destination; FIRM 1 and FIRM 2 stand) names it:**
+   the SURVIVING descent thread is bare-`Var` matched-field structural descent
+   (`0.p6 ↓→ 8.p0` = `@2 child`), and it fails by ROTATION -- it arrives at
+   member-0 `p0`/`p1` while the outgoing `0→8` edge decreases only from `p6`, so
+   no single thread survives a lap (one-lap `0→0` product has `Down` only
+   off-diagonal at `[6][0]`/`[6][1]`, squares to all-`Unknown`). The
+   helper-return edges (`g625`/`g631`) are OFF that binding thread; tracing them
+   would not close it. The three shapes seen on this consumer (Cast/J opacity
+   refuted, helper-return opacity, rotation) are ONE predicate, now MEASURED
+   authoritatively: **the FoKripke clique's real termination is not a single
+   structural size-change thread on its declared parameters under the current
+   `size_rel` abstraction.**
+
+   The kernel-lexicographic/permutation-aware arm is RULED OUT: SCT's
+   idempotent-closure strict-diagonal criterion is already sound-and-complete for
+   the size-change abstraction (Lee-Jones-Ben-Amram, POPL 2001), including
+   permuting descents -- a genuine rotating descent expressible in the
+   size-change graphs WOULD produce a strict-diagonal idempotent matrix, and the
+   closure has none. The gap is the GRAPHS (the `size_rel` abstraction does not
+   capture the clique's real decreasing measure), not the closure criterion.
+
+**Consequence for this node.** Its founding premise -- that FoKripke's SCT
+failure was the arity defect ALONE -- is refuted. So this node's decisive
+buildability gate becomes a **SYNTHETIC arity-isolation consumer** (three
+criteria in `AC-CONSUMER` below); the **real FoKripke clique is preserved -- not
+lost -- as the close gate of `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY`**, the
+language/spec enclave node that owns the rotation fork (upstream re-elaboration
+preferred; a narrow `size_rel` completeness fix or a richer measure are
+operator-gated conditional arms). The real `AC-CONSUMER` and
+`V3-FO-CHECKER-SOUNDNESS`'s `depends_on` re-point there -- NOT onto the
+helper-return node and NOT onto a kernel node. `blocks` re-points to that
+successor (this node's arity fix is still needed before the real clique can pass,
+so it stays a predecessor of it). This node closes on its arity ACs + the
+synthetic consumer; `kernel-implementer` is building the synthetic consumer now
+(evt_x4nhgwcnr3yj).
 
 # AUTHORIZED and released -- 2026-08-22 (operator, "tcb change authorized. proceed.")
 
@@ -190,9 +244,11 @@ nonterminating.*
 - `AC-NEG` (MANDATORY, gates close) defends the over-accept direction -- a
   nonterminating return-Pi group admitted by a mis-count reds; this is the
   arity-widening soundness hole.
-- `AC-CONSUMER` decisive buildability -- the real LANG-INDEXED clique
-  (`a84d71005` rebased onto `93d82a398`) passes full admission (`kernel_check`
-  AND `sct_check`); synthetic green does not substitute.
+- `AC-CONSUMER` decisive buildability -- REVISED by the final ruling (this D0
+  capture predates the measurement): the real LANG-INDEXED clique proved to
+  carry a SECOND blocker (helper-return invisibility, not arity), so it moved to
+  the successor and this node closes on the synthetic arity-isolation consumer.
+  See the FINAL RULING banner and the revised `AC-CONSUMER` below.
 - `AC-NO-REGRESSION` `canonical_inner` == today's inner for canonical bodies, so
   `sct_completeness_repro`, `sct_reconstruction_descent`,
   `sct-reconstruction-descent` units keep their verdicts.
@@ -231,12 +287,34 @@ a naive telescope-arity reading -- is REJECTED by the widened gate with
 widening must not open a soundness hole through a hidden return `Pi`. A mutation
 that admits this group reds the control.
 
-**`AC-CONSUMER` (the decisive buildability gate).** The exact LANG-INDEXED
-transport consumer -- the held-D3 mutual-recursion clique carrying the c-elab
-`J`/cast transport (`a84d71005` rebased onto the landed transport `93d82a398`)
--- passes FULL admission (`kernel_check` AND `sct_check`) through this fix, where
-it currently reds `NotTerminating`. Synthetic green does not stand in for
-real-family buildability.
+**`AC-CONSUMER` (the decisive buildability gate -- SYNTHETIC arity-isolation
+consumer, per the final ruling).** The measurement refuted the premise that the
+real FoKripke clique is blocked by arity alone (see the FINAL RULING banner), so
+the real clique moves to the successor and this node closes on a synthetic
+consumer that isolates the arity dimension. The Architect's three criteria
+(evt_4qgm2hatmwcgy, evt_1gtmndpzh3xda) all bind, and criterion 2 is
+load-bearing:
+
+1. **SHAPE.** A mutual-recursion clique whose ELABORATED leading-`Lam` count
+   diverges from its declared-telescope arity -- the exact defect this node
+   repairs. A canonical body that already has `n` leading lambdas exercises
+   nothing.
+2. **ISOLATION (load-bearing).** Its termination is size-change-visible at the
+   CORRECT declared arity with NO transport/cast/`J` and NO non-recursive helper
+   on its descending-argument path -- one persistent bare-`Var` descent thread
+   through a SINGLE parameter across laps (no rotation). So the arity fix alone
+   is necessary AND sufficient to flip it. A descent running through a coercion
+   or a helper return would carry the SECOND defect, could never green in this
+   node, and would wrongly block the arity landing -- the exact conflation the
+   real `AC-CONSUMER` suffered.
+3. **DISCRIMINATION.** RED with the arity reverted to `count_params` (arity read
+   off the body), GREEN with `27a84fcc5a94`. A consumer that greens without the
+   arity fix is vacuous.
+
+This is not "synthetic green stands in for real coverage": the two-defect gate
+is correctly split into its independently-landable halves, and the real FoKripke
+clique remains the close gate of `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` (full
+admission = `kernel_check` AND `sct_check`), not lost.
 
 **`AC-REVIEW` (control 4 -- adversary + conformance).** The Architect is the
 required soundness reviewer (author is not reviewer). The Adversary hunts the
@@ -272,18 +350,28 @@ in CI (`COORDINATION §12`); targeted `-p ken-kernel` locally, never
 
 **`ready`, authorized, released to the kernel ring.** `depends_on` is empty --
 the defect exists on `origin/main` today, because the transport that triggers it
-(`93d82a398`) is already landed. `blocks: [V3-FO-CHECKER-SOUNDNESS]`: this node
-inherits the SCT-pass gate role from `LANG-INDEXED-RECURSIVE-IH-DISCHARGE`, which
-is closed as an accepted partial (its transport deliverable done) with
-`V3-FO-CHECKER-SOUNDNESS`'s `depends_on` re-pointed here. V3-FO D3 resumes on
-this landing against a transport-aware, SCT-admitting IH.
+(`93d82a398`) is already landed.
+`blocks: [V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY]`: the D1
+measurement (see the FINAL RULING banner) refuted the premise that this arity
+fix is the whole SCT-pass gate for FoKripke. The real clique carries a second,
+independent residual (rotation -- a `size_rel`-abstraction gap, not arity), owned
+upstream by the language/spec enclave node `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY`,
+which is where `V3-FO-CHECKER-SOUNDNESS`'s `depends_on` now points. This node's
+arity fix is still a predecessor of that node (the real clique cannot pass until
+the arity is correctly dimensioned), so it blocks it.
 
 **Owner: kernel ring.** Author = `kernel-implementer` (T1 -- soundness-bearing
 termination-gate work). Independent soundness review = Architect. Adversary
 hunt + conformance seed per `AC-REVIEW`. First move is **D0** -- the Architect's
 durable capture of route A, grounded, with the locus pinned by measurement.
 
-**Bookkeeping.** This is the SCT-pass half of the full-admission gate that the
-mutual-recursion result-refinement chain reduces to: `LANG-INDEXED` delivered
-the c-elab transport (`kernel_check` half); this node delivers the SCT-pass
-half. Together they close the full admission `V3-FO-CHECKER-SOUNDNESS` D3 needs.
+**Bookkeeping.** This node delivers the ARITY correction to the SCT gate --
+one of the fixes the mutual-recursion result-refinement chain needs, and the
+only one it was authorized for under Q3. `LANG-INDEXED` delivered the c-elab
+transport (`kernel_check` half of full admission); this node corrects the arity
+so the size-change matrices are correctly dimensioned. The D1 measurement then
+showed FoKripke's full admission needs a THIRD thing beyond both -- an upstream
+resolution of the rotation / `size_rel`-abstraction gap -- carried by
+`V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY`. This node's own close is its arity ACs +
+the synthetic arity-isolation consumer; it does not, by itself, close the full
+admission `V3-FO-CHECKER-SOUNDNESS` D3 needs.
