@@ -46,61 +46,66 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `75b573c1d`.** Tree clean; no publisher running (PR #2735 landed
-doc-only). Re-arm on resume: the watchdog interval (fired this session, armed)
-and the CronCreate daily briefing-flush schedule (session-only, auto-expires —
-re-arm it).
+**`main` = `4ed363be`.** Tree clean; no publisher running. Re-arm on resume: the
+watchdog interval and the CronCreate daily briefing-flush schedule (`7d029bbf`,
+09:37 — session-only, auto-expires).
 
 **ONE LANE — runtime (operator, 2026-08-17; `steward.md` §0).** Lane 2
-(language + verify) is retired. Finished work still merges, filings queue
-behind the lane; framing for lane 1 is lane work.
+(language + verify) is retired. Finished work still merges, filings queue behind
+the lane; framing for lane 1 is lane work.
 
-### Runtime (lane 1) — NATIVE-HANDLE-CARRIER released, ring kicked
+### Runtime (lane 1) — RT-DEAD-ARM-EFFECT-LOWERING released; NHC held on it
 
-- NATIVE-HANDLE-CARRIER recut to `ready` and released (kick anchor
-  `evt_7cg8h0tmpfwck`, landed via PR #2735). All 7 deps merged (last two:
-  RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE).
-  Deliverable D-final: re-run the four `cap41_*` rows + the `AC-5` row on
-  current main, report per-row. Disposition: all-green → fold with preserved
-  slice/fixture + Architect six-axis oracle → close NHC + PX8-F-CAP-41 Phase
-  2; any red → report refusal + call site and cut the next successor. Awaiting
-  the runtime-implementer's per-row result; confirm the seat woke (leader ack
-  in the anchor thread).
-- Lane-1 frontier order after NHC (§0): RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT
-  [merged], the `RT-*` nodes already at `ready`, and RT-DESCENT-RETIRE's owed
-  `D6a`.
+- NATIVE-HANDLE-CARRIER D-final RAN RED (all five rows, `evt_1srzc4frpjhxn`):
+  ONE blocker — a whole-program-DEAD arm of a total FSOp request handler whose
+  ConstructorTag effect seat fails object emission on an unreachable path
+  (`effects.rs:277`). The constancy measurement (`evt_8j0tjp15ypw3`) ruled out
+  both the carried-observation route (A) and preserve-specialization (C) for
+  this fixture. NHC is now `active`, held on the successor; PX8-F-CAP-41 held on
+  NHC.
+- RT-DEAD-ARM-EFFECT-LOWERING CUT + RELEASED (Architect ruling
+  `evt_7kmh9atsrv80n`; kick anchor `evt_1b4zmr0d3btcd`; `ready`, no deps). Fix:
+  trap a provably-unreachable total-handler arm's refusing seat (fail-closed),
+  conservative whole-program census, seat kept strict. Three soundness
+  properties + mandatory negative control; D0 = census-existence. Architect
+  required reviewer; Adversary hunts landed code. Awaiting the ring's ack + D0.
+  When it lands: re-run NHC D-final → all-green folds with the preserved
+  slice/fixture + six-axis oracle, closes NHC + PX8-F-CAP-41 Phase 2.
+- (A) carried, NOT cut: carried-observation route + runtime tag-namespace
+  translation, for a genuinely live/varying policy; carries a bounded Spec
+  contract question I pre-cleared as lane-1 input (not a lane-2 reopen).
+- Lane-1 frontier after NHC (§0): RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT [merged],
+  the `RT-*` nodes at `ready`, RT-DESCENT-RETIRE's owed `D6a`.
 
-### LANG (retired lane, finishing in-flight approved work) — transport CI-red
+### LANG (retired lane, in-flight work finishing) — transport LANDED (partial)
 
-- LANG-INDEXED-RECURSIVE-IH-DISCHARGE c-elab transport: Decision
-  dec_5refwakaj0t4w APPROVE on 1b9aa9c7b, but PR #2734 CI-RED (build + test +
-  all four shards). Publisher stopped clean; branch intact at 1b9aa9c7b,
-  nothing landed. Routed to the language ring: implementer diagnosing
-  scoped-feature / downstream repro (never `--workspace`), fixing the
-  build-only delta and respinning a fresh SHA. On handback: differential
-  re-review (confirm build/feature-only, no transport-semantics change), fresh
-  merge Decision on the new SHA, then hand the resolved Decision to the
-  lieutenant.
-- Architect ruled the SCT wall is a SEPARATE, operator-gated KERNEL successor
-  (route A: `sct.rs` type-directed telescope-canonicalization). AC-7 NARROWED
-  to "held D3 bodies elaborate + pass kernel_check" (green today); full
-  admission (kernel_check AND SCT-pass, which unblocks
-  V3-FO-CHECKER-SOUNDNESS-D3) moves to the kernel successor.
+- Transport landed: squash `93d82a398` (`elab.rs` blob = approved `1afbb4b6`,
+  Decision `dec_1f50e3a2pnxj6` APPROVE — stack-plumbing-only respin of the
+  CI-red `1b9aa9c7b`). Narrowed AC-7 met. Adversary hunted the landed object:
+  CLEAN (`evt_64x1rmjbx4097`; it flagged a wrong range endpoint in the
+  lieutenant's M8 handoff and self-corrected).
+- LANG-INDEXED node HELD `active`, NOT merged: full admission (kernel_check AND
+  SCT-pass) is the operator-gated kernel SCT successor's gate, and
+  V3-FO-CHECKER-SOUNDNESS `depends_on` LANG. Do NOT close LANG before the kernel
+  successor is cut and V3-FO's `depends_on` re-pointed to it (gen-progress
+  `closed`==`merged` clearance hazard). Sequence on authorization: cut kernel
+  successor, re-point V3-FO, then close LANG.
 
 ### Operator questions OPEN (Pat) — none block lane 1
 
+Q3 now paces TWO threads: it unblocks V3-FO-CHECKER-SOUNDNESS-D3 AND lets
+LANG-INDEXED close.
+
 1. Runtime remains lane 1? [proceeding on the default yes]
-2. Is language/verify an authorized lane again, or does §0's single-lane
-   posture stand? (LANG is only finishing in-flight, already-approved work.)
+2. Is language/verify an authorized lane again, or does §0's single-lane posture
+   stand? (LANG is only finishing in-flight, already-approved work.)
 3. Authorize the operator-gated kernel SCT successor (route A,
-   "KERNEL-SCT-TELESCOPE-CANON")? Architect + research have fully specified
-   it; it is the only thing that admits the LANG D3 group. Controls: arity
-   from the DECLARED Pi telescope (type-directed, never a deep-lambda
+   "KERNEL-SCT-TELESCOPE-CANON")? Architect + research fully specified it.
+   Controls: arity from the DECLARED Pi telescope (never a deep-lambda
    heuristic), admit==analyze the same eta-long body, MANDATORY nonterminating
-   hidden-return-Pi negative control, adversary + conformance review,
-   operator-gated TCB change.
+   hidden-return-Pi negative control, adversary + conformance, operator-gated
+   TCB change.
 
 ### Preserved refs this session
 
-- `preserved/steward-work-df470315` — pre-compaction briefing checkpoint
-  (df4703153).
+- `preserved/steward-work-df470315` — pre-compaction briefing checkpoint.
