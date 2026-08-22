@@ -50,10 +50,20 @@ The operator authorized the kernel SCT successor on 2026-08-22 ("tcb change
 authorized. proceed."): `KERNEL-SCT-TELESCOPE-CANON` is cut and released to the
 kernel ring (TCB change, `gate: operator` satisfied; Architect required
 reviewer, adversary + conformance). `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` is
-`closed` (accepted partial — its c-elab transport landed; the SCT-pass half
-spun out to the successor), and `V3-FO`'s `depends_on` is re-pointed to
-`KERNEL-SCT-TELESCOPE-CANON`. `V3-FO` D3 resumes on that node's landing. (Q3 is
-no longer an open operator question.) Re-confirm each node's status
+`closed` (accepted partial — its c-elab transport landed). The KERNEL-SCT D1
+hard-stop is RESOLVED (Architect final ruling + correction, landed `716f63841`):
+route A is correct for the ARITY defect (`KERNEL-SCT-TELESCOPE-CANON` closes on
+its arity ACs + a SYNTHETIC arity-isolation consumer, being built), but the D1
+measurement refuted the premise that arity was the whole SCT-pass gate — the real
+FoKripke clique fails by ROTATION under the current `size_rel` abstraction (not
+arity, not Cast/J, not a closure-criterion gap → no lexicographic node). The real
+AC-CONSUMER and `V3-FO`'s `depends_on` are now re-pointed to the NEW
+language/spec enclave node `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY`, which carries the
+rotation fork D0 (a: upstream re-elaboration [preferred, no TCB]; b: narrow
+`size_rel` completeness [operator-gated]; c: richer measure [operator escalation,
+dispreferred]). `V3-FO` D3 now waits on that enclave resolution — materially
+harder than arity, genuinely open. No TCB authorization due to Pat yet ((a) needs
+none). (Q3 is no longer an open operator question.) Re-confirm each node's status
 (`git fetch`; read the node) before acting; a node id decays.
 
 **Lane 3 — foundation: expressibility trial (bounded).** Five independent,
