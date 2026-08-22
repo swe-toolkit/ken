@@ -1,0 +1,135 @@
+---
+id: RT-IH-MARKER-PRODUCER-COMPLETE
+title: "Resolve the OrientedSubcontinuationPlanV1 'computational IH invocation marker does not wrap a complete application' refusal on the checked-program family (both programs, the terminal of the four cap41_* pins, on RT-FSREADAT's AC-4/AC-5 critical path) by CORRECTING THE PRODUCER, never the validator: diagnose which producer step made the plan and the marked expression disagree about completeness, then resolve to ONE of the two lawful non-interchangeable representations -- (i) it IS complete => fix the producer so plan and marker agree on a full Call of the checked arity, or (ii) it is genuinely partial => the distinct closure/PAP form with its own later apply. NEVER pad the call, infer missing arguments at emission, or reinterpret a full-call node as partial. The completeness checker stays byte-untouched (GHC join-point / Lean IR-checker / typed-CPS precedent, all fail-closed). Carries a MANDATORY post-fix re-enumeration gate: this family is depth-1 and cannot self-bound, so after the fix lands, re-run the existing checked-family enumeration end-to-end and read what surfaces."
+status: active
+owner: runtime
+size: M
+gate: none
+depends_on: [RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION]
+blocks: []
+github: null
+origin: "Bounded successor cut by the Steward from the two enumeration reports (RT-COLD-LOWERING-PATH-ENUMERATION report 1 evt_1m6eg23vnbj4n found the IH-marker has ZERO entries in rt_parity; RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION report 2 evt_7rg8mye0bbfse confirmed it is the checked-program family's single terminal over both programs). Architect ruling point 3 + IH-marker addendum evt_1a8tf8776fd6m (producer-fix, validator untouched) and the report-2 review evt_4jcnbhx8nqwdy (the depth behind the marker is UNKNOWN, possibly zero; the cheap sound instrument is a post-fix re-enumeration, not speculative fixtures). Steward-filed per COORDINATION section 2."
+---
+
+# WHAT THIS NODE IS
+
+Resolve the `OrientedSubcontinuationPlanV1` "computational IH invocation marker
+does not wrap a complete application" refusal -- the checked-program family's
+single terminal, tripped by BOTH programs in the family (the source three of the
+four `cap41_*` pins share, and the distinct `rt_branched_scrutinee_unit_body_port`
+source), on RT-FSREADAT's own AC-4/AC-5 critical path. The fix is on the
+PRODUCER; the completeness checker stays byte-untouched.
+
+# THE MEASURED FACT (both enumeration reports; Architect evt_4jcnbhx8nqwdy)
+
+- Report 1: the IH-marker has ZERO entries in `RT_PARITY_SOURCE` -- unreachable
+  from that population.
+- Report 2: it is the checked-program family's ONE mechanism, tripped by both
+  programs (measured by content hash, not filed name -- the fourth pin's source
+  shares the entry NAME `rt_branched_stage` with a distinct body).
+- Structural finding (Architect confirms binding): this family is DEPTH-1 and
+  cannot self-bound. Each program is a population of one; a single compile
+  returns a single refusal, so whatever sits behind the IH-marker is INVISIBLE
+  until the marker refusal is cleared. The depth behind it is UNKNOWN, possibly
+  zero.
+
+# MECHANISM (Architect ruling point 3 + addendum evt_1a8tf8776fd6m; producer-fix, checker untouched)
+
+The refusal is the STANDARD compiler-IR well-formedness boundary, and prior art
+is unanimous it must NOT be relaxed (GHC join points: every occurrence a
+saturated same-arity tail call or invalid Core; Lean IR checker: a full
+application supplies exactly the declaration arity, recursor content gets no
+exception; typed-CPS: continuation application is a dedicated saturated form).
+Ken already matches this precedent (`CheckedComputationalIHCallTemplateV1` is an
+exact complete application; entry validation refuses a body that is not one
+`Call` of the checked arity before emitting). So the refusal is CORRECT and
+aligned -- it is evidence the producer-side PLAN and the marked EXPRESSION
+disagree about completeness, never evidence to accept an incomplete application.
+
+Diagnose which producer step created the disagreement, then resolve to ONE of the
+two lawful, non-interchangeable representations:
+
+- (i) it IS complete => fix the producer so plan and marker agree on a full
+  `Call` of the checked arity;
+- (ii) it is GENUINELY partial => represent it as the distinct closure/PAP form
+  with its own later apply operation.
+
+NEVER pad the call, let emission infer missing arguments, or reinterpret a
+full-call node as partial -- each weakens the IR contract. Keep the checker;
+correct the producer. The CPS/subcontinuation-planning prior art (research
+addenda evt_3p0rwsjw51mjq) is a fix-time input for the builder.
+
+# ACCEPTANCE
+
+- **AC-1 (both programs clear the marker).** After the fix, both checked-family
+  programs no longer stop at the `OrientedSubcontinuationPlanV1` completeness
+  check. Report, per program, which producer step disagreed and which lawful
+  representation resolved it.
+- **AC-2 (producer-corrected, one of the two lawful shapes).** The resolution is
+  a full `Call` of the checked arity OR the distinct closure/PAP form -- never a
+  pad, an inferred argument, or a full-call node reinterpreted as partial.
+- **AC-SOUNDNESS (checker byte-untouched).** The `OrientedSubcontinuationPlanV1`
+  completeness check is unchanged -- it stays the fail-closed boundary. A marked
+  expression that is not a complete application of the checked arity must STILL
+  trip it. Ship one durable test in that shape.
+- **AC-REENUM (MANDATORY post-fix re-enumeration gate).** Immediately after the
+  fix lands, RE-RUN the existing checked-family enumeration end-to-end (the
+  runner and red-until-green coverage test from
+  [[RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION]] already exist -- this is a
+  RERUN, not authoring). Read what surfaces: if BOTH programs go green, the
+  checked family is bounded and the co-land can green. If a FURTHER
+  checked-family refusal surfaces, STOP and report it -- do NOT silently proceed;
+  that is the trigger for the deferred decision point below. This is the cheap,
+  sound instrument for an unknown-depth space (Architect review evt_4jcnbhx8nqwdy):
+  clear one refusal, re-run, read -- one bounded step at a time, at near-zero
+  cost, so the family cannot resume serial discovery silently.
+- **AC-NO-REGRESSION.** No lowering on `main` regresses; whole-suite green in CI
+  (`COORDINATION §12`). Local targeted `-p` only, never `--workspace`; runtime
+  respin gate `-p ken-runtime` all-binaries + `-p ken-cli` + `-p ken-verify`.
+- **Required reviewer.** Architect (producer-direction soundness + checker
+  untouched, AND the post-fix re-enumeration result). The Adversary hunts the
+  three over-accept shapes: a padded call, an emission-inferred argument, and a
+  full-call node reinterpreted as partial.
+
+# DEFERRED DECISION POINT (contingency, NOT now)
+
+Fixture provisioning -- giving these sources a substitution site and additional
+admissible entries so the checked-program space becomes enumerable -- is NEW
+fixture work, not measurement, and is HELD as a contingency. Invest in it ONLY
+IF the AC-REENUM re-enumeration surfaces a further checked-family layer, i.e.
+the family demonstrates genuine serial depth rather than depth-1. Do NOT pay this
+expense speculatively against a depth we cannot yet show is nonempty (Architect
+review evt_4jcnbhx8nqwdy: the refinement that governs the investment). If it
+fires, it comes back to the Steward as a fresh cut.
+
+# CO-LANDING
+
+Part of the RT-FSREADAT co-landing set (§8) on
+`wp/RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` (thread `thr_3j5ew8rhy35nh`). This
+node's fix + its AC-REENUM green (both checked programs) are what let RT-FSREADAT's
+AC-4/AC-5 and the NHC `D-final` close. The whole set lands as ONE green candidate
+once the `cap41_*`/terminal rows go all-green.
+
+# NOT IN SCOPE
+
+- Relaxing or bypassing the `OrientedSubcontinuationPlanV1` completeness check.
+- The materialized-dead join reconciliation
+  ([[RT-MATERIALIZED-DEAD-JOIN-RECONCILE]]), the BoundaryCarrier layer-1 witness
+  (folded into [[RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL]]), and the elaboration
+  TypeMismatch (separate disposition) -- each its own ledger line.
+- Fixture provisioning now -- held as the contingency above.
+- Any kernel / TCB edit. `ken-runtime` cranelift lowering + planning
+  (`crates/ken-runtime/src/cranelift_backend/planning/`,
+  `oriented_subcontinuation_plan.rs`); no operator authorization is in play.
+
+# SEQUENCING / CONTENTION / CAPABILITY TIER
+
+`depends_on: [RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION]` -- bounded by its
+report 2. Same branch, ring, and thread as the co-landing set. Proceeds
+regardless of the report-1 successors -- it is a known refusal on RT-FSREADAT's
+critical path and must be fixed either way.
+
+Tier T1: the producer-side diagnosis (which step disagrees, and which of two
+non-interchangeable representations is correct) is the load-bearing judgment, and
+the depth-1 re-enumeration gate makes this the node that governs whether the
+checked family is bounded. Size M.
