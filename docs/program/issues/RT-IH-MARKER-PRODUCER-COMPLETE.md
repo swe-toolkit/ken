@@ -18,8 +18,8 @@ origin: "Bounded successor cut by the Steward from the two enumeration reports (
 > both checked-family programs cleared the marker seam (supplied 0 == arity 0,
 > method_binder_ordinal 0 == binder_index 0). This node's producer-side
 > deliverable is CLOSED (Architect confirmed effective, evt_3amhmvyd0sr9t). The
-> mandatory AC-REENUM then STOPPED at a deeper refusal ONE LAYER BELOW the marker
-> seam -- the static-worker ABI supply layer (template arity 0 vs
+> mandatory AC-REENUM then STOPPED at a deeper refusal ONE LAYER BELOW the
+> marker seam -- the static-worker ABI supply layer (template arity 0 vs
 > `worker.declared_arity` 1) -- a genuine NEW mechanism (HS=4, Steward-confirmed),
 > NOT a further checked-family layer, so the DEFERRED DECISION POINT below did NOT
 > fire. The Architect ruled the closure fork CLOSURE A (evt_3tspjkw7dhh6x): the
@@ -31,34 +31,56 @@ origin: "Bounded successor cut by the Steward from the two enumeration reports (
 > that successor + the join half (`6a45ae1a7`); it does not land alone.
 >
 > UPDATE 2026-08-22: Closure A was subsequently WITHDRAWN (Architect
-> evt_hftfnn4mh8jk) after the operand-seat mechanism was refuted at the type level
-> -- the recursive value at the firing seam is a live nested-recursor StaticWorker,
+> evt_hftfnn4mh8jk) after the operand-seat mechanism was refuted at the type
+> level -- the recursive value at the firing seam is a live nested-recursor
+> StaticWorker,
 > not a placeable operand (HS=5). The successor is HELD, re-framed pending a
 > reframed section-1a ruling (leading hypothesis: a nullary FORCE of a lazy IH
 > thunk, fixed upstream of the arity gate). This node's producer fix still STANDS
 > as a closed deliverable; the terminal AC-REENUM gate moves with the reframed
 > successor. Nothing lands until the reframed ruling and AC-REENUM green.
 
+> UPDATE 2026-08-22 (RESOLVED -- ESCAPING; co-land re-scoped). The reframed
+> ruling landed (Architect evt_2f4bbmt7qfde1): the marker is a NULLARY_FORCE
+> (realize the specialized IH function VALUE unapplied), and the fork is an
+> ESCAPE discriminator.
+> The decisive measurement came back ESCAPING (runtime-implementer
+> evt_79jd1nxamqd95): the realized IH value is stored straight into a Construct
+> on both checked-family programs -- a CAPABILITY GAP, not a seam fix. Steward
+> scoping
+> ruling (evt_5pmk273zg5paa): the co-land set lands WITHOUT the functional-IH
+> piece; the two checked-family programs are re-pointed to documented ADVANCING
+> REFUSALS
+> (they refuse at the correct deeper point now). This node's producer fix
+> (`64019430c`) still STANDS as a closed deliverable. The terminal AC-REENUM gate
+> and the "green both checked-family programs" goal move to the new deliverable
+> [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]]; the operand-seat successor
+> RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT is CLOSED (superseded). HS=5 (ESCAPING is a
+> scoping decision, not an increment). The co-land can now land on its own greenness
+> with the refusal encoded.
+
 > RE-SCOPED + RE-OWNED 2026-08-22 (Architect shape ruling evt_7rsy01s7k1d7x;
 > Steward ownership finalization). The shape is PRODUCER-SIDE, case (i) genuinely
-> complete but mis-spelled: at arity 0 the producer emits bare `RuntimeExpr::Var(0)`
-> (the un-applied IH), where the marker's contract is an application node and a
-> complete arity-0 invocation is `Call{ func, args: [] }` -- which the consumer
-> `enter_checked_computational_ih_invocation` ALREADY accepts (0 == 0). The fix is
-> in `ken-elaborator/src/erasure.rs` (sites 2327 / 2863 / 3302) -- Language's crate
-> -- so OWNER is now `language`. The id keeps its RT- prefix only to preserve the
-> [[RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL]] / [[RT-MATERIALIZED-DEAD-JOIN-RECONCILE]]
+> complete but mis-spelled: at arity 0 the producer emits bare
+> `RuntimeExpr::Var(0)` (the un-applied IH), where the marker's contract is an
+> application node and a complete arity-0 invocation is `Call{ func, args: [] }`
+> -- which the consumer `enter_checked_computational_ih_invocation` ALREADY
+> accepts (0 == 0). The fix is in `ken-elaborator/src/erasure.rs` (sites 2327 /
+> 2863 / 3302) -- Language's crate -- so OWNER is now `language`. The id keeps
+> its RT- prefix only to preserve the [[RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL]] /
+> [[RT-MATERIALIZED-DEAD-JOIN-RECONCILE]]
 > / enumeration links; the body is authoritative on ownership. Do NOT relax the
 > consumer (the Steward's arity-0-admitted counter was attributed to the wrong
 > mechanism -- that admission is BoundaryCarrier's carried-word at core.rs:3758,
-> a different subsystem, not the checked-IH marker; relaxing the unconditional-Call
-> demand would silently admit a bare-Var mis-emission that the demand refuses
-> fail-closed, stepping back toward the pre-D5a "wraps anything" hole). The RUNTIME
-> side narrows to VERIFICATION only: confirm the consumer stays byte-untouched and
-> accepts the emitted `Call{args:[]}`, the terminal pins advance/green, then run
-> AC-REENUM. Producer fix authored by the Language seat on the co-land branch
-> `wp/RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`; Runtime authors no ken-elaborator
-> edit. Architect required reviewer on both halves; Adversary hunts. HS stays 3.
+> a different subsystem, not the checked-IH marker; relaxing the
+> unconditional-Call demand would silently admit a bare-Var mis-emission that the
+> demand refuses fail-closed, stepping back toward the pre-D5a "wraps anything"
+> hole). The RUNTIME side narrows to VERIFICATION only: confirm the consumer
+> stays byte-untouched and accepts the emitted `Call{args:[]}`, the terminal pins
+> advance/green, then run AC-REENUM. Producer fix authored by the Language seat
+> on the co-land branch `wp/RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`; Runtime
+> authors no ken-elaborator edit. Architect required reviewer on both halves;
+> Adversary hunts. HS stays 3.
 
 Resolve the `OrientedSubcontinuationPlanV1` "computational IH invocation marker
 does not wrap a complete application" refusal -- the checked-program family's
