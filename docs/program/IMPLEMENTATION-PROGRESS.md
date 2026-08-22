@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 18:36:47Z — from 418 issue file(s) in `docs/program/issues/`.
+2026-08-22 19:57:11Z — from 420 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -159,6 +159,7 @@ the committed file matches the generator's output.
 | `LANG-MATCH-DIAGNOSTIC-PROSE` | The match checker's two error variants now SAY things that are false -- the exhaustiveness message calls an applied pattern a constructor, the reachability doc cites 34 §5 (Refinement types) for an obligation in §4.2, and a test file's header still advertises a gap the same file's own regression test proves closed | merged | language | S | none | — |
 | `LANG-MATCH-PATTERN-FORMS-ABSENT` | spec 34 §3 normatively lists nine pattern forms and the elaborator's PatKind has three -- literals, tuple/record patterns, as-patterns, or-patterns and guards are all absent from the AST, with no deferral statement anywhere in a chapter marked impl-ready and high-priority, and no tracker row for any of them | draft | language | unsized | none | — |
 | `LANG-MEMBERSHIP-OPERATOR-SURFACE` | membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator | ready | language | M | none | — |
+| `LANG-MODULE-IMPORT-SYSTEM` | Module/import capability campaign — declaration visibility (public export), a selective-import surface, and cross-package plus prelude symbol resolution, sufficient for catalog packages to reuse canonical modules instead of reimplementing them | draft | language | XL | none | — |
 | `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` | `ken-cli` native production runs `px4b_native_production` at effectively zero stack margin -- base passes with a few hundred bytes to spare, so any candidate adding a few hundred bytes aborts it, and `98e6ac51` is the trigger that exposed this rather than its cause | merged | language | M | none | — |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
 | `LANG-POW10-CASCADE-LITERAL-CLAUSE` | The pow10 generator's own doc comment says every branch is a concrete literal, which its own recursion refutes in the same way the elab.rs copy did -- but its conclusion rests on a DIFFERENT and TRUE property (no saturating/min/clamp anywhere in the generated cascade), so this is a wording repair on a sound argument, not a second false justification | merged | language | XS | none | — |
@@ -439,13 +440,14 @@ the committed file matches the generator's output.
 | `V3-FO-CHECKER-SOUNDNESS` | Author FokDerivation, fok_derives and fok_classically_valid, and prove checker_soundness in Ken over the check_cert that now exists -- the first of the two theorems 23 section 4.4 requires before route FO may return proved | active | language | L | none | — |
 | `V3-FO-CONVERSION-LOAD-MEASURED` | Establish source-level provenance for FO obligations and measure the Rust reference checker over their certificate trees, recording that the kernel-conversion quantity 23 section 4.4 names is not takeable at this SHA | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/2363 |
 | `V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT` | Exclude bottom_id from conjunct 1's sort candidates, and correct the design note's direction claim, which does not cover the mechanism that produced the defect | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2375 |
+| `V3-FO-EMBEDDING-ADEQUACY` | Author the embedding and prove embedding_adequacy (classically_valid of the translated form implies the source form) — the SECOND of the two theorems 23 section 4.4 requires before route FO may return proved | draft | language | L | none | — |
 | `V3-FO-GUARD-SHIFT-DIFFERENTIAL` | Pin mentions_var0 against a shift-built oracle so the duplicated binder discipline cannot drift silently | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2371 |
 | `V3-FO-KEN-LEVEL-CHECKER-AUTHORING` | Author the Ken-level check_cert, embed, Form and Cert so the conversion cost 23 section 4.4 names becomes measurable at all, and take that measurement | merged | language | L | none | — |
 | `V3-FO-KRIPKE-SLICE` | Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls | merged | language | L | none | — |
 | `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` | Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all | merged | language | L | none | 2353 |
 | `V3-FO-QUOTE-GUARD-FAIL-CLOSED` | Make quote_fo's pre-quotation guards fail closed: Pair is not a binder, and a proof-variable-occurrence test must default to true | merged | language | S | none | 2346 |
 | `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` | Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report | merged | language | S | none | — |
-| `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` | The FoKripke checker_soundness mutual-recursion clique's real termination is not a single structural size-change thread on its declared parameters under the current size_rel abstraction -- it fails by ROTATION (the bare-Var matched-field descent arrives in one slot while the outgoing edge decreases from another) -- so full SCT admission of the real consumer needs an UPSTREAM resolution (re-elaborate the soundness recursion to one structural thread; preferred, no TCB), with a narrow size_rel completeness fix or a richer measure as operator-gated conditional arms; this is the real AC-CONSUMER home V3-FO-CHECKER-SOUNDNESS D3 waits on, distinct from the arity fix (KERNEL-SCT-TELESCOPE-CANON) and from any Cast/J or lexicographic-SCT node | ready | language | L | none | — |
+| `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` | The FoKripke checker_soundness mutual-recursion clique's real termination is not a single structural size-change thread on its declared parameters under the current size_rel abstraction -- it fails by ROTATION (the bare-Var matched-field descent arrives in one slot while the outgoing edge decreases from another) -- so full SCT admission of the real consumer needs an UPSTREAM resolution (re-elaborate the soundness recursion to one structural thread; preferred, no TCB), with a narrow size_rel completeness fix or a richer measure as operator-gated conditional arms; this is the real AC-CONSUMER home V3-FO-CHECKER-SOUNDNESS D3 waits on, distinct from the arity fix (KERNEL-SCT-TELESCOPE-CANON) and from any Cast/J or lexicographic-SCT node | active | language | L | none | — |
 | `V3-FO-SUBST-DEPTH-CONTROL` | Give subst_form_at a control that can see its binder-depth discipline, and state the two premises fo_kripke.rs relies on without naming where the next editor will look -- the shift call-site correspondence and the bottom_id exclusion criterion | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2382 |
 | `V3-FO-TOP-REFUSAL-ENFORCEMENT` | Give the sort-candidate criterion an enforcement: a test asserting quote_iform refuses top_id with UnsupportedTermShape, so an IForm::Top arm reds at the same moment the collector needs updating -- and soften the D2 claim that the criterion forces that update | merged | language | XS | none | https://github.com/swe-toolkit/ken/pull/2388 |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | merged | verify | M | none | — |
@@ -486,7 +488,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `SPEC-45-CLOSURE-IN-CONSTRUCTOR-EXCEPTION` — Does 45 section 3's 'functions lower to ordinary closures' admit an exception for a function value held in a constructor field with no statically visible consumer -- if not, the native backend's current refusal is a defect against AC3 rather than a permitted narrowing
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
-- `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` — The FoKripke checker_soundness mutual-recursion clique's real termination is not a single structural size-change thread on its declared parameters under the current size_rel abstraction -- it fails by ROTATION (the bare-Var matched-field descent arrives in one slot while the outgoing edge decreases from another) -- so full SCT admission of the real consumer needs an UPSTREAM resolution (re-elaborate the soundness recursion to one structural thread; preferred, no TCB), with a narrow size_rel completeness fix or a richer measure as operator-gated conditional arms; this is the real AC-CONSUMER home V3-FO-CHECKER-SOUNDNESS D3 waits on, distinct from the arity fix (KERNEL-SCT-TELESCOPE-CANON) and from any Cast/J or lexicographic-SCT node
 
 ## Blockers
 
@@ -505,6 +506,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
+- `CAT-GCD-REFACTOR` blocked by `LANG-MODULE-IMPORT-SYSTEM` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
@@ -522,7 +524,7 @@ is itself not yet `merged`/`closed`:
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
-- `V3-FO-CHECKER-SOUNDNESS` blocked by `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` (status: ready)
+- `V3-FO-CHECKER-SOUNDNESS` blocked by `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` (status: active)
 
 ## Gate progress
 
