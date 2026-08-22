@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 21:55:45Z — from 425 issue file(s) in `docs/program/issues/`.
+2026-08-22 23:17:18Z — from 425 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -442,7 +442,7 @@ the committed file matches the generator's output.
 | `TEST-NATIVE-STACK-PROVISIONING-STANDARD` | Record the stated-stack standard where a candidate author will read it -- the governing property is that a test's stack is STATED, not that it is large, and the tree already derives both halves including the RUST_MIN_STACK / stack_size split | merged | doc | S | none | — |
 | `TEST-STATED-STACK-SITE-RECONCILE` | Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken | ready | runtime | M | none | — |
 | `V3-D-OPEN-GOAL-WITNESS-ROUTE` | The z3 round-trip's own stated population -- linear arithmetic over Int with universally-quantified parameters -- appears to reach neither fragment D nor FO, because is_first_order_intuit excludes Term::Eq outright and is_ground_decidable demands both sides be IntLit; the first obstacle to the round-trip is the classifier, not the solver | merged | verify | S | none | — |
-| `V3-FO-CHECKER-SOUNDNESS` | Author FokDerivation, fok_derives and fok_classically_valid, and prove checker_soundness in Ken over the check_cert that now exists -- the first of the two theorems 23 section 4.4 requires before route FO may return proved | active | language | L | none | — |
+| `V3-FO-CHECKER-SOUNDNESS` | Author FokDerivation, fok_derives and fok_classically_valid, and prove checker_soundness in Ken over the check_cert that now exists -- the first of the two theorems 23 section 4.4 requires before route FO may return proved | merged | language | L | none | — |
 | `V3-FO-CONVERSION-LOAD-MEASURED` | Establish source-level provenance for FO obligations and measure the Rust reference checker over their certificate trees, recording that the kernel-conversion quantity 23 section 4.4 names is not takeable at this SHA | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/2363 |
 | `V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT` | Exclude bottom_id from conjunct 1's sort candidates, and correct the design note's direction claim, which does not cover the mechanism that produced the defect | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2375 |
 | `V3-FO-EMBEDDING-ADEQUACY` | Author the embedding and prove embedding_adequacy (classically_valid of the translated form implies the source form) — the SECOND of the two theorems 23 section 4.4 requires before route FO may return proved | draft | language | L | none | — |
@@ -530,7 +530,6 @@ is itself not yet `merged`/`closed`:
 - `RT-CLOSURE-BOUNDARY-RESIDUAL` blocked by `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION` (status: draft)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
-- `V3-FO-CHECKER-SOUNDNESS` blocked by `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` (status: active)
 
 ## Gate progress
 
