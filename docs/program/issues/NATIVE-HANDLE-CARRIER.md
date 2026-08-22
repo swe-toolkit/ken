@@ -1,7 +1,7 @@
 ---
 id: NATIVE-HANDLE-CARRIER
 title: "Native build-pipeline completeness — a constructor-private resource-carrying handle fails checked-core body-view lowering (MissingClosureMetadata) when it crosses the higher-order withBuffer normalization boundary"
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,16 @@ blocks: [PX8-F-CAP-41]
 github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> CLOSED 2026-08-22 — D-final GREEN. The co-land RT-FSREADAT (the last open
+> dependency) merged at main=cbac30826 (13/13 blob-match to the approved
+> 71b358a925), and the Architect's D-final six-axis oracle on that head
+> (evt_32gfvvpfe63c8) confirmed the native assembly across the withBuffer
+> boundary is GREEN with exactly one documented exception: the checked-IH
+> escaping-family row — a deferred capability gap carried by
+> [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]], not unfinished work here. NHC and
+> [[PX8-F-CAP-41]] Phase 2 close except that row. HS 5. The sections below are the
+> reasoning record.
 
 # CURRENT STATE — 2026-08-22 (D-final blocker chain; held on RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL)
 
