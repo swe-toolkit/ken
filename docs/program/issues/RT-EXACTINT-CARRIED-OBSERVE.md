@@ -1,7 +1,7 @@
 ---
 id: RT-EXACTINT-CARRIED-OBSERVE
 title: "A genuinely-live effect seat needing ExactIntU64 (FsReadAt Argument(1)) cannot observe its need in the CarriedWord phase, so the withResource path still fails object emission behind the now-closed ResourceScalar family -- the ExactIntU64-need carried-observation closure on the existing carried_exact_int EITHER_PHASE precedent"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,46 @@ blocks: [NATIVE-HANDLE-CARRIER]
 github: null
 origin: "Measured terminal of [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] AC-1 (runtime-implementer evt_e68jv2mssxnd, runtime-qa evt_6e1kf4tdghchs, Architect evt_24nyqqhs5fy1f, 2026-08-22): with the ResourceScalar family closed, the cap41_* rows advance to `seat Argument(1) of FsReadAt needs ExactIntU64, which it cannot observe in CarriedWord`. The Architect scoped this OUT of the ResourceScalar node as a distinct need with its own precedent; the Steward cut it as the next lane-1 successor (evt_5xq3hw23kamrd). Steward-filed per COORDINATION section 2."
 ---
+
+# D0/D1 RESOLVED — 2026-08-22 (Architect `evt_2kspreq08s3a`; in review)
+
+D0 corrected the framing below in two ways, and the Architect ruled the
+mechanism; D1 is built and the merge gate is running.
+
+- **It is an Avail-move, NOT a new route.** `carried_exact_int` is an `Avail`
+  classification (`EITHER_PHASE`), not an `EffectSeatClaimRoute` -- the framing
+  below (and RT-RESOURCE-RELEASE's route-not-Avail precedent) suggested a route.
+  The Architect ruled a DELIBERATE Avail-move of the positioned exact-`Int`
+  seats onto the existing `carried_exact_int`, decoded carried via the already-
+  in-production `narrow_carried_int_u64`. This does NOT contradict the
+  route-not-Avail ruling: that was need-specific (the ResourceScalar carried arm
+  would read any word's bits as a scalar, so a fail-closed guard had to dominate
+  the read). Here the decoder is ITSELF fail-closed-with-validity -- it branches
+  on the boundary tag, `require_i64`s the viewed path, and an out-of-range value
+  returns `valid=0` into the operation's existing narrow-failure lane
+  (InvalidBounds/InvalidOffset), a lawful outcome, not a trap or misread. The
+  accept path re-runs the fail-closed consumer (the decoder), so no route guard
+  is needed. Subsume-don't-proliferate: `carried_exact_int` already IS the
+  `EITHER_PHASE` mechanism for this need (`BufferAllocate` `0` uses it).
+- **Scope: the six-seat positioned-arm unit (Steward node-scope call).** The
+  trap-preserved live census is `FsReadAt` `Arg(1)/3/4` (D0's initial "one seat"
+  was truncated by the walk aborting at the first refusal). `FsWriteAt` `1/3/4`
+  share the same emitter arm and the same one-decoder reader
+  (`narrow_positioned_int_seat`), are inert-but-correct on this witness
+  (`EITHER_PHASE` still admits the specialized phase, the reader is total over
+  both), and move as one unit -- splitting would leave `FsWriteAt` on `exact_int`
+  within the same arm, the proliferation shape. `FsChangeMode` `Arg(1)` is
+  `dead_arm=true` (trapped, not wired). `BufferFreeze` `1/2` are the other
+  emitter arm, deferred pure wiring. The Architect confirmed the mechanism is
+  uniform across the positioned arm, so the six-seat authorization is the
+  Steward's and is GIVEN.
+- **The `Arg(2)` reply-path removal is spun out.** The D0 side-classification
+  below is now its own node -- [[RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL]] (cut
+  `ready`, held on this node) -- because closing `ExactIntU64` moved it onto the
+  `cap41_*` critical path. It is NOT folded here; see that node.
+
+The rest of this frame is the original D0-first framing, retained for its
+measurements. The MERGED banner will record the final landing.
 
 # WHAT THIS NODE IS
 

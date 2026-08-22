@@ -5,13 +5,13 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE, RT-DEAD-ARM-EFFECT-LOWERING, RT-RESOURCE-RELEASE-CARRIED-OBSERVE, RT-EXACTINT-CARRIED-OBSERVE]
+depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE, RT-DEAD-ARM-EFFECT-LOWERING, RT-RESOURCE-RELEASE-CARRIED-OBSERVE, RT-EXACTINT-CARRIED-OBSERVE, RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL]
 blocks: [PX8-F-CAP-41]
 github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-# CURRENT STATE — 2026-08-22 (D-final blocker chain; held on RT-EXACTINT-CARRIED-OBSERVE)
+# CURRENT STATE — 2026-08-22 (D-final blocker chain; held on RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL)
 
 **Read this section only. Everything below it — including the demoted earlier
 "CURRENT STATE" block — is superseded history retained for the measurements it
@@ -20,8 +20,9 @@ records.**
 **All seven original dependencies merged and `D-final` ran RED. Each re-run
 advances the `cap41_*` rows to the next distinct blocker, which is cut as a
 runtime successor; the chain is the accepted shape (each fix advances, does not
-green, until the last one).** Two blockers are now landed and the third is cut;
-this node closes only when the chain reaches all-green and `D-final` re-runs:
+green, until the last one).** Two blockers are landed, the third is in review,
+and the fourth is cut; this node closes only when the chain reaches all-green and
+`D-final` re-runs:
 
 1. [[RT-DEAD-ARM-EFFECT-LOWERING]] -- MERGED 2026-08-22 (`55c7f51de` -> main).
    Traps the whole-program-DEAD `FSOp` arms so they no longer fail object
@@ -33,13 +34,24 @@ this node closes only when the chain reaches all-green and `D-final` re-runs:
    FsHandleMetadata/FsReadAt Arg(0)) on the `lower_resource_token_seat` route, no
    `Avail` widening. AC-1 measured: all three ResourceScalar seats advance; the
    rows TERMINATE at the `ExactIntU64` sibling below.
-3. [[RT-EXACTINT-CARRIED-OBSERVE]] -- the ExactIntU64-need carried-observation
-   closure for the genuinely-LIVE `FsReadAt` `Argument(1)`/`ExactIntU64` refusal
-   the rows now hit, on the existing `carried_exact_int` `EITHER_PHASE` precedent
-   (`BufferAllocate` `0` already reads through it, so likely a pure wiring). Cut
-   `ready`; kick held until the RT-RESOURCE-RELEASE M8 Adversary hunt reports
-   clean (`effects.rs` contention with any fold; single ring). **NHC now held on
-   node 3 only.**
+3. [[RT-EXACTINT-CARRIED-OBSERVE]] -- IN REVIEW (D1 built to the Architect's
+   Avail-move ruling `evt_2kspreq08s3a`; gate running, Architect required-reviewer
+   merge Decision pending). The `ExactIntU64`-need closure, ruled a deliberate
+   Avail-move of the positioned exact-`Int` seats onto the existing
+   `carried_exact_int` `EITHER_PHASE` classification (decoded by the already-in-
+   production, fail-closed-with-validity `narrow_carried_int_u64`), NOT a new
+   route -- the decoder is itself the fail-closed consumer, so no route guard is
+   needed. Closes `ExactIntU64`; the trap-preserved live census is `FsReadAt`
+   `Arg(1)/3/4` (`FsWriteAt` `1/3/4` same emitter arm, inert-but-correct), moved
+   as one positioned-arm unit (Steward node-scope call). The rows advance to the
+   `Arg(2)` reply-path blocker below.
+4. [[RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL]] -- CUT `ready` 2026-08-22. Closing
+   `ExactIntU64` moved the previously-deferred `FsReadAt` `Argument(2)` buffer
+   reply-path gate (`effects.rs:3226`) onto the critical path: it is now the
+   witness terminal. A `ResourceScalar`-family REMOVAL of a vestigial gate (its
+   `span_origin` is unused; the span is projected from the operand list at
+   `3233`), NOT a reroute (Architect `evt_2qdpkfvtqrxzy`). Released after node 3
+   merges (`effects.rs` contention; single ring). **NHC now held on node 4.**
 
 ## `D-final` RAN — all five rows RED, one blocker, downstream of every landed fix
 
@@ -78,7 +90,7 @@ from `4c9c59d3e` (`rt_parity_native.rs` rows `:620/:627/:634/:641`, helper
 `:593`, `AC-5` row `:687`), not a merge candidate; the fences hold (do not
 revert `4c9c59d3e`; do not touch `rt_body_ok` / `rt_cap41_expect_eof`).
 
-## Disposition — on RT-EXACTINT-CARRIED-OBSERVE landing
+## Disposition — on RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL landing
 
 | D-final re-run | means | next |
 |---|---|---|
@@ -86,7 +98,8 @@ revert `4c9c59d3e`; do not touch `rt_body_ok` / `rt_cap41_expect_eof`).
 | a distinct downstream result (e.g. interpreter parity) | native lowering now completes but a further gap is exposed | report and cut the next successor as before |
 
 **This node stays `owner: runtime`, `size: M`, `gate: none`, held on
-[[RT-EXACTINT-CARRIED-OBSERVE]]** (the two predecessors
+[[RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL]]** (node 3
+[[RT-EXACTINT-CARRIED-OBSERVE]] is in review; the two earlier predecessors
 [[RT-DEAD-ARM-EFFECT-LOWERING]] and [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] are
 merged). The blocker chain is the accepted shape: each landed fix advances the
 `cap41_*` rows to the next distinct blocker rather than greening them, until the
