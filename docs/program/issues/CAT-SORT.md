@@ -1,7 +1,7 @@
 ---
 id: CAT-SORT
 title: "Verified insertion sort — Algorithm/Sorting: sort an Ord-ordered List with the Sorted and Permutation laws proved, the simplest-first anchor of the Foundation expressibility trial"
-status: ready
+status: active
 owner: foundation
 size: M
 gate: none
