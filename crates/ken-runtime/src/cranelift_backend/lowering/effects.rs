@@ -1463,6 +1463,47 @@ impl<'a> Lowering<'a> {
         let p = builder.block_params(done);
         Ok((p[0], p[1], p[2]))
     }
+    /// **`RT-EXACTINT-CARRIED-OBSERVE` `D1` -- one positioned exact-`Int` seat,
+    /// read in whichever phase it arrives in.**
+    ///
+    /// The paired half of moving these seats to `carried_exact_int`. The two
+    /// decoders are the existing ones, one per phase, and this is the only
+    /// place the pairing is spelled -- so a seat cannot be admitted in a phase
+    /// this cannot decode, and no second carried `Int` decode exists to drift
+    /// from `narrow_carried_int_u64`.
+    ///
+    /// Both arms return `(value, valid)`. `valid = 0` is a LAWFUL outcome, not
+    /// an error: it feeds the operation's existing narrow-failure lane
+    /// (`InvalidBounds` / `InvalidOffset`) exactly as the specialized phase
+    /// already did for an out-of-range `Int`. The carried arm additionally
+    /// fail-closes on a word that is not a decodable `Int` at all -- the tag
+    /// branch's viewed path `require_i64`s its status -- so there is no misread
+    /// path and no route-level guard is needed on top.
+    fn narrow_positioned_int_seat(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seats: &ClaimedEffectSeats<'_>,
+        index: u32,
+        name: &'static str,
+    ) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), CraneliftBackendError>
+    {
+        let (_, operand) = seats.operand(EffectSeatSlot::Argument(index))?;
+        match operand {
+            LoweringOperand::Specialized(value @ Lowered::Int { .. }) => {
+                let value = value.clone();
+                self.narrow_native_int_u64(builder, &value)
+            }
+            LoweringOperand::Specialized(_) => Err(unsupported(
+                "Effect",
+                format!("positioned {name} operand is not Int"),
+            )),
+            LoweringOperand::Carried(word) => {
+                let word = *word;
+                self.narrow_carried_int_u64(builder, word)
+            }
+        }
+    }
+
     fn narrow_carried_int_u64(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -2452,26 +2493,26 @@ impl<'a> Lowering<'a> {
                 // phase. A specialized-only read here would leave the claim
                 // admitted and the read refusing -- the route would have moved
                 // the refusal rather than closed it.
-                let integer = |index: usize, name: &str| {
-                    let Some(value @ Lowered::Int { .. }) = seats
-                        .specialized(EffectSeatSlot::Argument(index as u32))
-                        .ok()
-                    else {
-                        return Err(unsupported(
-                            "Effect",
-                            format!("positioned {name} operand is not Int"),
-                        ));
-                    };
-                    Ok(value)
-                };
                 let file = self.lower_resource_token_seat(
                     builder,
                     seats.operand(EffectSeatSlot::Argument(0))?.1,
                     "positioned resource operation",
                     "file",
                 )?;
+                // `RT-EXACTINT-CARRIED-OBSERVE` `D1` -- these seats decode in
+                // EITHER phase, paired ATOMICALLY with the `carried_exact_int`
+                // move in the seat table. A widened `Avail` without its reader
+                // is the claim-admitted-read-refuses shape: the seat passes the
+                // gate and dies at the read, which moves a refusal instead of
+                // closing one.
+                //
+                // `narrow_native_int_u64` and `narrow_carried_int_u64` are the
+                // ONLY two decoders here, one per phase, both returning
+                // `(value, valid)` into the operation's existing
+                // narrow-failure lane below. No second carried `Int` decode is
+                // spelled.
                 let (file_offset, file_offset_valid) =
-                    self.narrow_native_int_u64(builder, integer(1, "file offset")?)?;
+                    self.narrow_positioned_int_seat(builder, &seats, 1, "file offset")?;
                 let buffer = self.lower_resource_token_seat(
                     builder,
                     seats.operand(EffectSeatSlot::Argument(2))?.1,
@@ -2479,9 +2520,9 @@ impl<'a> Lowering<'a> {
                     "buffer",
                 )?;
                 let (buffer_start, buffer_start_valid) =
-                    self.narrow_native_int_u64(builder, integer(3, "buffer start")?)?;
+                    self.narrow_positioned_int_seat(builder, &seats, 3, "buffer start")?;
                 let (length, length_valid) =
-                    self.narrow_native_int_u64(builder, integer(4, "length")?)?;
+                    self.narrow_positioned_int_seat(builder, &seats, 4, "length")?;
                 positioned_bounds = Some((buffer_start, length));
                 let file_offset_invalid = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal,

@@ -150,18 +150,18 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
     // which crosses a function boundary and carries only the word. Designed to
     // go red when THAT boundary is addressed; the deliverable then is to
     // re-measure the terminal state, not to widen this clause.
-    // REPOINTED AGAIN by `RT-RESOURCE-RELEASE-CARRIED-OBSERVE`. Every repoint has
-    // moved this pin STRICTLY DOWNSTREAM — ConstructorTag, then
-    // ResourceRelease/ResourceScalar, now ExactIntU64 — so the absence above
-    // holds each time, and more strongly. The direction is the safety argument;
-    // a repoint UPSTREAM would quietly gut it.
+    // REPOINTED AGAIN by `RT-EXACTINT-CARRIED-OBSERVE`. Every repoint has moved
+    // this pin STRICTLY DOWNSTREAM — ConstructorTag, ResourceRelease/
+    // ResourceScalar, ExactIntU64, now the FsReadAt Arg(2) reply-path gate — so
+    // the absence above holds each time, and more strongly. The direction is the
+    // safety argument; a repoint UPSTREAM would quietly gut it.
     assert!(
         reason.contains(
-            "seat Argument(1) of FsReadAt needs ExactIntU64, which it cannot \
-             observe in CarriedWord"
+            "seat Argument(2) of FsReadAt needs ResourceScalar, which this release can \
+             observe only in a specialized template"
         ),
         "the expected terminal state after `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` is the \
-         `ExactIntU64` seat refusal — a different need, the next sibling to wire — which \
+         `FsReadAt` Arg(2) buffer reply-path gate — a different reader, the next node's — which \
          is what keeps the absence above non-vacuous: \
          {error:?}"
     );
