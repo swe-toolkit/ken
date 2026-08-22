@@ -80,18 +80,125 @@ transport-carrying clique is accepted -- without weakening what SCT rejects.
 
 # Deliverables
 
-**`D0` -- durable capture of the route-A specification, grounded, by the
-Architect.** The Architect + research already specified route A in-thread; an
-in-thread ruling is not a durable deliverable, so D0 transcribes it into this
-node, grounded at the `sct.rs` coordinates above: (1) the exact source of the
-declared arity (the member's Pi-telescope length from `env`, and how a hidden
-`Pi` in the RETURN type is treated -- see `AC-NEG`); (2) the exact canonical
-eta-long form the body is normalised to and the exact locus that replaces
-`count_params`/`skip_lams` in `sct_check`; (3) the soundness argument that the
-widened arity accepts strictly more terminating cliques and **zero** additional
-nonterminating ones. **The four controls below are FIXED inputs, not open
-choices.** D0 is design capture + locus pin, measured against the tree, not a
-re-opening of the route.
+**`D0` -- RESOLVED. Route-A durable capture (Architect, `evt_67fm72hkpa3ej`,
+grounded and locus-pinned).** The Architect + research specified route A
+in-thread; an in-thread ruling is not a durable deliverable, so it is
+transcribed here verbatim in substance. **Self-contained -- D1 needs no further
+lookups.** The four controls below are FIXED inputs, not re-opened.
+
+Grounding coordinates confirmed by direct read at `586530f89`:
+`sct.rs` `count_params:623`, `skip_lams:634`, `initial_prov:650`,
+`sct_check:665`; `env.const_type:460`; `inductive.peel_pi:97`;
+`subst.weaken:129`; `conv.convert` Pi-eta arm `:349-361`; `conv.normalize:225`.
+Both `sct_check` call sites (`check.rs:1101` single-member, `:1173` group) pass a
+populated `env` in which every group member is pre-admitted opaque, so
+`const_type(id)` resolves at check time and delta never unfolds a group member.
+
+*(1) Declared-arity source, and the hidden return-Pi.* The arity for each group
+member is derived from its DECLARED TYPE, not from the body's leading-`Lam`
+count. Source: `env.const_type(id)` returns `(level_params, ty)`; the arity `n`
+is the length of `ty`'s Pi telescope. Concretely: iterate -- `whnf` the type; if
+it is `Term::Pi(A, B)`, that is one parameter, recurse into `B`; stop at the
+first non-Pi head. This is exactly the peel `inductive::peel_pi` performs (use it
+directly when the elaborated type is Pi-headed at each level; use the whnf-guided
+peel to be robust to a reducible/delta codomain head -- it mirrors `convert`'s
+own Pi-eta, which whnf's the type before matching Pi). **The telescope is
+MAXIMAL: a Pi in the RETURN type is counted as a parameter** (it is a Pi in the
+type). That is deliberate and is the case `AC-NEG` guards -- see (3): a return-Pi
+eta parameter is provably incapable of manufacturing a strict descent, so
+counting it is sound; under-counting it is what a naive body-reading would do.
+
+*(2) Canonical eta-long form + exact locus.* The body analysed and the arity are
+ONE canonical form: the member's elaborated body `b`, eta-expanded
+(type-directed, driven by the declared telescope) to exactly `n` leading
+parameters, with those `n` parameters beta-realigned so recursive-call arguments
+are expressed against them. Reference construction, mirroring `convert`'s Pi-eta
+de Bruijn convention (`conv.rs:349-361`) exactly:
+
+```
+let doms = first n domains of the peeled declared telescope;   // A_0 outermost .. A_{n-1} innermost
+let mut app = weaken(&b, n);                                   // b↑n, lift free vars past the n new binders
+for k in (0..n).rev() { app = Term::app(app, Term::var(k)); }  // apply Var(n-1), Var(n-2), ..., Var(0)
+// eta-long body = doms.rev().fold(app, |acc,a| Term::lam(a, acc));  == λA_0..λA_{n-1}. (b↑n @ (n-1) @ .. @ 0)
+```
+
+The inner term `collect_calls` analyses is `app` after firing exactly the `n`
+eta beta-redexes (NOT a full `normalize` -- see `AC-NO-REGRESSION`). The de
+Bruijn convention is unchanged from today: `Var(0)` = innermost = param `(n-1)`,
+so `initial_prov(n)`/`initial_recon(n)` are untouched.
+
+EXACT LOCUS in `sct_check` (`sct.rs:665`), the group-construction and edge loop
+-- two substitutions and nothing else:
+
+- `group[caller_idx].1`: replace `count_params(body)` with
+  `declared_arity(env, id)` (the telescope peel of (1)).
+- `inner`: replace `skip_lams(body, n)` with `canonical_inner(env, id, body, n)`
+  (the construction of (2), firing the `n` eta-redexes).
+- `initial_prov(n)`, `initial_recon(n)`, `collect_calls(inner, caller_idx, n,
+  &group, ...)` UNCHANGED -- they already key off `n`.
+
+Helpers are all pre-existing (`const_type`, `peel_pi`, `weaken`,
+`Term::var`/`app`/`lam`); no new kernel machinery, no new file. `count_params` is
+retained (unused by `sct_check`) so `AC-TELESCOPE`'s control can exhibit the
+pre-fix reading vs the declared arity.
+
+The reduction discipline (fire the `n` eta-redexes; do NOT deep-normalize the
+body) is bounded by three properties -- the D0 envelope; the exact loop is D1's:
+(i) def-equal to `b`; (ii) exposes exactly `n` parameters as the outer binding
+structure; (iii) for a canonical body (already `n` leading lambdas) it reduces to
+today's `skip_lams` inner verbatim (`AC-NO-REGRESSION`). A full `normalize` would
+over-reduce the body's interior (e.g. fire a match at the head) versus today's
+un-normalized `skip_lams` analysis and risk `AC-NO-REGRESSION` -- so canonicalise
+the eta head only, not the interior.
+
+*(3) Soundness -- strictly more terminating cliques, ZERO additional
+nonterminating.*
+
+- **Admission theorem intact** (why route A is sound where the deep-lambda
+  heuristic Agda retired is not): the canonical form is beta-eta-delta-equal to
+  `b` under the kernel's OWN conversion (eta is literally `convert`'s Pi-eta
+  step; beta fires only the eta-redexes; delta touches no group member -- they
+  are opaque). Admit and analyse run on this one def-equal form
+  (`AC-ADMIT-EQ-ANALYZE`) -- there is no analysis surrogate distinct from the
+  admitted body, so an untrusted producer cannot certify one body while a
+  different one is analysed.
+- **Zero additional nonterminating accepted:** eta to the declared arity adds
+  only type-mandated Pi parameters. At every recursive call the eta rule applies
+  each added parameter to the very variable that binds it, so its size relation
+  to the corresponding callee parameter is `DownEq` (equal), never `Down`
+  (strict). A column that is `DownEq`/`Unknown` everywhere contributes no strict
+  down-arrow to any idempotent self-loop diagonal, and the added columns do not
+  alter the real parameters' size relations or their composition closure. Hence
+  the widened arity cannot supply the `>=1` strict-down-arrow acceptance requires
+  where the real parameters do not already supply it: a clique the pre-fix gate
+  rejects for genuine nontermination stays rejected. `AC-NEG` pins exactly this
+  with a return-Pi-carrying nonterminating group.
+- **Strictly more terminating accepted:** the only behavioural change is (a) the
+  transport case -- a wrong arity/offset (leading-`Lam` count diverged from the
+  declared arity) is corrected, so the real descent that makes the clique
+  terminate is measured against the right parameter set and the false
+  `NotTerminating` clears; and (b) never removing a strict-down-arrow that
+  existed, since the real parameters' relations are unchanged. The accept set
+  grows by exactly the wrongly-rejected terminating cliques and nothing else.
+
+*Control -> failure-mode map (for the Adversary hunt and the conformance seed).*
+
+- `AC-TELESCOPE` defends "arity from type, not body" -- a revert-to-`count_params`
+  mutation reds.
+- `AC-ADMIT-EQ-ANALYZE` defends "one canonicalisation for dimension `n` and
+  analysed body" -- a two-normalisation split (this defect's own shape) reds.
+- `AC-NEG` (MANDATORY, gates close) defends the over-accept direction -- a
+  nonterminating return-Pi group admitted by a mis-count reds; this is the
+  arity-widening soundness hole.
+- `AC-CONSUMER` decisive buildability -- the real LANG-INDEXED clique
+  (`a84d71005` rebased onto `93d82a398`) passes full admission (`kernel_check`
+  AND `sct_check`); synthetic green does not substitute.
+- `AC-NO-REGRESSION` `canonical_inner` == today's inner for canonical bodies, so
+  `sct_completeness_repro`, `sct_reconstruction_descent`,
+  `sct-reconstruction-descent` units keep their verdicts.
+
+D0 is design capture + locus pin, measured against the tree, not a re-opening of
+the route. D0 complete; the ring's first build move is D1.
 
 **`D1` -- the arity repair in `sct.rs`.** Replace the deep-lambda arity with the
 declared-telescope arity and make admission and analysis run on the same
