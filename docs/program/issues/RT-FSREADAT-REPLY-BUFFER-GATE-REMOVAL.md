@@ -3,7 +3,7 @@ id: RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL
 title: "A vestigial specialized-only gate on FsReadAt's Argument(2) buffer reply/ok-construction path (effects.rs:3226) re-refuses a carried buffer that the request path already admits; the destructured span_origin is UNUSED (the span is projected from the operand list at 3233), so the fix is REMOVAL of the dead gate, not a reroute -- the ResourceScalar-family leftover reader RT-EXACTINT moved onto the cap41_* critical path"
 status: ready
 owner: runtime
-size: S
+size: M
 gate: none
 depends_on: [RT-EXACTINT-CARRIED-OBSERVE]
 blocks: [NATIVE-HANDLE-CARRIER]
@@ -26,6 +26,14 @@ This is a `ResourceScalar`-family item (RT-RESOURCE-RELEASE's leftover reader),
 NOT `ExactIntU64` work. It is kept distinct in the accounting from
 [[RT-EXACTINT-CARRIED-OBSERVE]] even though it shares the `effects.rs` edit
 region for contention.
+
+This node is also the tracked restoration home for two carried-observation-family
+TEST items the campaign deferred here because this removal is what unblocks the
+full `cap41_*` compile (Architect `evt_4wkc748vgfhhf`): the `ExactIntU64`
+runtime-half end-to-end test (AC-4) and a durable keyed-on-need discriminator for
+the ResourceScalar route (AC-5). Both are safe-direction coverage matters, not
+soundness holes -- the production code (route key, ledger re-derivation, the
+proven decoder) is intact.
 
 # WHY REMOVAL, NOT REROUTE (Architect ruling `evt_2qdpkfvtqrxzy`)
 
@@ -96,8 +104,34 @@ a removal, not a widening.
   workspace-green in CI. (Local: targeted `-p` only, never `--workspace`; the
   respin gate is `-p ken-runtime` all-binaries + `-p ken-cli` + `-p ken-verify`,
   the coverage the predecessors ran.)
+- **AC-4 (restore the ExactIntU64 runtime-half end-to-end test).** Carried in
+  from [[RT-EXACTINT-CARRIED-OBSERVE]] AC-3, whose runtime half was deferred
+  here purely by sequencing (Architect `evt_4wkc748vgfhhf`, Part C): on that
+  node the witness terminated at THIS Arg(2) gate before building fully, so the
+  generated code's runtime behaviour was not observable end-to-end. Removing the
+  gate unblocks the full compile, which is exactly when it becomes observable.
+  Add the end-to-end test: an in-range carried `Int` at the positioned seats
+  advances; an out-of-range carried `Int` returns `valid=0` into the operation's
+  existing narrow-failure lane (InvalidBounds/InvalidOffset). This is missing
+  end-to-end-on-this-op coverage, not an unproven mechanism -- the decoder is
+  `narrow_carried_int_u64`, the same one `BufferAllocate` `0` already ships and
+  runs.
+- **AC-5 (restore a durable keyed-on-need discriminator for the ResourceScalar
+  route).** [[RT-EXACTINT-CARRIED-OBSERVE]] had to drop the ResourceScalar
+  route's keyed-on-need negative test (its vanishing-contrast form -- "an
+  un-closed need still refuses" -- inverted to a false failure as the
+  `ExactIntU64` need closed; a real, green-suite-invisible coverage loss,
+  Architect `evt_4wkc748vgfhhf`, Part B). The route's key stays STRUCTURALLY
+  enforced in code by the ledger's independent `(CarriedWord, ResourceScalar)`
+  second-admissibility re-derivation (byte-unchanged; the Architect verifies
+  this at RT-EXACTINT review) -- what was lost is the persistent negative TEST.
+  Restore it in a DURABLE, positive cross-key form: one witness where a
+  ResourceScalar carried seat and an `ExactIntU64` carried seat each route
+  through their OWN decoder. This node's completing compile is what makes such
+  a witness available. Do NOT restore the fragile vanishing-contrast form.
 - **Required reviewer:** the Architect is the required reviewer on this node's
-  merge Decision (soundness-adjacent completeness removal) and confirms the D0
+  merge Decision (soundness-adjacent completeness removal, plus the two
+  carried-observation-family test-hardening ACs above) and confirms the D0
   classification. Adversary hunts the landed code.
 
 # EXPLICITLY NOT IN SCOPE
@@ -119,6 +153,8 @@ in review). [[NATIVE-HANDLE-CARRIER]] is held on this node.
 
 # CAPABILITY TIER
 
-T2-leaning: a bounded removal of a vestigial gate on the Architect's direct read
-of `3226`/`3233`, with a three-point D0 classification confirming nothing is
-consumed. Escalates only if D0 finds any of (1)-(3) needs real design. Size S.
+T2-leaning: a bounded removal of a vestigial gate on the Architect's direct
+read of `3226`/`3233`, with a three-point D0 classification confirming nothing
+is consumed. Escalates only if D0 finds any of (1)-(3) needs real design. Size
+S-to-M -- the removal itself is S; the two carried-in test-hardening ACs
+(AC-4, AC-5) add modest scope.
