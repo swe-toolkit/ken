@@ -199,14 +199,25 @@ const FAMILY: &[(&str, &str)] = &[
 /// than "everything completes", so a landing successor, a newly surfaced layer,
 /// and a by-design refusal are three distinguishable reds instead of one
 /// permanent one.
-const IH_MARKER: &str =
-    "computational IH invocation marker does not wrap a complete application";
+/// Both programs advanced past the marker seam when the producer fix landed,
+/// and now refuse at the real gap underneath it: the marker is a nullary_force
+/// of an ESCAPING functional induction hypothesis.
+///
+/// MEASURED escaping, not assumed: the realized IH value's immediate parent is
+/// a `Construct`, so it is stored straight into a constructor field and there is
+/// no in-frame application site to specialize it to. What refuses is the
+/// static-worker arity gate, seeing the arity-1 worker forced with zero
+/// arguments.
+///
+/// Retired by `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`, which owns the missing
+/// representation (a materialized closure value or a defunctionalized carried
+/// tag). This is a deferred capability gap, not unfinished work in this
+/// candidate.
+const ESCAPING_FUNCTIONAL_IH: &str = "static worker expects 1 arguments but call provides 0";
 
-/// Retired by `RT-IH-MARKER-PRODUCER-COMPLETE`, whose landing gate is a
-/// mandatory re-run of this runner.
 const EXPECTED: &[(&str, &str)] = &[
-    ("checked-capture (shared by three pins)", IH_MARKER),
-    ("branched-scrutinee (distinct source)", IH_MARKER),
+    ("checked-capture (shared by three pins)", ESCAPING_FUNCTIONAL_IH),
+    ("branched-scrutinee (distinct source)", ESCAPING_FUNCTIONAL_IH),
 ];
 
 #[test]
@@ -255,7 +266,7 @@ fn every_checked_family_program_reaches_its_expected_terminal_state() {
             .expect("covered by the_expectation_table_covers_exactly_the_family");
         if outcome == "OK" {
             mismatches.push(format!(
-                "{name}: now COMPLETES. If RT-IH-MARKER-PRODUCER-COMPLETE landed, \
+                "{name}: now COMPLETES. If RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION landed, \
                  this row is retired and the program joins the completing set."
             ));
         } else if !outcome.contains(key) {

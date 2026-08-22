@@ -530,9 +530,22 @@ enum Disposition {
     },
 }
 
-const IH_MARKER: Disposition = Disposition::Refuses {
-    key: "computational IH invocation marker does not wrap a complete application",
-    retired_by: "RT-IH-MARKER-PRODUCER-COMPLETE",
+/// The checked-IH marker's producer fix landed, so these entries advanced PAST
+/// the marker seam to the real gap underneath it: the marker is a nullary_force
+/// of an ESCAPING functional induction hypothesis, and Ken has no first-class
+/// functional-IH value to realize.
+///
+/// MEASURED escaping, not assumed: the realized value's immediate parent is a
+/// `Construct` -- it is stored straight into a constructor field, so there is no
+/// in-frame application site to specialize it to. The refusal below is the
+/// static-worker arity gate seeing the arity-1 worker forced with zero
+/// arguments.
+///
+/// This is a real capability gap deferred to its own deliverable, NOT an
+/// unfinished piece of this candidate.
+const ESCAPING_FUNCTIONAL_IH: Disposition = Disposition::Refuses {
+    key: "static worker expects 1 arguments but call provides 0",
+    retired_by: "RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION",
 };
 
 const BOUNDARY_CARRIER: Disposition = Disposition::Refuses {
@@ -559,15 +572,15 @@ const ELABORATION_MISMATCH: Disposition = Disposition::Refuses {
 
 const EXPECTED: &[(&str, Disposition)] = &[
     ("rt_allocate_stage", BOUNDARY_CARRIER),
-    ("rt_cap41_endpoint_stage", IH_MARKER),
-    ("rt_cap41_offset_endpoint_stage", IH_MARKER),
-    ("rt_cap41_offset_out_of_range_stage", IH_MARKER),
-    ("rt_cap41_out_of_range_stage", IH_MARKER),
-    ("rt_read_norights_stage", IH_MARKER),
-    ("rt_read_offset_stage", IH_MARKER),
-    ("rt_read_window_stage", IH_MARKER),
+    ("rt_cap41_endpoint_stage", ESCAPING_FUNCTIONAL_IH),
+    ("rt_cap41_offset_endpoint_stage", ESCAPING_FUNCTIONAL_IH),
+    ("rt_cap41_offset_out_of_range_stage", ESCAPING_FUNCTIONAL_IH),
+    ("rt_cap41_out_of_range_stage", ESCAPING_FUNCTIONAL_IH),
+    ("rt_read_norights_stage", ESCAPING_FUNCTIONAL_IH),
+    ("rt_read_offset_stage", ESCAPING_FUNCTIONAL_IH),
+    ("rt_read_window_stage", ESCAPING_FUNCTIONAL_IH),
     ("rt_write_pair_source", ELABORATION_MISMATCH),
-    ("rt_write_readonly_stage", IH_MARKER),
+    ("rt_write_readonly_stage", ESCAPING_FUNCTIONAL_IH),
     ("rt_write_writable_stage", CLOSURE_BOUNDARY),
 ];
 
