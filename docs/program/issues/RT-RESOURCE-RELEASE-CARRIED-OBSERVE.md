@@ -1,7 +1,7 @@
 ---
 id: RT-RESOURCE-RELEASE-CARRIED-OBSERVE
 title: "Genuinely-live effect seats needing ResourceScalar cannot observe their need in the CarriedWord phase, so the withResource path fails object emission -- the (A)-family carried-observation CLOSURE over the ResourceScalar need (ResourceRelease/FsHandleMetadata/FsReadAt Argument(0)): observe the need in the carried phase on the lower_buffer_freeze_resource_seat EITHER_PHASE precedent, keyed (need=ResourceScalar, phase=Carried), WITHOUT widening the seat's direct Need-subset-Avail partition"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,66 @@ blocks: [NATIVE-HANDLE-CARRIER]
 github: null
 origin: "Architect ruling evt_4hcny7ae7h9sb (thr_3r6wv5net6s61, 2026-08-22), the RT-DEAD-ARM-EFFECT-LOWERING D1 hard-stop, Finding 2. Surfaced by the runtime-implementer measuring past the dead arms (evt_6wtfb4p5jxhk1, scratch/reverted): behind the dead FSOp arms the cap41_* fixtures hit a genuinely LIVE refusal -- seat Argument(0) of ResourceRelease needs ResourceScalar, which it cannot observe in CarriedWord -- and the program DOES use withResource. The Architect ruled this the concrete FIRST instance of the (A) work deferred at evt_7kmh9atsrv80n, forced onto the critical path. Steward-filed per COORDINATION section 2."
 ---
+
+# MERGED — 2026-08-22
+
+Landed at `ef32b6ced` (candidate `ef99c319a`, base `69df7e775`), Decision
+`dec_3m2p4tmgnpa9t` resolved APPROVE. Both deliverables delivered: D0 grounded
+the `ResourceScalar` carried representation (runtime-valued resource-token
+handle, observed via the borrowed-opaque guards — no boundary->wire translation,
+no constant-vs-varying Spec contract question arose, so AC-3's no-contract branch
+holds), D1 built the route.
+
+- **runtime-qa APPROVE** (`evt_6e1kf4tdghchs`), independently reproduced at
+  `ef99c319a`; two-layer admission independence mutation-proven (loosening the
+  route key reddened via the ledger's second, independently re-derived
+  admissibility check, a distinct error string).
+- **Architect required-reviewer APPROVE** (`evt_24nyqqhs5fy1f`), full-diff read,
+  all nine soundness properties verified by direct read: fail-closed consumer
+  (both guards dominate the scalar read), exact complement of `Direct`, no `Avail`
+  change, independent second authority, non-degenerate discriminator (one witness,
+  two assertions moving in opposite directions), the borrowed-opaque nuance
+  grounded and not overclaimed, single authority (`lower_resource_token_seat`),
+  positioned-arm completeness, sentinels repointed strictly downstream. Approval
+  binds exact `ef99c319a`; a `crates/ken-runtime` fold requires differential
+  re-review.
+- **AC-1 met, all three ResourceScalar seats** (ResourceRelease/FsHandleMetadata/
+  FsReadAt Arg(0)) advance past the refusal; the rows TERMINATE at the
+  `ExactIntU64` sibling (FsReadAt Arg(1)), scoped OUT — cut as the successor
+  [[RT-EXACTINT-CARRIED-OBSERVE]]. That successor, not remaining work of this
+  node, is what NHC's `D-final` now waits on.
+- Gates 1142/0 (`-p ken-runtime` all binaries + `-p ken-cli` + `-p ken-verify`).
+- **M8 Adversary hunt: SOUNDNESS CLEAN** (`evt_5wx3bax63yak`, landed blob
+  `8c4009ea` == approved `ef99c319a` blob, byte-identical; approval transfers by
+  blob since the squash makes `ef99c319a` a non-ancestor). Verified the new route
+  is fail-closed by construction: every carried resource-scalar read re-runs
+  `lower_resource_token_seat`, whose `require_i64` emits `return -1` (runtime
+  failure) on a tag/class mismatch BEFORE the scalar load. Gate-weaker-than-
+  consumer, sound because the accept path re-runs the fail-closed authority.
+
+## POST-MERGE COMPLETENESS OBSERVATION (Adversary, safe-direction, non-blocking)
+
+The Adversary flagged one completeness gap for the runtime ring to triage
+(NOT a soundness defect, NOT a reopen): FsReadAt's `Argument(2)` BUFFER seat has
+two readers. AC-1b converted the REQUEST path (`effects.rs:2477`) to
+`lower_resource_token_seat` (handles carried), but the REPLY/span-provenance path
+(`effects.rs:3226`) still reads `seats.specialized(SEAT_2)?` and refuses a carried
+buffer ("FsReadAt buffer operand is not a resource"). So a carried FsReadAt buffer
+is admitted at request, then re-refused at reply -- the same "moving the refusal
+rather than closing it" shape AC-1b addressed, on a fourth reader not
+cross-referenced. Direction is SAFE (a pattern-match guard -> clean refusal, never
+a scalar misread -> no miscompile), and it is OFF the current `cap41_*` critical
+path (the rows hit the `ExactIntU64` terminal at Arg(1) first). The Adversary also
+notes `3226`'s destructured `span_origin` is unused (the constructor projects via
+`site_operand_argument` at `3233`), so that specialized-only match is a vestigial
+gate whose only post-D1 effect is rejecting carried buffers.
+
+**Disposition: routed to the runtime ring to confirm deferred-by-design vs
+not-cross-referenced.** Non-blocking and off the critical path, so it does not
+gate NHC now. If confirmed a real gap on the chain, it is a small fold/successor
+cut when the chain reaches it -- not remaining work of this closed node.
+
+The below is the node as framed, retained for its measurements.
 
 # WHAT THIS NODE IS
 

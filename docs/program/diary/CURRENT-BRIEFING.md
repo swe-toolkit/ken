@@ -46,38 +46,38 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `69df7e775`.** Tree clean; no publisher running. Watchdog armed
-@1800s (interval survived the compaction, firing); the CronCreate daily
-briefing-flush schedule (`7d029bbf`, 09:37 — session-only) present.
+**`main` = `ef32b6ced`.** Tree clean; no publisher running. Watchdog armed
+@1800s; the CronCreate daily briefing-flush schedule (`7d029bbf`, 09:37 —
+session-only) present.
 
 **ONE LANE — runtime (operator, 2026-08-17; `steward.md` §0).** Lane 2
 (language + verify) is retired. Finished work still merges, filings queue behind
 the lane; framing for lane 1 is lane work.
 
-### Runtime (lane 1) — RT-DEAD-ARM MERGED; RT-RESOURCE-RELEASE ACTIVE at D1
+### Runtime (lane 1) — RT-DEAD-ARM + RT-RESOURCE-RELEASE MERGED; RT-EXACTINT cut
 
-- RT-DEAD-ARM-EFFECT-LOWERING MERGED (`55c7f51de` -> main `69df7e775`, Decision
-  `dec_4p9n9a0b0rfqq`, Architect APPROVE + differential re-APPROVE, QA passed).
-  Corrected two-conjunct deadness predicate ((1) never program-constructed AND
-  (2) not runtime-producible via the sealed `NativeProcessSymbols` destructure)
-  closed the D1 hard-stop hole; both refusal sites gated on one shared predicate;
-  trap single-sourced; ledger keeps `claims` truthful. One benign CI-red round
-  (two ken-cli transition sentinels the advance moved; repointed downstream).
-- RT-RESOURCE-RELEASE-CARRIED-OBSERVE ACTIVE at D1. The ring measured guard
-  uniformity STRUCTURAL (tag/class is a function of `LoweredVariant`, not the
-  consumer — `boundary.rs`). Architect widened the KEY to `(need=ResourceScalar,
-  phase=Carried)` (`evt_3dnd21pjg193g`), rejecting enumerate-one-at-a-time.
-  STEWARD SCOPE RULING (`evt_5xq3hw23kamrd`): FAMILY CLOSURE over the
-  ResourceScalar need (ResourceRelease/FsHandleMetadata/FsReadAt Arg(0)), do not
-  narrow — one structural predicate is one node. Node text widened to match.
-  Boundary = the need: rows terminate at the `ExactIntU64` sibling (FsReadAt
-  Arg(1)), a distinct need with its own `carried_exact_int` precedent, scoped
-  OUT (its own future cut, NOT authorized now). Specialized-only positioned-
-  resource arm (FsReadAt/FsWriteAt) folded into the shared guarded observation
-  (else the refusal moves rather than closes). No Avail change; no TCB. Still
-  owed to handback: AC-2 runtime discriminator (malformed-carried-word negative
-  expressible vs defensive-unreachable), gate re-run on the widened code.
-  Architect required reviewer; Adversary hunts the landed route.
+The NHC `cap41_*` blocker chain: each landed fix ADVANCES the rows to the next
+distinct blocker (does not green them) until the last lands and D-final runs
+all-green.
+
+- RT-DEAD-ARM-EFFECT-LOWERING MERGED (`55c7f51de`, Decision `dec_4p9n9a0b0rfqq`).
+  Two-conjunct deadness predicate traps whole-program-dead FSOp arms.
+- RT-RESOURCE-RELEASE-CARRIED-OBSERVE MERGED (`ef32b6ced`, Decision
+  `dec_3m2p4tmgnpa9t`; QA `evt_6e1kf4tdghchs` + Architect required-reviewer
+  APPROVE `evt_24nyqqhs5fy1f`, all 9 soundness properties by direct read). The
+  carried-observation FAMILY CLOSURE over the ResourceScalar need (Steward ruling
+  `evt_5xq3hw23kamrd`, `lower_resource_token_seat`, no Avail change). AC-1: all
+  three ResourceScalar seats advance; rows TERMINATE at the ExactIntU64 sibling.
+  M8 Adversary hunt on the landed route in flight.
+- RT-EXACTINT-CARRIED-OBSERVE cut (`ready`) — the ExactIntU64-need carried-
+  observation closure for FsReadAt Arg(1), the measured terminal. Likely a pure
+  wiring to the existing `carried_exact_int` EITHER_PHASE route (BufferAllocate 0
+  already reads through it), so S/T2-leaning; D0 confirms. Architect required
+  reviewer. KICK HELD until the RT-RESOURCE-RELEASE M8 hunt reports clean
+  (effects.rs contention with any fold; single ring). NHC held on this node only.
+- NHC depends_on now names RT-EXACTINT; closes when the chain reaches all-green
+  and D-final re-runs (fold with preserved slice/fixture + six-axis oracle →
+  closes NHC + PX8-F-CAP-41 Phase 2). PX8-F-CAP-41 held on NHC.
 - CARRY CUT: RT-NATIVE-VOCAB-STRUCTURAL-COMPLETENESS (`draft`, queued, NOT
   released) — make conjunct-(2) completeness structural (route minting sites
   through `NativeProcessSymbols`, or a test asserting every module-level
