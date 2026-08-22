@@ -150,10 +150,18 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
     // which crosses a function boundary and carries only the word. Designed to
     // go red when THAT boundary is addressed; the deliverable then is to
     // re-measure the terminal state, not to widen this clause.
+    // REPOINTED by `RT-DEAD-ARM-EFFECT-LOWERING`, the boundary this sentinel
+    // named. The `ConstructorTag` stop sat on a DEAD handler arm; that node
+    // traps it, so this witness advances to the next refusal. Repointed rather
+    // than widened or deleted, and the new terminal is strictly DOWNSTREAM of
+    // the old one, so the absence above still holds — more strongly.
     assert!(
-        reason.contains("needs ConstructorTag, which it cannot observe in CarriedWord"),
-        "the expected terminal state after `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` is the \
-         host-effect seat refusal, which is what keeps the absence above non-vacuous: \
+        reason.contains(
+            "seat Argument(0) of ResourceRelease needs ResourceScalar, which it cannot \
+             observe in CarriedWord"
+        ),
+        "the expected terminal state after `RT-DEAD-ARM-EFFECT-LOWERING` is the LIVE \
+         ResourceRelease seat refusal, which is what keeps the absence above non-vacuous: \
          {error:?}"
     );
 }
