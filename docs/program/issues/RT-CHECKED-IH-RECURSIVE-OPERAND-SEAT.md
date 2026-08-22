@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT
 title: "Seat the checked-IH recursive-position ENVIRONMENT operand on the ported (checked-IH) route so the static worker call arrives saturated -- the structural closure of section-1b entries 2+3 (Architect ruling evt_3tspjkw7dhh6x: CLOSURE A). The checked-IH marker is a bound, already-specialized computational IH -- a saturated NULLARY closure-style invocation -- so explicit template arity 0 is CORRECT and the recursive value is an environment operand at the plan's recursive_position, NOT an explicit application argument. In the ported-route lowering (consume_checked_ih_marker_at_static_worker_call and the worker-call emission it feeds), BEFORE the declared-arity gate at core.rs:14306, materialize the recursive-position operand from the resolved checked slot template and place it in the worker-call inputs, reading the SAME recursive_position authority and using the SAME seating discipline the composed route already uses (composed_recursive_argument_binding, or an equivalent reading that authority). Do NOT weaken or bypass the core.rs:14306 declared-arity gate, do NOT relax the marker-seam checks, do NOT change the marker's meaning, and do NOT relabel any count -- post-fix, supplied == worker.declared_arity must hold HONESTLY because the operand is now supplied. Producer, template, marker seam, and the join half stay untouched. Carries the terminal AC-REENUM gate for the checked-program family (shared with RT-IH-MARKER-PRODUCER-COMPLETE)."
-status: active
+status: draft
 owner: runtime
 size: M
 gate: none
@@ -12,6 +12,38 @@ origin: "Successor cut by the Steward from the AC-REENUM STOP (runtime-implement
 ---
 
 # WHAT THIS NODE IS
+
+> HELD + NAME IS A MISNOMER 2026-08-22 (Closure A WITHDRAWN; Architect
+> evt_hftfnn4mh8jk). The runtime-implementer's grounded refutation
+> (evt_6tzrt1xndpx1e, measured on `64019430c`) and the Architect's acceptance
+> WITHDREW the Closure-A operand-seat mechanism this node prescribes. The premise
+> both Closure A (seat as an explicit input) and Closure B (producer emits an
+> explicit operand) shared -- that the recursive value is a PLACEABLE value -- is
+> refuted: at the firing seam (`core.rs:12519`, direct descent) the recursive
+> operand is a LIVE nested-recursor StaticWorker (declared_arity 1, captures 9).
+> `LoweringOperand` has only `{ Specialized(Lowered), Carried(CarriedBoundaryWord) }`
+> and `worker.captures` is itself `Vec<LoweringOperand>`, so the live worker fits
+> NEITHER `inputs` NOR captures; the only conversion is a Lowered closure value,
+> which is exactly the closure-boundary crossing Ken forbids (the
+> `rt_write_writable_stage` refusal -- the BoundaryCarrier wall from the other
+> side). Nothing can be "seated as an operand", so this node's NAME and mechanism
+> are both refuted.
+>
+> STATUS: `draft` (HELD) pending the reframed section-1a ruling -- the mechanism
+> below is refuted, so the node is reverted to draft until it is re-framed. HS=5
+> (Steward of record).
+> The Architect's LEADING, UNRULED hypothesis: env slot 0 (the IH itself) is a
+> lazy IH thunk (StaticWorker), and the checked-IH invocation is a nullary FORCE of
+> that thunk (Ken has a zero-input thunk at `core.rs:13128` and a bounded re-entry
+> path at `core.rs:4766 / 5020 / 1391`) -- not a declared_arity-1 raw-worker call,
+> so `worker.declared_arity` 1 is the wrong shape and the fix is UPSTREAM of the
+> gate (how the checked-IH callee is realized): the implementer's option (c) via
+> re-entry/force. Research is pulled on the reframed question (forced thunk vs
+> re-entry vs carried-word / fixpoint-self under CBV). On the reframed ruling this
+> node is re-framed or superseded -- the SEAM and possibly the OWNER may change.
+> Do NOT build the operand-seat mechanism below. The marker's nullary/arity-0
+> semantic, the producer fix (`64019430c`), and the join half (`6a45ae1a7`) all
+> STAND, untouched; both runner tables stay red; nothing lands.
 
 Seat the checked-IH recursive-position ENVIRONMENT operand on the ported
 (checked-IH) route so the static worker call arrives saturated at the

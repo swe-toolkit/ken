@@ -29,6 +29,15 @@ origin: "Bounded successor cut by the Steward from the two enumeration reports (
 > [[RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT]], which now carries the terminal
 > AC-REENUM gate. This node co-lands (§8) as a closed producer deliverable with
 > that successor + the join half (`6a45ae1a7`); it does not land alone.
+>
+> UPDATE 2026-08-22: Closure A was subsequently WITHDRAWN (Architect
+> evt_hftfnn4mh8jk) after the operand-seat mechanism was refuted at the type level
+> -- the recursive value at the firing seam is a live nested-recursor StaticWorker,
+> not a placeable operand (HS=5). The successor is HELD, re-framed pending a
+> reframed section-1a ruling (leading hypothesis: a nullary FORCE of a lazy IH
+> thunk, fixed upstream of the arity gate). This node's producer fix still STANDS
+> as a closed deliverable; the terminal AC-REENUM gate moves with the reframed
+> successor. Nothing lands until the reframed ruling and AC-REENUM green.
 
 > RE-SCOPED + RE-OWNED 2026-08-22 (Architect shape ruling evt_7rsy01s7k1d7x;
 > Steward ownership finalization). The shape is PRODUCER-SIDE, case (i) genuinely
