@@ -81,13 +81,19 @@ all-green. Two blockers merged, third in review, fourth cut.
   code.
 - RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL CUT `ready` 2026-08-22. Closing
   ExactIntU64 moved the previously-deferred FsReadAt Arg(2) buffer reply-path
-  gate (`effects.rs:3226`) ONTO the critical path (the "off critical path" ground
-  of the deferral is invalidated; implementer re-dispositioned carry→cut,
-  evt_6vxb4f1rxh3jk). ResourceScalar-family REMOVAL of a vestigial gate
-  (span_origin unused; span projected from operand list at 3233), NOT a reroute
-  (Architect `evt_2qdpkfvtqrxzy`). D0 = the Architect's (1)-(3) classify; depends
-  on RT-EXACTINT (effects.rs contention); released to the ring after RT-EXACTINT
-  merges. Architect required reviewer.
+  gate (`effects.rs:3226`) ONTO the critical path (the "off critical path"
+  ground of the deferral is invalidated; implementer re-dispositioned
+  carry→cut, evt_6vxb4f1rxh3jk). ResourceScalar-family REMOVAL of a vestigial
+  gate (span_origin unused; span projected from operand list at 3233), NOT a
+  reroute (Architect `evt_2qdpkfvtqrxzy`). D0 = the Architect's (1)-(3)
+  classify; depends on RT-EXACTINT (effects.rs contention); released to the
+  ring after RT-EXACTINT merges. Also the tracked restoration home for two
+  carried-observation-family TEST items (Architect `evt_4wkc748vgfhhf`): AC-4
+  the ExactIntU64 runtime-half end-to-end test (observable once this gate is
+  gone) and AC-5 a durable positive-cross-key keyed-on-need discriminator for
+  the ResourceScalar route (replacing the vanishing-contrast one RT-EXACTINT
+  had to drop). Both safe-direction coverage, not soundness holes. Size M.
+  Architect required reviewer.
 - NHC depends_on re-pointed onto RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL (added
   before RT-EXACTINT merges — gen-progress closed==merged hazard). Held on the
   removal node. Closes when the chain reaches all-green and D-final re-runs (fold

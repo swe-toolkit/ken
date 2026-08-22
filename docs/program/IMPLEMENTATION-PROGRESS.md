@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 06:04:47Z — from 408 issue file(s) in `docs/program/issues/`.
+2026-08-22 06:17:47Z — from 408 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -312,7 +312,7 @@ the committed file matches the generator's output.
 | `RT-FORCED-RETURNS-BOUND-RESTORE` | One clause: the six ignored tests' eighteen empty returns are FORCED by the refusal, not observed -- the measurement the Architect barred from this comment came back one repair later, and it now sits one sentence above the 81-return tally a reader will add it to | merged | runtime | XS | none | — |
 | `RT-FRAME-MARKER-ONCE` | Checked Runtime frame marker is consumed more than once under a nested computational eliminator | draft | runtime | TBD | none | — |
 | `RT-FRONTEND-REACHABILITY-TRIPWIRE` | Nothing in the tree would notice if a frontend change made one of the source-unreachable refusal shapes constructible -- the emitter fixtures that look like they cover this bypass the parser and elaborator entirely | draft | runtime | M | none | — |
-| `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` | A vestigial specialized-only gate on FsReadAt's Argument(2) buffer reply/ok-construction path (effects.rs:3226) re-refuses a carried buffer that the request path already admits; the destructured span_origin is UNUSED (the span is projected from the operand list at 3233), so the fix is REMOVAL of the dead gate, not a reroute -- the ResourceScalar-family leftover reader RT-EXACTINT moved onto the cap41_* critical path | ready | runtime | S | none | — |
+| `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` | A vestigial specialized-only gate on FsReadAt's Argument(2) buffer reply/ok-construction path (effects.rs:3226) re-refuses a carried buffer that the request path already admits; the destructured span_origin is UNUSED (the span is projected from the operand list at 3233), so the fix is REMOVAL of the dead gate, not a reroute -- the ResourceScalar-family leftover reader RT-EXACTINT moved onto the cap41_* critical path | ready | runtime | M | none | — |
 | `RT-GROUNDVALUE-RECURSIVE-DROP` | `RuntimeGroundValue` is a recursive type, so a decoder that is carefully iterative still cannot honour \"deep valid data uses no recursive host stack\" end to end -- a deeply nested value overflows the stack in its own `drop`, reproducible without the decoder, and the depth at which that happens is UNMEASURED: the two numbers in the source report are an observed abort and a deliberately-safe control, not a bisected threshold | draft | runtime | unknown | none | — |
 | `RT-IGNORED-CORPUS-MEMBERSHIP-RULE` | State the measurement corpus's exclusion by its membership rule -- all 33 ignored tests -- rather than by the six whose stated reason matched, which re-selects by reason at one scale down from the defect just repaired | merged | runtime | XS | none | https://github.com/swe-toolkit/ken/pull/2389 |
 | `RT-JOIN-DISPOSITION` | Join-disposition phase repair — the landed RECUR-PORT `consumed XOR statically-unselected` invariant conflates structural materialization with semantic reachability and false-rejects a join materialized before its enclosing match selects | merged | runtime | M | none | — |
