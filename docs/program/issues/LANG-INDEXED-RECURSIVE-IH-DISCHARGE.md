@@ -1,7 +1,7 @@
 ---
 id: LANG-INDEXED-RECURSIVE-IH-DISCHARGE
 title: "Transport the mutual-recursion sibling-call result along the dependent-match refinement equality at the elaboration boundary, so the source branch reconciles a recursive-group call's concrete indexed result with the refined motive index -- route (c) genuine J/cast transport over a PROPOSITIONAL equality via c-elab roster-aware auto-transport (the c-proof/c-elab fork RESOLVED to c-elab: D0 measured no lawful existing source carrier), surfacing the recursive-group roster into ElabCtx and inserting the transport at the equality-holding seam, NOT the reflexive same-owner discharge and NOT a new source-language carrier; the elaborator prerequisite V3-FO-CHECKER-SOUNDNESS D3 is blocked on"
-status: ready
+status: active
 owner: language
 size: M
 gate: none
@@ -10,6 +10,26 @@ blocks: [V3-FO-CHECKER-SOUNDNESS]
 github: null
 origin: "Steward, 2026-08-21. RE-FRAMED on the Architect's RE-RULE evt_349bjakvjj9yp (hard-stop 4 of the D3 chain, grounded via a full locus map of check_match_dependent). The node's first framing (on ruling evt_n4q1da1qp68) targeted the same-owner reflexive-discharge case; the language-implementer built that mechanism (candidate b89b4a2cf) and the Architect APPROVED it as sound (soundness line + application-spine boundary correct), but the AC-7 real-family control REDDED honestly: the held-D3 consumer (a84d7100561a89f3ded6300fbb4fb4b45b947888) stays kernel-rejected because its recursive call crosses a MUTUAL-RECURSION helper edge (callee != owner_label) and the leading equality is a dependent-match RESULT REFINEMENT, not bare same-owner-child evidence -- so the reflexive helper is by-design dead on this path. Architect's corrected locus + soundness frame below: the equality is PROPOSITIONAL, the fix is a genuine J/cast transport (route c). The reflexive helper is RETAINED as a sound building block. Elaborator-scoped + kernel-backstopped (the kernel re-checks and rejects any ill-typed transport), so NOT a TCB change and NOT operator-gated. Scope routed to the Steward per COORDINATION section 2. Estimated tier T1 (soundness-adjacent dependent-elaboration transport; reasoning-dense, must hold the propositional-vs-definitional line and be measured, not guessed)."
 ---
+
+# TRANSPORT LANDED — 2026-08-22 (accepted partial, node HELD open)
+
+The c-elab transport landed on `main` as squash `93d82a398` (its sole `elab.rs`
+blob equals the Architect-approved `1afbb4b6`; Decision `dec_1f50e3a2pnxj6`
+APPROVE — a stack-plumbing-only respin of `1b9aa9c7b`, transport bodies
+unchanged). **The narrowed AC-7 ("held D3 bodies elaborate + pass
+kernel_check") is met.** This is the accepted partial the Architect's split
+ruling authorized (`evt_4q9gwy44nzf1d`).
+
+**The node stays OPEN, not merged.** Full admission (kernel_check AND SCT-pass)
+— the gate that actually unblocks `V3-FO-CHECKER-SOUNDNESS` D3 — was ruled to a
+SEPARATE, operator-gated kernel SCT successor (route A, `sct.rs`
+telescope-canonicalization). That successor is not yet authorized (operator
+question pending). Do NOT flip this node `merged`/`closed` before the successor
+is cut and `V3-FO-CHECKER-SOUNDNESS` `depends_on` is re-pointed to it: closing
+here first would clear this node from V3-FO's `depends_on` and falsely unblock
+V3-FO while the real gate is unwired (the `gen-progress` `closed`==`merged`
+clearance hazard). Sequence on the successor's authorization: cut the kernel
+successor, re-point V3-FO's `depends_on`, then close this node.
 
 # WHY THIS NODE EXISTS (re-framed -- hard-stop 4)
 
