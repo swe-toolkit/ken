@@ -13,6 +13,23 @@ origin: "Bounded successor cut by the Steward from the two enumeration reports (
 
 # WHAT THIS NODE IS
 
+> OUTCOME 2026-08-22 (producer fix DELIVERED + effective; deeper layer ruled).
+> Language's producer fix landed on the co-land branch at `64019430c` and WORKED:
+> both checked-family programs cleared the marker seam (supplied 0 == arity 0,
+> method_binder_ordinal 0 == binder_index 0). This node's producer-side
+> deliverable is CLOSED (Architect confirmed effective, evt_3amhmvyd0sr9t). The
+> mandatory AC-REENUM then STOPPED at a deeper refusal ONE LAYER BELOW the marker
+> seam -- the static-worker ABI supply layer (template arity 0 vs
+> `worker.declared_arity` 1) -- a genuine NEW mechanism (HS=4, Steward-confirmed),
+> NOT a further checked-family layer, so the DEFERRED DECISION POINT below did NOT
+> fire. The Architect ruled the closure fork CLOSURE A (evt_3tspjkw7dhh6x): the
+> marker is a saturated nullary closure-style invocation, template arity 0 is
+> CORRECT, and the recursive value is an environment operand the ported route must
+> SEAT -- owner Runtime. That work is the successor
+> [[RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT]], which now carries the terminal
+> AC-REENUM gate. This node co-lands (§8) as a closed producer deliverable with
+> that successor + the join half (`6a45ae1a7`); it does not land alone.
+
 > RE-SCOPED + RE-OWNED 2026-08-22 (Architect shape ruling evt_7rsy01s7k1d7x;
 > Steward ownership finalization). The shape is PRODUCER-SIDE, case (i) genuinely
 > complete but mis-spelled: at arity 0 the producer emits bare `RuntimeExpr::Var(0)`
