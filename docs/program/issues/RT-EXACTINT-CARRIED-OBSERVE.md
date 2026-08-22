@@ -62,6 +62,39 @@ Measure and report, so the Architect rules the specific wiring:
 `D0` determines the node's final SIZE (estimated `S`) and hands the Architect the
 input to rule the specific wiring.
 
+## `D0` side-classification: the FsReadAt Arg(2) reply-path gate removal
+
+(Architect ruling `evt_2qdpkfvtqrxzy`; a distinct ResourceScalar-family item.)
+
+A distinct ResourceScalar-family item, NOT ExactIntU64 work -- carried here only
+because it shares the `effects.rs` edit for contention; keep it distinct in the
+accounting. The Adversary flagged (M8, `evt_5wx3bax63yak`) that FsReadAt's Arg(2)
+buffer REPLY/span-provenance path (`effects.rs:3226`) still refuses a carried
+buffer specialized-only, after RT-RESOURCE-RELEASE made the REQUEST path
+carried-capable. The Architect ruled the fix is REMOVAL of a vestigial gate, NOT
+a reroute: `3226`'s destructured `span_origin` is UNUSED (the constructor projects
+the span from `site_operand_argument(builder, static_origin, 2, &seats)` at
+`3233`), so routing it through `lower_resource_token_seat` would add a guarded read
+whose scalar result is discarded -- a dead read. Do NOT reroute it.
+
+CLASSIFY in D0, then route (do not fix it inside this node, do not absorb it
+silently):
+
+1. Confirm `site_operand_argument(.., 2, ..)` projects the buffer argument
+   correctly when Arg(2) arrives CARRIED (that operand-list projection, not the
+   destructured payload, is the live path that binds the span).
+2. Confirm Arg(2) is already validated as a resource token on the REQUEST path
+   (`2477` via `lower_resource_token_seat`), so the reply-path gate is a redundant
+   re-validation whose removal drops only a spurious refusal, not a real check.
+3. Direction: confirm removal enables no scalar misread (the value was already
+   discarded).
+
+If (1)-(3) hold and it is a clean removal, report it and I cut it as its own tiny
+ResourceScalar-family successor (RT-RESOURCE-RELEASE's leftover reader). If any of
+(1)-(3) needs real design work, name it with that argument as its own successor.
+Either way it is a SEPARATE node from this one -- report the classification, do
+not land the removal here.
+
 # `D1` -- THE WIRING
 
 Wire the enumerated `ExactIntU64` seats to observe the need in the carried phase
@@ -104,15 +137,16 @@ same non-vacuity discipline the two predecessors held.
 # CONTENTION
 
 `ken-runtime` cranelift backend lowering (`effects.rs`). Both predecessors are
-merged. The M8 Adversary hunt on the landed [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]]
-route reported SOUNDNESS CLEAN (`evt_5wx3bax63yak`), so no soundness fold is
-coming -- BUT it raised one non-blocking completeness observation (the FsReadAt
-Arg(2) buffer reply-path reader at `effects.rs:3226` still refuses a carried
-buffer specialized-only). If the runtime ring rules that a real gap to close now,
-it is a small fold on `effects.rs` that would contend this node (single ring,
-single lane, one `effects.rs`). SEQUENCED AFTER the ring dispositions that
-observation as deferred (off the current critical path; the rows hit this node's
-`ExactIntU64` terminal first). Do not kick this node until that disposition is in.
+merged and the M8 Adversary hunt on the landed
+[[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] route reported SOUNDNESS CLEAN
+(`evt_5wx3bax63yak`) -- no soundness fold coming. Its one completeness observation
+(the FsReadAt Arg(2) buffer reply-path gate) is DEFERRED (implementer
+`evt_1rz7rnphp9ndw`, Architect `evt_2qdpkfvtqrxzy`): a mechanism/removal item, not
+a fold, off the critical path. It rides into this node's `D0` as the
+side-classification above and, if a clean removal, becomes its own tiny
+ResourceScalar-family successor -- sharing this node's `effects.rs` edit for
+contention but distinct in the accounting. RELEASED to the runtime ring (anchor
+`evt_47kvrp1esty58`). Single ring, single lane, one `effects.rs`.
 NATIVE-HANDLE-CARRIER is held on this node.
 
 # CAPABILITY TIER

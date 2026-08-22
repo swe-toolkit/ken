@@ -46,7 +46,7 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `ef32b6ced`.** Tree clean; no publisher running. Watchdog armed
+**`main` = `aa0178eed`.** Tree clean; no publisher running. Watchdog armed
 @1800s; the CronCreate daily briefing-flush schedule (`7d029bbf`, 09:37 —
 session-only) present.
 
@@ -54,39 +54,38 @@ session-only) present.
 (language + verify) is retired. Finished work still merges, filings queue behind
 the lane; framing for lane 1 is lane work.
 
-### Runtime (lane 1) — RT-DEAD-ARM + RT-RESOURCE-RELEASE MERGED; RT-EXACTINT cut
+### Runtime (lane 1) — RT-EXACTINT-CARRIED-OBSERVE RELEASED; NHC held on it
 
 The NHC `cap41_*` blocker chain: each landed fix ADVANCES the rows to the next
 distinct blocker (does not green them) until the last lands and D-final runs
-all-green.
+all-green. Two blockers merged, third released.
 
-- RT-DEAD-ARM-EFFECT-LOWERING MERGED (`55c7f51de`, Decision `dec_4p9n9a0b0rfqq`).
-  Two-conjunct deadness predicate traps whole-program-dead FSOp arms.
-- RT-RESOURCE-RELEASE-CARRIED-OBSERVE MERGED (`ef32b6ced`, Decision
-  `dec_3m2p4tmgnpa9t`; QA `evt_6e1kf4tdghchs` + Architect required-reviewer
-  APPROVE `evt_24nyqqhs5fy1f`, all 9 soundness properties by direct read). The
-  carried-observation FAMILY CLOSURE over the ResourceScalar need (Steward ruling
-  `evt_5xq3hw23kamrd`, `lower_resource_token_seat`, no Avail change). AC-1: all
-  three ResourceScalar seats advance; rows TERMINATE at the ExactIntU64 sibling.
-  M8 Adversary hunt on the landed route in flight.
-- RT-EXACTINT-CARRIED-OBSERVE cut (`ready`) — the ExactIntU64-need carried-
-  observation closure for FsReadAt Arg(1), the measured terminal. Likely a pure
-  wiring to the existing `carried_exact_int` EITHER_PHASE route (BufferAllocate 0
-  already reads through it), so S/T2-leaning; D0 confirms. Architect required
-  reviewer. KICK HELD until the RT-RESOURCE-RELEASE M8 hunt reports clean
-  (effects.rs contention with any fold; single ring). NHC held on this node only.
-- NHC depends_on now names RT-EXACTINT; closes when the chain reaches all-green
-  and D-final re-runs (fold with preserved slice/fixture + six-axis oracle →
-  closes NHC + PX8-F-CAP-41 Phase 2). PX8-F-CAP-41 held on NHC.
-- CARRY CUT: RT-NATIVE-VOCAB-STRUCTURAL-COMPLETENESS (`draft`, queued, NOT
-  released) — make conjunct-(2) completeness structural (route minting sites
-  through `NativeProcessSymbols`, or a test asserting every module-level
-  constructor const is a field). Fail-closed-sound today; Architect req
-  reviewer; queues behind lane-1 indefinitely.
-- NHC held on RT-RESOURCE-RELEASE only now; closes when it lands and D-final
-  re-runs all-green (folds with the preserved slice/fixture + six-axis oracle
-  → closes NHC + PX8-F-CAP-41 Phase 2). The ConstructorTag/FsWriteFile (A)
-  instance stays DEFERRED. PX8-F-CAP-41 held on NHC.
+- RT-DEAD-ARM-EFFECT-LOWERING MERGED (`55c7f51de`, `dec_4p9n9a0b0rfqq`).
+- RT-RESOURCE-RELEASE-CARRIED-OBSERVE MERGED (`ef32b6ced`, `dec_3m2p4tmgnpa9t`;
+  QA + Architect required-reviewer APPROVE). Carried-observation FAMILY CLOSURE
+  over the ResourceScalar need (`lower_resource_token_seat`, no Avail change);
+  rows terminate at the ExactIntU64 sibling. M8 Adversary hunt SOUNDNESS CLEAN
+  (`evt_5wx3bax63yak`). Its one completeness obs (FsReadAt Arg(2) buffer
+  reply-path `effects.rs:3226` refuses a carried buffer) DEFERRED: implementer
+  (`evt_1rz7rnphp9ndw`) + Architect (`evt_2qdpkfvtqrxzy`) ruled the fix is
+  REMOVAL of a vestigial gate (span_origin unused; reroute would be a dead read),
+  a distinct ResourceScalar-family successor -> routed into RT-EXACTINT's D0 as a
+  CLASSIFY side-task; Steward cuts the tiny removal successor post-D0 if clean.
+  Safe-direction, off critical path, does not gate NHC.
+- RT-EXACTINT-CARRIED-OBSERVE RELEASED (anchor `evt_47kvrp1esty58`, runtime ring,
+  Opus 5 seat). ExactIntU64-need carried-observation closure for the measured
+  FsReadAt Arg(1) terminal, on the existing `carried_exact_int` EITHER_PHASE route
+  (BufferAllocate 0 precedent). D0-first: ground the reader census before sizing
+  (the ResourceScalar node looked like pure wiring too). S may escalate to T1 at
+  D0. Architect required reviewer; Adversary hunts landed code. Confirm the seat
+  transitions to Working.
+- NHC depends_on names RT-EXACTINT; held on it only. Closes when the chain
+  reaches all-green and D-final re-runs (fold with preserved slice/fixture +
+  six-axis oracle → closes NHC + PX8-F-CAP-41 Phase 2). PX8-F-CAP-41 held on NHC.
+- Queued carry (NOT released, behind lane-1 indefinitely):
+  RT-NATIVE-VOCAB-STRUCTURAL-COMPLETENESS (conjunct-(2) completeness structural;
+  Architect req reviewer). The FsReadAt Arg(2) removal is NOT a standalone node
+  yet — it rides in RT-EXACTINT's D0 classify and is cut post-D0.
 - Lane-1 frontier after NHC (§0): RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT
   [merged], the `RT-*` nodes at `ready`, RT-DESCENT-RETIRE's owed `D6a`.
 

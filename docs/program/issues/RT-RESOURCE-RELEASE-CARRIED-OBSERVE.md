@@ -64,10 +64,20 @@ notes `3226`'s destructured `span_origin` is unused (the constructor projects vi
 `site_operand_argument` at `3233`), so that specialized-only match is a vestigial
 gate whose only post-D1 effect is rejecting carried buffers.
 
-**Disposition: routed to the runtime ring to confirm deferred-by-design vs
-not-cross-referenced.** Non-blocking and off the critical path, so it does not
-gate NHC now. If confirmed a real gap on the chain, it is a small fold/successor
-cut when the chain reaches it -- not remaining work of this closed node.
+**Disposition: DEFERRED by design, and the fix is REMOVAL not reroute**
+(runtime-implementer `evt_1rz7rnphp9ndw` deferred it; Architect
+`evt_2qdpkfvtqrxzy` corrected the mechanism, both confirmed at `aa0178eed`). The
+`3226` `span_origin` binding is UNUSED -- the constructor projects the span from
+`site_operand_argument(.., 2, ..)` at `3233`, not the destructured payload -- so
+the gate is vestigial and rerouting it through `lower_resource_token_seat` would
+add a guarded read whose scalar result is discarded (a dead read). The correct
+fix is to REMOVE the vestigial gate. That removal carries its own small
+soundness/completeness check, so it is a distinct ResourceScalar-family successor,
+not a silent fold. Routed into [[RT-EXACTINT-CARRIED-OBSERVE]]'s `D0` as a
+side-classification (CLASSIFY, then the Steward cuts the tiny removal successor if
+clean, or names a design successor if not) -- kept distinct in the accounting from
+that node's ExactIntU64 need. Safe-direction and off the critical path; does not
+gate NHC.
 
 The below is the node as framed, retained for its measurements.
 
