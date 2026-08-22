@@ -1,7 +1,7 @@
 ---
 id: RT-IH-MARKER-PRODUCER-COMPLETE
 title: "Resolve the OrientedSubcontinuationPlanV1 'computational IH invocation marker does not wrap a complete application' refusal on the checked-program family (both programs, the terminal of the four cap41_* pins, on RT-FSREADAT's AC-4/AC-5 critical path) by CORRECTING THE PRODUCER, never the validator: diagnose which producer step made the plan and the marked expression disagree about completeness, then resolve to ONE of the two lawful non-interchangeable representations -- (i) it IS complete => fix the producer so plan and marker agree on a full Call of the checked arity, or (ii) it is genuinely partial => the distinct closure/PAP form with its own later apply. NEVER pad the call, infer missing arguments at emission, or reinterpret a full-call node as partial. The completeness checker stays byte-untouched (GHC join-point / Lean IR-checker / typed-CPS precedent, all fail-closed). Carries a MANDATORY post-fix re-enumeration gate: this family is depth-1 and cannot self-bound, so after the fix lands, re-run the existing checked-family enumeration end-to-end and read what surfaces."
-status: active
+status: closed
 owner: language
 size: M
 gate: none
@@ -10,6 +10,28 @@ blocks: []
 github: null
 origin: "Bounded successor cut by the Steward from the two enumeration reports (RT-COLD-LOWERING-PATH-ENUMERATION report 1 evt_1m6eg23vnbj4n found the IH-marker has ZERO entries in rt_parity; RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION report 2 evt_7rg8mye0bbfse confirmed it is the checked-program family's single terminal over both programs). Architect ruling point 3 + IH-marker addendum evt_1a8tf8776fd6m (producer-fix, validator untouched) and the report-2 review evt_4jcnbhx8nqwdy (the depth behind the marker is UNKNOWN, possibly zero; the cheap sound instrument is a post-fix re-enumeration, not speculative fixtures). Steward-filed per COORDINATION section 2."
 ---
+
+> CLOSED 2026-08-22 (Steward). The producer fix is COMPLETE and LANDED, and the
+> node's mandatory AC-REENUM is discharged. Language's `erasure.rs` change landed
+> at `64019430c` (ancestor of current main): it emits an unconditional
+> zero-argument `Call` around the existing callee, and its durable producer
+> control requires `Call { callee: Var(0), args: [] }` -- matching the ruled
+> `Call { func: Var(slot.method_binder_ordinal), args: [] }` AC on the measured
+> ordinal 0 (AC-1/AC-2 met; AC-SOUNDNESS: the completeness checker stayed
+> byte-untouched). The MANDATORY AC-REENUM re-ran end-to-end and surfaced a
+> refusal ONE LAYER BELOW the marker seam -- the realized IH function VALUE is
+> stored unapplied into a Construct on both checked-family programs, an ESCAPING
+> capability gap, NOT a further checked-family layer. That gap is a distinct
+> successor, [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]], which now carries the
+> terminal "green both checked-family programs" goal; the two programs are
+> re-pointed to documented ADVANCING refusals. The DEFERRED DECISION POINT below
+> did NOT fire (the surfaced refusal is a new mechanism, not serial checked-family
+> depth). No language-side AC remains (language-leader confirm evt_4v0bpjyxh5rhm;
+> runtime-side consumer-verification confirm runtime-leader evt_10rk35dhtw1cq;
+> Architect D-final evt_32gfvvpfe63c8 closes NHC + PX8-F-CAP-41 Phase 2 except
+> this ESCAPING row). Superseded/related: operand-seat successor
+> RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT is CLOSED. HS=5 (ESCAPING is a scoping
+> decision, not an increment).
 
 # WHAT THIS NODE IS
 
