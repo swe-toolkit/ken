@@ -5,6 +5,7 @@
 //! declare-def-sct-admits / declare-def-sct-rejects.
 
 use ken_kernel::env::Context;
+use ken_kernel::sct::count_params;
 use ken_kernel::term::{Level, Term};
 use ken_kernel::{
     convert, declare_def, declare_inductive, declare_recursive_group, CtorSpec, GlobalEnv,
@@ -107,9 +108,6 @@ fn nat_t(nb: &NB) -> Term {
 }
 fn bool_t(nb: &NB) -> Term {
     Term::indformer(nb.bool_, vec![])
-}
-fn zero_c(nb: &NB) -> Term {
-    Term::constructor(nb.zero, vec![])
 }
 fn suc_c(nb: &NB) -> Term {
     Term::constructor(nb.suc, vec![])
@@ -508,7 +506,10 @@ fn sct_reject_self_loop() {
         vec![Term::lam(nat_t, Term::app(cref(loop_id), Term::var(0)))]
     });
     assert!(result.is_err(), "loop must be rejected");
-    assert!(matches!(result.unwrap_err(), KernelError::NotTerminating(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        KernelError::NotTerminating(_)
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -690,7 +691,10 @@ fn sct_reject_union_masking() {
         result.is_err(),
         "f with a stationary self-call must be rejected"
     );
-    assert!(matches!(result.unwrap_err(), KernelError::NotTerminating(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        KernelError::NotTerminating(_)
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -783,6 +787,87 @@ fn sct_accept_plus() {
 }
 
 // ---------------------------------------------------------------------------
+// KERNEL-SCT-TELESCOPE-CANON conformance pair.
+//
+// Promise class: durable invariant. The accept and reject cases share the
+// declared-telescope route. The accept case differs from its canonical source
+// only by a definitionally transparent head wrapper; the reject case carries a
+// Pi in its return type but has no strict descent in either declared parameter.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn sct_accepts_mutual_arity_isolation_consumer() {
+    let (mut env, nb) = mk_env();
+    let nat = nat_t(&nb);
+    let bool_ = bool_t(&nb);
+    let ty = Term::pi(nat.clone(), bool_.clone());
+    let ids = declare_recursive_group(
+        &mut env,
+        vec![(vec![], ty.clone()), (vec![], ty.clone())],
+        |ids| {
+            let wrapped_body = |callee: GlobalId, zero_case: Term| {
+                // The recursive argument is the bare matched field Var(1):
+                // no Cast, J, helper call, or parameter rotation lies on the
+                // descending path. Both mutual edges are therefore [[Down]],
+                // leaving one persistent strict thread across every lap.
+                let suc_method = Term::lam(
+                    nat.clone(),
+                    Term::lam(bool_.clone(), Term::app(cref(callee), Term::var(1))),
+                );
+                let canonical = Term::lam(
+                    nat.clone(),
+                    nat_elim(
+                        &nb,
+                        asc_motive(&nb, bool_.clone()),
+                        zero_case,
+                        suc_method,
+                        Term::var(0),
+                    ),
+                );
+                let wrapped = Term::Ascript(Box::new(canonical), Box::new(ty.clone()));
+                assert_eq!(
+                    count_params(&wrapped),
+                    0,
+                    "the elaborated body head must diverge from declared arity 1"
+                );
+                wrapped
+            };
+
+            vec![
+                wrapped_body(ids[1], true_c(&nb)),
+                wrapped_body(ids[0], false_c(&nb)),
+            ]
+        },
+    )
+    .expect("the mutual arity-isolation consumer must be admitted at declared arity");
+
+    assert!(env.transparent_body(ids[0]).is_some());
+    assert!(env.transparent_body(ids[1]).is_some());
+}
+
+#[test]
+fn sct_rejects_nonterminating_hidden_return_pi_group() {
+    let (mut env, nb) = mk_env();
+    let nat = nat_t(&nb);
+    let ty = Term::pi(nat.clone(), Term::pi(nat.clone(), nat.clone()));
+    let result = declare_recursive_group(&mut env, vec![(vec![], ty)], |ids| {
+        let loop_id = ids[0];
+        let body = Term::lam(nat.clone(), Term::app(cref(loop_id), Term::var(0)));
+        assert_eq!(
+            count_params(&body),
+            1,
+            "the pre-fix body heuristic must miss the return Pi"
+        );
+        vec![body]
+    });
+
+    assert!(
+        matches!(result, Err(KernelError::NotTerminating(_))),
+        "a return-Pi eta parameter is equal, never strictly decreasing; got {result:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // SCT-reject: declare-def-nullary-self-loop-rejects (soundness — Architect
 // finding on wp/K2c-recursive-sct)
 //
@@ -810,7 +895,10 @@ fn sct_reject_bare_self_reference() {
         result.is_err(),
         "bare nullary self-reference must be rejected"
     );
-    assert!(matches!(result.unwrap_err(), KernelError::NotTerminating(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        KernelError::NotTerminating(_)
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -850,5 +938,8 @@ fn sct_reject_combinator_laundered() {
         result.is_err(),
         "loop laundered through id must be rejected"
     );
-    assert!(matches!(result.unwrap_err(), KernelError::NotTerminating(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        KernelError::NotTerminating(_)
+    ));
 }

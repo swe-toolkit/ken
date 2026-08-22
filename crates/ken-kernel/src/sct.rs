@@ -6,8 +6,10 @@
 //! 2. Compute the idempotent closure of self-loop matrices via Floyd-Warshall.
 //! 3. Accept iff every idempotent self-loop has ≥1 `↓` on the diagonal.
 
-use crate::env::GlobalEnv;
+use crate::conv::whnf;
+use crate::env::{Context, GlobalEnv};
 use crate::inductive::{peel_app, recursive_shapes};
+use crate::subst::{subst0, weaken};
 use crate::term::{GlobalId, Term};
 
 // ---------------------------------------------------------------------------
@@ -631,17 +633,70 @@ pub fn count_params(body: &Term) -> usize {
     n
 }
 
-/// Skip `n` leading `Lam` binders, returning the inner body.
-fn skip_lams(body: &Term, n: usize) -> &Term {
-    let mut cur = body;
-    for _ in 0..n {
-        if let Term::Lam(_, b) = cur {
-            cur = b;
-        } else {
-            break;
+/// The maximal Π telescope of a recursive member's declared type.
+///
+/// Weak-head reduction is demand-driven at each codomain, so a Π hidden behind
+/// a reducible head still contributes a parameter. A Π in the return type is
+/// deliberately part of the telescope: SCT dimensions the eta-long body, not
+/// merely the lambdas visible in the producer's original syntax.
+fn declared_telescope(
+    env: &GlobalEnv,
+    id: GlobalId,
+) -> crate::error::KernelResult<(Vec<Term>, Context)> {
+    let (_, mut ty) = env.const_type(id).ok_or_else(|| {
+        crate::error::KernelError::IllFormedDecl(format!(
+            "SCT: recursive group member {id:?} has no declared type"
+        ))
+    })?;
+    let mut doms = Vec::new();
+    let mut ctx = Context::new();
+    loop {
+        match whnf(env, &ctx, &ty) {
+            Term::Pi(dom, cod) => {
+                let dom = *dom;
+                ctx.push(dom.clone());
+                doms.push(dom);
+                ty = *cod;
+            }
+            _ => return Ok((doms, ctx)),
         }
     }
-    cur
+}
+
+fn declared_arity(env: &GlobalEnv, id: GlobalId) -> crate::error::KernelResult<usize> {
+    Ok(declared_telescope(env, id)?.0.len())
+}
+
+/// Canonical eta-head for SCT analysis at the declared arity.
+///
+/// Conceptually this builds
+/// `λx₀ ... xₙ₋₁. body↑n x₀ ... xₙ₋₁`, then returns the term beneath those
+/// exactly `n` binders. Each application weak-head-reduces only its function
+/// head far enough to expose and fire that eta β-redex. The final inner term is
+/// not normalized: an eliminator or transport in its body remains for
+/// `collect_calls` to traverse exactly as before.
+fn canonical_inner(
+    env: &GlobalEnv,
+    id: GlobalId,
+    body: &Term,
+    n: usize,
+) -> crate::error::KernelResult<Term> {
+    let (doms, ctx) = declared_telescope(env, id)?;
+    if doms.len() != n {
+        return Err(crate::error::KernelError::IllFormedDecl(format!(
+            "SCT: declared arity changed while canonicalizing {id:?}"
+        )));
+    }
+
+    let mut inner = weaken(body, n as i64);
+    for k in (0..n).rev() {
+        let head = whnf(env, &ctx, &inner);
+        inner = match head {
+            Term::Lam(_, lam_body) => subst0(&lam_body, &Term::var(k)),
+            other => Term::app(other, Term::var(k)),
+        };
+    }
+    Ok(inner)
 }
 
 /// Build provenance for the outermost `n` lambda parameters.
@@ -672,16 +727,18 @@ pub fn sct_check(
 
     let group: Vec<(GlobalId, usize)> = group_bodies
         .iter()
-        .map(|(id, body)| (*id, count_params(body)))
-        .collect();
+        .map(|(id, _body)| Ok((*id, declared_arity(env, *id)?)))
+        .collect::<crate::error::KernelResult<_>>()?;
 
     let mut edges: Vec<CallEdge> = Vec::new();
-    for (caller_idx, (_id, body)) in group_bodies.iter().enumerate() {
+    for (caller_idx, (id, body)) in group_bodies.iter().enumerate() {
         let n = group[caller_idx].1;
-        let inner = skip_lams(body, n);
+        let inner = canonical_inner(env, *id, body, n)?;
         let prov = initial_prov(n);
         let recon = initial_recon(n);
-        collect_calls(inner, caller_idx, n, &group, &prov, &recon, env, &mut edges);
+        collect_calls(
+            &inner, caller_idx, n, &group, &prov, &recon, env, &mut edges,
+        );
     }
 
     if edges.is_empty() {
@@ -834,6 +891,68 @@ mod tests {
         let recon = recons(vec![Some(tag(0, CTOR_A, 1, 0))]);
         let arg = Term::app(Term::const_(GlobalId(1), vec![]), Term::var(0));
         assert!(!is_exact_reconstruction(0, &arg, &recon));
+    }
+
+    /// Promise class: durable invariant. The SCT dimension is the complete
+    /// declared Π telescope, including a Π in the return type; body syntax is
+    /// an independent control and deliberately exposes only one lambda.
+    #[test]
+    fn declared_telescope_is_maximal_and_not_body_counted() {
+        let mut env = GlobalEnv::new();
+        let sort = Term::Type(crate::term::Level::zero());
+        let ty = Term::pi(sort.clone(), Term::pi(sort.clone(), sort.clone()));
+        let id = crate::check::declare_postulate(
+            &mut env,
+            "SCT declared-telescope control".to_string(),
+            vec![],
+            ty,
+        )
+        .expect("control declaration");
+        let body_control = Term::lam(sort, Term::var(0));
+
+        assert_eq!(count_params(&body_control), 1, "pre-fix body reading");
+        assert_eq!(declared_arity(&env, id).unwrap(), 2, "maximal telescope");
+    }
+
+    /// Promise class: durable invariant. Canonical bodies retain the exact
+    /// pre-change analysed inner term; no interior normalisation is allowed.
+    #[test]
+    fn canonical_eta_head_preserves_canonical_body_inner() {
+        let mut env = GlobalEnv::new();
+        let sort = Term::Type(crate::term::Level::zero());
+        let ty = Term::pi(sort.clone(), Term::pi(sort.clone(), sort.clone()));
+        let id = crate::check::declare_postulate(
+            &mut env,
+            "SCT canonical-body control".to_string(),
+            vec![],
+            ty,
+        )
+        .expect("control declaration");
+        let body = Term::lam(sort.clone(), Term::lam(sort, Term::var(0)));
+
+        assert_eq!(canonical_inner(&env, id, &body, 2).unwrap(), Term::var(0));
+    }
+
+    /// Promise class: durable invariant. A definitionally transparent head
+    /// wrapper cannot make admission and SCT analyse different parameter
+    /// dimensions: head-only canonicalisation exposes the same lambda without
+    /// reducing its interior.
+    #[test]
+    fn canonical_eta_head_realigns_wrapped_body() {
+        let mut env = GlobalEnv::new();
+        let sort = Term::Type(crate::term::Level::zero());
+        let ty = Term::pi(sort.clone(), sort.clone());
+        let id = crate::check::declare_postulate(
+            &mut env,
+            "SCT wrapped-body control".to_string(),
+            vec![],
+            ty.clone(),
+        )
+        .expect("control declaration");
+        let body = Term::Ascript(Box::new(Term::lam(sort, Term::var(0))), Box::new(ty));
+
+        assert_eq!(count_params(&body), 0, "pre-fix body reading");
+        assert_eq!(canonical_inner(&env, id, &body, 1).unwrap(), Term::var(0));
     }
 
     #[test]

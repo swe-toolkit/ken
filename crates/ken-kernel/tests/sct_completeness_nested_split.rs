@@ -21,7 +21,9 @@
 
 use ken_kernel::sct::sct_check;
 use ken_kernel::term::{Level, Term};
-use ken_kernel::{declare_inductive, CtorSpec, GlobalEnv, GlobalId, InductiveSpec};
+use ken_kernel::{
+    declare_inductive, declare_postulate, CtorSpec, GlobalEnv, GlobalId, InductiveSpec, KernelError,
+};
 
 fn mk_env() -> (GlobalEnv, GlobalId, GlobalId, GlobalId) {
     let mut env = GlobalEnv::new();
@@ -77,7 +79,12 @@ fn wrap_lams(n: usize, dom: &Term, body: Term) -> Term {
 /// Every leaf recurses only on `r`, the OUTERMOST `Node`'s flat sibling
 /// field — `r`'s true `Down` provenance must survive threading through
 /// TWO nested-Elim boundaries for `sct_check` to accept this.
-fn build_2level_body(t_id: GlobalId, leaf_id: GlobalId, _node_id: GlobalId, countr_id: GlobalId) -> Term {
+fn build_2level_body(
+    t_id: GlobalId,
+    leaf_id: GlobalId,
+    _node_id: GlobalId,
+    countr_id: GlobalId,
+) -> Term {
     let dom = Term::indformer(t_id, vec![]);
     let motive = dom.clone(); // sct.rs only scans the motive for calls; content is irrelevant
     let leaf_c = Term::constructor(leaf_id, vec![]);
@@ -143,7 +150,14 @@ fn build_2level_body(t_id: GlobalId, leaf_id: GlobalId, _node_id: GlobalId, coun
 #[test]
 fn two_level_nested_split_flat_sibling_recursion_accepts() {
     let (mut env, t_id, leaf_id, node_id) = mk_env();
-    let countr_id = env.fresh_id();
+    let dom = Term::indformer(t_id, vec![]);
+    let countr_id = declare_postulate(
+        &mut env,
+        "SCT direct-test provisional member".to_string(),
+        vec![],
+        Term::pi(dom.clone(), dom),
+    )
+    .expect("countR declared type");
     let body = build_2level_body(t_id, leaf_id, node_id, countr_id);
     let result = sct_check(&env, &[(countr_id, body)]);
     assert!(
@@ -165,8 +179,14 @@ fn two_level_nested_split_flat_sibling_recursion_accepts() {
 #[test]
 fn recursing_on_a_deferred_ih_slot_stays_rejected() {
     let (mut env, t_id, leaf_id, _node_id) = mk_env();
-    let countr_id = env.fresh_id();
     let dom = Term::indformer(t_id, vec![]);
+    let countr_id = declare_postulate(
+        &mut env,
+        "SCT direct-test provisional member".to_string(),
+        vec![],
+        Term::pi(dom.clone(), dom.clone()),
+    )
+    .expect("countR declared type");
     let motive = dom.clone();
     let leaf_c = Term::constructor(leaf_id, vec![]);
     // Same continuation layout as build_2level_body's Leaf-of-ll branch:
@@ -214,9 +234,9 @@ fn recursing_on_a_deferred_ih_slot_stays_rejected() {
 
     let result = sct_check(&env, &[(countr_id, body)]);
     assert!(
-        result.is_err(),
+        matches!(result, Err(KernelError::NotTerminating(_))),
         "recursing on a deferred IH slot (always-Unknown) must stay \
-         rejected — a fix that mis-tags an IH slot as a field would \
-         wrongly accept this"
+         rejected specifically by SCT — a fix that mis-tags an IH slot as a \
+         field would wrongly accept this; got {result:?}"
     );
 }
