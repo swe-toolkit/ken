@@ -221,7 +221,6 @@ flowchart TD
     PX12[PX12 nonblocking and event loop]
     ABI_REVOKE[ABI-REVOKE runtime revocation membrane]
 
-    PX8 --> ABI_R3
     ABI_R3 --> ABI_REVOKE
     ABI_REVOKE --> ABI_A1
     ABI_REVOKE --> ABI_A2
@@ -246,6 +245,14 @@ flowchart TD
 ```
 
 ABI-R1 is documentation-only and depends on nothing. (ABI-R2 was withdrawn — §4.1.)
+
+The `PX8 --> ABI-R3` edge was dropped on operator directive 2026-08-22. §7
+argued every sequencing edge except that one; ABI-R3 adds no operations and
+needs none of PX8's behavior, and the two things that made the edge cost
+nothing (contention on `effect_v1.rs` from the in-flight PX8-ERRID-ALLOC, and
+Runtime WPs queued ahead) are both gone. ABI-R3 now depends on nothing and is
+released ahead of PX8 closure. Every other edge, including `PX8 --> PX9`, is
+unchanged.
 
 ## 6. Exit
 

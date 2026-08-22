@@ -1,11 +1,11 @@
 ---
 id: ABI-R3
 title: "generated operation inventory derived from catalog structure — a new operation must be a build break"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
-depends_on: [PX8]
+depends_on: []
 blocks: [ABI-REVOKE, ABI-M1]
 github: null
 origin: docs/program/10-linux-abi-completion.md §4 (the ABI-completion program); node filed by the Steward 2026-07-25 on the operator's directive to frame the remaining program. Agents cannot create tracked work (COORDINATION §2).
@@ -53,14 +53,20 @@ origin: docs/program/10-linux-abi-completion.md §4 (the ABI-completion program)
 > ### ⚠ On the `PX8 -> ABI-R3` edge
 >
 > §7 of the program argues every sequencing edge it asserts **except this one**,
-> and this WP adds no operations and needs none of PX8's behavior. ⚠ The edge
-> stands until the Architect or operator moves it — it costs nothing today,
-> because `effect_v1.rs` is contended by the in-flight [[PX8-ERRID-ALLOC]] and
-> Runtime has two WPs queued ahead regardless. Raise it only if this becomes the
-> thing Runtime is waiting on.
+> and this WP adds no operations and needs none of PX8's behavior. The edge
+> stood until the Architect or operator moved it — it cost nothing while
+> `effect_v1.rs` was contended by the in-flight [[PX8-ERRID-ALLOC]] and Runtime
+> had WPs queued ahead. Both conditions are now gone: PX8-ERRID-ALLOC is merged
+> and the runtime lane is drained.
 >
-> ⭐ **Status stays `draft` because `depends_on` is unmet**, not because it is
-> unframed.
+> ### EDGE DROPPED and node RELEASED — operator directive 2026-08-22
+>
+> The operator moved the soft `PX8 -> ABI-R3` edge and released this node.
+> `depends_on` is now `[]` (ABI-R3 adds no operations and needs none of PX8's
+> behavior, exactly as the frame argued), and `status` is `ready`. PX8's
+> `blocks` and the completion doc's §5 graph are updated to match. ABI-R3 now
+> proceeds ahead of PX8 closure; PX8 -> PX9 and the rest of the graph are
+> unaffected.
 
 ## Objective
 
