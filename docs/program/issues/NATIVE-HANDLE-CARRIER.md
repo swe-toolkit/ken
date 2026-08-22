@@ -5,36 +5,41 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE, RT-DEAD-ARM-EFFECT-LOWERING, RT-RESOURCE-RELEASE-CARRIED-OBSERVE]
+depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE, RT-DEAD-ARM-EFFECT-LOWERING, RT-RESOURCE-RELEASE-CARRIED-OBSERVE, RT-EXACTINT-CARRIED-OBSERVE]
 blocks: [PX8-F-CAP-41]
 github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-# CURRENT STATE — 2026-08-22 (D-final ran RED; gated on TWO runtime nodes)
+# CURRENT STATE — 2026-08-22 (D-final blocker chain; held on RT-EXACTINT-CARRIED-OBSERVE)
 
 **Read this section only. Everything below it — including the demoted earlier
 "CURRENT STATE" block — is superseded history retained for the measurements it
 records.**
 
-**All seven original dependencies merged and `D-final` ran RED. It surfaced ONE
-blocker, cut as [[RT-DEAD-ARM-EFFECT-LOWERING]]; that node's D1 hard-stop
-(Architect `evt_4hcny7ae7h9sb`) then refined it AND exposed a SECOND blocker on
-the fixtures' critical path.** This node is now GATED on BOTH runtime nodes and
-closes only when both land and `D-final` re-runs all-green:
+**All seven original dependencies merged and `D-final` ran RED. Each re-run
+advances the `cap41_*` rows to the next distinct blocker, which is cut as a
+runtime successor; the chain is the accepted shape (each fix advances, does not
+green, until the last one).** Two blockers are now landed and the third is cut;
+this node closes only when the chain reaches all-green and `D-final` re-runs:
 
-1. [[RT-DEAD-ARM-EFFECT-LOWERING]] -- traps the whole-program-DEAD `FSOp`
-   arms so they no longer fail object emission. Its AC-1 was NARROWED
-   (Finding 2): it ADVANCES the `cap41_*` rows to their next distinct blocker,
-   it does not green them. LANDED 2026-08-22 (`55c7f51de` -> main `569ba3d0d`);
-   all five governed rows measured advancing to the ResourceRelease/
-   ResourceScalar blocker below. NHC now held on node 2 only.
-2. [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] -- the (A)-family carried-observation
-   route for the genuinely-LIVE `ResourceRelease` `Argument(0)`/`ResourceScalar`
-   refusal the fixtures hit BEHIND the dead arms (`withResource` IS used). Cut,
-   `ready`, sequenced AFTER the dead-arm node (both live in `effects.rs`; single
-   ring). This is the concrete first instance of the deferred (A) work, forced
-   onto the critical path.
+1. [[RT-DEAD-ARM-EFFECT-LOWERING]] -- MERGED 2026-08-22 (`55c7f51de` -> main).
+   Traps the whole-program-DEAD `FSOp` arms so they no longer fail object
+   emission. AC-1 NARROWED: it ADVANCES the rows, does not green them. All five
+   governed rows measured advancing to the ResourceScalar blocker below.
+2. [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] -- MERGED 2026-08-22 (`ef32b6ced`,
+   Decision `dec_3m2p4tmgnpa9t`; QA + Architect required-reviewer APPROVE). The
+   carried-observation CLOSURE over the `ResourceScalar` need (ResourceRelease/
+   FsHandleMetadata/FsReadAt Arg(0)) on the `lower_resource_token_seat` route, no
+   `Avail` widening. AC-1 measured: all three ResourceScalar seats advance; the
+   rows TERMINATE at the `ExactIntU64` sibling below.
+3. [[RT-EXACTINT-CARRIED-OBSERVE]] -- the ExactIntU64-need carried-observation
+   closure for the genuinely-LIVE `FsReadAt` `Argument(1)`/`ExactIntU64` refusal
+   the rows now hit, on the existing `carried_exact_int` `EITHER_PHASE` precedent
+   (`BufferAllocate` `0` already reads through it, so likely a pure wiring). Cut
+   `ready`; kick held until the RT-RESOURCE-RELEASE M8 Adversary hunt reports
+   clean (`effects.rs` contention with any fold; single ring). **NHC now held on
+   node 3 only.**
 
 ## `D-final` RAN — all five rows RED, one blocker, downstream of every landed fix
 
@@ -73,15 +78,19 @@ from `4c9c59d3e` (`rt_parity_native.rs` rows `:620/:627/:634/:641`, helper
 `:593`, `AC-5` row `:687`), not a merge candidate; the fences hold (do not
 revert `4c9c59d3e`; do not touch `rt_body_ok` / `rt_cap41_expect_eof`).
 
-## Disposition — on RT-DEAD-ARM-EFFECT-LOWERING landing
+## Disposition — on RT-EXACTINT-CARRIED-OBSERVE landing
 
 | D-final re-run | means | next |
 |---|---|---|
 | all four rows green and `AC-5` green | native lowering completes across the `withBuffer` boundary; the carrier is done | **fold** with the preserved elaborator slice `preserved/native-handle-carrier-c07e63c2` and fixture `preserved/px8-f-cap-41-p2-buffer-handle-f0eb65ce`, run the Architect's six-axis oracle (deep history below, axes (a)-(f)), then **close NATIVE-HANDLE-CARRIER and [[PX8-F-CAP-41]] Phase 2** |
 | a distinct downstream result (e.g. interpreter parity) | native lowering now completes but a further gap is exposed | report and cut the next successor as before |
 
-**This node stays `owner: runtime`, `size: M`, `gate: none`, held on BOTH
-[[RT-DEAD-ARM-EFFECT-LOWERING]] and [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]].**
+**This node stays `owner: runtime`, `size: M`, `gate: none`, held on
+[[RT-EXACTINT-CARRIED-OBSERVE]]** (the two predecessors
+[[RT-DEAD-ARM-EFFECT-LOWERING]] and [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] are
+merged). The blocker chain is the accepted shape: each landed fix advances the
+`cap41_*` rows to the next distinct blocker rather than greening them, until the
+last blocker lands and `D-final` runs all-green.
 
 # SUPERSEDED (was CURRENT STATE) — 2026-08-18, 02:10 UTC
 
