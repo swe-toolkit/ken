@@ -1026,6 +1026,17 @@ fn check_pair_or_record(
 }
 
 #[inline(never)]
+fn check_inferred_without_group_transport(
+    cx: &mut ElabCtx,
+    expr: &RExpr,
+    expected: &Term,
+) -> Result<Term, ElabError> {
+    let (core, inferred_ty) = infer(cx, expr)?;
+    unify_types(&mut cx.metas, expected, &inferred_ty);
+    Ok(core)
+}
+
+#[inline(never)]
 fn check_inferred_with_group_transport(
     cx: &mut ElabCtx,
     expr: &RExpr,
@@ -1294,6 +1305,9 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                 unify_types(&mut cx.metas, expected, &inferred_ty);
                 Ok(core)
             }
+        }
+        _ if cx.recursive_group.is_empty() => {
+            check_inferred_without_group_transport(cx, expr, expected)
         }
         _ => check_inferred_with_group_transport(cx, expr, expected),
     }
@@ -1677,6 +1691,79 @@ fn transport_recursive_group_call_result(
     } else {
         Ok(None)
     }
+}
+
+#[inline(never)]
+fn infer_reflexive_recursive_self_call(
+    cx: &mut ElabCtx,
+    expr: &RExpr,
+    span: &Span,
+) -> Result<Option<(Term, Term)>, ElabError> {
+    let mut head = expr;
+    let mut arguments = Vec::new();
+    while let RExpr::RApp(function, argument, _) = head {
+        arguments.push(argument.as_ref());
+        head = function.as_ref();
+    }
+    arguments.reverse();
+    let (RExpr::RCon(name, _), Some(RExpr::RVar(index, _, _))) =
+        (head, arguments.first().copied())
+    else {
+        return Ok(None);
+    };
+    if name != &cx.owner_label {
+        return Ok(None);
+    }
+    let Some((position, _)) = cx.surface_var(*index) else {
+        return Ok(None);
+    };
+    let Some(binding) = cx.lift_bindings.get(&position) else {
+        return Ok(None);
+    };
+    if binding.support.is_some() {
+        return Ok(None);
+    }
+    let Some((evidence, evidence_ty)) = cx.binding_term(binding.evidence_position) else {
+        return Ok(None);
+    };
+    let owner_id = cx.globals.get(name).copied().ok_or_else(|| {
+        ElabError::UnresolvedCon {
+            name: name.clone(),
+            span: span.clone(),
+        }
+    })?;
+    let (_, owner_ty) = cx
+        .env
+        .const_type(owner_id)
+        .ok_or_else(|| ElabError::Internal(format!("no type for recursive owner '{name}'")))?;
+    let Term::Pi(child_domain, owner_codomain) = whnf(cx.env, &cx.ctx, &owner_ty) else {
+        return Err(ElabError::NotAFunction { span: span.clone() });
+    };
+    let child_core = check(cx, arguments[0], &child_domain, span)?;
+    let source_result_ty = subst0(&owner_codomain, &child_core);
+    let (mut call, mut call_ty) = discharge_reflexive_recursive_ih_evidence(
+        cx.env,
+        &cx.ctx,
+        evidence,
+        evidence_ty,
+        &source_result_ty,
+        span,
+    )?;
+    if convert_type(cx.env, &cx.ctx, &call_ty, &source_result_ty) {
+        for argument in arguments.iter().skip(1) {
+            let Term::Pi(domain, codomain) = whnf(cx.env, &cx.ctx, &call_ty) else {
+                return Err(ElabError::NotAFunction { span: span.clone() });
+            };
+            let argument_core = check(cx, argument, &domain, span)?;
+            call_ty = subst0(&codomain, &argument_core);
+            call = Term::app(call, argument_core);
+        }
+        return Ok(Some((call, call_ty)));
+    }
+    if arguments.len() == 1 {
+        return Ok(Some((call, call_ty)));
+    }
+    Ok(None)
 }
 
 fn install_lift_binding(
@@ -2176,12 +2263,159 @@ fn check_match_dependent_refined_fallback(
     Ok(body_core)
 }
 
+/// Finish a dependent method after its branch body has returned. This owns the
+/// IH-domain and field-lambda construction in a non-recursive host frame: the
+/// caller recursively invokes `check` while elaborating the body, so keeping
+/// these later-only temporaries in that caller charges them at every source
+/// recursion level even though none is live across the recursive call.
+#[inline(never)]
+fn wrap_dependent_method_ihs(
+    shapes: &[RecursiveArgumentShape],
+    n: usize,
+    expected: &Term,
+    scrut_core: &Term,
+    ind: &InductiveDecl,
+    params_terms: &[Term],
+    scrut_indices: &[Term],
+    m: usize,
+    ctor: &ConstructorDecl,
+    method: Term,
+) -> Term {
+    // IH-slot emission (`dependent-match-nonnullary`, Map Gap B): the
+    // kernel's `method_type` requires `Π(fields) Π(ih₁…ih_p). M t̄ (Cₖ …)`.
+    let rec = shapes
+        .iter()
+        .map(|argument| {
+            let (domains, indices) = argument
+                .shape
+                .as_legacy()
+                .expect("structured shapes returned through the dedicated method path");
+            (argument.position, domains, indices)
+        })
+        .collect::<Vec<_>>();
+    let mut method = method;
+    for (pos, branching_tel, idxs) in rec.iter().rev() {
+        let nb = branching_tel.len();
+        let ih_ty = if nb == 0 {
+            let field_var = Term::var(n - 1 - pos);
+            let ih_body = subst_term_generalize(
+                &weaken(expected, n as i64),
+                &weaken(scrut_core, n as i64),
+                &field_var,
+            );
+            let ih_indices: Vec<Term> = idxs
+                .iter()
+                .map(|t| {
+                    ken_kernel::subst::shift(
+                        &subst_outer(t, m, params_terms, *pos),
+                        (n - pos) as i64,
+                        0,
+                    )
+                })
+                .collect();
+            let ih_premises =
+                method_index_premises(ind, params_terms, &ih_indices, scrut_indices, n);
+            wrap_premise_pis(ih_body, &ih_premises)
+        } else {
+            let mut scrut_body = Term::var(n - 1 - pos + nb);
+            for bk in 0..nb {
+                scrut_body = Term::app(scrut_body, Term::var(nb - 1 - bk));
+            }
+            let mut ih_ty = subst_term_generalize(
+                &weaken(expected, (n + nb) as i64),
+                &weaken(scrut_core, (n + nb) as i64),
+                &scrut_body,
+            );
+            for bk in (0..nb).rev() {
+                let b_dom = ken_kernel::subst::shift(
+                    &subst_outer(&branching_tel[bk], m, params_terms, pos + bk),
+                    (n - pos) as i64,
+                    bk,
+                );
+                ih_ty = Term::pi(b_dom, ih_ty);
+            }
+            ih_ty
+        };
+        method = Term::lam(ih_ty, weaken(&method, 1));
+    }
+    for j in (0..n).rev() {
+        method = Term::lam(subst_outer(&ctor.args[j], m, params_terms, j), method);
+    }
+    method
+}
+
+#[inline(never)]
+fn finish_dependent_elim(
+    cx: &mut ElabCtx,
+    d_id: GlobalId,
+    ind: &InductiveDecl,
+    params_terms: Vec<Term>,
+    motive: Term,
+    methods: Vec<Term>,
+    scrut_indices: &[Term],
+    scrut_core: &Term,
+    add_hidden_equation: bool,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let top_premises =
+        method_index_premises(ind, &params_terms, scrut_indices, scrut_indices, 0);
+    let mut elim = Term::Elim {
+        fam: d_id,
+        level_args: vec![],
+        params: params_terms,
+        motive: Box::new(motive),
+        methods,
+        indices: scrut_indices.to_vec(),
+        scrut: Box::new(scrut_core.clone()),
+    };
+    for premise in &top_premises {
+        let proof = synth_generated_index_evidence(cx.env, &cx.ctx, premise, span)?;
+        elim = Term::app(elim, proof);
+    }
+    if add_hidden_equation {
+        elim = Term::app(elim, Term::Refl(Box::new(scrut_core.clone())));
+        let zonked_ctx = Context {
+            types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
+        };
+        let zonked_elim = cx.metas.zonk_term(&elim);
+        kernel_infer(cx.env, &zonked_ctx, &zonked_elim).map_err(|error| {
+            ElabError::KernelRejected {
+                error,
+                span: span.clone(),
+            }
+        })?;
+    }
+    Ok(elim)
+}
+
 /// Check `match scrut { C₁ p… => e₁ ; … }` against a KNOWN `expected` goal
 /// that may reference the scrutinee (a per-branch-varying `Ω`- or `Type`-
 /// motive) — the K4/AC4 dependent-elimination path. Only FLAT constructor
 /// patterns are supported (no nested constructor sub-patterns), deliberately
 /// narrower than `infer_match`'s general nested-pattern compiler.
+#[inline(never)]
 fn check_match_dependent(
+    cx: &mut ElabCtx,
+    scrut: &RExpr,
+    equation: Option<&str>,
+    arms: &[RMatchArm],
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let hidden_group_result_refinement = equation.is_none()
+        && !cx.recursive_group.is_empty()
+        && arms
+            .iter()
+            .any(|arm| expression_mentions_recursive_group(cx, &arm.body));
+    if hidden_group_result_refinement {
+        check_match_dependent_mode::<true>(cx, scrut, equation, arms, expected, span)
+    } else {
+        check_match_dependent_mode::<false>(cx, scrut, equation, arms, expected, span)
+    }
+}
+
+#[inline(never)]
+fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     cx: &mut ElabCtx,
     scrut: &RExpr,
     equation: Option<&str>,
@@ -2281,8 +2515,7 @@ fn check_match_dependent(
         &weaken(&scrut_core, motive_base_depth as i64),
         &Term::var(0),
     );
-    let hidden_group_result_refinement = equation.is_none()
-        && !cx.recursive_group.is_empty()
+    let hidden_group_result_refinement = MAY_REFINE_GROUP_RESULT
         && ind.indices.is_empty()
         // The matched carrier must itself be an index domain of the result
         // family. This excludes unrelated control matches (for example Bool
@@ -2296,10 +2529,7 @@ fn check_match_dependent(
         // refinement machinery.
         && ind.constructors.iter().all(|ctor| {
             recursive_shapes(cx.env, ctor, d_id, m).is_ok_and(|shapes| shapes.is_empty())
-        })
-        && arms
-            .iter()
-            .any(|arm| expression_mentions_recursive_group(cx, &arm.body));
+        });
     if equation.is_some() {
         // The eliminator returns a function over the branch equation.  Its
         // methods can therefore bind the surface `eqn:` name, while applying
@@ -2620,109 +2850,18 @@ fn check_match_dependent(
             cx.ctx.pop();
         }
 
-        // IH-slot emission (`dependent-match-nonnullary`, Map Gap B): the
-        // kernel's `method_type` requires `Π(fields) Π(ih₁…ih_p). M t̄ (Cₖ …)` —
-        // `p = recursive_args(ctor).len()` dead (never surface-referenced)
-        // binders between the `n` field lambdas and the body. REUSE the
-        // kernel's own producer (`ken_kernel::inductive::recursive_args`,
-        // the exact function `method_type` uses) rather than re-deriving
-        // recursive-field detection locally. For indexed families, direct IHs
-        // use the same equality-premise motive shape as constructor methods:
-        // `M idxs recursive_field`.
-        let rec = shapes
-            .iter()
-            .map(|argument| {
-                let (domains, indices) = argument
-                    .shape
-                    .as_legacy()
-                    .expect("structured shapes returned through the dedicated method path");
-                (argument.position, domains, indices)
-            })
-            .collect::<Vec<_>>();
-        // Each IH's type is the goal `expected` specialized to that
-        // recursive field — `M xs2` for the direct tail of `Cons x xs2`, or
-        // `Π(b̄:B̄). M (k b̄)` for the W-style continuation of `Vis op k`. IHs
-        // are wrapped in `rec` order (rec[0] = first recursive field =
-        // outermost/ih₁, matching `method_type`); built in REVERSE
-        // (innermost/last field first) so each `weaken(_, 1)` — the same
-        // technique `compile_match_matrix`'s `ColKind::Ih` uses — naturally
-        // accumulates the correct additional shift for every already-wrapped
-        // inner IH, without hand-deriving a per-slot offset. This outer wrap
-        // is `weaken(&method, 1)` — ONE shift per IH slot, REGARDLESS of the
-        // slot's own `nb` (its branch binders live inside its own domain
-        // type, never in the method telescope) — the load-bearing
-        // correction pinned in `dependent-match-wstyle.md`.
-        let mut method = method;
-        for (pos, branching_tel, idxs) in rec.iter().rev() {
-            let nb = branching_tel.len();
-            let ih_ty = if nb == 0 {
-                let field_var = Term::var(n - 1 - pos);
-                let ih_body = subst_term_generalize(
-                    &weaken(expected, n as i64),
-                    &weaken(&scrut_core, n as i64),
-                    &field_var,
-                );
-                let ih_indices: Vec<Term> = idxs
-                    .iter()
-                    .map(|t| {
-                        ken_kernel::subst::shift(
-                            &subst_outer(t, m, &params_terms, *pos),
-                            (n - pos) as i64,
-                            0,
-                        )
-                    })
-                    .collect();
-                let ih_premises =
-                    method_index_premises(&ind, &params_terms, &ih_indices, &scrut_indices, n);
-                wrap_premise_pis(ih_body, &ih_premises)
-            } else {
-                // W-STYLE case: Π(b1:B1)...(b_nb:B_nb). expected[scrut := field_var b1..b_nb].
-                // Built in the bare [fields] frame (j = 0); the outer
-                // weaken(&method, 1) per IH slot below accumulates the +j
-                // exactly as for the direct case.
-
-                // Scrutinee body under the nb branch binders: `field_var`
-                // sits at (n-1-pos) shifted past the nb binders ->
-                // var(n-1-pos+nb); applied to b1 = var(nb-1), ..., b_nb = var(0).
-                let mut scrut_body = Term::var(n - 1 - pos + nb);
-                for bk in 0..nb {
-                    scrut_body = Term::app(scrut_body, Term::var(nb - 1 - bk));
-                }
-
-                // Specialized goal under the nb binders: weaken past n
-                // fields + nb branch binders, then rewrite the scrutinee
-                // occurrence to (field_var b_bar). (idxs empty -> this IS
-                // method_type's `M idxs (a_pos b_bar)`, in the elaborator's
-                // already-applied `expected = M scrut` representation.)
-                let mut ih_ty = subst_term_generalize(
-                    &weaken(expected, (n + nb) as i64),
-                    &weaken(&scrut_core, (n + nb) as i64),
-                    &scrut_body,
-                );
-
-                // Wrap the branching-domain Pi-binders, innermost (B_nb) to
-                // outermost (B1). B_k mirrors method_type's b_dom with j = 0:
-                //   shift(subst_outer(branching_tel[bk], m, params_terms, pos+bk), n-pos, bk)
-                // cutoff = bk preserves b1..b_{bk-1}; amount (n-pos) lifts
-                // args-after-pos and Γ. NO subst_levels — mirrors the
-                // direct-case field-domain convention (`level_args: vec![]`);
-                // the kernel recheck covers any residual.
-                for bk in (0..nb).rev() {
-                    let b_dom = ken_kernel::subst::shift(
-                        &subst_outer(&branching_tel[bk], m, &params_terms, pos + bk),
-                        (n - pos) as i64,
-                        bk,
-                    );
-                    ih_ty = Term::pi(b_dom, ih_ty);
-                }
-                ih_ty
-            };
-            method = Term::lam(ih_ty, weaken(&method, 1));
-        }
-        for j in (0..n).rev() {
-            method = Term::lam(subst_outer(&ctor.args[j], m, &params_terms, j), method);
-        }
-        methods[k] = Some(method);
+        methods[k] = Some(wrap_dependent_method_ihs(
+            &shapes,
+            n,
+            expected,
+            &scrut_core,
+            &ind,
+            &params_terms,
+            &scrut_indices,
+            m,
+            ctor,
+            method,
+        ));
     }
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
@@ -2744,35 +2883,18 @@ fn check_match_dependent(
         .map(|m| m.expect("every ctor bucket filled above"))
         .collect();
 
-    let top_premises =
-        method_index_premises(&ind, &params_terms, &scrut_indices, &scrut_indices, 0);
-    let mut elim = Term::Elim {
-        fam: d_id,
-        level_args: vec![],
-        params: params_terms,
-        motive: Box::new(motive),
+    finish_dependent_elim(
+        cx,
+        d_id,
+        &ind,
+        params_terms,
+        motive,
         methods,
-        indices: scrut_indices.clone(),
-        scrut: Box::new(scrut_core.clone()),
-    };
-    for premise in &top_premises {
-        let proof = synth_generated_index_evidence(cx.env, &cx.ctx, premise, span)?;
-        elim = Term::app(elim, proof);
-    }
-    if equation.is_some() || hidden_group_result_refinement {
-        elim = Term::app(elim, Term::Refl(Box::new(scrut_core.clone())));
-        let zonked_ctx = Context {
-            types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
-        };
-        let zonked_elim = cx.metas.zonk_term(&elim);
-        kernel_infer(cx.env, &zonked_ctx, &zonked_elim).map_err(|error| {
-            ElabError::KernelRejected {
-                error,
-                span: span.clone(),
-            }
-        })?;
-    }
-    Ok(elim)
+        &scrut_indices,
+        &scrut_core,
+        equation.is_some() || hidden_group_result_refinement,
+        span,
+    )
 }
 
 fn motive_context(outer: &Context, ind: &InductiveDecl, params: &[Term]) -> Context {
@@ -3898,80 +4020,11 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         }
 
         RExpr::RApp(f, a, span) => {
-            // A structural self-call may carry ordinary source arguments after
-            // the recursive child. Resolve the whole application spine here so
-            // generated index-equality evidence is discharged before those
-            // arguments are consumed. Falling through preserves the ordinary
-            // application path for neutral/non-reflexive evidence.
-            let mut head = expr;
-            let mut arguments = Vec::new();
-            while let RExpr::RApp(function, argument, _) = head {
-                arguments.push(argument.as_ref());
-                head = function.as_ref();
-            }
-            arguments.reverse();
-            if let (RExpr::RCon(name, _), Some(RExpr::RVar(index, _, _))) =
-                (head, arguments.first().copied())
-            {
-                if name == &cx.owner_label {
-                    if let Some((position, _)) = cx.surface_var(*index) {
-                        if let Some(binding) = cx.lift_bindings.get(&position) {
-                            if binding.support.is_none() {
-                                if let Some((evidence, evidence_ty)) =
-                                    cx.binding_term(binding.evidence_position)
-                                {
-                                    let owner_id =
-                                        cx.globals.get(name).copied().ok_or_else(|| {
-                                            ElabError::UnresolvedCon {
-                                                name: name.clone(),
-                                                span: span.clone(),
-                                            }
-                                        })?;
-                                    let (_, owner_ty) =
-                                        cx.env.const_type(owner_id).ok_or_else(|| {
-                                            ElabError::Internal(format!(
-                                                "no type for recursive owner '{name}'"
-                                            ))
-                                        })?;
-                                    let Term::Pi(child_domain, owner_codomain) =
-                                        whnf(cx.env, &cx.ctx, &owner_ty)
-                                    else {
-                                        return Err(ElabError::NotAFunction { span: span.clone() });
-                                    };
-                                    let child_core = check(cx, arguments[0], &child_domain, span)?;
-                                    let source_result_ty = subst0(&owner_codomain, &child_core);
-                                    let (mut call, mut call_ty) =
-                                        discharge_reflexive_recursive_ih_evidence(
-                                            cx.env,
-                                            &cx.ctx,
-                                            evidence,
-                                            evidence_ty,
-                                            &source_result_ty,
-                                            span,
-                                        )?;
-                                    if convert_type(cx.env, &cx.ctx, &call_ty, &source_result_ty) {
-                                        for argument in arguments.iter().skip(1) {
-                                            let Term::Pi(domain, codomain) =
-                                                whnf(cx.env, &cx.ctx, &call_ty)
-                                            else {
-                                                return Err(ElabError::NotAFunction {
-                                                    span: span.clone(),
-                                                });
-                                            };
-                                            let argument_core = check(cx, argument, &domain, span)?;
-                                            call_ty = subst0(&codomain, &argument_core);
-                                            call = Term::app(call, argument_core);
-                                        }
-                                        return Ok((call, call_ty));
-                                    }
-                                    if arguments.len() == 1 {
-                                        return Ok((call, call_ty));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+            // Peel and inspect the whole source spine in a separate frame.
+            // On the overwhelmingly-common decline path that frame (including
+            // its argument vector) is gone before generic application recurses.
+            if let Some(call) = infer_reflexive_recursive_self_call(cx, expr, span)? {
+                return Ok(call);
             }
             let (f_core, f_ty) = infer(cx, f)?;
             let f_ty_wh = whnf(cx.env, &cx.ctx, &f_ty);
