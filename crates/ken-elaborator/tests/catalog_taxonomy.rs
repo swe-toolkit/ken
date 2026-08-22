@@ -46,7 +46,14 @@ fn catalog_package_roots_use_only_the_controlled_sections() {
     validate_sections(sections.iter().map(String::as_str)).unwrap();
     assert_eq!(
         sections,
-        ["Application", "Capability", "Core", "Data", "Tooling"],
+        [
+            "Algorithm",
+            "Application",
+            "Capability",
+            "Core",
+            "Data",
+            "Tooling",
+        ],
         "reserved Sections stay absent until their first package lands"
     );
 }
