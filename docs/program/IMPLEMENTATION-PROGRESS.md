@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 18:27:06Z — from 418 issue file(s) in `docs/program/issues/`.
+2026-08-22 18:36:47Z — from 418 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -59,7 +59,7 @@ the committed file matches the generator's output.
 | `CAT-C2` | Localized Map/Set key-interface split: a non-canonical carrier becomes a lawful Map/Set key under a weaker key-order dictionary while staying an unlawful Ord key wherever antisym concludes kernel Equal | draft | spec-enclave | M | none | — |
 | `CAT-CAPEX` | catalog exhibits no checked capability/authority exemplar — write one against the landed Cap/Auth surface | merged | ergo | M | none | — |
 | `CAT-DEQUE` | Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial | ready | foundation | M | none | — |
-| `CAT-GCD-REFACTOR` | Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last) | active | foundation | S | none | — |
+| `CAT-GCD-REFACTOR` | Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last) | draft | foundation | S | none | — |
 | `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | merged | foundation | M | none | — |
 | `CAT-SORT` | Verified insertion sort — Algorithm/Sorting: sort an Ord-ordered List with the Sorted and Permutation laws proved, the simplest-first anchor of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-VEC` | Length-indexed Vector — Data/Vector: Vec n a with total head/index/zip/map and the length laws, the deliberate fully-dependent probe of the Foundation expressibility trial | ready | foundation | M | none | — |
