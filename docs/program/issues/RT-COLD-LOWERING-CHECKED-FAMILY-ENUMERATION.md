@@ -1,7 +1,7 @@
 ---
 id: RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION
 title: "Bound the COMPLETE remaining downstream-refusal set for the SECOND cold-lowering witness family -- the checked-program source the four cap41_* terminal pins share -- in ONE exhaustive pass, with the same discipline RT-COLD-LOWERING-PATH-ENUMERATION applied to RT_PARITY_SOURCE. That first enumeration found FIVE mechanisms over rt_parity but the OrientedSubcontinuationPlanV1 IH-marker refusal has ZERO entries there; it provably lives in THIS family, which is on RT-FSREADAT's own AC-4/AC-5 critical path and was never enumerated. Sequencing successors off the first report alone would OMIT a real, already-identified refusal and rediscover it serially -- the exact failure the enumeration exists to end -- so the complete successor set requires enumerating this family end-to-end too (collect ALL, do not stop at the IH-marker; a second population may hide a 6th mechanism exactly as the first hid three). Validators untouched -- this measures and covers, it does not fix. (Architect binding finding evt_4ag90qfacmgwy on AC-3 report evt_1m6eg23vnbj4n; ruling point 4 evt_r3tt1gpv4tkn.)"
-status: active
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,12 @@ blocks: []
 github: null
 origin: "Architect review of RT-COLD-LOWERING-PATH-ENUMERATION AC-3 (evt_4ag90qfacmgwy): the node's ACs are MET and SOUND over RT_PARITY_SOURCE (AC-1 closure over the entry signature, not the name-suffix habit; 11 admissible entries; complete five-mechanism set collected in one pass), but the refusal set cut from that report ALONE is INCOMPLETE for RT-FSREADAT closure -- the IH-marker (OrientedSubcontinuationPlanV1) has ZERO entries in RT_PARITY_SOURCE and provably lives in the SECOND witness family, the checked-program source the four terminal pins share, which is on RT-FSREADAT's AC-4/AC-5 critical path and was never enumerated. The implementer correctly did NOT extend unilaterally; the Architect handed the scope call (extend the first node's AC vs. a sibling enumeration node) to the Steward. Steward decision: SIBLING node -- the first node is verified done for its population, and a second family needs its own closure argument and coverage test. Steward-filed per COORDINATION section 2."
 ---
+
+> CLOSED 2026-08-22 — co-land merged (cbac30826). Report-2 census landed and
+> Architect-verified (evt_4jcnbhx8nqwdy), including its honest "cannot self-bound"
+> finding (the deliverable, not a defect); runtime-leader confirmed
+> evt_10rk35dhtw1cq. The single remaining checked-family terminal is the checked-IH
+> row, carried by [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]]. HS 5.
 
 # WHAT THIS NODE IS
 

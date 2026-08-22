@@ -1,7 +1,7 @@
 ---
 id: RT-COLD-LOWERING-PATH-ENUMERATION
 title: "Bound the COMPLETE remaining downstream-refusal set for the cold cap41_*/rt_parity backend-lowering path in ONE pass -- clearing the effect-seat layer (RT-FSREADAT projection) and the join-consumption layer (RT-DEAD-ARM-JOIN-DISPOSITION) exposed TWO disjoint fail-closed refusals at once (materialized-dead join StaticOriginId(288) reconciliation; OrientedSubcontinuationPlanV1 IH-marker completeness), and the path has never been driven end-to-end so its true depth is unknown -- by bounded-EXHAUSTIVE enumeration of the plan authority's constructors run through the FULL lowering+validation pipeline, reporting the complete remaining refusal set (the input that sequences the per-gap successors) and landing the durable production coverage test whose ABSENCE is why these invariants surface serially (Architect layer-3 ruling evt_r3tt1gpv4tkn point 4; research advisory evt_5f0rzjghjhmy9). Validators untouched -- this measures and covers, it does not fix."
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,12 @@ blocks: []
 github: null
 origin: "Architect layer-3 ruling evt_r3tt1gpv4tkn (SCOPE/SEQUENCING handed to the Steward), on the research prior-art advisory evt_5f0rzjghjhmy9 pulled per the HS=3 §1a trigger. The advisory's spine: preservation (soundness-if-success) is NOT traversability (progress); no verified backend gets traversability for free (CompCert Compiler.v:446-469, CakeML compilerProofScript), so the stacked refusals are the absence of an established traversability discipline for this cold population, not a bug pile. Prior art (SmallCheck bounded exhaustive enumeration on a finite domain, DOI 10.1145/1411286.1411292; MLIR verify-after-every-pass over a declared target population) says stop discovering layers serially: enumerate the small plan space and run each plan end-to-end to surface ALL remaining refusals together. Steward-filed per COORDINATION section 2."
 ---
+
+> CLOSED 2026-08-22 — co-land merged (cbac30826). AC-1/AC-3/AC-4/AC-SOUNDNESS met
+> (bounded-exhaustive census, complete 5-mechanism refusal set, durable coverage
+> test landed); Architect-verified evt_4ag90qfacmgwy; runtime-leader confirmed
+> evt_10rk35dhtw1cq. The per-gap successors it sequenced are tracked separately.
+> HS 5.
 
 # WHAT THIS NODE IS
 

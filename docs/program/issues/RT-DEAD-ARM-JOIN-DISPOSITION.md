@@ -1,7 +1,7 @@
 ---
 id: RT-DEAD-ARM-JOIN-DISPOSITION
 title: "The merged RT-DEAD-ARM-EFFECT-LOWERING trap short-circuits a provably-dead arm's lowering but leaves that arm's planned source-join origins neither emitted nor dispositioned, so finalize_join_disposition (joins.rs:1675) fires 'neither emitted nor statically unselected' once a downstream fix clears the effect-seat layer in front of it (19/19 unconsumed origins measured inside provably-dead arms, StaticOriginId(20)); complete the trap by dispositioning a PROVED-dead arm's joins as statically unselected (add to dispositioned_join_origins), reusing the RT-LEXICAL-RECURSOR-CONSUMERS D2b abandoned-region mechanism -- a latent completeness gap SURFACED (not caused) by RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL clearing the projection layer, co-landing with it as one candidate"
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,13 @@ blocks: [RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL]
 github: null
 origin: "Measured by runtime-implementer during RT-FSREADAT D1 (evt_3xy5qvjbt8zqe): the resource-aware carried projection cleared the effect-seat layer and the compile then stopped on `Cranelift backend failure: function left planned source join StaticOriginId(20) neither emitted nor statically unselected` -- 37 required joins, 18 covered; the dead-arm predicate over all 19 unconsumed origins returned 19/19 inside provably-dead arms. Architect ruling evt_230wt9hcynjmh: this is a distinct completeness gap in the merged [[RT-DEAD-ARM-EFFECT-LOWERING]] node, cut as a successor exactly as RT-FSREADAT's own AC-1 prescribes ('a further distinct blocker exposed behind this one is a measurement to report and CUT ... not a failure of this node'). Latent since RT-DEAD-ARM merged; the invariant was unreachable until RT-FSREADAT cleared the layer in front of it. Steward-filed per COORDINATION section 2."
 ---
+
+> CLOSED 2026-08-22 — co-land merged (cbac30826). The dead-arm join-disposition
+> mechanism (19 dispositions = 19 measured-unconsumed joins, disposition-follows-
+> deadness by construction) landed complete and Architect-approved. runtime-leader
+> confirmed (evt_10rk35dhtw1cq) that the deeper 288+301 reachability-vs-consumption
+> defect is [[RT-MATERIALIZED-DEAD-JOIN-RECONCILE]]'s own AC, not unfinished work
+> here. D-final GREEN. HS 5.
 
 # WHAT THIS NODE IS
 
