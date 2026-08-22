@@ -1,7 +1,7 @@
 ---
 id: RT-DEAD-ARM-EFFECT-LOWERING
 title: "A whole-program-dead but type-total request-handler arm is lowered at full strength, so its ConstructorTag effect seat (claim_host_effect_seat) fails the ENTIRE object emission on a path no execution reaches -- the cut is to lower a provably-unreachable total-handler arm's refusing effect seat to a runtime TRAP (fail-closed), gated on a conservative whole-program construction-site census, keeping the seat's Need-subset-Avail partition strict and unchanged"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,43 @@ blocks: [NATIVE-HANDLE-CARRIER]
 github: null
 origin: "Architect ruling evt_7kmh9atsrv80n (thr_4q62g2fmmrxm9, 2026-08-22), on the NATIVE-HANDLE-CARRIER D-final refuse arm. Surfaced by NHC D-final (all five cap41_* rows RED, evt_1srzc4frpjhxn) and pinned by the runtime-implementer's two grounding measurements (evt_8j0tjp15ypw3): the refusing FsWriteFile seat sits in a dead arm of a total FSOp request handler that this program never constructs. The Architect ruled NEITHER the carried-observation route (A) NOR preserve-the-specialization (C) is this fixture's blocker; the immediate fix is dead-arm effect lowering. Steward-filed per COORDINATION section 2."
 ---
+
+# MERGED — 2026-08-22 (D1 + revised-D1 landed; both refusal sites gated)
+
+Landed at `55c7f51de` (respin; superseded the CI-red `9b9fbf3c1`/PR #2741),
+merged to `main` `569ba3d0d` on Decision `dec_4p9n9a0b0rfqq` (Architect
+required-reviewer APPROVE `evt_1qnc66xke540m`, differential re-APPROVE on the
+respin `evt_7k51qr0dbxx3z`; runtime-qa gate passed). The corrected two-conjunct
+deadness predicate (`(1)` never program-constructed AND `(2)` not
+runtime-producible via the sealed `NativeProcessSymbols` destructure) closes
+the D1 hard-stop hole; both refusal sites consult one shared predicate; the
+trap is single-sourced; the ledger keeps `claims` a truthful attestation
+(`unreachable` disjoint). AC-1 (narrowed) met per row: no dead-arm refusal
+fails object emission; all five governed rows advance to the same live
+ResourceRelease/ResourceScalar blocker — the successor
+[[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]]. The AC-4 negative control is
+non-vacuous (dispatched through a called closure). Adversary hunts the landed
+code as usual.
+
+**One CI-red round on the way (benign):** two ken-cli transition-sentinel
+anchors (`rt_capture_projection_grow.rs`,
+`rt_branched_scrutinee_unit_body_port.rs`) pinned the pre-fix ConstructorTag
+terminal state; the dead-arm advance moved them to the ResourceRelease/
+ResourceScalar blocker, and the Architect censused the tree (exactly two,
+non-vacuity preserved) before the implementer repointed them per the sentinels'
+own instructions. The gate gap (local `-p ken-runtime --lib` + `rt_parity_native`
+missed the ken-cli sibling pins) is the retro finding; the respin gate is
+`-p ken-runtime` all-binaries + `ken-cli` + `ken-verify`.
+
+**Carry (Steward-owned, non-blocking):** make conjunct-`(2)` completeness
+STRUCTURAL — route the runtime minting sites through `NativeProcessSymbols`, or
+a test asserting every module-level constructor const is a
+`NativeProcessSymbols` field. Fail-closed-sound today (a missed field traps its
+arm and halts, never miscompiles); cut as
+[[RT-NATIVE-VOCAB-STRUCTURAL-COMPLETENESS]], queued behind lane-1 indefinitely,
+Architect required reviewer.
+
+Everything below is the node as framed and is retained as the record.
 
 # WHAT THIS NODE IS
 
@@ -148,15 +185,6 @@ consult it at each of the ≤N refusal sites (DRY); a modest scope bump, NOT a
 switch to trigger (a). The leader's (b) ruling stands (fewer arms touched =
 fewer places the predicate can be wrong).
 
-# SYMPTOM INVENTORY (section 1b)
-
-1. Deadness oracle (whole-program syntactic construction census) unsound in the
-   LIVE direction: a host-synthesized constructor (`Result::Ok` effect response)
-   reads as never-constructed and is wrongly proven dead. Keyed on: the census
-   sees only program-syntax origins, not runtime/host value production.
-   Corrected by conjunct (2) above. (The predicate-across-entries question fires
-   at the 3rd entry, not now.)
-
 # `D0` -- CENSUS EXISTENCE (first deliverable; determines SIZE, not design)
 
 Does the lowering pipeline already carry a sound constructed-constructor census
@@ -212,10 +240,11 @@ Keep the failing control failing until the predicate is right; do not edit it.
 # HOUSEKEEPING FOLDED IN (Architect + implementer flagged)
 
 - The `AC-5` row's `#[ignore]` reason at `rt_parity_native.rs:745` is STALE: it
-  names a terminal state (`a carried recursive hypothesis is an eliminated value
-  ... but the call provides 1`) that `c7f462857` (RT-CAPTURE-CONTEXT-FRAME-EMIT
-  D1+D2) already cleared -- that string appears zero times in the D-final run.
-  Correct it when this node touches that row.
+  names a terminal state (`a carried recursive hypothesis is an eliminated
+  value ... but the call provides 1`) that `c7f462857`
+  (RT-CAPTURE-CONTEXT-FRAME-EMIT D1+D2) already cleared -- that string appears
+  zero times in the D-final run. CORRECTED in this node's landing (`55c7f51de`):
+  the row now names the measured post-fix terminal state.
 
 # SYMPTOM INVENTORY (Architect section 1b)
 

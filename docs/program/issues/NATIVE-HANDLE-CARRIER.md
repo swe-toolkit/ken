@@ -23,10 +23,12 @@ blocker, cut as [[RT-DEAD-ARM-EFFECT-LOWERING]]; that node's D1 hard-stop
 the fixtures' critical path.** This node is now GATED on BOTH runtime nodes and
 closes only when both land and `D-final` re-runs all-green:
 
-1. [[RT-DEAD-ARM-EFFECT-LOWERING]] -- traps the whole-program-DEAD `FSOp` arms
-   so they no longer fail object emission. Its AC-1 was NARROWED (Finding 2):
-   it ADVANCES the `cap41_*` rows to their next distinct blocker, it does not
-   green them. In flight now.
+1. [[RT-DEAD-ARM-EFFECT-LOWERING]] -- traps the whole-program-DEAD `FSOp`
+   arms so they no longer fail object emission. Its AC-1 was NARROWED
+   (Finding 2): it ADVANCES the `cap41_*` rows to their next distinct blocker,
+   it does not green them. LANDED 2026-08-22 (`55c7f51de` -> main `569ba3d0d`);
+   all five governed rows measured advancing to the ResourceRelease/
+   ResourceScalar blocker below. NHC now held on node 2 only.
 2. [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] -- the (A)-family carried-observation
    route for the genuinely-LIVE `ResourceRelease` `Argument(0)`/`ResourceScalar`
    refusal the fixtures hit BEHIND the dead arms (`withResource` IS used). Cut,
