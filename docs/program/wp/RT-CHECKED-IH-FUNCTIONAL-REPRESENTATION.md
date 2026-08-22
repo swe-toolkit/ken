@@ -86,15 +86,20 @@ states the authoritative list. In brief:
   defunctionalized object; the arity-1 worker is never called with zero args;
   the escaped value is constructed and applied honestly across the constructor
   boundary; no closure boundary is crossed illegitimately and no arity gate is
-  weakened or relabeled. The apply dispatcher is exhaustive over the enumerated
-  code identities with NO wildcard/fallback arm; an unenumerated identity is a
-  BUILD ERROR, not a runtime path — so deliverable 1's enumerability precondition
-  becomes a durable compile-time invariant forcing any future apply site back
-  through the gate (the ABI-R3 next_in_inventory discipline; freeze a predicate,
-  not a roster). That converts the gate from a reading into an enforcement.
-  Control (Adversary): a boundary crossing dressed as the new representation, a
-  relabeled/weakened arity gate, or a dispatcher widened with a wildcard arm,
-  must be detectable and is a reject. (Architect fold-in evt_3wb4cy7f7aj50.)
+  weakened or relabeled. Off-roster-identity enforcement is TWO-TIER (Architect
+  ruling evt_3k0bv5px3m097, refining the earlier single-match fold-in which was
+  unbuildable — Rust exhaustiveness is over TYPES, not the u64 template ids): KIND
+  — a no-`_` match over the SEALED checked-IH shape set, so a new shape is a
+  ken-runtime build error; INSTANCE — the template id resolved through the
+  existing fail-closed plan lookup (`computational_ih_call`/`_slot`), the same
+  point erasure.rs's double bijection is asserted, no parallel roster to drift;
+  VALUE — the crossing value is the admitted env `Record` only, no runtime
+  code-identity tag. Every apply/slot site MUST resolve its id through the plan
+  lookup. The node holds the authoritative full form and the built-repr review
+  conditions. Control (Adversary): a boundary crossing dressed as the
+  representation, a relabeled/weakened arity gate, a `_`/fallback arm on the kind
+  match, or an apply site bypassing the plan lookup, must be detectable and is a
+  reject.
 - **AC-REENUM.** Rerun report-2's checked-family runner end-to-end. Both
   checked-family programs green => the family is bounded; re-point both runner
   tables from the advancing-refusal pins to green. Any FURTHER refusal => STOP
