@@ -59,7 +59,7 @@ verify+language (Z3 integration); lane 3 foundation (expressibility trial, the
 Architect-burden probe). Doc track concurrent, contention-free. Finished work
 still merges; framing an active lane is lane work.
 
-### Runtime (lane 1) — HS=4; closure A ruled, ring building the operand seat
+### Runtime (lane 1) — HS=5; Closure A WITHDRAWN, §1a hold on reframed question
 
 The NHC `cap41_*` chain, co-landing on `wp/RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`
 (thr_3j5ew8rhy35nh). Held on the branch (none affects `main`, still 48188cde6):
@@ -89,32 +89,46 @@ RT-DEAD-ARM-EFFECT-LOWERING (`55c7f51de`), RT-RESOURCE-RELEASE-CARRIED-OBSERVE
   reconciliation; masked by the depth-1 family, not in the enumeration's bounded
   set). 4 is NOT a mandatory 3/6/9 re-trigger; next mandatory at 6. Research
   pulled on the merits (§1a floor, not ceiling).
-- §1a CLOSURE RESOLVED — CLOSURE A (Architect evt_3tspjkw7dhh6x,
-  research-backed evt_n38ptc08a1sc; B rejected). The checked-IH marker
-  is a saturated nullary closure-style invocation: template arity 0 is
-  CORRECT; the recursive value is an environment operand at the plan's
-  `recursive_position` that the ported route must SEAT (as the composed
-  route already does via `composed_recursive_argument_binding`), not an
-  explicit argument. This is the STRUCTURAL closure of §1b entries 2+3
-  — no count relabeled, no gate weakened. The fixture-provisioning
-  contingency did NOT fire (a different mechanism, not a further
-  checked-family layer).
-- SUCCESSOR CUT + OWNED: RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT (owner runtime,
-  active, depends_on RT-IH-MARKER-PRODUCER-COMPLETE) carries the deliverable (seat
-  the operand from the resolved slot's `recursive_position` BEFORE the
-  `core.rs:14306` declared-arity gate; producer/template/marker/join untouched;
-  `supplied==declared_arity` holds by supply not relabel) + the terminal AC-REENUM
-  gate. RT-IH-MARKER's producer fix (`64019430c`) is a CLOSED Language deliverable;
-  the seat's ownership returned to Runtime. runtime-leader dispatched it to the
-  implementer on the co-land branch (evt_7s2qpj3qxnrr3, "Confirm Working, proceed").
-- CO-LAND (§8, ONE green candidate, does not land in pieces): join half
-  (`6a45ae1a7`, APPROVED) + producer fix (`64019430c`, closed) + runtime operand
-  seat + built projection/disposition + join reconcile. Lands once AC-REENUM greens
-  (both checked-family programs; the 8 rt_parity 288/301-then-marker entries
-  advance) and the cap41_*/terminal rows go all-green; a FURTHER refusal ⇒
-  STOP+report (new deeper mechanism, back to Architect + Steward). Then D-final
-  closes NATIVE-HANDLE-CARRIER + PX8-F-CAP-41 Phase 2, then RT-BACKEND-MODULE-SPLIT.
-  HS=4 (count of record); next mandatory re-trigger at 6. No kernel/TCB.
+- §1a CLOSURE A WITHDRAWN (Architect evt_hftfnn4mh8jk) on the implementer's
+  grounded refutation (evt_6tzrt1xndpx1e, measured on `64019430c`). At the firing
+  seam (`core.rs:12519`, direct descent — NOT the source-machine sites) the
+  recursive operand is a LIVE nested-recursor StaticWorker (declared_arity 1,
+  captures 9). `LoweringOperand` is only `{ Specialized(Lowered),
+  Carried(CarriedBoundaryWord) }` and `worker.captures` is itself
+  `Vec<LoweringOperand>`, so the live worker fits NEITHER `inputs` NOR captures;
+  the only conversion is a Lowered closure value — the closure-boundary crossing
+  Ken forbids (the `rt_write_writable_stage` / BoundaryCarrier wall). Nothing can
+  be "seated as an operand". §1b: BOTH Closure A (seat as input) and B (producer
+  emits operand) shared the refuted PLACEABILITY premise — B is not resurrected
+  (same wall). The marker's nullary/arity-0 semantic STANDS.
+- HS 4 → 5 (count of record, Steward-confirmed evt_1jp5fvt7zt88v). Second
+  premise-refutation in the arc (join-reachability, now IH-operand-placeability);
+  a distinct mechanism (live-worker-cannot-be-an-operand, same boundary
+  prohibition as BoundaryCarrier). NOT itself a mandatory 3/6/9 trigger; next
+  mandatory re-trigger at 6, so a further hard stop on this design question fires
+  it. Architect pulled research now on the merits (§1a floor).
+- REFRAMED §1a HOLD (research reframed advisory DELIVERED evt_5jp0npxf78erv;
+  Architect owes the reframed ruling). Leading
+  UNRULED hypothesis: env slot 0 (the IH) is a lazy IH thunk (StaticWorker) and
+  the checked-IH invocation is a nullary FORCE of that thunk (Ken has a zero-input
+  thunk `core.rs:13128` + bounded re-entry `core.rs:4766/5020/1391`), not a
+  declared_arity-1 raw-worker call — so `worker.declared_arity` 1 is the wrong
+  shape and the fix is UPSTREAM of the gate (how the checked-IH callee is
+  realized): the implementer's option (c) via re-entry/force. Reframed question to
+  research: under CBV, when the IH is itself a live nested recursor (thunk/closure,
+  not a value), how is it supplied at a nullary IH use — forced thunk vs re-entry
+  vs fixpoint/self / carried-word? "Prior art has nothing new; Ken-internal
+  choice" is a first-class answer (§1a step 4).
+- NODE HELD: RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT reverted to `status: draft`
+  (held) — its name and
+  operand-seat mechanism are refuted. On the reframed ruling it is re-framed or
+  superseded; the SEAM (`core.rs:12519`) and possibly the OWNER may change (a
+  thunk-force / worker-resolution fix may sit upstream, off Runtime). The terminal
+  AC-REENUM gate moves with the reframed successor. Producer fix (`64019430c`,
+  closed) + join half (`6a45ae1a7`, APPROVED) STAND untouched; both runner tables
+  stay red; NOTHING lands until the reframed ruling and AC-REENUM green, then
+  D-final closes NATIVE-HANDLE-CARRIER + PX8-F-CAP-41 Phase 2, then
+  RT-BACKEND-MODULE-SPLIT. No kernel/TCB.
 
 ### Verify + language (lane 2) — Z3 integration; V3-FO D0 RESOLVED = arm (a), no TCB
 
@@ -163,8 +177,24 @@ if the Architect's layer-3 ruling or a future D0 rules in an operator-gated arm.
 
 ### Session log / escalations of record
 
+- HS=5 §1a arc (RT-FSREADAT IH-operand-placeability, `thr_3j5ew8rhy35nh`,
+  2026-08-22): the runtime-implementer built to the ruled Closure A, hit two
+  structural obstacles and REFUTED it (evt_6tzrt1xndpx1e, measured on 64019430c) —
+  the recursive value at the firing seam (core.rs:12519) is a live nested-recursor
+  StaticWorker that fits neither `inputs` nor captures and cannot become a
+  LoweringOperand without the forbidden closure-boundary crossing. Architect
+  ACCEPTED the refutation and WITHDREW Closure A (evt_hftfnn4mh8jk): both A and B
+  shared the refuted placeability premise; B not resurrected. HS 4→5 (a distinct
+  mechanism, Steward-confirmed evt_1jp5fvt7zt88v; not a mandatory 3/6/9 trigger;
+  next at 6). Reframed §1a research pull issued (leading hypothesis: nullary FORCE
+  of a lazy IH thunk, upstream of the gate). Steward set
+  RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT to `status: draft`/held (name + mechanism
+  refuted),
+  to be re-framed/superseded on the reframed ruling. Nothing lands; producer fix +
+  join half untouched; tables stay red. Count of record: HS=5, next mandatory at 6.
 - HS=4 §1a arc (RT-FSREADAT static-worker ABI supply, `thr_3j5ew8rhy35nh`,
-  2026-08-22): Language producer fix (64019430c) cleared the marker seam
+  2026-08-22) [Closure A later WITHDRAWN — see HS=5 above]: Language producer fix
+  (64019430c) cleared the marker seam
   → AC-REENUM STOPPED (evt_6p7vfbadg863p) at a deeper refusal one layer
   below (template arity 0 vs worker.declared_arity 1) → Architect ruled
   the binary FALSE, a genuine new mechanism (HS 3→4, Steward-confirmed
