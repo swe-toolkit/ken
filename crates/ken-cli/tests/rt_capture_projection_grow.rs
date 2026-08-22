@@ -205,9 +205,11 @@ fn the_conditional_join_grows_the_projection_and_records_every_deferral() {
          means the effect-seat boundary below was closed too, and this sentinel is the \
          thing to re-measure rather than remove: {error}"
     );
-    // REPOINTED by `RT-DEAD-ARM-EFFECT-LOWERING`, which is the boundary the
-    // sentinel above named. The `ConstructorTag` stop this used to pin sat on a
-    // DEAD handler arm, so that node traps it and the witness advances.
+    // REPOINTED AGAIN by `RT-RESOURCE-RELEASE-CARRIED-OBSERVE`. Each repoint has
+    // moved the pin STRICTLY DOWNSTREAM: ConstructorTag (dead arm, trapped) ->
+    // ResourceRelease/ResourceScalar (carried observation, now routed) ->
+    // ExactIntU64. Direction is the whole safety argument, so it is recorded
+    // rather than left to be re-derived.
     //
     // Repointed, not widened and not deleted — the sentinel's own instruction.
     // The new terminal is strictly DOWNSTREAM of the old one, which is what
@@ -216,12 +218,13 @@ fn the_conditional_join_grows_the_projection_and_records_every_deferral() {
     // UPSTREAM of the guarded feature would be the accommodation this forbids.
     assert!(
         error.contains(
-            "seat Argument(0) of ResourceRelease needs ResourceScalar, which it cannot \
+            "seat Argument(1) of FsReadAt needs ExactIntU64, which it cannot \
              observe in CarriedWord"
         ),
-        "the expected terminal state after `RT-DEAD-ARM-EFFECT-LOWERING` is the LIVE \
-         ResourceRelease seat refusal — the deferred carried-observation work — which \
-         is what makes the two absences above non-vacuous: without it they would also \
-         hold on a compile that failed for some unrelated earlier reason: {error}"
+        "the expected terminal state after `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` is the \
+         `ExactIntU64` seat refusal — a DIFFERENT need, with its own carried precedent, \
+         and the next sibling to wire — which is what makes the two absences above \
+         non-vacuous: without it they would also hold on a compile that failed for some \
+         unrelated earlier reason: {error}"
     );
 }
