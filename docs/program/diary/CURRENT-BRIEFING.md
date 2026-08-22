@@ -46,7 +46,7 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `d49a232ad`.** Tree clean; no publisher running. Watchdog armed
+**`main` = `716f63841`.** Tree clean; no publisher running. Watchdog armed
 @1800s; the CronCreate daily briefing-flush schedule (`7d029bbf`, 09:37 —
 session-only) present.
 
@@ -135,17 +135,32 @@ surface; charter `docs/program/wp/foundation-expressibility-trial.md`.
   CI-red `1b9aa9c7b`). Narrowed AC-7 met. Adversary hunted the landed object:
   CLEAN (`evt_64x1rmjbx4097`; it flagged a wrong range endpoint in the
   lieutenant's M8 handoff and self-corrected).
-- Q3 EXECUTED 2026-08-22 (operator "tcb change authorized. proceed."). Sequence
-  run in hazard order: (1) cut `KERNEL-SCT-TELESCOPE-CANON` (kernel ring, TCB
-  change, `gate: operator` satisfied; route A = SCT arity from the declared Pi
-  telescope, admit==analyze the same eta-long body, MANDATORY nonterminating
-  hidden-return-Pi negative control, adversary + conformance; Architect required
-  reviewer); (2) re-point `V3-FO-CHECKER-SOUNDNESS` `depends_on` from LANG-INDEXED
-  to `KERNEL-SCT-TELESCOPE-CANON`; (3) close `LANG-INDEXED-RECURSIVE-IH-DISCHARGE`
-  (accepted partial — its c-elab transport `93d82a398` delivered the
-  kernel_check half; SCT-pass half is the successor). V3-FO D3 resumes on
-  KERNEL-SCT's landing, no proof re-authoring. Kernel ring kicked (seat check +
-  Architect required reviewer).
+- Q3 EXECUTED 2026-08-22 (operator "tcb change authorized. proceed.").
+  `KERNEL-SCT-TELESCOPE-CANON` cut (route A, arity from the declared Pi
+  telescope); `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` closed (accepted partial,
+  c-elab transport `93d82a398`); kernel ring kicked, D0 durable (`4fc1f7b5`).
+- KERNEL-SCT D1 HARD-STOP RESOLVED (Architect final ruling evt_1gtmndpzh3xda +
+  correction evt_134z6mr80ymqp; landed `716f63841`). Route A is correct/complete
+  FOR THE ARITY DEFECT (WIP `27a84fcc5a94`, gate un-weakened). The D1 measurement
+  on the exact FoKripke consumer REFUTED the premise that arity was the whole
+  SCT-pass gate: the real clique fails by ROTATION under the current `size_rel`
+  abstraction — NOT arity, NOT Cast/J (refuted, zero descending args are
+  Cast/J), NOT a closure-criterion gap (SCT already complete for the abstraction,
+  Lee-Jones-Ben-Amram → no lexicographic node). Disposition executed:
+  - KERNEL-SCT closes on its arity ACs + a SYNTHETIC arity-isolation consumer
+    (single-parameter descent, no rotation, no coercion). kernel-implementer is
+    building it (evt_x4nhgwcnr3yj); D1 close routes to the Architect.
+  - NEW node `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` (language/spec enclave, `ready`,
+    held behind KERNEL-SCT): the real AC-CONSUMER home, carrying the rotation
+    fork D0 — (a) upstream re-elaboration [preferred, no TCB], (b) narrow
+    `size_rel` completeness [operator-gated, conditional], (c) richer measure
+    [operator escalation, dispreferred]. D0 is a FORK, not a build. Kick its D0
+    once arity lands or the enclave seat is free to take the fork.
+  - `V3-FO-CHECKER-SOUNDNESS.depends_on` re-pointed onto that enclave node.
+  - Program consequence for the operator: V3-FO (soundness-critical) now waits on
+    an UPSTREAM expressibility question, materially harder than arity and
+    genuinely open. No TCB authorization due to Pat yet — (a) needs none;
+    (b)/(c) arise only if the enclave's D0 rules them in.
 
 ### Operator questions — Q3 ANSWERED; none block lane 1
 
