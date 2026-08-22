@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 07:01:54Z — from 408 issue file(s) in `docs/program/issues/`.
+2026-08-22 07:26:43Z — from 409 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -128,6 +128,7 @@ the committed file matches the generator's output.
 | `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | active | kernel | L | none | — |
 | `KERNEL-RECURSIVE-RESULT-SURFACE` | A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible | merged | spec-enclave | M | none | — |
 | `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` | The recursor's iota-rule forces an induction hypothesis for every recursive argument eagerly, so a non-recursive match on a recursive inductive does not reduce at an abstract recursive field -- repair iota_reduct to skip an IH whose method binder does not occur, the reduction-time enabler V3-FO-CHECKER-SOUNDNESS D3 is blocked on | merged | kernel | M | operator | — |
+| `KERNEL-SCT-TELESCOPE-CANON` | The SCT gate derives each group member's arity by counting leading Lam binders in the elaborated body (count_params, sct.rs:623), so once the c-elab result-refinement transport wraps a mutual-recursion body the leading-Lam count diverges from the declared arity, skip_lams skips the wrong number, the size-change matrices are mis-dimensioned, and a terminating transport-carrying clique wrongly reds NotTerminating -- repair the arity to the DECLARED Pi telescope (route A, telescope-canonicalization) with admit==analyze on the same eta-long body, the SCT-pass enabler LANG-INDEXED full admission and V3-FO-CHECKER-SOUNDNESS D3 are blocked on | ready | kernel | M | operator | — |
 | `KERNEL-SUBST-OUTER-INDEX-SCOPE` | Rule whether kernel subst_outer should bound its parameter index -- it panics on an out-of-range params[p_idx] and is defended only by a reachability argument enumerating one of its 29 call sites | draft | spec-enclave | S | none | — |
 | `KW-ORACLE-CLOSURE` | close the KW-THEOREM source oracle structurally — the occurrence sweep is never applied, and the file population is a five-arm hand enumeration | merged | language | S | none | 986 |
 | `KW-ORACLE-REMOVE` | Delete the whole-tree source-text oracle: it asserts facts about repository text, which is now a prohibited test subject | merged | language | S | none | 1035 |
@@ -146,7 +147,7 @@ the committed file matches the generator's output.
 | `LANG-FOREIGN-NAME-CONTROL-CHARS` | Escape decoding made `foreign` symbol and library names able to carry an embedded NUL, where the source text `\\0` previously reached the compiler as two harmless characters -- a NUL in a name that will cross a C-ABI boundary is the classic truncation vector, the declared and effective names silently differ, and there is no consumer today only because the loader path has not landed yet | merged | language | XS | none | 2128 |
 | `LANG-FOREIGN-NAME-FORMAT-CHARS` | Unicode Cf format characters -- bidi overrides, zero-width joiners, U+FEFF -- are a visual-spoofing vector at the same `foreign`-name trust boundary the Cc control-character check just closed, and they are a DIFFERENT vector: not truncation but two distinct declarations rendering identically to the reviewer doing the check | draft | language | XS | operator | — |
 | `LANG-GADT-SEQUENCE-TRACKER-GAP` | `34 §8` names four `SURF-gadt-*` build WPs and all four have frames in `docs/program/wp/` -- none has a tracker node, so `gen-progress.sh` shows the whole dependent-constructor area as absent, while the code has in fact moved past every one of the four frames' stated baselines | merged | language | S | none | — |
-| `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` | Transport the mutual-recursion sibling-call result along the dependent-match refinement equality at the elaboration boundary, so the source branch reconciles a recursive-group call's concrete indexed result with the refined motive index -- route (c) genuine J/cast transport over a PROPOSITIONAL equality via c-elab roster-aware auto-transport (the c-proof/c-elab fork RESOLVED to c-elab: D0 measured no lawful existing source carrier), surfacing the recursive-group roster into ElabCtx and inserting the transport at the equality-holding seam, NOT the reflexive same-owner discharge and NOT a new source-language carrier; the elaborator prerequisite V3-FO-CHECKER-SOUNDNESS D3 is blocked on | active | language | M | none | — |
+| `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` | Transport the mutual-recursion sibling-call result along the dependent-match refinement equality at the elaboration boundary, so the source branch reconciles a recursive-group call's concrete indexed result with the refined motive index -- route (c) genuine J/cast transport over a PROPOSITIONAL equality via c-elab roster-aware auto-transport (the c-proof/c-elab fork RESOLVED to c-elab: D0 measured no lawful existing source carrier), surfacing the recursive-group roster into ElabCtx and inserting the transport at the equality-holding seam, NOT the reflexive same-owner discharge and NOT a new source-language carrier; the elaborator prerequisite V3-FO-CHECKER-SOUNDNESS D3 is blocked on | closed | language | M | none | — |
 | `LANG-INFIX-APPLICATION-DEFAULT` | with symbolic operator names defined, `a <+> b` must parse as application of `<+>` at the normative default `infixl 9` -- one precedence level in the existing cascade, and it needs no fixity table | draft | language | S | none | — |
 | `LANG-INTERVENING-LET-FRAME-WEAKENING` | An intervening let between an outer match's premise and a nested match reaches install_index_refinements and dies in refine_branch_goal with 'could not classify the branch goal: TypeMismatch' -- and the Architect refused 'orthogonal', because the reported found term carries LANG-CONVOY's own D1 signature and there is an influence path through RVar resolution | active | language | S | none | — |
 | `LANG-LEX-HEX-FLOAT` | Both spec literal tables give `0x1p-3` as a `Float` form, but the lexer has no hex-float path at all -- and unlike every other numeric form in this arc it cannot be reached by handing a string to `parse::<f64>()`, because Rust's float parser rejects hex-float syntax, so the value must be assembled and correctly rounded by hand | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1885 |
@@ -457,6 +458,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `CAT-GCD` — Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe
 - `CAT-VEC` — Length-indexed Vector — Data/Vector: Vec n a with total head/index/zip/map and the length laws, the deliberate fully-dependent probe of the Foundation expressibility trial
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
+- `KERNEL-SCT-TELESCOPE-CANON` — The SCT gate derives each group member's arity by counting leading Lam binders in the elaborated body (count_params, sct.rs:623), so once the c-elab result-refinement transport wraps a mutual-recursion body the leading-Lam count diverges from the declared arity, skip_lams skips the wrong number, the size-change matrices are mis-dimensioned, and a terminating transport-carrying clique wrongly reds NotTerminating -- repair the arity to the DECLARED Pi telescope (route A, telescope-canonicalization) with admit==analyze on the same eta-long body, the SCT-pass enabler LANG-INDEXED full admission and V3-FO-CHECKER-SOUNDNESS D3 are blocked on
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
@@ -518,7 +520,7 @@ is itself not yet `merged`/`closed`:
 - `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` blocked by `RT-EXACTINT-CARRIED-OBSERVE` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
-- `V3-FO-CHECKER-SOUNDNESS` blocked by `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` (status: active)
+- `V3-FO-CHECKER-SOUNDNESS` blocked by `KERNEL-SCT-TELESCOPE-CANON` (status: ready)
 
 ## Gate progress
 
@@ -529,7 +531,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **operator**: `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` (merged) `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` (draft) `LANG-FOREIGN-NAME-FORMAT-CHARS` (draft)
+- **operator**: `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` (merged) `KERNEL-SCT-TELESCOPE-CANON` (ready) `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` (draft) `LANG-FOREIGN-NAME-FORMAT-CHARS` (draft)
 
 ## Archive & diary
 

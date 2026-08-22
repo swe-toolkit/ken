@@ -46,7 +46,7 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `8d37068bc`.** Tree clean; no publisher running. Watchdog armed
+**`main` = `d49a232ad`.** Tree clean; no publisher running. Watchdog armed
 @1800s; the CronCreate daily briefing-flush schedule (`7d029bbf`, 09:37 —
 session-only) present.
 
@@ -58,7 +58,7 @@ Architect-burden probe, launched 2026-08-22 anchor `evt_4r550cbd3fvvb`). Doc
 track concurrent, contention-free. Finished work still merges; framing an active
 lane is lane work.
 
-### Runtime (lane 1) — RT-EXACTINT IN REVIEW; RT-FSREADAT-REPLY removal cut; NHC held on removal
+### Runtime (lane 1) — RT-EXACTINT D1 landed d49a232a (node active/partial); removal + NHC held
 
 The NHC `cap41_*` blocker chain: each landed fix ADVANCES the rows to the next
 distinct blocker (does not green them) until the last lands and D-final runs
@@ -69,8 +69,12 @@ all-green. Two blockers merged, third in review, fourth cut.
   QA + Architect APPROVE). ResourceScalar-need FAMILY CLOSURE
   (`lower_resource_token_seat`, no Avail change). M8 Adversary hunt SOUNDNESS
   CLEAN (`evt_5wx3bax63yak`).
-- RT-EXACTINT-CARRIED-OBSERVE IN REVIEW (active; anchor `evt_47kvrp1esty58`,
-  thread `thr_6syere95dng6r`; runtime ring, Opus 5). D0 corrected the frame: it
+- RT-EXACTINT-CARRIED-OBSERVE D1 LANDED on `main` as `d49a232a` (six
+  corrected-stat candidate paths blob-match `2a8a6d569`; Architect APPROVE
+  carried, lieutenant merged). Node stays `active` — D1 is a partial; no
+  successor release is due yet (lieutenant, evt on `thr_6syere95dng6r`). Anchor
+  `evt_47kvrp1esty58`, thread `thr_6syere95dng6r`; runtime ring, Opus 5). D0
+  corrected the frame: it
   is an AVAIL-MOVE, not a new route. Architect ruled (`evt_2kspreq08s3a`) a
   deliberate move of the positioned exact-`Int` seats onto the existing
   `carried_exact_int` EITHER_PHASE classification, decoded by the in-production
@@ -131,27 +135,25 @@ surface; charter `docs/program/wp/foundation-expressibility-trial.md`.
   CI-red `1b9aa9c7b`). Narrowed AC-7 met. Adversary hunted the landed object:
   CLEAN (`evt_64x1rmjbx4097`; it flagged a wrong range endpoint in the
   lieutenant's M8 handoff and self-corrected).
-- LANG-INDEXED node HELD `active`, NOT merged: full admission (kernel_check AND
-  SCT-pass) is the operator-gated kernel SCT successor's gate, and
-  V3-FO-CHECKER-SOUNDNESS `depends_on` LANG. Do NOT close LANG before the kernel
-  successor is cut and V3-FO's `depends_on` re-pointed to it (gen-progress
-  `closed`==`merged` clearance hazard). Sequence on authorization: cut kernel
-  successor, re-point V3-FO, then close LANG.
+- Q3 EXECUTED 2026-08-22 (operator "tcb change authorized. proceed."). Sequence
+  run in hazard order: (1) cut `KERNEL-SCT-TELESCOPE-CANON` (kernel ring, TCB
+  change, `gate: operator` satisfied; route A = SCT arity from the declared Pi
+  telescope, admit==analyze the same eta-long body, MANDATORY nonterminating
+  hidden-return-Pi negative control, adversary + conformance; Architect required
+  reviewer); (2) re-point `V3-FO-CHECKER-SOUNDNESS` `depends_on` from LANG-INDEXED
+  to `KERNEL-SCT-TELESCOPE-CANON`; (3) close `LANG-INDEXED-RECURSIVE-IH-DISCHARGE`
+  (accepted partial — its c-elab transport `93d82a398` delivered the
+  kernel_check half; SCT-pass half is the successor). V3-FO D3 resumes on
+  KERNEL-SCT's landing, no proof re-authoring. Kernel ring kicked (seat check +
+  Architect required reviewer).
 
-### Operator questions OPEN (Pat) — none block lane 1
+### Operator questions — Q3 ANSWERED; none block lane 1
 
-Q3 now paces TWO threads: it unblocks V3-FO-CHECKER-SOUNDNESS-D3 AND lets
-LANG-INDEXED close.
-
-1. Runtime remains lane 1? [proceeding on the default yes]
-2. Is language/verify an authorized lane again, or does §0's single-lane posture
-   stand? (LANG is only finishing in-flight, already-approved work.)
-3. Authorize the operator-gated kernel SCT successor (route A,
-   "KERNEL-SCT-TELESCOPE-CANON")? Architect + research fully specified it.
-   Controls: arity from the DECLARED Pi telescope (never a deep-lambda
-   heuristic), admit==analyze the same eta-long body, MANDATORY nonterminating
-   hidden-return-Pi negative control, adversary + conformance, operator-gated
-   TCB change.
+Q1/Q2 were resolved by the 2026-08-21/22 three-lane trial (roster:
+`steward/lanes.md`): runtime is lane 1, and language/verify is an authorized
+lane (lane 2). Q3 (authorize the operator-gated kernel SCT successor) was
+answered YES on 2026-08-22 ("tcb change authorized. proceed.") and is executed —
+see the Language+verify (lane 2) section above. No operator question is open.
 
 ### Preserved refs this session
 
