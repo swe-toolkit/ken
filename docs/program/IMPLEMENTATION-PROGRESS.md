@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 08:27:30Z — from 410 issue file(s) in `docs/program/issues/`.
+2026-08-22 08:52:06Z — from 410 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -128,7 +128,7 @@ the committed file matches the generator's output.
 | `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | active | kernel | L | none | — |
 | `KERNEL-RECURSIVE-RESULT-SURFACE` | A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible | merged | spec-enclave | M | none | — |
 | `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` | The recursor's iota-rule forces an induction hypothesis for every recursive argument eagerly, so a non-recursive match on a recursive inductive does not reduce at an abstract recursive field -- repair iota_reduct to skip an IH whose method binder does not occur, the reduction-time enabler V3-FO-CHECKER-SOUNDNESS D3 is blocked on | merged | kernel | M | operator | — |
-| `KERNEL-SCT-TELESCOPE-CANON` | The SCT gate derives each group member's arity by counting leading Lam binders in the elaborated body (count_params, sct.rs:623), so once the c-elab result-refinement transport wraps a mutual-recursion body the leading-Lam count diverges from the declared arity, skip_lams skips the wrong number, the size-change matrices are mis-dimensioned, and a terminating transport-carrying clique wrongly reds NotTerminating -- repair the arity to the DECLARED Pi telescope (route A, telescope-canonicalization) with admit==analyze on the same eta-long body, the SCT-pass enabler LANG-INDEXED full admission and V3-FO-CHECKER-SOUNDNESS D3 are blocked on | ready | kernel | M | operator | — |
+| `KERNEL-SCT-TELESCOPE-CANON` | The SCT gate derives each group member's arity by counting leading Lam binders in the elaborated body (count_params, sct.rs:623), so once the c-elab result-refinement transport wraps a mutual-recursion body the leading-Lam count diverges from the declared arity, skip_lams skips the wrong number, the size-change matrices are mis-dimensioned, and a terminating transport-carrying clique wrongly reds NotTerminating -- repair the arity to the DECLARED Pi telescope (route A, telescope-canonicalization) with admit==analyze on the same eta-long body, the SCT-pass enabler LANG-INDEXED full admission and V3-FO-CHECKER-SOUNDNESS D3 are blocked on | merged | kernel | M | operator | — |
 | `KERNEL-SUBST-OUTER-INDEX-SCOPE` | Rule whether kernel subst_outer should bound its parameter index -- it panics on an out-of-range params[p_idx] and is defended only by a reachability argument enumerating one of its 29 call sites | draft | spec-enclave | S | none | — |
 | `KW-ORACLE-CLOSURE` | close the KW-THEOREM source oracle structurally — the occurrence sweep is never applied, and the file population is a five-arm hand enumeration | merged | language | S | none | 986 |
 | `KW-ORACLE-REMOVE` | Delete the whole-tree source-text oracle: it asserts facts about repository text, which is now a prohibited test subject | merged | language | S | none | 1035 |
@@ -459,7 +459,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `CAT-GCD` — Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe
 - `CAT-VEC` — Length-indexed Vector — Data/Vector: Vec n a with total head/index/zip/map and the length laws, the deliberate fully-dependent probe of the Foundation expressibility trial
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
-- `KERNEL-SCT-TELESCOPE-CANON` — The SCT gate derives each group member's arity by counting leading Lam binders in the elaborated body (count_params, sct.rs:623), so once the c-elab result-refinement transport wraps a mutual-recursion body the leading-Lam count diverges from the declared arity, skip_lams skips the wrong number, the size-change matrices are mis-dimensioned, and a terminating transport-carrying clique wrongly reds NotTerminating -- repair the arity to the DECLARED Pi telescope (route A, telescope-canonicalization) with admit==analyze on the same eta-long body, the SCT-pass enabler LANG-INDEXED full admission and V3-FO-CHECKER-SOUNDNESS D3 are blocked on
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
@@ -480,6 +479,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `SPEC-45-CLOSURE-IN-CONSTRUCTOR-EXCEPTION` — Does 45 section 3's 'functions lower to ordinary closures' admit an exception for a function value held in a constructor field with no statically visible consumer -- if not, the native backend's current refusal is a defect against AC3 rather than a permitted narrowing
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
+- `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` — The FoKripke checker_soundness mutual-recursion clique's real termination is not a single structural size-change thread on its declared parameters under the current size_rel abstraction -- it fails by ROTATION (the bare-Var matched-field descent arrives in one slot while the outgoing edge decreases from another) -- so full SCT admission of the real consumer needs an UPSTREAM resolution (re-elaborate the soundness recursion to one structural thread; preferred, no TCB), with a narrow size_rel completeness fix or a richer measure as operator-gated conditional arms; this is the real AC-CONSUMER home V3-FO-CHECKER-SOUNDNESS D3 waits on, distinct from the arity fix (KERNEL-SCT-TELESCOPE-CANON) and from any Cast/J or lexicographic-SCT node
 
 ## Blockers
 
@@ -522,7 +522,6 @@ is itself not yet `merged`/`closed`:
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 - `V3-FO-CHECKER-SOUNDNESS` blocked by `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` (status: ready)
-- `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` blocked by `KERNEL-SCT-TELESCOPE-CANON` (status: ready)
 
 ## Gate progress
 
@@ -533,7 +532,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **operator**: `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` (merged) `KERNEL-SCT-TELESCOPE-CANON` (ready) `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` (draft) `LANG-FOREIGN-NAME-FORMAT-CHARS` (draft)
+- **operator**: `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` (merged) `KERNEL-SCT-TELESCOPE-CANON` (merged) `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` (draft) `LANG-FOREIGN-NAME-FORMAT-CHARS` (draft)
 
 ## Archive & diary
 
