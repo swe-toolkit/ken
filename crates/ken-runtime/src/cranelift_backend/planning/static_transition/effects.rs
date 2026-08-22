@@ -428,12 +428,35 @@ fn host_effect_seat_contract(
             Some(resource)
         }
         (Op::FsWriteAt, 5) => Some(resource),
+        // `RT-EXACTINT-CARRIED-OBSERVE` `D1` -- the positioned arm's exact-`Int`
+        // seats join the EITHER_PHASE classification `BufferAllocate` `0`
+        // already uses. Architect `evt_2kspreq08s3a` ruled AVAIL here rather
+        // than a route, and the distinction is need-specific rather than a
+        // reversal: route-not-Avail was required for `ResourceScalar` because
+        // `emit_carrier_scalar` would read ANY word's bits as a scalar, so a
+        // guard had to dominate the read. `narrow_carried_int_u64` is itself
+        // FAIL-CLOSED -- it branches on the boundary tag and `require_i64`s the
+        // viewed path's status, so a word that is not a decodable `Int` takes
+        // the failure return and an out-of-range one returns `valid = 0` into
+        // this operation's EXISTING narrow-failure lane. The accept path
+        // re-runs the fail-closed consumer; it is simply the decoder rather
+        // than a route's guards.
+        //
+        // ⇒ One mechanism for one need. A route here would leave
+        // `BufferAllocate` `0` on `Avail` and these on a route -- two admission
+        // mechanisms for a single need.
+        //
+        // These six move together because ONE reader edit covers them: they
+        // share the positioned emitter arm. The Avail widening is inert for a
+        // seat that never arrives carried (`EITHER_PHASE` still admits the
+        // specialized phase through `Direct`), and the reader is total over
+        // both phases.
         (Op::FsReadAt, 1)
         | (Op::FsReadAt, 3)
         | (Op::FsReadAt, 4)
         | (Op::FsWriteAt, 1)
         | (Op::FsWriteAt, 3)
-        | (Op::FsWriteAt, 4) => Some(exact_int),
+        | (Op::FsWriteAt, 4) => Some(carried_exact_int),
         // An ADMITTED operation at an ordinal it does not have. `None` here is
         // an arity disagreement, refused by the caller with the seat's own
         // coordinates -- never a seat that is exempt from having a contract.

@@ -154,10 +154,24 @@ fn the_carried_resource_route_observes_resource_scalar_and_still_refuses_a_diffe
     // The route FIRED. Every `ResourceScalar` seat on this path -- across
     // `ResourceRelease`, `FsHandleMetadata` and `FsReadAt` `Argument(0)` -- is
     // now observed in the carried phase rather than refused.
+    // KEYED ON THE CLAIM-GATE WORDING, not on the bare need name. The original
+    // form asserted `!contains("needs ResourceScalar")`, and that substring does
+    // NOT discriminate: it appears in TWO structurally different refusals -- the
+    // claim-gate membership one this route is about ("...which it cannot observe
+    // in CarriedWord") and `ClaimedEffectSeats::specialized`'s READER tripwire
+    // ("...which this release can observe only in a specialized template").
+    //
+    // It cost a false signal to find out. When `RT-EXACTINT-CARRIED-OBSERVE`
+    // advanced this witness to the Arg(2) reader tripwire, this row failed
+    // printing "the route stopped firing" while the route was working perfectly
+    // -- a message that would have sent the next reader hunting the wrong
+    // mechanism. A control must key on the refusal it is ABOUT, not on a word
+    // the refusal happens to contain.
     assert!(
-        !error.contains("needs ResourceScalar"),
-        "the carried resource-token route must observe the ResourceScalar need; a surviving \
-         `needs ResourceScalar` refusal means the route stopped firing: {error}"
+        !error.contains("needs ResourceScalar, which it cannot observe in CarriedWord"),
+        "the carried resource-token route must observe the ResourceScalar need at the CLAIM \
+         GATE; a surviving membership refusal in that exact wording means the route stopped \
+         firing: {error}"
     );
 
     // The route is KEYED ON THE NEED. A carried seat of a different need is
@@ -165,10 +179,34 @@ fn the_carried_resource_route_observes_resource_scalar_and_still_refuses_a_diffe
     // proved observability for one need rather than admitting carried seats
     // generally. This is the half that fails if the key is ever loosened to
     // "any carried seat", and it is why the row above cannot pass vacuously.
+    // WEAKENED, DELIBERATELY AND WITH THE LOSS NAMED. This half used to assert
+    // that a carried seat of a DIFFERENT need (`ExactIntU64`) still refused at
+    // the claim gate -- the half that failed if the route were ever loosened to
+    // "any carried seat". `RT-EXACTINT-CARRIED-OBSERVE` closed that need, so
+    // this witness no longer contains a different-need claim-gate refusal, and
+    // the discriminator it provided is GONE rather than merely relocated.
+    //
+    // What remains is a non-vacuity anchor: the compile still stops, at a
+    // measured later blocker, so the absence above is not satisfied by a
+    // compile that failed upstream of the route. That is strictly less than the
+    // keying property it replaces.
+    //
+    // The property itself still holds IN CODE -- the ledger's second
+    // admissibility independently re-derives `(CarriedWord, ResourceScalar)`,
+    // byte-unchanged by the node that dropped this row's witness -- so what was
+    // lost is persistent regression DETECTION, not the route's keying.
+    //
+    // RESTORATION HOME: `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`, tracked as an
+    // AC rather than left to this comment (Architect `evt_4wkc748vgfhhf`). That
+    // node removes the Arg(2) gate, which is what produces a COMPLETING witness
+    // to carry a durable discriminator. Durable means a POSITIVE CROSS-KEY form
+    // -- one witness where a `ResourceScalar` carried seat and an `ExactIntU64`
+    // carried seat each route through their OWN decoder -- rather than this
+    // vanishing-contrast shape, which is inherently fragile precisely because
+    // it is spent the moment the contrasting need is closed.
     assert!(
-        error.contains("needs ExactIntU64, which it cannot observe in CarriedWord"),
-        "a carried seat of a DIFFERENT need must still refuse: the route is keyed on \
-         ResourceScalar, and admitting carried seats generally would relax the gate this \
-         node exists to keep strict: {error}"
+        error.contains("seat Argument(2) of FsReadAt needs ResourceScalar"),
+        "the compile must still stop at the measured later blocker, so the absence above is \
+         not satisfied vacuously by a failure upstream of the route: {error}"
     );
 }
