@@ -24,10 +24,15 @@ consumer, per the final ruling below.
 
 Two post-merge items from the Architect's APPROVE (evt_4xbrdeey44mew), tracked
 so they are not dropped:
-- AC-REVIEW adversary half: the adversary hunt on the LANDED code (the
-  admitted-nonterminating over-accept hole) is dispatched by the Steward as
-  post-merge verification (parallel to RT-EXACTINT's pattern). A finding would
-  open a fresh soundness node, not reopen this one.
+- AC-REVIEW adversary half: DISCHARGED CLEAN. The adversary hunt on the LANDED
+  code (`evt_2hns5xwecc60`) found NO admitted-nonterminating over-accept hole.
+  All three vectors (maximal return-Pi count, delta-revealed telescope, eta-head
+  false Down) refute against one structural fact: `Down` has a single source (an
+  Elim scrutinizing a Var with caller-param provenance, `sct.rs:373`), and
+  eta-added params appear in `canonical_inner` only as bare spine-arg Vars, so
+  they can never be a scrutinee and are DownEq-only by construction
+  (`initial_recon(n)=None`). The AC-NEG negative control ships
+  (`sct_rejects_nonterminating_hidden_return_pi_group`). No fresh soundness node.
 - AC-REVIEW conformance disposition: the verdict-flip pair is realized as the
   kernel-test accept/reject pair in `k2c_conversion.rs` (synthetic accept +
   AC-NEG `NotTerminating` reject), which is correct for this node; the SURFACE
@@ -341,9 +346,10 @@ admission = `kernel_check` AND `sct_check`), not lost.
 
 **`AC-REVIEW` (control 4 -- adversary + conformance).** The Architect is the
 required soundness reviewer (author is not reviewer) -- DONE, APPROVE
-`evt_4xbrdeey44mew`. The Adversary hunts the landed code for an
+`evt_4xbrdeey44mew`. The Adversary hunted the landed code for an
 admitted-nonterminating over-accept hole (the arity-widening failure mode) --
-dispatched by the Steward as post-merge verification. The verdict-flip pair is
+DONE, SOUNDNESS CLEAN `evt_2hns5xwecc60` (all three vectors refute; `Down` has a
+single source and eta params are DownEq-only by construction). The verdict-flip pair is
 realized as the kernel-test accept/reject pair in `k2c_conversion.rs` (synthetic
 clique ACCEPTED + `AC-NEG` nonterminating hidden-return-Pi group REJECTED),
 which is the correct form for this node; the SURFACE conformance seed for the
