@@ -11,16 +11,28 @@ github: 41
 origin: charter backlog (#41); RE-GROUNDED as a live PX8 clause-(a) blocker by architect verdict evt_163mfgjs7fkh8 (2026-07-23); RE-SCOPED spec-first by architect ruling evt_xnkrzjy1c8br (2026-07-23)
 ---
 
-> CLOSED 2026-08-22 — both phases complete except the checked-IH row. Phase 1
-> (spec) merged @ 8ebe370a; Phase 2 (impl) landed via the
-> [[NATIVE-HANDLE-CARRIER]] co-land and was verified GREEN by the Architect's
-> D-final six-axis oracle on main=cbac30826 (evt_32gfvvpfe63c8): the
-> closed-endpoint ReadEof admission ladder and all four cap41_* two-engine
-> acceptance rows pass, both absence axes carry positive red controls. The sole
-> exception is the checked-IH escaping-family row — a deferred capability gap
-> carried by [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]]. The 2026-08-17
-> "Phase 2 blocked / startable / unpaired" sections below are SUPERSEDED by
-> D-final and retained as the reasoning record. HS 5.
+> CLOSED 2026-08-22 (scoped interp/reification deliverable) — NATIVE RESIDUAL
+> CORRECTED 2026-08-22. Phase 1 (spec) merged @ 8ebe370a; Phase 2's interpreter
+> half and native reification seats landed via the [[NATIVE-HANDLE-CARRIER]]
+> co-land and were Architect-approved. The node STAYS CLOSED on that scoped AC.
+>
+> The earlier close read the native full-program half as GREEN "except the
+> checked-IH row." That was wrong, and the Architect corrected its own D-final
+> (re-verification evt_57m51ed8npf75): the native-slow CI jobs were vacuously
+> green (`--no-tests=pass` over a zero-test selection) and `#[ignore]`d rows
+> count as expected-fail — no checked positioned/partial-IO program was ever
+> witnessed on the native backend. The true residual is not one row but the
+> SIX-NODE native carried-value family (native lowering cannot observe a carried
+> / higher-order value across the effect-seat boundary):
+> [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]], [[RT-CARRIED-RESOURCE-SCALAR]],
+> [[RT-COMPMATCH-TREE-SCRUTINEE]], [[RT-SITEOP-CARRIED-WITNESS]] D2,
+> [[RT-DEAD-ARM-EFFECT-LOWERING]], [[RT-CLOSURE-BOUNDARY-LANE]].
+>
+> Operator decision 2026-08-22: this node stays CLOSED on its scoped AC; native
+> completion is RE-HOMED to the native carried-value capability program
+> (Architect framing scheduled). PX8 stays OPEN until that program lands. The
+> 2026-08-17 "Phase 2 blocked / startable / unpaired" sections below are
+> SUPERSEDED and retained as the reasoning record. HS 5.
 
 # THE FOUR `cap41_*` ROWS ARE THIS NODE'S, AND THEY COME BACK HERE — 2026-08-17
 

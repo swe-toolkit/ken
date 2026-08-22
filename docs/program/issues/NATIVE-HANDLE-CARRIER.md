@@ -11,15 +11,31 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> CLOSED 2026-08-22 — D-final GREEN. The co-land RT-FSREADAT (the last open
-> dependency) merged at main=cbac30826 (13/13 blob-match to the approved
-> 71b358a925), and the Architect's D-final six-axis oracle on that head
-> (evt_32gfvvpfe63c8) confirmed the native assembly across the withBuffer
-> boundary is GREEN with exactly one documented exception: the checked-IH
-> escaping-family row — a deferred capability gap carried by
-> [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]], not unfinished work here. NHC and
-> [[PX8-F-CAP-41]] Phase 2 close except that row. HS 5. The sections below are the
-> reasoning record.
+> CLOSED 2026-08-22 (scoped interp/reification deliverable) — NATIVE RESIDUAL
+> CORRECTED 2026-08-22. This node's own scoped deliverable — the interpreter
+> half and the native reification seats across the withBuffer boundary — landed
+> and was Architect-approved; the node STAYS CLOSED on it. Native full-program
+> completion was never in this node's ACs.
+>
+> The earlier close read the NATIVE FULL-PROGRAM half as "GREEN with exactly one
+> exception (the checked-IH row)." That was wrong, and the Architect corrected
+> its own D-final (re-verification evt_57m51ed8npf75): the native-slow CI jobs
+> were vacuously green (`--no-tests=pass` over a zero-test selection) and
+> `#[ignore]`d rows count as expected-fail, not pass — so NO checked
+> positioned/partial-IO program was ever witnessed reifying on the native
+> backend. The true residual is not one row but a SIX-NODE family sharing one
+> predicate — native lowering cannot observe a carried / higher-order value
+> across the effect-seat boundary: [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]],
+> [[RT-CARRIED-RESOURCE-SCALAR]], [[RT-COMPMATCH-TREE-SCRUTINEE]],
+> [[RT-SITEOP-CARRIED-WITNESS]] D2, [[RT-DEAD-ARM-EFFECT-LOWERING]],
+> [[RT-CLOSURE-BOUNDARY-LANE]].
+>
+> Operator decision 2026-08-22: this node (and [[PX8-F-CAP-41]]) stay CLOSED on
+> their scoped interp/reification ACs; native completion is RE-HOMED to the
+> native carried-value capability program (Architect design framing scheduled,
+> same operator decision). PX8 stays OPEN until that program reifies each value
+> on the native backend, absolute and co-indexed, green (un-ignored). HS 5. The
+> sections below are the reasoning record.
 
 # CURRENT STATE — 2026-08-22 (D-final blocker chain; held on RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL)
 
