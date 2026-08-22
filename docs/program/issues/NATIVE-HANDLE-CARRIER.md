@@ -1,72 +1,71 @@
 ---
 id: NATIVE-HANDLE-CARRIER
 title: "Native build-pipeline completeness — a constructor-private resource-carrying handle fails checked-core body-view lowering (MissingClosureMetadata) when it crosses the higher-order withBuffer normalization boundary"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE]
+depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE, RT-DEAD-ARM-EFFECT-LOWERING]
 blocks: [PX8-F-CAP-41]
 github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-# CURRENT STATE — 2026-08-22
+# CURRENT STATE — 2026-08-22 (D-final ran RED; gated on RT-DEAD-ARM-EFFECT-LOWERING)
 
-**Read this section only. Everything below it — including the 2026-08-18
-"CURRENT STATE" block, now demoted — is superseded history retained for the
-measurements it records.**
+**Read this section only. Everything below it — including the demoted earlier
+"CURRENT STATE" block — is superseded history retained for the measurements it
+records.**
 
-**All seven dependencies are merged.** The two that gated every remaining
-deliverable are the last to land, and both are verified `merged` in the tree:
-[[RT-RECURSIVE-POSITION-ARM-ARITY]] and [[RT-BRANCH-LOCAL-DECLARED-CALLABLE]] —
-the branch-local declared-callable routing that eliminates the closure crossing
-the Architect ruled in scope (`evt_7aeb7hqrykgpz`). The downstream blocker that
-`D0'`/`D0''` measured and cut **no longer exists.**
+**All seven original dependencies merged, `D-final` ran, and the result is a
+single new blocker now cut as its own node.** This node is GATED on
+[[RT-DEAD-ARM-EFFECT-LOWERING]] and closes on its landing (disposition below).
 
-**Why this reopens the deciding measurement.** Every run of the four `cap41_*`
-rows on record — `D0'` and `D0''` at `86049d660`, the base differentials at
-`7b8dad7df` — predates `RT-BRANCH-LOCAL-DECLARED-CALLABLE`. They each measured a
-tree that still carried the blocker. **No run exists against a tree that carries
-all the fixes**, so the measurement that decides whether this node is finished
-or still gapped must be taken again, on current `main` (`965ef4819`).
+## `D-final` RAN — all five rows RED, one blocker, downstream of every landed fix
 
-## `D-final` — re-run the four `cap41_*` rows + the `AC-5` row on current main
+Measured by the runtime-implementer against `main` `75b573c1d`
+(`evt_1srzc4frpjhxn`), restoration uncommitted, tree clean. All four `cap41_*`
+rows and the `AC-5` row (`--ignored`) FAIL with one byte-identical refusal:
+`unsupported runtime-IR lowering: Effect: seat Argument(1) of FsWriteFile needs
+ConstructorTag, which it cannot observe in CarriedWord`, at
+`cranelift_backend/lowering/effects.rs:277` (`claim_host_effect_seat`).
 
-**Restore the four `cap41_*` Rust rows and the `AC-5` row and run them against
-current `main`. Report per row: pass or fail, and on any fail the exact refusal
-string plus its call site. Nothing else — do not repair toward green.**
+Three things it settled: (1) ONE blocker, not five — same operation/seat/need/
+phase/static site, plus two existing transition sentinels = seven witnesses
+across three fixtures. (2) The RT-CAPTURE chain's fixes DID move these rows past
+the old carried-residual stop (the `AC-5` `#[ignore]` predicted-string appears
+zero times); this is a new, distinct, downstream blocker. (3) The interpreter
+half was never exercised — `differential` builds native FIRST and refuses there
+— so these rows say nothing yet about interpreter parity.
 
-Recover the four rows from `4c9c59d3e`,
-`crates/ken-cli/tests/rt_parity_native.rs`: the `#[test]` rows at `:620`,
-`:627`, `:634`, `:641` and their exclusive helper
-`assert_cap41_derived_without_read` at `:593`. Run the `AC-5` row
-`fs_read_at_malformed_offset_narrows_to_invalid_offset`
-(`rt_parity_native.rs:687`) `--ignored`. This is four test functions plus one
-helper added to a file you already have — not a cherry-pick, not a rebase, not a
-re-derivation. **Two standing fences hold:** do not revert `4c9c59d3e` (it also
-modified 7 existing lines), and do not touch the Ken decls `rt_body_ok` /
-`rt_cap41_expect_eof` (each has a live reference that is not one of the four
-rows).
+Two grounding measurements plus a decisive constancy measurement
+(`evt_8j0tjp15ypw3`) established the refusing `FsWriteFile` sits in a
+whole-program-DEAD arm of a total `FSOp` request handler (this program never
+constructs `FSOp::WriteFile`), lowered at full strength and refusing on a value
+no execution reaches. Neither the carried-observation route (A) nor
+preserve-the-specialization (C) is this fixture's blocker.
 
-**A red result is a successful deliverable.** The deliverable is the
-measurement, not a green fixture. If the rows still refuse, that is a new
-blocker to measure and cut — exactly as `RT-RECURSIVE-POSITION-ARM-ARITY` and
-`RT-BRANCH-LOCAL-DECLARED-CALLABLE` were — not a failure of the turn. Do not
-enter `D3`/`D4`/`D5` and do not commit the restoration to `main`: adding failing
-tests to `main` stays barred, and the restoration is a measurement fixture, not
-a merge candidate.
+## The cut — [[RT-DEAD-ARM-EFFECT-LOWERING]] (Architect ruling `evt_7kmh9atsrv80n`)
 
-## Disposition — forks on the measurement, not before it
+Lower a provably-unreachable total-handler arm's refusing effect seat to a
+runtime TRAP (fail-closed), gated on a conservative whole-program
+construction-site census, keeping the seat strict — three soundness properties
+and a mandatory negative control in that node's frame. Cut as a new lane-1
+runtime node; this node's `depends_on` names it. **When it lands, re-run
+`D-final` on current main.** The restoration is a measurement fixture recovered
+from `4c9c59d3e` (`rt_parity_native.rs` rows `:620/:627/:634/:641`, helper
+`:593`, `AC-5` row `:687`), not a merge candidate; the fences hold (do not
+revert `4c9c59d3e`; do not touch `rt_body_ok` / `rt_cap41_expect_eof`).
 
-| result | means | next |
+## Disposition — on RT-DEAD-ARM-EFFECT-LOWERING landing
+
+| D-final re-run | means | next |
 |---|---|---|
-| all four rows green and `AC-5` green | native lowering completes across the `withBuffer` boundary; the carrier is done | **fold** the fix with the preserved elaborator slice `preserved/native-handle-carrier-c07e63c2` and fixture `preserved/px8-f-cap-41-p2-buffer-handle-f0eb65ce`, run the Architect's six-axis oracle (deep history below, axes (a)-(f)), then **close NATIVE-HANDLE-CARRIER and [[PX8-F-CAP-41]] Phase 2** |
-| any row still refuses | a downstream blocker survives the landed fixes | report the refusal string and its static call site, hand back for a cut; this node stays gated behind the new successor |
+| all four rows green and `AC-5` green | native lowering completes across the `withBuffer` boundary; the carrier is done | **fold** with the preserved elaborator slice `preserved/native-handle-carrier-c07e63c2` and fixture `preserved/px8-f-cap-41-p2-buffer-handle-f0eb65ce`, run the Architect's six-axis oracle (deep history below, axes (a)-(f)), then **close NATIVE-HANDLE-CARRIER and [[PX8-F-CAP-41]] Phase 2** |
+| a distinct downstream result (e.g. interpreter parity) | native lowering now completes but a further gap is exposed | report and cut the next successor as before |
 
-**This node stays `owner: runtime`, `size: M`, `gate: none`.** The immediate
-turn — restore and run — is small and mechanical (capability tier T2); the
-fold-and-oracle close path, taken only if the rows green, is the M-sized half.
+**This node stays `owner: runtime`, `size: M`, `gate: none`, held on
+[[RT-DEAD-ARM-EFFECT-LOWERING]].**
 
 # SUPERSEDED (was CURRENT STATE) — 2026-08-18, 02:10 UTC
 
