@@ -5,21 +5,34 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE, RT-DEAD-ARM-EFFECT-LOWERING]
+depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT, RT-SITEOP-CARRIED-WITNESS, RT-RECURSIVE-POSITION-ARM-ARITY, RT-BRANCH-LOCAL-DECLARED-CALLABLE, RT-DEAD-ARM-EFFECT-LOWERING, RT-RESOURCE-RELEASE-CARRIED-OBSERVE]
 blocks: [PX8-F-CAP-41]
 github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-# CURRENT STATE — 2026-08-22 (D-final ran RED; gated on RT-DEAD-ARM-EFFECT-LOWERING)
+# CURRENT STATE — 2026-08-22 (D-final ran RED; gated on TWO runtime nodes)
 
 **Read this section only. Everything below it — including the demoted earlier
 "CURRENT STATE" block — is superseded history retained for the measurements it
 records.**
 
-**All seven original dependencies merged, `D-final` ran, and the result is a
-single new blocker now cut as its own node.** This node is GATED on
-[[RT-DEAD-ARM-EFFECT-LOWERING]] and closes on its landing (disposition below).
+**All seven original dependencies merged and `D-final` ran RED. It surfaced ONE
+blocker, cut as [[RT-DEAD-ARM-EFFECT-LOWERING]]; that node's D1 hard-stop
+(Architect `evt_4hcny7ae7h9sb`) then refined it AND exposed a SECOND blocker on
+the fixtures' critical path.** This node is now GATED on BOTH runtime nodes and
+closes only when both land and `D-final` re-runs all-green:
+
+1. [[RT-DEAD-ARM-EFFECT-LOWERING]] -- traps the whole-program-DEAD `FSOp` arms
+   so they no longer fail object emission. Its AC-1 was NARROWED (Finding 2):
+   it ADVANCES the `cap41_*` rows to their next distinct blocker, it does not
+   green them. In flight now.
+2. [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] -- the (A)-family carried-observation
+   route for the genuinely-LIVE `ResourceRelease` `Argument(0)`/`ResourceScalar`
+   refusal the fixtures hit BEHIND the dead arms (`withResource` IS used). Cut,
+   `ready`, sequenced AFTER the dead-arm node (both live in `effects.rs`; single
+   ring). This is the concrete first instance of the deferred (A) work, forced
+   onto the critical path.
 
 ## `D-final` RAN — all five rows RED, one blocker, downstream of every landed fix
 
@@ -51,8 +64,9 @@ Lower a provably-unreachable total-handler arm's refusing effect seat to a
 runtime TRAP (fail-closed), gated on a conservative whole-program
 construction-site census, keeping the seat strict — three soundness properties
 and a mandatory negative control in that node's frame. Cut as a new lane-1
-runtime node; this node's `depends_on` names it. **When it lands, re-run
-`D-final` on current main.** The restoration is a measurement fixture recovered
+runtime node; this node's `depends_on` names it (and the (A)-family successor
+[[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]]). **When BOTH land, re-run `D-final` on
+current main.** The restoration is a measurement fixture recovered
 from `4c9c59d3e` (`rt_parity_native.rs` rows `:620/:627/:634/:641`, helper
 `:593`, `AC-5` row `:687`), not a merge candidate; the fences hold (do not
 revert `4c9c59d3e`; do not touch `rt_body_ok` / `rt_cap41_expect_eof`).
@@ -64,8 +78,8 @@ revert `4c9c59d3e`; do not touch `rt_body_ok` / `rt_cap41_expect_eof`).
 | all four rows green and `AC-5` green | native lowering completes across the `withBuffer` boundary; the carrier is done | **fold** with the preserved elaborator slice `preserved/native-handle-carrier-c07e63c2` and fixture `preserved/px8-f-cap-41-p2-buffer-handle-f0eb65ce`, run the Architect's six-axis oracle (deep history below, axes (a)-(f)), then **close NATIVE-HANDLE-CARRIER and [[PX8-F-CAP-41]] Phase 2** |
 | a distinct downstream result (e.g. interpreter parity) | native lowering now completes but a further gap is exposed | report and cut the next successor as before |
 
-**This node stays `owner: runtime`, `size: M`, `gate: none`, held on
-[[RT-DEAD-ARM-EFFECT-LOWERING]].**
+**This node stays `owner: runtime`, `size: M`, `gate: none`, held on BOTH
+[[RT-DEAD-ARM-EFFECT-LOWERING]] and [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]].**
 
 # SUPERSEDED (was CURRENT STATE) — 2026-08-18, 02:10 UTC
 

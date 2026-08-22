@@ -46,34 +46,45 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `4ed363be`.** Tree clean; no publisher running. Re-arm on resume: the
-watchdog interval and the CronCreate daily briefing-flush schedule (`7d029bbf`,
-09:37 — session-only, auto-expires).
+**`main` = `9c9341266`.** Tree clean; no publisher running. Watchdog re-armed
+@1800s; the CronCreate daily briefing-flush schedule (`7d029bbf`, 09:37 —
+session-only) survived the compaction, confirmed present.
 
 **ONE LANE — runtime (operator, 2026-08-17; `steward.md` §0).** Lane 2
 (language + verify) is retired. Finished work still merges, filings queue behind
 the lane; framing for lane 1 is lane work.
 
-### Runtime (lane 1) — RT-DEAD-ARM-EFFECT-LOWERING released; NHC held on it
+### Runtime (lane 1) — RT-DEAD-ARM D1 hard-stop RULED; NHC held on TWO nodes
 
-- NATIVE-HANDLE-CARRIER D-final RAN RED (all five rows, `evt_1srzc4frpjhxn`):
-  ONE blocker — a whole-program-DEAD arm of a total FSOp request handler whose
-  ConstructorTag effect seat fails object emission on an unreachable path
-  (`effects.rs:277`). The constancy measurement (`evt_8j0tjp15ypw3`) ruled out
-  both the carried-observation route (A) and preserve-specialization (C) for
-  this fixture. NHC is now `active`, held on the successor; PX8-F-CAP-41 held on
-  NHC.
-- RT-DEAD-ARM-EFFECT-LOWERING CUT + RELEASED (Architect ruling
-  `evt_7kmh9atsrv80n`; kick anchor `evt_1b4zmr0d3btcd`; `ready`, no deps). Fix:
-  trap a provably-unreachable total-handler arm's refusing seat (fail-closed),
-  conservative whole-program census, seat kept strict. Three soundness
-  properties + mandatory negative control; D0 = census-existence. Architect
-  required reviewer; Adversary hunts landed code. Awaiting the ring's ack + D0.
-  When it lands: re-run NHC D-final → all-green folds with the preserved
-  slice/fixture + six-axis oracle, closes NHC + PX8-F-CAP-41 Phase 2.
-- (A) carried, NOT cut: carried-observation route + runtime tag-namespace
-  translation, for a genuinely live/varying policy; carries a bounded Spec
-  contract question I pre-cleared as lane-1 input (not a lane-2 reopen).
+- RT-DEAD-ARM-EFFECT-LOWERING in flight. D0 accepted (no existing census, but
+  size-S derived from `source_occurrences` — coverage-by-construction; node M,
+  work in AC-3/AC-4). Trigger (b) gate-the-refusal confirmed (it is (iii)
+  verbatim, not a fork). D1 HIT A HARD-STOP that was a real soundness hole,
+  ruled directly by the Architect (`evt_4hcny7ae7h9sb`): a whole-program
+  SYNTACTIC census is NOT the conservative oracle — it is blind to
+  host-synthesized values, so it wrongly proved `Result::Ok` (an effect
+  RESPONSE) dead. CORRECTED criterion: dead = (1) never program-constructed AND
+  (2) not producible by ANY runtime/host origin (union recipe-tree
+  `SynthesizedFixedConstructorRole` as LIVE), exhaustive over a SEALED
+  origin-kind set, NO catch-all. Implementer building revised-D1 (first
+  deliverable: ground the sealed origin set). Architect required reviewer.
+- AC-1 NARROWED (Architect Finding 2): this node ADVANCES the cap41_* rows to
+  their next distinct blocker, it does NOT green them. 2 refusal sites (the seat
+  + the represented-unavailable-lane check atop `lower_process_host_effect`);
+  trigger (b) unchanged, predicate computed once and consulted at each.
+- NEW NODE CUT: RT-RESOURCE-RELEASE-CARRIED-OBSERVE (`ready`, owner runtime,
+  blocks NHC). The concrete first (A)-family instance, forced onto the critical
+  path: behind the dead arms the fixtures hit a genuinely LIVE refusal
+  (ResourceRelease Arg(0) needs ResourceScalar; `withResource` IS used).
+  Carried-observation route on the `lower_buffer_freeze_resource_seat`
+  EITHER_PHASE precedent, no Avail widening; specific mechanism + any bounded
+  Spec contract question grounded at its D0, Architect rules it. CONTENDS with
+  RT-DEAD-ARM on `effects.rs` → sequenced AFTER it (single ring); NOT released
+  while the dead-arm node is in flight.
+- NHC now held on BOTH runtime nodes; closes when both land and D-final re-runs
+  all-green (folds with the preserved slice/fixture + six-axis oracle → closes
+  NHC + PX8-F-CAP-41 Phase 2). The ConstructorTag/FsWriteFile (A) instance stays
+  DEFERRED (its arm is dead here). PX8-F-CAP-41 held on NHC.
 - Lane-1 frontier after NHC (§0): RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT [merged],
   the `RT-*` nodes at `ready`, RT-DESCENT-RETIRE's owed `D6a`.
 
