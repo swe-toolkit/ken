@@ -5,11 +5,23 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, LANG-INDEXED-RECURSIVE-IH-DISCHARGE]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, KERNEL-SCT-TELESCOPE-CANON]
 blocks: []
 github: null
 origin: "Steward, 2026-08-16, discharging section 4e on the merge of V3-FO-KEN-LEVEL-CHECKER-AUTHORING (D4+D5, PR #2421). That node's own banned scope names this work: 'Proving embedding_adequacy or checker_soundness. Unfiled successors.' Every coordinate below re-verified against origin/main 5aae7a454 before filing. Steward-filed per COORDINATION section 2."
 ---
+
+> ## DEPENDS_ON RE-POINTED 2026-08-22 -- LANG-INDEXED → KERNEL-SCT-TELESCOPE-CANON
+>
+> `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` delivered its c-elab result-refinement
+> transport as an accepted partial (squash `93d82a398`, `kernel_check` half of
+> full admission) and is now CLOSED. The SCT-pass half of full admission -- the
+> gate D3 actually resumes on -- moved to the operator-authorized TCB successor
+> [[KERNEL-SCT-TELESCOPE-CANON]] (route A, SCT arity from the declared Pi
+> telescope). `depends_on` is re-pointed here so this node stays correctly
+> blocked on the real gate; closing LANG-INDEXED first without this re-point
+> would have falsely unblocked D3 (`gen-progress` `closed`==`merged` clearance
+> hazard). D3 resumes on KERNEL-SCT's landing, with no proof re-authoring.
 
 ## Why this exists: the predecessor removed the last thing that was missing
 

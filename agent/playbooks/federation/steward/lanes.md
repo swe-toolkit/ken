@@ -45,12 +45,16 @@ work (not a drift). Architect is required reviewer on the carried-observation
 nodes — the Architect-heavy lane.
 
 **Lane 2 — verify + language (+ kernel): Z3 integration.**
-`V3-FO-CHECKER-SOUNDNESS` and `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` are `active`;
-`CI-Z3-BASE-IMAGE` landed (verify infra). NOTE: `V3-FO`'s `D3` and letting
-`LANG-INDEXED` close are both gated on the operator-gated kernel SCT successor
-(`KERNEL-SCT-TELESCOPE-CANON`), which is open operator question Q3 — see the
-briefing. Re-confirm each node's status (`git fetch`; read the node) before
-acting; a node id decays.
+`V3-FO-CHECKER-SOUNDNESS` is `active`; `CI-Z3-BASE-IMAGE` landed (verify infra).
+The operator authorized the kernel SCT successor on 2026-08-22 ("tcb change
+authorized. proceed."): `KERNEL-SCT-TELESCOPE-CANON` is cut and released to the
+kernel ring (TCB change, `gate: operator` satisfied; Architect required
+reviewer, adversary + conformance). `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` is
+`closed` (accepted partial — its c-elab transport landed; the SCT-pass half
+spun out to the successor), and `V3-FO`'s `depends_on` is re-pointed to
+`KERNEL-SCT-TELESCOPE-CANON`. `V3-FO` D3 resumes on that node's landing. (Q3 is
+no longer an open operator question.) Re-confirm each node's status
+(`git fetch`; read the node) before acting; a node id decays.
 
 **Lane 3 — foundation: expressibility trial (bounded).** Five independent,
 non-sequential CAT WPs — `CAT-SORT`, `CAT-GCD`, `CAT-DEQUE`, `CAT-BSEARCH`,
