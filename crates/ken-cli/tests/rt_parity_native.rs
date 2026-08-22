@@ -691,7 +691,7 @@ fn buffer_allocate_malformed_capacity_narrows_to_invalid_bounds() {
 // dead-arm refusals in front of it. The terminal state below is the one
 // MEASURED after both, and it is a LIVE refusal on this row's own path, not a
 // dead arm: it is the deferred (A)-family carried-observation work.
-#[ignore = "RT-DEAD-ARM-EFFECT-LOWERING: dead-arm refusals no longer fail emission; this row now advances to a LIVE blocker -- seat Argument(0) of ResourceRelease needs ResourceScalar, which it cannot observe in CarriedWord (the deferred carried-observation route)"]
+#[ignore = "RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION: the checked-IH marker is a nullary force of an ESCAPING functional induction hypothesis, so the arity-1 static worker is forced with zero arguments and lowering refuses with \"static worker expects 1 arguments but call provides 0\". MEASURED 2026-08-22 on this row; the previously named blocker is retired and was no longer what stops it."]
 fn fs_read_at_malformed_offset_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-read-offset", || {
         assert_narrowed_alike(
@@ -721,7 +721,7 @@ fn fs_read_at_malformed_offset_narrows_to_invalid_offset() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
+#[ignore = "RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION: the checked-IH marker is a nullary force of an ESCAPING functional induction hypothesis, so the arity-1 static worker is forced with zero arguments and lowering refuses with \"static worker expects 1 arguments but call provides 0\". MEASURED 2026-08-22 on this row; the previously named blocker is retired and was no longer what stops it."]
 fn fs_read_at_malformed_window_narrows_to_invalid_bounds() {
     in_large_stack_thread("rt-parity-read-window", || {
         assert_narrowed_alike(
@@ -769,7 +769,7 @@ fn fs_read_at_malformed_window_narrows_to_invalid_bounds() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
+#[ignore = "RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION: the checked-IH marker is a nullary force of an ESCAPING functional induction hypothesis, so the arity-1 static worker is forced with zero arguments and lowering refuses with \"static worker expects 1 arguments but call provides 0\". MEASURED 2026-08-22 on this row; the previously named blocker is retired and was no longer what stops it."]
 fn fs_read_at_malformed_offset_without_read_right_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-read-norights", || {
         assert_narrowed_alike(
@@ -865,7 +865,7 @@ fn fs_write_at_malformed_offset_narrows_to_invalid_offset() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
+#[ignore = "RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION: the checked-IH marker is a nullary force of an ESCAPING functional induction hypothesis, so the arity-1 static worker is forced with zero arguments and lowering refuses with \"static worker expects 1 arguments but call provides 0\". MEASURED 2026-08-22 on this row; the previously named blocker is retired and was no longer what stops it."]
 fn fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-write-readonly", || {
         assert_narrowed_alike(
