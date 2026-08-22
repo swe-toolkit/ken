@@ -1,4 +1,4 @@
-# ken federation — moot launch profile. TWO HARNESSES, split 26 / 2.
+# ken federation — moot launch profile. TWO HARNESSES, split 22 / 6.
 #
 # ⚠ DERIVE WIRING FROM THE `[agents.*]` BLOCKS, NEVER FROM PROSE — INCLUDING
 # THIS PROSE. This header has been wrong twice (it once claimed every seat ran
@@ -6,19 +6,39 @@
 # Code seats after three had moved). The blocks are the configuration; this is a
 # summary that goes stale between edits.
 #
-# **26 seats — native Codex harness** (`harness = "codex"`, the operator's
+# **22 seats — native Codex harness** (`harness = "codex"`, the operator's
 # ChatGPT/Codex subscription). Effort is `model_reasoning_effort` on these seats.
 #   - `gpt-5.6-sol`   — the seats that author or audit deeply: spec-author,
 #                       conformance-validator, librarian, doc-author, research,
-#                       architect, and the kernel/verify/ergo/foundation
-#                       implementers.
-#   - `gpt-5.6-terra` — leaders, QA, and the runtime and language implementers.
+#                       and the kernel/verify/ergo/foundation implementers.
+#   - `gpt-5.6-terra` — leaders, QA, and the language implementer.
 #
-# **2 seats — Claude Code direct on the Anthropic subscription** (OAuth via the
+# **6 seats — Claude Code direct on the Anthropic subscription** (OAuth via the
 # steward's cold-start `/login`; these use `effort`, NOT
-# `model_reasoning_effort`). Both Opus:
-#   - `steward`   — operator proxy / workflow authority.
-#   - `adversary` — standing red team.
+# `model_reasoning_effort`). NOT uniformly Opus — do not infer a model from the
+# harness:
+#   - `steward`   — operator proxy / workflow authority. Opus.
+#   - `adversary` — standing red team. Opus.
+#   - `architect` — Opus (T1), reseated 2026-08-18. See the note below.
+#   - `runtime-leader`, `runtime-implementer`, `runtime-qa` — **Sonnet 5**
+#     (T2), reseated 2026-08-18. Not a tier change: MODELS.md names Sonnet 5
+#     as one of the two sanctioned T2 options for this ring.
+
+# ⚠ THE 2026-08-18 RESEAT IS PURPOSE-LIMITED (operator). The OpenAI pool hit
+# its subscription floor — `runtime-qa`, `runtime-leader`, `research` and
+# `architect` all reported the same reset, Aug 20 03:46 — with item 4's `D0`
+# candidate held unreviewed. The operator authorised moving **runtime and the
+# architect** to Anthropic **solely to land the in-flight work**, narrowing the
+# standing "do not fail over to Anthropic" instruction for that purpose only.
+#
+# ⇒ This is NOT a general failover and NOT a re-tiering. `research` stays on
+# Codex and stays idle. When the in-flight work lands, these four seats revert
+# to the Codex blocks above unless the operator says otherwise.
+#
+# ⇒ THE STRANDING RISK MOVES WITH THE HARNESS. All four are Claude Code now, so
+# they no longer strand on convo mentions — but `moot compact` is no-op-prone
+# there; prefer `send-keys`. The per-tick composer check now belongs only on
+# `language-implementer`.
 #
 # ⚠ THE KEY SPLIT IS THE THING THAT SILENTLY BREAKS. A Codex seat needs
 # `harness = "codex"` AND `model_reasoning_effort`; a Claude Code seat has NO
@@ -77,25 +97,27 @@ human_interface = "steward"
 # server-side rate limit was relaxed 10x and the box (t3.small) peaked at ~35%
 # CPU under the full 25-agent burst — so the stagger only slows launch for no
 # benefit. Re-enable (e.g. 1-2s) if a future, larger fleet herds join_space.
-launch_stagger_seconds = 30
+launch_stagger_seconds = 3
 
 [agents.spec-author]
 display_name = "spec-author"
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "high"
+harness = "pi"
+model = "openrouter/deepseek/deepseek-v4-pro-0813"
+effort = "high"
+env = { OPENROUTER_API_KEY = "${secret:openrouter-api-key}", PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's spec author (clean-room enclave). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/spec-author.md and CLEAN-ROOM.md, set your status, and await the spec leader's kickoff. Do not poll."
 
 [agents.conformance-validator]
 display_name = "conformance-validator"
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "high"
+harness = "pi"
+model = "openai-codex/gpt-5.6-sol"
+effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's conformance validator (clean-room enclave). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/conformance-validator.md and CLEAN-ROOM.md, set status, await kickoff. Do not poll."
 
 [agents.steward]
 display_name = "steward"
-model = "claude-opus-5[1m]"
+model = "claude-opus-4-8[1m]"
 effort = "high"
 startup_prompt = "You are Ken's Steward (operator proxy, workflow authority). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/steward.md and docs/program/05-implementation-dag.md, then begin tracking program progress per your playbook."
 
@@ -112,23 +134,31 @@ display_name = "architect"
 # `send-keys -l` for literal text. It stranded on nearly every mention the last
 # time it ran Codex — five stacked pastes, then six — and it is the seat every
 # scope fork routes through. Put the per-tick composer check BACK on this pane.
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "high"
+# 2026-08-19 reseat (operator): pi/OpenRouter glm-5.2 -> Anthropic Opus. OpenRouter
+# credits exhausted; spend down the Anthropic subscription before it renews (~10h).
+# Claude Code harness = NO harness key, uses `effort`, NO env; uses the steward's
+# cold-start subscription OAuth. Restores this seat's pre-bridge Anthropic seating
+# (Opus, T1). The Codex-stranding comment above is stale (this seat was pi, not
+# Codex, before this edit). Author-vs-reviewer independence preserved: Architect=Opus,
+# runtime-implementer=Sonnet 5 (different models).
+model = "claude-opus-4-8[1m]"
+effort = "high"
 startup_prompt = "You are Ken's Architect (component design + security review). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/architect.md, set status, and stand ready for design queries and merge reviews. Do not poll."
 
 [agents.spec-leader]
 display_name = "spec-leader"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+harness = "pi"
+model = "openrouter/deepseek/deepseek-v4-flash-0731"
+effort = "medium"
+env = { OPENROUTER_API_KEY = "${secret:openrouter-api-key}", PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's spec enclave. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/leader.md, set status, and await the Steward's kickoff. Do not poll."
 
 [agents.librarian]
 display_name = "librarian"
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "high"
+harness = "pi"
+model = "openrouter/deepseek/deepseek-v4-flash-0731"
+effort = "medium"
+env = { OPENROUTER_API_KEY = "${secret:openrouter-api-key}", PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Librarian: editor, fact-checker and reviewer of library/ (Ken product documentation), and the DOC TEAM's QA seat. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/librarian.md, then docs/program/12-documentation-program.md (the program frame) and agent/teams/doc/{leader,implementer}.md (what your ring is held to). Your ring is doc-leader and doc-author. You also hold a standing as-built mandate. Set status, and stand ready. Do not poll."
 
 [agents.doc-leader]
@@ -140,79 +170,97 @@ startup_prompt = "You lead Ken's doc team, which produces library/ (Ken's produc
 
 [agents.doc-author]
 display_name = "Doc author"
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "medium"
+harness = "pi"
+model = "openrouter/deepseek/deepseek-v4-flash-0731"
+effort = "medium"
+env = { OPENROUTER_API_KEY = "${secret:openrouter-api-key}", PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You author library/, Ken's product documentation. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/doc/implementer.md, then docs/program/12-documentation-program.md (the program frame and its settled decisions). Your reviewer is the librarian. Set status, await your leader's kickoff. Do not poll."
 
 [agents.research]
 display_name = "research"
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "high"
+harness = "pi"
+model = "openai-codex/gpt-5.6-sol"
+effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Research agent (ad hoc external-knowledge dispatch; research is not a standing team — see the Steward playbook §5). Read agent/COORDINATION.md (federation law) and MODELS.md first. Set your status and await the Steward's research dispatch, then gather sources and synthesize a cited report back to the Steward. Do not poll."
 
 [agents.adversary]
 display_name = "adversary"
-model = "claude-opus-5[1m]"
+# 2026-08-19 reseat (operator): pi/OpenRouter glm-5.2 -> Anthropic Opus. OpenRouter
+# credits exhausted; spend down the Anthropic subscription before renewal (~10h).
+# Claude Code harness = NO harness key, uses `effort`, NO env.
+model = "claude-opus-4-8[1m]"
 effort = "high"
 startup_prompt = "You are Ken's Adversary (a standing red-team; the negative-space twin of the Librarian). Read agent/COORDINATION.md (federation law) and MODELS.md first, then your playbook agent/playbooks/federation/adversary.md and your memory scopes (fleet + enclave + roles/adversary). Set your status and, event-driven on Steward/publisher merge notifications, hunt recent changes + their blast radius for flaws, gaps, leaky abstractions, and undesirable behavior. Ground every finding (repro + file:line + the violated invariant) and route it to a side thread to the Steward. You are advisory and non-blocking — never gate a merge, fix, rule, or merge. Do not poll."
 
 [agents.kernel-leader]
 display_name = "Kernel leader"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's Kernel team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/kernel/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.kernel-implementer]
 display_name = "Kernel implementer"
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "medium"
+# 2026-08-20 reseat terra -> sol (T1) per the operator, for the lane-2 reopen:
+# LANG-CTOR-PREMISE-ELABORATION-DIVERGES is deep kernel capability work (make
+# proof-carrying inductive families elaborate; inductive.rs:97), a §4h T1 subject
+# terra (T2) is under-provisioned for. Same pi harness/effort/env. REVERT to terra
+# when this seat next takes mechanical (T2) work.
+model = "openai-codex/gpt-5.6-sol"
+harness = "pi"
+effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Kernel team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/kernel/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.kernel-qa]
 display_name = "Kernel QA"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Kernel team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/kernel/qa.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.verify-leader]
 display_name = "Verify leader"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's Verify team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/verify/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.verify-implementer]
 display_name = "Verify implementer"
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "medium"
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Verify team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/verify/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.verify-qa]
 display_name = "Verify QA"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Verify team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/verify/qa.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.language-leader]
 display_name = "Language leader"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's Language team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/language/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.language-implementer]
 
 display_name = "Language implementer"
 # Reseated from Sonnet 5 (high) to `gpt-5.6-terra` (medium) on 2026-08-17 per the
-# operator. Codex harness: `harness = "codex"` present, effort key is
-# `model_reasoning_effort`.
+# operator, then MOVED to the pi harness on 2026-08-20 per the operator (same
+# OpenAI model via `openai-codex/`, tier preserved): `harness = "pi"`, effort key
+# is `effort`, env carries the PI_* flags.
 #
 # The 2026-08-13 reason for the Anthropic seating is DISCHARGED, not overridden.
 # That move was a PROVIDER CAPABILITY GAP, not difficulty: the OpenAI policy
@@ -224,59 +272,85 @@ display_name = "Language implementer"
 #
 # ⇒ If a stack-depth subject returns to this seat, the refusal returns with it
 # and it will re-trip rather than clear. That is a reseat trigger, not a retry.
+# This is a PROVIDER (OpenAI policy-layer) property of the model, so it SURVIVES
+# the pi move — the model is still `openai-codex/gpt-5.6-terra`.
 #
-# ⇒ Codex stranding behaviour applies again: mentions strand this pane, `moot
-# compact` works here, `send-keys -l` for literal text.
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+# ⇒ On pi the codex stranding behaviour NO LONGER applies: this pane wakes on
+# mention (like the lieutenant), `moot compact` works here, `send-keys -l` for
+# literal text.
+#
+# 2026-08-20 reseat terra -> sol (T1) per the operator, for the lane-2 reopen:
+# V3-FO-CHECKER-SOUNDNESS is soundness-PROOF authoring in Ken (steward.md §4h
+# T1 row), which terra (T2) is under-provisioned for. Same pi harness / effort /
+# env, model tier only. REVERT to terra when this seat next takes mechanical
+# (T2) work. The stack-depth OpenAI-policy caveat above still applies (sol is
+# also `openai-codex/`), but checker_soundness is not a stack-depth subject.
+model = "openai-codex/gpt-5.6-sol"
+harness = "pi"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Language team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/language/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.language-qa]
 display_name = "Language QA"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Language team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/language/qa.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.runtime-leader]
 display_name = "Runtime leader"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+# 2026-08-19 reseat (operator): pi/OpenRouter deepseek-flash -> Anthropic Sonnet 5.
+# OpenRouter credits exhausted; spend down the Anthropic subscription before renewal
+# (~10h). Claude Code harness = NO harness key, uses `effort`, NO env. Restores the
+# pre-bridge Anthropic seating (Sonnet 5, T2 — MODELS.md-sanctioned for this ring).
+model = "claude-sonnet-5"
+effort = "medium"
 startup_prompt = "You lead Ken's Runtime team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/runtime/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.runtime-implementer]
 
 display_name = "Runtime implementer"
-# Reseated from Sonnet 5 (high) to `gpt-5.6-terra` (medium) on 2026-08-17 per the
-# operator. Codex harness: `harness = "codex"` present, effort key is
-# `model_reasoning_effort`.
-#
-# This exercises the condition MODELS.md already named for the Terra option —
-# it lists "default Sonnet 5" between the two T2 choices and flips to Terra when
-# Anthropic-pool capacity is the binding constraint, the pools being independent.
-# The T1 -> T2 move itself was the scheduled one, taken 2026-08-17 at the #8
-# phase boundary; this changes which T2.
-#
-# ⇒ Raise, do not assume: MODELS.md documents the T2 suspension as covering the
-# `RT-BACKEND-MODULE-SPLIT` #8 slices, with discovery and semantic repair staying
-# T1. `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` — a new lowering capability with an
-# advancing-refusal acceptance — is semantic repair by that description. The
-# operator's instruction stands; flag it at release rather than re-deciding it.
-#
-# ⇒ Codex stranding behaviour applies again: mentions strand this pane, `moot
-# compact` works here, `send-keys -l` for literal text.
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+# Reseated deepseek-v4-flash-0731 -> deepseek-v4-pro-0813 on 2026-08-19 per the
+# operator: the flash seat churned for ~2h on D2 of RT-PLANNER-UNITS-ABI-SPLIT
+# without converging or committing (the leader had already RULED the design fork;
+# flash kept re-deriving the module-visibility question in circles at $1.34 / 57%
+# ctx / effort=high, its ceiling). The "behaviour-preserving mechanical move"
+# framing understated it: these splits require holding a multi-module Rust
+# ancestor-private-visibility model, which is real design reasoning, not a
+# textual move. deepseek-pro is the capability step up within the same provider
+# and 1M window, proven in-fleet (research/spec-author/conformance-validator).
+# Author-vs-reviewer independence is PRESERVED: implementer=deepseek-pro,
+# Architect=glm-5.2 (the independent soundness vote) — deliberately different
+# models. History: glm-5.2 -> deepseek-flash on 2026-08-18 was a cost move for a
+# campaign believed purely mechanical; D2 disproved that.
+# 2026-08-19 reseat (operator): pi/OpenRouter deepseek-pro -> Anthropic Sonnet 5.
+# OpenRouter credits exhausted; spend down the Anthropic subscription before renewal
+# (~10h). Claude Code harness = NO harness key, uses `effort`, NO env. Sonnet 5 (T2,
+# effort=high) is a capability step up from both deepseek-flash (which churned) and
+# deepseek-pro on the multi-module visibility reasoning these splits need. The
+# deepseek reseat comment above is stale. Author-vs-reviewer independence PRESERVED:
+# implementer=Sonnet 5, Architect=Opus (the independent soundness vote) — different models.
+# 2026-08-21 reseat (operator, Steward-executed): Sonnet 5 -> Opus (claude-opus-5[1m], T1)
+# for RT-BRANCH-LOCAL-DECLARED-CALLABLE — a genuine lowering-capability / semantic-design
+# node on the Linux-ABI completion chain. Restores runtime's standing T1 exception
+# (MODELS.md: the implementer is the hard-coding seat) now the RT-BACKEND-MODULE-SPLIT
+# refactoring campaign that scoped the T2 suspension has closed. Claude Code seat: NO
+# harness key, uses `effort`. Author-vs-reviewer independence PRESERVED: implementer=Opus
+# (Anthropic), Architect=gpt-5.6-sol (OpenAI) — different model and provider. The deepseek
+# and Sonnet-5 comments above are stale.
+model = "claude-opus-5[1m]"
+effort = "high"
 startup_prompt = "You are the Runtime team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/runtime/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.runtime-qa]
 display_name = "Runtime QA"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+# 2026-08-19 reseat (operator): pi/OpenRouter deepseek-flash -> Anthropic Sonnet 5.
+# OpenRouter credits exhausted; spend down the Anthropic subscription before renewal
+# (~10h). Claude Code harness = NO harness key, uses `effort`, NO env.
+model = "claude-sonnet-5"
+effort = "medium"
 startup_prompt = "You are the Runtime team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/runtime/qa.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.ergo-leader]
@@ -302,21 +376,40 @@ startup_prompt = "You are the Ergo team QA. Read agent/COORDINATION.md (federati
 
 [agents.foundation-leader]
 display_name = "Foundation leader"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+# 2026-08-22 reseat codex -> pi (operator directive; Steward-executed) after
+# CAT-GCD closed. Same OpenAI model/tier via the pi harness (openai-codex/),
+# like kernel/verify/language. effort key is `effort`; env carries PI_* flags.
+# On pi the codex turn-end stranding no longer applies: this pane wakes on mention.
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's Foundation team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/foundation/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.foundation-implementer]
 display_name = "Foundation implementer"
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "high"
+# 2026-08-22 reseat codex -> pi (operator directive; Steward-executed) after
+# CAT-GCD closed. Same OpenAI model/tier via the pi harness (openai-codex/).
+model = "openai-codex/gpt-5.6-sol"
+harness = "pi"
+effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Foundation team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/foundation/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.foundation-qa]
 display_name = "Foundation QA"
-model = "gpt-5.6-terra"
-harness = "codex"
-model_reasoning_effort = "medium"
+# 2026-08-22 reseat codex -> pi (operator directive; Steward-executed) after
+# CAT-GCD closed. Same OpenAI model/tier via the pi harness (openai-codex/).
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Foundation team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/foundation/qa.md if present, set status, await your leader's kickoff. Do not poll."
+
+[agents.lieutenant]
+display_name = "lieutenant"
+harness = "pi"
+model = "openai-codex/gpt-5.6-terra"
+effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
+startup_prompt = "You are Ken's merge/campaign lieutenant (the Steward's mechanical half, T2). Read agent/COORDINATION.md (federation law) and agent/MODELS.md first. Then read your playbook at /workspaces/ken/.worktrees/steward/local/lieutenant-playbook.md (draft-for-trial) and agent/playbooks/federation/steward/merge-procedure.md (the canonical M1-M9, your primary instrument). Set your status via update_status and await the Steward's kickoff. Do not poll."
