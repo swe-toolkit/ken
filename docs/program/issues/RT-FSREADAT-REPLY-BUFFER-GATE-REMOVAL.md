@@ -1,11 +1,11 @@
 ---
 id: RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL
 title: "The carried-operand projection path for FsReadAt's Argument(2) buffer reply arm handles ONLY ONE observation kind (BytesPointerLength, observe_carried_bytes_span at effects.rs:1405) and re-refuses a carried ResourceScalar buffer; removing the dead specialized-only gate at 3267 (whose span_origin binding is genuinely unused) only RELOCATES that refusal one function deeper and greens nothing, so the fix is NEED-DIRECTED resource-awareness in site_operand_argument's carried branch (a seat whose declared need is ResourceScalar projects via lower_resource_token_seat, not the byte-span observer) WITH the dead gate removed as part of that one change -- the ResourceScalar-family reader RT-EXACTINT moved onto the cap41_* critical path (D0 re-scoped 2026-08-22 from removal-only: point (1) was FALSE, Architect ruling evt_7h23767bakhgm)"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-EXACTINT-CARRIED-OBSERVE, RT-DEAD-ARM-JOIN-DISPOSITION]
+depends_on: [RT-EXACTINT-CARRIED-OBSERVE, RT-DEAD-ARM-JOIN-DISPOSITION, RT-COLD-LOWERING-PATH-ENUMERATION]
 blocks: [NATIVE-HANDLE-CARRIER]
 github: null
 origin: "Adversary M8 completeness flag on the landed [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] route (evt_5wx3bax63yak); Architect removal-not-reroute ruling (evt_2qdpkfvtqrxzy: 3226's destructured span_origin is unused, the span is projected from site_operand_argument(.., 2, ..) at 3233, so the specialized(SEAT_2)? match is a vestigial gate whose only post-D1 effect is the spurious carried-buffer refusal); runtime-implementer critical-path re-disposition (evt_6vxb4f1rxh3jk: with ExactIntU64 closed the witness terminal is now this Arg(2) reply-path refusal, so the deferral's off-critical-path ground is invalidated and it must be re-dispositioned from a carry to a cut). Steward-filed per COORDINATION section 2."
@@ -33,6 +33,23 @@ origin: "Adversary M8 completeness flag on the landed [[RT-RESOURCE-RELEASE-CARR
 > trap. The projection greens nothing alone, so the two CO-LAND as ONE candidate
 > on this branch (§8 green-witness); this node's AC-1/AC-4/AC-5 are met when the
 > successor's completing compile lands. `depends_on` now includes the successor.
+
+> LAYER-3 RULING 2026-08-22 (Architect evt_r3tt1gpv4tkn on research advisory
+> evt_5f0rzjghjhmy9; HS=3 closed, next re-trigger HS=6). Clearing the
+> join-consumption layer exposed TWO disjoint pre-existing downstream refusals at
+> once -- a materialized-dead join reconciliation (StaticOriginId(288)) and a
+> distinct-subsystem completeness gap (OrientedSubcontinuationPlanV1 IH-marker) --
+> so the stacked refusals are the absence of a traversability discipline for this
+> cold path, not defects in the built projection+disposition (which stay, measured
+> sound; they green nothing only because of these gaps -- do NOT revert). Ruled
+> shape (SCOPE/SEQUENCING to the Steward): (a) run an enumeration/coverage step
+> FIRST to bound the COMPLETE remaining refusal set before sequencing --
+> [[RT-COLD-LOWERING-PATH-ENUMERATION]], cut and released, `depends_on` above; (b)
+> cut a bounded successor per genuine gap it surfaces, each on its own
+> reconciliation/completeness merits with BOTH validators untouched; (c) co-land
+> the whole set as one green candidate (§8). This node's full AC-1/AC-4/AC-5 green
+> now waits on the enumeration + the per-gap successors. No kernel/TCB; no operator
+> authorization.
 
 Make `FsReadAt`'s `Argument(2)` buffer reply/ok-construction arm admit a carried
 `ResourceScalar` buffer, by giving the carried-operand projection path

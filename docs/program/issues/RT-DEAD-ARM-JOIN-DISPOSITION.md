@@ -1,7 +1,7 @@
 ---
 id: RT-DEAD-ARM-JOIN-DISPOSITION
 title: "The merged RT-DEAD-ARM-EFFECT-LOWERING trap short-circuits a provably-dead arm's lowering but leaves that arm's planned source-join origins neither emitted nor dispositioned, so finalize_join_disposition (joins.rs:1675) fires 'neither emitted nor statically unselected' once a downstream fix clears the effect-seat layer in front of it (19/19 unconsumed origins measured inside provably-dead arms, StaticOriginId(20)); complete the trap by dispositioning a PROVED-dead arm's joins as statically unselected (add to dispositioned_join_origins), reusing the RT-LEXICAL-RECURSOR-CONSUMERS D2b abandoned-region mechanism -- a latent completeness gap SURFACED (not caused) by RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL clearing the projection layer, co-landing with it as one candidate"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
