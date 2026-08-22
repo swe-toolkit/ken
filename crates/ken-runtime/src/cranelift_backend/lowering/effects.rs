@@ -173,6 +173,21 @@ pub(super) fn site_operand_substitution_hits() -> usize {
     SITE_OPERAND_SUBSTITUTION_HITS.with(std::cell::Cell::get)
 }
 
+/// **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- what claiming one seat produced.**
+///
+/// Two outcomes rather than a `Result` with a stringly-matched error, because
+/// the caller must be able to tell "this seat refused" from "this seat refused
+/// AND its arm is provably unreachable" WITHOUT re-deriving the second fact or
+/// matching on a message. The decision belongs at the seat, which is the only
+/// place that holds both the membership verdict and the effect's origin.
+#[derive(Clone, Copy, Debug)]
+enum SeatClaimOutcome {
+    Claimed(PlannedEffectSeat),
+    /// Today's refusal, on an arm PROVEN never-constructed program-wide. The
+    /// caller lowers the whole effect to a trap instead of a wire request.
+    UnreachableArm,
+}
+
 impl<'a> Lowering<'a> {
     /// **`D7` — open the claim group for one visit to one effect occurrence.**
     ///
@@ -230,7 +245,7 @@ impl<'a> Lowering<'a> {
         effect_origin: StaticOriginId,
         slot: EffectSeatSlot,
         operand: &LoweringOperand,
-    ) -> Result<PlannedEffectSeat, CraneliftBackendError> {
+    ) -> Result<SeatClaimOutcome, CraneliftBackendError> {
         let record = self
             .static_transition_plan
             .host_effect_seat(effect_origin, slot)?;
@@ -274,6 +289,36 @@ impl<'a> Lowering<'a> {
                 && record.need == EffectSeatNeed::BytesPointerLength
                 && observed == EffectSeatPhase::CarriedWord);
         if !admits {
+            // **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the narrowest trigger.**
+            //
+            // Reached ONLY where today's lowering already refuses, so every
+            // currently-compiling program lowers exactly as it did. The seat's
+            // `Need`-subset-`Avail` partition above is untouched: this does not
+            // widen what a seat may observe, it asks whether this seat can be
+            // reached at all.
+            //
+            // **This is a substitute-on-refusal shape, and that is normally the
+            // fail-OPEN smell this backend refuses. It is sound here for one
+            // specific reason and not as a general pattern: the substitute is a
+            // TRAP.** An arm wrongly reported dead HALTS -- it never yields a
+            // wrong result, never skips a capability gate, never returns a
+            // value the seat could not observe. So the census's completeness
+            // buys LIVENESS, and correctness does not depend on it. Substituting
+            // anything that could succeed here would be unsound, and the
+            // distinction is the whole justification.
+            //
+            // The predicate is conservative in the safe direction: an arm not
+            // PROVEN never-constructed answers `false` and takes the refusal
+            // below, unchanged.
+            if self
+                .static_transition_plan
+                .origin_is_in_provably_dead_arm(effect_origin)?
+            {
+                if let (Some(group), Some(ledger)) = (group, self.host_effect_seats.as_mut()) {
+                    ledger.record_unreachable_seat(group, slot)?;
+                }
+                return Ok(SeatClaimOutcome::UnreachableArm);
+            }
             return Err(unsupported(
                 "Effect",
                 format!(
@@ -283,13 +328,13 @@ impl<'a> Lowering<'a> {
             ));
         }
         let Some(group) = group else {
-            return Ok(record);
+            return Ok(SeatClaimOutcome::Claimed(record));
         };
         let Some(ledger) = self.host_effect_seats.as_mut() else {
-            return Ok(record);
+            return Ok(SeatClaimOutcome::Claimed(record));
         };
         ledger.claim(group, record, observed, route)?;
-        Ok(record)
+        Ok(SeatClaimOutcome::Claimed(record))
     }
     /// **`D7` — close the visit, before host dispatch or any successful exit.**
     fn close_host_effect_seat_group(
@@ -369,6 +414,16 @@ struct OpenEffectSeatGroup {
     /// change to the plan cannot move the target the group closes against.
     planned: BTreeSet<EffectSeatSlot>,
     claims: BTreeMap<EffectSeatSlot, ClaimedEffectSeat>,
+    /// **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- planned seats this visit REACHED
+    /// but could not observe, on an arm proven never-constructed.**
+    ///
+    /// Held apart from `claims` deliberately, and this is the load-bearing
+    /// half. The ledger is an ATTESTATION of what the emitter actually
+    /// consumed, so recording an unobservable seat as a claim would enter a
+    /// falsehood into the record that every later reader trusts. The visit is
+    /// still COMPLETE -- every planned seat was reached -- and `close_group`
+    /// asks for exactly that, over the union.
+    unreachable: BTreeSet<EffectSeatSlot>,
 }
 /// A visit that closed complete.
 #[derive(Clone, Debug)]
@@ -376,6 +431,10 @@ struct CommittedEffectSeatGroup {
     function: FuncId,
     effect_origin: StaticOriginId,
     claims: BTreeMap<EffectSeatSlot, ClaimedEffectSeat>,
+    /// See [`OpenEffectSeatGroup::unreachable`]. Carried through the commit so
+    /// the whole-pass closeout can report reached-but-unobservable seats
+    /// separately from claims rather than silently counting them as neither.
+    unreachable: BTreeSet<EffectSeatSlot>,
 }
 /// **`RT-DECL-CLOSURE-PORT` `D7` — what the emitter ACTUALLY consumed, per
 /// visit.**
@@ -445,6 +504,7 @@ impl EffectSeatLedger {
             operation,
             planned,
             claims: BTreeMap::new(),
+            unreachable: BTreeSet::new(),
         });
         Ok(id)
     }
@@ -540,6 +600,29 @@ impl EffectSeatLedger {
         Ok(())
     }
 
+    /// **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- record a planned seat this visit
+    /// REACHED but could not observe, because its arm is proven unreachable.**
+    ///
+    /// Deliberately NOT `claim`: nothing is attested about the operand's phase
+    /// or its route, because nothing was observed. This only keeps the visit's
+    /// completeness accounting total.
+    fn record_unreachable_seat(
+        &mut self,
+        group: EffectSeatGroupId,
+        slot: EffectSeatSlot,
+    ) -> Result<(), CraneliftBackendError> {
+        let open = self.open_group_mut(group)?;
+        if open.claims.contains_key(&slot) {
+            return Err(backend_module(format!(
+                "host effect seat ledger: seat {slot:?} of {:?} was already claimed, so recording \
+                 it as unobservable would put one seat on both sides of the visit's accounting",
+                open.effect_origin
+            )));
+        }
+        open.unreachable.insert(slot);
+        Ok(())
+    }
+
     /// Close the visit, before host dispatch or any successful exit.
     ///
     /// ⛔ Group-local slot EQUALITY. Not "at least the ones it read", and not
@@ -547,9 +630,21 @@ impl EffectSeatLedger {
     fn close_group(&mut self, group: EffectSeatGroupId) -> Result<(), CraneliftBackendError> {
         let open = self.open_group_mut(group)?.clone();
         let claimed = open.claims.keys().copied().collect::<BTreeSet<_>>();
-        if claimed != open.planned {
+        // `RT-DEAD-ARM-EFFECT-LOWERING` `D1`: completeness is asked over the
+        // UNION of seats claimed and seats reached-but-unobservable, so the
+        // property this gate enforces is unchanged -- every planned seat of the
+        // visit was reached. What changed is that a seat on a provably dead arm
+        // is accounted for HONESTLY, as reached and not observed, instead of
+        // being either claimed falsely or silently dropped. The two sets are
+        // disjoint by construction: a seat takes exactly one of the two paths in
+        // `claim_host_effect_seat`.
+        let reached = claimed
+            .union(&open.unreachable)
+            .copied()
+            .collect::<BTreeSet<_>>();
+        if reached != open.planned {
             return Err(backend_module(format!(
-                "host effect seat ledger: the visit to {:?} claimed {claimed:?} but its planned \
+                "host effect seat ledger: the visit to {:?} reached {reached:?} but its planned \
                  population is {:?}, so the occurrence was read incompletely",
                 open.effect_origin, open.planned
             )));
@@ -560,6 +655,7 @@ impl EffectSeatLedger {
                 function: open.function,
                 effect_origin: open.effect_origin,
                 claims: open.claims,
+                unreachable: open.unreachable,
             },
         );
         self.open = None;
@@ -1689,19 +1785,36 @@ impl<'a> Lowering<'a> {
         #[cfg(not(test))]
         let omitted: Option<EffectSeatSlot> = None;
         let mut claimed = BTreeMap::new();
+        // `RT-DEAD-ARM-EFFECT-LOWERING` `D1`: set when any seat of this
+        // occurrence reports its arm provably unreachable. Recorded rather than
+        // returned early, so the seat visit still completes and the claim group
+        // still closes -- an early return here would leave `D7`'s group open and
+        // trade one refusal for a different, misattributed one.
+        let mut unreachable_arm = false;
         let mut claim = |lowering: &mut Self,
                          claimed: &mut BTreeMap<EffectSeatSlot, PlannedEffectSeat>,
+                         unreachable_arm: &mut bool,
                          slot,
                          operand: &LoweringOperand| {
             if omitted == Some(slot) {
                 return Ok(());
             }
-            let record = lowering.claim_host_effect_seat(group, static_origin, slot, operand)?;
-            claimed.insert(slot, record);
+            match lowering.claim_host_effect_seat(group, static_origin, slot, operand)? {
+                SeatClaimOutcome::Claimed(record) => {
+                    claimed.insert(slot, record);
+                }
+                SeatClaimOutcome::UnreachableArm => *unreachable_arm = true,
+            }
             Ok(())
         };
         if let Some(operand) = &capability_operand {
-            claim(self, &mut claimed, EffectSeatSlot::Capability, operand)?;
+            claim(
+                self,
+                &mut claimed,
+                &mut unreachable_arm,
+                EffectSeatSlot::Capability,
+                operand,
+            )?;
         }
         for (ordinal, operand) in lowered.iter().enumerate() {
             let ordinal = u32::try_from(ordinal).map_err(|_| {
@@ -1713,6 +1826,7 @@ impl<'a> Lowering<'a> {
             claim(
                 self,
                 &mut claimed,
+                &mut unreachable_arm,
                 EffectSeatSlot::Argument(ordinal),
                 operand,
             )?;
@@ -1720,10 +1834,36 @@ impl<'a> Lowering<'a> {
         #[cfg(test)]
         if effect_seat_visit_mutation() == EffectSeatVisitMutation::DuplicateWithinVisit {
             if let Some(operand) = lowered.first() {
-                claim(self, &mut claimed, EffectSeatSlot::Argument(0), operand)?;
+                claim(
+                    self,
+                    &mut claimed,
+                    &mut unreachable_arm,
+                    EffectSeatSlot::Argument(0),
+                    operand,
+                )?;
             }
         }
         self.close_host_effect_seat_group(group)?;
+        // **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the substitution, after the
+        // claim group closes.**
+        //
+        // The arm this effect sits in is PROVEN never-constructed program-wide,
+        // so no execution selects it. Lower the whole effect to a trap rather
+        // than a wire request: the arm KEEPS its place in the match, so totality
+        // and control flow are unchanged -- nothing is elided -- and if a request
+        // value ever reaches here from outside the census's view the program
+        // halts instead of issuing a host operation it could not observe a seat
+        // for.
+        if unreachable_arm {
+            return Ok(LoweringOperand::Specialized(Lowered::Trap(RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: format!(
+                    "unreachable {family}.{} arm: its request constructor is never constructed in \
+                     this program, and a seat of it cannot be observed in the phase it arrives in",
+                    operation as u16
+                ),
+            })));
+        }
         // ⭐ **The bulk pre-operation conversion is gone.** It crossed every
         // operand to a specialized template BEFORE the operation was known, so a
         // seat that could not be read that way failed as "a host-effect operand"

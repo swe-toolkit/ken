@@ -230,6 +230,39 @@ pub(super) fn validate_occurrence_authority_plan(
 /// Bounded by the occurrence population rather than by a depth budget: the
 /// walk visits each origin at most once, so a malformed cyclic child relation
 /// terminates instead of recurring.
+/// Does this literal value carry `constructor` anywhere inside it?
+///
+/// Recurses through every nesting a `RuntimeValue` admits, because a census
+/// that stopped at the outermost value would miss a constructor buried in an
+/// argument, a record field, or a closure capture -- and missing one is the
+/// unsound direction for a deadness proof.
+fn runtime_value_constructs(value: &crate::RuntimeValue, constructor: &crate::RuntimeSymbol) -> bool {
+    match value {
+        crate::RuntimeValue::Constructor {
+            constructor: constructed,
+            args,
+        } => {
+            constructed == constructor
+                || args
+                    .iter()
+                    .any(|arg| runtime_value_constructs(arg, constructor))
+        }
+        crate::RuntimeValue::Record { fields } => fields
+            .iter()
+            .any(|(_, field)| runtime_value_constructs(field, constructor)),
+        crate::RuntimeValue::ClosureRef { captured, .. } => captured
+            .iter()
+            .any(|capture| runtime_value_constructs(capture, constructor)),
+        crate::RuntimeValue::Bool(_)
+        | crate::RuntimeValue::Int(_)
+        | crate::RuntimeValue::Bytes(_)
+        | crate::RuntimeValue::String(_)
+        // An opaque value is one this census cannot see into. It is part of the
+        // residual the consumer's TRAP covers, not something to read as absence.
+        | crate::RuntimeValue::Unknown => false,
+    }
+}
+
 pub(super) fn occurrence_subtree_contains(
     plan: &StaticTransitionPlan<'_>,
     root: StaticOriginId,
@@ -298,6 +331,122 @@ impl<'src> Planner<'src> {
 }
 
 impl<'src> StaticTransitionPlan<'src> {
+
+    /// **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the whole-program
+    /// construction-site census: is this constructor EVER constructed?**
+    ///
+    /// Derived from `source_occurrences`, which is the same table lowering
+    /// reads, so the census's coverage equals what the backend will lower **by
+    /// construction** rather than by agreement between two walks. Every planned
+    /// occurrence reaches `record_source_occurrence` (`construction.rs:393`,
+    /// via `plan_expr`'s recursion over every child and every arm body), so the
+    /// table is total over the occurrence population -- the property
+    /// `validate_source_occurrence_table` already relies on.
+    ///
+    /// A hand-rolled parallel traversal is precisely where an
+    /// **under**-approximation of the construction sites would hide, and an
+    /// under-approximation is the unsound direction here: it would let an arm
+    /// be called dead that a construction elsewhere makes live.
+    ///
+    /// **Keyed on the `RuntimeSymbol` itself.** `RuntimeMatchCase.constructor`
+    /// and `RuntimeExpr::Construct.constructor` are the same type carrying the
+    /// same spelling (`ir.rs:588`, `ir.rs:650`), so this is an exact match with
+    /// no translation step that could disagree.
+    pub(in crate::cranelift_backend) fn constructor_is_ever_constructed(
+        &self,
+        constructor: &crate::RuntimeSymbol,
+    ) -> bool {
+        self.source_occurrences
+            .iter()
+            .flatten()
+            .any(|occurrence| match occurrence.expr {
+                RuntimeExpr::Construct {
+                    constructor: constructed,
+                    ..
+                } => constructed == constructor,
+                // A constructor value does NOT only arise from `Construct`. It
+                // can be a LITERAL, and literals nest: a constructor's own
+                // arguments, a record's fields, and a closure reference's
+                // captured values are all `RuntimeValue`s that may carry one.
+                //
+                // Missing this class was a real defect in the first cut of this
+                // census, and it failed in the UNSOUND direction -- fewer
+                // constructions seen means more arms wrongly proven dead. It was
+                // caught by an existing lowering control whose fixture builds its
+                // scrutinee as a literal, which is exactly the shape a
+                // `Construct`-only walk cannot see.
+                RuntimeExpr::Value(value) => runtime_value_constructs(value, constructor),
+                _ => false,
+            })
+    }
+
+    /// **Is `needle` inside a match arm whose constructor is never constructed
+    /// program-wide?**
+    ///
+    /// The reachability half of `RT-DEAD-ARM-EFFECT-LOWERING`. An arm of a
+    /// total handler is entered only when its constructor is the scrutinee's,
+    /// so a constructor no occurrence anywhere constructs cannot select its
+    /// arm, and nothing inside that arm can execute.
+    ///
+    /// **EXISTENTIAL over enclosing arms, deliberately, and it does not need
+    /// the innermost one.** If ANY enclosing arm is dead then everything nested
+    /// inside it is unreachable, so taking the first witness is sound and more
+    /// enclosing arms can only help. Asking for the innermost would add a
+    /// nesting order this predicate does not need and could get wrong.
+    ///
+    /// **Sound in the conservative direction.** The census over-approximates
+    /// constructions (it counts every `Construct` the plan holds), so this
+    /// under-approximates deadness: an arm is reported dead only when NO
+    /// construction of its constructor exists anywhere in the plan. Anything
+    /// not proven dead answers `false` and keeps today's strict behaviour.
+    ///
+    /// Values constructed outside the plan's view -- across the
+    /// checked-continuation boundary, or by the host -- are the residual this
+    /// predicate cannot see, and they are exactly why the substitute at the
+    /// consumer is a TRAP: an arm wrongly reported dead HALTS rather than
+    /// yielding a wrong result. Census incompleteness costs liveness, never
+    /// correctness.
+    ///
+    /// Walked on demand rather than cached. This runs only on a path that is
+    /// already failing today, so the cost is paid once per refusal and there is
+    /// no cached set that could go stale against the table it was derived from.
+    pub(in crate::cranelift_backend) fn origin_is_in_provably_dead_arm(
+        &self,
+        needle: StaticOriginId,
+    ) -> Result<bool, CraneliftBackendError> {
+        for occurrence in self.source_occurrences.iter().flatten() {
+            let cases = match occurrence.expr {
+                RuntimeExpr::Match { cases, .. } => cases
+                    .iter()
+                    .map(|case| &case.constructor)
+                    .collect::<Vec<_>>(),
+                RuntimeExpr::ComputationalMatch { cases, .. } => cases
+                    .iter()
+                    .map(|case| &case.constructor)
+                    .collect::<Vec<_>>(),
+                _ => continue,
+            };
+            // Child 0 is the scrutinee and child `1 + i` is case `i`'s body,
+            // the ordering `plan_expr` builds for both match forms
+            // (`construction.rs`, `children.push(scrutinee.occurrence)` then the
+            // case bodies). Read through `child_origins` rather than restated.
+            let Ok(children) = self.semantic.child_origins(occurrence.static_origin) else {
+                continue;
+            };
+            for (index, constructor) in cases.into_iter().enumerate() {
+                if self.constructor_is_ever_constructed(constructor) {
+                    continue;
+                }
+                let Some(body) = children.get(1 + index).copied() else {
+                    continue;
+                };
+                if occurrence_subtree_contains(self, body, needle)? {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
 
     /// Planner-private source lookup for pre-allocation derivations.
     ///
