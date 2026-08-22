@@ -1,11 +1,11 @@
 ---
 id: RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL
-title: "A vestigial specialized-only gate on FsReadAt's Argument(2) buffer reply/ok-construction path (effects.rs:3226) re-refuses a carried buffer that the request path already admits; the destructured span_origin is UNUSED (the span is projected from the operand list at 3233), so the fix is REMOVAL of the dead gate, not a reroute -- the ResourceScalar-family leftover reader RT-EXACTINT moved onto the cap41_* critical path"
+title: "The carried-operand projection path for FsReadAt's Argument(2) buffer reply arm handles ONLY ONE observation kind (BytesPointerLength, observe_carried_bytes_span at effects.rs:1405) and re-refuses a carried ResourceScalar buffer; removing the dead specialized-only gate at 3267 (whose span_origin binding is genuinely unused) only RELOCATES that refusal one function deeper and greens nothing, so the fix is NEED-DIRECTED resource-awareness in site_operand_argument's carried branch (a seat whose declared need is ResourceScalar projects via lower_resource_token_seat, not the byte-span observer) WITH the dead gate removed as part of that one change -- the ResourceScalar-family reader RT-EXACTINT moved onto the cap41_* critical path (D0 re-scoped 2026-08-22 from removal-only: point (1) was FALSE, Architect ruling evt_7h23767bakhgm)"
 status: ready
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-EXACTINT-CARRIED-OBSERVE]
+depends_on: [RT-EXACTINT-CARRIED-OBSERVE, RT-DEAD-ARM-JOIN-DISPOSITION]
 blocks: [NATIVE-HANDLE-CARRIER]
 github: null
 origin: "Adversary M8 completeness flag on the landed [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] route (evt_5wx3bax63yak); Architect removal-not-reroute ruling (evt_2qdpkfvtqrxzy: 3226's destructured span_origin is unused, the span is projected from site_operand_argument(.., 2, ..) at 3233, so the specialized(SEAT_2)? match is a vestigial gate whose only post-D1 effect is the spurious carried-buffer refusal); runtime-implementer critical-path re-disposition (evt_6vxb4f1rxh3jk: with ExactIntU64 closed the witness terminal is now this Arg(2) reply-path refusal, so the deferral's off-critical-path ground is invalidated and it must be re-dispositioned from a carry to a cut). Steward-filed per COORDINATION section 2."
@@ -13,14 +13,36 @@ origin: "Adversary M8 completeness flag on the landed [[RT-RESOURCE-RELEASE-CARR
 
 # WHAT THIS NODE IS
 
-The removal of the vestigial specialized-only gate at `effects.rs:3226` on
-`FsReadAt`'s `Argument(2)` buffer reply/ok-construction arm. After
-[[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] made the REQUEST-arm resource-token
-readers carried-capable and [[RT-EXACTINT-CARRIED-OBSERVE]] closed the
-`ExactIntU64` terminal, the `cap41_*` rows advance to this gate: it refuses a
-carried buffer on the reply arm -- `seat Argument(2) of FsReadAt needs
-ResourceScalar, which this release can observe only in a specialized template,
-but this visit holds a carried word`.
+> D0 RE-SCOPE 2026-08-22 (Architect evt_7h23767bakhgm; Steward adopts arm (a),
+> widen-in-place). The original framing -- "remove a vestigial gate, no
+> mechanism" -- was FALSE at point (1): removing the dead gate only RELOCATES the
+> reply-arm refusal one function deeper and greens nothing (measured, below). The
+> node now carries ONE change: teach the carried-operand projection to be
+> need-directed (project a ResourceScalar seat via the resource-token
+> observation, not the byte-span observer), with the dead gate removed as part of
+> it. No kernel/TCB edit; no operator authorization in play.
+
+> D1 OUTCOME 2026-08-22 (implementer evt_3xy5qvjbt8zqe; Architect evt_230wt9hcynjmh).
+> The resource-aware projection is BUILT and reads SOUND against the AC-2 envelope
+> (Architect on-report affirmation; formal review at the merge Decision). It
+> cleared the whole effect-seat layer and the compile then stopped on a LATENT
+> completeness gap in the merged [[RT-DEAD-ARM-EFFECT-LOWERING]] node (a
+> provably-dead arm's source-joins left neither emitted nor dispositioned; 19/19
+> measured). Per this node's AC-1 that distinct downstream blocker is CUT, not
+> folded: the successor [[RT-DEAD-ARM-JOIN-DISPOSITION]] completes the dead-arm
+> trap. The projection greens nothing alone, so the two CO-LAND as ONE candidate
+> on this branch (§8 green-witness); this node's AC-1/AC-4/AC-5 are met when the
+> successor's completing compile lands. `depends_on` now includes the successor.
+
+Make `FsReadAt`'s `Argument(2)` buffer reply/ok-construction arm admit a carried
+`ResourceScalar` buffer, by giving the carried-operand projection path
+(`site_operand_argument` / the carried branch it delegates to) need-directed
+dispatch. After [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] made the REQUEST-arm
+resource-token readers carried-capable and [[RT-EXACTINT-CARRIED-OBSERVE]] closed
+the `ExactIntU64` terminal, the `cap41_*` rows advance to this arm, where two
+refusals sit in series: the dead specialized-only gate (3267), and behind it the
+byte-span observer (`observe_carried_bytes_span`, 1405) which refuses any need
+that is not `BytesPointerLength`. Removing only the first exposes the second.
 
 This is a `ResourceScalar`-family item (RT-RESOURCE-RELEASE's leftover reader),
 NOT `ExactIntU64` work. It is kept distinct in the accounting from
@@ -35,22 +57,47 @@ the ResourceScalar route (AC-5). Both are safe-direction coverage matters, not
 soundness holes -- the production code (route key, ledger re-derivation, the
 proven decoder) is intact.
 
-# WHY REMOVAL, NOT REROUTE (Architect ruling `evt_2qdpkfvtqrxzy`)
+# WHY REMOVAL ALONE IS INSUFFICIENT -- the D0 finding
 
-The Architect read `3226`/`3233` directly: the destructured `span_origin` is
-UNUSED. The constructor binds the span from `site_operand_argument(builder,
-static_origin, 2, &seats)` (the operand-list projection) at `3233`, with the
-code's own comment "projected from the operand list rather than rebuilt from its
-destructured payload." So the `specialized(SEAT_2)?` match is a VESTIGIAL GATE:
-its value is discarded; its only post-D1 effect is the spurious carried-buffer
-refusal.
+(Measured: runtime-implementer evt_vtyk18cp0zcv. Architect ruling:
+evt_7h23767bakhgm.)
 
-Routing `3226` through `lower_resource_token_seat` (the reroute an earlier note
-named) would be WRONG: it adds a guarded observation whose scalar result is
-thrown away -- a dead read wearing the shared-observation costume. The correct
-fix is to REMOVE the vestigial gate (delete the specialized-only destructure
-whose value nothing consumes), so a carried buffer is no longer spuriously
-re-refused on the reply path.
+The binding is dead; the refusal is load-bearing. Two different objects, the same
+word "vestigial". The earlier ruling (`evt_2qdpkfvtqrxzy`) confirmed the
+destructured `span_origin` at 3267 is UNUSED (TRUE) and reasoned from that to
+"the gate's refusal is spurious" (FALSE). Grounded as-implemented on
+`origin/main` `720f31e34`, `effects.rs`:
+
+- `3267` gate: `let Lowered::ResourceToken { value: span_origin } =
+  seats.specialized(SEAT_2)? else {...}` -- `specialized(SEAT_2)?` refuses a
+  CARRIED SEAT_2 (the pre-removal witness); `span_origin` unused.
+- `3275` live projection: `site_operand_argument(.., 2, ..)` binds the real
+  `span_argument` for `PrivateBufferSpan`. For a carried SEAT_2 it routes to
+  `observe_carried_bytes_span`, which refuses any non-`BytesPointerLength` need
+  at `1405` (the post-removal witness). `FsReadAt` `Argument(2)`'s need is
+  `ResourceScalar`.
+
+Measured by applying the removal in scratch and reading the terminal (reverted):
+the same witness, same blocker, moves from the `3267` gate to
+`observe_carried_bytes_span` one function deeper -- the compile does not complete
+and the `cap41_*` rows do not advance. `observe_carried_bytes_span` is a
+BYTE-SPAN observer; its `1405` refusal is a deliberate fail-closed contract and
+must NOT be weakened. `PrivateBufferSpan` arg0 wants the buffer RESOURCE, so the
+byte-span route is simply the wrong projector for this seat.
+
+# MECHANISM (Architect design ruling evt_7h23767bakhgm)
+
+Need-directed dispatch in the carried-operand projection path
+(`site_operand_argument` / the carried branch it delegates to): a seat whose
+declared need is `ResourceScalar` projects via the resource-token observation,
+NOT the byte-span observer. Reuse `lower_resource_token_seat` (`1936`) -- its
+`Carried(word)` branch already carries the full fail-closed envelope
+(`require_i64(tag == InvocationBorrowed)`, `require_i64(class ==
+BorrowedOpaque)`, then `emit_carrier_scalar`). Make it NEED-DIRECTED (dispatch on
+the planner's declared need), NOT an `FsReadAt`-SEAT_2 special-case -- that
+subsumes the whole `ResourceScalar` family in the carried projection rather than
+proliferating per-seat patches (subsume-don't-proliferate). The dead `3267` gate
+is removed as PART of this change.
 
 # HOW THIS REACHED THE CRITICAL PATH
 
@@ -63,30 +110,34 @@ witness terminal is now this `Arg(2)` reply-path refusal. Grounds (a) and (b)
 stand unchanged; ground (c) is invalidated, which is why the disposition is now
 a CUT (this node) rather than a carry. NHC blocks on it.
 
-# `D0` -- CLASSIFY (first deliverable; the Architect's 1-3)
+# `D0` -- CLASSIFY (COMPLETE 2026-08-22; hard-stop worked as designed)
 
-Measure and report, so the removal is confirmed clean before it lands:
+D0 ran the three-point classification and HARD-STOPPED, exactly as the frame's
+"if any of (1)-(3) needs real design, hard-stop and re-scope" clause directs:
 
-1. Confirm `site_operand_argument(.., 2, ..)` projects the buffer argument
-   correctly when `Arg(2)` arrives CARRIED -- that operand-list projection (at
-   `3233`), NOT the destructured payload, is the live path that binds the span.
-2. Confirm `Arg(2)` is already validated as a resource token on the REQUEST path
-   (`2477` via `lower_resource_token_seat`), so the reply-path gate is a
-   redundant re-validation whose removal drops only a spurious refusal, not a
-   real check.
-3. Direction: confirm removal enables no scalar misread -- the destructured
-   value was already discarded, so nothing downstream reads it.
+- (1) FALSE (the stop). `site_operand_argument(.., 2, ..)` does NOT project the
+  buffer correctly when `Arg(2)` arrives CARRIED -- its carried branch routes to
+  `observe_carried_bytes_span`, which refuses the `ResourceScalar` need. Removing
+  the gate relocates the refusal one function deeper; it greens nothing.
+- (2) CONFIRMED. `Arg(2)` is already validated as a resource token on the REQUEST
+  path (`2471` via `lower_resource_token_seat`); the reply-path gate is a genuine
+  redundant re-validation.
+- (3) CONFIRMED. `span_origin` is consumed by nothing; the crate builds with the
+  gate deleted, no unused-variable diagnostic.
 
-If (1)-(3) hold it is a clean removal; proceed to `D1`. If any of (1)-(3) needs
-real design work, HARD-STOP and report with that argument -- the node re-scopes
-rather than landing a removal that turns out to consume something.
+Outcome: the node re-scoped to arm (a) (widen-in-place, mechanism included) per
+the Architect's ruling and the Steward's disposition. See MECHANISM above.
 
-# `D1` -- THE REMOVAL
+# `D1` -- THE RESOURCE-AWARE PROJECTION (the removal rides inside it)
 
-Delete the vestigial specialized-only `specialized(SEAT_2)?` destructure whose
-`span_origin` nothing consumes. The span continues to bind from the operand-list
-projection at `3233`. No new route, no `Avail` change, no reader added -- this is
-a removal, not a widening.
+Implement need-directed dispatch in the carried-operand projection path so a
+`ResourceScalar` seat is projected via the resource-token observation
+(`lower_resource_token_seat`'s carried branch), and remove the dead `3267` gate
+as part of the same change. Dispatch on the planner's declared `EffectSeatNeed`
+(structural signal), family-wide, not an `FsReadAt`-SEAT_2 special-case. This is
+a `ken-runtime` cranelift-lowering change -- no new `Avail` partition, no kernel
+edit. The soundness envelope below (from the required reviewer) is binding on the
+landed code.
 
 # ACCEPTANCE
 
@@ -96,10 +147,21 @@ a removal, not a widening.
   distinct blocker exposed behind this one is a measurement to report and cut
   (or, if the rows go green, hand back to [[NATIVE-HANDLE-CARRIER]]'s
   `D-final`), not a failure of this node.
-- **AC-2 (removal drops only a spurious refusal).** The request-path
-  resource-token validation (`2477`) is unchanged and remains the real check;
-  the removed gate consumed nothing (`span_origin` unused). State that removal
-  enables no scalar misread and no relaxation of any real resource check.
+- **AC-2 (soundness envelope -- the Architect's required-reviewer conditions on
+  the landed code).** All three, on the resource-aware carried projection:
+  1. The carried `ResourceScalar` projection RE-RUNS the fail-closed tag+class
+     guard on the carried word (satisfied by routing through
+     `lower_resource_token_seat`); never project a raw carried word as a
+     resource. Re-observation on the reply path is idempotent and sound;
+     threading the request-path value (validated at `2471`) instead is an
+     optional optimization, not a soundness requirement.
+  2. Dispatch on the STRUCTURAL signal (the planner's declared `EffectSeatNeed`),
+     never a self-reported value.
+  3. CENSUS every seat/need routed through the carried branch of
+     `site_operand_argument`: state which needs map to the byte-span observer and
+     which to the resource-token path, so no seat silently changes projection.
+     `observe_carried_bytes_span`'s `1405` refusal stays as the byte-span
+     observer's own backstop (not weakened).
 - **AC-3 (no regression).** All currently-compiling lowering preserved;
   workspace-green in CI. (Local: targeted `-p` only, never `--workspace`; the
   respin gate is `-p ken-runtime` all-binaries + `-p ken-cli` + `-p ken-verify`,
@@ -138,11 +200,17 @@ a removal, not a widening.
 
 - **The `ExactIntU64` need** -- closed by [[RT-EXACTINT-CARRIED-OBSERVE]]. This
   node touches only the `ResourceScalar` reply-path gate.
-- **Any `Avail` partition change, new route, or new reader.** This is a removal
-  of a dead gate, not a widening.
-- **The REQUEST-path resource-token validation (`2477`).** It stays; only the
-  redundant reply-path re-validation is removed.
-- **Any kernel / TCB edit.**
+- **Any `Avail` partition change or new route.** The fix reuses the EXISTING
+  `lower_resource_token_seat` observation, need-directed; it adds no `Avail`
+  partition and no new route.
+- **Weakening `observe_carried_bytes_span`'s `1405` refusal.** It stays the
+  byte-span observer's fail-closed backstop; the fix routes ResourceScalar seats
+  AROUND it, it does not relax it.
+- **A per-seat / `FsReadAt`-SEAT_2 special-case.** Dispatch is need-directed and
+  family-wide.
+- **The REQUEST-path resource-token validation (`2471`).** It stays; it is the
+  real check.
+- **Any kernel / TCB edit.** No operator TCB authorization is in play.
 
 # CONTENTION
 
@@ -153,8 +221,9 @@ in review). [[NATIVE-HANDLE-CARRIER]] is held on this node.
 
 # CAPABILITY TIER
 
-T2-leaning: a bounded removal of a vestigial gate on the Architect's direct
-read of `3226`/`3233`, with a three-point D0 classification confirming nothing
-is consumed. Escalates only if D0 finds any of (1)-(3) needs real design. Size
-S-to-M -- the removal itself is S; the two carried-in test-hardening ACs
-(AC-4, AC-5) add modest scope.
+T1 (confirmed by D0, 2026-08-22). The frame's own tier line said it escalates
+from T2-leaning if D0 finds real design; it did -- point (1) was false and the
+node is now genuine mechanism work (need-directed dispatch in the carried
+projection, with a three-condition soundness envelope). runtime-implementer's
+default seat (Opus) is T1, correct for this. Size M -- the projection mechanism
+plus the two carried-in test-hardening ACs (AC-4, AC-5).
