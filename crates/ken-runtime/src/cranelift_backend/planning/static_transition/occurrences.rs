@@ -425,6 +425,29 @@ impl<'src> StaticTransitionPlan<'src> {
         needle: StaticOriginId,
         runtime_producible: &BTreeSet<crate::RuntimeSymbol>,
     ) -> Result<bool, CraneliftBackendError> {
+        Ok(self
+            .provably_dead_arm_body_containing(needle, runtime_producible)?
+            .is_some())
+    }
+
+    /// **`RT-DEAD-ARM-JOIN-DISPOSITION` -- the same question, returning its
+    /// WITNESS: the body of the dead arm that contains `needle`.**
+    ///
+    /// The predicate above is this, asked for existence. One scan, one set of
+    /// conjuncts, one answer -- a second traversal that agreed "usually" is
+    /// exactly how disposition and deadness would drift apart.
+    ///
+    /// The caller needs the witness, not the verdict: dispositioning a dead
+    /// arm's joins requires knowing WHICH arm was proved dead, and re-deriving
+    /// it at the consumer would be a second authority over deadness. Returning
+    /// it here keeps `disposition-follows-deadness` true BY CONSTRUCTION -- the
+    /// only arm whose joins can be dispositioned is one this predicate already
+    /// proved dead, because it is the only arm the caller is ever handed.
+    pub(in crate::cranelift_backend) fn provably_dead_arm_body_containing(
+        &self,
+        needle: StaticOriginId,
+        runtime_producible: &BTreeSet<crate::RuntimeSymbol>,
+    ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
         for occurrence in self.source_occurrences.iter().flatten() {
             let cases = match occurrence.expr {
                 RuntimeExpr::Match { cases, .. } => cases
@@ -464,11 +487,11 @@ impl<'src> StaticTransitionPlan<'src> {
                     continue;
                 };
                 if occurrence_subtree_contains(self, body, needle)? {
-                    return Ok(true);
+                    return Ok(Some(body));
                 }
             }
         }
-        Ok(false)
+        Ok(None)
     }
 
     /// Planner-private source lookup for pre-allocation derivations.

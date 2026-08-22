@@ -2316,13 +2316,9 @@ fn lower_body_term_with_plans(
                 parent_oriented_frame,
             )?);
         }
-        let body = if args.is_empty() {
-            callee
-        } else {
-            RuntimeExpr::Call {
-                callee: Box::new(callee),
-                args,
-            }
+        let body = RuntimeExpr::Call {
+            callee: Box::new(callee),
+            args,
         };
         return Ok(RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
@@ -2852,13 +2848,9 @@ fn lower_checked_host_computation(
                 "computational IH runtime index does not fit runtime IR",
             )
         })?);
-        let body = if args.is_empty() {
-            callee
-        } else {
-            RuntimeExpr::Call {
-                callee: Box::new(callee),
-                args,
-            }
+        let body = RuntimeExpr::Call {
+            callee: Box::new(callee),
+            args,
         };
         return Ok(RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
@@ -6856,9 +6848,8 @@ mod px7l_tests {
 
     /// How many operands the marker's application ACTUALLY carries.
     ///
-    /// ⛔ A nullary ordinary IH emits its bare callee rather than a `Call`, so
-    /// "no application" is `0` operands and not a fixture error. That shape is
-    /// itself refused by the Runtime marker gate, on a different clause.
+    /// A nullary ordinary IH emits a zero-argument `Call`, so "no source
+    /// operands" is `0` operands and not a fixture error.
     fn emitted_operand_count(marker: &RuntimeExpr) -> usize {
         let RuntimeExpr::CheckedComputationalIHInvocation { body, .. } = marker else {
             panic!("the route must emit a checked computational IH marker, got {marker:?}")
@@ -7418,7 +7409,11 @@ mod px7l_tests {
                 call_template_id: 11,
                 body,
                 ..
-            } if matches!(body.as_ref(), RuntimeExpr::Var(0))
+            } if matches!(
+                body.as_ref(),
+                RuntimeExpr::Call { callee, args }
+                    if matches!(callee.as_ref(), RuntimeExpr::Var(0)) && args.is_empty()
+            )
         ));
         assert_eq!(plans.consumed_computational_ih_calls, BTreeSet::from([11]));
         assert_eq!(plans.pending_computational_ih_calls.len(), 1);

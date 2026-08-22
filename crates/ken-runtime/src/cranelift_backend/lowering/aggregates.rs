@@ -2869,21 +2869,106 @@ impl<'a> Lowering<'a> {
             let (mut value, source) = match operand {
                 LoweringOperand::Specialized(value) => (value.clone(), SiteOperandSource::Specialized),
                 LoweringOperand::Carried(word) => {
-                    let (pointer, len, outcome) =
-                        self.observe_carried_bytes_span(builder, record, *word)?;
-                    let valid = builder.ins().icmp_imm(
-                        cranelift_codegen::ir::condcodes::IntCC::Equal,
-                        outcome,
-                        0,
-                    );
-                    let pointer_type = builder.func.dfg.value_type(pointer);
-                    let value = Lowered::ResponseBytes(SafeByteSpan::masked_at_producer(
-                        builder,
-                        pointer_type,
-                        pointer,
-                        len,
-                        valid,
-                    ));
+                    // **`RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` `D1` -- the
+                    // carried branch is NEED-DIRECTED.**
+                    //
+                    // It used to project every carried site operand as a BYTE
+                    // SPAN. That is right for a path operand and wrong for a
+                    // buffer: the recipes declare two different child types --
+                    // `OptionSome -> [Bytes]` and `PrivateBufferSpan ->
+                    // [ResourceToken, ...]` -- and this projector knew only the
+                    // first. So a carried buffer refused here, one function
+                    // below the reply-path gate that used to refuse it earlier.
+                    // Removing that gate alone only relocated the refusal; the
+                    // projector is where it actually closes.
+                    //
+                    // **Dispatched on the PLANNER-DECLARED `record.need`**, never
+                    // on anything the operand reports about itself. A carried
+                    // word is an opaque machine word: asking IT what it is would
+                    // be letting the value pick the observation that reads it,
+                    // which is the confusion this seat exists to prevent.
+                    //
+                    // **Exhaustive, no wildcard** (`COORDINATION` section 7).
+                    // Adding an `EffectSeatNeed` is a COMPILE ERROR here rather
+                    // than a silent fall into a projection built for a different
+                    // type. The needs with no carried projection keep today's
+                    // behaviour exactly: they route to
+                    // `observe_carried_bytes_span`, whose own need check refuses
+                    // them by name. That backstop is left byte-unweakened -- it
+                    // is still the thing that stops a projection being emitted
+                    // for a need it was not built for.
+                    // **SCOPE, with its witness named.** This projection closes
+                    // the carried SITE-OPERAND seat and nothing else. The next
+                    // layer behind it is the `BoundaryCarrier` refusal
+                    // *"a carried recursive hypothesis is an eliminated value,
+                    // not a callable, so it takes no arguments, but the call
+                    // provides N"*, whose witness in the cold-lowering
+                    // enumeration is `rt_allocate_stage`.
+                    //
+                    // That refusal is `reject_carried_residual_arguments`, and
+                    // it is OUT OF SCOPE here in the strong sense: it is an
+                    // arity property of an IH invocation against a carried
+                    // residual, decided before any invocation segment is
+                    // installed, and it does not become reachable or
+                    // unreachable by anything this projector does. Widening
+                    // this dispatch cannot close it and must not try -- the
+                    // witness is recorded so the next reader does not mistake a
+                    // still-red enumeration row for an unfinished projection.
+                    let value = match record.need {
+                        EffectSeatNeed::BytesPointerLength => {
+                            let (pointer, len, outcome) =
+                                self.observe_carried_bytes_span(builder, record, *word)?;
+                            let valid = builder.ins().icmp_imm(
+                                cranelift_codegen::ir::condcodes::IntCC::Equal,
+                                outcome,
+                                0,
+                            );
+                            let pointer_type = builder.func.dfg.value_type(pointer);
+                            Lowered::ResponseBytes(SafeByteSpan::masked_at_producer(
+                                builder,
+                                pointer_type,
+                                pointer,
+                                len,
+                                valid,
+                            ))
+                        }
+                        // The SAME guarded observation the request path already
+                        // reads this operand through, reused rather than
+                        // respelled: `lower_resource_token_seat`'s carried arm
+                        // requires `BoundaryTag::InvocationBorrowed` AND
+                        // `BoundaryClass::BorrowedOpaque` before it reads the
+                        // scalar, so a word not proven a borrowed-opaque handle
+                        // takes the failure return instead of yielding a bogus
+                        // token. One authority for what proves that, not two.
+                        EffectSeatNeed::ResourceScalar => {
+                            let value = self.lower_resource_token_seat(
+                                builder,
+                                operand,
+                                "site operand",
+                                "resource",
+                            )?;
+                            Lowered::ResourceToken { value }
+                        }
+                        EffectSeatNeed::ConstructorTag
+                        | EffectSeatNeed::CapabilityTokenScalar
+                        | EffectSeatNeed::ExactIntU64 => {
+                            let (pointer, len, outcome) =
+                                self.observe_carried_bytes_span(builder, record, *word)?;
+                            let valid = builder.ins().icmp_imm(
+                                cranelift_codegen::ir::condcodes::IntCC::Equal,
+                                outcome,
+                                0,
+                            );
+                            let pointer_type = builder.func.dfg.value_type(pointer);
+                            Lowered::ResponseBytes(SafeByteSpan::masked_at_producer(
+                                builder,
+                                pointer_type,
+                                pointer,
+                                len,
+                                valid,
+                            ))
+                        }
+                    };
                     let projected = site_operand_witness(&value).ok_or_else(|| {
                         unsupported(
                             "Effect",

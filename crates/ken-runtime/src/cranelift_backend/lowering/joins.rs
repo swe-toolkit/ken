@@ -1400,6 +1400,7 @@ impl<'a> Lowering<'a> {
                 | JoinConsumptionMutation::OmitSourceMachineComputationalMatchSelection
                 | JoinConsumptionMutation::MaterializeFirstUnselectedMatchJoin
                 | JoinConsumptionMutation::AttachEntryToFirstMaterializedDead
+                | JoinConsumptionMutation::ForceMaterializedDeadOverlapWithEntry
                 | JoinConsumptionMutation::DispositionDynamicHostResultMerge => {}
             }
             if !self.function_local.consumed_join_origins.insert(origin) {
@@ -1432,6 +1433,41 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .source_join_origins_in_owner_subtree(root)?;
             for origin in joins {
+                // **`RT-MATERIALIZED-DEAD-JOIN-RECONCILE` `D1` -- a join lowering
+                // actually CONSUMED is never dispositioned dead.**
+                //
+                // `finalize_join_disposition` requires `consumed united with
+                // dispositioned` to cover `required` and to be DISJOINT, so the
+                // two sets are one partition. An origin that lowering emitted and
+                // this walk also dispositions lands in both halves: the overlap
+                // check passes only because the CFG half runs later, where it
+                // surfaces as *"materialized-but-dead source join ... retained a
+                // reachable block"* -- a contradiction reported one plane away
+                // from where it was created.
+                //
+                // The reachability of the arm is NOT the question here, and
+                // treating it as one is what made two successive re-entry
+                // predicates fail in opposite directions. Widening a re-entry
+                // predicate to retain this arm removes it from `dispositioned`
+                // without adding it to `consumed`, so the SAME partition breaks
+                // through the other face -- *"left planned source join ... neither
+                // emitted nor statically unselected"* -- and it does so for every
+                // genuinely unselected arm in the program, not just this one.
+                // MEASURED: the narrowest such widening cost 12 lib regressions
+                // and still did not close the witness.
+                //
+                // Consumption is the authority because it is a FACT lowering
+                // already established by emitting the block, not an inference
+                // about control flow. Deciding from it makes the partition
+                // consistent by construction.
+                #[cfg(test)]
+                let force_overlap = D8_JOIN_CONSUMPTION_MUTATION.with(std::cell::Cell::get)
+                    == JoinConsumptionMutation::ForceMaterializedDeadOverlapWithEntry;
+                #[cfg(not(test))]
+                let force_overlap = false;
+                if !force_overlap && self.function_local.consumed_join_origins.contains(&origin) {
+                    continue;
+                }
                 self.function_local
                     .dispositioned_join_origins
                     .insert(origin);
@@ -1471,6 +1507,7 @@ impl<'a> Lowering<'a> {
                 D8_JOIN_CONSUMPTION_MUTATION.with(std::cell::Cell::get),
                 JoinConsumptionMutation::MaterializeFirstUnselectedMatchJoin
                     | JoinConsumptionMutation::AttachEntryToFirstMaterializedDead
+                    | JoinConsumptionMutation::ForceMaterializedDeadOverlapWithEntry
             ) {
                 let mut materialized = None;
                 for (index, root) in case_bodies.iter().copied().enumerate() {
@@ -1780,6 +1817,7 @@ impl<'a> Lowering<'a> {
                 #[cfg(test)]
                 let blocks = match D8_JOIN_CONSUMPTION_MUTATION.with(std::cell::Cell::get) {
                     JoinConsumptionMutation::AttachEntryToFirstMaterializedDead
+                    | JoinConsumptionMutation::ForceMaterializedDeadOverlapWithEntry
                     | JoinConsumptionMutation::OmitSourceMachineComputationalMatchSelection => {
                         let mut blocks = blocks;
                         blocks.push(entry);

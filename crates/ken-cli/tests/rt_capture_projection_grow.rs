@@ -205,12 +205,26 @@ fn the_conditional_join_grows_the_projection_and_records_every_deferral() {
          means the effect-seat boundary below was closed too, and this sentinel is the \
          thing to re-measure rather than remove: {error}"
     );
-    // REPOINTED AGAIN by `RT-EXACTINT-CARRIED-OBSERVE`. Every repoint has moved
-    // this pin STRICTLY DOWNSTREAM: ConstructorTag (dead arm, trapped) ->
-    // ResourceRelease/ResourceScalar (carried observation, routed) ->
-    // ExactIntU64 (Avail move + carried decode) -> the FsReadAt Arg(2) reply-path
-    // gate. Direction is the whole safety argument, so it is recorded rather
-    // than left to be re-derived at each move.
+    // REPOINTED AGAIN by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`. Every repoint
+    // has moved this pin STRICTLY DOWNSTREAM: ConstructorTag (dead arm, trapped)
+    // -> ResourceRelease/ResourceScalar (carried observation, routed) ->
+    // ExactIntU64 (Avail move + carried decode) -> the FsReadAt Arg(2)
+    // reply-path gate -> the checked-IH nullary force. Direction is the whole
+    // safety argument, so it is recorded rather than left to be re-derived at
+    // each move.
+    //
+    // THE DIRECTION ARGUMENT FOR THIS REPOINT: the old terminal names
+    // `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` as the owner of that gate, and
+    // this candidate IS that node -- the need-directed carried projection now
+    // serves the seat the gate used to refuse. The witness advances past its
+    // own former stop, so the move is downstream by construction rather than by
+    // assertion.
+    //
+    // The new terminal is the escaping functional induction hypothesis: the
+    // checked-IH marker is a nullary_force whose realized value is stored
+    // straight into a `Construct`, so the arity-1 static worker is forced with
+    // zero arguments and the worker-arity gate refuses. Measured. Retired by
+    // `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`.
     //
     // Repointed, not widened and not deleted — the sentinel's own instruction.
     // The new terminal is strictly DOWNSTREAM of the old one, which is what
@@ -218,14 +232,12 @@ fn the_conditional_join_grows_the_projection_and_records_every_deferral() {
     // further, so the guarded path is still exercised. A repoint to something
     // UPSTREAM of the guarded feature would be the accommodation this forbids.
     assert!(
-        error.contains(
-            "seat Argument(2) of FsReadAt needs ResourceScalar, which this release can \
-             observe only in a specialized template"
-        ),
-        "the expected terminal state after `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` is the \
-         `FsReadAt` Arg(2) buffer reply-path gate — a different READER, owned by \
-         `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` — which is what makes the two absences above \
-         non-vacuous: without it they would also hold on a compile that failed for some \
-         unrelated earlier reason: {error}"
+        error.contains("static worker expects 1 arguments but call provides 0"),
+        "the expected terminal state after `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` is the \
+         checked-IH nullary force of an ESCAPING functional IH — a different READER again, \
+         and a deferred capability gap owned by \
+         `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION` — which is what makes the two absences \
+         above non-vacuous: without it they would also hold on a compile that failed for \
+         some unrelated earlier reason: {error}"
     );
 }

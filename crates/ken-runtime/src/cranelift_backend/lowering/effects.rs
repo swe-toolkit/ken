@@ -369,6 +369,55 @@ impl<'a> Lowering<'a> {
         )
     }
 
+    /// **`RT-DEAD-ARM-JOIN-DISPOSITION` -- when the trap fires, the arm's
+    /// planned source joins are DISPOSITIONED as statically unselected.**
+    ///
+    /// Trapping a dead arm skips lowering its body, so that body's planned
+    /// joins are neither emitted nor statically unselected and the
+    /// join-consumption invariant refuses the whole function. Latent since the
+    /// trap landed: every compile refused in the effect-seat layer before
+    /// reaching that invariant. Measured on the governed witness -- 19 of 19
+    /// unconsumed joins were inside provably dead arms, no exceptions.
+    ///
+    /// **DISPOSITION FOLLOWS DEADNESS, never the reverse.** The arm body comes
+    /// from the deadness predicate's OWN witness, so the only joins this can
+    /// disposition are those of an arm that predicate already proved dead. If a
+    /// join cannot be dispositioned under the existing predicate that is a
+    /// finding to report -- never a reason to widen the predicate until it can,
+    /// which is the over-accept this shape invites.
+    ///
+    /// Reuses `RT-LEXICAL-RECURSOR-CONSUMERS` `D2b`'s abandoned-region
+    /// mechanism unchanged: a trapped dead arm is the same category of region as
+    /// an abandoned `Let` body, and that mechanism's own doc records it removing
+    /// this identical refusal.
+    ///
+    /// The `"neither emitted nor statically unselected"` refusal stays as the
+    /// fail-closed backstop, and `validate_materialized_dead_join_cfg` still
+    /// runs afterwards -- it additionally requires the emitted and dispositioned
+    /// sets to be DISJOINT, so dispositioning a join that was in fact emitted
+    /// refuses rather than passing.
+    fn disposition_dead_arm_joins(
+        &mut self,
+        effect_origin: StaticOriginId,
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(arm_body) = self
+            .static_transition_plan
+            .provably_dead_arm_body_containing(
+                effect_origin,
+                &runtime_producible_constructors(&self.process_symbols),
+            )?
+        else {
+            return Ok(());
+        };
+        let joins = self
+            .static_transition_plan
+            .source_join_origins_in_owner_subtree(arm_body)?;
+        for origin in joins {
+            self.function_local.dispositioned_join_origins.insert(origin);
+        }
+        Ok(())
+    }
+
     fn claim_host_effect_seat(
         &mut self,
         group: Option<EffectSeatGroupId>,
@@ -490,6 +539,7 @@ impl<'a> Lowering<'a> {
                 if let (Some(group), Some(ledger)) = (group, self.host_effect_seats.as_mut()) {
                     ledger.record_unreachable_seat(group, slot)?;
                 }
+                self.disposition_dead_arm_joins(effect_origin)?;
                 return Ok(SeatClaimOutcome::UnreachableArm);
             }
             return Err(unsupported(
@@ -1993,6 +2043,7 @@ impl<'a> Lowering<'a> {
             // proven dead HALTS rather than issuing an operation this backend
             // cannot represent.
             if self.effect_arm_is_provably_dead(static_origin)? {
+                self.disposition_dead_arm_joins(static_origin)?;
                 return Ok(LoweringOperand::Specialized(Lowered::Trap(
                     dead_arm_effect_trap(family, operation),
                 )));
@@ -3264,13 +3315,17 @@ impl<'a> Lowering<'a> {
                 let reply_start_int = self.lower_unsigned_u64_int(builder, reply_start)?;
                 // PX8-SPAN-PROV: bind the minted span to this `readAt`'s buffer
                 // operand acquisition (lowered arg 2, the request seat).
-                let Lowered::ResourceToken { value: span_origin } = seats.specialized(SEAT_2)?
-                else {
-                    return Err(unsupported(
-                        "Effect",
-                        "FsReadAt buffer operand is not a resource",
-                    ));
-                };
+                // `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` `D1` -- the dead
+                // reply-path gate is REMOVED here, and it is removed WITH the
+                // projector fix rather than before it.
+                //
+                // It destructured a `span_origin` that nothing consumed (the
+                // span is projected from the operand list below), so as a
+                // BINDING it was vestigial. But its refusal was not: deleting
+                // it alone only moved the refusal into the projector, which
+                // could not handle a carried buffer either. Measured both ways
+                // before this node widened. The two edits are one semantic unit;
+                // splitting them ships a diff that greens nothing.
                 let span_argument =
                     self.site_operand_argument(builder, static_origin, 2, &seats)?;
                 let span = self.synthesized_constructor(

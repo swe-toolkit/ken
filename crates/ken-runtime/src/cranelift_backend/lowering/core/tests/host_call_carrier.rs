@@ -2297,23 +2297,49 @@ fn d8_every_required_join_plan_is_consumed_exactly_once() {
         "token-only materialization may become dead after final semantic selection",
     );
 
+    // `RT-MATERIALIZED-DEAD-JOIN-RECONCILE` `D1` -- this mutation's target state
+    // is now UNCONSTRUCTIBLE FROM THE DISPOSITION PATH, and that is the property
+    // being pinned. A consumed origin is never dispositioned dead, so
+    // `consumed intersect dispositioned` is empty and the whole
+    // materialized-but-dead branch of the validator has nothing to iterate.
+    // Attaching an entry block to "the first materialized dead join" therefore
+    // finds no such join and the program compiles.
+    //
+    // This asserts an invariant, not an absence of news: before the fix this
+    // same call produced "retained a reachable block", so the expectation
+    // genuinely inverted when the overlap stopped being constructible here.
     set_d8_join_consumption_mutation(
         JoinConsumptionMutation::AttachEntryToFirstMaterializedDead,
     );
-    let reachable_dead_result =
+    let unconstructible_from_disposition_path =
         recursive_port_process_compiles(&d8_known_bool_match_with_dead_join_case(true));
     set_d8_join_consumption_mutation(JoinConsumptionMutation::Exact);
-    let reachable_dead = reachable_dead_result
-        .expect_err("an entry-reachable materialized-but-dead join must fail");
+    unconstructible_from_disposition_path.expect(
+        "the disposition path can no longer build a consumed-and-dispositioned overlap, \
+         so there is no materialized-but-dead join for this mutation to make reachable",
+    );
+
+    // ...and the validator's OWN contract stays tested directly, on a
+    // synthetically forced overlap that does not depend on the disposition path
+    // being able to produce one. Without this the guard above would have
+    // retired the negative control: a byte-untouched validator, permanently
+    // green, free to rot against a future path that reintroduces the state.
+    set_d8_join_consumption_mutation(
+        JoinConsumptionMutation::ForceMaterializedDeadOverlapWithEntry,
+    );
+    let forced_overlap_result =
+        recursive_port_process_compiles(&d8_known_bool_match_with_dead_join_case(true));
+    set_d8_join_consumption_mutation(JoinConsumptionMutation::Exact);
+    let forced_overlap = forced_overlap_result
+        .expect_err("an entry-reachable materialized-but-dead join must still fail");
     assert!(
         matches!(
-            reachable_dead,
+            forced_overlap,
             CraneliftBackendError::Backend(BackendFailure::Module(ref detail))
                 if detail.contains("materialized-but-dead source join")
                     && detail.contains("retained a reachable block")
         ),
-        "materialized-dead reachability mutation reached the wrong boundary: \
-         {reachable_dead:?}"
+        "forced materialized-dead overlap reached the wrong boundary: {forced_overlap:?}"
     );
 
     set_d8_join_consumption_mutation(JoinConsumptionMutation::SkipFirst);

@@ -150,19 +150,32 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
     // which crosses a function boundary and carries only the word. Designed to
     // go red when THAT boundary is addressed; the deliverable then is to
     // re-measure the terminal state, not to widen this clause.
-    // REPOINTED AGAIN by `RT-EXACTINT-CARRIED-OBSERVE`. Every repoint has moved
-    // this pin STRICTLY DOWNSTREAM — ConstructorTag, ResourceRelease/
-    // ResourceScalar, ExactIntU64, now the FsReadAt Arg(2) reply-path gate — so
-    // the absence above holds each time, and more strongly. The direction is the
-    // safety argument; a repoint UPSTREAM would quietly gut it.
+    // REPOINTED AGAIN by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`. Every repoint
+    // has moved this pin STRICTLY DOWNSTREAM — ConstructorTag, ResourceRelease/
+    // ResourceScalar, ExactIntU64, the FsReadAt Arg(2) reply-path gate, and now
+    // the checked-IH nullary force — so the absence above holds each time, and
+    // more strongly. The direction is the safety argument; a repoint UPSTREAM
+    // would quietly gut it.
+    //
+    // THE DIRECTION ARGUMENT FOR THIS REPOINT, which is the whole licence for
+    // it: the previous terminal was the `FsReadAt` Arg(2) reply-path gate, and
+    // THIS WP is what cleared that gate — the need-directed carried projection
+    // now serves the seat the gate used to refuse. So the witness advances past
+    // its own former stop into a strictly deeper one, exactly as every earlier
+    // repoint did. Nothing was widened to accommodate a red.
+    //
+    // The new terminal is the escaping functional induction hypothesis: the
+    // checked-IH marker is a nullary_force whose realized value is stored
+    // straight into a `Construct`, so the arity-1 static worker is forced with
+    // zero arguments and the worker-arity gate refuses. Measured, not inferred.
+    // Retired by `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`, which owns the
+    // missing first-class functional-IH representation.
     assert!(
-        reason.contains(
-            "seat Argument(2) of FsReadAt needs ResourceScalar, which this release can \
-             observe only in a specialized template"
-        ),
-        "the expected terminal state after `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` is the \
-         `FsReadAt` Arg(2) buffer reply-path gate — a different reader, the next node's — which \
-         is what keeps the absence above non-vacuous: \
+        reason.contains("static worker expects 1 arguments but call provides 0"),
+        "the expected terminal state after `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` is the \
+         checked-IH nullary force of an ESCAPING functional IH — a deferred capability gap, \
+         and a different subsystem again — which is what keeps the absence above \
+         non-vacuous: \
          {error:?}"
     );
 }
