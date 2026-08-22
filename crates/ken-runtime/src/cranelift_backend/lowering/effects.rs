@@ -400,10 +400,56 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .host_effect_site_operand_slots(effect_origin)?
                 .contains(&slot);
+        // **`RT-RESOURCE-RELEASE-CARRIED-OBSERVE` `D1` -- keyed on the
+        // (need, phase) PAIR, closing over the whole `ResourceScalar` family.**
+        //
+        // Architect `evt_3dnd21pjg193g`, on a measured guard-uniformity result.
+        // The key began as the (operation, slot, need) triple naming only
+        // `ResourceRelease` `Argument(0)`; measuring past it showed the SAME
+        // observation is wanted at `FsHandleMetadata` `Argument(0)` and
+        // `FsReadAt` `Argument(0)` too. Enumerating one operation at a time is
+        // an unbounded chain of near-identical rulings for one predicate, so
+        // where entries share a predicate the closure is over the predicate.
+        //
+        // **Sound ONLY because the guards are UNIFORM across those seats, and
+        // that is structural rather than sampled.** A `Lowered`'s boundary
+        // representation is chosen by ONE `match` on its `LoweredVariant`
+        // (`boundary.rs`, the `CapabilityToken | ResourceToken` arm), with no
+        // consuming operation in scope -- so a resource token carries
+        // `InvocationBorrowed` / `BorrowedOpaque` no matter which seat later
+        // reads it. Had the tag/class varied by consumer, widening with fixed
+        // guards would send a VALID handle down the runtime failure path:
+        // a loud compile refusal traded for a silent runtime failure on a
+        // well-typed program, which is worse than the refusal it replaces.
+        //
+        // The guards prove "a borrowed-opaque invocation handle", NOT
+        // "specifically a resource token" -- `CapabilityToken` and the borrowed
+        // native/option variants share that tag/class pair. That is the
+        // PRECEDENT's existing property, inherited unchanged rather than
+        // introduced here: what keeps a capability from arriving at a
+        // `ResourceScalar` seat is the seat's own contract and Ken's typing, not
+        // these guards. Stated so a reader does not over-read them.
+        //
+        // Conditioned on the CARRIED phase, so the route is the exact
+        // complement of where `Direct` serves. In the specialized phase
+        // `avail.admits` is true and `Direct` takes it, unchanged -- a new route
+        // beside an old one must fire only where the old one cannot serve, or
+        // it masks the strict gate on inputs the strict gate was handling
+        // correctly.
+        //
+        // NOT `host_effect_site_operand_slots`, measured the wrong key for this
+        // seat shape on the sibling. NOT widened across NEEDS: `ExactIntU64`
+        // is a different observation with its own carried precedent
+        // (`carried_exact_int`), and one key spanning two observations would
+        // conflate them.
+        let carried_resource_token = observed == EffectSeatPhase::CarriedWord
+            && record.need == EffectSeatNeed::ResourceScalar;
         let route = if record.avail.admits(observed) {
             EffectSeatClaimRoute::Direct
         } else if carried_site_operand {
             EffectSeatClaimRoute::SiteOperandProjection
+        } else if carried_resource_token {
+            EffectSeatClaimRoute::CarriedResourceObservation
         } else {
             EffectSeatClaimRoute::Direct
         };
@@ -523,6 +569,22 @@ struct ClaimedEffectSeat {
 enum EffectSeatClaimRoute {
     Direct,
     SiteOperandProjection,
+    /// **`RT-RESOURCE-RELEASE-CARRIED-OBSERVE` `D1` -- the carried
+    /// resource-token observation.**
+    ///
+    /// Admitted through the same door the byte-span route uses -- `route !=
+    /// Direct` bypasses `avail` -- so the seat's `Need`-subset-`Avail`
+    /// partition is BYTE-UNTOUCHED: `(ResourceRelease, 0)` stays
+    /// `Avail::SPECIALIZED_ONLY` in the `resource` row and is NOT moved to
+    /// `phase_bearing_resource`. A new route PROVES observability; it does not
+    /// relax membership (Architect `evt_48m6xvb59wnyg`).
+    ///
+    /// Bypassing `avail` is sound ONLY because the accept path re-runs a
+    /// fail-closed consumer: the emitter arm reads this seat through
+    /// `lower_resource_token_seat`, whose carried arm requires the boundary tag
+    /// AND the boundary class before it reads the scalar. Admission here is a
+    /// permission; the guarded observation is the authority.
+    CarriedResourceObservation,
 }
 /// One compiler-side lowering VISIT to one effect occurrence.
 ///
@@ -687,6 +749,16 @@ impl EffectSeatLedger {
                 observed == EffectSeatPhase::CarriedWord
                     && record.need == EffectSeatNeed::BytesPointerLength
                     && matches!(record.slot, EffectSeatSlot::Argument(_))
+            }
+            // `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` `D1`. Re-derived HERE from
+            // the record's own fields, independently of the caller that chose
+            // the route -- which is the point of this second check: a route
+            // selected on one set of facts and admitted on another would let a
+            // mis-keyed route in. The triple is the same narrow key, spelled
+            // again rather than shared, so the two must agree.
+            EffectSeatClaimRoute::CarriedResourceObservation => {
+                observed == EffectSeatPhase::CarriedWord
+                    && record.need == EffectSeatNeed::ResourceScalar
             }
         };
         if !admissible {
@@ -1812,17 +1884,26 @@ impl<'a> Lowering<'a> {
         builder.switch_to_block(done);
     }
 
-    pub(super) fn lower_buffer_freeze_resource_seat(
+    ///
+    /// **`RT-RESOURCE-RELEASE-CARRIED-OBSERVE` `D1` -- generalized to `owner` so
+    /// there is ONE guarded resource-token observation, not two copies.** The
+    /// carried route this node adds for `ResourceRelease` performs the SAME
+    /// guards and the SAME read; duplicating them would create a second
+    /// authority over what proves a carried word is a resource token, and the
+    /// two would drift. `owner` names the operation only for the refusal
+    /// message.
+    pub(super) fn lower_resource_token_seat(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         operand: &LoweringOperand,
+        owner: &'static str,
         seat: &'static str,
     ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
         match operand {
             LoweringOperand::Specialized(Lowered::ResourceToken { value }) => Ok(*value),
             LoweringOperand::Specialized(_) => Err(unsupported(
                 "Effect",
-                format!("BufferFreeze {seat} is not a resource"),
+                format!("{owner} {seat} is not a resource"),
             )),
             LoweringOperand::Carried(word) => {
                 let tag = self.emit_carrier_tag(builder, *word)?;
@@ -2227,15 +2308,39 @@ impl<'a> Lowering<'a> {
                         "resource operation carried a capability",
                     ));
                 }
-                let Lowered::ResourceToken { value: token } = seats.specialized(SEAT_0)? else {
-                    return Err(unsupported(
-                        "Effect",
-                        "resource operand is not an opaque resource token",
-                    ));
-                };
+                // **`RT-RESOURCE-RELEASE-CARRIED-OBSERVE` `D1` -- the carried
+                // route's OBSERVATION, and it is where the route's admission is
+                // PAID FOR.**
+                //
+                // `claim_host_effect_seat` admitted this seat through
+                // `EffectSeatClaimRoute::CarriedResourceObservation`, which
+                // bypasses `avail` by construction. That is sound only because
+                // the accept path re-runs a fail-closed consumer, and this is
+                // it: `lower_resource_token_seat`'s carried arm requires
+                // `BoundaryTag::InvocationBorrowed` AND
+                // `BoundaryClass::BorrowedOpaque` BEFORE reading the scalar, so
+                // a carried word not proven a resource token REFUSES rather
+                // than yielding a garbage read.
+                //
+                // ⇒ The route does not weaken the gate; it moves the proof from
+                // the phase table to a guarded observation, and the observation
+                // is the one `BufferFreeze` already trusts and ships.
+                //
+                // `FsHandleMetadata` shares this arm and, since the key was
+                // widened to the (need, phase) pair, is covered by the same
+                // route -- its `Argument(0)` is a `ResourceScalar` seat too, and
+                // the guards it passes are the same ones, for the same reason:
+                // the tag/class a resource token carries is a function of its
+                // `LoweredVariant`, not of the operation that reads it.
+                let token = self.lower_resource_token_seat(
+                    builder,
+                    seats.operand(SEAT_0)?.1,
+                    "resource operation",
+                    "operand",
+                )?;
                 builder
                     .ins()
-                    .stack_store(*token, request, request_offset(0));
+                    .stack_store(token, request, request_offset(0));
             }
             ken_host::HostOpV1::BufferAllocate => {
                 if capability.is_some() {
@@ -2301,9 +2406,10 @@ impl<'a> Lowering<'a> {
                 if capability.is_some() {
                     return Err(unsupported("Effect", "BufferFreeze carried a capability"));
                 }
-                let token = self.lower_buffer_freeze_resource_seat(
+                let token = self.lower_resource_token_seat(
                     builder,
                     seats.operand(SEAT_0)?.1,
+                    "BufferFreeze",
                     "buffer",
                 )?;
                 let start = seats.specialized(SEAT_1)?;
@@ -2321,9 +2427,10 @@ impl<'a> Lowering<'a> {
                     .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
                 record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
                 // PX8-SPAN-PROV: trailing `span_origin` acquisition token.
-                let span_origin = self.lower_buffer_freeze_resource_seat(
+                let span_origin = self.lower_resource_token_seat(
                     builder,
                     seats.operand(SEAT_3)?.1,
+                    "BufferFreeze",
                     "span origin",
                 )?;
                 for (index, value) in [token, start, length, span_origin].into_iter().enumerate() {
@@ -2339,18 +2446,12 @@ impl<'a> Lowering<'a> {
                         "positioned resource operation carried a capability",
                     ));
                 }
-                let resource = |index: usize, name: &str| {
-                    let Some(Lowered::ResourceToken { value }) = seats
-                        .specialized(EffectSeatSlot::Argument(index as u32))
-                        .ok()
-                    else {
-                        return Err(unsupported(
-                            "Effect",
-                            format!("positioned {name} operand is not a resource"),
-                        ));
-                    };
-                    Ok(*value)
-                };
+                // `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` `D1`: these resource
+                // seats read through the SHARED guarded observation, because the
+                // widened (need, phase) key can now claim them in the carried
+                // phase. A specialized-only read here would leave the claim
+                // admitted and the read refusing -- the route would have moved
+                // the refusal rather than closed it.
                 let integer = |index: usize, name: &str| {
                     let Some(value @ Lowered::Int { .. }) = seats
                         .specialized(EffectSeatSlot::Argument(index as u32))
@@ -2363,10 +2464,20 @@ impl<'a> Lowering<'a> {
                     };
                     Ok(value)
                 };
-                let file = resource(0, "file")?;
+                let file = self.lower_resource_token_seat(
+                    builder,
+                    seats.operand(EffectSeatSlot::Argument(0))?.1,
+                    "positioned resource operation",
+                    "file",
+                )?;
                 let (file_offset, file_offset_valid) =
                     self.narrow_native_int_u64(builder, integer(1, "file offset")?)?;
-                let buffer = resource(2, "buffer")?;
+                let buffer = self.lower_resource_token_seat(
+                    builder,
+                    seats.operand(EffectSeatSlot::Argument(2))?.1,
+                    "positioned resource operation",
+                    "buffer",
+                )?;
                 let (buffer_start, buffer_start_valid) =
                     self.narrow_native_int_u64(builder, integer(3, "buffer start")?)?;
                 let (length, length_valid) =
@@ -2400,7 +2511,12 @@ impl<'a> Lowering<'a> {
                     // PX8-SPAN-PROV: `FsWriteAt` carries the trailing
                     // `span_origin` acquisition token; `FsReadAt` mints the span
                     // and has no origin operand.
-                    let span_origin = resource(5, "span origin")?;
+                    let span_origin = self.lower_resource_token_seat(
+                        builder,
+                        seats.operand(EffectSeatSlot::Argument(5))?.1,
+                        "positioned resource operation",
+                        "span origin",
+                    )?;
                     for (index, value) in
                         [file, buffer, file_offset, buffer_start, length, span_origin]
                             .into_iter()
