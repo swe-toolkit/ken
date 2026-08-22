@@ -5,7 +5,7 @@ status: draft
 owner: foundation
 size: S
 gate: none
-depends_on: [CAT-GCD]
+depends_on: [CAT-GCD, LANG-MODULE-IMPORT-SYSTEM]
 blocks: []
 github: null
 origin: "Operator directive 2026-08-22, after CAT-GCD merged (3283528c4): Gcd.ken.md redundantly reimplements generic Nat tools that already exist in the catalog, and is arranged bottom-up. This is a well-factoring / arrangement follow-up, not a soundness re-open — CAT-GCD stays closed. Steward-filed. Held until the foundation ring is reseated to pi (see reseat directive) so the standard's first application runs on the new seating."
