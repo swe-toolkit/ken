@@ -2897,6 +2897,23 @@ impl<'a> Lowering<'a> {
                     // them by name. That backstop is left byte-unweakened -- it
                     // is still the thing that stops a projection being emitted
                     // for a need it was not built for.
+                    // **SCOPE, with its witness named.** This projection closes
+                    // the carried SITE-OPERAND seat and nothing else. The next
+                    // layer behind it is the `BoundaryCarrier` refusal
+                    // *"a carried recursive hypothesis is an eliminated value,
+                    // not a callable, so it takes no arguments, but the call
+                    // provides N"*, whose witness in the cold-lowering
+                    // enumeration is `rt_allocate_stage`.
+                    //
+                    // That refusal is `reject_carried_residual_arguments`, and
+                    // it is OUT OF SCOPE here in the strong sense: it is an
+                    // arity property of an IH invocation against a carried
+                    // residual, decided before any invocation segment is
+                    // installed, and it does not become reachable or
+                    // unreachable by anything this projector does. Widening
+                    // this dispatch cannot close it and must not try -- the
+                    // witness is recorded so the next reader does not mistake a
+                    // still-red enumeration row for an unfinished projection.
                     let value = match record.need {
                         EffectSeatNeed::BytesPointerLength => {
                             let (pointer, len, outcome) =
