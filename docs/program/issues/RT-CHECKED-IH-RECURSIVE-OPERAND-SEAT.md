@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT
 title: "Seat the checked-IH recursive-position ENVIRONMENT operand on the ported (checked-IH) route so the static worker call arrives saturated -- the structural closure of section-1b entries 2+3 (Architect ruling evt_3tspjkw7dhh6x: CLOSURE A). The checked-IH marker is a bound, already-specialized computational IH -- a saturated NULLARY closure-style invocation -- so explicit template arity 0 is CORRECT and the recursive value is an environment operand at the plan's recursive_position, NOT an explicit application argument. In the ported-route lowering (consume_checked_ih_marker_at_static_worker_call and the worker-call emission it feeds), BEFORE the declared-arity gate at core.rs:14306, materialize the recursive-position operand from the resolved checked slot template and place it in the worker-call inputs, reading the SAME recursive_position authority and using the SAME seating discipline the composed route already uses (composed_recursive_argument_binding, or an equivalent reading that authority). Do NOT weaken or bypass the core.rs:14306 declared-arity gate, do NOT relax the marker-seam checks, do NOT change the marker's meaning, and do NOT relabel any count -- post-fix, supplied == worker.declared_arity must hold HONESTLY because the operand is now supplied. Producer, template, marker seam, and the join half stay untouched. Carries the terminal AC-REENUM gate for the checked-program family (shared with RT-IH-MARKER-PRODUCER-COMPLETE)."
-status: draft
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -13,37 +13,39 @@ origin: "Successor cut by the Steward from the AC-REENUM STOP (runtime-implement
 
 # WHAT THIS NODE IS
 
-> HELD + NAME IS A MISNOMER 2026-08-22 (Closure A WITHDRAWN; Architect
-> evt_hftfnn4mh8jk). The runtime-implementer's grounded refutation
-> (evt_6tzrt1xndpx1e, measured on `64019430c`) and the Architect's acceptance
-> WITHDREW the Closure-A operand-seat mechanism this node prescribes. The premise
-> both Closure A (seat as an explicit input) and Closure B (producer emits an
-> explicit operand) shared -- that the recursive value is a PLACEABLE value -- is
-> refuted: at the firing seam (`core.rs:12519`, direct descent) the recursive
-> operand is a LIVE nested-recursor StaticWorker (declared_arity 1, captures 9).
-> `LoweringOperand` has only `{ Specialized(Lowered), Carried(CarriedBoundaryWord) }`
-> and `worker.captures` is itself `Vec<LoweringOperand>`, so the live worker fits
-> NEITHER `inputs` NOR captures; the only conversion is a Lowered closure value,
-> which is exactly the closure-boundary crossing Ken forbids (the
-> `rt_write_writable_stage` refusal -- the BoundaryCarrier wall from the other
-> side). Nothing can be "seated as an operand", so this node's NAME and mechanism
-> are both refuted.
+> SUPERSEDED + CLOSED 2026-08-22 (never merged; mechanism and name both refuted).
+> Successor: [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]]. Steward scoping ruling
+> evt_5pmk273zg5paa, on the Architect's pre-committed conditional ruling
+> evt_2f4bbmt7qfde1 and the decisive ESCAPE measurement evt_79jd1nxamqd95.
 >
-> STATUS: `draft` (HELD) pending the reframed section-1a ruling -- the mechanism
-> below is refuted, so the node is reverted to draft until it is re-framed. HS=5
-> (Steward of record).
-> The Architect's LEADING, UNRULED hypothesis: env slot 0 (the IH itself) is a
-> lazy IH thunk (StaticWorker), and the checked-IH invocation is a nullary FORCE of
-> that thunk (Ken has a zero-input thunk at `core.rs:13128` and a bounded re-entry
-> path at `core.rs:4766 / 5020 / 1391`) -- not a declared_arity-1 raw-worker call,
-> so `worker.declared_arity` 1 is the wrong shape and the fix is UPSTREAM of the
-> gate (how the checked-IH callee is realized): the implementer's option (c) via
-> re-entry/force. Research is pulled on the reframed question (forced thunk vs
-> re-entry vs carried-word / fixpoint-self under CBV). On the reframed ruling this
-> node is re-framed or superseded -- the SEAM and possibly the OWNER may change.
-> Do NOT build the operand-seat mechanism below. The marker's nullary/arity-0
-> semantic, the producer fix (`64019430c`), and the join half (`6a45ae1a7`) all
-> STAND, untouched; both runner tables stay red; nothing lands.
+> Why it is closed rather than re-framed: the whole arc refuted this node twice
+> over. (1) Closure A WITHDRAWN (Architect evt_hftfnn4mh8jk) on the
+> runtime-implementer's grounded refutation (evt_6tzrt1xndpx1e, measured on
+> `64019430c`): the recursive value at the firing seam is a LIVE nested-recursor
+> StaticWorker, and `LoweringOperand` = `{ Specialized(Lowered),
+> Carried(CarriedBoundaryWord) }` with `worker.captures` itself
+> `Vec<LoweringOperand>` -- so the live worker fits NEITHER `inputs` NOR captures,
+> and the only conversion is the forbidden closure-boundary crossing. Nothing can
+> be "seated as an operand". (2) The reframed ruling then established the marker is
+> a NULLARY_FORCE (Ken's own elaborator concept, `compiler_driver.rs:1718-1743`):
+> template arity 0 means "realize the specialized IH function VALUE, unapplied,"
+> not "call with zero args." (3) The decisive ESCAPE measurement came back
+> ESCAPING: the realized IH value's immediate parent is a `Construct` on both
+> checked-family programs -- it is stored straight into a constructor field, so no
+> in-frame use-site specialization can apply. This is a CAPABILITY GAP (Ken has no
+> first-class functional-IH value), not an operand seat and not a seam fix.
+>
+> Disposition of the surrounding work: the marker's nullary_force semantic, the
+> producer fix (`64019430c`, closed Language deliverable), and the join half
+> (`6a45ae1a7`, APPROVED) all STAND. The co-land set lands WITHOUT the functional-IH
+> piece; the two checked-family programs are re-pointed to documented ADVANCING
+> REFUSALS (they now refuse at the correct deeper capability-gap point, not the
+> shallow marker seam). The terminal "green both checked-family programs" goal and
+> the AC-REENUM rerun move to the successor. HS=5 (Steward of record); the ESCAPING
+> outcome is a scoping decision, not a hard-stop increment.
+>
+> Everything below is the REFUTED Closure-A mechanism, retained only as the
+> reasoning record. Do NOT build it.
 
 Seat the checked-IH recursive-position ENVIRONMENT operand on the ported
 (checked-IH) route so the static worker call arrives saturated at the

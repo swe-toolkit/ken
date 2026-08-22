@@ -46,7 +46,7 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `48188cde6`.** Tree clean; `steward/work` == `origin/main`. Publisher
+**`main` = `aa40a2378`.** Tree clean; `steward/work` == `origin/main`. Publisher
 lane clear: orphans PR #2692 + #2768 both CLOSED (confirmed); integrator's
 befc2dc4/#365 watchdog ref answered as stale (July auto-merge tooling); zero open
 PRs. Watchdog is one convo agent-interval (1800s, server-side) — re-verify armed
@@ -59,10 +59,10 @@ verify+language (Z3 integration); lane 3 foundation (expressibility trial, the
 Architect-burden probe). Doc track concurrent, contention-free. Finished work
 still merges; framing an active lane is lane work.
 
-### Runtime (lane 1) — HS=5; Closure A WITHDRAWN, §1a hold on reframed question
+### Runtime (lane 1) — HS=5; ESCAPING measured, co-land RE-SCOPED to land without the functional-IH piece
 
 The NHC `cap41_*` chain, co-landing on `wp/RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`
-(thr_3j5ew8rhy35nh). Held on the branch (none affects `main`, still 48188cde6):
+(thr_3j5ew8rhy35nh). Held on the branch (none affects `main`, still aa40a2378):
 join half (`6a45ae1a7`, APPROVED, byte-identical), built projection + disposition,
 join reconcile, IH-marker producer fix (`64019430c`). Merged predecessors:
 RT-DEAD-ARM-EFFECT-LOWERING (`55c7f51de`), RT-RESOURCE-RELEASE-CARRIED-OBSERVE
@@ -107,28 +107,44 @@ RT-DEAD-ARM-EFFECT-LOWERING (`55c7f51de`), RT-RESOURCE-RELEASE-CARRIED-OBSERVE
   prohibition as BoundaryCarrier). NOT itself a mandatory 3/6/9 trigger; next
   mandatory re-trigger at 6, so a further hard stop on this design question fires
   it. Architect pulled research now on the merits (§1a floor).
-- REFRAMED §1a HOLD (research reframed advisory DELIVERED evt_5jp0npxf78erv;
-  Architect owes the reframed ruling). Leading
-  UNRULED hypothesis: env slot 0 (the IH) is a lazy IH thunk (StaticWorker) and
-  the checked-IH invocation is a nullary FORCE of that thunk (Ken has a zero-input
-  thunk `core.rs:13128` + bounded re-entry `core.rs:4766/5020/1391`), not a
-  declared_arity-1 raw-worker call — so `worker.declared_arity` 1 is the wrong
-  shape and the fix is UPSTREAM of the gate (how the checked-IH callee is
-  realized): the implementer's option (c) via re-entry/force. Reframed question to
-  research: under CBV, when the IH is itself a live nested recursor (thunk/closure,
-  not a value), how is it supplied at a nullary IH use — forced thunk vs re-entry
-  vs fixpoint/self / carried-word? "Prior art has nothing new; Ken-internal
-  choice" is a first-class answer (§1a step 4).
-- NODE HELD: RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT reverted to `status: draft`
-  (held) — its name and
-  operand-seat mechanism are refuted. On the reframed ruling it is re-framed or
-  superseded; the SEAM (`core.rs:12519`) and possibly the OWNER may change (a
-  thunk-force / worker-resolution fix may sit upstream, off Runtime). The terminal
-  AC-REENUM gate moves with the reframed successor. Producer fix (`64019430c`,
-  closed) + join half (`6a45ae1a7`, APPROVED) STAND untouched; both runner tables
-  stay red; NOTHING lands until the reframed ruling and AC-REENUM green, then
-  D-final closes NATIVE-HANDLE-CARRIER + PX8-F-CAP-41 Phase 2, then
-  RT-BACKEND-MODULE-SPLIT. No kernel/TCB.
+- REFRAMED RULING LANDED (Architect evt_2f4bbmt7qfde1, research advisory
+  evt_5jp0npxf78erv in hand). The marker is a NULLARY_FORCE — Ken's own
+  elaborator concept (`compiler_driver.rs:1718-1743` sets
+  `nullary_force = arguments.is_empty()`).
+  Template arity 0 means "realize the specialized IH function VALUE, unapplied," NOT
+  "call with zero args." For ITree.Vis the IH is `lambda response. rec (k response)`
+  — field k fixed, response still explicit. The measured arity-1 StaticWorker is the
+  applied BODY (compiler metadata, no runtime identity; `mod.rs:3578-3603`), not the
+  realized value. The fork was an ESCAPE discriminator (GHC let-no-escape); the
+  Architect handed runtime a decisive measurement (measure, not build).
+- ESCAPE MEASUREMENT: ESCAPING (runtime-implementer evt_79jd1nxamqd95, on
+  `64019430c`). The realized IH value's immediate parent is `Expression(Construct)`
+  on BOTH checked-family programs — stored straight into a constructor field. Two
+  marker populations: 12 fine `template=4/arity=1` (`source.rs:655`) and exactly one
+  failing `template=0/arity=0` nullary_force per program (`core.rs:11699`). The
+  non-escaping remedy is inapplicable here (no response arg, no in-frame application
+  site). Architect confirmed the mechanism half (evt_5wvex36s7nm6d).
+- STEWARD SCOPING RULING (evt_5pmk273zg5paa, on the Architect's pre-committed
+  conditional ruling). CAPABILITY-GAP branch: Ken has no first-class functional-IH
+  value. (1) The co-land set lands WITHOUT the functional-IH piece — join half
+  (`6a45ae1a7`, APPROVED) + producer fix (`64019430c`, closed) +
+  projection/disposition/join-reconcile + the re-point below. (2) AUTHORIZED: both
+  checked-family runner tables re-point to documented ADVANCING-REFUSAL pins (they
+  refuse at the correct deeper capability-gap point now), so the candidate is green
+  with the refusal encoded. On its green, D-final closes NATIVE-HANDLE-CARRIER +
+  PX8-F-CAP-41 Phase 2, then RT-BACKEND-MODULE-SPLIT. Runtime-leader assembles the
+  candidate (approvals live on exact SHAs, green on cut + main, §8a) and routes the
+  git_request to me. (3) New deliverable cut:
+  [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]] (draft/deferred, owner runtime, T1,
+  size L) — carries a design D0 the Architect rules before build (materialized
+  closure value vs defunctionalized carried tag) and the terminal AC-REENUM. (4)
+  RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT is CLOSED (superseded). HS stays 5 (ESCAPING
+  is a scoping decision, not an increment; next mandatory at 6). No kernel/TCB.
+- OPERATOR SURFACE (not blocking): a new large functional-IH-representation
+  deliverable now exists (`RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`, deferred). Its
+  sequencing into a lane is a priority call. Nothing in the co-land, the NHC close,
+  or the module-split pivot waits on it; the two checked-family programs are a
+  documented advancing refusal until it lands.
 
 ### Verify + language (lane 2) — Z3 integration; V3-FO D0 RESOLVED = arm (a), no TCB
 
@@ -177,6 +193,19 @@ if the Architect's layer-3 ruling or a future D0 rules in an operator-gated arm.
 
 ### Session log / escalations of record
 
+- ESCAPING resolved + co-land re-scoped (`thr_3j5ew8rhy35nh`, 2026-08-22): the
+  reframed ruling (Architect evt_2f4bbmt7qfde1) established the marker as a
+  NULLARY_FORCE and made the fork an ESCAPE discriminator; the decisive measurement
+  (runtime-implementer evt_79jd1nxamqd95) came back ESCAPING (realized IH value's
+  parent is a Construct on both programs). Steward scoping ruling
+  (evt_5pmk273zg5paa): capability-gap branch — co-land lands WITHOUT the
+  functional-IH piece; both runner tables re-point to documented advancing-refusal
+  pins; new deliverable RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION cut (draft/deferred,
+  owner runtime, design D0 = materialized closure vs defunctionalized carried tag,
+  Architect rules before build); RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT CLOSED
+  (superseded). HS stays 5 (scoping decision, not an increment). Runtime-leader owes
+  the assembled candidate + git_request to me. Operator surface: sequencing of the
+  new representation deliverable is a priority call (nothing waits on it).
 - HS=5 §1a arc (RT-FSREADAT IH-operand-placeability, `thr_3j5ew8rhy35nh`,
   2026-08-22): the runtime-implementer built to the ruled Closure A, hit two
   structural obstacles and REFUTED it (evt_6tzrt1xndpx1e, measured on 64019430c) —
