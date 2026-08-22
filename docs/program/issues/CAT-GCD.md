@@ -1,7 +1,7 @@
 ---
 id: CAT-GCD
 title: "Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe"
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none
