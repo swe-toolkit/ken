@@ -1,7 +1,7 @@
 ---
 id: KERNEL-SCT-TELESCOPE-CANON
 title: "The SCT gate derives each group member's arity by counting leading Lam binders in the elaborated body (count_params, sct.rs:623), so once the c-elab result-refinement transport wraps a mutual-recursion body the leading-Lam count diverges from the declared arity, skip_lams skips the wrong number, the size-change matrices are mis-dimensioned, and a terminating transport-carrying clique wrongly reds NotTerminating -- repair the arity to the DECLARED Pi telescope (route A, telescope-canonicalization) with admit==analyze on the same eta-long body, the SCT-pass enabler LANG-INDEXED full admission and V3-FO-CHECKER-SOUNDNESS D3 are blocked on"
-status: closed
+status: merged
 owner: kernel
 size: M
 gate: operator
@@ -11,7 +11,7 @@ github: null
 origin: "Steward, 2026-08-22, on the operator's authorization (\"tcb change authorized. proceed.\") of the route-A kernel SCT successor that LANG-INDEXED-RECURSIVE-IH-DISCHARGE and V3-FO-CHECKER-SOUNDNESS D3 name as their SCT-pass gate. The c-elab result-refinement transport landed (LANG-INDEXED accepted partial, squash 93d82a398): the narrowed AC-7 -- held-D3 bodies ELABORATE + pass kernel_check -- is met, but FULL admission is kernel_check AND SCT-pass, and the transport-carrying mutual-recursion clique reds the SCT gate. Route A (SCT arity from the declared Pi telescope, not the deep-lambda body heuristic) was specified in-thread by the Architect + research and is captured durably at D0 (an in-thread ruling is not a durable deliverable). TCB change: it modifies the trusted size-change termination gate (crates/ken-kernel/src/sct.rs). gate: operator, and the operator's authorization above satisfies it. Steward-filed per COORDINATION section 2. Estimated capability tier: T1 (soundness-bearing termination-gate change; the arity widening must not admit a nonterminating recursion -- the negative control below is mandatory)."
 ---
 
-# CLOSED -- 2026-08-22. Merged `ea9e5c14f` (candidate `bd0ac4c5`).
+# MERGED -- 2026-08-22. `ea9e5c14f` (candidate `bd0ac4c5`).
 
 D1 delivered: route-A arity fix (`27a84fcc`) + synthetic arity-isolation
 consumer (`bd0ac4c5`), three kernel paths (+259/-29). Gates: Kernel QA APPROVE

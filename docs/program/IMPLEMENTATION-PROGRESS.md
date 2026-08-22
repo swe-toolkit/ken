@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 09:07:42Z — from 410 issue file(s) in `docs/program/issues/`.
+2026-08-22 09:11:50Z — from 410 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -128,7 +128,7 @@ the committed file matches the generator's output.
 | `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | active | kernel | L | none | — |
 | `KERNEL-RECURSIVE-RESULT-SURFACE` | A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible | merged | spec-enclave | M | none | — |
 | `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` | The recursor's iota-rule forces an induction hypothesis for every recursive argument eagerly, so a non-recursive match on a recursive inductive does not reduce at an abstract recursive field -- repair iota_reduct to skip an IH whose method binder does not occur, the reduction-time enabler V3-FO-CHECKER-SOUNDNESS D3 is blocked on | merged | kernel | M | operator | — |
-| `KERNEL-SCT-TELESCOPE-CANON` | The SCT gate derives each group member's arity by counting leading Lam binders in the elaborated body (count_params, sct.rs:623), so once the c-elab result-refinement transport wraps a mutual-recursion body the leading-Lam count diverges from the declared arity, skip_lams skips the wrong number, the size-change matrices are mis-dimensioned, and a terminating transport-carrying clique wrongly reds NotTerminating -- repair the arity to the DECLARED Pi telescope (route A, telescope-canonicalization) with admit==analyze on the same eta-long body, the SCT-pass enabler LANG-INDEXED full admission and V3-FO-CHECKER-SOUNDNESS D3 are blocked on | closed | kernel | M | operator | — |
+| `KERNEL-SCT-TELESCOPE-CANON` | The SCT gate derives each group member's arity by counting leading Lam binders in the elaborated body (count_params, sct.rs:623), so once the c-elab result-refinement transport wraps a mutual-recursion body the leading-Lam count diverges from the declared arity, skip_lams skips the wrong number, the size-change matrices are mis-dimensioned, and a terminating transport-carrying clique wrongly reds NotTerminating -- repair the arity to the DECLARED Pi telescope (route A, telescope-canonicalization) with admit==analyze on the same eta-long body, the SCT-pass enabler LANG-INDEXED full admission and V3-FO-CHECKER-SOUNDNESS D3 are blocked on | merged | kernel | M | operator | — |
 | `KERNEL-SUBST-OUTER-INDEX-SCOPE` | Rule whether kernel subst_outer should bound its parameter index -- it panics on an out-of-range params[p_idx] and is defended only by a reachability argument enumerating one of its 29 call sites | draft | spec-enclave | S | none | — |
 | `KW-ORACLE-CLOSURE` | close the KW-THEOREM source oracle structurally — the occurrence sweep is never applied, and the file population is a five-arm hand enumeration | merged | language | S | none | 986 |
 | `KW-ORACLE-REMOVE` | Delete the whole-tree source-text oracle: it asserts facts about repository text, which is now a prohibited test subject | merged | language | S | none | 1035 |
@@ -532,7 +532,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **operator**: `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` (merged) `KERNEL-SCT-TELESCOPE-CANON` (closed) `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` (draft) `LANG-FOREIGN-NAME-FORMAT-CHARS` (draft)
+- **operator**: `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` (merged) `KERNEL-SCT-TELESCOPE-CANON` (merged) `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` (draft) `LANG-FOREIGN-NAME-FORMAT-CHARS` (draft)
 
 ## Archive & diary
 
