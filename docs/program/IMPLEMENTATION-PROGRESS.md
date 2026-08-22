@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 10:49:32Z — from 412 issue file(s) in `docs/program/issues/`.
+2026-08-22 11:10:44Z — from 413 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -247,6 +247,7 @@ the committed file matches the generator's output.
 | `RT-CHECKED-IH-REALIZATION-AUTHORITY` | Mint the checked-IH realization authority -- pending marker, oriented plan, call template, slot and parent -- so the ComputationalRecursorClosure capsule is realizable IN PLACE at the source-machine Match seat, without widening the ordinary-Match selector and without any terminal-All licensing | ready | runtime | M | none | — |
 | `RT-CLOSURE-BOUNDARY-LANE` | Admit the source-authored closure crossing on clause 2's liveness-and-domain predicate, routed through B2F's cross-owner carrier -- attempt the repair, and measure only if it fails | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2322 |
 | `RT-CLOSURE-CROSSING-ELIMINATE` | Eliminate the closure crossing instead of admitting it: carry the captured environment as an already-admitted Record and dispatch statically to the known body, so no Closure value ever reaches the boundary | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2327 |
+| `RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION` | Bound the COMPLETE remaining downstream-refusal set for the SECOND cold-lowering witness family -- the checked-program source the four cap41_* terminal pins share -- in ONE exhaustive pass, with the same discipline RT-COLD-LOWERING-PATH-ENUMERATION applied to RT_PARITY_SOURCE. That first enumeration found FIVE mechanisms over rt_parity but the OrientedSubcontinuationPlanV1 IH-marker refusal has ZERO entries there; it provably lives in THIS family, which is on RT-FSREADAT's own AC-4/AC-5 critical path and was never enumerated. Sequencing successors off the first report alone would OMIT a real, already-identified refusal and rediscover it serially -- the exact failure the enumeration exists to end -- so the complete successor set requires enumerating this family end-to-end too (collect ALL, do not stop at the IH-marker; a second population may hide a 6th mechanism exactly as the first hid three). Validators untouched -- this measures and covers, it does not fix. (Architect binding finding evt_4ag90qfacmgwy on AC-3 report evt_1m6eg23vnbj4n; ruling point 4 evt_r3tt1gpv4tkn.) | active | runtime | S | none | — |
 | `RT-COLD-LOWERING-PATH-ENUMERATION` | Bound the COMPLETE remaining downstream-refusal set for the cold cap41_*/rt_parity backend-lowering path in ONE pass -- clearing the effect-seat layer (RT-FSREADAT projection) and the join-consumption layer (RT-DEAD-ARM-JOIN-DISPOSITION) exposed TWO disjoint fail-closed refusals at once (materialized-dead join StaticOriginId(288) reconciliation; OrientedSubcontinuationPlanV1 IH-marker completeness), and the path has never been driven end-to-end so its true depth is unknown -- by bounded-EXHAUSTIVE enumeration of the plan authority's constructors run through the FULL lowering+validation pipeline, reporting the complete remaining refusal set (the input that sequences the per-gap successors) and landing the durable production coverage test whose ABSENCE is why these invariants surface serially (Architect layer-3 ruling evt_r3tt1gpv4tkn point 4; research advisory evt_5f0rzjghjhmy9). Validators untouched -- this measures and covers, it does not fix. | active | runtime | M | none | — |
 | `RT-COMPMATCH-TREE-SCRUTINEE` | ComputationalMatch refuses a tree-producing scrutinee that is not Bool or a constructor (rt_span_prov) | draft | runtime | TBD | none | — |
 | `RT-CONSUMER-CARRY-CONTROL-DEBT` | five carries on the consumer-descent-carry merge: two new planner refusals are unreachable in production because the interned target is not an independent authority, two of four equality assertions are vacuous, the lag law is NOT uniform and its depth-1 boundary is asserted nowhere, the primary Source branch is unexercised and sits one level off from the fallback, and the D8a twin clones where the real descent advances | merged | runtime | S | none | — |
@@ -520,6 +521,8 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
+- `RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION` blocked by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` (status: active)
+- `RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION` blocked by `RT-DEAD-ARM-JOIN-DISPOSITION` (status: active)
 - `RT-COLD-LOWERING-PATH-ENUMERATION` blocked by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` (status: active)
 - `RT-COLD-LOWERING-PATH-ENUMERATION` blocked by `RT-DEAD-ARM-JOIN-DISPOSITION` (status: active)
 - `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` blocked by `RT-EXACTINT-CARRIED-OBSERVE` (status: active)
