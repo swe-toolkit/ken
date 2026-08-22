@@ -1,7 +1,7 @@
 ---
 id: NATIVE-HANDLE-CARRIER
 title: "Native build-pipeline completeness — a constructor-private resource-carrying handle fails checked-core body-view lowering (MissingClosureMetadata) when it crosses the higher-order withBuffer normalization boundary"
-status: active
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,13 +11,67 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-# CURRENT STATE — 2026-08-18, 02:10 UTC
+# CURRENT STATE — 2026-08-22
 
-**Read this section only. Everything below it is reverse-chronological history,
-and the top three banners are superseded on their central claims.** Fifteen
-stacked banners is what the operator meant by *"disorganized and doesn't fit a
-human reading model"*; this section is the fix, and the history stays because it
-carries measurements nothing else records.
+**Read this section only. Everything below it — including the 2026-08-18
+"CURRENT STATE" block, now demoted — is superseded history retained for the
+measurements it records.**
+
+**All seven dependencies are merged.** The two that gated every remaining
+deliverable are the last to land, and both are verified `merged` in the tree:
+[[RT-RECURSIVE-POSITION-ARM-ARITY]] and [[RT-BRANCH-LOCAL-DECLARED-CALLABLE]] —
+the branch-local declared-callable routing that eliminates the closure crossing
+the Architect ruled in scope (`evt_7aeb7hqrykgpz`). The downstream blocker that
+`D0'`/`D0''` measured and cut **no longer exists.**
+
+**Why this reopens the deciding measurement.** Every run of the four `cap41_*`
+rows on record — `D0'` and `D0''` at `86049d660`, the base differentials at
+`7b8dad7df` — predates `RT-BRANCH-LOCAL-DECLARED-CALLABLE`. They each measured a
+tree that still carried the blocker. **No run exists against a tree that carries
+all the fixes**, so the measurement that decides whether this node is finished
+or still gapped must be taken again, on current `main` (`965ef4819`).
+
+## `D-final` — re-run the four `cap41_*` rows + the `AC-5` row on current main
+
+**Restore the four `cap41_*` Rust rows and the `AC-5` row and run them against
+current `main`. Report per row: pass or fail, and on any fail the exact refusal
+string plus its call site. Nothing else — do not repair toward green.**
+
+Recover the four rows from `4c9c59d3e`,
+`crates/ken-cli/tests/rt_parity_native.rs`: the `#[test]` rows at `:620`,
+`:627`, `:634`, `:641` and their exclusive helper
+`assert_cap41_derived_without_read` at `:593`. Run the `AC-5` row
+`fs_read_at_malformed_offset_narrows_to_invalid_offset`
+(`rt_parity_native.rs:687`) `--ignored`. This is four test functions plus one
+helper added to a file you already have — not a cherry-pick, not a rebase, not a
+re-derivation. **Two standing fences hold:** do not revert `4c9c59d3e` (it also
+modified 7 existing lines), and do not touch the Ken decls `rt_body_ok` /
+`rt_cap41_expect_eof` (each has a live reference that is not one of the four
+rows).
+
+**A red result is a successful deliverable.** The deliverable is the
+measurement, not a green fixture. If the rows still refuse, that is a new
+blocker to measure and cut — exactly as `RT-RECURSIVE-POSITION-ARM-ARITY` and
+`RT-BRANCH-LOCAL-DECLARED-CALLABLE` were — not a failure of the turn. Do not
+enter `D3`/`D4`/`D5` and do not commit the restoration to `main`: adding failing
+tests to `main` stays barred, and the restoration is a measurement fixture, not
+a merge candidate.
+
+## Disposition — forks on the measurement, not before it
+
+| result | means | next |
+|---|---|---|
+| all four rows green and `AC-5` green | native lowering completes across the `withBuffer` boundary; the carrier is done | **fold** the fix with the preserved elaborator slice `preserved/native-handle-carrier-c07e63c2` and fixture `preserved/px8-f-cap-41-p2-buffer-handle-f0eb65ce`, run the Architect's six-axis oracle (deep history below, axes (a)-(f)), then **close NATIVE-HANDLE-CARRIER and [[PX8-F-CAP-41]] Phase 2** |
+| any row still refuses | a downstream blocker survives the landed fixes | report the refusal string and its static call site, hand back for a cut; this node stays gated behind the new successor |
+
+**This node stays `owner: runtime`, `size: M`, `gate: none`.** The immediate
+turn — restore and run — is small and mechanical (capability tier T2); the
+fold-and-oracle close path, taken only if the rows green, is the M-sized half.
+
+# SUPERSEDED (was CURRENT STATE) — 2026-08-18, 02:10 UTC
+
+**Superseded by the 2026-08-22 section above.** Everything below it is
+reverse-chronological history that carries measurements nothing else records.
 
 **What this node is:** a constructor-private resource-carrying handle fails
 native lowering when it crosses the higher-order `withBuffer` normalization
