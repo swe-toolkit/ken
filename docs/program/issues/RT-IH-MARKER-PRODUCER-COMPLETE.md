@@ -2,7 +2,7 @@
 id: RT-IH-MARKER-PRODUCER-COMPLETE
 title: "Resolve the OrientedSubcontinuationPlanV1 'computational IH invocation marker does not wrap a complete application' refusal on the checked-program family (both programs, the terminal of the four cap41_* pins, on RT-FSREADAT's AC-4/AC-5 critical path) by CORRECTING THE PRODUCER, never the validator: diagnose which producer step made the plan and the marked expression disagree about completeness, then resolve to ONE of the two lawful non-interchangeable representations -- (i) it IS complete => fix the producer so plan and marker agree on a full Call of the checked arity, or (ii) it is genuinely partial => the distinct closure/PAP form with its own later apply. NEVER pad the call, infer missing arguments at emission, or reinterpret a full-call node as partial. The completeness checker stays byte-untouched (GHC join-point / Lean IR-checker / typed-CPS precedent, all fail-closed). Carries a MANDATORY post-fix re-enumeration gate: this family is depth-1 and cannot self-bound, so after the fix lands, re-run the existing checked-family enumeration end-to-end and read what surfaces."
 status: active
-owner: runtime
+owner: language
 size: M
 gate: none
 depends_on: [RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION]
@@ -12,6 +12,27 @@ origin: "Bounded successor cut by the Steward from the two enumeration reports (
 ---
 
 # WHAT THIS NODE IS
+
+> RE-SCOPED + RE-OWNED 2026-08-22 (Architect shape ruling evt_7rsy01s7k1d7x;
+> Steward ownership finalization). The shape is PRODUCER-SIDE, case (i) genuinely
+> complete but mis-spelled: at arity 0 the producer emits bare `RuntimeExpr::Var(0)`
+> (the un-applied IH), where the marker's contract is an application node and a
+> complete arity-0 invocation is `Call{ func, args: [] }` -- which the consumer
+> `enter_checked_computational_ih_invocation` ALREADY accepts (0 == 0). The fix is
+> in `ken-elaborator/src/erasure.rs` (sites 2327 / 2863 / 3302) -- Language's crate
+> -- so OWNER is now `language`. The id keeps its RT- prefix only to preserve the
+> [[RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL]] / [[RT-MATERIALIZED-DEAD-JOIN-RECONCILE]]
+> / enumeration links; the body is authoritative on ownership. Do NOT relax the
+> consumer (the Steward's arity-0-admitted counter was attributed to the wrong
+> mechanism -- that admission is BoundaryCarrier's carried-word at core.rs:3758,
+> a different subsystem, not the checked-IH marker; relaxing the unconditional-Call
+> demand would silently admit a bare-Var mis-emission that the demand refuses
+> fail-closed, stepping back toward the pre-D5a "wraps anything" hole). The RUNTIME
+> side narrows to VERIFICATION only: confirm the consumer stays byte-untouched and
+> accepts the emitted `Call{args:[]}`, the terminal pins advance/green, then run
+> AC-REENUM. Producer fix authored by the Language seat on the co-land branch
+> `wp/RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`; Runtime authors no ken-elaborator
+> edit. Architect required reviewer on both halves; Adversary hunts. HS stays 3.
 
 Resolve the `OrientedSubcontinuationPlanV1` "computational IH invocation marker
 does not wrap a complete application" refusal -- the checked-program family's
