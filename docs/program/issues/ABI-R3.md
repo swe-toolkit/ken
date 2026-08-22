@@ -1,7 +1,7 @@
 ---
 id: ABI-R3
 title: "generated operation inventory derived from catalog structure — a new operation must be a build break"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none

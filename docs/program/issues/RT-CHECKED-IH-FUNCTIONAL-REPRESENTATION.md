@@ -5,11 +5,35 @@ status: draft
 owner: runtime
 size: L
 gate: none
-depends_on: [RT-IH-MARKER-PRODUCER-COMPLETE]
-blocks: []
+depends_on: [RT-IH-MARKER-PRODUCER-COMPLETE, RT-NATIVE-TRACK0-REARM]
+blocks: [RT-CARRIED-IH-DISPATCH-SITEOP, RT-CLOSURE-BOUNDARY-RESIDUAL]
 github: null
 origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect's pre-committed conditional ruling (evt_2f4bbmt7qfde1) after the decisive ESCAPE measurement (runtime-implementer evt_79jd1nxamqd95) returned ESCAPING. Supersedes RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT (closed; both its Closure-A operand-seat mechanism and its NULLARY_FORCE re-reading were refuted -- the realized IH value escapes into a constructor, a capability gap, not a seam fix). HS=5 (Steward of record); ESCAPING is a scoping decision, not a hard-stop increment. Steward-filed per COORDINATION section 2."
 ---
+
+> # D0 RULED 2026-08-22 — DEFUNCTIONALIZE; re-homed as Track-1 of [[RT-NATIVE-CARRIED-VALUE]]
+>
+> The Architect ruled the D0 this node carried (materialized closure value vs
+> defunctionalized carried tag) in the native-program frame (evt_9kat78d438cb):
+> DEFUNCTIONALIZE — code id + env Record + finite static apply dispatcher. This
+> is not a new invention; [[RT-CLOSURE-CROSSING-ELIMINATE]] (merged PR #2327)
+> proved it for the source-authored closure population, and
+> `spec/40-runtime/41-values.md:76-118` sanctions live-domain closure exchange,
+> constraining only the durable lane.
+>
+> The one open discriminator the build must confirm: are ALL apply sites of a
+> stored/escaped checked IH statically enumerable from the checked plan? Yes ->
+> the defunctionalized carried tag is sound. A genuinely non-enumerable apply
+> site is a NEW fork (materialization) that returns to the enclave + Architect,
+> never a silent widen. Architect's lean, corroborated by the merged
+> source-authored case: enumerability holds.
+>
+> This is the M6 seat (calls.rs:222, escaping functional IH as
+> StaticWorkerBinding — the representation itself) and the Track-1 D0. It now
+> follows Track 0 ([[RT-NATIVE-TRACK0-REARM]]) and gates the consumers M3
+> ([[RT-CARRIED-IH-DISPATCH-SITEOP]]) and M4 ([[RT-CLOSURE-BOUNDARY-RESIDUAL]]).
+> No longer deferred — it is the runtime lane-1 Track-1 crux. Needs a build frame
+> before release. HS 5.
 
 # WHAT THIS NODE IS
 
