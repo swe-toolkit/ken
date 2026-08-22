@@ -254,6 +254,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     EffectSeatSlot, PlannedEffectSeat,
     AggregateOccurrenceId, PlannedAggregateAllocation, PlannedAggregateShape,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
+    dead_arm_effect_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
     verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,

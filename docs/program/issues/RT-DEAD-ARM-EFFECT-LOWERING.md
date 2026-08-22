@@ -217,6 +217,31 @@ Keep the failing control failing until the predicate is right; do not edit it.
   D1+D2) already cleared -- that string appears zero times in the D-final run.
   Correct it when this node touches that row.
 
+# SYMPTOM INVENTORY (Architect section 1b)
+
+**Entry 1** (`evt_4hcny7ae7h9sb`, measured by the runtime-implementer at
+`b61923254`): *deadness oracle (whole-program syntactic construction census)
+unsound in the LIVE direction: a host-synthesized constructor
+(`Result::Ok` effect response) reads as never-constructed and is wrongly proven
+dead* -- **keyed on:** the census sees only program-syntax origins, not
+runtime/host value production.
+
+Disposition: closed by the corrected two-conjunct predicate. Conjunct (2)
+unions in the runtime's own constructor vocabulary
+(`NativeProcessSymbols`, destructured exhaustively so a new origin is a compile
+error). The witness control
+(`an_incomplete_duplicate_discarded_or_misobserved_visit_rejects`) passes again
+**without being edited**, which is what makes the correction a repair rather
+than an accommodation.
+
+**Entry 2** (measured, same node): *a dead-arm control is vacuous unless the arm
+is genuinely LOWERED; with a scrutinee lowering can resolve statically, the
+unselected arm is folded and its effect is never visited* -- **keyed on:**
+instrumenting `lower_process_host_effect` showed the refusing operation absent
+from the lowered set entirely, so both rows of the pair compiled for the same
+trivial reason. Closed by routing the request through a called closure, which
+forces the runtime tag dispatch.
+
 # EXPLICITLY NOT IN SCOPE
 
 - **Route (A)** -- the carried-observation route + runtime tag-namespace

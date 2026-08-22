@@ -385,6 +385,18 @@ impl<'src> Planner<'src> {
                     self.intern_trap(&trap)?;
                 }
             }
+            // `RT-DEAD-ARM-EFFECT-LOWERING` `D1`: every effect occurrence gets
+            // its dead-arm trap interned here, unconditionally. Deadness is a
+            // LOWERING-time verdict, so the planner cannot know which effects
+            // will need one -- and an identity minted only for the effects some
+            // earlier pass guessed at would fail exactly on the occurrence that
+            // turned out to need it. An interned trap nothing emits is lawful;
+            // the catalog authorizes, it does not oblige.
+            RuntimeExpr::Effect {
+                family, operation, ..
+            } => {
+                self.intern_trap(&super::joins_traps::dead_arm_effect_trap(family, *operation))?;
+            }
             _ => {}
         }
         let seed =
