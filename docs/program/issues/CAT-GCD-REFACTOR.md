@@ -1,7 +1,7 @@
 ---
 id: CAT-GCD-REFACTOR
 title: "Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last)"
-status: active
+status: draft
 owner: foundation
 size: S
 gate: none
@@ -10,6 +10,26 @@ blocks: []
 github: null
 origin: "Operator directive 2026-08-22, after CAT-GCD merged (3283528c4): Gcd.ken.md redundantly reimplements generic Nat tools that already exist in the catalog, and is arranged bottom-up. This is a well-factoring / arrangement follow-up, not a soundness re-open — CAT-GCD stays closed. Steward-filed. Held until the foundation ring is reseated to pi (see reseat directive) so the standard's first application runs on the new seating."
 ---
+
+> # HELD — FRAME PREMISE FALSIFIED, reframe owed (Steward, 2026-08-22)
+>
+> Released to the reseated pi foundation ring and immediately hard-stopped by the
+> foundation-leader (evt_4qy0b6p16vg5b): the import-surface premise is FALSE.
+> `add`/`mul` (Arithmetic) and `leq_nat`/`sub` (Order) are plain non-`pub` `fn`s,
+> not importable public exports, and `Arithmetic.ken.md` does not even elaborate
+> standalone (`UnresolvedCon { name: "cong" }`). Selective import cannot reach
+> them, so this WP is not executable as framed. The Steward inherited the
+> importable-public-export premise without verifying it.
+>
+> This is not a one-node defect: it means the catalog reuse standard's core
+> mechanism (import canonical tools instead of reimplementing) has an unmet
+> PREREQUISITE — the canonical modules must load standalone AND export their tools
+> as `pub` before any package can reuse them. Foundation correctly HOLDS and does
+> NOT expand this Gcd-only WP into dependency-package/public-export repairs. Owner
+> of the reframe/replace: Steward, with an Architect design ruling on the reuse
+> mechanism and an operator scope call (see the second-lane / catalog-reusability
+> campaign question). Flipped active -> draft to reflect the hold. Do not release
+> until the reuse prerequisite is resolved and this frame is rewritten.
 
 ## Objective
 
