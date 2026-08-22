@@ -351,7 +351,7 @@ fn assert_write_trace(result: &RunResult, expected_exit: i32, expected: &[Expect
 // is in ken-verify, not ken-cli -- CI runs it as its own -p ken-verify job.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-CLOSURE-BOUNDARY-LANE: lowering refuses with \"Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane\". MEASURED 2026-08-22 on this row. The RT-CARRIED-RESOURCE-SCALAR blocker this row used to name IS retired, but closing it moved the row to this refusal rather than greening it."]
+#[ignore = "RT-CLOSURE-BOUNDARY-RESIDUAL: lowering refuses with \"Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane\" (boundary.rs:1044). MEASURED 2026-08-22 on this row. The origin seam RT-CLOSURE-BOUNDARY-LANE is RESOLVED, and so is the RT-CARRIED-RESOURCE-SCALAR blocker this row used to name -- closing them moved the row to this residual population rather than greening it."]
 fn checked_write_all_reaches_full_short_zero_progress_flip_and_error_prefixes() {
     std::thread::Builder::new()
         .name("px8f-write-partition".to_string())
