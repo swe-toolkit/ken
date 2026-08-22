@@ -216,6 +216,31 @@ team's space mentioning the implementer; approval → the merge Decision /
 work-thread route so publisher-path handling can proceed once CI is green. An
 unmirrored review is a silent stall.
 
+## 2a. Catalog WPs — factoring and arrangement are review criteria
+
+For a `catalog/packages/` WP your post-implementation review carries two extra
+standing criteria the general soundness pass does not cover. Both are the
+operator's, 2026-08-22, after CAT-GCD shipped `Gcd.ken.md` reimplementing Nat
+`add`/`mul` (already in `Data/Numeric/Nat/Arithmetic`) and `leq_nat`/`sub`
+(already in `Data/Numeric/Nat/Order`) — sound, so every soundness gate and the
+Adversary passed it, but redundant. Soundness does not check factoring or
+arrangement; you and foundation-qa do.
+
+- **Reject redundant reimplementation of a shared-module component.** A package
+  contains only what is specific to it; a generic tool that already exists in a
+  catalog module is imported, not re-defined. Block a local definition that
+  duplicates (or shadows) a public export of an existing module, naming the
+  canonical module + symbol to import from. The conformance-validator owns the
+  mechanical form of this rule (`ken-conformance-validator`, "Catalog
+  implementation standard") and foundation-qa runs the name-shadow scan; **your
+  review is the design backstop for what a grep cannot see** — a re-derivation
+  that is spelled differently but is the same tool.
+- **Require top-down arrangement — the lede first.** Definitions may appear in
+  any order, so a module leads with what it provides (its headline export, e.g.
+  `divides_gcd`) and descends into the more fundamental pieces it is built from,
+  most-fundamental last. The first thing a human reader sees is the module's
+  purpose, not its plumbing. Block a module arranged bottom-up.
+
 ## 3. Self-compact: checkpoint-and-seam
 
 You are a singleton: unlike a build team you get **no compact seam from the WP

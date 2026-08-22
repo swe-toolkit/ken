@@ -81,6 +81,29 @@ load and follow it after this generic archetype.
    terms / dependent telescopes, eliminator methods that **use** the IH (not
    discard it via β). A green suite that only explores single-variable/closed
    instances is **Blocked**, not Approved (COORDINATION §7).
+## Catalog WPs — factoring and arrangement (the foundation-qa mechanical gate)
+
+On a `catalog/packages/` WP you run two extra mechanical checks the
+conformance-validator owns as the **catalog implementation standard**
+(`ken-conformance-validator`, "Catalog implementation standard"); soundness gates
+do not cover them. Operator, 2026-08-22, after CAT-GCD's `Gcd.ken.md`
+reimplemented Nat `add`/`mul`/`leq_nat`/`sub` already exported by
+`Data/Numeric/Nat/{Arithmetic,Order}`.
+
+- **Reuse, not reimplement.** Flag any local definition whose name matches a
+  public export of an existing catalog module — a name-shadow scan over the
+  catalog's public surface. A hit blocks: the author imports the canonical symbol
+  instead. Over-approximate by design (a same-named-but-genuinely-distinct
+  definition is a one-line clear); the Architect's design review backstops the
+  dual — a duplicate under a different name.
+- **Top-down arrangement.** The module's headline export (the one the package is
+  named for) appears before the low-level helpers it is built from; a module
+  arranged bottom-up blocks. The lede is what the module provides, not its
+  plumbing.
+
+Run both before you cast a catalog verdict; a redundant or bottom-up module is
+Blocked, not Approved.
+
 ## Does the suite reach the real subject?
 
 - **For an elaborator / translator / codegen, assert the *emitted output*, not

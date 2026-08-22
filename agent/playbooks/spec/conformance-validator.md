@@ -321,6 +321,42 @@ implementations across the whole federation. Read `../../COORDINATION.md`,
 The conformance corpus is the contract the entire build fleet codes against —
 its correctness is the highest-leverage thing in the project.
 
+## Catalog implementation standard (mechanically checkable; foundation-qa enforces)
+
+Beyond the conformance corpus you also own the **catalog implementation
+standard** — the rules a `catalog/packages/` entry must meet to be well-formed,
+written so **foundation-qa can check them mechanically** without judgment.
+Operator, 2026-08-22, after CAT-GCD's `Gcd.ken.md` reimplemented Nat `add`/`mul`
+(already in `Data/Numeric/Nat/Arithmetic`) and `leq_nat`/`sub` (already in
+`Data/Numeric/Nat/Order`): sound, so the verified-catalog-entry oracle and the
+Adversary passed it, but redundant. **Soundness gates do not check factoring or
+arrangement — this standard does.**
+
+Two rules, both mechanical:
+
+- **Reuse, do not reimplement.** A package holds only what is specific to it;
+  every generic tool it needs that a catalog module already exports is imported,
+  not re-defined. **The foundation-qa check:** flag any local definition whose
+  name matches a public export of an existing catalog module (a name-shadow scan
+  over the catalog's public surface). A hit blocks with the canonical module +
+  symbol; the author imports instead. It is **over-approximate by design** — a
+  same-named-but-genuinely-distinct definition is a false positive the author
+  clears in one line; the Architect's design review is the backstop for the dual
+  miss, a duplicate spelled under a different name.
+- **Top-down arrangement.** A module leads with what it provides (its headline
+  export, the one the package is named for) and descends to the more fundamental
+  pieces it is built from, most-fundamental last — the first thing a reader sees
+  is the module's purpose, not its plumbing. **The foundation-qa check:** the
+  headline export appears before the low-level helpers it depends on; a module
+  arranged bottom-up blocks.
+
+Author these as a concrete, runnable check-list handed to foundation-qa (and
+every build-qa) at the point a catalog WP is reviewed — the check lives in
+`ken-build-qa` ("Catalog WPs"), keyed to the catalog's actual module surface so
+the name-shadow scan stays accurate as modules are added. The Architect carries
+the same two criteria as design review (`ken-architect`, §2a); the mechanical
+scan and the design read are complementary, not redundant.
+
 ## The copyleft-leakage recheck (your originality gate)
 
 You also run the **copyleft-leakage recheck** (`../../../CLEAN-ROOM.md`): before
