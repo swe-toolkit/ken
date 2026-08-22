@@ -46,13 +46,17 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `2d8a2e94d`.** Tree clean; no publisher running. Watchdog armed
+**`main` = `8d37068bc`.** Tree clean; no publisher running. Watchdog armed
 @1800s; the CronCreate daily briefing-flush schedule (`7d029bbf`, 09:37 —
 session-only) present.
 
-**ONE LANE — runtime (operator, 2026-08-17; `steward.md` §0).** Lane 2
-(language + verify) is retired. Finished work still merges, filings queue behind
-the lane; framing for lane 1 is lane work.
+**THREE LANES (operator, 2026-08-21/22 trial). Roster: `steward/lanes.md` —
+that file is the source of truth, not this block.** Lane 1 runtime (finish the
+NHC carried-observation chain, then RT-BACKEND-MODULE-SPLIT); lane 2
+verify+language (Z3 integration); lane 3 foundation (expressibility trial, the
+Architect-burden probe, launched 2026-08-22 anchor `evt_4r550cbd3fvvb`). Doc
+track concurrent, contention-free. Finished work still merges; framing an active
+lane is lane work.
 
 ### Runtime (lane 1) — RT-EXACTINT IN REVIEW; RT-FSREADAT-REPLY removal cut; NHC held on removal
 
@@ -102,10 +106,25 @@ all-green. Two blockers merged, third in review, fourth cut.
 - Queued carry (NOT released, behind lane-1 indefinitely):
   RT-NATIVE-VOCAB-STRUCTURAL-COMPLETENESS (conjunct-(2) completeness structural;
   Architect req reviewer).
-- Lane-1 frontier after NHC (§0): RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT
-  [merged], the `RT-*` nodes at `ready`, RT-DESCENT-RETIRE's owed `D6a`.
+- Lane-1 objective after NHC (operator 2026-08-22): pivot to
+  RT-BACKEND-MODULE-SPLIT (currently `draft` — needs framing before startable).
 
-### LANG (retired lane, in-flight work finishing) — transport LANDED (partial)
+### Foundation (lane 3) — expressibility trial LAUNCHED 2026-08-22
+
+Bounded trial, the Architect-burden probe (operator 2026-08-21). Five
+independent CAT WPs authoring verified catalog algorithms against Ken's current
+surface; charter `docs/program/wp/foundation-expressibility-trial.md`.
+
+- Launched to the foundation ring (anchor `evt_4r550cbd3fvvb`), simplest-first:
+  CAT-SORT (started) → CAT-GCD → CAT-DEQUE → CAT-BSEARCH → CAT-VEC (last,
+  fully dependent, highest gap risk). Seat check: implementer gpt-5.6-sol high.
+- `gate: none`, no deps, Architect NOT a default reviewer; QA reviews. Stop-on-
+  gap: a surface-gap report is the trial's payoff and routes to spec/Architect;
+  absent one, these are QA-reviewed expressibility authoring.
+- Confirm the foundation seat transitions to Working; anchor the next CAT when
+  CAT-SORT lands.
+
+### Language + verify (lane 2) — Z3 integration; V3-FO / LANG in flight
 
 - Transport landed: squash `93d82a398` (`elab.rs` blob = approved `1afbb4b6`,
   Decision `dec_1f50e3a2pnxj6` APPROVE — stack-plumbing-only respin of the
