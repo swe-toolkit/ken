@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 05:46:16Z — from 407 issue file(s) in `docs/program/issues/`.
+2026-08-22 06:04:47Z — from 408 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -290,7 +290,7 @@ the committed file matches the generator's output.
 | `RT-ENTRY-TRAP-254` | public_source_observes_raw_argv_environment_cwd_bytes_in_field_order exits 1 with an explicit entry trap where it expects 254 — branch-introduced, and the only tip failure that is not the byte-span gap | closed | runtime | M | none | — |
 | `RT-ENTRY-TRAP-PX7O` | px7o heterogeneous eliminator frames: native traps at the explicit entry (RuntimeTrap(4), exit 1) where the interpreter returns exit 7 -- the entry-trap family the de Bruijn repair did NOT clear | closed | runtime | TBD | none | — |
 | `RT-ESCAPE` | escaping a second Resource through a bracket fails native lowering | merged | runtime | M | none | PR #911 @ 238a5c5d (origin/main 4ac9141e, CI green) |
-| `RT-EXACTINT-CARRIED-OBSERVE` | A genuinely-live effect seat needing ExactIntU64 (FsReadAt Argument(1)) cannot observe its need in the CarriedWord phase, so the withResource path still fails object emission behind the now-closed ResourceScalar family -- the ExactIntU64-need carried-observation closure on the existing carried_exact_int EITHER_PHASE precedent | ready | runtime | S | none | — |
+| `RT-EXACTINT-CARRIED-OBSERVE` | A genuinely-live effect seat needing ExactIntU64 (FsReadAt Argument(1)) cannot observe its need in the CarriedWord phase, so the withResource path still fails object emission behind the now-closed ResourceScalar family -- the ExactIntU64-need carried-observation closure on the existing carried_exact_int EITHER_PHASE precedent | active | runtime | S | none | — |
 | `RT-FNSPLIT-B1R` | RT-NATIVE-FNSPLIT Boundary B1R — encode the occurrence-local semantic material B1 counted but never stored (repair of landed B1) | merged | runtime | L | none | 937 |
 | `RT-FNSPLIT-B2A-C` | plan↔lowering occurrence correspondence — transport the preallocated StaticOriginId to the site where it is out of scope | merged | runtime | L | none | 940 |
 | `RT-FNSPLIT-B2A-S` | defunctionalize retained body selection — static-origin tag plus one closed consumer, replacing cloned-RuntimeExpr identity | merged | runtime | M | none | 944 |
@@ -312,6 +312,7 @@ the committed file matches the generator's output.
 | `RT-FORCED-RETURNS-BOUND-RESTORE` | One clause: the six ignored tests' eighteen empty returns are FORCED by the refusal, not observed -- the measurement the Architect barred from this comment came back one repair later, and it now sits one sentence above the 81-return tally a reader will add it to | merged | runtime | XS | none | — |
 | `RT-FRAME-MARKER-ONCE` | Checked Runtime frame marker is consumed more than once under a nested computational eliminator | draft | runtime | TBD | none | — |
 | `RT-FRONTEND-REACHABILITY-TRIPWIRE` | Nothing in the tree would notice if a frontend change made one of the source-unreachable refusal shapes constructible -- the emitter fixtures that look like they cover this bypass the parser and elaborator entirely | draft | runtime | M | none | — |
+| `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` | A vestigial specialized-only gate on FsReadAt's Argument(2) buffer reply/ok-construction path (effects.rs:3226) re-refuses a carried buffer that the request path already admits; the destructured span_origin is UNUSED (the span is projected from the operand list at 3233), so the fix is REMOVAL of the dead gate, not a reroute -- the ResourceScalar-family leftover reader RT-EXACTINT moved onto the cap41_* critical path | ready | runtime | S | none | — |
 | `RT-GROUNDVALUE-RECURSIVE-DROP` | `RuntimeGroundValue` is a recursive type, so a decoder that is carefully iterative still cannot honour \"deep valid data uses no recursive host stack\" end to end -- a deeply nested value overflows the stack in its own `drop`, reproducible without the decoder, and the depth at which that happens is UNMEASURED: the two numbers in the source report are an observed abort and a deliberately-safe control, not a bisected threshold | draft | runtime | unknown | none | — |
 | `RT-IGNORED-CORPUS-MEMBERSHIP-RULE` | State the measurement corpus's exclusion by its membership rule -- all 33 ignored tests -- rather than by the six whose stated reason matched, which re-selects by reason at one scale down from the defect just repaired | merged | runtime | XS | none | https://github.com/swe-toolkit/ken/pull/2389 |
 | `RT-JOIN-DISPOSITION` | Join-disposition phase repair — the landed RECUR-PORT `consumed XOR statically-unselected` invariant conflates structural materialization with semantic reachability and false-rejects a join materialized before its enclosing match selects | merged | runtime | M | none | — |
@@ -469,7 +470,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` — the consuming-occurrence validator refusal has four defects that must land together: the production string sits in a cfg arm no test compiles; under cfg(test) the production arm is ABSENT rather than dead so a dropped return makes the validator silently ACCEPT a mismatched occurrence; and the classifier has two messages for FIVE causes, with the body arm a catch-all over an eliminator-kind defect, an identity-match failure and an ambiguity; and the sibling function 55 lines up has the same defect over four more causes, one of which the D2k probe only just measured
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
-- `RT-EXACTINT-CARRIED-OBSERVE` — A genuinely-live effect seat needing ExactIntU64 (FsReadAt Argument(1)) cannot observe its need in the CarriedWord phase, so the withResource path still fails object emission behind the now-closed ResourceScalar family -- the ExactIntU64-need carried-observation closure on the existing carried_exact_int EITHER_PHASE precedent
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-RETIRED-CENSUS-ROT` — Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
@@ -502,7 +502,8 @@ is itself not yet `merged`/`closed`:
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
 - `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: draft)
 - `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: ready)
-- `NATIVE-HANDLE-CARRIER` blocked by `RT-EXACTINT-CARRIED-OBSERVE` (status: ready)
+- `NATIVE-HANDLE-CARRIER` blocked by `RT-EXACTINT-CARRIED-OBSERVE` (status: active)
+- `NATIVE-HANDLE-CARRIER` blocked by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` (status: ready)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)
 - `PX10` blocked by `ABI-S5` (status: draft)
@@ -515,6 +516,7 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
+- `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` blocked by `RT-EXACTINT-CARRIED-OBSERVE` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 - `V3-FO-CHECKER-SOUNDNESS` blocked by `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` (status: active)

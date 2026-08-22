@@ -46,7 +46,7 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `aa0178eed`.** Tree clean; no publisher running. Watchdog armed
+**`main` = `2d8a2e94d`.** Tree clean; no publisher running. Watchdog armed
 @1800s; the CronCreate daily briefing-flush schedule (`7d029bbf`, 09:37 —
 session-only) present.
 
@@ -54,38 +54,48 @@ session-only) present.
 (language + verify) is retired. Finished work still merges, filings queue behind
 the lane; framing for lane 1 is lane work.
 
-### Runtime (lane 1) — RT-EXACTINT-CARRIED-OBSERVE RELEASED; NHC held on it
+### Runtime (lane 1) — RT-EXACTINT IN REVIEW; RT-FSREADAT-REPLY removal cut; NHC held on removal
 
 The NHC `cap41_*` blocker chain: each landed fix ADVANCES the rows to the next
 distinct blocker (does not green them) until the last lands and D-final runs
-all-green. Two blockers merged, third released.
+all-green. Two blockers merged, third in review, fourth cut.
 
 - RT-DEAD-ARM-EFFECT-LOWERING MERGED (`55c7f51de`, `dec_4p9n9a0b0rfqq`).
 - RT-RESOURCE-RELEASE-CARRIED-OBSERVE MERGED (`ef32b6ced`, `dec_3m2p4tmgnpa9t`;
-  QA + Architect required-reviewer APPROVE). Carried-observation FAMILY CLOSURE
-  over the ResourceScalar need (`lower_resource_token_seat`, no Avail change);
-  rows terminate at the ExactIntU64 sibling. M8 Adversary hunt SOUNDNESS CLEAN
-  (`evt_5wx3bax63yak`). Its one completeness obs (FsReadAt Arg(2) buffer
-  reply-path `effects.rs:3226` refuses a carried buffer) DEFERRED: implementer
-  (`evt_1rz7rnphp9ndw`) + Architect (`evt_2qdpkfvtqrxzy`) ruled the fix is
-  REMOVAL of a vestigial gate (span_origin unused; reroute would be a dead read),
-  a distinct ResourceScalar-family successor -> routed into RT-EXACTINT's D0 as a
-  CLASSIFY side-task; Steward cuts the tiny removal successor post-D0 if clean.
-  Safe-direction, off critical path, does not gate NHC.
-- RT-EXACTINT-CARRIED-OBSERVE RELEASED (anchor `evt_47kvrp1esty58`, runtime ring,
-  Opus 5 seat). ExactIntU64-need carried-observation closure for the measured
-  FsReadAt Arg(1) terminal, on the existing `carried_exact_int` EITHER_PHASE route
-  (BufferAllocate 0 precedent). D0-first: ground the reader census before sizing
-  (the ResourceScalar node looked like pure wiring too). S may escalate to T1 at
-  D0. Architect required reviewer; Adversary hunts landed code. Confirm the seat
-  transitions to Working.
-- NHC depends_on names RT-EXACTINT; held on it only. Closes when the chain
-  reaches all-green and D-final re-runs (fold with preserved slice/fixture +
-  six-axis oracle → closes NHC + PX8-F-CAP-41 Phase 2). PX8-F-CAP-41 held on NHC.
+  QA + Architect APPROVE). ResourceScalar-need FAMILY CLOSURE
+  (`lower_resource_token_seat`, no Avail change). M8 Adversary hunt SOUNDNESS
+  CLEAN (`evt_5wx3bax63yak`).
+- RT-EXACTINT-CARRIED-OBSERVE IN REVIEW (active; anchor `evt_47kvrp1esty58`,
+  thread `thr_6syere95dng6r`; runtime ring, Opus 5). D0 corrected the frame: it
+  is an AVAIL-MOVE, not a new route. Architect ruled (`evt_2kspreq08s3a`) a
+  deliberate move of the positioned exact-`Int` seats onto the existing
+  `carried_exact_int` EITHER_PHASE classification, decoded by the in-production
+  fail-closed-with-validity `narrow_carried_int_u64` — the decoder IS the
+  fail-closed consumer, so no route guard (does not contradict route-not-Avail,
+  which was need-specific to the ResourceScalar scalar-read). ExactIntU64 closed;
+  rows advance. Steward node-scope call (evt to ring): SIX-seat positioned-arm
+  unit confirmed — live census FsReadAt Arg(1)/3/4, FsWriteAt 1/3/4 same emitter
+  arm inert-but-correct, one decoder `narrow_positioned_int_seat`; FsChangeMode
+  Arg(1) dead_arm-trapped; BufferFreeze 1/2 other arm deferred pure wiring. D1
+  built, merge gate running, Architect required reviewer; Adversary hunts landed
+  code.
+- RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL CUT `ready` 2026-08-22. Closing
+  ExactIntU64 moved the previously-deferred FsReadAt Arg(2) buffer reply-path
+  gate (`effects.rs:3226`) ONTO the critical path (the "off critical path" ground
+  of the deferral is invalidated; implementer re-dispositioned carry→cut,
+  evt_6vxb4f1rxh3jk). ResourceScalar-family REMOVAL of a vestigial gate
+  (span_origin unused; span projected from operand list at 3233), NOT a reroute
+  (Architect `evt_2qdpkfvtqrxzy`). D0 = the Architect's (1)-(3) classify; depends
+  on RT-EXACTINT (effects.rs contention); released to the ring after RT-EXACTINT
+  merges. Architect required reviewer.
+- NHC depends_on re-pointed onto RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL (added
+  before RT-EXACTINT merges — gen-progress closed==merged hazard). Held on the
+  removal node. Closes when the chain reaches all-green and D-final re-runs (fold
+  with preserved slice/fixture + six-axis oracle → closes NHC + PX8-F-CAP-41
+  Phase 2). PX8-F-CAP-41 held on NHC.
 - Queued carry (NOT released, behind lane-1 indefinitely):
   RT-NATIVE-VOCAB-STRUCTURAL-COMPLETENESS (conjunct-(2) completeness structural;
-  Architect req reviewer). The FsReadAt Arg(2) removal is NOT a standalone node
-  yet — it rides in RT-EXACTINT's D0 classify and is cut post-D0.
+  Architect req reviewer).
 - Lane-1 frontier after NHC (§0): RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT
   [merged], the `RT-*` nodes at `ready`, RT-DESCENT-RETIRE's owed `D6a`.
 
