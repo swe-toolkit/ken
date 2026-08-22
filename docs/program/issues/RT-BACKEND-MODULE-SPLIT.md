@@ -1,7 +1,7 @@
 ---
 id: RT-BACKEND-MODULE-SPLIT
 title: "Split the oversized ken-runtime backend files into modules — the follow-on to the recursive-descent retirement, not an interlude in it"
-status: draft
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,30 @@ blocks: []
 github: null
 origin: Operator directive 2026-07-31 — the ken-runtime backend files are oversized again; a previous interlude of this shape produced the cranelift_backend/ directory. Operator asked whether to repeat it now or after the campaign, and confirmed AFTER on the Steward's recommendation. Campaign docs/program/16-recursive-descent-retirement.md §4 node #8. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # CLOSED 2026-08-22 (Steward) -- resolved without landing, as this phase
+> # record was always going to be (line 52: "when the full cut is filed it
+> # becomes closed, not merged").
+>
+> All seventeen slices of the cut are delivered on `main`: items 1, 2, 4-9,
+> 9b, 10-16, 18 `merged`; items 3, 9b, 10, 17 `closed` (item 17 absorbed into
+> 18; item 3 gated nothing; the rest resolved-without-landing per their own
+> records). RT-BACKEND-SPLIT-CLOSURE (item 18) merged at `aeffbd2cb`, and its
+> AC-6 closure remeasure proved every `.rs` under `cranelift_backend/` plus
+> `boundary_value_clif.rs` was under the 10k ceiling AT CLOSURE. The phase
+> delivered exactly what it framed.
+>
+> POST-CLOSURE REGROWTH, NOT UNFINISHED PHASE WORK (measured on `main` =
+> `fd774d9a2`): two files have since regrown past the operator's 10k ceiling --
+> `lowering/core.rs` 13,226 and `lowering/mod.rs` 12,396 -- from feature work
+> that landed AFTER `aeffbd2cb` (RT-CAPTURE-CONTEXT-FRAME-EMIT,
+> RT-CAPTURE-PROJECTION-GROW, RT-BRANCH-LOCAL-DECLARED-CALLABLE on core.rs;
+> RT-FSREADAT, RT-DEAD-ARM-EFFECT-LOWERING, RT-CAPTURE-CONTEXT-FRAME-EMIT on
+> mod.rs). This is a NEW violation of the standing operator size requirement
+> (line 106), not a defect in this phase, and it is a fresh re-split candidate
+> the Steward surfaces to the operator for sequencing -- it does NOT reopen this
+> record. Do not carry these counts into any new frame; re-measure at release
+> time (the standing rule of this phase).
 
 > ## DELIBERATELY UNFRAMED UNTIL [[RT-DESCENT-RETIRE]] MERGES
 >
