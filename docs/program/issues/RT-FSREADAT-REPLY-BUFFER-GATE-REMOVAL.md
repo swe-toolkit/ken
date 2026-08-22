@@ -51,6 +51,23 @@ origin: "Adversary M8 completeness flag on the landed [[RT-RESOURCE-RELEASE-CARR
 > now waits on the enumeration + the per-gap successors. No kernel/TCB; no operator
 > authorization.
 
+> ENUMERATION SUCCESSOR CUT 2026-08-22 (Steward, on both enumeration reports;
+> Architect evt_4ag90qfacmgwy + evt_4jcnbhx8nqwdy). Report 1 (RT_PARITY_SOURCE):
+> five mechanisms. Report 2 (checked-program family): the IH-marker only, over two
+> programs, depth-1. Per-gap ledger: (1) materialized-dead join 288+301 as a class
+> => [[RT-MATERIALIZED-DEAD-JOIN-RECONCILE]]; (2) IH-marker producer-fix + a
+> mandatory post-fix re-enumeration gate => [[RT-IH-MARKER-PRODUCER-COMPLETE]];
+> (3) BoundaryCarrier carried-recursive-hypothesis (`rt_allocate_stage`, 1 entry)
+> is a NEW WITNESS of THIS node's OWN layer-1 effect-seat mechanism -- FOLDED HERE
+> (extend the need-directed carried-operand projection to cover it; diagnose
+> same-family at fix time; do NOT treat as novel), not a separate node; (4)
+> closure-crossing (`rt_write_writable_stage`) is the tracked standing limitation
+> of the merged RT-CLOSURE-BOUNDARY-LANE lane, excluded from this arc; (5) the
+> `rt_write_pair_source` elaboration KernelRejected TypeMismatch is NOT a lowering
+> refusal (never reaches the backend) -- explicit disposition owed (correct
+> rejection of an ill-typed fixture, or a real elaboration gap routing to
+> language/elaboration), not silently dropped. Both validators stay byte-untouched.
+
 Make `FsReadAt`'s `Argument(2)` buffer reply/ok-construction arm admit a carried
 `ResourceScalar` buffer, by giving the carried-operand projection path
 (`site_operand_argument` / the carried branch it delegates to) need-directed
