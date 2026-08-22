@@ -1,0 +1,71 @@
+---
+id: CAT-GCD-REFACTOR
+title: "Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last)"
+status: ready
+owner: foundation
+size: S
+gate: none
+depends_on: [CAT-GCD]
+blocks: []
+github: null
+origin: "Operator directive 2026-08-22, after CAT-GCD merged (3283528c4): Gcd.ken.md redundantly reimplements generic Nat tools that already exist in the catalog, and is arranged bottom-up. This is a well-factoring / arrangement follow-up, not a soundness re-open — CAT-GCD stays closed. Steward-filed. Held until the foundation ring is reseated to pi (see reseat directive) so the standard's first application runs on the new seating."
+---
+
+## Objective
+
+Bring the merged `catalog/packages/Algorithm/Numeric/Gcd.ken.md` into line with
+the **catalog implementation standard** (`ken-conformance-validator`, "Catalog
+implementation standard"): a package holds only what is specific to it, reuses
+the catalog's generic tools rather than reimplementing them, and is arranged
+top-down.
+
+## Motivation
+
+CAT-GCD is sound and stays closed — the Adversary hunted it clean
+(evt_2cds3ty6qevch) and its acceptance oracle passed. The defect is **factoring
+and arrangement**, which no soundness gate checks:
+
+- `Gcd.ken.md` locally defines `add`/`mul`, already exported by
+  `catalog/packages/Data/Numeric/Nat/Arithmetic.ken.md`.
+- `Gcd.ken.md` locally defines `leq_nat`/`sub`, already exported by
+  `catalog/packages/Data/Numeric/Nat/Order.ken.md`.
+- The module is arranged bottom-up (fundamentals first), so a reader meets the
+  plumbing before the point of the module.
+
+## Deliverables
+
+- `Gcd.ken.md` imports `add`, `mul` from `Data/Numeric/Nat/Arithmetic` and
+  `leq_nat`, `sub` from `Data/Numeric/Nat/Order`; the local redefinitions are
+  removed. If any local variant is genuinely distinct from the catalog export
+  (not a plain duplicate), keep it and say why in one line — but the default is
+  import.
+- The module is re-arranged **top-down**: it leads with the headline export the
+  package is named for (`divides_gcd` / the gcd law), and the more fundamental
+  pieces it is built from follow, most-fundamental last.
+- Nothing gcd-specific is lost: `Divides`, the fuel/termination presentation,
+  `GcdSpec`, and the proved divisibility laws stay.
+
+## Acceptance criteria
+
+- **AC-REUSE.** The foundation-qa name-shadow scan (`ken-build-qa`, "Catalog
+  WPs") reports zero local definitions in `Gcd.ken.md` shadowing a public export
+  of an existing catalog module (or each surviving one carries a one-line
+  distinct-tool justification the Architect accepts).
+- **AC-ARRANGE.** The headline gcd export appears before the low-level helpers it
+  depends on; the module reads top-down.
+- **AC-LAWS.** The gcd divisibility laws still hold — the CAT-GCD acceptance
+  oracle stays green (trusted_base delta unchanged, laws instantiated). This is a
+  behavior-preserving refactor.
+- **AC-NO-REGRESSION.** Whole-suite green in CI (COORDINATION section 12). Local
+  targeted checks only, never `--workspace`.
+
+## Capability tier and sequencing
+
+Tier T2 — a behavior-preserving import-and-rearrange against an existing,
+proved module; the review is differential (same laws, same delta, fewer local
+defs, top-down order). Size S.
+
+HELD, not startable yet: released only once the foundation ring is reseated to
+pi and the catalog implementation standard has landed in the playbooks, so the
+first application of the standard is on the reseated ring. The Steward releases
+it, then CAT-DEQUE/CAT-BSEARCH/CAT-VEC, all authored factored from the start.
