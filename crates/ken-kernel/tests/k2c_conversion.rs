@@ -109,9 +109,6 @@ fn nat_t(nb: &NB) -> Term {
 fn bool_t(nb: &NB) -> Term {
     Term::indformer(nb.bool_, vec![])
 }
-fn zero_c(nb: &NB) -> Term {
-    Term::constructor(nb.zero, vec![])
-}
 fn suc_c(nb: &NB) -> Term {
     Term::constructor(nb.suc, vec![])
 }
@@ -799,37 +796,53 @@ fn sct_accept_plus() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn sct_accepts_wrapped_body_at_declared_telescope_arity() {
+fn sct_accepts_mutual_arity_isolation_consumer() {
     let (mut env, nb) = mk_env();
     let nat = nat_t(&nb);
-    let ty = Term::pi(nat.clone(), nat.clone());
-    let ids = declare_recursive_group(&mut env, vec![(vec![], ty.clone())], |ids| {
-        let f = ids[0];
-        let suc_method = Term::lam(
-            nat.clone(),
-            Term::lam(nat.clone(), Term::app(cref(f), Term::var(1))),
-        );
-        let canonical = Term::lam(
-            nat.clone(),
-            nat_elim(
-                &nb,
-                asc_motive(&nb, nat.clone()),
-                zero_c(&nb),
-                suc_method,
-                Term::var(0),
-            ),
-        );
-        let wrapped = Term::Ascript(Box::new(canonical), Box::new(ty.clone()));
-        assert_eq!(
-            count_params(&wrapped),
-            0,
-            "the pre-fix body heuristic must disagree with declared arity 1"
-        );
-        vec![wrapped]
-    })
-    .expect("wrapped structural recursion must be admitted at declared arity");
+    let bool_ = bool_t(&nb);
+    let ty = Term::pi(nat.clone(), bool_.clone());
+    let ids = declare_recursive_group(
+        &mut env,
+        vec![(vec![], ty.clone()), (vec![], ty.clone())],
+        |ids| {
+            let wrapped_body = |callee: GlobalId, zero_case: Term| {
+                // The recursive argument is the bare matched field Var(1):
+                // no Cast, J, helper call, or parameter rotation lies on the
+                // descending path. Both mutual edges are therefore [[Down]],
+                // leaving one persistent strict thread across every lap.
+                let suc_method = Term::lam(
+                    nat.clone(),
+                    Term::lam(bool_.clone(), Term::app(cref(callee), Term::var(1))),
+                );
+                let canonical = Term::lam(
+                    nat.clone(),
+                    nat_elim(
+                        &nb,
+                        asc_motive(&nb, bool_.clone()),
+                        zero_case,
+                        suc_method,
+                        Term::var(0),
+                    ),
+                );
+                let wrapped = Term::Ascript(Box::new(canonical), Box::new(ty.clone()));
+                assert_eq!(
+                    count_params(&wrapped),
+                    0,
+                    "the elaborated body head must diverge from declared arity 1"
+                );
+                wrapped
+            };
+
+            vec![
+                wrapped_body(ids[1], true_c(&nb)),
+                wrapped_body(ids[0], false_c(&nb)),
+            ]
+        },
+    )
+    .expect("the mutual arity-isolation consumer must be admitted at declared arity");
 
     assert!(env.transparent_body(ids[0]).is_some());
+    assert!(env.transparent_body(ids[1]).is_some());
 }
 
 #[test]
