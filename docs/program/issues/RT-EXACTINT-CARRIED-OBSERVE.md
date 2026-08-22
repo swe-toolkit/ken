@@ -1,7 +1,7 @@
 ---
 id: RT-EXACTINT-CARRIED-OBSERVE
 title: "A genuinely-live effect seat needing ExactIntU64 (FsReadAt Argument(1)) cannot observe its need in the CarriedWord phase, so the withResource path still fails object emission behind the now-closed ResourceScalar family -- the ExactIntU64-need carried-observation closure on the existing carried_exact_int EITHER_PHASE precedent"
-status: active
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,11 @@ blocks: [NATIVE-HANDLE-CARRIER]
 github: null
 origin: "Measured terminal of [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] AC-1 (runtime-implementer evt_e68jv2mssxnd, runtime-qa evt_6e1kf4tdghchs, Architect evt_24nyqqhs5fy1f, 2026-08-22): with the ResourceScalar family closed, the cap41_* rows advance to `seat Argument(1) of FsReadAt needs ExactIntU64, which it cannot observe in CarriedWord`. The Architect scoped this OUT of the ResourceScalar node as a distinct need with its own precedent; the Steward cut it as the next lane-1 successor (evt_5xq3hw23kamrd). Steward-filed per COORDINATION section 2."
 ---
+
+> CLOSED 2026-08-22 (tracker catch-up) — the ExactIntU64 carried-observe
+> deliverable landed earlier this session at d49a232ad (well before the RT-FSREADAT
+> chain), retros collected; the tracker had simply not reflected it. runtime-leader
+> confirmed evt_10rk35dhtw1cq. Not new work. HS 5.
 
 # D0/D1 RESOLVED — 2026-08-22 (Architect `evt_2kspreq08s3a`; in review)
 

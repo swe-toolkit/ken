@@ -1,7 +1,7 @@
 ---
 id: RT-MATERIALIZED-DEAD-JOIN-RECONCILE
 title: "Reconcile the materialized-but-dead source-join disagreement as a CLASS over StaticOriginId(288) AND (301) (8 entries in RT_PARITY_SOURCE) -- a join dead-classified yet still reachable at final validation is a genuine disagreement between two reachability views, so determine which view is stale (the pre-existing dead disposition is false and the origin is actually reachable, OR the CFG retained a live edge that should have been eliminated -- predecessor removed, successor PHIs repaired) and correct THAT side, never a blind drop of either. validate_materialized_dead_join_cfg stays byte-untouched -- it is the correct fail-closed boundary that CAUGHT this; the fix is on the producing side. Bounded by RT-COLD-LOWERING-PATH-ENUMERATION report 1 (Architect ruling evt_r3tt1gpv4tkn point 2 + sharpened evt_4ag90qfacmgwy: this is a class over both origins, not an instance)."
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,13 @@ blocks: []
 github: null
 origin: "Bounded successor cut by the Steward from RT-COLD-LOWERING-PATH-ENUMERATION's AC-3 report (runtime-implementer evt_1m6eg23vnbj4n; Architect verified evt_4ag90qfacmgwy). The materialized-but-dead join refusal is a CLASS, not an instance: origins 288 AND 301, 8 entries across RT_PARITY_SOURCE. Architect ruling point 2 (evt_r3tt1gpv4tkn) fixes the RECONCILIATION mechanism, never a drop of either side; the sharpened review requires the AC to exercise both origins as a non-degenerate pair. Steward-filed per COORDINATION section 2."
 ---
+
+> CLOSED 2026-08-22 — co-land merged (cbac30826). The 288+301 reachability-vs-
+> consumption reconciliation (the consumed-guard fix, 8/8 cleared) WAS the landed
+> deliverable, Architect-approved evt_7rsy01s7k1d7x; runtime-leader confirmed
+> nothing pending on this node's AC (evt_10rk35dhtw1cq). validate_materialized_
+> dead_join_cfg stayed byte-untouched (the fail-closed boundary that caught it).
+> HS 5.
 
 # WHAT THIS NODE IS
 
