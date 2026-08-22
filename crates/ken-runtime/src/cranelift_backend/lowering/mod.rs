@@ -1327,6 +1327,21 @@ enum JoinConsumptionMutation {
     OmitSourceMachineComputationalMatchSelection,
     MaterializeFirstUnselectedMatchJoin,
     AttachEntryToFirstMaterializedDead,
+    /// **`RT-MATERIALIZED-DEAD-JOIN-RECONCILE` `D1` -- reconstructs the
+    /// consumed-AND-dispositioned overlap SYNTHETICALLY.**
+    ///
+    /// The disposition path can no longer build that state: a consumed origin
+    /// is never dispositioned dead, so `consumed intersect dispositioned` is
+    /// empty by construction and every guard downstream of it is unreachable
+    /// from that producer. This mutation forces the overlap anyway, and
+    /// attaches an entry-reachable block to it, so
+    /// `validate_materialized_dead_join_cfg` keeps a LIVE test of its own
+    /// contract.
+    ///
+    /// Without it the validator is defence-in-depth in name only: byte-untouched,
+    /// permanently green, and free to rot against some future path that
+    /// reintroduces the state it exists to catch.
+    ForceMaterializedDeadOverlapWithEntry,
     DispositionDynamicHostResultMerge,
 }
 

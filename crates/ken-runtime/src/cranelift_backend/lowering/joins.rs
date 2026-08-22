@@ -1400,6 +1400,7 @@ impl<'a> Lowering<'a> {
                 | JoinConsumptionMutation::OmitSourceMachineComputationalMatchSelection
                 | JoinConsumptionMutation::MaterializeFirstUnselectedMatchJoin
                 | JoinConsumptionMutation::AttachEntryToFirstMaterializedDead
+                | JoinConsumptionMutation::ForceMaterializedDeadOverlapWithEntry
                 | JoinConsumptionMutation::DispositionDynamicHostResultMerge => {}
             }
             if !self.function_local.consumed_join_origins.insert(origin) {
@@ -1459,7 +1460,12 @@ impl<'a> Lowering<'a> {
                 // already established by emitting the block, not an inference
                 // about control flow. Deciding from it makes the partition
                 // consistent by construction.
-                if self.function_local.consumed_join_origins.contains(&origin) {
+                #[cfg(test)]
+                let force_overlap = D8_JOIN_CONSUMPTION_MUTATION.with(std::cell::Cell::get)
+                    == JoinConsumptionMutation::ForceMaterializedDeadOverlapWithEntry;
+                #[cfg(not(test))]
+                let force_overlap = false;
+                if !force_overlap && self.function_local.consumed_join_origins.contains(&origin) {
                     continue;
                 }
                 self.function_local
@@ -1501,6 +1507,7 @@ impl<'a> Lowering<'a> {
                 D8_JOIN_CONSUMPTION_MUTATION.with(std::cell::Cell::get),
                 JoinConsumptionMutation::MaterializeFirstUnselectedMatchJoin
                     | JoinConsumptionMutation::AttachEntryToFirstMaterializedDead
+                    | JoinConsumptionMutation::ForceMaterializedDeadOverlapWithEntry
             ) {
                 let mut materialized = None;
                 for (index, root) in case_bodies.iter().copied().enumerate() {
@@ -1810,6 +1817,7 @@ impl<'a> Lowering<'a> {
                 #[cfg(test)]
                 let blocks = match D8_JOIN_CONSUMPTION_MUTATION.with(std::cell::Cell::get) {
                     JoinConsumptionMutation::AttachEntryToFirstMaterializedDead
+                    | JoinConsumptionMutation::ForceMaterializedDeadOverlapWithEntry
                     | JoinConsumptionMutation::OmitSourceMachineComputationalMatchSelection => {
                         let mut blocks = blocks;
                         blocks.push(entry);
