@@ -1,7 +1,7 @@
 ---
 id: V3-FO-CHECKER-SOUNDNESS
 title: "Author FokDerivation, fok_derives and fok_classically_valid, and prove checker_soundness in Ken over the check_cert that now exists -- the first of the two theorems 23 section 4.4 requires before route FO may return proved"
-status: active
+status: merged
 owner: language
 size: L
 gate: none
@@ -11,6 +11,28 @@ github: null
 origin: "Steward, 2026-08-16, discharging section 4e on the merge of V3-FO-KEN-LEVEL-CHECKER-AUTHORING (D4+D5, PR #2421). That node's own banned scope names this work: 'Proving embedding_adequacy or checker_soundness. Unfiled successors.' Every coordinate below re-verified against origin/main 5aae7a454 before filing. Steward-filed per COORDINATION section 2."
 ---
 
+> ## MERGED 2026-08-22 — D4 landed; FO checker-soundness theorem complete
+>
+> **D4 (quantifier rules) landed** as origin/main `ba20b4810` (PR #2805, base
+> `376cb37b9`; landed tree `2f37d122b` verified by the publisher's fresh-result
+> gate re-deriving D4 onto the current main, since the base had advanced past
+> D4's cut base `f10273429` by PR #2804). Candidate `6d701e77d`, +610/-109 over
+> `FoKripke.ken` + the D3 sentinel retire + a new D4 suite; no
+> spec/conformance/kernel/SCT/surface/TCB path; `trusted_base()` unchanged.
+> Exact-SHA approvals: language-QA `evt_13606w1hc4qe7`, Architect
+> soundness-oracle `evt_rdtmj6rmcw3g`; Decision `dec_748vyk917c86q` resolved.
+> (Publisher note: first run hit the known transient GH-API blip at check-poll
+> after all 15 checks passed; re-driven on the same SHA merged cleanly.)
+>
+> **`fok_checker_soundness` is now `(q)(pi) : fok_check_cert q pi = True ->
+> fok_classically_valid q`** — the D3 fragment hypothesis removed, total over all
+> three rules (Init, ImpRight, ForallRight). **D5 (state the reach honestly) is
+> satisfied inline** by the D4 delivery's pin-account (measured/claimed/gap,
+> explicitly disclaiming embedding-adequacy and any FO `Proved`), per QA and the
+> Architect's completeness confirmation. **The remaining FO-campaign obligation is
+> the second `23 §4.4` theorem, [[V3-FO-EMBEDDING-ADEQUACY]]** (separate node);
+> `AC-3` holds — `attempt_fo` untouched, no FO `Proved`.
+>
 > ## DEPENDS_ON RE-POINTED 2026-08-22 (twice) -- now on V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY
 >
 > **Chain as it now stands:** `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` delivered its
