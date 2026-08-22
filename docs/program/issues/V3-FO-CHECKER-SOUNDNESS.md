@@ -5,23 +5,40 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, KERNEL-SCT-TELESCOPE-CANON]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY]
 blocks: []
 github: null
 origin: "Steward, 2026-08-16, discharging section 4e on the merge of V3-FO-KEN-LEVEL-CHECKER-AUTHORING (D4+D5, PR #2421). That node's own banned scope names this work: 'Proving embedding_adequacy or checker_soundness. Unfiled successors.' Every coordinate below re-verified against origin/main 5aae7a454 before filing. Steward-filed per COORDINATION section 2."
 ---
 
-> ## DEPENDS_ON RE-POINTED 2026-08-22 -- LANG-INDEXED → KERNEL-SCT-TELESCOPE-CANON
+> ## DEPENDS_ON RE-POINTED 2026-08-22 (twice) -- now on V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY
 >
-> `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` delivered its c-elab result-refinement
-> transport as an accepted partial (squash `93d82a398`, `kernel_check` half of
-> full admission) and is now CLOSED. The SCT-pass half of full admission -- the
-> gate D3 actually resumes on -- moved to the operator-authorized TCB successor
-> [[KERNEL-SCT-TELESCOPE-CANON]] (route A, SCT arity from the declared Pi
-> telescope). `depends_on` is re-pointed here so this node stays correctly
-> blocked on the real gate; closing LANG-INDEXED first without this re-point
-> would have falsely unblocked D3 (`gen-progress` `closed`==`merged` clearance
-> hazard). D3 resumes on KERNEL-SCT's landing, with no proof re-authoring.
+> **Chain as it now stands:** `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` delivered its
+> c-elab result-refinement transport as an accepted partial (squash `93d82a398`,
+> `kernel_check` half of full admission) and is CLOSED. The operator-authorized
+> route-A arity fix [[KERNEL-SCT-TELESCOPE-CANON]] (SCT arity from the declared
+> Pi telescope) is landing now -- but the D1 measurement on the exact FoKripke
+> consumer refuted the premise that arity was the whole SCT-pass gate.
+>
+> **The residual is an upstream expressibility question, not a kernel one**
+> (Architect final ruling evt_1gtmndpzh3xda + correction evt_134z6mr80ymqp). The
+> FoKripke soundness clique's real termination is not a single structural
+> size-change thread on its declared parameters under the current `size_rel`
+> abstraction -- it fails by ROTATION (the bare-`Var` matched-field descent
+> arrives in one slot while the outgoing edge decreases from another). SCT's
+> closure criterion is already sound-and-complete for the abstraction (including
+> permuting descents), so this is NOT a kernel closure-criterion gap; it is the
+> size-change GRAPHS not capturing the real measure. `depends_on` is therefore
+> re-pointed to [[V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY]], the language/spec enclave
+> node that owns the rotation fork: (a) re-elaborate the soundness recursion to a
+> single structural thread [preferred, no TCB]; (b) a narrow `size_rel`
+> completeness fix [operator-gated, conditional]; (c) a richer measure
+> [operator escalation, dispreferred]. **D3 now resumes on the enclave's
+> resolution, likely with proof/elaboration restructure -- materially harder than
+> arity and genuinely open.** The `depends_on` chain (arity node -> enclave node
+> -> here) keeps D3 correctly blocked on the real gate; closing predecessors
+> first without these re-points would have falsely unblocked D3 (`gen-progress`
+> `closed`==`merged` clearance hazard).
 
 ## Why this exists: the predecessor removed the last thing that was missing
 

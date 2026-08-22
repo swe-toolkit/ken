@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 07:26:43Z — from 409 issue file(s) in `docs/program/issues/`.
+2026-08-22 08:27:30Z — from 410 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -437,6 +437,7 @@ the committed file matches the generator's output.
 | `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` | Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all | merged | language | L | none | 2353 |
 | `V3-FO-QUOTE-GUARD-FAIL-CLOSED` | Make quote_fo's pre-quotation guards fail closed: Pair is not a binder, and a proof-variable-occurrence test must default to true | merged | language | S | none | 2346 |
 | `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` | Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report | merged | language | S | none | — |
+| `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` | The FoKripke checker_soundness mutual-recursion clique's real termination is not a single structural size-change thread on its declared parameters under the current size_rel abstraction -- it fails by ROTATION (the bare-Var matched-field descent arrives in one slot while the outgoing edge decreases from another) -- so full SCT admission of the real consumer needs an UPSTREAM resolution (re-elaborate the soundness recursion to one structural thread; preferred, no TCB), with a narrow size_rel completeness fix or a richer measure as operator-gated conditional arms; this is the real AC-CONSUMER home V3-FO-CHECKER-SOUNDNESS D3 waits on, distinct from the arity fix (KERNEL-SCT-TELESCOPE-CANON) and from any Cast/J or lexicographic-SCT node | ready | language | L | none | — |
 | `V3-FO-SUBST-DEPTH-CONTROL` | Give subst_form_at a control that can see its binder-depth discipline, and state the two premises fo_kripke.rs relies on without naming where the next editor will look -- the shift call-site correspondence and the bottom_id exclusion criterion | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2382 |
 | `V3-FO-TOP-REFUSAL-ENFORCEMENT` | Give the sort-candidate criterion an enforcement: a test asserting quote_iform refuses top_id with UnsupportedTermShape, so an IForm::Top arm reds at the same moment the collector needs updating -- and soften the D2 claim that the criterion forces that update | merged | language | XS | none | https://github.com/swe-toolkit/ken/pull/2388 |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | merged | verify | M | none | — |
@@ -520,7 +521,8 @@ is itself not yet `merged`/`closed`:
 - `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` blocked by `RT-EXACTINT-CARRIED-OBSERVE` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
-- `V3-FO-CHECKER-SOUNDNESS` blocked by `KERNEL-SCT-TELESCOPE-CANON` (status: ready)
+- `V3-FO-CHECKER-SOUNDNESS` blocked by `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` (status: ready)
+- `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` blocked by `KERNEL-SCT-TELESCOPE-CANON` (status: ready)
 
 ## Gate progress
 
