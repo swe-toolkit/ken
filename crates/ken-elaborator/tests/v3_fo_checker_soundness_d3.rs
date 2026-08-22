@@ -1,9 +1,9 @@
 //! `V3-FO-CHECKER-SOUNDNESS` D3: the accepted propositional certificate
 //! fragment produces the indexed derivation promised by `fok_checker_soundness`.
 //!
-//! Promise classes are stated per test below: the live D3 theorem application
-//! is a transition sentinel for D4, while full-tree fragment classification is
-//! a durable invariant of the D3/D4 interface.
+//! Promise class: durable invariant. D4 replaced the former four-argument
+//! transition sentinel with the full theorem application below; full-tree
+//! fragment classification remains a stable description of the D3 partition.
 
 use std::collections::BTreeSet;
 
@@ -19,10 +19,10 @@ fn elaborate_fok() -> ElabEnv {
     env
 }
 
-/// Transition sentinel: D4 retires or replaces this exact application when it
-/// removes `fok_checker_soundness`'s fragment hypothesis.
+/// Durable invariant: a propositional accepted tree remains covered by the
+/// full theorem after D4 removes the fragment hypothesis.
 #[test]
-fn accepted_imp_right_init_tree_instantiates_checker_soundness() {
+fn accepted_imp_right_init_tree_instantiates_full_checker_soundness() {
     let mut env = elaborate_fok();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
 
@@ -52,7 +52,7 @@ fn accepted_imp_right_init_tree_instantiates_checker_soundness() {
         "theorem d3_fragment_ok \
            : Equal Bool (fok_cert_no_forall_right d3_cert) True = Proved",
     )
-    .expect("the entire certificate is in the propositional fragment");
+    .expect("the durable classifier still recognizes the D3 fragment");
     env.elaborate_decl(
         "theorem d3_checker_ok \
            : Equal Bool (fok_check_cert d3_q d3_cert) True = Proved",
@@ -60,10 +60,9 @@ fn accepted_imp_right_init_tree_instantiates_checker_soundness() {
     .expect("the checker accepts the concrete Init/ImpRight tree");
     env.elaborate_decl(
         "theorem d3_soundness_live : fok_classically_valid d3_q = \
-         fok_checker_soundness \
-           d3_q d3_cert d3_fragment_ok d3_checker_ok",
+         fok_checker_soundness d3_q d3_cert d3_checker_ok",
     )
-    .expect("the generic theorem must produce the promised truncated derivation");
+    .expect("the full theorem must preserve the accepted propositional case");
 
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "D3 must not add trust");
