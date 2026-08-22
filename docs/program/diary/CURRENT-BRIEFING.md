@@ -46,11 +46,11 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `633064e45`.** Tree clean; `steward/work` == `origin/main`. Publisher
-lane: one orphan open PR (#2692, stale older RT-CONTROL node version) routed to
-the lieutenant to CLOSE not merge; integrator's befc2dc4/#365 watchdog ref
-answered as stale (July auto-merge tooling). Watchdog is one convo agent-interval
-(1800s, server-side) — re-verify armed at each resume.
+**`main` = `9c17b082f`.** Tree clean; `steward/work` == `origin/main`. Publisher
+lane clear: orphans PR #2692 + #2768 both CLOSED (confirmed); integrator's
+befc2dc4/#365 watchdog ref answered as stale (July auto-merge tooling); zero open
+PRs. Watchdog is one convo agent-interval (1800s, server-side) — re-verify armed
+at each resume.
 
 **THREE LANES (operator, 2026-08-21/22 trial). Roster: `steward/lanes.md` —
 that file is the source of truth, not this block.** Lane 1 runtime (finish the
@@ -71,25 +71,27 @@ RT-DEAD-ARM-EFFECT-LOWERING (`55c7f51de`), RT-RESOURCE-RELEASE-CARRIED-OBSERVE
   addendum (evt_1a8tf8776fd6m) on the research advisory (evt_5f0rzjghjhmy9 +
   evt_3p0rwsjw51mjq): both validators are correct fail-closed boundaries — do NOT
   weaken; fixes are producer-side; bound the COMPLETE set before sequencing.
-- ENUMERATION-FIRST. RT-COLD-LOWERING-PATH-ENUMERATION landed (#2766) and
-  DELIVERED AC-3 (Architect verified done, evt_4ag90qfacmgwy): FIVE mechanisms
-  over RT_PARITY_SOURCE, not two — 288+301 materialized-dead join (a CLASS),
-  BoundaryCarrier (layer-1 family), closure-boundary, one non-elaborating
-  TypeMismatch, and the IH-marker with ZERO entries here.
-- BINDING FINDING → SIBLING node. The IH-marker lives in a SECOND witness family
-  (checked-program source shared by the four cap41_* terminal pins), on
-  RT-FSREADAT's AC-4/AC-5 path, never enumerated. Steward scope call: cut the
-  sibling RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION (landed `633064e45`, blob
-  `762b0ac3`), released to the ring (evt_7sfny7j9sab0m). Same exhaustive
-  discipline; a 2nd population may hide a 6th mechanism (collect all, do not
-  stop at the IH-marker).
-- SUCCESSOR SEQUENCE HELD until BOTH enumerations report. The per-gap successors
-  are cut from report-1 ∪ report-2, not before (full ledger recorded in the
-  sibling node: 288+301 reconciliation class; BoundaryCarrier layer-1 fold;
-  closure-boundary → existing RT-CLOSURE-BOUNDARY-LANE; TypeMismatch explicit
-  disposition; IH-marker producer-fix). HS stays 3; next re-trigger HS=6. No
-  kernel/TCB. Whole set co-lands as one green candidate (§8); then D-final closes
-  NATIVE-HANDLE-CARRIER + PX8-F-CAP-41 Phase 2, then RT-BACKEND-MODULE-SPLIT.
+- ENUMERATION COMPLETE (both families). RT-COLD-LOWERING-PATH-ENUMERATION
+  (report 1, RT_PARITY_SOURCE = five mechanisms) + sibling
+  RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION (report 2 = the IH-marker only, two
+  programs, depth-1); Architect verified both (evt_4ag90qfacmgwy,
+  evt_4jcnbhx8nqwdy). The checked family cannot self-bound — depth behind the
+  IH-marker is unknown, possibly zero.
+- SUCCESSORS CUT + RELEASED (landed `9c17b082f`, evt_4dx1y8hskm2c5). Two bounded
+  fix nodes, active, co-landing (§8): RT-MATERIALIZED-DEAD-JOIN-RECONCILE (288+301
+  as a class — reconcile the stale reachability view, never a drop) and
+  RT-IH-MARKER-PRODUCER-COMPLETE (producer-fix + MANDATORY post-fix re-enumeration
+  gate + deferred fixture contingency). Ledger recorded in RT-FSREADAT:
+  BoundaryCarrier folds into its own layer-1 projection; closure-crossing is the
+  excluded standing limitation; TypeMismatch owes an explicit disposition. Both
+  validators byte-untouched.
+- NOW: runtime ring works the two fix nodes + the BoundaryCarrier fold on
+  wp/RT-FSREADAT. GATE: after the IH-marker fix lands, the mandatory
+  re-enumeration reads the checked family's true depth — green ⇒ bounded, further
+  layer ⇒ STOP+report (triggers the deferred fixture decision). Whole set co-lands
+  as one green candidate once cap41_*/terminal rows go all-green, then D-final
+  closes NATIVE-HANDLE-CARRIER + PX8-F-CAP-41 Phase 2, then RT-BACKEND-MODULE-SPLIT.
+  HS stays 3; next re-trigger HS=6. No kernel/TCB.
 
 ### Verify + language (lane 2) — Z3 integration; V3-FO D0 RESOLVED = arm (a), no TCB
 
@@ -138,11 +140,13 @@ if the Architect's layer-3 ruling or a future D0 rules in an operator-gated arm.
 
 ### Session log / escalations of record
 
-- HS=3 §1a run COMPLETE (RT-FSREADAT + RT-DEAD-ARM chain, `thr_3j5ew8rhy35nh`,
-  2026-08-22): research advisory delivered → Architect ruled (evt_r3tt1gpv4tkn +
-  IH-marker addendum) → enumeration-first executed. RT-COLD-LOWERING-PATH-
-  ENUMERATION AC-3 delivered (5 mechanisms) + sibling RT-COLD-LOWERING-CHECKED-
-  FAMILY-ENUMERATION cut for the 2nd family (Architect binding finding). Count of
-  record: HS=3, next re-trigger at HS=6.
-- Orphan open PR #2692 (stale RT-CONTROL node version) routed to lieutenant to
-  close; integrator befc2dc4/#365 stale-ref answered (2026-08-22).
+- HS=3 §1a arc CLOSED (RT-FSREADAT + RT-DEAD-ARM chain, `thr_3j5ew8rhy35nh`,
+  2026-08-22): research advisory → Architect ruled (evt_r3tt1gpv4tkn + IH-marker
+  addendum) → enumeration-first, both families reported (report 1 = 5 mechanisms,
+  report 2 = IH-marker only / depth-1) → Steward cut the two bounded successors
+  (RT-MATERIALIZED-DEAD-JOIN-RECONCILE, RT-IH-MARKER-PRODUCER-COMPLETE) +
+  BoundaryCarrier fold + 2 recorded dispositions, released (evt_4dx1y8hskm2c5,
+  landed 9c17b082f). Count of record: HS=3, next re-trigger at HS=6.
+- Publisher hygiene: orphans PR #2692 (stale RT-CONTROL node) + #2768 (stale
+  briefing-refresh debris) both CLOSED; integrator befc2dc4/#365 stale-ref
+  answered (2026-08-22). Zero open PRs.
