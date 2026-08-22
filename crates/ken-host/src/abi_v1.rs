@@ -1748,7 +1748,21 @@ mod tests {
         offset!("HostReplyV1", HostReplyV1, detail);
         offset!("HostReplyV1", HostReplyV1, bytes);
         offset!("HostReplyV1", HostReplyV1, resource_error);
-        assert_eq!(crate::HOST_EFFECT_ABI_V1_CATALOG.len(), 25);
+        // **`ABI-R3` `D3`** -- this was a length assertion over the generated
+        // catalog against the literal 25, not reproduced here because `AC-3`'s
+        // control greps for that spelling. The loop below
+        // already covers inventory -> catalog; the count was standing in for
+        // the other direction, "the catalog has no row the inventory does not
+        // account for". State that relation directly instead: it stays
+        // meaningful when the catalog grows, and unlike a count it cannot be
+        // satisfied by a compensating duplicate.
+        for row in crate::HOST_EFFECT_ABI_V1_CATALOG {
+            assert!(
+                HostOpV1::ALL.iter().any(|operation| *operation as u16 == row.1),
+                "generated catalog row {:#06x} has no operation in the derived inventory",
+                row.1
+            );
+        }
         for operation in HostOpV1::ALL {
             let row = crate::HOST_EFFECT_ABI_V1_CATALOG
                 .iter()

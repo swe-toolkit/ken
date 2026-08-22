@@ -42,69 +42,161 @@ pub enum HostOpV1 {
 }
 
 impl HostOpV1 {
-    pub const ALL: [Self; 25] = [
-        Self::ConsoleRead,
-        Self::ConsoleWrite,
-        Self::ConsoleFlush,
-        Self::ConsoleIsTerminal,
-        Self::ClockWallNow,
-        Self::ClockMonotonicNow,
-        Self::ClockSleepUntil,
-        Self::FsReadFile,
-        Self::FsWriteFile,
-        Self::FsAppendFile,
-        Self::FsMetadata,
-        Self::FsReadDirectory,
-        Self::FsCreateDirectory,
-        Self::FsRemoveFile,
-        Self::FsRemoveDirectory,
-        Self::FsRename,
-        Self::FsChangeMode,
-        Self::FsOpen,
-        Self::FsHandleMetadata,
-        Self::FsReadAt,
-        Self::FsWriteAt,
-        Self::ResourceRelease,
-        Self::BufferAllocate,
-        Self::BufferFreeze,
-        Self::EntropyRandomBytes,
-    ];
+    /// **`ABI-R3` `D1` -- the operation inventory is DERIVED FROM THE ENUM.**
+    ///
+    /// `ALL` used to be a hand-written `[Self; 25]` that nothing tied to
+    /// `HostOpV1`. Adding a variant and stopping there compiled, left `ALL` at
+    /// 25, and every downstream set agreed with every other one -- because all
+    /// of them are downstream of `ALL`, and `ALL` never heard about the new
+    /// variant. Measured before this change: the build passed, all 58
+    /// `ken-host` tests passed, and the new operation silently received
+    /// `RepresentedUnavailable`, `is_ambient() == false`, and absence from
+    /// `ALL`.
+    ///
+    /// The inventory now walks [`Self::next_in_inventory`], whose `match` is
+    /// exhaustive with no wildcard, so a new variant is a COMPILE ERROR rather
+    /// than a silent omission. `COUNT` is walked from the same chain, so the
+    /// length cannot drift from the contents either.
+    ///
+    /// This is the discipline `FsOpenModeV1::required_right` already used in
+    /// this same file, applied to the enum that lacked it.
+    pub const COUNT: usize = {
+        let mut count = 1usize;
+        let mut current = Self::FIRST;
+        loop {
+            match current.next_in_inventory() {
+                Some(next) => {
+                    count += 1;
+                    current = next;
+                }
+                None => break,
+            }
+        }
+        count
+    };
 
-    pub const fn availability(self) -> HostOpAvailabilityV1 {
-        if matches!(
-            self,
-            Self::ConsoleWrite
-                | Self::ConsoleFlush
-                | Self::ConsoleIsTerminal
-                | Self::FsReadFile
-                | Self::FsWriteFile
-                | Self::FsChangeMode
-                | Self::FsOpen
-                | Self::FsHandleMetadata
-                | Self::ResourceRelease
-                | Self::FsReadAt
-                | Self::FsWriteAt
-                | Self::BufferAllocate
-                | Self::BufferFreeze
-        ) {
-            HostOpAvailabilityV1::NativeTested
-        } else {
-            HostOpAvailabilityV1::RepresentedUnavailable
+    /// The head of the inventory chain. ABI order, which `ALL` preserves.
+    const FIRST: Self = Self::ConsoleRead;
+
+    pub const ALL: [Self; Self::COUNT] = {
+        let mut all = [Self::FIRST; Self::COUNT];
+        let mut index = 1usize;
+        let mut current = Self::FIRST;
+        loop {
+            match current.next_in_inventory() {
+                Some(next) => {
+                    all[index] = next;
+                    current = next;
+                    index += 1;
+                }
+                None => break,
+            }
+        }
+        all
+    };
+
+    /// The successor of one operation in ABI order, or `None` at the end.
+    ///
+    /// Exhaustive, no wildcard: this is the single site a new operation must
+    /// be threaded through, and omitting it is `error[E0004]`.
+    const fn next_in_inventory(self) -> Option<Self> {
+        match self {
+            Self::ConsoleRead => Some(Self::ConsoleWrite),
+            Self::ConsoleWrite => Some(Self::ConsoleFlush),
+            Self::ConsoleFlush => Some(Self::ConsoleIsTerminal),
+            Self::ConsoleIsTerminal => Some(Self::ClockWallNow),
+            Self::ClockWallNow => Some(Self::ClockMonotonicNow),
+            Self::ClockMonotonicNow => Some(Self::ClockSleepUntil),
+            Self::ClockSleepUntil => Some(Self::FsReadFile),
+            Self::FsReadFile => Some(Self::FsWriteFile),
+            Self::FsWriteFile => Some(Self::FsAppendFile),
+            Self::FsAppendFile => Some(Self::FsMetadata),
+            Self::FsMetadata => Some(Self::FsReadDirectory),
+            Self::FsReadDirectory => Some(Self::FsCreateDirectory),
+            Self::FsCreateDirectory => Some(Self::FsRemoveFile),
+            Self::FsRemoveFile => Some(Self::FsRemoveDirectory),
+            Self::FsRemoveDirectory => Some(Self::FsRename),
+            Self::FsRename => Some(Self::FsChangeMode),
+            Self::FsChangeMode => Some(Self::FsOpen),
+            Self::FsOpen => Some(Self::FsHandleMetadata),
+            Self::FsHandleMetadata => Some(Self::FsReadAt),
+            Self::FsReadAt => Some(Self::FsWriteAt),
+            Self::FsWriteAt => Some(Self::ResourceRelease),
+            Self::ResourceRelease => Some(Self::BufferAllocate),
+            Self::BufferAllocate => Some(Self::BufferFreeze),
+            Self::BufferFreeze => Some(Self::EntropyRandomBytes),
+            Self::EntropyRandomBytes => None,
         }
     }
 
+    /// **`ABI-R3` `D2` -- exhaustive, no wildcard and no `else` fallback.**
+    ///
+    /// This was a membership test against the native set with an `else`
+    /// fallback, so a new operation was silently classified
+    /// `RepresentedUnavailable` -- a plausible-looking default, which is what
+    /// let it survive review. Classification is now explicit per operation.
+    pub const fn availability(self) -> HostOpAvailabilityV1 {
+        match self {
+            Self::ConsoleRead => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::ConsoleWrite => HostOpAvailabilityV1::NativeTested,
+            Self::ConsoleFlush => HostOpAvailabilityV1::NativeTested,
+            Self::ConsoleIsTerminal => HostOpAvailabilityV1::NativeTested,
+            Self::ClockWallNow => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::ClockMonotonicNow => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::ClockSleepUntil => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsReadFile => HostOpAvailabilityV1::NativeTested,
+            Self::FsWriteFile => HostOpAvailabilityV1::NativeTested,
+            Self::FsAppendFile => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsMetadata => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsReadDirectory => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsCreateDirectory => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsRemoveFile => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsRemoveDirectory => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsRename => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsChangeMode => HostOpAvailabilityV1::NativeTested,
+            Self::FsOpen => HostOpAvailabilityV1::NativeTested,
+            Self::FsHandleMetadata => HostOpAvailabilityV1::NativeTested,
+            Self::FsReadAt => HostOpAvailabilityV1::NativeTested,
+            Self::FsWriteAt => HostOpAvailabilityV1::NativeTested,
+            Self::ResourceRelease => HostOpAvailabilityV1::NativeTested,
+            Self::BufferAllocate => HostOpAvailabilityV1::NativeTested,
+            Self::BufferFreeze => HostOpAvailabilityV1::NativeTested,
+            Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
+        }
+    }
+
+    /// **`ABI-R3` `D2` -- exhaustive, no wildcard.**
+    ///
+    /// This was a bare membership test, so a new operation silently became
+    /// non-ambient.
     pub const fn is_ambient(self) -> bool {
-        matches!(
-            self,
-            Self::ConsoleRead
-                | Self::ConsoleWrite
-                | Self::ConsoleFlush
-                | Self::ConsoleIsTerminal
-                | Self::ClockWallNow
-                | Self::ClockMonotonicNow
-                | Self::ClockSleepUntil
-                | Self::EntropyRandomBytes
-        )
+        match self {
+            Self::ConsoleRead => true,
+            Self::ConsoleWrite => true,
+            Self::ConsoleFlush => true,
+            Self::ConsoleIsTerminal => true,
+            Self::ClockWallNow => true,
+            Self::ClockMonotonicNow => true,
+            Self::ClockSleepUntil => true,
+            Self::FsReadFile => false,
+            Self::FsWriteFile => false,
+            Self::FsAppendFile => false,
+            Self::FsMetadata => false,
+            Self::FsReadDirectory => false,
+            Self::FsCreateDirectory => false,
+            Self::FsRemoveFile => false,
+            Self::FsRemoveDirectory => false,
+            Self::FsRename => false,
+            Self::FsChangeMode => false,
+            Self::FsOpen => false,
+            Self::FsHandleMetadata => false,
+            Self::FsReadAt => false,
+            Self::FsWriteAt => false,
+            Self::ResourceRelease => false,
+            Self::BufferAllocate => false,
+            Self::BufferFreeze => false,
+            Self::EntropyRandomBytes => true,
+        }
     }
 }
 
@@ -341,7 +433,33 @@ pub fn host_effect_wire_layout_v1(
             checked_u32(field("length")?)?,
             checked_u32(field("span_origin")?)?,
         ],
-        _ => return Err(TerminalErrorV1::OperationUnavailable(operation)),
+        // **`ABI-R3` `D4` -- the request/reply schema axis, made a build break.**
+        //
+        // This was a `_` wildcard. Unlike the three defaults `D2` closed it did
+        // NOT classify silently -- it returned `OperationUnavailable`, so it
+        // failed closed. But failing closed at RUNTIME is not the same as
+        // failing at BUILD, and §5 requires each axis to be a build break to
+        // omit. Naming the operations that legitimately carry no wire layout
+        // turns a new operation from a runtime refusal into `error[E0004]`.
+        //
+        // These twelve are exactly the `RepresentedUnavailable` set, and the
+        // thirteen matched above are exactly the `NativeTested` set. That
+        // correspondence is asserted by name in the tests rather than left as
+        // a coincidence of two lists.
+        HostOpV1::ConsoleRead
+        | HostOpV1::ClockWallNow
+        | HostOpV1::ClockMonotonicNow
+        | HostOpV1::ClockSleepUntil
+        | HostOpV1::FsAppendFile
+        | HostOpV1::FsMetadata
+        | HostOpV1::FsReadDirectory
+        | HostOpV1::FsCreateDirectory
+        | HostOpV1::FsRemoveFile
+        | HostOpV1::FsRemoveDirectory
+        | HostOpV1::FsRename
+        | HostOpV1::EntropyRandomBytes => {
+            return Err(TerminalErrorV1::OperationUnavailable(operation))
+        }
     };
     let reply_bytes = offset("HostReplyV1", "bytes")?;
     let reply_resource_error = offset("HostReplyV1", "resource_error")?;
@@ -2922,7 +3040,44 @@ mod tests {
 
     #[test]
     fn catalog_is_closed_and_availability_is_exact() {
-        assert_eq!(HostOpV1::ALL.len(), 25);
+        // **`ABI-R3` `D3`** -- this was a length assertion over the inventory
+        // against the literal 25. `ALL` is declared with a fixed length, so
+        // that length was a COMPILE-TIME CONSTANT and the assertion read
+        // `25 == 25`. It could never fail, and no edit to the catalog could
+        // make it fail.
+        //
+        // The quoted spelling is deliberately not reproduced here: `AC-3`'s
+        // control greps for it, and a comment quoting the removed code is a
+        // hit a reviewer must open to dismiss.
+        //
+        // A count is also a proxy that a compensating duplicate defeats: an
+        // inventory listing one operation twice and omitting another has the
+        // same length and passes. So assert the two properties the count was
+        // standing in for, both of which survive the inventory growing.
+        for named in [
+            HostOpV1::ConsoleRead,
+            HostOpV1::FsReadAt,
+            HostOpV1::FsWriteAt,
+            HostOpV1::FsOpen,
+            HostOpV1::ResourceRelease,
+            HostOpV1::BufferAllocate,
+            HostOpV1::BufferFreeze,
+            HostOpV1::EntropyRandomBytes,
+        ] {
+            assert!(
+                HostOpV1::ALL.contains(&named),
+                "{named:?} must appear in the derived inventory"
+            );
+        }
+        let mut seen: Vec<HostOpV1> = Vec::new();
+        for operation in HostOpV1::ALL {
+            assert!(
+                !seen.contains(&operation),
+                "{operation:?} appears twice in the derived inventory, which is exactly \
+                 the defect a length check cannot see"
+            );
+            seen.push(operation);
+        }
         assert_eq!(
             HostOpV1::ALL
                 .into_iter()
