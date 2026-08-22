@@ -1,7 +1,7 @@
 ---
 id: RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL
 title: "The carried-operand projection path for FsReadAt's Argument(2) buffer reply arm handles ONLY ONE observation kind (BytesPointerLength, observe_carried_bytes_span at effects.rs:1405) and re-refuses a carried ResourceScalar buffer; removing the dead specialized-only gate at 3267 (whose span_origin binding is genuinely unused) only RELOCATES that refusal one function deeper and greens nothing, so the fix is NEED-DIRECTED resource-awareness in site_operand_argument's carried branch (a seat whose declared need is ResourceScalar projects via lower_resource_token_seat, not the byte-span observer) WITH the dead gate removed as part of that one change -- the ResourceScalar-family reader RT-EXACTINT moved onto the cap41_* critical path (D0 re-scoped 2026-08-22 from removal-only: point (1) was FALSE, Architect ruling evt_7h23767bakhgm)"
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none

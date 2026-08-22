@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-22 16:28:49Z — from 418 issue file(s) in `docs/program/issues/`.
+2026-08-22 16:35:47Z — from 418 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -319,7 +319,7 @@ the committed file matches the generator's output.
 | `RT-FORCED-RETURNS-BOUND-RESTORE` | One clause: the six ignored tests' eighteen empty returns are FORCED by the refusal, not observed -- the measurement the Architect barred from this comment came back one repair later, and it now sits one sentence above the 81-return tally a reader will add it to | merged | runtime | XS | none | — |
 | `RT-FRAME-MARKER-ONCE` | Checked Runtime frame marker is consumed more than once under a nested computational eliminator | draft | runtime | TBD | none | — |
 | `RT-FRONTEND-REACHABILITY-TRIPWIRE` | Nothing in the tree would notice if a frontend change made one of the source-unreachable refusal shapes constructible -- the emitter fixtures that look like they cover this bypass the parser and elaborator entirely | draft | runtime | M | none | — |
-| `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` | The carried-operand projection path for FsReadAt's Argument(2) buffer reply arm handles ONLY ONE observation kind (BytesPointerLength, observe_carried_bytes_span at effects.rs:1405) and re-refuses a carried ResourceScalar buffer; removing the dead specialized-only gate at 3267 (whose span_origin binding is genuinely unused) only RELOCATES that refusal one function deeper and greens nothing, so the fix is NEED-DIRECTED resource-awareness in site_operand_argument's carried branch (a seat whose declared need is ResourceScalar projects via lower_resource_token_seat, not the byte-span observer) WITH the dead gate removed as part of that one change -- the ResourceScalar-family reader RT-EXACTINT moved onto the cap41_* critical path (D0 re-scoped 2026-08-22 from removal-only: point (1) was FALSE, Architect ruling evt_7h23767bakhgm) | active | runtime | M | none | — |
+| `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` | The carried-operand projection path for FsReadAt's Argument(2) buffer reply arm handles ONLY ONE observation kind (BytesPointerLength, observe_carried_bytes_span at effects.rs:1405) and re-refuses a carried ResourceScalar buffer; removing the dead specialized-only gate at 3267 (whose span_origin binding is genuinely unused) only RELOCATES that refusal one function deeper and greens nothing, so the fix is NEED-DIRECTED resource-awareness in site_operand_argument's carried branch (a seat whose declared need is ResourceScalar projects via lower_resource_token_seat, not the byte-span observer) WITH the dead gate removed as part of that one change -- the ResourceScalar-family reader RT-EXACTINT moved onto the cap41_* critical path (D0 re-scoped 2026-08-22 from removal-only: point (1) was FALSE, Architect ruling evt_7h23767bakhgm) | closed | runtime | M | none | — |
 | `RT-GROUNDVALUE-RECURSIVE-DROP` | `RuntimeGroundValue` is a recursive type, so a decoder that is carefully iterative still cannot honour \"deep valid data uses no recursive host stack\" end to end -- a deeply nested value overflows the stack in its own `drop`, reproducible without the decoder, and the depth at which that happens is UNMEASURED: the two numbers in the source report are an observed abort and a deliberately-safe control, not a bisected threshold | draft | runtime | unknown | none | — |
 | `RT-IGNORED-CORPUS-MEMBERSHIP-RULE` | State the measurement corpus's exclusion by its membership rule -- all 33 ignored tests -- rather than by the six whose stated reason matched, which re-selects by reason at one scale down from the defect just repaired | merged | runtime | XS | none | https://github.com/swe-toolkit/ken/pull/2389 |
 | `RT-IH-MARKER-PRODUCER-COMPLETE` | Resolve the OrientedSubcontinuationPlanV1 'computational IH invocation marker does not wrap a complete application' refusal on the checked-program family (both programs, the terminal of the four cap41_* pins, on RT-FSREADAT's AC-4/AC-5 critical path) by CORRECTING THE PRODUCER, never the validator: diagnose which producer step made the plan and the marked expression disagree about completeness, then resolve to ONE of the two lawful non-interchangeable representations -- (i) it IS complete => fix the producer so plan and marker agree on a full Call of the checked arity, or (ii) it is genuinely partial => the distinct closure/PAP form with its own later apply. NEVER pad the call, infer missing arguments at emission, or reinterpret a full-call node as partial. The completeness checker stays byte-untouched (GHC join-point / Lean IR-checker / typed-CPS precedent, all fail-closed). Carries a MANDATORY post-fix re-enumeration gate: this family is depth-1 and cannot self-bound, so after the fix lands, re-run the existing checked-family enumeration end-to-end and read what surfaces. | active | language | M | none | — |
@@ -513,7 +513,6 @@ is itself not yet `merged`/`closed`:
 - `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: draft)
 - `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: ready)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-EXACTINT-CARRIED-OBSERVE` (status: active)
-- `NATIVE-HANDLE-CARRIER` blocked by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` (status: active)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)
 - `PX10` blocked by `ABI-S5` (status: draft)
@@ -527,13 +526,8 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION` blocked by `RT-IH-MARKER-PRODUCER-COMPLETE` (status: active)
-- `RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION` blocked by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` (status: active)
 - `RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION` blocked by `RT-DEAD-ARM-JOIN-DISPOSITION` (status: active)
-- `RT-COLD-LOWERING-PATH-ENUMERATION` blocked by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` (status: active)
 - `RT-COLD-LOWERING-PATH-ENUMERATION` blocked by `RT-DEAD-ARM-JOIN-DISPOSITION` (status: active)
-- `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` blocked by `RT-EXACTINT-CARRIED-OBSERVE` (status: active)
-- `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` blocked by `RT-DEAD-ARM-JOIN-DISPOSITION` (status: active)
-- `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` blocked by `RT-COLD-LOWERING-PATH-ENUMERATION` (status: active)
 - `RT-IH-MARKER-PRODUCER-COMPLETE` blocked by `RT-COLD-LOWERING-CHECKED-FAMILY-ENUMERATION` (status: active)
 - `RT-MATERIALIZED-DEAD-JOIN-RECONCILE` blocked by `RT-COLD-LOWERING-PATH-ENUMERATION` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
