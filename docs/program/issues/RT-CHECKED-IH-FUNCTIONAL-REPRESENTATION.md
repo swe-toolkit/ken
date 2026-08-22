@@ -11,7 +11,7 @@ github: null
 origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect's pre-committed conditional ruling (evt_2f4bbmt7qfde1) after the decisive ESCAPE measurement (runtime-implementer evt_79jd1nxamqd95) returned ESCAPING. Supersedes RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT (closed; both its Closure-A operand-seat mechanism and its NULLARY_FORCE re-reading were refuted -- the realized IH value escapes into a constructor, a capability gap, not a seam fix). HS=5 (Steward of record); ESCAPING is a scoping decision, not a hard-stop increment. Steward-filed per COORDINATION section 2."
 ---
 
-> # D0 RULED 2026-08-22 — DEFUNCTIONALIZE; re-homed as Track-1 of [[RT-NATIVE-CARRIED-VALUE]]
+> # D0 RULED 2026-08-22 — DEFUNCTIONALIZE; re-homed as native-program Track-1
 >
 > The Architect ruled the D0 this node carried (materialized closure value vs
 > defunctionalized carried tag) in the native-program frame (evt_9kat78d438cb):
@@ -34,6 +34,21 @@ origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect'
 > ([[RT-CARRIED-IH-DISPATCH-SITEOP]]) and M4 ([[RT-CLOSURE-BOUNDARY-RESIDUAL]]).
 > No longer deferred — it is the runtime lane-1 Track-1 crux. Needs a build frame
 > before release. HS 5.
+>
+> REACH BROADER THAN FIRST FRAMED (Architect evt_4sp2xftkmc1mz, 2026-08-22): this
+> D0 is the WHOLE remaining PX8-closure critical path. Track-0 measurement showed
+> every native checked-IO full program carries the checked continuation closure,
+> so this representation gates ALL FOUR native witnesses (ReadEof/ReadSome/Wrote
+> AND SemanticErrorV1), not just the positioned one — discharging M3+M4+M6 at
+> their three seats across every native checked-IO program.
+>
+> TRACK-1 ENTRY CRITERION (bounds the D0, from the Architect): confirm the
+> checked-write closure is the checked continuation — statically enumerable apply
+> sites, matching CROSSING-ELIMINATE's defunctionalization precondition — NOT a
+> genuinely non-enumerable source closure. Lean (merged-state logic): it is the
+> checked continuation, defunctionalizable. A genuinely non-enumerable apply site
+> is the Architect's return-fork condition (back to Architect + enclave), never a
+> silent widen.
 
 # WHAT THIS NODE IS
 

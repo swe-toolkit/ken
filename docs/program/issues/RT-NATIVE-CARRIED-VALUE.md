@@ -40,19 +40,37 @@ closed:
 
 ## Two tracks
 
-- Track 0 ([[RT-NATIVE-TRACK0-REARM]], shovel-ready first, NO new mechanism):
-  un-ignore the first-order stale rows, re-measure native, re-arm the vacuous CI
-  jobs, run the ignored-sweep as the oracle. Owns the decision-4 CI
-  de-vacuuming. Lights PX8's first-order native witnesses ReadEof / ReadSome /
-  Wrote.
+- Track 0 ([[RT-NATIVE-TRACK0-REARM]]): PURE HYGIENE (CORRECTED 2026-08-22,
+  Architect evt_4sp2xftkmc1mz). Re-label the stale first-order `#[ignore]`
+  reasons to their measured current blocker, confirm M1/M2 gone, establish the
+  sweep baseline. It lights NO PX8 witness green by itself. Its AC-2 (rows go
+  green) was FALSIFIED — closing M1/M2 MOVED the checked-write rows to the
+  closure-boundary seam, not to green. The decision-4 CI de-vacuuming re-homes to
+  Track 1 (the rows un-ignore only when Track 1 greens them).
 - Track 1 (one design decision applied at three seats): the D0 =
   [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]] (defunctionalization, ruled by the
   Architect). Consumers [[RT-CARRIED-IH-DISPATCH-SITEOP]] (M3) and
-  [[RT-CLOSURE-BOUNDARY-RESIDUAL]] (M4). Lights PX8's positioned native witness
-  SemanticErrorV1.
+  [[RT-CLOSURE-BOUNDARY-RESIDUAL]] (M4). Lights ALL FOUR native full-program
+  witnesses — ReadEof/ReadSome/Wrote AND positioned SemanticErrorV1 — because
+  every native checked-IO full program carries the checked continuation closure,
+  so the higher-order representation gates the first-order values too. Track 1
+  got bigger, Track 0 got smaller; the representation decision is unchanged.
 
-Dependency order: Track 0 first → Track 1 D0 → M6 (the representation itself,
-inside the D0 node) → M3 + M4.
+Dependency order: Track 0 (hygiene, independent) then Track 1 D0 → M6 (the
+representation itself, inside the D0 node) → M3 + M4. Track 1 is the whole
+remaining PX8-closure critical path.
+
+## Symptom inventory (§1b-i)
+
+Entry 1 (measured 2026-08-22, [[RT-NATIVE-TRACK0-REARM]] sweep): closing the
+first-order (need,phase) family MOVED the checked-IO full-programs to the
+closure-boundary seam, not to green — three refusals ("closure cannot cross"
+M4, "static worker expects 1 arguments but call provides 0" M6, "carried
+recursive hypothesis is an eliminated value" M3) are ONE defect. Keyed on: the
+checked continuation is a higher-order value with no first-class native
+representation. The predicate was already named; this is its measured
+confirmation, and it strengthens the unification (one checked program manifests
+it at multiple seams) rather than fracturing it.
 
 ## Closure condition (when PX8 re-verifies + closes)
 
