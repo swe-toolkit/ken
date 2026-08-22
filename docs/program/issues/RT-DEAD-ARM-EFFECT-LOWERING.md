@@ -68,7 +68,10 @@ inviolable:
 - **(i) Conservative oracle, fail-closed to strict.** The reachability census
   is a sound OVER-approximation: an arm is treated dead only if PROVEN
   never-constructed program-wide. Anything not proven dead stays LIVE and keeps
-  the strict seat (today's behaviour).
+  the strict seat (today's behaviour). **(i) as first stated is REFUTED in the
+  LIVE direction and CORRECTED — see the "D1 HARD-STOP" section below: a
+  whole-program SYNTACTIC construction census is NOT the conservative oracle
+  this required, because it is blind to host-synthesized values.)**
 - **(ii) The substitute is a TRAP, and this is load-bearing.** A trap
   (abort / `unreachable`) is the only substitute that is fail-closed under an
   incomplete census: if a request value ever reaches this arm from outside the
@@ -88,6 +91,72 @@ reachability property, coupling the seat abstraction to whole-program analysis
 -- the same "a dynamic/contextual property names a static capability" smell the
 `RT-NATIVE-FNSPLIT` closure retired. Keep the seat strict.
 
+# D1 HARD-STOP -- CORRECTED DEADNESS CRITERION (Architect `evt_4hcny7ae7h9sb`)
+
+The first D1 cut proved the mechanism's deadness oracle UNSOUND in the LIVE
+direction, demonstrated with a witness (runtime-implementer `evt_6wtfb4p5jxhk1`,
+WIP `b61923254` -- a NON-merge candidate that reds one existing control). A
+whole-program SYNTACTIC construction-site census errs toward DEAD: it sees only
+values built by program syntax and is blind to values produced OUTSIDE it.
+Witness: an effect RESPONSE `Result::Ok` is host-synthesized, never
+`Construct`-ed, so the census "proves dead" the SUCCESS continuation of every
+effect. That is the wrong conservatism direction; property (i) demanded
+PROVEN-dead and a syntactic census is not a proof. The trap keeps it fail-CLOSED
+per (ii) (halt, not miscompile), but it would break working programs -- exactly
+the regression (i) exists to prevent. The implementer reported the red control
+rather than editing it, which is correct: a control that reds against a new
+predicate is the predicate being refuted, not the control going stale.
+
+**CORRECTED CRITERION (Architect rules the direction; the ring builds it).** An
+arm on scrutinee `s:T` with constructor `c` is dead iff a value carrying `c` can
+never become `s` at runtime. Sound sufficient condition = BOTH:
+- **(1)** `c` is never program-constructed -- no `Construct c`, and no
+  `RuntimeValue::Constructor c` literal nested through args / record fields /
+  closure captures (the second class the ring already widened to, correctly);
+  AND
+- **(2)** `c` is not producible for a `T`-value by ANY runtime/host origin.
+  `host_effect_recipe_tree(operation)` / `SynthesizedFixedConstructorRole`
+  (`aggregates.rs:556`) is the authority for the effect-RESPONSE origin and MUST
+  be unioned in as LIVE. An `FSOp` REQUEST is program-constructed and never
+  host-synthesized (stays in (1), so the FSOp target stays dead cleanly); a
+  RESPONSE like `Result::Ok` is host-synthesized (so (2) marks it LIVE). The
+  request/response axis is the axis that decides whether a syntactic census is
+  sound.
+
+**REVISED-D1 FIRST DELIVERABLE (grounding, not a fork).** Enumerate the COMPLETE
+set of non-syntactic `RuntimeValue::Constructor` origins and make the predicate
+exhaustive-by-construction over a SEALED origin-kind set with NO catch-all
+(COORDINATION section 7): a future origin kind not taught to the predicate must
+be a COMPILE error, not a silent unsound trap. Recipe-tree responses are one
+origin; ground whether there are others (primitive/builtin results returning
+constructors -- `Bool`/`Ordering`/`Result` from comparisons; program-entry
+inputs from the host). If unsure whether an origin can yield `c` ⇒ treat LIVE,
+never trap. Completeness of (2) is not optional.
+
+**Do NOT take the shortcut "trap any seat that can't be claimed, skip the
+deadness analysis."** That turns a loud compile error into a SILENT runtime trap
+on genuinely-live effects, masks the real (A) need, and lets a compile-only test
+go green falsely. The deadness analysis is load-bearing precisely so the loud
+refusal SURVIVES on live arms -- that is the negative control (AC-4).
+
+**Refusal SITES = 2, not 1 (scope note; trigger (b) unchanged).** Behind the
+seat refusal (`effects.rs:277`), seven further dead arms refuse at a DIFFERENT
+site -- the represented-unavailable-lane check atop `lower_process_host_effect`
+(FsAppendFile, FsMetadata, FsReadDirectory, FsCreateDirectory, FsRemoveFile,
+FsRemoveDirectory, FsRename). Compute the deadness predicate ONCE per arm and
+consult it at each of the ≤N refusal sites (DRY); a modest scope bump, NOT a
+switch to trigger (a). The leader's (b) ruling stands (fewer arms touched =
+fewer places the predicate can be wrong).
+
+# SYMPTOM INVENTORY (section 1b)
+
+1. Deadness oracle (whole-program syntactic construction census) unsound in the
+   LIVE direction: a host-synthesized constructor (`Result::Ok` effect response)
+   reads as never-constructed and is wrongly proven dead. Keyed on: the census
+   sees only program-syntax origins, not runtime/host value production.
+   Corrected by conjunct (2) above. (The predicate-across-entries question fires
+   at the 3rd entry, not now.)
+
 # `D0` -- CENSUS EXISTENCE (first deliverable; determines SIZE, not design)
 
 Does the lowering pipeline already carry a sound constructed-constructor census
@@ -96,23 +165,33 @@ conservative one? Report which, name the mechanism if it exists, and state the
 resulting node size. This is the Architect's one in-node scoping input -- a
 measurement, not a fork.
 
-# `D1` -- THE FIX
+# `D1` -- THE FIX (per the corrected criterion above)
 
-Gate the refusing arm's effect-seat lowering on the (existing or newly-built,
-per `D0`) conservative construction-site census: on a PROVEN-dead arm, emit a
-trap for the refusing seat; on any arm not proven dead, leave today's strict
-lowering untouched.
+Build the deadness predicate as conjunct **(1) ∪ (2)** (see "D1 HARD-STOP"):
+program-construction census UNION recipe-tree-synthesized-LIVE, exhaustive-by-
+construction over the sealed origin-kind set (the revised-D1 first deliverable).
+On a PROVEN-dead arm, emit a trap for the refusing seat; on any arm not proven
+dead, leave today's strict lowering untouched. Compute the predicate once per
+arm and consult it at each of the ≤N refusal sites (the seat at `effects.rs:277`
+and the represented-unavailable-lane check atop `lower_process_host_effect`).
+Keep the failing control failing until the predicate is right; do not edit it.
 
 # ACCEPTANCE
 
-- **AC-1 (rows green).** The four `cap41_*` rows and the `AC-5` row
+- **AC-1 (dead-arm emission unblocked; rows ADVANCE).** NARROWED by the D1
+  hard-stop ruling (Architect `evt_4hcny7ae7h9sb`, Finding 2): this node does
+  NOT green the `cap41_*` rows. Behind the dead arms the fixtures hit a
+  genuinely LIVE refusal (`seat Argument(0) of ResourceRelease needs
+  ResourceScalar, ... CarriedWord`; `withResource` IS used), which is
+  (A)-family and OUT of this node's scope -- cut as its own node
+  [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]]. This node's honest deliverable:
+  **no dead-arm refusal fails object emission, and each of the four `cap41_*`
+  rows and the `AC-5` row
   (`fs_read_at_malformed_offset_narrows_to_invalid_offset`, `--ignored`) in
-  `crates/ken-cli/tests/rt_parity_native.rs` compile past the `ObjectEmission`
-  refusal. NOTE: greening the NATIVE lowering may expose a distinct downstream
-  interpreter-parity result -- the implementer's D-final observed the native
-  build fails FIRST, so the interpreter half of `differential` was never
-  exercised. Report the full per-row disposition; a newly-exposed distinct
-  blocker is a measurement to report, not a failure of this node.
+  `crates/ken-cli/tests/rt_parity_native.rs` ADVANCES to its next distinct
+  blocker, measured and named.** Report the full per-row disposition; the next
+  blocker (expected: the ResourceRelease/ResourceScalar live refusal) is a
+  measurement to report, not a failure of this node.
 - **AC-2 (conservative oracle).** The census is a sound over-approximation; an
   arm not proven dead keeps the strict seat. State the soundness argument.
 - **AC-3 (trap, not elision, not silent success).** The dead arm's refusing
@@ -165,11 +244,14 @@ runtime-varying live case is (A). The fixtures hit ONLY case (a).
 
 # CONTENTION
 
-`ken-runtime` cranelift backend lowering (`effects.rs`, and per `D0` possibly a
-census helper). No other lane-1 node is open on these files;
-NATIVE-HANDLE-CARRIER is held on this node and touches only the
-`rt_parity_native.rs` fixture rows (which this node greens). No `crates/`
-contention.
+`ken-runtime` cranelift backend lowering (`effects.rs`, and per `D0` a small
+census helper over `source_occurrences`). NATIVE-HANDLE-CARRIER is held on this
+node and touches only the `rt_parity_native.rs` fixture rows (which this node
+ADVANCES, not greens). [[RT-RESOURCE-RELEASE-CARRIED-OBSERVE]] -- the (A)-family
+successor for the live ResourceRelease/ResourceScalar refusal -- also lives in
+`effects.rs`, so it CONTENDS with this node and is SEQUENCED AFTER it in the
+runtime ring (single lane, one ring). It is not released while this node is in
+flight.
 
 # CAPABILITY TIER
 
