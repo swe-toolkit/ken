@@ -46,140 +46,101 @@
 
 ## LIVE — 2026-08-22
 
-**`main` = `b902d574f`.** Tree clean. Watchdog armed @1800s; the CronCreate
-daily briefing-flush schedule (`7d029bbf`, 09:37 — session-only) present.
+**`main` = `493672c8a`.** Tree clean; `steward/work` == `origin/main`. Publisher
+lane clear (lieutenant removed a stale CAT-SORT-close `merge.lock`,
+evt_10na22h4h4jkh). Watchdog + daily briefing-flush cron are session-only —
+re-verify armed at each resume.
 
 **THREE LANES (operator, 2026-08-21/22 trial). Roster: `steward/lanes.md` —
 that file is the source of truth, not this block.** Lane 1 runtime (finish the
 NHC carried-observation chain, then RT-BACKEND-MODULE-SPLIT); lane 2
 verify+language (Z3 integration); lane 3 foundation (expressibility trial, the
-Architect-burden probe, launched 2026-08-22 anchor `evt_4r550cbd3fvvb`). Doc
-track concurrent, contention-free. Finished work still merges; framing an active
-lane is lane work.
+Architect-burden probe). Doc track concurrent, contention-free. Finished work
+still merges; framing an active lane is lane work.
 
-### Runtime (lane 1) — RT-EXACTINT D1 landed d49a232a (node active/partial); removal + NHC held
+### Runtime (lane 1) — carried-observation chain at a 3rd hard-stop; research advisory in flight
 
-The NHC `cap41_*` blocker chain: each landed fix ADVANCES the rows to the next
-distinct blocker (does not green them) until the last lands and D-final runs
-all-green. Two blockers merged, third in review, fourth cut.
+The NHC `cap41_*` chain advances row-by-row: each landed fix moves the compile
+to the next distinct blocker until the last lands and D-final re-runs all-green.
 
-- RT-DEAD-ARM-EFFECT-LOWERING MERGED (`55c7f51de`, `dec_4p9n9a0b0rfqq`).
-- RT-RESOURCE-RELEASE-CARRIED-OBSERVE MERGED (`ef32b6ced`, `dec_3m2p4tmgnpa9t`;
-  QA + Architect APPROVE). ResourceScalar-need FAMILY CLOSURE
-  (`lower_resource_token_seat`, no Avail change). M8 Adversary hunt SOUNDNESS
-  CLEAN (`evt_5wx3bax63yak`).
-- RT-EXACTINT-CARRIED-OBSERVE D1 LANDED on `main` as `d49a232a` (six
-  corrected-stat candidate paths blob-match `2a8a6d569`; Architect APPROVE
-  carried, lieutenant merged). Node stays `active` — D1 is a partial; no
-  successor release is due yet (lieutenant, evt on `thr_6syere95dng6r`). Anchor
-  `evt_47kvrp1esty58`, thread `thr_6syere95dng6r`; runtime ring, Opus 5). D0
-  corrected the frame: it
-  is an AVAIL-MOVE, not a new route. Architect ruled (`evt_2kspreq08s3a`) a
-  deliberate move of the positioned exact-`Int` seats onto the existing
-  `carried_exact_int` EITHER_PHASE classification, decoded by the in-production
-  fail-closed-with-validity `narrow_carried_int_u64` — the decoder IS the
-  fail-closed consumer, so no route guard (does not contradict route-not-Avail,
-  which was need-specific to the ResourceScalar scalar-read). ExactIntU64 closed;
-  rows advance. Steward node-scope call (evt to ring): SIX-seat positioned-arm
-  unit confirmed — live census FsReadAt Arg(1)/3/4, FsWriteAt 1/3/4 same emitter
-  arm inert-but-correct, one decoder `narrow_positioned_int_seat`; FsChangeMode
-  Arg(1) dead_arm-trapped; BufferFreeze 1/2 other arm deferred pure wiring. D1
-  built, merge gate running, Architect required reviewer; Adversary hunts landed
-  code.
-- RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL CUT `ready` 2026-08-22. Closing
-  ExactIntU64 moved the previously-deferred FsReadAt Arg(2) buffer reply-path
-  gate (`effects.rs:3226`) ONTO the critical path (the "off critical path"
-  ground of the deferral is invalidated; implementer re-dispositioned
-  carry→cut, evt_6vxb4f1rxh3jk). ResourceScalar-family REMOVAL of a vestigial
-  gate (span_origin unused; span projected from operand list at 3233), NOT a
-  reroute (Architect `evt_2qdpkfvtqrxzy`). D0 = the Architect's (1)-(3)
-  classify; depends on RT-EXACTINT (effects.rs contention); released to the
-  ring after RT-EXACTINT merges. Also the tracked restoration home for two
-  carried-observation-family TEST items (Architect `evt_4wkc748vgfhhf`): AC-4
-  the ExactIntU64 runtime-half end-to-end test (observable once this gate is
-  gone) and AC-5 a durable positive-cross-key keyed-on-need discriminator for
-  the ResourceScalar route (replacing the vanishing-contrast one RT-EXACTINT
-  had to drop). Both safe-direction coverage, not soundness holes. Size M.
-  Architect required reviewer.
-- NHC depends_on re-pointed onto RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL (added
-  before RT-EXACTINT merges — gen-progress closed==merged hazard). Held on the
-  removal node. Closes when the chain reaches all-green and D-final re-runs (fold
-  with preserved slice/fixture + six-axis oracle → closes NHC + PX8-F-CAP-41
-  Phase 2). PX8-F-CAP-41 held on NHC.
-- Queued carry (NOT released, behind lane-1 indefinitely):
-  RT-NATIVE-VOCAB-STRUCTURAL-COMPLETENESS (conjunct-(2) completeness structural;
-  Architect req reviewer).
-- Lane-1 objective after NHC (operator 2026-08-22): pivot to
-  RT-BACKEND-MODULE-SPLIT (currently `draft` — needs framing before startable).
+- MERGED predecessors: RT-DEAD-ARM-EFFECT-LOWERING (`55c7f51de`),
+  RT-RESOURCE-RELEASE-CARRIED-OBSERVE (`ef32b6ced`), RT-EXACTINT-CARRIED-OBSERVE
+  (D1 `d49a232a`; node now CLOSED, runtime-qa retro).
+- RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL + RT-DEAD-ARM-JOIN-DISPOSITION are
+  CO-LANDING as one candidate on `wp/RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`
+  (thread `thr_3j5ew8rhy35nh`). Both BUILT and measured sound: the resource-aware
+  carried projection meets the Architect's AC-2 envelope; the join disposition
+  is 19 dispositions = the 19 measured-unconsumed joins, sourced from the
+  deadness predicate's own witness (`provably_dead_arm_body_containing`), so
+  disposition-follows-deadness holds BY CONSTRUCTION (predicate untouched).
+  Neither greens the compile alone; together they do not either.
+- HARD STOP, HS=3 (research-advisory trigger FIRED). A THIRD latent invariant
+  surfaced behind the join fix: `validate_materialized_dead_join_cfg` refuses
+  materialized-but-dead source join `StaticOriginId(288)` — consumed AND
+  dispositioned (overlap_len=1), NOT one of the implementer's 19 (pre-existing,
+  reachable for the first time now layer 2 cleared; fail-closed, safe). The
+  pattern IS the finding: three individually-sound fail-closed completeness
+  invariants (effect-seat need, join-consumption, materialized-dead CFG
+  reachability) stack on one lowering path, each masking the next.
+- §1a IN FLIGHT (happy path). Architect HOLDING its layer-3 ruling
+  (evt_6jshpy0n2164n), framed a sharp research prior-art ask (meta-pattern /
+  layer-3 join-phi under dead-region elimination / coverage; CompCert, CakeML,
+  verified LLVM/MLIR, SSA refs). Research PICKED UP (evt_13f09d04hc9wc, Sol/T1,
+  advisory only). Architect resumes + rules on the advisory; the ruling stays
+  the Architect's; runtime-implementer holds (not chasing layer 3). Steward
+  carries the count of record, no design opinion.
+- NHC held on the chain; D-final re-runs when both nodes land and the rows go
+  all-green (closes NATIVE-HANDLE-CARRIER + PX8-F-CAP-41 Phase 2). Then pivot to
+  RT-BACKEND-MODULE-SPLIT (`draft` — needs framing before startable).
 
-### Foundation (lane 3) — expressibility trial LAUNCHED 2026-08-22
+### Verify + language (lane 2) — Z3 integration; V3-FO D0 RESOLVED = arm (a), no TCB
 
-Bounded trial, the Architect-burden probe (operator 2026-08-21). Five
-independent CAT WPs authoring verified catalog algorithms against Ken's current
-surface; charter `docs/program/wp/foundation-expressibility-trial.md`.
+- CI-Z3-BASE-IMAGE landed + closed (verify infra).
+- KERNEL-SCT-TELESCOPE-CANON landed + CLOSED (code `ea9e5c14f`, closure
+  `b902d574f`; route-A arity fix + synthetic isolation consumer; Kernel QA +
+  Architect soundness APPROVE; gate un-weakened).
+- V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY D0 RULED (Architect evt_6y5b4ks46syd2):
+  arm (a) UPSTREAM, NO TCB. The four-row probe is an exhaustive discriminator;
+  row-4 (two-level descent split into per-level mutual helpers, one matched-field
+  peel per edge) passes full admission under UNCHANGED `size_rel`. Arms (b)/(c)
+  are OFF — no `size_rel` completeness gap, no richer measure. The whole SCT arc
+  closes with EXACTLY ONE kernel change (the landed arity canon) and no
+  `size_rel` change — smallest-TCB, the frame's preferred outcome.
+- AC-CONSUMER: restructure the real nine-member FoKripke `checker_soundness`
+  clique so every recursive-call argument is a one-level matched field; the real
+  clique must pass full admission (`kernel_check` AND `sct_check`) — no synthetic
+  substitute. Architect required reviewer; Adversary hunts; NO kernel gate (no
+  TCB). V3-FO-CHECKER-SOUNDNESS D3 resumes on this node's resolution.
+- HELD: language-leader holds arm-(a) dispatch on transport prereq `1afbb4b6`
+  landing on `origin/main` (QA-approved, awaiting the leader's merge Decision;
+  single-ring/no-stacking). No source signature change authorized meanwhile.
 
-- Launched to the foundation ring (anchor `evt_4r550cbd3fvvb`), simplest-first:
-  CAT-SORT (started) → CAT-GCD → CAT-DEQUE → CAT-BSEARCH → CAT-VEC (last,
-  fully dependent, highest gap risk). Seat check: implementer gpt-5.6-sol high.
-- `gate: none`, no deps, Architect NOT a default reviewer; QA reviews. Stop-on-
-  gap: a surface-gap report is the trial's payoff and routes to spec/Architect;
-  absent one, these are QA-reviewed expressibility authoring.
-- Confirm the foundation seat transitions to Working; anchor the next CAT when
-  CAT-SORT lands.
+### Foundation (lane 3) — expressibility trial, 2 of 5 resolved
 
-### Language + verify (lane 2) — Z3 integration; V3-FO / LANG in flight
+Bounded Architect-burden probe; charter
+`docs/program/wp/foundation-expressibility-trial.md`. Simplest-first, VEC last.
 
-- Transport landed: squash `93d82a398` (`elab.rs` blob = approved `1afbb4b6`,
-  Decision `dec_1f50e3a2pnxj6` APPROVE — stack-plumbing-only respin of the
-  CI-red `1b9aa9c7b`). Narrowed AC-7 met. Adversary hunted the landed object:
-  CLEAN (`evt_64x1rmjbx4097`; it flagged a wrong range endpoint in the
-  lieutenant's M8 handoff and self-corrected).
-- Q3 EXECUTED 2026-08-22 (operator "tcb change authorized. proceed.").
-  `KERNEL-SCT-TELESCOPE-CANON` cut (route A, arity from the declared Pi
-  telescope); `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` closed (accepted partial,
-  c-elab transport `93d82a398`); kernel ring kicked, D0 durable (`4fc1f7b5`).
-- KERNEL-SCT-TELESCOPE-CANON MERGED + CLOSED (`ea9e5c14`, candidate `bd0ac4c5`;
-  node `status: merged`). Route A arity fix + synthetic arity-isolation consumer;
-  Kernel QA APPROVE (evt_3t5f06yyasvvh) + Architect soundness APPROVE
-  (evt_4xbrdeey44mew, deep as-implemented pass); Decision `dec_26c9nn62gempr`.
-  Gate un-weakened. Two post-merge AC-REVIEW items recorded in the node:
-  adversary hunt on the landed code DISPATCHED (evt_6yq03w1s8br3k, report-only,
-  awaiting result); surface conformance seed for the real FoKripke consumer lives
-  on the successor. (Publisher note: node-close-on-merge is the lieutenant's
-  M8/M9 — I raced it this once and caused #2757 to conflict; do not pre-empt it
-  again.)
-- The D1 measurement REFUTED the premise that arity was the whole SCT-pass gate:
-  the real FoKripke clique fails by ROTATION under the current `size_rel`
-  abstraction — NOT arity, NOT Cast/J (refuted), NOT a closure-criterion gap
-  (SCT already complete for the abstraction, Lee-Jones-Ben-Amram → no
-  lexicographic node). Residual routed to NEW node
-  `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` (the real AC-CONSUMER home; `ready`, now
-  UNBLOCKED — its KERNEL-SCT predecessor merged). It carries the rotation fork
-  D0: (a) upstream re-elaboration [preferred, no TCB], (b) narrow `size_rel`
-  completeness [operator-gated, conditional], (c) richer measure [operator
-  escalation, dispreferred]. D0 is a FORK, not a build. `V3-FO-CHECKER-SOUNDNESS`
-  `depends_on` re-pointed onto it.
-- NEXT ACTION (deferred at the 25% seam, needs a deliberate seat call): KICK the
-  `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` D0 fork. SEAT ISSUE — it is a T1 design
-  fork, but the enclave lead (spec-leader) is on `deepseek-v4-flash` (mechanical
-  tier, under-provisioned per §4h). Decide the T1 seat before kicking: reseat
-  spec-leader to T1, or route the discrimination to research (Sol/T1, available
-  but advisory) with the Architect as design authority + the language ring
-  owning outcome (a) execution, or escalate the tier. Architect is required
-  soundness reviewer on any kernel touch (arm b).
-- Program consequence for the operator: V3-FO (soundness-critical) now waits on
-  an UPSTREAM expressibility question, materially harder than arity and genuinely
-  open. No TCB authorization due to Pat yet — (a) needs none; (b)/(c) arise only
-  if the enclave's D0 rules them in.
+- CAT-SORT CLOSED (landed `ec395fd3f`, node-close `3e2e257b6`, blob-matched
+  `1ee236ebe`; Adversary hunt CLEAN, no watch-item).
+- CAT-GCD WORKING (`thr_2efpzygmfk5g3`; `wp/CAT-GCD`). D0 chose explicit-fuel
+  subtractive Euclid — NO current-surface hard stop, so not an expressibility
+  failure and no gap node warranted (it corroborates but does not duplicate the
+  language SCT termination-presentation pressure). D1 checkpoint `130fa7d29`:
+  entry checks; AC proofs next.
+- Remaining after CAT-GCD: CAT-DEQUE → CAT-BSEARCH → CAT-VEC (last, fully
+  dependent, highest gap risk).
 
-### Operator questions — Q3 ANSWERED; none block lane 1
+### Operator questions — none open
 
-Q1/Q2 were resolved by the 2026-08-21/22 three-lane trial (roster:
-`steward/lanes.md`): runtime is lane 1, and language/verify is an authorized
-lane (lane 2). Q3 (authorize the operator-gated kernel SCT successor) was
-answered YES on 2026-08-22 ("tcb change authorized. proceed.") and is executed —
-see the Language+verify (lane 2) section above. No operator question is open.
+Q1/Q2 resolved by the three-lane trial; Q3 answered YES ("tcb change
+authorized. proceed.") and executed (KERNEL-SCT). No TCB authorization is due to
+the operator right now: V3-FO D0 ruled arm (a) which needs none; the RT-FSREADAT
+layer-3 stack is `ken-runtime` cranelift lowering (no kernel/TCB). Escalate only
+if the Architect's layer-3 ruling or a future D0 rules in an operator-gated arm.
 
-### Preserved refs this session
+### Session log / escalations of record
 
-- `preserved/steward-work-df470315` — pre-compaction briefing checkpoint.
+- HS=3 research-advisory escalation logged (RT-FSREADAT + RT-DEAD-ARM chain,
+  `thr_3j5ew8rhy35nh`, 2026-08-22): 3rd hard-stop on one mechanism chain;
+  Architect holding per §1a; research advisory pending. Count of record: HS=3,
+  next re-trigger at HS=6.
