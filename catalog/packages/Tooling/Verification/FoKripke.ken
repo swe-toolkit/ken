@@ -821,3 +821,959 @@ fn fok_or_elim (a : Bool) (b : Bool) (target : Type)
     True ↦ λh. λka. λkb. ka h;
     False ↦ λh. λka. λkb. kb h
   }
+
+-- === D3: propositional checker soundness (23 section 4.4) ===
+--
+-- D3 proves the Init/ImpRight partition without introducing a parallel
+-- certificate type. The standalone predicate excludes FokForallRight at every
+-- node, not merely at the root: its child fold supplies the same witness to
+-- every recursive proof call. D4 owns both target shapes of FokForallRight
+-- (FokForallWorld and FokForallObj) and removes this explicit hypothesis.
+fn fok_rule_is_not_forall_right (rule : FokRule) : Bool =
+  match rule {
+    FokInit left right ↦ True;
+    FokImpRight right ↦ True;
+    FokForallRight right eigen ↦ False
+  }
+
+fn fok_cert_no_forall_right (pi : FokCert) : Bool =
+  match pi {
+    FokMkCert conclusion rule children ↦
+      fok_and
+        (fok_rule_is_not_forall_right rule)
+        (fok_cert_children_all_no_forall_right children)
+  }
+
+fn fok_cert_children_all_no_forall_right (children : List FokCert) : Bool =
+  match children {
+    Nil ↦ True;
+    Cons child rest ↦
+      fok_and
+        (fok_cert_no_forall_right child)
+        (fok_cert_children_all_no_forall_right rest)
+  }
+
+-- Boolean equality results become kernel equalities before checker evidence is
+-- transported across a stored conclusion. These helpers follow the actual
+-- equality-checker call chain rather than assuming boolean reflection.
+theorem fok_cong
+      (a : Type) (b : Type) (x : a) (y : a) (f : a → b) (same : Equal a x y)
+    : Equal b (f x) (f y) =
+  J (λy2 _. Equal b (f x) (f y2)) Refl same
+
+theorem fok_cong2
+      (a : Type)
+      (b : Type)
+      (c : Type)
+      (x1 : a)
+      (y1 : a)
+      (x2 : b)
+      (y2 : b)
+      (f : a → b → c)
+      (same1 : Equal a x1 y1)
+      (same2 : Equal b x2 y2)
+    : Equal c (f x1 x2) (f y1 y2) =
+  J
+    (λy1b _. Equal c (f x1 x2) (f y1b y2))
+    (J (λy2b _. Equal c (f x1 x2) (f x1 y2b)) Refl same2)
+    same1
+
+theorem fok_nat_eq_sound (a : Nat)
+    : (b : Nat) → Equal Bool (fok_nat_eq a b) True → Equal Nat a b =
+  match a {
+    Zero ↦
+      λb.
+        match b {
+          Zero ↦ λh. Proved;
+          Suc j ↦ λh. absurd h
+        };
+    Suc i ↦
+      λb.
+        match b {
+          Zero ↦ λh. absurd h;
+          Suc j ↦
+            λh.
+              fok_cong Nat Nat i j (λn. Suc n) (fok_nat_eq_sound i j h)
+        }
+  }
+
+theorem fok_qterm_eq_sound (a : FokQTerm)
+    : (b : FokQTerm) →
+      Equal Bool (fok_qterm_eq a b) True → Equal FokQTerm a b =
+  match a {
+    FokQBound i ↦
+      λb.
+        match b {
+          FokQBound j ↦
+            λh.
+              fok_cong
+                Nat FokQTerm i j (λn. FokQBound n) (fok_nat_eq_sound i j h);
+          FokQParameter j ↦ λh. absurd h
+        };
+    FokQParameter i ↦
+      λb.
+        match b {
+          FokQBound j ↦ λh. absurd h;
+          FokQParameter j ↦
+            λh.
+              fok_cong
+                Nat FokQTerm i j (λn. FokQParameter n) (fok_nat_eq_sound i j h)
+        }
+  }
+
+theorem fok_form_eq_sound (a : FokForm)
+    : (b : FokForm) →
+      Equal Bool (fok_form_eq a b) True → Equal FokForm a b =
+  match a {
+    FokBottom ↦
+      λb.
+        match b {
+          FokBottom ↦ λh. Proved;
+          FokAccess b1 b2 ↦ λh. absurd h;
+          FokDomainA b1 b2 ↦ λh. absurd h;
+          FokForcingP b1 b2 ↦ λh. absurd h;
+          FokAnd b1 b2 ↦ λh. absurd h;
+          FokOr b1 b2 ↦ λh. absurd h;
+          FokImp b1 b2 ↦ λh. absurd h;
+          FokForallWorld b1 ↦ λh. absurd h;
+          FokForallObj b1 ↦ λh. absurd h
+        };
+    FokAccess a1 a2 ↦
+      λb.
+        match b {
+          FokBottom ↦ λh. absurd h;
+          FokAccess b1 b2 ↦
+            λh.
+              fok_cong2 FokQTerm FokQTerm FokForm a1 b1 a2 b2
+                (λx. λy. FokAccess x y)
+                (fok_qterm_eq_sound a1 b1
+                  (fok_and_left (fok_qterm_eq a1 b1) (fok_qterm_eq a2 b2) h))
+                (fok_qterm_eq_sound a2 b2
+                  (fok_and_right (fok_qterm_eq a1 b1) (fok_qterm_eq a2 b2) h));
+          FokDomainA b1 b2 ↦ λh. absurd h;
+          FokForcingP b1 b2 ↦ λh. absurd h;
+          FokAnd b1 b2 ↦ λh. absurd h;
+          FokOr b1 b2 ↦ λh. absurd h;
+          FokImp b1 b2 ↦ λh. absurd h;
+          FokForallWorld b1 ↦ λh. absurd h;
+          FokForallObj b1 ↦ λh. absurd h
+        };
+    FokDomainA a1 a2 ↦
+      λb.
+        match b {
+          FokBottom ↦ λh. absurd h;
+          FokAccess b1 b2 ↦ λh. absurd h;
+          FokDomainA b1 b2 ↦
+            λh.
+              fok_cong2 FokQTerm FokQTerm FokForm a1 b1 a2 b2
+                (λx. λy. FokDomainA x y)
+                (fok_qterm_eq_sound a1 b1
+                  (fok_and_left (fok_qterm_eq a1 b1) (fok_qterm_eq a2 b2) h))
+                (fok_qterm_eq_sound a2 b2
+                  (fok_and_right (fok_qterm_eq a1 b1) (fok_qterm_eq a2 b2) h));
+          FokForcingP b1 b2 ↦ λh. absurd h;
+          FokAnd b1 b2 ↦ λh. absurd h;
+          FokOr b1 b2 ↦ λh. absurd h;
+          FokImp b1 b2 ↦ λh. absurd h;
+          FokForallWorld b1 ↦ λh. absurd h;
+          FokForallObj b1 ↦ λh. absurd h
+        };
+    FokForcingP a1 a2 ↦
+      λb.
+        match b {
+          FokBottom ↦ λh. absurd h;
+          FokAccess b1 b2 ↦ λh. absurd h;
+          FokDomainA b1 b2 ↦ λh. absurd h;
+          FokForcingP b1 b2 ↦
+            λh.
+              fok_cong2 FokQTerm FokQTerm FokForm a1 b1 a2 b2
+                (λx. λy. FokForcingP x y)
+                (fok_qterm_eq_sound a1 b1
+                  (fok_and_left (fok_qterm_eq a1 b1) (fok_qterm_eq a2 b2) h))
+                (fok_qterm_eq_sound a2 b2
+                  (fok_and_right (fok_qterm_eq a1 b1) (fok_qterm_eq a2 b2) h));
+          FokAnd b1 b2 ↦ λh. absurd h;
+          FokOr b1 b2 ↦ λh. absurd h;
+          FokImp b1 b2 ↦ λh. absurd h;
+          FokForallWorld b1 ↦ λh. absurd h;
+          FokForallObj b1 ↦ λh. absurd h
+        };
+    FokAnd a1 a2 ↦
+      λb.
+        match b {
+          FokBottom ↦ λh. absurd h;
+          FokAccess b1 b2 ↦ λh. absurd h;
+          FokDomainA b1 b2 ↦ λh. absurd h;
+          FokForcingP b1 b2 ↦ λh. absurd h;
+          FokAnd b1 b2 ↦
+            λh.
+              fok_cong2 FokForm FokForm FokForm a1 b1 a2 b2
+                (λx. λy. FokAnd x y)
+                (fok_form_eq_sound a1 b1
+                  (fok_and_left (fok_form_eq a1 b1) (fok_form_eq a2 b2) h))
+                (fok_form_eq_sound a2 b2
+                  (fok_and_right (fok_form_eq a1 b1) (fok_form_eq a2 b2) h));
+          FokOr b1 b2 ↦ λh. absurd h;
+          FokImp b1 b2 ↦ λh. absurd h;
+          FokForallWorld b1 ↦ λh. absurd h;
+          FokForallObj b1 ↦ λh. absurd h
+        };
+    FokOr a1 a2 ↦
+      λb.
+        match b {
+          FokBottom ↦ λh. absurd h;
+          FokAccess b1 b2 ↦ λh. absurd h;
+          FokDomainA b1 b2 ↦ λh. absurd h;
+          FokForcingP b1 b2 ↦ λh. absurd h;
+          FokAnd b1 b2 ↦ λh. absurd h;
+          FokOr b1 b2 ↦
+            λh.
+              fok_cong2 FokForm FokForm FokForm a1 b1 a2 b2
+                (λx. λy. FokOr x y)
+                (fok_form_eq_sound a1 b1
+                  (fok_and_left (fok_form_eq a1 b1) (fok_form_eq a2 b2) h))
+                (fok_form_eq_sound a2 b2
+                  (fok_and_right (fok_form_eq a1 b1) (fok_form_eq a2 b2) h));
+          FokImp b1 b2 ↦ λh. absurd h;
+          FokForallWorld b1 ↦ λh. absurd h;
+          FokForallObj b1 ↦ λh. absurd h
+        };
+    FokImp a1 a2 ↦
+      λb.
+        match b {
+          FokBottom ↦ λh. absurd h;
+          FokAccess b1 b2 ↦ λh. absurd h;
+          FokDomainA b1 b2 ↦ λh. absurd h;
+          FokForcingP b1 b2 ↦ λh. absurd h;
+          FokAnd b1 b2 ↦ λh. absurd h;
+          FokOr b1 b2 ↦ λh. absurd h;
+          FokImp b1 b2 ↦
+            λh.
+              fok_cong2 FokForm FokForm FokForm a1 b1 a2 b2
+                (λx. λy. FokImp x y)
+                (fok_form_eq_sound a1 b1
+                  (fok_and_left (fok_form_eq a1 b1) (fok_form_eq a2 b2) h))
+                (fok_form_eq_sound a2 b2
+                  (fok_and_right (fok_form_eq a1 b1) (fok_form_eq a2 b2) h));
+          FokForallWorld b1 ↦ λh. absurd h;
+          FokForallObj b1 ↦ λh. absurd h
+        };
+    FokForallWorld a1 ↦
+      λb.
+        match b {
+          FokBottom ↦ λh. absurd h;
+          FokAccess b1 b2 ↦ λh. absurd h;
+          FokDomainA b1 b2 ↦ λh. absurd h;
+          FokForcingP b1 b2 ↦ λh. absurd h;
+          FokAnd b1 b2 ↦ λh. absurd h;
+          FokOr b1 b2 ↦ λh. absurd h;
+          FokImp b1 b2 ↦ λh. absurd h;
+          FokForallWorld b1 ↦
+            λh.
+              fok_cong FokForm FokForm a1 b1
+                (λx. FokForallWorld x) (fok_form_eq_sound a1 b1 h);
+          FokForallObj b1 ↦ λh. absurd h
+        };
+    FokForallObj a1 ↦
+      λb.
+        match b {
+          FokBottom ↦ λh. absurd h;
+          FokAccess b1 b2 ↦ λh. absurd h;
+          FokDomainA b1 b2 ↦ λh. absurd h;
+          FokForcingP b1 b2 ↦ λh. absurd h;
+          FokAnd b1 b2 ↦ λh. absurd h;
+          FokOr b1 b2 ↦ λh. absurd h;
+          FokImp b1 b2 ↦ λh. absurd h;
+          FokForallWorld b1 ↦ λh. absurd h;
+          FokForallObj b1 ↦
+            λh.
+              fok_cong FokForm FokForm a1 b1
+                (λx. FokForallObj x) (fok_form_eq_sound a1 b1 h)
+        }
+  }
+
+fn fok_list_form_eq_cons_result
+      (x : FokForm)
+      (rest : List FokForm)
+      (y : FokForm)
+      (ys2 : List FokForm)
+      (head_result : Bool)
+    : Omega =
+  Equal Bool
+    (match head_result {
+      True ↦ fok_list_form_eq rest ys2;
+      False ↦ False
+    })
+    True
+
+theorem fok_list_form_eq_sound_cons
+      (x : FokForm)
+      (rest : List FokForm)
+      (y : FokForm)
+      (ys2 : List FokForm)
+      (ih : (ys : List FokForm) →
+        Equal Bool (fok_list_form_eq rest ys) True → Equal (List FokForm) rest ys)
+    : fok_list_form_eq_cons_result x rest y ys2 (fok_form_eq x y) →
+      Equal (List FokForm) (Cons FokForm x rest) (Cons FokForm y ys2) =
+  match fok_form_eq x y eqn : head_true {
+    True ↦
+      λh.
+        J
+          (λy2 _.
+            Equal (List FokForm)
+              (Cons FokForm x rest)
+              (Cons FokForm y2 ys2))
+          (fok_cong
+            (List FokForm)
+            (List FokForm)
+            rest
+            ys2
+            (λtail. Cons FokForm x tail)
+            (ih ys2 h))
+          (fok_form_eq_sound x y head_true);
+    False ↦ λh. absurd h
+  }
+
+theorem fok_list_form_eq_sound (xs : List FokForm)
+    : (ys : List FokForm) →
+      Equal Bool (fok_list_form_eq xs ys) True → Equal (List FokForm) xs ys =
+  match xs {
+    Nil ↦
+      λys.
+        match ys {
+          Nil ↦ λh. Proved;
+          Cons y rest ↦ λh. absurd h
+        };
+    Cons x rest ↦
+      λys.
+        match ys {
+          Nil ↦ λh. absurd h;
+          Cons y ys2 ↦
+            fok_list_form_eq_sound_cons
+              x rest y ys2 (fok_list_form_eq_sound rest)
+        }
+  }
+
+theorem fok_sequent_eq_sound_fields
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (gamma2 : List FokForm)
+      (delta2 : List FokForm)
+      (gamma_same : Equal (List FokForm) gamma gamma2)
+      (delta_same : Equal (List FokForm) delta delta2)
+    : Equal FokSequent
+      (FokMkSequent gamma delta) (FokMkSequent gamma2 delta2) =
+  J
+    (λgamma3 _.
+      Equal FokSequent
+        (FokMkSequent gamma delta)
+        (FokMkSequent gamma3 delta2))
+    (J
+      (λdelta3 _.
+        Equal FokSequent
+          (FokMkSequent gamma delta)
+          (FokMkSequent gamma delta3))
+      (Refl, Refl)
+      delta_same)
+    gamma_same
+
+fn fok_sequent_eq_result
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (gamma2 : List FokForm)
+      (delta2 : List FokForm)
+      (gamma_result : Bool)
+    : Omega =
+  Equal Bool
+    (match gamma_result {
+      True ↦ fok_list_form_eq delta delta2;
+      False ↦ False
+    })
+    True
+
+theorem fok_sequent_eq_sound_parts
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (gamma2 : List FokForm)
+      (delta2 : List FokForm)
+    : fok_sequent_eq_result
+        gamma delta gamma2 delta2 (fok_list_form_eq gamma gamma2) →
+      Equal FokSequent
+        (FokMkSequent gamma delta) (FokMkSequent gamma2 delta2) =
+  match fok_list_form_eq gamma gamma2 eqn : gamma_true {
+    True ↦
+      λh.
+        fok_sequent_eq_sound_fields
+          gamma delta gamma2 delta2
+          (fok_list_form_eq_sound gamma gamma2 gamma_true)
+          (fok_list_form_eq_sound delta delta2 h);
+    False ↦ λh. absurd h
+  }
+
+theorem fok_sequent_eq_sound (a : FokSequent)
+    : (b : FokSequent) →
+      Equal Bool (fok_sequent_eq a b) True → Equal FokSequent a b =
+  match a {
+    FokMkSequent gamma delta ↦
+      λb.
+        match b {
+          FokMkSequent gamma2 delta2 ↦
+            fok_sequent_eq_sound_parts gamma delta gamma2 delta2
+        }
+  }
+
+-- The rule proof is total over FokRule. Init and ImpRight reflect their exact
+-- checker paths. FokForallRight is unreachable under D3's explicit fragment
+-- witness, so that arm returns only by eliminating `False = True`.
+fn fok_false_elim (target : Type) (h : Equal Bool False True) : target = absurd h
+
+theorem fok_equal_bool_true_transport
+      (a : Bool)
+      (b : Bool)
+      (ab : Equal Bool a b)
+      (a_true : Equal Bool a True)
+    : Equal Bool b True =
+  J (λb2 _. Equal Bool b2 True) a_true ab
+
+fn fok_init_right_check (g : FokForm) (right_lookup : Option FokForm) : Bool =
+  match right_lookup {
+    None ↦ False;
+    Some d ↦ fok_form_eq g d
+  }
+
+fn fok_init_left_check
+      (delta : List FokForm)
+      (right : Nat)
+      (left_lookup : Option FokForm)
+    : Bool =
+  match left_lookup {
+    None ↦ False;
+    Some g ↦ fok_init_right_check g (fok_nth_form delta right)
+  }
+
+fn fok_prop_init_right_sound
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (left : Nat)
+      (right : Nat)
+      (g : FokForm)
+      (left_lookup : Equal (Option FokForm)
+        (fok_nth_form gamma left) (Some FokForm g))
+      (right_result : Option FokForm)
+    : Equal (Option FokForm) (fok_nth_form delta right) right_result →
+      Equal Bool (fok_init_right_check g right_result) True →
+      FokDerivation (FokMkSequent gamma delta) =
+  match right_result {
+    None ↦
+      λright_lookup. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    Some d ↦
+      λright_lookup. λaccepted.
+        FokDerivInit gamma delta left right g d
+          left_lookup right_lookup accepted
+  }
+
+fn fok_prop_init_left_sound
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (left : Nat)
+      (right : Nat)
+      (left_result : Option FokForm)
+    : Equal (Option FokForm) (fok_nth_form gamma left) left_result →
+      Equal Bool (fok_init_left_check delta right left_result) True →
+      FokDerivation (FokMkSequent gamma delta) =
+  match left_result {
+    None ↦
+      λleft_lookup. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    Some g ↦
+      λleft_lookup. λaccepted.
+        fok_prop_init_right_sound
+          gamma delta left right g left_lookup
+          (fok_nth_form delta right) Refl accepted
+  }
+
+fn fok_prop_init_sound
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (left : Nat)
+      (right : Nat)
+      (children : List FokCert)
+    : Equal Bool (fok_cert_children_all_no_forall_right children) True →
+      Equal Bool (fok_check_rule gamma delta (FokInit left right) children) True →
+      FokDerivation (FokMkSequent gamma delta) =
+  match children {
+    Cons child rest ↦
+      λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    Nil ↦
+      λchildren_ok. λaccepted.
+        fok_prop_init_left_sound
+          gamma delta left right (fok_nth_form gamma left) Refl accepted
+  }
+
+fn fok_imp_rest_check
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (right : Nat)
+      (p : FokForm)
+      (q : FokForm)
+      (child : FokCert)
+      (rest : List FokCert)
+    : Bool =
+  match rest {
+    Cons child2 rest2 ↦ False;
+    Nil ↦
+      fok_check_tree
+        (FokMkSequent
+          (fok_list_form_append_one gamma p)
+          (fok_list_form_set_nth delta right q))
+        child
+  }
+
+fn fok_imp_children_check
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (right : Nat)
+      (p : FokForm)
+      (q : FokForm)
+      (children : List FokCert)
+    : Bool =
+  match children {
+    Nil ↦ False;
+    Cons child rest ↦
+      fok_imp_rest_check gamma delta right p q child rest
+  }
+
+fn fok_imp_form_check
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (right : Nat)
+      (target : FokForm)
+      (children : List FokCert)
+    : Bool =
+  match target {
+    FokBottom ↦ False;
+    FokAccess a b ↦ False;
+    FokDomainA a b ↦ False;
+    FokForcingP a b ↦ False;
+    FokAnd p q ↦ False;
+    FokOr p q ↦ False;
+    FokImp p q ↦ fok_imp_children_check gamma delta right p q children;
+    FokForallWorld body ↦ False;
+    FokForallObj body ↦ False
+  }
+
+fn fok_imp_lookup_check
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (right : Nat)
+      (target_result : Option FokForm)
+      (children : List FokCert)
+    : Bool =
+  match target_result {
+    None ↦ False;
+    Some target ↦ fok_imp_form_check gamma delta right target children
+  }
+
+fn fok_prop_check_tree_sound_type (pi : FokCert) : Type =
+  (expected : FokSequent) →
+  Equal Bool (fok_cert_no_forall_right pi) True →
+  Equal Bool (fok_check_tree expected pi) True → FokDerivation expected
+
+-- The recursion result for a child list is the head certificate's soundness
+-- proof. Empty lists carry an inert Nat because no checker rule recurs there.
+fn fok_prop_children_head_sound_type (children : List FokCert) : Type =
+  match children {
+    Nil ↦ Nat;
+    Cons child rest ↦ fok_prop_check_tree_sound_type child
+  }
+
+fn fok_prop_imp_build
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (right : Nat)
+      (p : FokForm)
+      (q : FokForm)
+      (target_lookup : Equal (Option FokForm)
+        (fok_nth_form delta right) (Some FokForm (FokImp p q)))
+      (child_derivation : FokDerivation
+        (FokMkSequent
+          (fok_list_form_append_one gamma p)
+          (fok_list_form_set_nth delta right q)))
+    : FokDerivation (FokMkSequent gamma delta) =
+  FokDerivImpRight
+    gamma delta right p q target_lookup child_derivation
+
+fn fok_prop_imp_build_from_sound
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (right : Nat)
+      (p : FokForm)
+      (q : FokForm)
+      (target_lookup : Equal (Option FokForm)
+        (fok_nth_form delta right) (Some FokForm (FokImp p q)))
+      (child : FokCert)
+      (child_sound : fok_prop_check_tree_sound_type child)
+    : Equal Bool
+        (fok_cert_children_all_no_forall_right
+          (Cons FokCert child (Nil FokCert))) True →
+      Equal Bool
+        (fok_check_tree
+          (FokMkSequent
+            (fok_list_form_append_one gamma p)
+            (fok_list_form_set_nth delta right q))
+          child) True →
+      FokDerivation (FokMkSequent gamma delta) =
+  λchildren_ok. λaccepted.
+    fok_prop_imp_build gamma delta right p q target_lookup
+      (child_sound
+        (FokMkSequent
+          (fok_list_form_append_one gamma p)
+          (fok_list_form_set_nth delta right q))
+        (fok_and_left
+          (fok_cert_no_forall_right child)
+          (fok_cert_children_all_no_forall_right (Nil FokCert))
+          children_ok)
+        accepted)
+
+fn fok_prop_imp_children_sound
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (right : Nat)
+      (p : FokForm)
+      (q : FokForm)
+      (target_lookup : Equal (Option FokForm)
+        (fok_nth_form delta right) (Some FokForm (FokImp p q)))
+      (children : List FokCert)
+    : fok_prop_children_head_sound_type children →
+      Equal Bool (fok_cert_children_all_no_forall_right children) True →
+      Equal Bool (fok_imp_children_check gamma delta right p q children) True →
+      FokDerivation (FokMkSequent gamma delta) =
+  match children {
+    Nil ↦
+      λchildren_sound. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    Cons child rest ↦
+      λchildren_sound.
+        match rest {
+          Cons child2 rest2 ↦
+            λchildren_ok. λaccepted.
+              fok_false_elim
+                (FokDerivation (FokMkSequent gamma delta)) accepted;
+          Nil ↦
+            fok_prop_imp_build_from_sound
+              gamma delta right p q target_lookup child children_sound
+        }
+  }
+
+fn fok_prop_imp_form_sound
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (right : Nat)
+      (target : FokForm)
+    : (target_lookup : Equal (Option FokForm)
+        (fok_nth_form delta right) (Some FokForm target)) →
+      (children : List FokCert) →
+      (children_sound : fok_prop_children_head_sound_type children) →
+      Equal Bool (fok_cert_children_all_no_forall_right children) True →
+      Equal Bool (fok_imp_form_check gamma delta right target children) True →
+      FokDerivation (FokMkSequent gamma delta) =
+  match target {
+    FokBottom ↦
+      λtarget_lookup. λchildren. λchildren_sound. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    FokAccess a b ↦
+      λtarget_lookup. λchildren. λchildren_sound. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    FokDomainA a b ↦
+      λtarget_lookup. λchildren. λchildren_sound. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    FokForcingP a b ↦
+      λtarget_lookup. λchildren. λchildren_sound. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    FokAnd p q ↦
+      λtarget_lookup. λchildren. λchildren_sound. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    FokOr p q ↦
+      λtarget_lookup. λchildren. λchildren_sound. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    FokImp p q ↦
+      λtarget_lookup. λchildren. λchildren_sound.
+        fok_prop_imp_children_sound
+          gamma delta right p q target_lookup children children_sound;
+    FokForallWorld body ↦
+      λtarget_lookup. λchildren. λchildren_sound. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    FokForallObj body ↦
+      λtarget_lookup. λchildren. λchildren_sound. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted
+  }
+
+fn fok_prop_imp_lookup_sound
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (right : Nat)
+      (target_result : Option FokForm)
+      (children : List FokCert)
+      (children_sound : fok_prop_children_head_sound_type children)
+    : Equal (Option FokForm) (fok_nth_form delta right) target_result →
+      Equal Bool (fok_cert_children_all_no_forall_right children) True →
+      Equal Bool
+        (fok_imp_lookup_check gamma delta right target_result children) True →
+      FokDerivation (FokMkSequent gamma delta) =
+  match target_result {
+    None ↦
+      λtarget_lookup. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) accepted;
+    Some target ↦
+      λtarget_lookup.
+        fok_prop_imp_form_sound
+          gamma delta right target target_lookup children children_sound
+  }
+
+fn fok_prop_imp_right_sound
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (right : Nat)
+      (children : List FokCert)
+      (children_sound : fok_prop_children_head_sound_type children)
+    : Equal Bool (fok_cert_children_all_no_forall_right children) True →
+      Equal Bool (fok_check_rule gamma delta (FokImpRight right) children) True →
+      FokDerivation (FokMkSequent gamma delta) =
+  fok_prop_imp_lookup_sound
+    gamma delta right (fok_nth_form delta right)
+    children children_sound Refl
+
+fn fok_prop_check_rule_sound
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (rule : FokRule)
+    : (children : List FokCert) →
+      (children_sound : fok_prop_children_head_sound_type children) →
+      Equal Bool (fok_rule_is_not_forall_right rule) True →
+      Equal Bool (fok_cert_children_all_no_forall_right children) True →
+      Equal Bool (fok_check_rule gamma delta rule children) True →
+      FokDerivation (FokMkSequent gamma delta) =
+  match rule {
+    FokInit left right ↦
+      λchildren. λchildren_sound. λrule_ok.
+        fok_prop_init_sound gamma delta left right children;
+    FokImpRight right ↦
+      λchildren. λchildren_sound. λrule_ok.
+        fok_prop_imp_right_sound
+          gamma delta right children children_sound;
+    FokForallRight right eigen ↦
+      λchildren. λchildren_sound. λrule_ok. λchildren_ok. λaccepted.
+        fok_false_elim (FokDerivation (FokMkSequent gamma delta)) rule_ok
+  }
+
+fn fok_matched_conclusion_check
+      (conclusion : FokSequent)
+      (rule : FokRule)
+      (children : List FokCert)
+    : Bool =
+  match conclusion {
+    FokMkSequent gamma delta ↦ fok_check_rule gamma delta rule children
+  }
+
+fn fok_prop_matched_fields_sound
+      (expected : FokSequent)
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (conclusion_matches : Equal Bool
+        (fok_sequent_eq (FokMkSequent gamma delta) expected) True)
+      (rule : FokRule)
+      (children : List FokCert)
+      (children_sound : fok_prop_children_head_sound_type children)
+    : Equal Bool
+        (fok_cert_no_forall_right
+          (FokMkCert (FokMkSequent gamma delta) rule children)) True →
+      Equal Bool (fok_check_rule gamma delta rule children) True →
+      FokDerivation expected =
+  λfragment_ok. λaccepted.
+    J
+      (λexpected2 _. FokDerivation expected2)
+      (fok_prop_check_rule_sound
+        gamma delta rule children children_sound
+        (fok_and_left
+          (fok_rule_is_not_forall_right rule)
+          (fok_cert_children_all_no_forall_right children)
+          fragment_ok)
+        (fok_and_right
+          (fok_rule_is_not_forall_right rule)
+          (fok_cert_children_all_no_forall_right children)
+          fragment_ok)
+        accepted)
+      (fok_sequent_eq_sound
+        (FokMkSequent gamma delta) expected conclusion_matches)
+
+fn fok_check_tree_view
+      (expected : FokSequent)
+      (conclusion : FokSequent)
+      (rule : FokRule)
+      (children : List FokCert)
+    : Bool =
+  match fok_sequent_eq conclusion expected {
+    False ↦ False;
+    True ↦ fok_matched_conclusion_check conclusion rule children
+  }
+
+theorem fok_check_tree_view_eq
+      (expected : FokSequent)
+      (conclusion : FokSequent)
+      (rule : FokRule)
+      (children : List FokCert)
+    : Equal Bool
+        (fok_check_tree_view expected conclusion rule children)
+        (fok_check_tree expected (FokMkCert conclusion rule children)) = Refl
+
+fn fok_check_tree_result
+      (conclusion : FokSequent)
+      (rule : FokRule)
+      (children : List FokCert)
+      (conclusion_result : Bool)
+    : Bool =
+  match conclusion_result {
+    False ↦ False;
+    True ↦ fok_matched_conclusion_check conclusion rule children
+  }
+
+theorem fok_check_tree_result_view_eq
+      (expected : FokSequent)
+      (conclusion : FokSequent)
+      (rule : FokRule)
+      (children : List FokCert)
+    : Equal Bool
+        (fok_check_tree_result conclusion rule children
+          (fok_sequent_eq conclusion expected))
+        (fok_check_tree_view expected conclusion rule children) = Refl
+
+fn fok_prop_check_tree_result_sound
+      (expected : FokSequent)
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (rule : FokRule)
+      (children : List FokCert)
+      (children_sound : fok_prop_children_head_sound_type children)
+      (conclusion_result : Bool)
+    : Equal Bool
+        (fok_sequent_eq (FokMkSequent gamma delta) expected)
+        conclusion_result →
+      Equal Bool
+        (fok_cert_no_forall_right
+          (FokMkCert (FokMkSequent gamma delta) rule children)) True →
+      Equal Bool
+        (fok_check_tree_result
+          (FokMkSequent gamma delta) rule children conclusion_result) True →
+      FokDerivation expected =
+  match conclusion_result {
+    False ↦
+      λconclusion_matches. λfragment_ok. λaccepted.
+        fok_false_elim (FokDerivation expected) accepted;
+    True ↦
+      λconclusion_matches.
+        fok_prop_matched_fields_sound
+          expected gamma delta conclusion_matches
+          rule children children_sound
+  }
+
+fn fok_prop_check_tree_view_sound
+      (expected : FokSequent)
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (rule : FokRule)
+      (children : List FokCert)
+      (children_sound : fok_prop_children_head_sound_type children)
+    : Equal Bool
+        (fok_cert_no_forall_right
+          (FokMkCert (FokMkSequent gamma delta) rule children)) True →
+      Equal Bool
+        (fok_check_tree_view
+          expected (FokMkSequent gamma delta) rule children) True →
+      FokDerivation expected =
+  J
+    (λcheck_result _.
+      Equal Bool
+        (fok_cert_no_forall_right
+          (FokMkCert (FokMkSequent gamma delta) rule children)) True →
+      Equal Bool check_result True → FokDerivation expected)
+    (fok_prop_check_tree_result_sound
+      expected gamma delta rule children children_sound
+      (fok_sequent_eq (FokMkSequent gamma delta) expected) Refl)
+    (fok_check_tree_result_view_eq
+      expected (FokMkSequent gamma delta) rule children)
+
+fn fok_prop_check_tree_sound_by_cert (pi : FokCert)
+    : fok_prop_check_tree_sound_type pi =
+  match pi {
+    FokMkCert conclusion rule children ↦
+      match conclusion {
+        FokMkSequent gamma delta ↦
+          fok_prop_check_tree_sound_by_children
+            gamma delta rule children
+      }
+  }
+
+fn fok_prop_check_tree_sound_by_children
+      (gamma : List FokForm)
+      (delta : List FokForm)
+      (rule : FokRule)
+      (children : List FokCert)
+    : fok_prop_check_tree_sound_type
+        (FokMkCert (FokMkSequent gamma delta) rule children) =
+  match children {
+    Nil ↦
+      λexpected.
+        J
+          (λcheck_result _.
+            Equal Bool
+              (fok_cert_no_forall_right
+                (FokMkCert
+                  (FokMkSequent gamma delta)
+                  rule
+                  (Nil FokCert))) True →
+            Equal Bool check_result True → FokDerivation expected)
+          (fok_prop_check_tree_view_sound
+            expected gamma delta
+            rule (Nil FokCert) Zero)
+          (fok_check_tree_view_eq
+            expected (FokMkSequent gamma delta)
+            rule (Nil FokCert));
+    Cons child rest ↦
+      λexpected.
+        J
+          (λcheck_result _.
+            Equal Bool
+              (fok_cert_no_forall_right
+                (FokMkCert
+                  (FokMkSequent gamma delta)
+                  rule
+                  (Cons FokCert child rest))) True →
+            Equal Bool check_result True → FokDerivation expected)
+          (fok_prop_check_tree_view_sound
+            expected gamma delta
+            rule (Cons FokCert child rest)
+            (fok_prop_check_tree_sound_by_cert child))
+          (fok_check_tree_view_eq
+            expected (FokMkSequent gamma delta)
+            rule (Cons FokCert child rest))
+  }
+
+fn fok_prop_check_tree_sound (expected : FokSequent) (pi : FokCert)
+    : Equal Bool (fok_cert_no_forall_right pi) True →
+      Equal Bool (fok_check_tree expected pi) True → FokDerivation expected =
+  fok_prop_check_tree_sound_by_cert pi expected
+
+-- D3's theorem is intentionally fragment-indexed: every target formula and
+-- certificate is admitted, while `fok_cert_no_forall_right pi = True` states
+-- exactly the rule partition proved here. D4 removes that hypothesis by
+-- proving the two ForallRight target shapes.
+theorem fok_checker_soundness (q : FokForm) (pi : FokCert)
+    : Equal Bool (fok_cert_no_forall_right pi) True →
+      Equal Bool (fok_check_cert q pi) True → fok_classically_valid q =
+  λfragment_ok. λaccepted.
+    trunc_intro
+      (fok_prop_check_tree_sound
+        (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm)))
+        pi fragment_ok accepted)
