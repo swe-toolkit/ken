@@ -1,15 +1,29 @@
 ---
 id: RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION
 title: "Give Ken a first-class representation for an ESCAPING functional induction hypothesis, so the nullary_force of a checked computational IH whose realized value is stored into a constructor (escapes its frame) can be lowered honestly. The decisive escape measurement (runtime-implementer evt_79jd1nxamqd95) proved the realized IH value's immediate parent is a Construct on both checked-family programs -- it is stored straight into a constructor field, so the non-escaping use-site-specialization remedy cannot apply (no in-frame application site, no response argument at the use). Ken has no first-class functional-IH value: StaticWorkerBinding is compiler metadata with no runtime word/tag/layout/env-pointer/callable identity (lowering/mod.rs:3578-3603), LoweringOperand is exactly {Specialized(Lowered), Carried(CarriedBoundaryWord)} with no closure/worker arm, and an ordinary carried word cannot hold `lambda response. rec (k response)`. This node introduces the genuine new representation. It carries a design D0 the Architect rules before build: materialized closure value vs defunctionalized carried tag (code identity + environment + apply dispatcher). Successor to the closed RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT."
-status: active
+status: draft
 owner: runtime
 size: L
 gate: none
-depends_on: [RT-IH-MARKER-PRODUCER-COMPLETE, RT-NATIVE-TRACK0-REARM]
+depends_on: [RT-IH-MARKER-PRODUCER-COMPLETE, RT-NATIVE-TRACK0-REARM, RT-CHECKED-IH-CAPTURED-ENV-SCHEMA]
 blocks: [RT-CARRIED-IH-DISPATCH-SITEOP, RT-CLOSURE-BOUNDARY-RESIDUAL]
 github: null
 origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect's pre-committed conditional ruling (evt_2f4bbmt7qfde1) after the decisive ESCAPE measurement (runtime-implementer evt_79jd1nxamqd95) returned ESCAPING. Supersedes RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT (closed; both its Closure-A operand-seat mechanism and its NULLARY_FORCE re-reading were refuted -- the realized IH value escapes into a constructor, a capability gap, not a seam fix). HS=5 (Steward of record); ESCAPING is a scoping decision, not a hard-stop increment. Steward-filed per COORDINATION section 2."
 ---
+
+> # HELD 2026-08-22 — tier-3 blocked on a predecessor (Case-C reach fork)
+>
+> Reverted active -> draft. The build reached deliverable 2 and measured the
+> escaped IH environment NON-EMPTY (StaticWorker captures=9); the existing
+> admitted-env concept is bounded to empty captures by construction. The Architect
+> ruled the Case-C fork (evt_2e11sk1jvp8mv): a new predecessor slice
+> [[RT-CHECKED-IH-CAPTURED-ENV-SCHEMA]] must admit the captured environment (tiers
+> 1 elaborator-emit + 2 planner-schema) before this node's tier-3 lowering can
+> build. M6 now depends_on it. NOTHING on M6 proper regressed: AC-ENTRY discharged
+> (enumerability holds), the two-tier dispatch design is ruled and durable
+> (AC-REPR, PR #2802) — this fork is about the VALUE's schema only. Tier-3 (Record
+> build + defunctionalize at core.rs:11674) resumes, unchanged, when the
+> predecessor lands. Re-flip ready + kick then. HS 5.
 
 > # D0 RULED 2026-08-22 — DEFUNCTIONALIZE; re-homed as native-program Track-1
 >
