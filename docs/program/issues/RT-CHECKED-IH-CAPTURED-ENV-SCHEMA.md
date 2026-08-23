@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-CAPTURED-ENV-SCHEMA
 title: "Admit the checked-IH's non-empty captured environment as a value-domain Record with a planner-issued schema — extend the UnitBoundaryEnvironment role from empty captures to n declared children whose per-field identities are SOURCED from each capture's own occurrence in the checked plan (not fabricated), so the escaping checked functional IH has an admitted environment to cross the effect-seat boundary. The predecessor M6 (RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION) lowering-proper depends on. Tiers 1 (elaborator emit of the captured environment as a semantic object with per-capture occurrences, a COORDINATION section 9a language spillover) + 2 (runtime planner extends UnitBoundaryEnvironment to issue an occurrence with those declared children, mirroring the Constructor branch)."
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
@@ -11,14 +11,67 @@ github: null
 origin: "Steward, 2026-08-22, cutting the Case-C reach-fork predecessor from the Architect's ruling (evt_2e11sk1jvp8mv) on RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION (M6). The M6 build measured the escaped IH environment NON-EMPTY (StaticWorker declared_arity=1, captures=9) and the existing admitted-env concept bounded to empty captures by construction (implementer evt_svjnmypxr4j5, leader evt_4jg3k6r75mhvz). Design shape ruled by the Architect; BUILD gated on the enclave denotational-faithfulness confirmation (AC-ENTRY). Steward-filed per COORDINATION section 2. HS 5."
 ---
 
-> # BUILD-GATED (draft) — do NOT release until the enclave confirms AC-ENTRY
+> # RELEASED 2026-08-23 — AC-ENTRY satisfied (enclave GO); refined slice below
 >
-> The DESIGN SHAPE is ruled (Architect evt_2e11sk1jvp8mv), so this node is cut and
-> fully framed. Its BUILD does not start until the spec enclave answers the
-> denotational-faithfulness question (AC-ENTRY below). The Steward frames + releases
-> it once the enclave confirms; a "some captures have no value-domain denotation"
-> answer is a deeper representability fork back to the enclave + Architect, not a
-> build.
+> The enclave ruled AC-ENTRY GO (spec-author evt_46jrmz0ktsg9n, confirmed
+> spec-leader evt_6yr2xardwcza1): reifying this population as a record of
+> per-capture occurrences HAS a value-domain denotation and preserves it with zero
+> new trust, under the live-domain sanction `41-values.md:76-118` — measurement 2
+> showed the escape is ActivationOwned / InvocationAggregate (live-domain, NOT the
+> durable lane), so the durable-lane prohibition is not tripped. The per-capture
+> NEED/seat trace (measurement 1) is NOT an AC prerequisite; it is an
+> implementation instrument the build MAY commission from runtime-implementer if
+> tier 1 cannot derive + validate the ci<->oi bijection from what it has.
+>
+> The Architect handed the refined slice shape (evt_710975vkbjqt), settling the
+> lifetime call. RELEASED to the runtime ring; the runtime-leader sequences it
+> AHEAD of ABI-M1 at the next increment/hard-stop boundary — M6 tier-3 depends on
+> it (critical path). Below supersedes the pre-release framing where they differ.
+>
+> REFINED DESIGN (folds into the tiers + acceptance below):
+> - TIER 1 (elaborator): emit the per-capture occurrences AS the exact, order- and
+>   multiplicity-preserving bijection ci <-> oi (ci = StaticWorker capture vector
+>   c0..cn-1 in binding order; oi = its sourced checked-plan occurrence). The
+>   occurrence is FIELD-IDENTITY AUTHORITY ONLY — it neither interprets nor
+>   reconstructs the carried word. Tier 1 must DERIVE and MECHANICALLY VALIDATE the
+>   bijection at its construction site; FAIL-CLOSED on any capture whose oi cannot
+>   be sourced (never a fabricated label).
+> - TIER 2 (planner): extend UnitBoundaryEnvironment to issue the occurrence with
+>   declared_children = the sourced oi run, plus a VALUE-SOURCED LIFETIME. LIFETIME
+>   CALL SETTLED (Architect ruling, confirmed by measurement 2 + the GO): record
+>   lifetime (meet + allocation) = ActivationOwned / InvocationAggregate, SOURCED
+>   FROM the reified value — NOT the hard-coded Persistent / PersistentGround the
+>   empty-captures issuance carries (`aggregates.rs` ~1341). MECHANISM: a LIFETIME
+>   PARAMETER on UnitBoundaryEnvironment (value-sourced), NOT a sibling role — role
+>   identity unchanged, the empty-captures population keeps its current lifetime, a
+>   sibling would fracture the sealed set for one lifetime-parameterized concept. No
+>   runtime code-identity tag.
+> - TIER 3 (M6 proper, HELD): Record{occurrence, fields=captures}, defunctionalize;
+>   the static dispatcher projects the same ordered run <v0..vn-1>.
+>
+> FOLDED AC (sourced-from-source invariant + the enclave's zero-trust conditions) —
+> every property the record carries is ADMITTED FROM its source, never
+> hard-coded/invented: dispatch identity = plan template ids; per-field identity =
+> capture occurrences via the ci<->oi bijection; lifetime = the reified value's
+> meet/allocation. FAIL-CLOSED on any unsourced occurrence (matches the landed
+> "None is a REFUSAL", `mod.rs:3226/3397`). NO code/environment identity exposure
+> (no code-identity tag; no source-level projection/equality/hash/provenance/
+> env-identity; callable edge opaque; only ordinary captured values in an existing
+> live Record lane). ZERO TCB/trusted-base growth (semantic object elaborator/
+> planner-internal; runtime record uses the existing Record/InvocationAggregate
+> class; tier 3 is ordinary backend downstream of kernel checking; correctness
+> stays TESTED by the existing native/interpreter checked-family differential
+> `42 §3.7` / `45 §4` — a bug yields a wrong value, never a false proof). No /spec
+> edit (instance of landed law: `41 §2.1`, `42 §3.1`, `45 §2`/`§4`).
+>
+> CONTROLS: the exact-occurrence-bijection control + the no-code-identity
+> structural control, ALONGSIDE the existing end-to-end checked-family differential.
+>
+> Architect review on the built predecessor: the ONE sourced-from-source invariant
+> (every record property traces to its authority; ci<->oi order+multiplicity
+> preserving; fail-closed on unsourced; no code-identity tag; lifetime
+> value-sourced). Then M6 tier-3 unblocks; AC-REENUM (both checked-family programs
+> green) + Adversary over-accept hunt in parallel.
 
 # WHY THIS NODE EXISTS (the Case-C reach fork)
 
@@ -88,7 +141,8 @@ interface the planner then has to adapt to.
 
 # ACCEPTANCE
 
-- **AC-ENTRY (BUILD GATE — enclave, clean-room semantics).** The spec enclave
+- **AC-ENTRY (SATISFIED 2026-08-23 — enclave GO, see the release banner above).**
+  The spec enclave
   (spec-author -> spec-leader) confirms: the checked-IH's captured environment
   (the StaticWorker's n captures, free variables of the body at
   `StaticOriginId(694)`) has a value-domain denotation such that reifying it as a
