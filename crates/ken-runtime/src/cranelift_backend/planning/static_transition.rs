@@ -10,6 +10,11 @@ mod aggregates;
 mod closure;
 mod construction;
 mod continuations;
+/// Fixture re-export for the lowering-side reconcile controls; see
+/// `planning.rs`. Test-only, and deliberately re-exporting the one fixture
+/// rather than opening the module.
+#[cfg(test)]
+pub(in crate::cranelift_backend) use continuations::tests::contspec_activation_owned_worker_captures_fixture;
 mod effects;
 mod joins_traps;
 mod occurrences;

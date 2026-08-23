@@ -6341,6 +6341,112 @@ fn ac5_redirecting_the_resolved_worker_target_reds_the_same_shape_witness() {
 ///
 /// The fourth consumer, `dynamic_alternatives_agree`, has its own row:
 /// `a_dynamic_alternative_with_no_planned_record_refuses`.
+/// **The capture-word reconcile arm consults the PLAN, not just itself.**
+///
+/// The arm's whole job is an actual-versus-declared cross-check across three
+/// independent sources: the declared model supplies the POSITION, the emitter
+/// supplies WHICH OCCURRENCE it put there, and the plan's ruled ci<->oi run
+/// supplies which occurrence BELONGS there. If the arm did not consult the
+/// third, any occurrence would satisfy any position and the check would be
+/// free.
+///
+/// LIMIT, stated rather than implied: the positive case's expected origin is
+/// read from the same planner record the arm consults, so it is NOT an
+/// independent oracle -- it shows the arm accepts the truth, not that it
+/// derived it. The DISCRIMINATING half is the negative: handing the arm a
+/// different capture's occurrence, which is a real occurrence in the same run
+/// and differs only in being at the wrong position.
+///
+/// Also not covered here: the arm does not inspect the lowered VALUE, only the
+/// occurrence identity. Checking that the carried word matches the capture is
+/// tier-3's obligation, and there is no emitter building these arguments yet.
+#[test]
+fn a_capture_operand_reconciles_only_against_its_own_ruled_position() {
+    use crate::cranelift_backend::planning::{
+        SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot,
+    };
+
+    let source =
+        crate::cranelift_backend::planning::contspec_activation_owned_worker_captures_fixture();
+    let (plan, _root) = planned_root_occurrence(&source);
+    let (owner, seat, origins) = plan
+        .checked_ih_record_for_test()
+        .expect("the nine-capture fixture plans one checked-IH captured environment");
+    assert!(
+        origins.len() >= 2,
+        "the negative case needs a SECOND real capture occurrence to swap in"
+    );
+    let right = origins[0];
+    let wrong = origins[1];
+
+    let seed_env = NativeSeedEnvironment::empty();
+    let mut compiler = bare_carrier_test_lowering(&seed_env, plan);
+    let path =
+        SynthesizedAggregatePath::root(SynthesizedAggregateRoot::CheckedIhCapturedEnvironment);
+    const DECLARED: &[SynthesizedAggregateNode] =
+        &[SynthesizedAggregateNode::WorkerCaptureOperand(0)];
+
+    let argument = |ordinal: u32, origin| {
+        vec![SynthesizedArgument::WorkerCaptureOperand {
+            seat,
+            ordinal,
+            origin,
+            value: Lowered::Constructor {
+                constructor: crate::NativeProcessSymbols::legacy_prelude()
+                    .private_transfer_count
+                    .clone(),
+                synthesized_identity: None,
+                occurrence: None,
+                args: Vec::new(),
+            },
+        }]
+    };
+
+    assert!(
+        compiler
+            .reconcile_declared_children(
+                owner,
+                seat,
+                &path,
+                DECLARED,
+                &argument(0, right),
+                &ClaimedEffectSeats::none(),
+            )
+            .is_ok(),
+        "the occurrence the ruled run places at position 0 must reconcile there"
+    );
+
+    assert!(
+        compiler
+            .reconcile_declared_children(
+                owner,
+                seat,
+                &path,
+                DECLARED,
+                &argument(0, wrong),
+                &ClaimedEffectSeats::none(),
+            )
+            .is_err(),
+        "a DIFFERENT capture's occurrence at position 0 must refuse -- it is a real \
+         occurrence of the same run, so accepting it would mean the arm checks membership \
+         rather than position"
+    );
+
+    assert!(
+        compiler
+            .reconcile_declared_children(
+                owner,
+                seat,
+                &path,
+                DECLARED,
+                &argument(1, right),
+                &ClaimedEffectSeats::none(),
+            )
+            .is_err(),
+        "an emitter ordinal disagreeing with the declared position must refuse"
+    );
+}
+
 #[test]
 fn a_construction_time_occurrence_lookup_fails_closed() {
     use crate::cranelift_backend::planning::{

@@ -7555,7 +7555,7 @@ impl<'src> StaticTransitionPlan<'src> {
 }
 
 #[cfg(test)]
-pub(in crate::cranelift_backend::planning::static_transition) mod tests {
+pub(in crate::cranelift_backend) mod tests {
     #[allow(unused_imports)]
     use super::super::tests::*;
     use super::super::*;
@@ -7630,7 +7630,7 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_ca
         }
     }
 
-pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_activation_owned_worker_captures_fixture() -> RuntimeExpr {
+pub(in crate::cranelift_backend)     fn contspec_activation_owned_worker_captures_fixture() -> RuntimeExpr {
         // ⛔ The captures are `Construct`s WITH A FIELD, not `unit()`, and that
         // is the entire point of this fixture existing beside
         // `contspec_multiple_worker_captures_fixture`. A `unit()` capture is a
