@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-23 03:21:09Z — from 431 issue file(s) in `docs/program/issues/`.
+2026-08-23 05:47:22Z — from 431 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -162,7 +162,7 @@ the committed file matches the generator's output.
 | `LANG-MATCH-PATTERN-FORMS-ABSENT` | spec 34 §3 normatively lists nine pattern forms and the elaborator's PatKind has three -- literals, tuple/record patterns, as-patterns, or-patterns and guards are all absent from the AST, with no deferral statement anywhere in a chapter marked impl-ready and high-priority, and no tracker row for any of them | draft | language | unsized | none | — |
 | `LANG-MEMBERSHIP-OPERATOR-SURFACE` | membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator | ready | language | M | none | — |
 | `LANG-MOD-CATALOG-REALIZATION` | WP-4 — catalog realization: mark pub on Arithmetic/Order, add the imports, and make Gcd import add/mul + leq_nat/sub instead of reimplementing them; each checks standalone through the real loader (campaign SUCCESS) | draft | language | M | none | — |
-| `LANG-MOD-LOADER-ENTRY` | WP-1 — route ken check catalog files through elaborate_module_from_roots instead of the direct single-file call; behavior-preserving, non-strict | draft | language | M | none | — |
+| `LANG-MOD-LOADER-ENTRY` | WP-1 — route ken check catalog files through elaborate_module_from_roots instead of the direct single-file call; behavior-preserving, non-strict | ready | language | M | none | — |
 | `LANG-MOD-PUB-ELIGIBILITY` | WP-3 — semantic gate rejecting pub on ineligible placements with a surface diagnostic; pub proof retains the subject-must-be-public rule | draft | language | M | none | — |
 | `LANG-MOD-STRICT-RESOLUTION` | WP-2 — strict root-loaded resolution: a bare name in a loader-built scope resolves only through locals, explicit imports, kernel vocabulary, and the closed prelude floor; no fall-through to arbitrary program globals (the soundness core) | draft | language | L | none | — |
 | `LANG-MODULE-IMPORT-SYSTEM` | Module/import capability campaign — declaration visibility (public export), a selective-import surface, and cross-package plus prelude symbol resolution, sufficient for catalog packages to reuse canonical modules instead of reimplementing them | draft | language | XL | none | — |
@@ -483,6 +483,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
+- `LANG-MOD-LOADER-ENTRY` — WP-1 — route ken check catalog files through elaborate_module_from_roots instead of the direct single-file call; behavior-preserving, non-strict
 - `LANG-SYMBOLIC-OPERATOR-NAMES` — `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
@@ -523,10 +524,10 @@ is itself not yet `merged`/`closed`:
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
 - `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: draft)
 - `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: ready)
-- `LANG-MOD-CATALOG-REALIZATION` blocked by `LANG-MOD-LOADER-ENTRY` (status: draft)
+- `LANG-MOD-CATALOG-REALIZATION` blocked by `LANG-MOD-LOADER-ENTRY` (status: ready)
 - `LANG-MOD-CATALOG-REALIZATION` blocked by `LANG-MOD-PUB-ELIGIBILITY` (status: draft)
 - `LANG-MOD-CATALOG-REALIZATION` blocked by `LANG-MOD-STRICT-RESOLUTION` (status: draft)
-- `LANG-MOD-STRICT-RESOLUTION` blocked by `LANG-MOD-LOADER-ENTRY` (status: draft)
+- `LANG-MOD-STRICT-RESOLUTION` blocked by `LANG-MOD-LOADER-ENTRY` (status: ready)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: ready)
 - `PX10` blocked by `ABI-S5` (status: draft)
