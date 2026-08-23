@@ -1,22 +1,24 @@
 ---
 id: LANG-MOD-LOADER-ENTRY
 title: "WP-1 — route ken check catalog files through elaborate_module_from_roots instead of the direct single-file call; behavior-preserving, non-strict"
-status: draft
+status: ready
 owner: language
 size: M
 gate: none
 depends_on: []
 blocks: [LANG-MOD-STRICT-RESOLUTION, LANG-MOD-CATALOG-REALIZATION]
 github: null
-origin: "Architect component framing evt_hpnhqy1ex286 (WP-1), under [[LANG-MODULE-IMPORT-SYSTEM]]. Steward-filed per COORDINATION section 2, 2026-08-23. FRAMED; release HELD (see campaign root release gate)."
+origin: "Architect component framing evt_hpnhqy1ex286 (WP-1), under [[LANG-MODULE-IMPORT-SYSTEM]]. Steward-filed per COORDINATION section 2, 2026-08-23. RELEASED 2026-08-23 (language ring finished embedding-adequacy D1; operator finish-then-switch gate satisfied)."
 ---
 
-> # FRAMED — HELD FOR RELEASE
+> # RELEASED 2026-08-23 — leads the module/import campaign
 >
-> Independent, can lead the campaign. Release held until the language ring
-> finishes [[V3-FO-EMBEDDING-ADEQUACY]] (operator finish-then-switch). The wp/
-> frame is authored at release time grounded on then-current main. This WP does
-> NOT change strictness and does NOT depend on the spec candidate merging.
+> Full frame: `docs/program/wp/LANG-MOD-LOADER-ENTRY.md`, fixed inputs measured
+> at `origin/main c386635306`. The release gate (language ring finishes
+> [[V3-FO-EMBEDDING-ADEQUACY]] per operator finish-then-switch) is satisfied: D1
+> landed at `5ef0f0983` and the ring is idle. This WP does NOT change strictness
+> (WP-2) and does not depend on any further spec merge — the spec surface is
+> already merged at `def16ecf4`.
 
 # Objective
 
