@@ -1092,6 +1092,45 @@ fn cat4_union_intersection_difference_execute_over_nat() {
     assert_eq!(list_pair_nat_nat(&env, &v), vec![(2, 20)], "difference keeps left-only keys");
 }
 
+/// Regression for LANG-MOD-STRICT-RESOLUTION D1: strict-only prebinding
+/// temporaries must not enlarge `expand_scope`'s long-lived legacy frame.
+/// The union application below is the smallest existing Map acceptance arm
+/// that crossed the CI worker's stack limit when those temporaries lived in
+/// that frame.
+#[test]
+fn d1_strict_prebinding_preserves_legacy_map_union_stack_budget() {
+    let mut env = mk_env();
+    let mut store = make_store(&env);
+    let a = format!(
+        "insert Nat Nat leq_nat ({one}) ({ten}) \
+           (insert Nat Nat leq_nat ({two}) ({twenty}) (empty Nat Nat))",
+        one = nat(1),
+        two = nat(2),
+        ten = nat(10),
+        twenty = nat(20)
+    );
+    let b = format!(
+        "insert Nat Nat leq_nat ({one}) ({thirty}) \
+           (insert Nat Nat leq_nat ({three}) ({forty}) (empty Nat Nat))",
+        one = nat(1),
+        three = nat(3),
+        thirty = nat(30),
+        forty = nat(40)
+    );
+    let value = eval_view(
+        &mut env,
+        &mut store,
+        "t_d1_legacy_union_stack",
+        "Option Nat",
+        &format!(
+            "lookup Nat Nat leq_nat ({}) \
+             (union Nat Nat leq_nat (λx.λy. x) ({a}) ({b}))",
+            nat(1)
+        ),
+    );
+    assert_eq!(option_nat(&env, &value), Some(10));
+}
+
 #[test]
 fn cat4_keys_values_are_aligned_tolist_projections() {
     let mut env = mk_env();

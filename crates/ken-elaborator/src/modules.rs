@@ -1637,6 +1637,64 @@ fn resolve_scoped_decl(
     rewrite_rdecl(scope, exports, rdecl)
 }
 
+fn prebind_scope_declarations(
+    scope: &mut Scope,
+    decls: &[Decl],
+    prefix: &str,
+    prelude_names: &HashSet<String>,
+) -> Result<(), ElabError> {
+    // Collect locals before imports so collisions are source-order independent.
+    // Keep these strict-only constructor/class temporaries out of
+    // `expand_scope`'s long-lived frame: elaborating large application spines
+    // is intentionally recursive and must retain the legacy stack budget.
+    for decl in decls {
+        let inner = decl.unwrap_pub();
+        let strict_unqualified_local =
+            scope.mode == ResolutionMode::Strict && matches!(inner, Decl::ClassDecl { .. });
+        if !is_qualifiable(inner) && !strict_unqualified_local {
+            continue;
+        }
+        if matches!(inner, Decl::AttachedProofDecl { .. }) {
+            continue;
+        }
+        let bare = inner.name().to_string();
+        let qualified = if strict_unqualified_local {
+            bare.clone()
+        } else {
+            qualify(prefix, &bare)
+        };
+        if prefix.is_empty() && prelude_names.contains(&bare) && !scope.locals.contains(&bare) {
+            return Err(ElabError::AmbiguousReference {
+                name: bare.clone(),
+                sources: vec![format!("<prelude>.{bare}"), qualified],
+                span: inner.span().clone(),
+            });
+        }
+        scope.bind_local(&bare, &qualified, inner.span())?;
+        if scope.mode != ResolutionMode::Strict {
+            continue;
+        }
+        match inner {
+            Decl::DataDecl { ctors, .. } => {
+                for ctor in ctors {
+                    scope.bind_local(&ctor.name, &qualify(prefix, &ctor.name), &ctor.span)?;
+                }
+            }
+            Decl::ExplicitDataDecl { ctors, .. } => {
+                for ctor in ctors {
+                    let (name, span) = match ctor {
+                        ExplicitDataCtor::Simple(ctor) => (&ctor.name, &ctor.span),
+                        ExplicitDataCtor::Signature { name, span, .. } => (name, span),
+                    };
+                    scope.bind_local(name, &qualify(prefix, name), span)?;
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// Expand and elaborate a compilation unit's raw decls (one `elaborate_*`
 /// call's `Vec<Decl>`) at nesting `prefix` ("" at the file root), threading
 /// `scope` (built fresh for a `module { … }` block; the persisted root
@@ -1672,59 +1730,7 @@ fn expand_scope(
         }
     }
 
-    // Pre-pass: collect this scope's own local declared names FIRST. Imports
-    // below therefore detect a local/import clash independently of textual
-    // order, even when the clashing name is never referenced.
-    for decl in decls {
-        let inner = decl.unwrap_pub();
-        let strict_unqualified_local =
-            scope.mode == ResolutionMode::Strict && matches!(inner, Decl::ClassDecl { .. });
-        if is_qualifiable(inner) || strict_unqualified_local {
-            if matches!(inner, Decl::AttachedProofDecl { .. }) {
-                continue;
-            }
-            let bare = inner.name().to_string();
-            let qualified = if strict_unqualified_local {
-                bare.clone()
-            } else {
-                qualify(prefix, &bare)
-            };
-            if prefix.is_empty()
-                && elab.module_state.prelude_names.contains(&bare)
-                && !scope.locals.contains(&bare)
-            {
-                return Err(ElabError::AmbiguousReference {
-                    name: bare.clone(),
-                    sources: vec![format!("<prelude>.{bare}"), qualified],
-                    span: inner.span().clone(),
-                });
-            }
-            scope.bind_local(&bare, &qualified, inner.span())?;
-            if scope.mode == ResolutionMode::Strict {
-                match inner {
-                    Decl::DataDecl { ctors, .. } => {
-                        for ctor in ctors {
-                            scope.bind_local(
-                                &ctor.name,
-                                &qualify(prefix, &ctor.name),
-                                &ctor.span,
-                            )?;
-                        }
-                    }
-                    Decl::ExplicitDataDecl { ctors, .. } => {
-                        for ctor in ctors {
-                            let (name, span) = match ctor {
-                                ExplicitDataCtor::Simple(ctor) => (&ctor.name, &ctor.span),
-                                ExplicitDataCtor::Signature { name, span, .. } => (name, span),
-                            };
-                            scope.bind_local(name, &qualify(prefix, name), span)?;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
+    prebind_scope_declarations(scope, decls, prefix, &elab.module_state.prelude_names)?;
 
     let mut ids = Vec::new();
     let mut exports_here: HashMap<String, String> = HashMap::new();
