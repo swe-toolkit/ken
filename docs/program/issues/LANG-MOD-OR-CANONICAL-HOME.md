@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-OR-CANONICAL-HOME
 title: "Or arm (b), NODE B — author Core.Logic.Or (data Or (a:Omega)(b:Omega):Type with Inl/Inr, field-for-field the prelude shape), migrate the six catalog consumers to import it, and retire the Rust prelude Or/Inl/Inr registration so exactly one catalog Or identity exists"
-status: draft
+status: ready
 owner: language
 size: M
 gate: none
@@ -11,12 +11,18 @@ github: null
 origin: "Operator ruled the Or/Inl/Inr fork arm (b) — canonical package home, not refactor-away (evt_6b9wrt1kwswcp). Architect NODE-B framing evt_21gve67p385jh. Home = Core.Logic (its own .ken.md). Steward-filed per COORDINATION section 2, 2026-08-23, under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
-> # HELD — downstream of NODE A and WP-2 D1.
+> # RELEASED 2026-08-23 — both dependencies landed; flipped draft -> ready.
 >
-> Architect sequence: [[LANG-MOD-OR-OMEGA-PARAM-ELAB]] (NODE A) ->
-> [[LANG-MOD-STRICT-RESOLUTION]] D1 -> NODE B. NODE A makes `Or` spellable as a
-> catalog data declaration; WP-2 D1 makes strict resolution the mode under which
-> the six consumers must resolve `Or` through a legal import. Both must land first.
+> Architect sequence [[LANG-MOD-OR-OMEGA-PARAM-ELAB]] (NODE A) ->
+> [[LANG-MOD-STRICT-RESOLUTION]] D1 -> NODE B is satisfied, both verified on
+> origin/main 3af44ffff by the Steward: NODE A merged (6fae7a918 -> main; Omega
+> case at ken-elaborator/src/data.rs:633,648 makes `Or` spellable as a catalog
+> data declaration), and STRICT-RESOLUTION D1 merged (5a74301f4 is an ancestor of
+> main; strict resolution is the mode under which the six consumers resolve `Or`
+> through a legal import). gate:none, no other gate remains. Released to the
+> language ring. Capability tier T2 (mechanical authoring + six-consumer migration
+> + prelude-registration removal; the soundness is carried by NODE A's Omega
+> sort-admission and WP-2 strict resolution). Kicked by the Steward.
 
 # Why arm (b), not refactor-away (the census that decided it)
 
