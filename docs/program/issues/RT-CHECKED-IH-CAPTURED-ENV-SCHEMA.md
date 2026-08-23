@@ -328,27 +328,32 @@ landing an elaborator interface the planner then has to adapt to.
   `CheckedIhCapturedEnvironment` role (role != shape; the distinct role
   preserves the blocker-2 distinct-record soundness guard) — issues a
   POSITIONALLY-identified aggregate carrying:
-  - `declared_children: Some(...)` via a NEW positional
-    `SynthesizedAggregateNode` variant (e.g. `WorkerCaptureOperand(u32)`;
-    exact name at implementer/CV discretion) whose child at position i is
-    "the i-th carried continuation-envelope WorkerCapture word." This is
-    NOT a reuse of the Constructor `semantic_use.children` const-recipe nor
-    the SiteOperand/effect-seat operand vector: the captured env is the
-    FIRST synthesized aggregate whose children are neither a compile-time
-    recipe nor an effect seat's arguments, so it needs its own kind (the
-    original fork's option (a); z161's "reuse Some(semantic_use.children)
-    like branch 2" was wrong). STORAGE via const-array-slice-by-arity —
-    `const CAPTURE_OPERANDS: &[Node] = &[WorkerCaptureOperand(0)..(N_MAX-1)]`,
-    per unit `&CAPTURE_OPERANDS[..arity]` (per-unit content at position i is
-    fully determined by i, so per-unit arity is representable by slicing).
-    REQUIRES an EXPLICIT arity-bound refusal above N_MAX — never silent
-    truncation. RESOLUTION via a NEW `reconcile_declared_children` arm
-    resolving `WorkerCaptureOperand(i)` against the continuation-envelope
-    WorkerCapture operand vector (the ci<->oi run), with its OWN
-    path-identity check, SEPARATE from and NOT touching/weakening the
-    existing SiteOperand/effect-seat arm (that separation is what keeps the
-    effect-seat path-identity contract every host-result aggregate relies
-    on intact).
+  - `declared_children: Some(...)` — MECHANISM OPEN. The Architect REOPENED
+    this as a genuine fork (evt_43mccgm178g6r, 19:36, revising the (B) ruling
+    in evt_3tky5wzycfnxb): "stay held, do NOT build the variant yet"; ruling
+    B-vs-D after the Architect compacts. DO NOT build either arm until it
+    rules. The two arms:
+    - (B) a NEW positional `SynthesizedAggregateNode` variant (e.g.
+      `WorkerCaptureOperand(u32)`) — ADDITIVE BESIDE the shared consumer
+      contract (which currently fails closed for everyone). Storage via
+      const-array-slice-by-arity (`&CAPTURE_OPERANDS[..arity]`, explicit
+      N_MAX refusal, no silent truncation); resolution via a NEW
+      `reconcile_declared_children` arm against the continuation-envelope
+      WorkerCapture operand vector, SEPARATE from the effect-seat arm.
+      Implementer measurement (evt_75468w00batqb): the variant enumerates
+      exactly FOUR exhaustive-match sites, all in planning aggregates, zero
+      in lowering, no wildcard — small blast radius, shared machinery
+      untouched.
+    - (D) give the consumer a DERIVE-FROM-CHILDREN path for positional
+      aggregates instead — NO new vocabulary, but a change to the SHARED
+      `synthesized_aggregate_children` + `(Some,Some)` preflight machinery
+      every host-result aggregate depends on (even gated on positional shape
+      + distinct role). The `children: Vec` already carries the per-unit run
+      with origins+owners, so the information is present; what is absent today
+      is any consumer path that reads it — so (D) is a consumer change, not a
+      discovery (runtime-implementer evt_3484ndvgqksma).
+    The asymmetry the ring flags: (B) is additive-beside a fail-closed
+    contract; (D) modifies currently-uniform shared machinery.
   - `children[i].origin: Some(oi)` — the capture's checked-plan
     occurrence; branch 4 (`aggregates.rs:1450`) ALREADY sets it.
   - `field_identity: None` is CORRECT and non-fabricated — the captured env
@@ -394,13 +399,14 @@ ken-runtime type work, reviewed on the argument).
 
 SCOPE CORRECTED BACK TO L/XL (Architect evt_3tky5wzycfnxb, REVISING the
 earlier evt_497awrccwy20k "S-M / not a new layer" note): tier-1 is real
-type work, NOT a reuse of existing machinery — a NEW sealed-vocabulary
-`SynthesizedAggregateNode` variant (`WorkerCaptureOperand`) + a NEW
-`reconcile_declared_children` arm (separate from the effect-seat arm) + the
-arity-bound (N_MAX) machinery. The `capture_field_identity` producer is
-DROPPED (field_identity is positional `None`; the ordinal is the identity).
-Branch 4 already sources `children[i].origin`; what remains is the new
-positional-variant storage + resolution + the positional/distinct-role
-shape (Constructor-family / `record_fields = None`). Returns to Architect +
-CV + Adversary together as the AC-SCHEMA / AC-M6-UNBLOCK discharge; tier-1
-alone does NOT close the node.
+type work, NOT a reuse of existing machinery. Settled: field_identity is
+positional `None` (the `capture_field_identity` producer is DROPPED — the
+ordinal is the identity), the positional/distinct-role shape
+(Constructor-family / `record_fields = None`), and branch 4 already sources
+`children[i].origin`. OPEN (Architect B-vs-D fork evt_43mccgm178g6r, ruling
+after it compacts): the `declared_children` storage mechanism — (B) a new
+`WorkerCaptureOperand` variant + a separate reconcile arm + arity-bound
+machinery, vs (D) a derive-from-children consumer path on the shared
+machinery. Either way it is L/XL. Returns to Architect + CV + Adversary
+together as the AC-SCHEMA / AC-M6-UNBLOCK discharge; tier-1 alone does NOT
+close the node.
