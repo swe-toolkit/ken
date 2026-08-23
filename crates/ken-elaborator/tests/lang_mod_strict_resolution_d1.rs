@@ -120,7 +120,7 @@ fn strict_globals_choke_covers_every_d0_globals_representation() {
     );
     root.write(
         "AttachedExpr.ken",
-        "theorem consume (x : Int) : Eq Int (ambient_id x) x = ambient_id::stable x",
+        "theorem consume (x : Int) : Eq Int x x = ambient_id::stable x",
     );
 
     let cases = [
