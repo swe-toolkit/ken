@@ -6,8 +6,9 @@
 > (the minimal elaborator, `§5`) and the foundation the whole surface rests on.
 > Elaboration turns the surface language (`31`–`38`) into fully-explicit **core
 > terms** (`../10-kernel/`). It is **untrusted**: the kernel re-checks
-> everything it emits. `§1`–`§4`, `§6` stay frame-level for the full (Phase-3)
-> elaborator; `§5.1`–`§5.7` pin V0 to pseudocode.
+> everything it emits. `§2.0` pins the existing in-repo source loader to
+> algorithm level. The other parts of `§1`–`§4` and `§6` stay frame-level for
+> the full (Phase-3) elaborator; `§5.1`–`§5.7` pin V0 to pseudocode.
 
 ## 1. Role and the trust split
 
@@ -26,8 +27,9 @@ is a core term the kernel `check`s (`../10-kernel/18 §4`). Consequences:
 
 ## 2. What elaboration does
 
-1. **Scope & resolution** — resolve names against the module environment (`33`),
-   reject unbound/ambiguous references.
+1. **Source loading, scope & resolution** — load the entry-rooted source graph,
+   construct each unit's module environment, and resolve names in it (`§2.0`,
+   `33`), rejecting unbound or ambiguous references.
 2. **Implicit insertion** — insert implicit arguments `{x:A}` (`32`, `33 §1`) at
    uses, creating metavariables for them.
 3. **Type inference & unification** — a bidirectional, **Hindley–Milner +
@@ -63,6 +65,49 @@ is a core term the kernel `check`s (`../10-kernel/18 §4`). Consequences:
    wrapping-arithmetic primitives (`35 §3`).
 8. **Obligation emission** — where a refinement/contract is introduced, emit the
    proof obligation (`../20-verification/22`) and leave a hole/`prove` slot.
+
+### 2.0 Source-unit loading and module-scope construction
+
+Cross-file elaboration uses the module loader specified by `33 §3`; it is not a
+second parsing or name-resolution path. Its input is a list of catalog roots and
+one dotted entry-module path. In the current source-world round, a valid input
+has **exactly one populated root**. Zero roots or more than one populated root
+are surface errors. Resolution and precedence among multiple roots remain
+explicitly deferred to the package-manager round (`33 §3.2`); the elaborator
+must not infer or silently order them.
+
+The loader proceeds as follows:
+
+1. Map the dotted module path to its unique source leaf under the root, using the
+   role-blind path identity of `33 §3.2`. A leaf/directory collision, two source
+   extensions for one leaf, an invalid component, or no source leaf is a surface
+   error.
+2. Parse the entry unit and discover dependencies lazily from its `import` and
+   facade `export M (…)` edges. Repeat from each newly discovered unit; do not
+   scan the catalog tree eagerly.
+3. Keep an entry-rooted active stack. Encountering a unit already on that stack
+   raises `ImportCycle` before either cyclic unit's declarations are admitted.
+   Cache each successfully completed unit by canonical module path and elaborate
+   it at most once in the run; later edges reuse that result.
+4. Construct a fresh scope for each unit from exactly its local declarations,
+   explicit imports, kernel and built-in vocabulary, and the closed prelude
+   floor. Imports are non-transitive in both directions, as required by `33
+   §3.3`: a unit neither borrows its caller's imports nor exports its own imports
+   merely because it was loaded. An unresolved bare name does not fall through
+   to arbitrary implementation globals outside that scope.
+5. Resolve every imported or re-exported name through the provider's public
+   interface to the provider declaration's existing canonical identity. Enforce
+   privacy, ambiguity, and re-export clashes before emitting the caller. An
+   import or re-export never allocates a replacement declaration or `GlobalId`.
+6. After resolution, erase path, scope, import, export, and visibility metadata
+   and elaborate the declarations through the ordinary checked path. The kernel
+   receives the same flat append-only `Σ` as the fully qualified one-file
+   program, with an identical `trusted_base()` delta.
+
+A front end checking a source entry uses this loader whenever that entry is
+addressed through a catalog root. Reading the entry as an isolated file is not a
+substitute: it cannot establish the entry-rooted dependency graph or the
+per-unit visibility and scope contract above.
 
 ### 2.1 Proof-returning dependent `match` motives
 
