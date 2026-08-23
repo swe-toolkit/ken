@@ -492,6 +492,30 @@ Then run the stay-one-release-ahead check (`../steward.md`, section 4): every
 node whose `depends_on` names this one is `ready` with a shovel-ready frame
 before you stop.
 
+### M9a — Return your worktree to your home branch, after every merge
+
+**Executor step — the "keep `steward/work` fresh" rule below, generalized to
+whichever seat ran M5-M9.** Authoring the M7 close commit leaves your worktree
+on a `wp/...` branch; if you never switch back, it rests **detached** on a
+superseded close commit — a stale tip that misleads every "what has landed" read
+and is the state in which the branch namespace accretes. Measured 2026-08-23:
+1846 stale `wp/scripted-merge-*` refs had accumulated this way. (Detachment was
+initially suspected of also blocking `moot compact <seat>`; a direct test
+2026-08-23 falsified that — the hang persists with the worktree attached, so its
+cause is separate and still open.)
+
+```sh
+git fetch origin --prune
+git switch <home>/work        # steward/work (Steward) or lieutenant/work (lieutenant)
+git reset --hard origin/main  # your tracker-sync commit already put the tracker on main; nothing durable is lost
+git branch -D "wp/scripted-merge-$(git rev-parse --short <target-sha>)"  # publisher synthetic ref; disposable once M6 verified the landing
+```
+
+Rest on your home branch at `origin/main`, never on a `wp/...` tip. The synthetic
+branch the publisher mints (`scripts/scripted-pr-automerge.sh`, ~line 279) is
+disposable the moment M6 confirms the content on `main`; reaping it each run is
+what keeps the ref namespace from accreting (1846 had accumulated by 2026-08-23).
+
 ## Routing your own corpus edits
 
 Your operational docs — the progress tracker, `agent/` playbook and
