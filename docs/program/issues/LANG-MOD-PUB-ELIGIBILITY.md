@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-PUB-ELIGIBILITY
 title: "WP-3 — semantic gate rejecting pub on ineligible placements with a surface diagnostic; pub proof retains the subject-must-be-public rule"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
