@@ -102,9 +102,13 @@ launch_stagger_seconds = 3
 [agents.spec-author]
 display_name = "spec-author"
 harness = "pi"
-model = "openrouter/deepseek/deepseek-v4-pro-0813"
+# 2026-08-23 reseat (operator): openrouter ABANDONED (not cost-effective) -> OpenAI
+# via the pi harness. This seat was stranded on a hard 402 on openrouter/deepseek
+# and could not post its T1 semantic-faithfulness rulings. T1 enclave seat, so
+# gpt-5.6-sol at high, mirroring conformance-validator. OPENROUTER_API_KEY dropped.
+model = "openai-codex/gpt-5.6-sol"
 effort = "high"
-env = { OPENROUTER_API_KEY = "${secret:openrouter-api-key}", PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's spec author (clean-room enclave). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/spec-author.md and CLEAN-ROOM.md, set your status, and await the spec leader's kickoff. Do not poll."
 
 [agents.conformance-validator]
@@ -148,9 +152,12 @@ startup_prompt = "You are Ken's Architect (component design + security review). 
 [agents.spec-leader]
 display_name = "spec-leader"
 harness = "pi"
-model = "openrouter/deepseek/deepseek-v4-flash-0731"
+# 2026-08-23 reseat (operator): openrouter ABANDONED -> OpenAI via the pi harness.
+# Coordinator/leader tier, so gpt-5.6-terra at medium, matching the other pi
+# leaders (kernel/verify/language/foundation). OPENROUTER_API_KEY dropped.
+model = "openai-codex/gpt-5.6-terra"
 effort = "medium"
-env = { OPENROUTER_API_KEY = "${secret:openrouter-api-key}", PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's spec enclave. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/leader.md, set status, and await the Steward's kickoff. Do not poll."
 
 [agents.librarian]
@@ -412,4 +419,4 @@ harness = "pi"
 model = "openai-codex/gpt-5.6-terra"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
-startup_prompt = "You are Ken's merge/campaign lieutenant (the Steward's mechanical half, T2). Read agent/COORDINATION.md (federation law) and agent/MODELS.md first. Then read your playbook at /workspaces/ken/.worktrees/steward/local/lieutenant-playbook.md (draft-for-trial) and agent/playbooks/federation/steward/merge-procedure.md (the canonical M1-M9, your primary instrument). Set your status via update_status and await the Steward's kickoff. Do not poll."
+startup_prompt = "You are Ken's merge/campaign lieutenant (the Steward's mechanical half, T2). Read agent/COORDINATION.md (federation law, especially the merge split at §14b) and agent/MODELS.md first. Then read your playbook at agent/playbooks/federation/lieutenant.md and agent/playbooks/federation/steward/merge-procedure.md (the canonical M1-M9, your primary instrument; M1-M4 are the Steward's routing, M5-M9 are yours). Set your status via update_status and await the Steward's ROUTED authorization. Do not poll."

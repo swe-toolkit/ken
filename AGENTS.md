@@ -18,6 +18,7 @@ again **after every context compaction** — orient yourself:
 | Your role (from `orientation()`) | Skill to load |
 |---|---|
 | `steward` | `ken-steward` |
+| `lieutenant` | `ken-merge-lieutenant` |
 | `architect` | `ken-architect` |
 | `librarian` | `ken-librarian` |
 | `research` | `ken-research` |
@@ -67,6 +68,7 @@ narrower scopes on your path (its path + ancestors).
 |---|---|
 | _any role_ | `agent/memory/fleet/` |
 | `steward` | `fleet` + `agent/memory/enclave/` + `agent/memory/roles/steward/` |
+| `lieutenant` | `fleet` + `agent/memory/build/` (it releases build WPs) |
 | `architect` | `fleet` + `enclave` + `agent/memory/roles/architect/` |
 | `spec-leader` / `spec-author` / `conformance-validator` | `fleet` + `enclave` + `agent/memory/roles/<role>/` |
 | `librarian` | `fleet` + `agent/memory/roles/librarian/` + `agent/memory/teams/doc/` (it is the doc team's QA) |
