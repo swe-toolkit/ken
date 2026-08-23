@@ -8,6 +8,38 @@ Context compaction is strictly the Steward's responsibility. You direct the
 work flow, so you own the clean context boundary that flows with it. **Leaders
 do not compact their members.**
 
+## Codex (pi) seats: a 272k window, auto-compaction ON — compact at SEAMS only
+
+The Codex/pi seats — the lieutenant and every pi ring seat
+(kernel/verify/language/spec/foundation) — have a **272k-token** context window,
+not Claude Code's 1M (operator, 2026-08-23). Their pane footer reads
+`N%/272k (auto)`: the percent is of 272k, and **`(auto)` means auto-compaction is
+on**. Orientation (skills + role playbook + memory scopes) is a **>40k fixed
+floor** — about 15% of the window before any work is done.
+
+**The model for compacting THEM: deliberate compaction pays only at a clean task
+SEAM; between seams, let auto-compaction handle growth.** At a seam the old
+context is disposable — the seat re-orients for the new unit regardless — so
+compaction there loses nothing. Between seams the context IS the working state,
+and on a 272k window with a 40k floor an early-threshold compaction (33% ≈ 90k,
+only ~50k of it real work) discards half the useful context to reclaim headroom
+the floor immediately refills, then re-pays orientation. That is thrash;
+auto-compaction near the ceiling avoids it.
+
+- **A seat that STARTS FRESH on a new task/hunt — compact at that seam.** Build
+  teams and the spec enclave (the before-new-work gate below) and the Adversary
+  (M8a). The seam is real and the context is disposable there, so these gates
+  stand exactly as written.
+- **The lieutenant — NEVER deliberately compact it; let it autocompact.** It runs
+  a continuous merge queue with **no "before new work" seam** to hang a
+  compaction on. It climbs slowly (~0.3%/merge), is a stateless executor that
+  re-orients cleanly, and `moot compact lieutenant` hangs anyway (2026-08-23;
+  detachment was tested and is NOT the cause). If it ever truly needs shrinking,
+  **restart the session** (stronger than compact) rather than chasing it.
+
+**Your OWN 33% self-compact (steward §0a) is unchanged** — you are a Claude Code
+seat on a 1M window, where the floor is a small fraction and the math differs.
+
 ## Compacting a team before new work
 
 **Always compact before new work — build teams and the spec enclave. No
@@ -181,6 +213,15 @@ The fleet runs the Codex TUI in `moot-<role>` panes.
   in-flight compaction.
 
 ## The mid-flight ceiling and the ctx scan
+
+**For pi seats this mid-flight threshold-chasing is superseded by
+auto-compaction** — see the Codex-seats section above. The 25/33/45 figures below
+date to the pre-pi enclave (operator, 2026-07-02) and to Claude Code seats; on a
+272k window with a 40k floor, chasing a 25/33% mid-flight number thrashes. For pi
+seats the SEAM gate (before-new-work; M8a) is the primary trigger and
+auto-compaction is the mid-flight net; the scan below is then only for spotting a
+genuinely stuck or near-ceiling seat, never a licence to compact a mid-flight pi
+seat at 33%.
 
 High context is expensive per turn for very little gain: an agent at 90%
 reprocesses about 900K tokens every turn, and the working state beyond a good
