@@ -71,6 +71,16 @@ pub struct ModuleState {
     prelude_names: HashSet<String>,
 }
 
+/// The complete Ken-defined always-present floor (`30-taxonomy §4`).
+///
+/// D0 exposes the installer's source of truth without changing resolution.
+/// D1 may consult [`is_prelude_floor_name`] instead of duplicating this set.
+pub const PRELUDE_FLOOR_NAMES: [&str; 3] = ["Bool", "Char", "List"];
+
+pub fn is_prelude_floor_name(name: &str) -> bool {
+    PRELUDE_FLOOR_NAMES.contains(&name)
+}
+
 impl ModuleState {
     pub(crate) fn loaded_unit_count(&self) -> usize {
         self.loaded_units.len()
@@ -84,7 +94,7 @@ impl ModuleState {
         // `30-taxonomy §4` derives this exact closed set from the built-in
         // primitive signatures. Other definitions constructed in prelude.rs
         // are package-level conveniences, not unshadowable prelude members.
-        self.prelude_names = ["Bool", "Char", "List"]
+        self.prelude_names = PRELUDE_FLOOR_NAMES
             .into_iter()
             .map(str::to_string)
             .collect();
