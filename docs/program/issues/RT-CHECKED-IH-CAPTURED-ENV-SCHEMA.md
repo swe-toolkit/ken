@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-CAPTURED-ENV-SCHEMA
 title: "Admit the checked-IH's non-empty captured environment as a value-domain Record with a planner-issued schema — issue a DEDICATED checked-IH captured-env record (a sibling of, not an extension of, UnitBoundaryEnvironment) with n declared children whose per-field identities are SOURCED from each capture's own occurrence in the checked plan (not fabricated), so the escaping checked functional IH has an admitted environment to cross the effect-seat boundary. The predecessor M6 (RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION) lowering-proper depends on. Tiers 1 (elaborator emit of the captured environment as a semantic object with per-capture occurrences, a COORDINATION section 9a language spillover) + 2 (runtime planner issues a dedicated checked-IH captured-env occurrence with those declared children, reusing the Constructor-branch child-owner derivation)."
-status: ready
+status: merged
 owner: runtime
 size: L
 gate: none
