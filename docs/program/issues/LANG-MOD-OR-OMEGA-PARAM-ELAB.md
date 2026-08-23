@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-OR-OMEGA-PARAM-ELAB
 title: "Or arm (b), NODE A (prerequisite) — teach explicit-data parameter/index elaboration to honor an Omega-sorted binder, so a catalog package can declare Or : Omega -> Omega -> Type; the result-sort admission is unchanged, preserving the ban on proof-relevant multi-constructor Omega-valued families"
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
