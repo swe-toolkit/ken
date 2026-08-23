@@ -379,7 +379,7 @@ loader path; a generic parse failure, missing fixture, or loaderless
   | `export M (foo)` from the same case | `export M (pub foo)` |
   | the module from `module-elaborates-to-identical-flat-sigma` | `pub module M { … }` |
   | a positive `instance C T { … }` from `../classes/seed-classes.md` | `pub instance C T { … }` |
-  | a positive `derive C for T` from `../classes/seed-classes.md` | `pub derive C for T` |
+  | locked postfix derive `data T = MkT derive (DecEq)` (`33 §5.6`) | `data T = MkT pub derive (DecEq)` |
   | the ordinary anonymous `program` header fixture below | `pub program` |
   | the ordinary anonymous `package` header fixture below | `pub package` |
   | a positive `infixl 6 +` declaration `(gated: fixity surface)` | `pub infixl 6 +` |
@@ -388,11 +388,13 @@ loader path; a generic parse failure, missing fixture, or loaderless
   retains its independently pinned behavior. Every `pub`-bearing mutation
   rejects as a surface error attributable to an unsupported `pub` placement;
   **RED UNTIL the module/import repair campaign** at this eligibility gate;
-  no mutation is accepted and ignored, and none reaches the kernel. The exact
-  diagnostic variant is not pinned because `32 §1` locks eligibility and phase,
-  not error spelling. The fixity row becomes live with its ordinary positive
-  control when `fixity_decl` is reachable; until then both arms are explicitly
-  gated rather than crediting an unrelated unknown-keyword error.
+  no mutation is accepted and ignored, and none reaches the kernel. The
+  ordinary postfix-derive arm must drive the real derive generator and its
+  kernel-checked candidate; parser-only recognition is not a positive control.
+  The exact diagnostic variant is not pinned because `32 §1` locks eligibility
+  and phase, not error spelling. The fixity row becomes live with its ordinary
+  positive control when `fixity_decl` is reachable; until then both arms are
+  explicitly gated rather than crediting an unrelated unknown-keyword error.
 - why: this is an allowed-inventory check over the forms explicitly forbidden
   by `32 §1`, not a token grep. The eligible declaration prevents an
   implementation from satisfying the matrix by rejecting all `pub`. The
