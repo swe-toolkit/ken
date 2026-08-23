@@ -1129,13 +1129,23 @@ fn fixed_node_selected_owner_of(
 fn checked_ih_coordinate_run(
     unit: &super::continuations::ContinuationUnitView<'_>,
 ) -> Result<Option<(StaticOriginId, Vec<(u32, StaticOriginId)>)>, CraneliftBackendError> {
-    // No ruled envelope means no nonrecursive prefix, so no run, so no
-    // membership. Not a skip of an in-domain unit -- there is no record such a
-    // unit could have.
-    let Ok(envelope) = unit.ordinary_envelope() else {
+    // ⛔ `Ok(None)` on this line is EXACTLY ONE condition -- the ruled envelope
+    // has no nonrecursive prefix -- and the ENVELOPE AUTHORITY decides it, not a
+    // predicate re-derived here. Such a unit has no capture-to-ordinary-parameter
+    // correspondence, hence no run, hence no record it could have; it is out of
+    // the domain, not skipped.
+    //
+    // ⛔ What stood here was `let Ok(envelope) = unit.ordinary_envelope() else {
+    // return Ok(None) }`, which turned EVERY envelope failure into
+    // non-membership -- a malformed envelope on a unit that IS in the domain
+    // silently issued nothing. That is fail-open, in exactly the direction this
+    // slice exists to close, and it was introduced while implementing the fix
+    // FOR fail-open. An armed `EnvelopeDefect::SelectionOutOfRange` produced
+    // zero records instead of a refusal.
+    let Some(envelope) = unit.ruled_ordinary_envelope()? else {
         return Ok(None);
     };
-    let mut closure_origin = None;
+    let mut closure_origin: Option<StaticOriginId> = None;
     let mut run = Vec::new();
     for role in &envelope {
         let ContinuationOrdinaryEnvelopeRole::WorkerCapture {
@@ -1153,7 +1163,20 @@ fn checked_ih_coordinate_run(
                  occurrence, so its field identity cannot be admitted from the plan",
             ));
         };
-        closure_origin = Some(*origin);
+        // ⛔ Agreement is CHECKED, not assumed. This used to be a plain
+        // assignment, so a run whose captures named different closures kept the
+        // LAST one and produced a record keyed on a closure most of its own
+        // fields do not come from -- silently, since the seat still resolves.
+        match closure_origin {
+            None => closure_origin = Some(*origin),
+            Some(established) if established == *origin => {}
+            Some(established) => {
+                return Err(planner_error(format!(
+                    "checked-IH captured environment: the ruled run mixes captures from closure \
+                     {established:?} and closure {origin:?}, so no single closure seat keys it",
+                )));
+            }
+        }
         run.push((*ordinal, *sourced));
     }
     // An envelope with no worker captures is the capture-free unit-boundary
@@ -3326,9 +3349,10 @@ mod tests {
 
 #[cfg(test)]
 mod checked_ih_captured_env_schema {
+    use super::super::continuations::{set_envelope_defect, EnvelopeDefect};
     use super::*;
     use crate::cranelift_backend::planning::static_transition::plan_static_transition_graph;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
 
     fn checked_ih_records<'plan>(
         plan: &'plan StaticTransitionPlan<'_>,
@@ -3347,71 +3371,267 @@ mod checked_ih_captured_env_schema {
             .collect()
     }
 
+    fn record_seat(record: &PlannedAggregateOwnership) -> StaticOriginId {
+        match record.producer {
+            AggregateOccurrenceProducer::SynthesizedUse { seat, .. } => seat,
+            _ => unreachable!("checked_ih_records filters on SynthesizedUse"),
+        }
+    }
+
+    /// **The ORACLE: the planner's own `WorkerCapture` roles, read directly.**
+    ///
+    /// ⛔ This deliberately does NOT call `checked_ih_coordinate_run`. That
+    /// function and the issuance loop are the SUBJECTS here; comparing a record
+    /// to the predicate that produced it is circular and stays green under any
+    /// change they make together. The authority is the ruled ordered-worker
+    /// envelope, so this reads the roles and rebuilds what the record is
+    /// supposed to say from them.
+    fn authoritative_runs(
+        plan: &StaticTransitionPlan<'_>,
+    ) -> BTreeMap<StaticOriginId, Vec<(u32, StaticOriginId)>> {
+        let mut runs = BTreeMap::new();
+        for unit in plan.continuation_units().expect("the plan exposes its units") {
+            let Some(envelope) = unit
+                .ruled_ordinary_envelope()
+                .expect("no fixture here has a malformed envelope")
+            else {
+                continue;
+            };
+            let mut seat = None;
+            let mut run = Vec::new();
+            for role in &envelope {
+                let ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+                    ordinal,
+                    closure_origin,
+                    source,
+                    ..
+                } = role
+                else {
+                    continue;
+                };
+                let ContinuationWorkerCaptureSource::Lexical(sourced) = source else {
+                    continue;
+                };
+                seat = Some(*closure_origin);
+                run.push((*ordinal, *sourced));
+            }
+            if let Some(seat) = seat {
+                if !run.is_empty() {
+                    runs.insert(seat, run);
+                }
+            }
+        }
+        runs
+    }
+
+    fn plan_of(expr: RuntimeExpr) -> StaticTransitionPlan<'static> {
+        let expr = Box::leak(Box::new(expr));
+        plan_static_transition_graph(expr, &BTreeMap::new()).expect("the fixture plans")
+    }
+
     /// **The half of the option-(c) control that this instrument can honestly
     /// carry: plan construction still succeeds.**
     ///
-    /// This fixture contains a unit that has worker captures and, DURING plan
-    /// construction, no ruled ordered-worker envelope -- measured live at the
-    /// issuance site as `captures=2 ordinary_params=1`. Propagating that
-    /// precondition failure (option (a)) fails plan construction for a program
-    /// that is compile-valid, so this `expect` is what reds under (a).
+    /// The fixture contains a unit that has worker captures and no ruled
+    /// ordered-worker envelope. Propagating that precondition failure (option
+    /// (a)) fails plan construction for a program that is compile-valid, so this
+    /// `expect` is what reds under (a).
     ///
     /// LIMIT, stated rather than implied: the out-of-domain unit is NOT
-    /// observable through `continuation_units()` on the FINISHED plan -- the
-    /// set there carries no envelope-less unit, so a test cannot assert "this
-    /// seat received no record" about it from here. The anti-(b) evidence is
-    /// therefore carried by the equivalence test below (issued seats equal
-    /// coordinate-run units) and by the code shape -- membership is derived
-    /// from the run's existence, with no separate captures filter that could
-    /// drift -- not by this fixture. A control that cannot see the case it
-    /// names is worth less than saying so.
+    /// observable through `continuation_units()` on the FINISHED plan, so a test
+    /// cannot assert "this seat received no record" about it from here. The
+    /// anti-(b) evidence is carried by the set-equality test below, not by this
+    /// fixture. A control that cannot see the case it names is worth less than
+    /// saying so.
     #[test]
     fn a_program_with_an_envelope_less_captured_unit_still_plans() {
-        let expr = Box::leak(Box::new(
+        let plan = plan_of(
             super::super::continuations::tests::contspec_multiple_worker_captures_fixture(),
-        ));
-        let plan = plan_static_transition_graph(expr, &BTreeMap::new())
-            .expect("a compile-valid program must still plan when a unit is out of this domain");
+        );
         for record in checked_ih_records(&plan) {
             assert!(
                 !record.children.is_empty(),
                 "a checked-IH record is issued only for a unit with a coordinate run, so it \
-                 can never carry an empty child run -- an empty one would mean the record was \
-                 issued for a unit outside the domain"
+                 can never carry an empty child run"
             );
         }
     }
 
-    /// Membership EQUALS coordinate-existence, checked per unit against the
-    /// coordinate source rather than against a proxy for it.
+    /// Membership EQUALS coordinate-existence, as SETS of seats.
     ///
-    /// This is the anti-(b) shape: it asserts the two sets agree unit by unit,
-    /// so a filter that admitted a unit with no run, or dropped one with a run,
-    /// would red here.
+    /// ⛔ This asserted `issued.len() == expected` and was green while a seat
+    /// was substituted for a different one -- a cardinality check cannot see a
+    /// swap, only a count change. Set equality names both directions at once:
+    /// an admitted unit with no run appears in `issued` and not `expected`, and
+    /// a dropped in-domain unit appears in `expected` and not `issued`.
     #[test]
-    fn every_issued_record_corresponds_to_a_unit_with_a_coordinate_run() {
-        let expr = Box::leak(Box::new(super::super::continuations::tests::contspec_multiple_worker_captures_fixture()));
-        let plan = plan_static_transition_graph(expr, &BTreeMap::new()).expect("plans");
-        let mut expected = 0usize;
-        for unit in plan.continuation_units().expect("units") {
-            if checked_ih_coordinate_run(&unit)
-                .expect("the run derivation does not refuse on this fixture")
-                .is_some()
-            {
-                expected += 1;
+    fn the_issued_seats_are_exactly_the_seats_with_a_coordinate_run() {
+        for fixture in [
+            super::super::continuations::tests::contspec_multiple_worker_captures_fixture(),
+            super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(
+            ),
+            super::super::continuations::tests::contspec_capture_free_worker_fixture(),
+        ] {
+            let plan = plan_of(fixture);
+            let expected: BTreeSet<StaticOriginId> =
+                authoritative_runs(&plan).keys().copied().collect();
+            let issued: BTreeSet<StaticOriginId> = checked_ih_records(&plan)
+                .iter()
+                .map(|record| record_seat(record))
+                .collect();
+            assert_eq!(
+                issued, expected,
+                "the issued seats must be exactly the seats the authoritative envelope roles \
+                 admit -- as a set, not as a count"
+            );
+        }
+    }
+
+    /// The record's ordered `(position, origin)` run equals the authoritative
+    /// role sequence, pairs kept together.
+    ///
+    /// ⛔ The gap this closes: nothing pinned the ci<->oi ASSOCIATION. Reversing
+    /// the source column alone left every count, every ordinal and every
+    /// membership check satisfied, because each was true of a projection of the
+    /// run rather than of the run. Comparing the ordered pair vector refutes a
+    /// permutation of either column independently, a drop, and a duplicate.
+    #[test]
+    fn each_records_ordered_run_matches_the_authoritative_roles() {
+        for fixture in [
+            super::super::continuations::tests::contspec_multiple_worker_captures_fixture(),
+            super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(
+            ),
+        ] {
+            let plan = plan_of(fixture);
+            let runs = authoritative_runs(&plan);
+            let records = checked_ih_records(&plan);
+            assert!(
+                !records.is_empty(),
+                "this fixture must issue at least one record or the comparison below is vacuous"
+            );
+            for record in records {
+                let seat = record_seat(record);
+                let expected = runs
+                    .get(&seat)
+                    .expect("every issued seat has an authoritative run");
+                let actual: Vec<(u32, StaticOriginId)> = record
+                    .children
+                    .iter()
+                    .map(|child| {
+                        (
+                            child.position,
+                            child
+                                .origin
+                                .expect("every checked-IH child names its source occurrence"),
+                        )
+                    })
+                    .collect();
+                assert_eq!(
+                    actual, *expected,
+                    "seat {seat:?}: the record's ordered (position, origin) run must equal the \
+                     ruled envelope's WorkerCapture sequence"
+                );
             }
         }
-        let issued: std::collections::BTreeSet<StaticOriginId> = checked_ih_records(&plan)
-            .iter()
-            .filter_map(|record| match record.producer {
-                AggregateOccurrenceProducer::SynthesizedUse { seat, .. } => Some(seat),
-                _ => None,
-            })
-            .collect();
+    }
+
+    /// The escaping arm, on a run that carries BOTH lifetimes at once.
+    ///
+    /// ⛔ Every earlier control ran on a fixture whose captures were `unit()`,
+    /// so every child was `Persistent` and the record was `PersistentGround`.
+    /// A hard-coded `Persistent` would have passed all of them. This fixture
+    /// alternates `Effect` (activation-owned) and `unit()` captures, so a
+    /// constant in EITHER direction reds: the record must say two different
+    /// things about two of its own children.
+    #[test]
+    fn a_mixed_run_carries_the_per_capture_lifetime_and_the_escaping_meet() {
+        let plan = plan_of(
+            super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(),
+        );
+        let records = checked_ih_records(&plan);
+        assert_eq!(records.len(), 1, "the fixture has one checked-IH seat");
+        let record = records[0];
         assert_eq!(
-            issued.len(),
-            expected,
-            "the issued seats must be exactly the units whose coordinate run exists"
+            record.children.len(),
+            9,
+            "the fixture declares nine captures"
+        );
+        for (position, child) in record.children.iter().enumerate() {
+            // Independent oracle: the FIXTURE decides which captures are
+            // effects, and the occurrence plane rules `Effect` activation-owned
+            // and `unit()` persistent. Neither half is read back from the code
+            // under test.
+            let expected = if position % 2 == 0 {
+                PlannedReferentLifetime::ActivationOwned
+            } else {
+                PlannedReferentLifetime::Persistent
+            };
+            assert_eq!(
+                child.lifetime, expected,
+                "capture {position} of the mixed run"
+            );
+        }
+        assert_eq!(
+            record.meet,
+            PlannedReferentLifetime::ActivationOwned,
+            "a run with an escaping member meets at the escaping lifetime"
+        );
+        assert_eq!(
+            record.allocation,
+            PlannedAggregateAllocation::InvocationAggregate,
+            "an escaping meet allocates in the invocation arena"
+        );
+    }
+
+    /// The capture-free population receives no record, from a fixture that
+    /// demonstrably reaches the issuance site.
+    #[test]
+    fn a_capture_free_program_receives_no_checked_ih_record() {
+        let plan = plan_of(super::super::continuations::tests::contspec_capture_free_worker_fixture());
+        assert!(
+            !plan
+                .continuation_units()
+                .expect("the plan exposes its units")
+                .is_empty(),
+            "the negative is vacuous unless this fixture actually builds continuation units"
+        );
+        assert!(
+            checked_ih_records(&plan).is_empty(),
+            "a capture-free unit has no coordinate run, so it is served by \
+             UnitBoundaryEnvironment and must receive no checked-IH record"
+        );
+    }
+
+    /// **A MALFORMED ENVELOPE MUST REFUSE, NOT READ AS A NON-MEMBER.**
+    ///
+    /// ⛔ This is the control for the fail-open defect introduced while
+    /// implementing the fix for fail-open. The issuance site matched
+    /// `let Ok(envelope) = unit.ordinary_envelope() else { return Ok(None) }`,
+    /// which turned EVERY envelope failure into "not in this domain". With the
+    /// defect armed, planning silently produced zero records and every other
+    /// test here stayed green, because each one asks about records that exist.
+    /// Only a test that arms an integrity fault and demands a REFUSAL can see
+    /// it.
+    #[test]
+    fn an_integrity_defect_in_the_envelope_refuses_rather_than_dropping_the_unit() {
+        let expr = Box::leak(Box::new(
+            super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(),
+        ));
+        let baseline = plan_static_transition_graph(expr, &BTreeMap::new())
+            .expect("the fixture plans when the envelope is exact");
+        assert!(
+            !checked_ih_records(&baseline).is_empty(),
+            "the armed run below is only meaningful because the unarmed one issues records"
+        );
+
+        set_envelope_defect(EnvelopeDefect::SelectionOutOfRange);
+        let armed = plan_static_transition_graph(expr, &BTreeMap::new());
+        set_envelope_defect(EnvelopeDefect::Exact);
+
+        assert!(
+            armed.is_err(),
+            "an envelope integrity defect must fail plan construction; swallowing it and \
+             issuing no record is the fail-open shape this slice exists to close"
         );
     }
 }
