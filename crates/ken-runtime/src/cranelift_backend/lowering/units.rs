@@ -33,6 +33,151 @@ use crate::cranelift_backend::planning::{
 
 use cranelift_module::FuncId;
 
+/// **`RT-CHECKED-IH-CAPTURED-ENV-SCHEMA` tier 1 -- mechanically validate the
+/// admitted ci<->oi bijection at its construction site.**
+///
+/// The mapping is READ from the planner's `WorkerCapture` roles, never rebuilt,
+/// so this does not re-derive it. What it checks is that what the plan issued
+/// really is a bijection over the capture run: exactly one entry per capture,
+/// ordinals contiguous from zero, no ordinal repeated, and no source occurrence
+/// serving two captures.
+///
+/// Deliberately checks ORDER AND MULTIPLICITY, not just the count. A count
+/// agreement is the class of evidence that made a nine-versus-nine coincidence
+/// look like confirmation during this slice's measurement; the whole point of a
+/// bijection is the part a count cannot see.
+/// **`RT-CHECKED-IH-CAPTURED-ENV-SCHEMA` tier 1 -- admit one capture's source
+/// occurrence, or REFUSE.**
+///
+/// `Lexical` carries the planner-issued occurrence, which is the field-identity
+/// authority. `Seed` carries none: a seed capture has no source occurrence, so
+/// there is nothing to admit and a label would have to be invented. That is the
+/// fabrication this slice exists to prevent, so it fails closed.
+///
+/// There is deliberately NO positional fallback. Falling back to "capture i gets
+/// occurrence i" would compile, would pass on any population whose ordinals
+/// happen to line up, and is exactly the plausible-face fabrication this
+/// slice's measurement rejected.
+fn admitted_capture_source(
+    ordinal: u32,
+    source: &ContinuationWorkerCaptureSource,
+) -> Result<StaticOriginId, CraneliftBackendError> {
+    match source {
+        ContinuationWorkerCaptureSource::Lexical(origin) => Ok(*origin),
+        ContinuationWorkerCaptureSource::Seed => Err(backend_module(format!(
+            "checked-IH captured environment: capture {ordinal} is a seed capture with no \
+             source occurrence, so its field identity cannot be admitted from the plan \
+             and must not be invented",
+        ))),
+    }
+}
+
+/// **`RT-CHECKED-IH-CAPTURED-ENV-SCHEMA` tier 1 -- the admitted run IS the
+/// planner-issued one, field for field.**
+///
+/// [`validate_captured_environment_bijection`] proves the run is A bijection:
+/// contiguous ordinals, no repeats, injective sources. It cannot prove it is
+/// THE PLANNER'S bijection -- permuting only the source column preserves the
+/// count, the ordinals, the multiplicity and the injectivity, so every one of
+/// those predicates still holds while each capture now carries a DIFFERENT
+/// capture's occurrence. That is the plausible-face fabrication this node
+/// exists to prevent, and it was reachable in production until this check.
+///
+/// So this compares the admitted association against the authoritative role
+/// sequence pairwise, in order: capture i must carry the ordinal AND the source
+/// that the i-th `WorkerCapture` role in the envelope issued.
+fn validate_admitted_matches_role_sequence(
+    envelope: &[ContinuationOrdinaryEnvelopeRole],
+    capture_sources: &[(u32, StaticOriginId)],
+) -> Result<(), CraneliftBackendError> {
+    let mut index = 0usize;
+    for role in envelope {
+        let ContinuationOrdinaryEnvelopeRole::WorkerCapture { ordinal, source, .. } = role else {
+            continue;
+        };
+        let Some((admitted_ordinal, admitted_source)) = capture_sources.get(index) else {
+            return Err(backend_module(format!(
+                "checked-IH captured environment: the envelope issues more worker captures \
+                 than the admitted run holds, first missing at position {index}",
+            )));
+        };
+        if admitted_ordinal != ordinal {
+            return Err(backend_module(format!(
+                "checked-IH captured environment: capture at position {index} was admitted \
+                 with ordinal {admitted_ordinal}, but the plan issues ordinal {ordinal} there",
+            )));
+        }
+        let issued = admitted_capture_source(*ordinal, source)?;
+        if *admitted_source != issued {
+            return Err(backend_module(format!(
+                "checked-IH captured environment: capture {ordinal} was admitted with source \
+                 {admitted_source:?}, but the plan issues {issued:?} for it -- the admitted \
+                 association is not the planner-issued one",
+            )));
+        }
+        index += 1;
+    }
+    if index != capture_sources.len() {
+        return Err(backend_module(format!(
+            "checked-IH captured environment: the admitted run holds {} captures but the \
+             envelope issues {index}",
+            capture_sources.len(),
+        )));
+    }
+    Ok(())
+}
+
+fn validate_captured_environment_bijection(
+    capture_sources: &[(u32, StaticOriginId)],
+    capture_count: usize,
+) -> Result<(), CraneliftBackendError> {
+    // Unreachable from the single call site today: that loop pushes to
+    // `capture_sources` and `worker_captures` in lockstep, so the two lengths
+    // cannot diverge there. Retained as defence-in-depth for a real
+    // function-level invariant -- this validator takes the run as an argument
+    // and must not assume its caller built it that way. Noted so a later reader
+    // does not mistake it for a live production guard and reason from its
+    // reachability.
+    if capture_sources.len() != capture_count {
+        return Err(backend_module(format!(
+            "checked-IH captured environment: {} sourced occurrences for {capture_count} \
+             captures, so the admitted run is not a bijection",
+            capture_sources.len(),
+        )));
+    }
+    let mut seen_ordinals: Vec<u32> = Vec::with_capacity(capture_sources.len());
+    let mut seen_sources: Vec<StaticOriginId> = Vec::with_capacity(capture_sources.len());
+    for (index, (ordinal, source)) in capture_sources.iter().enumerate() {
+        let expected = u32::try_from(index).map_err(|_| {
+            backend_module(
+                "checked-IH captured environment: capture ordinal exceeds addressable range"
+                    .to_string(),
+            )
+        })?;
+        if *ordinal != expected {
+            return Err(backend_module(format!(
+                "checked-IH captured environment: capture at position {index} carries ordinal \
+                 {ordinal}, so the plan's capture ordinals are not the contiguous run this \
+                 environment is admitted over",
+            )));
+        }
+        if seen_ordinals.contains(ordinal) {
+            return Err(backend_module(format!(
+                "checked-IH captured environment: capture ordinal {ordinal} appears twice",
+            )));
+        }
+        if seen_sources.contains(source) {
+            return Err(backend_module(format!(
+                "checked-IH captured environment: source occurrence {source:?} is claimed by \
+                 two captures, so the admitted mapping is not injective",
+            )));
+        }
+        seen_ordinals.push(*ordinal);
+        seen_sources.push(*source);
+    }
+    Ok(())
+}
+
 /// **`RT-FNSPLIT-B2F` `AC-2` — what the compiled module ACTUALLY contains.**
 ///
 /// ⭐ **This exists because the census pin in `control.rs` cannot answer the
@@ -1597,11 +1742,32 @@ pub(super) fn lower_continuation_selected_case_body(
     // envelope's `WorkerCapture` roles, in capture-ordinal order,
     // taking each one's operand from its own Parameter position.
     let mut worker_captures = Vec::new();
+    // **`RT-CHECKED-IH-CAPTURED-ENV-SCHEMA` tier 1 -- the ci<->oi bijection is
+    // ADMITTED here, not rebuilt.**
+    //
+    // This loop used to match `WorkerCapture { .. }` and discard every field,
+    // keeping only the operand. The planner had already issued the bijection on
+    // that record -- `ordinal` IS ci and `source` IS oi -- so the mapping was
+    // never missing, it was being dropped one line before the consumer that
+    // needs it. Reading it here is sourced-from-source by construction: there is
+    // no parallel map to drift and no positional inference to be right by luck.
+    //
+    // `Seed` is the genuinely unsourced case and is REFUSED. A seed capture
+    // has no source occurrence, and inventing a label for it is the exact
+    // fabrication this slice exists to prevent -- so it fails closed rather than
+    // taking a positional fallback.
+    let mut capture_sources: Vec<(u32, StaticOriginId)> = Vec::new();
     for (position, role) in envelope.iter().enumerate() {
-        if matches!(role, ContinuationOrdinaryEnvelopeRole::WorkerCapture { .. }) {
+        if let ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+            ordinal, source, ..
+        } = role
+        {
+            capture_sources.push((*ordinal, admitted_capture_source(*ordinal, source)?));
             worker_captures.push(ordinary[position].clone());
         }
     }
+    validate_captured_environment_bijection(&capture_sources, worker_captures.len())?;
+    validate_admitted_matches_role_sequence(envelope, &capture_sources)?;
     if worker_captures.len() != facts.worker_capture_count {
         return Err(backend_module(
             "the ordinary envelope's worker-capture segment disagrees with the selected \
@@ -6344,4 +6510,188 @@ fn define_unit_body<M: Module>(
         cell.set((declared, defined + 1));
     });
     Ok(root_outcome)
+}
+
+#[cfg(test)]
+mod captured_environment_bijection {
+    use super::*;
+
+    fn origin(id: u32) -> StaticOriginId {
+        StaticOriginId::for_test(id)
+    }
+
+    /// The admitted run measured on the checked family: nine captures, ordinals
+    /// contiguous from zero, each with its own sourced occurrence.
+    fn measured_run() -> Vec<(u32, StaticOriginId)> {
+        (0..9u32).map(|i| (i, origin(703 - i))).collect()
+    }
+
+    #[test]
+    fn the_admitted_run_measured_on_the_checked_family_validates() {
+        validate_captured_environment_bijection(&measured_run(), 9)
+            .expect("the plan-issued run is a bijection over the capture list");
+    }
+
+    /// Swapping whole (ordinal, source) PAIRS is refused.
+    ///
+    /// CORRECTED LABEL: this swaps entire tuples, so what refuses it is the
+    /// moved ORDINALS, not the sources -- each source stays paired with its own
+    /// ordinal. It was previously described as reordering sources "while
+    /// leaving the ordinals alone", which it never did, and that mislabel hid a
+    /// real gap: a permutation of the SOURCE COLUMN ALONE preserves count,
+    /// ordinals, multiplicity and injectivity, so this validator cannot see it.
+    /// That case is covered by
+    /// [`super::validate_admitted_matches_role_sequence`] and its own control
+    /// below, not here.
+    #[test]
+    fn swapping_whole_ordinal_source_pairs_is_refused() {
+        let mut run = measured_run();
+        run.swap(0, 8);
+        let refusal = validate_captured_environment_bijection(&run, 9)
+            .expect_err("a reordered source run is not the plan's bijection");
+        assert!(
+            format!("{refusal:?}").contains("ordinal"),
+            "the refusal must name the ordinal disagreement: {refusal:?}"
+        );
+    }
+
+    /// A fabricated source -- one occurrence claimed by two captures -- breaks
+    /// injectivity, which a count check cannot see.
+    #[test]
+    fn a_duplicated_source_occurrence_is_refused() {
+        let mut run = measured_run();
+        run[3].1 = run[4].1;
+        let refusal = validate_captured_environment_bijection(&run, 9)
+            .expect_err("two captures may not claim one occurrence");
+        assert!(
+            format!("{refusal:?}").contains("injective"),
+            "the refusal must name the injectivity failure: {refusal:?}"
+        );
+    }
+
+    /// Order and multiplicity, not just the count: a run whose length matches
+    /// but whose ordinals are not the contiguous plan run must still refuse.
+    #[test]
+    fn a_gapped_ordinal_run_is_refused_even_at_the_right_length() {
+        let mut run = measured_run();
+        run[5].0 = 42;
+        validate_captured_environment_bijection(&run, 9)
+            .expect_err("a gapped ordinal run is not the plan's contiguous capture run");
+    }
+
+    #[test]
+    fn a_short_run_is_refused_against_the_capture_count() {
+        let mut run = measured_run();
+        run.pop();
+        validate_captured_environment_bijection(&run, 9)
+            .expect_err("fewer sourced occurrences than captures is not a bijection");
+    }
+
+    /// **The fail-closed pin.** A seed capture has no source occurrence, so it
+    /// is REFUSED rather than given a positional label.
+    #[test]
+    fn a_seed_capture_is_refused_rather_than_labelled() {
+        let refusal = admitted_capture_source(4, &ContinuationWorkerCaptureSource::Seed)
+            .expect_err("a seed capture has no admissible source occurrence");
+        let text = format!("{refusal:?}");
+        assert!(
+            text.contains("seed capture") && text.contains("must not be invented"),
+            "the refusal must name the seed case and the prohibition: {text}"
+        );
+    }
+
+    /// The source value here is deliberately NOT `703 - ordinal`.
+    ///
+    /// On the measured family the run happens to be descending, so an
+    /// implementation that computed `703 - ordinal` instead of reading the
+    /// plan's source would satisfy a positive control drawn from that run and
+    /// look correct. Choosing an origin outside the pattern makes THIS control
+    /// independently discriminating, rather than leaning on the reorder and
+    /// structural ACs to carry the anti-positional property alone.
+    #[test]
+    fn a_lexical_capture_admits_its_planner_issued_occurrence() {
+        let admitted =
+            admitted_capture_source(4, &ContinuationWorkerCaptureSource::Lexical(origin(42)))
+                .expect("a lexical capture carries its source occurrence");
+        assert_eq!(
+            admitted,
+            origin(42),
+            "the admitted occurrence must be the plan's own, never derived from the ordinal"
+        );
+    }
+}
+
+#[cfg(test)]
+mod admitted_matches_role_sequence {
+    use super::*;
+
+    fn origin(id: u32) -> StaticOriginId {
+        StaticOriginId::for_test(id)
+    }
+
+    /// Two captures whose sources are NOT related by any offset or ordering
+    /// pattern, so agreement cannot be satisfied by a formula.
+    fn roles() -> Vec<ContinuationOrdinaryEnvelopeRole> {
+        vec![
+            ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+                ordinal: 0,
+                owner: PredeclaredFunctionId::for_test(1),
+                closure_origin: origin(900),
+                source: ContinuationWorkerCaptureSource::Lexical(origin(17)),
+                lifetime: PlannedReferentLifetime::ActivationOwned,
+            },
+            ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+                ordinal: 1,
+                owner: PredeclaredFunctionId::for_test(1),
+                closure_origin: origin(900),
+                source: ContinuationWorkerCaptureSource::Lexical(origin(4)),
+                lifetime: PlannedReferentLifetime::ActivationOwned,
+            },
+        ]
+    }
+
+    fn admitted() -> Vec<(u32, StaticOriginId)> {
+        vec![(0, origin(17)), (1, origin(4))]
+    }
+
+    #[test]
+    fn the_planner_issued_association_agrees() {
+        validate_admitted_matches_role_sequence(&roles(), &admitted())
+            .expect("the admitted run is the planner-issued association");
+    }
+
+    /// **The gap CV found.** Permuting ONLY the source column preserves the
+    /// count, the ordinals, the multiplicity and the injectivity, so the
+    /// bijection validator accepts it -- every capture now carries another
+    /// capture's occurrence. This control is the one that must see it.
+    #[test]
+    fn a_source_only_permutation_is_refused() {
+        let mut run = admitted();
+        let first = run[0].1;
+        run[0].1 = run[1].1;
+        run[1].1 = first;
+        // The permuted run is still A bijection: ordinals intact, sources distinct.
+        validate_captured_environment_bijection(&run, 2)
+            .expect("the permuted run still satisfies the weaker bijection predicate");
+        let refusal = validate_admitted_matches_role_sequence(&roles(), &run)
+            .expect_err("a source-only permutation is not the planner-issued association");
+        assert!(
+            format!("{refusal:?}").contains("not the planner-issued one"),
+            "the refusal must name the association, not a shape property: {refusal:?}"
+        );
+    }
+
+    #[test]
+    fn a_short_admitted_run_is_refused_against_the_roles() {
+        validate_admitted_matches_role_sequence(&roles(), &admitted()[..1])
+            .expect_err("fewer admitted captures than the envelope issues");
+    }
+
+    #[test]
+    fn an_ordinal_disagreement_with_the_roles_is_refused() {
+        let mut run = admitted();
+        run[1].0 = 7;
+        validate_admitted_matches_role_sequence(&roles(), &run)
+            .expect_err("an ordinal the plan does not issue at that position");
+    }
 }

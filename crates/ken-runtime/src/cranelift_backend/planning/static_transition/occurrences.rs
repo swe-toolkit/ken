@@ -33,6 +33,19 @@ use crate::RuntimeExpr;
 #[repr(transparent)]
 pub(in crate::cranelift_backend) struct StaticOriginId(pub(super) u32);
 
+impl StaticOriginId {
+    /// Construct an origin for a TEST only.
+    ///
+    /// The field stays `pub(super)` so production code outside this module
+    /// cannot mint an origin the planner never issued -- that restriction is
+    /// the point, and this does not relax it: the constructor is `cfg(test)`
+    /// and compiled out of the real artifact.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) const fn for_test(id: u32) -> Self {
+        Self(id)
+    }
+}
+
 /// One planned source occurrence: the borrowed term, paired with the origin the
 /// planner gave it in the very same visit.
 ///

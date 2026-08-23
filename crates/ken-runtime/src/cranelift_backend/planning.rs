@@ -83,6 +83,7 @@ pub(super) use static_transition::{
     ContinuationConsumingOccurrence, ContinuationEmissionOwner,
     ContinuationInputView, RequiredConsumerProjection,
     ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
+    ContinuationWorkerCaptureSource,
     // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — the closed coordinate sum reaches
     // lowering because the emission resolver must MATCH on it; there is no
     // accessor that answers "which ABI position" without the domain.
