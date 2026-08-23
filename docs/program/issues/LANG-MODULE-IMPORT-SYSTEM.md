@@ -11,12 +11,54 @@ github: null
 origin: "Operator directive 2026-08-22: module/import is its own campaign and, because it blocks the foundation catalog trial, ranks above the smaller language surface-syntax items. Framing is routed to the spec enclave (spec-surface) plus the Architect (elaborator/loader component-design); the language ring builds it. Steward-filed per COORDINATION section 2."
 ---
 
-> # CAMPAIGN ROOT — framing in flight with the enclave (2026-08-22)
+> # CAMPAIGN ROOT — framing COMPLETE (2026-08-23); member WPs filed, release HELD
 >
-> Framing routed at spec-leader/spec-author evt_wg636336eymv (spec-surface) and
-> the Architect (component-design, joining after the runtime native framing).
-> Member WP nodes are filed by the Steward from the enclave decomposition; this
-> root carries the objective and the measured gap only.
+> The enclave + Architect framing is delivered and the member WP nodes are filed:
+> - Spec surface: MERGED 2026-08-23 at `def16ecf4` (PR #2812, candidate
+>   `2711fc566a9af2195d29f24a2de6024a0d2b6495`) — spec/30-surface 32-grammar +
+>   33-declarations + 39-elaboration plus the bounded module-conformance fold
+>   (conformance/README + seed-modules.md). Approvals on exact 2711fc: Architect
+>   soundness (evt_1qef8ewzc13yx), spec-author independent conformance fidelity
+>   (evt_9g2ggrmmetkb), CV /spec fidelity carrying (byte-identical /spec tree);
+>   Decision dec_67cjs8p38k904. This is the SPEC-SURFACE half; the build WPs below
+>   implement it and are still held.
+> - Component-design + 4-WP decomposition: Architect evt_hpnhqy1ex286, with the
+>   WP-2 keying REVISED to strict-all-root-loaded in evt_xtscdw8r3q3k (see below).
+>
+> MEMBER WPs (Steward-filed, this campaign):
+> - [[LANG-MOD-LOADER-ENTRY]] (WP-1) — route `ken check` catalog through the
+>   loader; behavior-preserving, non-strict. Independent, can lead.
+> - [[LANG-MOD-PUB-ELIGIBILITY]] (WP-3) — semantic gate rejecting ineligible
+>   `pub` placements. Independent, can lead.
+> - [[LANG-MOD-STRICT-RESOLUTION]] (WP-2) — strict root-loaded resolution (the
+>   soundness core); D0 probe then D1. Rides on WP-1 for catalog observability.
+> - [[LANG-MOD-CATALOG-REALIZATION]] (WP-4) — Arithmetic/Order/Gcd import the
+>   canonical operations. Gated on WP-1..3 AND the Or/Inl/Inr fork.
+>
+> Ring order: WP-1 -> WP-3 -> WP-2 -> WP-4 (or WP-2's D0 parallel with WP-1/WP-3).
+> Every WP: Architect (soundness/component fit) + conformance-validator
+> (resolution/visibility discriminators). Cross-cutting invariant on every WP:
+> flat-Σ / zero trusted_base delta (extend `module_elaborates_to_identical_flat_
+> sigma`, never weaken it).
+>
+> THE REVISED STRICT/LEGACY KEY (Architect evt_xtscdw8r3q3k — supersedes the
+> boundary-header key in evt_hpnhqy1ex286): strict resolution is keyed on
+> ROOT-LOADED (loader use), not on a package boundary header. `/spec` candidate
+> 860c605 makes every root-loaded unit strict; the Architect aligned to it (the
+> boundary-header carve-out would introduce a third mode the spec does not have).
+> Mode threads from the ENTRY: `elaborate_module_from_roots` ⇒ strict;
+> `elaborate_file`/`elaborate_ken_md_file` (isolated-file) ⇒ legacy passthrough
+> verbatim. The flag-day is SEQUENCING, not impossibility: co-gate WP-2's
+> CI-greenness with WP-4's catalog migration, and make WP-4's migration set
+> CENSUS-driven (every catalog file the strict flip breaks, measured — not just
+> the Gcd trio).
+>
+> RELEASE GATE (all members): held until the language ring FINISHES
+> embedding-adequacy ([[V3-FO-EMBEDDING-ADEQUACY]]) per operator finish-then-
+> switch — do NOT interrupt the in-flight WP. WP-4 additionally gated on the
+> Or/Inl/Inr fork (escalated to operator, evt_6b9wrt1kwswcp) and on WP-1..3. The
+> wp/ frames are authored at release time grounded on the MERGED spec SHA (now
+> landed at def16ecf4), so WP-2/WP-3 conformance ACs cite CV's landed fold.
 
 ## The measured gap (Steward, on main 2026-08-22)
 
