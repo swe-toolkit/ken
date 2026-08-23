@@ -162,6 +162,10 @@ pub struct TargetAbi {
     pub dependencies: &'static [DependencyIdentity],
     pub fact_count: usize,
     pub facts: &'static [AbiFact],
+    /// **`ABI-M1` `D1`** -- the per-family projections whose hashes compose
+    /// into `manifest_hash`. `facts` is retained as the flat view; `families`
+    /// is the structured one the v2 hash is built from.
+    pub families: &'static [AbiFamilyProjection],
     pub manifest_hash: [u8; 32],
 }
 
@@ -1637,6 +1641,87 @@ mod abi_m1_d0_probe {
                  the defect a length check cannot see"
             );
             seen.push(family);
+        }
+    }
+
+    /// **`ABI-M1` `D1` -- the INSTANCE-level closure control.**
+    ///
+    /// The KIND side is compile-time: a variant added without threading is
+    /// `error[E0004]`. But that cannot see a DATA omission -- `build.rs`
+    /// emitting five projections when the enum holds six compiles fine and
+    /// silently drops a family from the manifest. This is the fail-closed
+    /// instance check that closes it, the same two-tier shape the checked-IH
+    /// dispatcher ruling settled on.
+    #[test]
+    fn the_generated_projections_cover_every_family_exactly_once() {
+        if TARGET_ABI.backend != "linux_raw" {
+            // Non-Linux / cross targets record an unavailable backend and emit
+            // no facts by design; there is nothing to project. Asserting
+            // coverage there would fail for the wrong reason.
+            assert!(
+                TARGET_ABI.families.is_empty(),
+                "an unavailable backend must emit no family projections"
+            );
+            return;
+        }
+        for family in AbiFamily::ALL {
+            let matches = TARGET_ABI
+                .families
+                .iter()
+                .filter(|projection| projection.family == family)
+                .count();
+            assert_eq!(
+                matches, 1,
+                "{family:?} must have exactly one generated projection; a family the \
+                 generator does not emit is dropped from the manifest silently"
+            );
+        }
+        assert_eq!(
+            TARGET_ABI.families.len(),
+            AbiFamily::COUNT,
+            "the generator emitted a projection for a family outside the sealed set"
+        );
+    }
+
+    /// The projections PARTITION the flat fact list: every fact appears in
+    /// exactly one family, and no fact is invented or dropped.
+    #[test]
+    fn the_family_projections_partition_the_flat_facts() {
+        if TARGET_ABI.backend != "linux_raw" {
+            return;
+        }
+        let mut from_families: Vec<&str> = TARGET_ABI
+            .families
+            .iter()
+            .flat_map(|projection| projection.facts.iter().map(|fact| fact.name))
+            .collect();
+        let mut flat: Vec<&str> = TARGET_ABI.facts.iter().map(|fact| fact.name).collect();
+        from_families.sort_unstable();
+        flat.sort_unstable();
+        assert_eq!(
+            from_families, flat,
+            "the family projections must partition the flat fact list exactly -- a \
+             difference means a fact was dropped from every projection or invented \
+             into one"
+        );
+    }
+
+    /// Distinct projection hashes are what make `AC-2` checkable: if two
+    /// families hashed alike, "mutating one family flips exactly that family's
+    /// hash" could not be observed.
+    #[test]
+    fn every_family_projection_hash_is_distinct() {
+        if TARGET_ABI.backend != "linux_raw" {
+            return;
+        }
+        let mut seen: Vec<[u8; 32]> = Vec::new();
+        for projection in TARGET_ABI.families {
+            assert!(
+                !seen.contains(&projection.projection_hash),
+                "{:?} shares a projection hash with another family",
+                projection.family
+            );
+            seen.push(projection.projection_hash);
         }
     }
 
