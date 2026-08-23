@@ -76,6 +76,13 @@ fn validate_captured_environment_bijection(
     capture_sources: &[(u32, StaticOriginId)],
     capture_count: usize,
 ) -> Result<(), CraneliftBackendError> {
+    // Unreachable from the single call site today: that loop pushes to
+    // `capture_sources` and `worker_captures` in lockstep, so the two lengths
+    // cannot diverge there. Retained as defence-in-depth for a real
+    // function-level invariant -- this validator takes the run as an argument
+    // and must not assume its caller built it that way. Noted so a later reader
+    // does not mistake it for a live production guard and reason from its
+    // reachability.
     if capture_sources.len() != capture_count {
         return Err(backend_module(format!(
             "checked-IH captured environment: {} sourced occurrences for {capture_count} \
@@ -6531,14 +6538,22 @@ mod captured_environment_bijection {
         );
     }
 
+    /// The source value here is deliberately NOT `703 - ordinal`.
+    ///
+    /// On the measured family the run happens to be descending, so an
+    /// implementation that computed `703 - ordinal` instead of reading the
+    /// plan's source would satisfy a positive control drawn from that run and
+    /// look correct. Choosing an origin outside the pattern makes THIS control
+    /// independently discriminating, rather than leaning on the reorder and
+    /// structural ACs to carry the anti-positional property alone.
     #[test]
     fn a_lexical_capture_admits_its_planner_issued_occurrence() {
         let admitted =
-            admitted_capture_source(4, &ContinuationWorkerCaptureSource::Lexical(origin(699)))
+            admitted_capture_source(4, &ContinuationWorkerCaptureSource::Lexical(origin(42)))
                 .expect("a lexical capture carries its source occurrence");
         assert_eq!(
             admitted,
-            origin(699),
+            origin(42),
             "the admitted occurrence must be the plan's own, never derived from the ordinal"
         );
     }
