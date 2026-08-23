@@ -482,6 +482,31 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateNode {
     /// The index is into the seat's `args`, before the capability offset that
     /// `RuntimeExpr::Effect` applies to its semantic children.
     SiteOperand(u32),
+    /// **A carried continuation-envelope worker-capture word, by position.**
+    ///
+    /// The child at position `i` is the `i`-th `WorkerCapture` operand of the
+    /// unit's ruled ordered-worker envelope -- the ci<->oi run. This is the
+    /// checked-IH captured environment's child model.
+    ///
+    /// ⛔ **THIS IS DELIBERATELY NOT [`Self::SiteOperand`], AND THE TWO MUST
+    /// NEVER SHARE A RESOLUTION PATH.** `SiteOperand` resolves against an
+    /// EFFECT SEAT's claimed operand vector (`ClaimedEffectSeats`, keyed
+    /// `EffectSeatSlot::Argument(i)`). A captured environment has no effect
+    /// seat: its operands are the continuation envelope's carried capture
+    /// words, reached by a different path entirely. Resolving this kind through
+    /// the effect-seat arm would force a second operand source into
+    /// `reconcile_declared_children` and weaken the path-identity check every
+    /// host-result aggregate depends on -- which is the reuse that was measured
+    /// and refused before this kind existed.
+    ///
+    /// ⛔ Its arity is PER UNIT while the slice is `&'static`, which works only
+    /// because the content at position `i` is fully determined by `i`: the
+    /// planner slices a const run to the unit's capture arity. That is sound
+    /// exactly as long as an arity ABOVE the const run's length REFUSES.
+    /// Silently truncating would hand the emitter a child model shorter than
+    /// the record it governs, and every count downstream would agree with
+    /// itself while describing fewer captures than exist.
+    WorkerCaptureOperand(u32),
     /// This arm of the host result synthesizes no aggregate at all.
     ///
     /// `FsReadFile`'s `ResponseBytes`, `FsOpen`'s `ResourceToken`,
@@ -755,7 +780,14 @@ pub(in crate::cranelift_backend::planning::static_transition) fn collect_site_op
         }
         // The closed IOError alternatives contain only scalar payloads. They
         // cannot introduce a site operand behind this dynamic node.
-        SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::IoErrors)
+        // ⛔ A capture word is NOT a site operand, and this arm states that
+        // rather than inheriting it. The two name different operand vectors --
+        // an effect seat's `args` versus the continuation envelope's ruled
+        // WorkerCapture run -- so a capture contributes no ordinal to a
+        // population that indexes the seat's arguments. Folding it in here
+        // would claim the seat supplies an argument it does not have.
+        SynthesizedAggregateNode::WorkerCaptureOperand(_)
+        | SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::IoErrors)
         | SynthesizedAggregateNode::Scalar { .. }
         | SynthesizedAggregateNode::Absent => {}
         SynthesizedAggregateNode::SiteOperand(index) => {
@@ -910,6 +942,12 @@ fn collect_reachable_uses(
         }
         SynthesizedAggregateNode::Scalar { .. }
         | SynthesizedAggregateNode::SiteOperand(_)
+        // A capture word is a leaf and, more to the point, is never reachable
+        // from a host-effect recipe at all: this walk starts at
+        // `host_effect_recipe_tree(operation)`, and no recipe names a capture.
+        // The checked-IH child model is built by the issuance site from the
+        // unit's own ci<->oi run, not flattened out of an operation tree.
+        | SynthesizedAggregateNode::WorkerCaptureOperand(_)
         | SynthesizedAggregateNode::Absent => {}
     }
 }
@@ -980,6 +1018,19 @@ pub(in crate::cranelift_backend::planning::static_transition) fn node_referent_o
         SynthesizedAggregateNode::SiteOperand(index) => {
             site_operand_referent_owners(plan, seat, index)
         }
+        // ⛔ A capture word's owners are NOT derivable from this node, so this
+        // REFUSES rather than guessing. `SiteOperand` above can answer because
+        // the seat's own child occurrence carries the evidence; a capture's
+        // evidence is its capture occurrence in the ruled ci<->oi run, which
+        // this shape node does not name and this function is not given. The
+        // checked-IH issuance derives each child's owners from that occurrence's
+        // authority directly. Reaching here means something walked a captured
+        // environment down the host-recipe owner path, where the answer would be
+        // an invention.
+        SynthesizedAggregateNode::WorkerCaptureOperand(_) => Err(planner_error(
+            "a worker-capture operand's referent owners come from its capture occurrence, \
+             not from the shape node, so they cannot be derived on the host-recipe path",
+        )),
         // ⛔ Never a child. `Absent` marks a host-result arm that builds no
         // aggregate; reaching it as a child means the tree claims an allocation
         // has a child at a position where nothing is built.
@@ -1126,6 +1177,140 @@ fn fixed_node_selected_owner_of(
 /// `Err` is reserved for a capture that IS in the run but cannot be sourced --
 /// a seed capture. That is a refusal, not an absence, and it must not be
 /// confused with being out of domain.
+impl StaticTransitionPlan<'_> {
+    /// The one checked-IH record a fixture plans, for tests that must drive the
+    /// lowering-side reconcile arm with real planner coordinates.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn checked_ih_record_for_test(
+        &self,
+    ) -> Option<(ContinuationEmissionOwner, StaticOriginId, Vec<StaticOriginId>)> {
+        self.aggregate_ownership.iter().find_map(|record| {
+            let AggregateOccurrenceProducer::SynthesizedUse {
+                owner,
+                seat,
+                role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                ..
+            } = record.producer
+            else {
+                return None;
+            };
+            Some((
+                owner,
+                seat,
+                record
+                    .children
+                    .iter()
+                    .filter_map(|child| child.origin)
+                    .collect(),
+            ))
+        })
+    }
+
+    /// The capture occurrence the ruled run places at `ordinal`, for one
+    /// checked-IH captured-environment record.
+    ///
+    /// ⛔ This is the THIRD party in the reconcile cross-check, and that is the
+    /// whole reason it exists. The declared child model says "position i is
+    /// capture word i" -- a compile-time positional contract carrying no
+    /// occurrence. The emitter states which occurrence it actually put there.
+    /// This resolves what the PLAN's ci<->oi run says belongs there. Comparing
+    /// the emitter's answer against this one is an actual-versus-declared
+    /// check between two independent sources; deriving the expectation from
+    /// the emitter's own operand instead would make the comparison free.
+    ///
+    /// Fails closed: an unknown (owner, seat) or a position the run does not
+    /// carry is a refusal, never a default.
+    pub(in crate::cranelift_backend) fn checked_ih_capture_origin(
+        &self,
+        owner: ContinuationEmissionOwner,
+        seat: StaticOriginId,
+        ordinal: u32,
+    ) -> Result<StaticOriginId, CraneliftBackendError> {
+        let record = self
+            .aggregate_ownership
+            .iter()
+            .find(|record| {
+                matches!(
+                    record.producer,
+                    AggregateOccurrenceProducer::SynthesizedUse {
+                        owner: record_owner,
+                        seat: record_seat,
+                        role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                        ..
+                    } if record_owner == owner && record_seat == seat
+                )
+            })
+            .ok_or_else(|| {
+                planner_error(
+                    "no checked-IH captured-environment record is planned for this owner and \
+                     seat, so a capture operand cannot be reconciled against its ruled run",
+                )
+            })?;
+        let child = record
+            .children
+            .iter()
+            .find(|child| child.position == ordinal)
+            .ok_or_else(|| {
+                planner_error(format!(
+                    "the checked-IH captured environment's ruled run has no capture at \
+                     position {ordinal}"
+                ))
+            })?;
+        child.origin.ok_or_else(|| {
+            planner_error(
+                "a checked-IH capture child carries no source occurrence, so there is nothing \
+                 to reconcile the emitter's operand against",
+            )
+        })
+    }
+}
+
+/// The largest capture arity the positional child model can state.
+///
+/// ⛔ This is a REFUSAL bound, not a truncation bound. The const run below is
+/// what makes a per-unit arity expressible in a `&'static` slice at all -- the
+/// content at position `i` is fully determined by `i`, so one run serves every
+/// unit and each takes the prefix its arity names. That trick is sound exactly
+/// as long as an arity ABOVE the run REFUSES: silently handing back a shorter
+/// prefix would give the emitter a child model describing fewer captures than
+/// the record holds, and every count downstream would agree with itself while
+/// describing the wrong aggregate.
+const CHECKED_IH_CAPTURE_OPERAND_LIMIT: usize = 64;
+
+/// The positional child model, DERIVED rather than hand-listed.
+///
+/// A hand-written run of 64 entries is a roster that can drift from its own
+/// index; this states the rule (`position i names capture word i`) once and
+/// lets the compiler produce the members, so the table cannot disagree with
+/// itself. `static` rather than `const` on purpose: the slice handed to
+/// `declared_children` must be `&'static`, which a `static` item's address
+/// gives and a `const`'s per-use temporary does not.
+static CHECKED_IH_CAPTURE_OPERANDS: [SynthesizedAggregateNode;
+    CHECKED_IH_CAPTURE_OPERAND_LIMIT] = {
+    let mut operands =
+        [SynthesizedAggregateNode::WorkerCaptureOperand(0); CHECKED_IH_CAPTURE_OPERAND_LIMIT];
+    let mut position = 0usize;
+    while position < CHECKED_IH_CAPTURE_OPERAND_LIMIT {
+        operands[position] = SynthesizedAggregateNode::WorkerCaptureOperand(position as u32);
+        position += 1;
+    }
+    operands
+};
+
+/// The declared positional child model for one unit's capture arity.
+fn checked_ih_declared_children(
+    arity: usize,
+) -> Result<&'static [SynthesizedAggregateNode], CraneliftBackendError> {
+    if arity > CHECKED_IH_CAPTURE_OPERAND_LIMIT {
+        return Err(planner_capacity_error(format!(
+            "a checked-IH captured environment has {arity} captures, more than the \
+             {CHECKED_IH_CAPTURE_OPERAND_LIMIT} its positional child model can state -- \
+             refusing rather than declaring a shorter run than the record carries"
+        )));
+    }
+    Ok(&CHECKED_IH_CAPTURE_OPERANDS[..arity])
+}
+
 fn checked_ih_coordinate_run(
     unit: &super::continuations::ContinuationUnitView<'_>,
 ) -> Result<Option<(StaticOriginId, Vec<(u32, StaticOriginId)>)>, CraneliftBackendError> {
@@ -1464,6 +1649,9 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
         let Some((seat, run)) = checked_ih_coordinate_run(&unit)? else {
             continue;
         };
+        // Refuse an arity the positional model cannot state, BEFORE building
+        // anything that would have to agree with it.
+        let declared = checked_ih_declared_children(run.len())?;
         let mut children = Vec::with_capacity(run.len());
         for (ordinal, sourced) in &run {
             let authority = occurrence_authority(plan, *sourced)?;
@@ -1512,8 +1700,19 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                     role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
                 },
                 owner: plan.semantic.function_owner(seat)?,
-                shape: PlannedAggregateShape::Record,
-                declared_children: None,
+                // ⛔ Constructor, not Record, and the ROLE stays
+                // `CheckedIhCapturedEnvironment` -- role is not shape. The
+                // shape selects the POSITIONAL downstream path
+                // (`Lowered::Constructor`, `record_fields: None`), under which
+                // the field-identity preflight does not run and
+                // `field_identity: None` is legitimate rather than merely
+                // tolerated. A captured environment IS positionally identified:
+                // the ci<->oi ordinal is the identity, and M6 consumes it as an
+                // ordered projection, not by field name. Keeping the distinct
+                // role is what preserves the separation from every other
+                // synthesized use.
+                shape: PlannedAggregateShape::Constructor,
+                declared_children: Some(declared),
                 children: children.clone(),
                 meet,
                 allocation,
@@ -2042,6 +2241,8 @@ impl<'src> StaticTransitionPlan<'src> {
                 SynthesizedAggregateNode::Fixed { .. }
                 | SynthesizedAggregateNode::Scalar { .. }
                 | SynthesizedAggregateNode::SiteOperand(_)
+                // A capture word is a leaf, never a dynamic alternative set.
+                | SynthesizedAggregateNode::WorkerCaptureOperand(_)
                 | SynthesizedAggregateNode::Absent => Ok(None),
             },
             // An alternative is a member of a set, not a set. A path that names
@@ -3348,6 +3549,9 @@ mod tests {
             SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::IoErrors)
             | SynthesizedAggregateNode::Scalar { .. }
             | SynthesizedAggregateNode::SiteOperand(_)
+            // A leaf, and never in a host-effect recipe tree, which is what
+            // this walker is pointed at.
+            | SynthesizedAggregateNode::WorkerCaptureOperand(_)
             | SynthesizedAggregateNode::Absent => {}
         }
     }
@@ -3674,6 +3878,82 @@ mod checked_ih_captured_env_schema {
         assert!(
             checked_ih_records(&plan).is_empty(),
             "a capture-free unit has no coordinate run, so it receives no checked-IH record"
+        );
+    }
+
+    /// **AC-SCHEMA: the record now DECLARES its positional child model.**
+    ///
+    /// `declared_children` is the static shape tree and says only "position i
+    /// is capture word i" -- it carries no occurrence, which is what keeps it
+    /// an independent authority from `children`, the per-unit occurrence
+    /// carrier. The reconcile arm cross-checks one against the other; derive
+    /// either from the other and that check goes vacuous.
+    ///
+    /// The shape is `Constructor`, not `Record`, while the ROLE stays
+    /// `CheckedIhCapturedEnvironment`: shape selects the positional
+    /// (`record_fields: None`) downstream path on which `field_identity: None`
+    /// is legitimate, and the distinct role preserves the separation from every
+    /// other synthesized use.
+    #[test]
+    fn the_record_declares_a_positional_child_model_for_its_arity() {
+        let plan = plan_of(
+            super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(),
+        );
+        let records = checked_ih_records(&plan);
+        assert_eq!(records.len(), 1, "the fixture has one checked-IH seat");
+        let record = records[0];
+
+        assert_eq!(
+            record.shape,
+            PlannedAggregateShape::Constructor,
+            "the captured environment takes the POSITIONAL downstream path"
+        );
+        let declared = record
+            .declared_children
+            .expect("a checked-IH record declares its child model");
+        assert_eq!(
+            declared.len(),
+            record.children.len(),
+            "the declared model must cover the ruled run exactly -- a shorter one would \
+             describe fewer captures than the record carries"
+        );
+        let expected: Vec<SynthesizedAggregateNode> = (0..record.children.len() as u32)
+            .map(SynthesizedAggregateNode::WorkerCaptureOperand)
+            .collect();
+        assert_eq!(
+            declared, expected,
+            "position i must declare capture word i, in order"
+        );
+        for child in &record.children {
+            assert!(
+                child.field_identity.is_none(),
+                "identity is positional here; a field name would be invented"
+            );
+        }
+    }
+
+    /// **The arity bound REFUSES; it never truncates.**
+    ///
+    /// The const-run-sliced-by-arity trick is what makes a per-unit arity
+    /// expressible in a `&'static` slice, and it is sound only while an arity
+    /// above the run refuses. Silently returning a shorter prefix would hand
+    /// the emitter a child model describing fewer captures than the record
+    /// holds, and every length check downstream would agree with itself.
+    ///
+    /// Both sides of the boundary are asserted: at the limit it must still
+    /// serve, one past it must refuse.
+    #[test]
+    fn an_arity_above_the_positional_run_refuses_rather_than_truncating() {
+        let at_limit = checked_ih_declared_children(CHECKED_IH_CAPTURE_OPERAND_LIMIT)
+            .expect("an arity exactly at the limit is still expressible");
+        assert_eq!(at_limit.len(), CHECKED_IH_CAPTURE_OPERAND_LIMIT);
+
+        let over = checked_ih_declared_children(CHECKED_IH_CAPTURE_OPERAND_LIMIT + 1);
+        assert!(
+            over.is_err(),
+            "one capture past the run must REFUSE; returning a {}-long prefix for a longer \
+             run is the silent truncation this bound exists to prevent",
+            CHECKED_IH_CAPTURE_OPERAND_LIMIT
         );
     }
 

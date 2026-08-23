@@ -665,6 +665,21 @@ pub(super) enum SynthesizedArgument {
         value: Lowered,
         source: SiteOperandSource,
     },
+    /// The `ordinal`-th carried capture word of a checked-IH captured
+    /// environment, together with the occurrence the emitter believes it is.
+    ///
+    /// ⛔ Deliberately NOT [`Self::SiteOperand`]. That one names a slot in an
+    /// EFFECT SEAT's claimed operand vector; this names a position in the
+    /// continuation envelope's ruled ci<->oi run. Sharing the variant would
+    /// mean one reconcile arm resolving two different operand vectors, which
+    /// is exactly the widening the effect-seat path-identity check must not
+    /// suffer.
+    WorkerCaptureOperand {
+        seat: StaticOriginId,
+        ordinal: u32,
+        origin: StaticOriginId,
+        value: Lowered,
+    },
 }
 
 /// The phase-bearing source that authorized a site-bound projection.
@@ -688,14 +703,14 @@ impl SynthesizedArgument {
     fn into_lowered(self) -> Lowered {
         match self {
             Self::Scalar(value) | Self::Nested(value) | Self::Dynamic(value) => value,
-            Self::SiteOperand { value, .. } => value,
+            Self::SiteOperand { value, .. } | Self::WorkerCaptureOperand { value, .. } => value,
         }
     }
 
     fn lowered(&self) -> &Lowered {
         match self {
             Self::Scalar(value) | Self::Nested(value) | Self::Dynamic(value) => value,
-            Self::SiteOperand { value, .. } => value,
+            Self::SiteOperand { value, .. } | Self::WorkerCaptureOperand { value, .. } => value,
         }
     }
 }
@@ -3333,6 +3348,38 @@ impl<'a> Lowering<'a> {
                                 }
                                 _ => false,
                             }
+                        }
+                    }
+                    // ⛔ THE CAPTURE-WORD ARM. Additive BESIDE the site-operand
+                    // arm above, which is untouched: that one resolves an
+                    // effect seat's claimed argument slot, this one resolves a
+                    // position in the continuation envelope's ruled ci<->oi
+                    // run. Two operand vectors, two arms, two path-identity
+                    // checks -- never one arm reaching for a second source.
+                    //
+                    // ⭐ THREE INDEPENDENT SOURCES MEET HERE, which is what
+                    // makes the check real rather than a read-back. The
+                    // DECLARED model contributes the position; the EMITTER
+                    // contributes which occurrence it put there; the PLAN's
+                    // ruled run contributes which occurrence belongs there.
+                    // Derive any one of them from another and the comparison
+                    // becomes free.
+                    (
+                        SynthesizedAggregateNode::WorkerCaptureOperand(declared_ordinal),
+                        SynthesizedArgument::WorkerCaptureOperand {
+                            seat: bound,
+                            ordinal,
+                            origin,
+                            ..
+                        },
+                    ) => {
+                        if *bound != seat || ordinal != declared_ordinal {
+                            false
+                        } else {
+                            let planned = self
+                                .static_transition_plan
+                                .checked_ih_capture_origin(owner, seat, *declared_ordinal)?;
+                            *origin == planned
                         }
                     }
                     // ⛔ `Absent` marks a host-result arm that builds no aggregate,
