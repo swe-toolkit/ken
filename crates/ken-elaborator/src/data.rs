@@ -645,7 +645,9 @@ fn rtype_to_kernel_checked(
 ) -> Result<Term, ElabError> {
     match rty {
         RType::RCon(name, span) => {
-            if name == d_name {
+            if name == "Omega" {
+                Ok(Term::omega(Level::Zero))
+            } else if name == d_name {
                 Ok(Term::IndFormer {
                     id: d_id,
                     level_args: vec![],
