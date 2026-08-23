@@ -1,7 +1,7 @@
 ---
 id: ABI-M1
 title: "manifest v2 — family-scoped, versioned, generated from family schemas"
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
@@ -11,14 +11,15 @@ github: null
 origin: docs/program/10-linux-abi-completion.md §4 (the ABI-completion program); node filed by the Steward 2026-07-25 on the operator's directive to frame the remaining program. Agents cannot create tracked work (COORDINATION §2).
 ---
 
-> ## Authority: `10-linux-abi-completion.md` §4 — read that, not this
+> ## Authority: the WP frame — `docs/program/wp/abi-m1-family-scoped-manifest.md`
 >
-> ⛔ **This is a tracker/DAG node, NOT a shovel-ready WP frame.** A
-> `docs/program/wp/` frame carrying deliverables, acceptance criteria, fixed
-> inputs, negative controls, and a contention check **must be authored before
-> release** (§2c front-load rule: the T1 enclave does the design judgment so the
-> build ring executes mechanically). **Do not release this on the strength of
-> this file.**
+> Frame authored + released by the Steward 2026-08-23 (fixed inputs at
+> `origin/main a12f74158`). It carries the objective, front-loaded design
+> judgment (structure-derived family schemas, reuse of the PX2 generator + the
+> ABI-R3 derive discipline), the D0 representation probe with an Architect
+> return-fork, deliverables D0-D3, acceptance criteria AC-1..AC-7 with controls,
+> the zero-TCB note, the contention check, and the named Foundation consult.
+> Read the frame, not this node, for the build.
 
 ## Objective
 
