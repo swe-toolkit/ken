@@ -311,14 +311,14 @@ fn fok_denote_at
   match f {
     FokScopedBottom ↦ λxs. Bottom;
     FokScopedAtom i ↦ λxs.
-      (fok_pred_p sigma c rho) (fok_object_env_lookup sigma c n xs i);
+      fok_pred_p sigma c rho (fok_object_env_lookup sigma c n xs i);
     FokScopedOr p q ↦ λxs.
       ‖Or
         ((fok_denote_at sigma c rho n p) xs)
         ((fok_denote_at sigma c rho n q) xs)‖;
     FokScopedImp p q ↦ λxs.
-      ((fok_denote_at sigma c rho n p) xs)
-        -> ((fok_denote_at sigma c rho n q) xs);
+      (fok_denote_at sigma c rho n p xs)
+        -> (fok_denote_at sigma c rho n q xs);
     FokScopedForall p ↦ λxs.
       (x : fok_sort_a sigma c) ->
         (fok_denote_at sigma c rho (Suc n) p)
@@ -333,7 +333,7 @@ fn fok_denote
     (rho : FokAtomEnv sigma c)
     (f : FokScopedIForm sigma Zero)
     : Omega =
-  (fok_denote_at sigma c rho Zero f) (FokObjectEnvNil sigma c)
+  fok_denote_at sigma c rho Zero f (FokObjectEnvNil sigma c)
 
 -- Forget only the scope evidence. Constructor order and atom identity are
 -- unchanged, and the bounded index becomes the same de Bruijn `Nat`.
