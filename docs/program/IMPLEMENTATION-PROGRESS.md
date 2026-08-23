@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-23 02:43:17Z — from 431 issue file(s) in `docs/program/issues/`.
+2026-08-23 03:21:09Z — from 431 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -126,7 +126,7 @@ the committed file matches the generator's output.
 | `F3-39` | F3 [task-list #39] — reducer: degrade-not-wrap + retire legacy arms | draft | runtime | TBD | none | — |
 | `F4` | content-addressing + value-model design (aka PX8-F-PROOF) | draft | foundation+spec-enclave | M | none | — |
 | `KERNEL-CONV-CONGRUENCE-CLOSURE` | Complete conv_struct's congruence closure for the remaining formers with no arm — Quot, QuotClass, QuotElim, Cast, Omega (level_eq), Refl — each matching that former's real formation/equality rule with its own acceptance + discrimination conformance case; no blanket add | draft | kernel | M | none | — |
-| `KERNEL-CONV-TRUNC-CONGRUENCE` | Add the truncation-former congruence pair (Trunc + TruncProj) to conv_struct so the ordinary conversion gate (whnf + congruence) recognizes convertible-but-not-syntactically-identical truncation types/eliminations — unblocking V3-FO-EMBEDDING-ADEQUACY's quotation-preservation Or arm | ready | kernel | S | none | — |
+| `KERNEL-CONV-TRUNC-CONGRUENCE` | Add the truncation-former congruence pair (Trunc + TruncProj) to conv_struct so the ordinary conversion gate (whnf + congruence) recognizes convertible-but-not-syntactically-identical truncation types/eliminations — unblocking V3-FO-EMBEDDING-ADEQUACY's quotation-preservation Or arm | merged | kernel | S | none | — |
 | `KERNEL-ELIM-SHAPE-NORMALIZE-DIVERGES` | Eliminator/recursor shape derivation over a proof-carrying inductive family diverges -- derive_recursive_shape and structured_lift normalize a constructor premise before the occurrence test, the elimination-time twin of LANG-CTOR-PREMISE-ELABORATION-DIVERGES | merged | kernel | M | none | — |
 | `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | active | kernel | L | none | — |
 | `KERNEL-RECURSIVE-RESULT-SURFACE` | A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible | merged | spec-enclave | M | none | — |
@@ -480,7 +480,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `CAT-DEQUE` — Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial
 - `CAT-VEC` — Length-indexed Vector — Data/Vector: Vec n a with total head/index/zip/map and the length laws, the deliberate fully-dependent probe of the Foundation expressibility trial
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
-- `KERNEL-CONV-TRUNC-CONGRUENCE` — Add the truncation-former congruence pair (Trunc + TruncProj) to conv_struct so the ordinary conversion gate (whnf + congruence) recognizes convertible-but-not-syntactically-identical truncation types/eliminations — unblocking V3-FO-EMBEDDING-ADEQUACY's quotation-preservation Or arm
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
@@ -521,7 +520,6 @@ is itself not yet `merged`/`closed`:
 - `CAT-GCD-REFACTOR` blocked by `LANG-MODULE-IMPORT-SYSTEM` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
-- `KERNEL-CONV-CONGRUENCE-CLOSURE` blocked by `KERNEL-CONV-TRUNC-CONGRUENCE` (status: ready)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
 - `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: draft)
 - `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: ready)

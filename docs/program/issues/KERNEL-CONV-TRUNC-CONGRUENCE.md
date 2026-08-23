@@ -1,7 +1,7 @@
 ---
 id: KERNEL-CONV-TRUNC-CONGRUENCE
 title: "Add the truncation-former congruence pair (Trunc + TruncProj) to conv_struct so the ordinary conversion gate (whnf + congruence) recognizes convertible-but-not-syntactically-identical truncation types/eliminations — unblocking V3-FO-EMBEDDING-ADEQUACY's quotation-preservation Or arm"
-status: ready
+status: merged
 owner: kernel
 size: S
 gate: none
