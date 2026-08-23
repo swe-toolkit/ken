@@ -792,7 +792,7 @@ if [ "$doc_only" -eq 1 ]; then
   merge_pr
   printf 'Doc-only PR #%s merge command succeeded.\n' "$pr_number"
   verify_landed_tree
-  sync_primary_checkout
+  sync_primary_checkout || true
   exit 0
 fi
 
@@ -868,7 +868,7 @@ while :; do
     merge_pr
     printf 'PR #%s checks passed and merge command succeeded.\n' "$pr_number"
     verify_landed_tree
-    sync_primary_checkout
+    sync_primary_checkout || true
     exit 0
   fi
 
