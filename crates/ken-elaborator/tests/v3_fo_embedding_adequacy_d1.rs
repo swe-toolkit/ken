@@ -215,7 +215,7 @@ fn intrinsic_connectives_and_adequacy_statement_are_live() {
 }
 
 #[test]
-fn truncation_conversion_is_the_remaining_quotation_hard_stop() {
+fn truncation_conversion_preserves_quotation() {
     let mut env = env_with_fok();
     add_bool_model(&mut env);
     let denotation_source = "fok_denote FokSliceSignature fok_d1_bool_carriers fok_d1_bool_atoms \
@@ -247,10 +247,9 @@ fn truncation_conversion_is_the_remaining_quotation_hard_stop() {
         "full normalization must expose the same truncated Or"
     );
     assert!(
-        !convert_type(&env.env, &context, &denotation, &obligation),
-        "transition sentinel: ordinary kernel conversion currently lacks \
-         congruence for Trunc terms whose interiors become equal only after \
-         recursive denotation unfolds"
+        convert_type(&env.env, &context, &denotation, &obligation),
+        "ordinary kernel conversion must recurse through Trunc and compare \
+         the recursively unfolded denotation with the quoted Or obligation"
     );
 }
 
