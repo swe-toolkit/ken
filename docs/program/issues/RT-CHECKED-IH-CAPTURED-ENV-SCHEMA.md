@@ -126,16 +126,13 @@ origin: "Steward, 2026-08-22, cutting the Case-C reach-fork predecessor from the
 > EXISTING CaptureSymbol atoms; the machinery already exists; NOT a new layer")
 > agrees.
 >
-> CORRECTED OWNERSHIP + DELIVERABLE (Architect evt_6h5ndf9hxf22f): tier-1 is a
-> RUNTIME-ring deliverable — (1) emit the checked-IH captured-environment
-> semantic_use so tier-2 reads declared_children = Some(its children), the shape
-> tree; (2) add the capture_field_identity(origin, position) = FieldIdentity(
-> identity_span(origin, CaptureSymbol, position)) producer — both reusing the
-> existing semantic_ir CaptureSymbol atoms. NO ken-elaborator diff. BUILD NOTE:
-> confirm the CaptureSymbol atoms are reachable for the checked-IH
-> Var->StaticWorker route specifically; if that route needs them additionally
-> surfaced, that is still in-lane runtime, not a reason to reach for the
-> elaborator.
+> CORRECTED OWNERSHIP (Architect evt_6h5ndf9hxf22f): tier-1 is a RUNTIME-ring
+> deliverable, NO ken-elaborator diff. The DELIVERABLE SHAPE was further revised
+> to POSITIONAL by Architect evt_3tky5wzycfnxb (the capture_field_identity
+> producer this banner first named is DROPPED; field_identity is positional
+> None) — see the reframed AC-SCHEMA below for the operative deliverable (a new
+> positional WorkerCaptureOperand variant + a separate reconcile arm). The
+> ownership finding here stands; only the field-shape changed.
 >
 > REVIEWERS: Architect + runtime-QA + conformance-validator + Adversary (NO
 > language-QA/language-leader — there is no ken-elaborator diff to review).
@@ -325,37 +322,60 @@ landing an elaborator interface the planner then has to adapt to.
   representability fork), never emit. Whether the confirmation also lands
   as a `41-values.md` erratum or stays an in-slice check is the
   Steward's packaging call once the enclave's answer is seen.
-- **AC-SCHEMA (UN-FUSED per the SCHEMA UN-FUSED banner —
-  Architect evt_497awrccwy20k).** A DEDICATED checked-IH captured-env
-  record (distinct from `UnitBoundaryEnvironment`, unless a grep in the
-  handoff proves every UBE consumer is capture-count-agnostic) issues an
-  occurrence carrying THREE correctly-located fields — the first ruling's
-  "declared_children: Some(occurrences)" was a FUSION defect (Architect
-  owns it); occurrences do not live in `declared_children`:
-  - `declared_children: Some(semantic_use.children)` — the STATIC SHAPE
-    TREE (kinds only), sourced from the TIER-1 elaborator captured-env
-    semantic use, byte-for-byte the branch-2 Constructor precedent
-    (`aggregates.rs:1388`). NOT the occurrence carrier.
+- **AC-SCHEMA (REFRAMED POSITIONAL — Architect evt_3tky5wzycfnxb, which
+  REVISES the SCHEMA UN-FUSED / z161 ruling; the Architect owns the
+  revision).** A DEDICATED checked-IH captured-env record — the distinct
+  `CheckedIhCapturedEnvironment` role (role != shape; the distinct role
+  preserves the blocker-2 distinct-record soundness guard) — issues a
+  POSITIONALLY-identified aggregate carrying:
+  - `declared_children: Some(...)` via a NEW positional
+    `SynthesizedAggregateNode` variant (e.g. `WorkerCaptureOperand(u32)`;
+    exact name at implementer/CV discretion) whose child at position i is
+    "the i-th carried continuation-envelope WorkerCapture word." This is
+    NOT a reuse of the Constructor `semantic_use.children` const-recipe nor
+    the SiteOperand/effect-seat operand vector: the captured env is the
+    FIRST synthesized aggregate whose children are neither a compile-time
+    recipe nor an effect seat's arguments, so it needs its own kind (the
+    original fork's option (a); z161's "reuse Some(semantic_use.children)
+    like branch 2" was wrong). STORAGE via const-array-slice-by-arity —
+    `const CAPTURE_OPERANDS: &[Node] = &[WorkerCaptureOperand(0)..(N_MAX-1)]`,
+    per unit `&CAPTURE_OPERANDS[..arity]` (per-unit content at position i is
+    fully determined by i, so per-unit arity is representable by slicing).
+    REQUIRES an EXPLICIT arity-bound refusal above N_MAX — never silent
+    truncation. RESOLUTION via a NEW `reconcile_declared_children` arm
+    resolving `WorkerCaptureOperand(i)` against the continuation-envelope
+    WorkerCapture operand vector (the ci<->oi run), with its OWN
+    path-identity check, SEPARATE from and NOT touching/weakening the
+    existing SiteOperand/effect-seat arm (that separation is what keeps the
+    effect-seat path-identity contract every host-result aggregate relies
+    on intact).
   - `children[i].origin: Some(oi)` — the capture's checked-plan
-    occurrence. This is where "entries are the captures' own occurrences"
-    actually lives, and branch 4 (`aggregates.rs:1450`) ALREADY sets it.
-  - `children[i].field_identity: Some(FieldIdentity)` — per-child
-    identity sourced NON-fabricated from the capture's own `CaptureSymbol`
-    atom, via a new producer
-    `capture_field_identity(origin, position) = FieldIdentity(identity_span(origin, CaptureSymbol, position))`.
-    There is deliberately no `&str -> FieldIdentity` path
-    (`lowering/aggregates.rs:914-921`), so fabrication is structurally
-    impossible.
-  Owners still come from `aggregate_child_referent_owners`
-  (aggregates.rs:295) — the DERIVATION reused, not the UBE entry gate;
-  owners are NOT meet/allocation assignments. Discriminating-pair test:
-  the issuance fires for the checked-IH family (nine children, each a
-  derived owner) and does NOT fire for a program `UnitBoundaryEnvironment`
-  already serves.
-- **AC-M6-UNBLOCK.** With the slice landed, M6's tier-3 lowering can
-  build `Record { occurrence, fields = captures }` at `core.rs:11674`
-  — i.e. the escaped environment now has an admitted representation.
-  (Verified by M6, not here.)
+    occurrence; branch 4 (`aggregates.rs:1450`) ALREADY sets it.
+  - `field_identity: None` is CORRECT and non-fabricated — the captured env
+    is POSITIONALLY identified (the ci<->oi ordinal IS the identity). The
+    record takes the POSITIONAL downstream path (Lowered::Constructor /
+    `record_fields = None`), under which the preflight's field-identity
+    comparison (`lowering/aggregates.rs:922-941`) is BYPASSED entirely
+    (dispatch at :730-758) — exactly why branch 2's Constructor children
+    carry `field_identity: None` and pass. The `capture_field_identity`
+    producer is DROPPED; the Var-binder-ParamName route stays rejected (it
+    would invent nominal identity). The earlier "no identity: None on this
+    path" clause was the error.
+  Owners come from `aggregate_child_referent_owners` (aggregates.rs:295).
+  LEGITIMACY (CV + Adversary — the invention-in-costume line): the new kind
+  is the concept the genuinely-new population REQUIRES, not a widened
+  concept for a population it did not model; arity + content trace to the
+  ci<->oi run resolved against the real envelope operand vector; the missing
+  `&str -> FieldIdentity` path stays missing; the effect-seat reconcile arm
+  is untouched. Auditable by: the new reconcile arm reds if pointed at the
+  wrong operand vector; the arity bound reds above N_MAX rather than
+  truncating; the discriminating pair fires for the checked-IH family and
+  NOT for a program `UnitBoundaryEnvironment` already serves.
+- **AC-M6-UNBLOCK.** With the slice landed, M6's tier-3 lowering builds the
+  captured env as a POSITIONAL aggregate consumed by ordinal projection
+  `<v0..vn-1>` (NOT a nominal `Record` / field-name lookup) at
+  `core.rs:11674` — the escaped environment now has an admitted
+  representation. (Verified by M6, not here.)
 - **AC-NO-REGRESSION.** Whole-suite green in CI (COORDINATION section
   12). Local targeted `-p` only, never `--workspace`.
 - **Required reviewers.** Architect (soundness of the environment
@@ -369,18 +389,18 @@ landing an elaborator interface the planner then has to adapt to.
 # SEQUENCING
 
 Runtime lane-1, ahead of M6's tier-3 (M6 `depends_on` this node). BUILD
-gated on AC-ENTRY (enclave). Capability tier T1 (a soundness-bearing
-elaborator emit, reviewed on the argument).
+gated on AC-ENTRY (enclave, satisfied). Capability tier T1 (soundness-bearing
+ken-runtime type work, reviewed on the argument).
 
-SCOPE REVISED DOWN (Architect evt_497awrccwy20k): tier-1 is SMALLER than
-the earlier "plausibly XL" — it is NOT a new semantic layer. The
-field-identity machinery already exists (`CaptureSymbol` is a
-`SemanticAtomKind`; `FieldIdentity` is a transparent newtype over a
-named-atom span; `identity_span` exists). Tier-1 is: emit a
-captured-environment semantic use whose children reuse the existing
-`CaptureSymbol` atoms, plus the one new `capture_field_identity` producer.
-The runtime tier-2 planner half already sources `children[i].origin`
-(branch 4); what remains is consuming a tier-1 `semantic_use.children` for
-`declared_children` and setting `field_identity` from the new producer.
-Size S-M for tier-1; the tier-2 completion is a small consume-and-wire on
-top of the landed 5d1531dc structure.
+SCOPE CORRECTED BACK TO L/XL (Architect evt_3tky5wzycfnxb, REVISING the
+earlier evt_497awrccwy20k "S-M / not a new layer" note): tier-1 is real
+type work, NOT a reuse of existing machinery — a NEW sealed-vocabulary
+`SynthesizedAggregateNode` variant (`WorkerCaptureOperand`) + a NEW
+`reconcile_declared_children` arm (separate from the effect-seat arm) + the
+arity-bound (N_MAX) machinery. The `capture_field_identity` producer is
+DROPPED (field_identity is positional `None`; the ordinal is the identity).
+Branch 4 already sources `children[i].origin`; what remains is the new
+positional-variant storage + resolution + the positional/distinct-role
+shape (Constructor-family / `record_fields = None`). Returns to Architect +
+CV + Adversary together as the AC-SCHEMA / AC-M6-UNBLOCK discharge; tier-1
+alone does NOT close the node.
