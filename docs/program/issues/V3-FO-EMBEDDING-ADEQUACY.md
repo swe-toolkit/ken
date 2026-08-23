@@ -20,6 +20,76 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > `proved` — that verdict-flip is a separate downstream node** (see AC-3 and the
 > `attempt_fo` fixed input).
 
+> # D1 BUILD HANDOFF — Architect-ruled 2026-08-23 (authoritative build spec)
+>
+> D0 landed as a genuine representability hard stop (probe `4d5fd8cee`,
+> QA-approved evt_2ty00dbtgy1xv): the plain `FokIForm` atom (bare `Nat`, no scope
+> proof) has no total denotation, and the two invention workarounds were correctly
+> refused. The spec enclave concurred on the fix's semantic faithfulness
+> (spec-author evt_2q0tkxtca67e2 / spec-leader evt_447d5qssxrftr: scope-indexed
+> quotation/denotation commutation, zero new trust), and the Architect ruled the
+> component design (evt_4s0p5m234544h + D1 handoff evt_pxmzdg6kq6as; `§4.4:531`
+> places the representation with the Architect). This section is the authoritative
+> D1 build; it supersedes the abstract D-sequence below where they differ.
+>
+> COMPONENT DESIGN (all NEW/additive; nothing landed is re-cut):
+> 1. `IForm Sigma n` — intrinsically-scoped source form. Atom variable = bounded
+>    index `i : Fin n` (n = object-binder depth), NOT a bare `Nat`. Five
+>    constructors mirroring the landed `FokIForm` (Bottom, Atom, Or, Imp, Forall),
+>    scope-indexed. This IS the spec's `IForm Sigma`.
+> 2. `denote_at` (internal): interprets `IForm Sigma n` under a length-n carrier
+>    env; atom arm = total `Fin` lookup (no Option, no default, no invented
+>    Bottom); Forall extends the env (n -> n+1); proof-hypothesis Imp introduces NO
+>    object slot (n unchanged). Bottom / truncated Or / Pi into Omega / carrier Pi
+>    into Omega = the four green D0 axes. Public `denote C rho f` derives from it.
+> 3. `erase_n : IForm Sigma n -> FokIForm` — constructor-homomorphic, maps
+>    `i : Fin n` to the same de Bruijn `Nat`, changes neither binder order nor atom
+>    identity. Used ONLY on the target-embedding leg.
+> 4. `embed Sigma f := fok_embed (erase_n f)` — reuses the landed `fok_embed`
+>    verbatim.
+> 5. `embedding_adequacy` statement (`§4.4:498-503`): `(Sigma)(C)(rho)(f : IForm
+>    Sigma) -> classically_valid (embed Sigma f) -> denote C rho f`.
+>
+> THE TWO LEGS (spec-author's refinement, load-bearing): the DENOTE leg consumes
+> the intrinsic `f` directly (`denote_at`, no erase); the EMBED leg uses erase
+> (`embed = fok_embed . erase_n`). Adequacy consumes intrinsic `f`; the landed
+> `fok_embed` + checker operate only on its forgetful image. Quotation-then-
+> intrinsic-denotation is the identity up to kernel conversion.
+>
+> REUSED UNTOUCHED (a fold must NOT touch these): `check_cert`,
+> `checker_soundness`, `FokForm`, `FokCert`, `fok_embed`, `fok_w_forces`
+> (`FoKripke.ken:165-199`). The discharge composition (`§4.4:515-521`) type-checks
+> with `checker_soundness` reused verbatim on `embed Sigma f : Form`.
+>
+> D1 SLICE (Steward's cut, per the Architect's recommended boundary): D1 = the
+> apparatus (`IForm Sigma` + `denote_at`/`denote` + `erase_n` + `embed`) + the
+> `embedding_adequacy` STATEMENT + the quotation-preservation STATEMENT, all
+> zero-trust, with the D0 probe axes carried in as durable controls ON THE
+> INTRINSIC FORM (the four passing axes carry over directly; the atom axis is
+> re-expressed on `IForm Sigma n` — total-by-construction, the D0-refused
+> workarounds stay refused). The D0 probe `4d5fd8cee` is ABSORBED INTO the D1
+> branch (rebased/carried), NOT merged standalone, so no plain-form atom assertion
+> lands only to be reshaped. The two PROOFS (adequacy: `classically_valid embed ->
+> denote`; quotation-preservation: `denote` = the Pi-closed obligation up to
+> conversion) follow as D2/D3. `§4.5`'s first slice (one sort A, one unary P, five
+> source forms) is exactly this grammar.
+>
+> D1 ACs (sourced-from-source + the enclave's zero-trust conditions):
+> - `denote` TOTAL BY CONSTRUCTION — atom carrier value admitted from the `Fin`
+>   index into the length-n env; NO default, NO Bottom-on-None, NO invented carrier.
+> - ZERO trusted-base delta (before==after) on every new declaration.
+> - Connectives per `§4.4:489` / `16 §1.3` (the four green D0 axes).
+> - SCT green by direct-subterm descent (scope index n->n+1 at Forall rides a
+>   strictly-smaller subform).
+> - Discharge composition type-checks with `checker_soundness` reused verbatim.
+> - GATE: this does NOT license an FO `proved` verdict — held behind the
+>   kernel-checked `embedding_adequacy` AND quotation-preservation TERMS landing
+>   (later deliverables; the verdict-flip stays a separate downstream node, AC-3).
+>
+> Reviewers: Architect (required soundness reviewer — checker reuse untouched,
+> `denote` total-by-construction, zero-trust, discharge composition sound),
+> language-QA, Adversary (over-accept hunt in parallel). Capability tier: T1.
+
 ## Objective
 
 Author a Ken-level embedding-denotation apparatus (`Carriers`, `AtomEnv`,
