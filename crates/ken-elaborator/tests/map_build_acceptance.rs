@@ -21,6 +21,19 @@ const COLLECTIONS_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Co
 const TRANSPORT_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
 const MAP_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Map.ken.md");
 
+/// The stated stack for the D1 legacy-frame budget instrument. Two MiB is the
+/// measured candidate-green / inline-parent-SIGABRT boundary. An explicit
+/// `Builder::stack_size` overrides the spawned-thread default that
+/// `RUST_MIN_STACK` would otherwise select, making the control independent of
+/// the ambient machine configuration.
+const D1_LEGACY_MAP_STACK_BYTES: usize = 2 * 1024 * 1024;
+
+/// The local `Builder` thread omits the libtest entry frames present when the
+/// two-MiB boundary was first measured. This live reservation normalizes that
+/// headroom. Bisection at the stated stack found 512 bytes candidate-green and
+/// inline-parent-SIGABRT; zero let both pass and 2,048 made both abort.
+const D1_LEGACY_MAP_STACK_RESERVATION_BYTES: usize = 512;
+
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
@@ -1090,6 +1103,67 @@ fn cat4_union_intersection_difference_execute_over_nat() {
         &format!("to_list Nat Nat (difference Nat Nat leq_nat ({a}) ({b}))"),
     );
     assert_eq!(list_pair_nat_nat(&env, &v), vec![(2, 20)], "difference keeps left-only keys");
+}
+
+/// Regression for LANG-MOD-STRICT-RESOLUTION D1: strict-only prebinding
+/// temporaries must not enlarge `expand_scope`'s long-lived legacy frame.
+/// The union application below is the smallest existing Map acceptance arm
+/// that crossed the CI worker's stack limit when those temporaries lived in
+/// that frame.
+///
+/// Promise class: durable invariant. Intended strict-resolution extensions
+/// remain green while any change that restores the enlarged legacy frame goes
+/// red at the stated stack.
+///
+/// **MEASURED:** this legacy Map workload elaborates and evaluates on the
+/// explicit [`D1_LEGACY_MAP_STACK_BYTES`] thread stack.
+/// **CLAIMED:** strict-only prebinding does not consume the repaired legacy
+/// frame budget.
+/// **THE GAP:** the workload must reach the affected `expand_scope` recursion;
+/// the exact inline-parent mutation closes that gap by making this test abort
+/// with SIGABRT while the candidate remains green.
+#[test]
+fn d1_strict_prebinding_preserves_legacy_map_union_stack_budget() {
+    std::thread::Builder::new()
+        .stack_size(D1_LEGACY_MAP_STACK_BYTES)
+        .spawn(|| {
+            let stack_boundary_reservation = [0u8; D1_LEGACY_MAP_STACK_RESERVATION_BYTES];
+            std::hint::black_box(&stack_boundary_reservation);
+            let mut env = mk_env();
+            let mut store = make_store(&env);
+            let a = format!(
+                "insert Nat Nat leq_nat ({one}) ({ten}) \
+                   (insert Nat Nat leq_nat ({two}) ({twenty}) (empty Nat Nat))",
+                one = nat(1),
+                two = nat(2),
+                ten = nat(10),
+                twenty = nat(20)
+            );
+            let b = format!(
+                "insert Nat Nat leq_nat ({one}) ({thirty}) \
+                   (insert Nat Nat leq_nat ({three}) ({forty}) (empty Nat Nat))",
+                one = nat(1),
+                three = nat(3),
+                thirty = nat(30),
+                forty = nat(40)
+            );
+            let value = eval_view(
+                &mut env,
+                &mut store,
+                "t_d1_legacy_union_stack",
+                "Option Nat",
+                &format!(
+                    "lookup Nat Nat leq_nat ({}) \
+                     (union Nat Nat leq_nat (λx.λy. x) ({a}) ({b}))",
+                    nat(1)
+                ),
+            );
+            assert_eq!(option_nat(&env, &value), Some(10));
+            std::hint::black_box(stack_boundary_reservation);
+        })
+        .expect("spawn stated-stack D1 legacy Map thread")
+        .join()
+        .expect("stated-stack D1 legacy Map thread panicked");
 }
 
 #[test]

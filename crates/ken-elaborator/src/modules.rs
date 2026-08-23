@@ -69,6 +69,12 @@ pub struct ModuleState {
     active_imports: Vec<String>,
     /// The unshadowable prelude floor (`30-taxonomy §4`, `33 §3.3`).
     prelude_names: HashSet<String>,
+    /// Compiler vocabulary captured before package source can add aliases.
+    /// Includes native trusted names and constructors of the closed floor.
+    strict_builtin_names: HashSet<String>,
+    /// One roots-loader run cannot mix legacy and strict units: the loaded-unit
+    /// cache records elaborated results rather than unresolved source.
+    roots_resolution_mode: Option<ResolutionMode>,
 }
 
 /// The complete Ken-defined always-present floor (`30-taxonomy §4`).
@@ -99,6 +105,34 @@ impl ModuleState {
             .map(str::to_string)
             .collect();
     }
+
+    pub(crate) fn capture_strict_builtin_names(
+        &mut self,
+        env: &ken_kernel::GlobalEnv,
+        globals: &HashMap<String, ken_kernel::GlobalId>,
+        native_trusted_base: &std::collections::BTreeSet<ken_kernel::GlobalId>,
+    ) {
+        let floor_formers: HashSet<_> = PRELUDE_FLOOR_NAMES
+            .iter()
+            .filter_map(|name| globals.get(*name).copied())
+            .collect();
+        self.strict_builtin_names = globals
+            .iter()
+            .filter_map(|(name, id)| {
+                let floor_constructor = env
+                    .constructor(*id)
+                    .is_some_and(|(parent, _)| floor_formers.contains(&parent.id));
+                (native_trusted_base.contains(id) || floor_constructor).then_some(name.clone())
+            })
+            .collect();
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum ResolutionMode {
+    #[default]
+    Legacy,
+    Strict,
 }
 
 /// Per-scope bare-name resolution: selective-import bindings plus this scope's
@@ -107,6 +141,10 @@ impl ModuleState {
 /// §3.3`); narrower lexical binders remain innermost-wins.
 #[derive(Default, Clone)]
 struct Scope {
+    mode: ResolutionMode,
+    /// Compiler-installed vocabulary captured before package source can speak.
+    /// This excludes later ambient postulates while preserving primitive names.
+    kernel_names: HashSet<String>,
     bindings: HashMap<String, String>,
     /// Bare names bound by a top-level LOCAL declaration in this scope.
     locals: std::collections::HashSet<String>,
@@ -121,6 +159,14 @@ struct Scope {
 }
 
 impl Scope {
+    fn with_mode(mode: ResolutionMode, kernel_names: HashSet<String>) -> Self {
+        Self {
+            mode,
+            kernel_names,
+            ..Self::default()
+        }
+    }
+
     fn bind_import(&mut self, bare: &str, qualified: &str, span: &Span) -> Result<(), ElabError> {
         if self.locals.contains(bare) {
             let local = self
@@ -183,12 +229,17 @@ fn qualify(prefix: &str, name: &str) -> String {
 
 /// Resolve a (possibly dotted) surface name reference to its canonical
 /// qualified form, using the active `scope` for bare names and `exports`
-/// for qualified (`M.foo`) references. Returns the name **unchanged** if it
-/// isn't module-tracked at all (not imported, not locally shadowed) — this
-/// is what keeps every non-module program byte-for-byte backward
-/// compatible: `scope`/`exports` are empty unless `module`/`import`
-/// actually appear, so every lookup here is a no-op passthrough to the
-/// pre-existing flat `cx.globals` resolution.
+/// for qualified (`M.foo`) references. Legacy mode returns an untracked name
+/// unchanged, preserving the pre-existing flat `cx.globals` fallback. Strict
+/// mode instead fails closed unless the name is scope-bound, compiler
+/// vocabulary, or a member of the closed prelude floor.
+fn is_unshadowable_kernel_name(name: &str) -> bool {
+    matches!(
+        name,
+        "Omega" | crate::resolve::SUGAR_REFL | crate::resolve::SUGAR_AXIOM
+    )
+}
+
 fn resolve_ref(
     scope: &Scope,
     exports: &HashMap<String, HashMap<String, String>>,
@@ -229,9 +280,31 @@ fn resolve_ref(
                 name: name.to_string(),
                 span: span.clone(),
             }),
+            None if scope.mode == ResolutionMode::Strict
+                && !is_prelude_floor_name(name)
+                && !scope.kernel_names.contains(name)
+                && !is_unshadowable_kernel_name(name) =>
+            {
+                Err(ElabError::UnboundName {
+                    name: name.to_string(),
+                    span: span.clone(),
+                })
+            }
             None => Ok(name.to_string()),
         }
     }
+}
+
+/// Resolve a class-environment reference through the unit's class namespace.
+/// Class-bearing declarations do not carry an RCon, so this is their single
+/// strict choke, parallel to [`resolve_ref`] for globals-routed forms.
+fn resolve_class_ref(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    name: &str,
+    span: &Span,
+) -> Result<String, ElabError> {
+    resolve_ref(scope, exports, name, span)
 }
 
 fn resolve_attached_ref(
@@ -582,6 +655,7 @@ fn load_unit(
     elab: &mut ElabEnv,
     module: &str,
     span: &Span,
+    mode: ResolutionMode,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
     if let Some(start) = elab
         .module_state
@@ -652,7 +726,7 @@ fn load_unit(
             {
                 continue;
             }
-            load_unit(elab, &dependency, &import_span)?;
+            load_unit(elab, &dependency, &import_span, mode)?;
         }
         refresh_carried_instance_admission(elab);
 
@@ -661,7 +735,7 @@ fn load_unit(
         // not leak into this unit's declarations.
         elab.class_env.next_module();
 
-        let mut scope = Scope::default();
+        let mut scope = Scope::with_mode(mode, elab.module_state.strict_builtin_names.clone());
         let mut unit_definitions = HashSet::new();
         let (results, exports) = expand_scope(
             elab,
@@ -741,6 +815,25 @@ pub fn elaborate_module_from_roots(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
+    elaborate_module_from_roots_with_mode(elab, roots, entry, ResolutionMode::Legacy)
+}
+
+/// Opt-in strict roots entry. WP-4 will move the real catalog caller to this
+/// entry only after its dependency census has been migrated.
+pub fn elaborate_module_from_roots_strict(
+    elab: &mut ElabEnv,
+    roots: &[PathBuf],
+    entry: &str,
+) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
+    elaborate_module_from_roots_with_mode(elab, roots, entry, ResolutionMode::Strict)
+}
+
+fn elaborate_module_from_roots_with_mode(
+    elab: &mut ElabEnv,
+    roots: &[PathBuf],
+    entry: &str,
+    mode: ResolutionMode,
+) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
     if roots.len() != 1 {
         return Err(ElabError::ParseError {
             msg: format!(
@@ -752,13 +845,18 @@ pub fn elaborate_module_from_roots(
     }
     if elab.module_state.catalog_roots.is_empty() {
         elab.module_state.catalog_roots = roots.to_vec();
+        elab.module_state.roots_resolution_mode = Some(mode);
     } else if elab.module_state.catalog_roots != roots {
         return Err(ElabError::ParseError {
             msg: "catalog roots cannot change during one elaboration run".to_string(),
             span: Span::zero(),
         });
+    } else if elab.module_state.roots_resolution_mode != Some(mode) {
+        return Err(ElabError::Internal(
+            "roots resolution mode cannot change during one elaboration run".to_string(),
+        ));
     }
-    load_unit(elab, entry, &Span::zero())
+    load_unit(elab, entry, &Span::zero(), mode)
 }
 
 /// Rename the declared name(s) of a raw surface `Decl` to their fully
@@ -928,12 +1026,34 @@ fn qualify_decl_name(decl: &Decl, prefix: &str) -> Decl {
     }
 }
 
+fn rtype_kernel_head(ty: &RType) -> Option<&'static str> {
+    let mut cursor = ty;
+    let mut arity = 0;
+    while let RType::RApp(function, _, _) = cursor {
+        arity += 1;
+        cursor = function;
+    }
+    matches!(cursor, RType::RCon(name, _) if name == crate::resolve::SUGAR_EQ && arity == 3)
+        .then_some(crate::resolve::SUGAR_EQ)
+}
+
 fn rewrite_rtype(
     scope: &Scope,
     exports: &HashMap<String, HashMap<String, String>>,
     ty: RType,
 ) -> Result<RType, ElabError> {
+    let kernel_head = rtype_kernel_head(&ty);
+    rewrite_rtype_inner(scope, exports, ty, kernel_head)
+}
+
+fn rewrite_rtype_inner(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    ty: RType,
+    kernel_head: Option<&'static str>,
+) -> Result<RType, ElabError> {
     Ok(match ty {
+        RType::RCon(name, span) if kernel_head == Some(name.as_str()) => RType::RCon(name, span),
         RType::RCon(name, span) => {
             let n = resolve_ref(scope, exports, &name, &span)?;
             RType::RCon(n, span)
@@ -970,11 +1090,31 @@ fn rewrite_rtype(
             s,
         ),
         RType::RApp(f, a, s) => RType::RApp(
-            Box::new(rewrite_rtype(scope, exports, *f)?),
+            Box::new(rewrite_rtype_inner(scope, exports, *f, kernel_head)?),
             Box::new(rewrite_rtype(scope, exports, *a)?),
             s,
         ),
     })
+}
+
+fn rexpr_kernel_head(expr: &RExpr) -> Option<&'static str> {
+    let mut cursor = expr;
+    let mut arity = 0;
+    while let RExpr::RApp(function, _, _) = cursor {
+        arity += 1;
+        cursor = function;
+    }
+    let RExpr::RCon(name, _) = cursor else {
+        return None;
+    };
+    match (name.as_str(), arity) {
+        (crate::resolve::SUGAR_ABSURD, 1) => Some(crate::resolve::SUGAR_ABSURD),
+        (crate::resolve::SUGAR_TRUNC_INTRO, 1) => Some(crate::resolve::SUGAR_TRUNC_INTRO),
+        (crate::resolve::SUGAR_J, 3) => Some(crate::resolve::SUGAR_J),
+        (crate::resolve::SUGAR_EQ, 3) => Some(crate::resolve::SUGAR_EQ),
+        (crate::resolve::SUGAR_ELIM_TRUNC, 3) => Some(crate::resolve::SUGAR_ELIM_TRUNC),
+        _ => None,
+    }
 }
 
 fn rewrite_rexpr(
@@ -982,7 +1122,18 @@ fn rewrite_rexpr(
     exports: &HashMap<String, HashMap<String, String>>,
     e: RExpr,
 ) -> Result<RExpr, ElabError> {
+    let kernel_head = rexpr_kernel_head(&e);
+    rewrite_rexpr_inner(scope, exports, e, kernel_head)
+}
+
+fn rewrite_rexpr_inner(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
     Ok(match e {
+        RExpr::RCon(name, span) if kernel_head == Some(name.as_str()) => RExpr::RCon(name, span),
         RExpr::RCon(name, span) => {
             let n = resolve_ref(scope, exports, &name, &span)?;
             RExpr::RCon(n, span)
@@ -1003,7 +1154,7 @@ fn rewrite_rexpr(
         },
         RExpr::RUniv(l, s) => RExpr::RUniv(l, s),
         RExpr::RApp(f, a, s) => RExpr::RApp(
-            Box::new(rewrite_rexpr(scope, exports, *f)?),
+            Box::new(rewrite_rexpr_inner(scope, exports, *f, kernel_head)?),
             Box::new(rewrite_rexpr(scope, exports, *a)?),
             s,
         ),
@@ -1146,6 +1297,17 @@ fn rewrite_rdecl(
     exports: &HashMap<String, HashMap<String, String>>,
     rdecl: RDecl,
 ) -> Result<RDecl, ElabError> {
+    // Instance and derive declarations carry their class reference in the
+    // declaration-name slot rather than an RCon. Route that direct class
+    // family through the same scope/floor decision as every other bare name.
+    let direct_class_name = if matches!(
+        &rdecl.kind,
+        RDeclKind::InstanceDecl { .. } | RDeclKind::DeriveDecl { .. }
+    ) {
+        Some(resolve_class_ref(scope, exports, &rdecl.name, &rdecl.span)?)
+    } else {
+        None
+    };
     let ty = rdecl
         .ty
         .map(|t| rewrite_rtype(scope, exports, t))
@@ -1174,7 +1336,12 @@ fn rewrite_rdecl(
                 .into_iter()
                 .map(|constraint| {
                     Ok(crate::resolve::RInstanceConstraint {
-                        class_name: constraint.class_name,
+                        class_name: resolve_class_ref(
+                            scope,
+                            exports,
+                            &constraint.class_name,
+                            &rdecl.span,
+                        )?,
                         head_type: rewrite_rtype(scope, exports, constraint.head_type)?,
                         binder: constraint.binder,
                     })
@@ -1330,7 +1497,12 @@ fn rewrite_rdecl(
                 .into_iter()
                 .map(|constraint| {
                     Ok(crate::resolve::RInstanceConstraint {
-                        class_name: constraint.class_name,
+                        class_name: resolve_class_ref(
+                            scope,
+                            exports,
+                            &constraint.class_name,
+                            &rdecl.span,
+                        )?,
                         head_type: rewrite_rtype(scope, exports, constraint.head_type)?,
                         binder: constraint.binder,
                     })
@@ -1341,13 +1513,18 @@ fn rewrite_rdecl(
                 .map(|(n, e)| Ok((n, rewrite_rexpr(scope, exports, e)?)))
                 .collect::<Result<Vec<_>, ElabError>>()?,
         },
-        RDeclKind::DeriveDecl { data_name } => RDeclKind::DeriveDecl { data_name },
+        RDeclKind::DeriveDecl { data_name } => RDeclKind::DeriveDecl {
+            data_name: resolve_ref(scope, exports, &data_name, &rdecl.span)?,
+        },
     };
     let name = match &kind {
         RDeclKind::AttachedProof {
             subject,
             proof_name,
         } => format!("{subject}::{proof_name}"),
+        RDeclKind::InstanceDecl { .. } | RDeclKind::DeriveDecl { .. } => {
+            direct_class_name.expect("direct class declaration name is resolved above")
+        }
         _ => rdecl.name,
     };
     Ok(RDecl {
@@ -1460,6 +1637,64 @@ fn resolve_scoped_decl(
     rewrite_rdecl(scope, exports, rdecl)
 }
 
+fn prebind_scope_declarations(
+    scope: &mut Scope,
+    decls: &[Decl],
+    prefix: &str,
+    prelude_names: &HashSet<String>,
+) -> Result<(), ElabError> {
+    // Collect locals before imports so collisions are source-order independent.
+    // Keep these strict-only constructor/class temporaries out of
+    // `expand_scope`'s long-lived frame: elaborating large application spines
+    // is intentionally recursive and must retain the legacy stack budget.
+    for decl in decls {
+        let inner = decl.unwrap_pub();
+        let strict_unqualified_local =
+            scope.mode == ResolutionMode::Strict && matches!(inner, Decl::ClassDecl { .. });
+        if !is_qualifiable(inner) && !strict_unqualified_local {
+            continue;
+        }
+        if matches!(inner, Decl::AttachedProofDecl { .. }) {
+            continue;
+        }
+        let bare = inner.name().to_string();
+        let qualified = if strict_unqualified_local {
+            bare.clone()
+        } else {
+            qualify(prefix, &bare)
+        };
+        if prefix.is_empty() && prelude_names.contains(&bare) && !scope.locals.contains(&bare) {
+            return Err(ElabError::AmbiguousReference {
+                name: bare.clone(),
+                sources: vec![format!("<prelude>.{bare}"), qualified],
+                span: inner.span().clone(),
+            });
+        }
+        scope.bind_local(&bare, &qualified, inner.span())?;
+        if scope.mode != ResolutionMode::Strict {
+            continue;
+        }
+        match inner {
+            Decl::DataDecl { ctors, .. } => {
+                for ctor in ctors {
+                    scope.bind_local(&ctor.name, &qualify(prefix, &ctor.name), &ctor.span)?;
+                }
+            }
+            Decl::ExplicitDataDecl { ctors, .. } => {
+                for ctor in ctors {
+                    let (name, span) = match ctor {
+                        ExplicitDataCtor::Simple(ctor) => (&ctor.name, &ctor.span),
+                        ExplicitDataCtor::Signature { name, span, .. } => (name, span),
+                    };
+                    scope.bind_local(name, &qualify(prefix, name), span)?;
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// Expand and elaborate a compilation unit's raw decls (one `elaborate_*`
 /// call's `Vec<Decl>`) at nesting `prefix` ("" at the file root), threading
 /// `scope` (built fresh for a `module { … }` block; the persisted root
@@ -1495,30 +1730,7 @@ fn expand_scope(
         }
     }
 
-    // Pre-pass: collect this scope's own local declared names FIRST. Imports
-    // below therefore detect a local/import clash independently of textual
-    // order, even when the clashing name is never referenced.
-    for decl in decls {
-        let inner = decl.unwrap_pub();
-        if is_qualifiable(inner) {
-            if matches!(inner, Decl::AttachedProofDecl { .. }) {
-                continue;
-            }
-            let bare = inner.name().to_string();
-            let qualified = qualify(prefix, &bare);
-            if prefix.is_empty()
-                && elab.module_state.prelude_names.contains(&bare)
-                && !scope.locals.contains(&bare)
-            {
-                return Err(ElabError::AmbiguousReference {
-                    name: bare.clone(),
-                    sources: vec![format!("<prelude>.{bare}"), qualified],
-                    span: inner.span().clone(),
-                });
-            }
-            scope.bind_local(&bare, &qualified, inner.span())?;
-        }
-    }
+    prebind_scope_declarations(scope, decls, prefix, &elab.module_state.prelude_names)?;
 
     let mut ids = Vec::new();
     let mut exports_here: HashMap<String, String> = HashMap::new();
@@ -1569,7 +1781,7 @@ fn expand_scope(
                 span: _,
             } => {
                 let child_prefix = qualify(prefix, name);
-                let mut child_scope = Scope::default();
+                let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
                 let (child_ids, child_exports) = expand_scope(
                     elab,
                     inner,
@@ -1725,7 +1937,9 @@ fn expand_scope(
                         for rdecl in &members {
                             let simple_kind = matches!(
                                 &rdecl.kind,
-                                RDeclKind::Let | RDeclKind::Theorem | RDeclKind::AttachedProof { .. }
+                                RDeclKind::Let
+                                    | RDeclKind::Theorem
+                                    | RDeclKind::AttachedProof { .. }
                             ) || matches!(
                                 &rdecl.kind,
                                 RDeclKind::View { constraints, is_space_op, .. }
