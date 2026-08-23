@@ -1163,24 +1163,30 @@ fn checked_ih_coordinate_run(
                  occurrence, so its field identity cannot be admitted from the plan",
             ));
         };
-        // ⛔ Agreement is CHECKED, not assumed. This used to be a plain
-        // assignment, so a run whose captures named different closures kept the
-        // LAST one and produced a record keyed on a closure most of its own
-        // fields do not come from -- silently, since the seat still resolves.
-        match closure_origin {
-            None => closure_origin = Some(*origin),
-            Some(established) if established == *origin => {}
-            Some(established) => {
-                return Err(planner_error(format!(
-                    "checked-IH captured environment: the ruled run mixes captures from closure \
-                     {established:?} and closure {origin:?}, so no single closure seat keys it",
-                )));
-            }
-        }
+        // ⛔ A LAST-WRITE-WINS ASSIGNMENT IS SAFE HERE, AND THE REASON IS
+        // UPSTREAM, NOT LOCAL. Every capture in a ruled run carries the same
+        // `closure_origin` because `exact_continuation_ordinary_parameters`
+        // (`continuations.rs`, the "continuation worker captures are not one
+        // exact ordered envelope" refusal) compares EVERY capture's
+        // `closure_origin` against the worker's before this run can exist. A
+        // disagreeing run is refused there and never reaches this loop.
+        //
+        // ⛔ A guard was added here for that disagreement and then removed: it
+        // was unreachable through the natural producer, so it pinned nothing
+        // and read as though this function established a property it merely
+        // inherits. Do not re-add it without a production witness that reaches
+        // it without going through that validator first -- if you find one, the
+        // fix belongs upstream, where the invariant is stated.
+        closure_origin = Some(*origin);
         run.push((*ordinal, *sourced));
     }
-    // An envelope with no worker captures is the capture-free unit-boundary
-    // population, which UnitBoundaryEnvironment serves. No run, no membership.
+    // ⛔ No worker captures means no run, hence no membership -- and that is
+    // ALL this says. It is NOT a claim that such a unit is served by
+    // `UnitBoundaryEnvironment`: that producer additionally requires the
+    // concrete `Call` -> empty-capture `LexicalClosure` shape
+    // (`unit_boundary_environment_fields` below), which most capture-free units
+    // do not have. The two populations are disjoint from this one for different
+    // reasons, and conflating them would let "not ours" be read as "theirs".
     match closure_origin {
         Some(origin) if !run.is_empty() => Ok(Some((origin, run))),
         _ => Ok(None),
@@ -3583,11 +3589,81 @@ mod checked_ih_captured_env_schema {
         );
     }
 
-    /// The capture-free population receives no record, from a fixture that
-    /// demonstrably reaches the issuance site.
+    /// The real `UnitBoundaryEnvironment` producer shape: a `Call` whose
+    /// argument carries an empty-capture `LexicalClosure`.
+    fn unit_boundary_environment_fixture() -> RuntimeExpr {
+        RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["value".to_string()],
+                body: Box::new(RuntimeExpr::Var(0)),
+            }),
+            args: vec![RuntimeExpr::Construct {
+                constructor: "ctor:fixture::Environment::Wrap".to_string(),
+                args: vec![RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["unit".to_string()],
+                    body: Box::new(RuntimeExpr::Construct {
+                        constructor: "ctor:fixture::Environment::Leaf".to_string(),
+                        args: Vec::new(),
+                    }),
+                }],
+            }],
+        }
+    }
+
+    fn unit_boundary_environment_records(plan: &StaticTransitionPlan<'_>) -> usize {
+        plan.aggregate_ownership
+            .iter()
+            .filter(|record| {
+                matches!(
+                    record.producer,
+                    AggregateOccurrenceProducer::SynthesizedUse {
+                        role: SynthesizedAggregateRole::UnitBoundaryEnvironment,
+                        ..
+                    }
+                )
+            })
+            .count()
+    }
+
+    /// **The negative half of the frame's discriminating pair: a program
+    /// `UnitBoundaryEnvironment` ACTUALLY SERVES receives no checked-IH
+    /// record.**
+    ///
+    /// ⛔ THE POSITIVE CONTROL IS ASSERTED FIRST, AND IT IS THE WHOLE POINT.
+    /// What stood here used a merely capture-free contspec fixture and checked
+    /// only that it built continuation units and got no checked-IH record. That
+    /// fixture is not in the UBE population at all -- requiring a UBE record on
+    /// it reds `0` against `1` -- so the absence it measured was about a program
+    /// NEITHER producer serves, and the pair was half-open: it proved
+    /// checked-IH fires for the nine-capture family, and never that it declines
+    /// where UBE already answers. "No worker captures" is not UBE membership;
+    /// UBE additionally requires this `Call` -> empty-capture `LexicalClosure`
+    /// shape.
     #[test]
-    fn a_capture_free_program_receives_no_checked_ih_record() {
-        let plan = plan_of(super::super::continuations::tests::contspec_capture_free_worker_fixture());
+    fn a_unit_boundary_environment_program_receives_no_checked_ih_record() {
+        let plan = plan_of(unit_boundary_environment_fixture());
+        assert!(
+            unit_boundary_environment_records(&plan) > 0,
+            "positive control: this fixture must be one UnitBoundaryEnvironment actually \
+             serves, or the checked-IH absence below is about a program neither producer \
+             claims and discriminates nothing"
+        );
+        assert!(
+            checked_ih_records(&plan).is_empty(),
+            "a program UnitBoundaryEnvironment serves has no capture coordinate run, so the \
+             checked-IH schema must decline it"
+        );
+    }
+
+    /// A capture-free continuation unit also receives no record -- a DIFFERENT
+    /// out-of-domain population from the UBE one above, and deliberately not
+    /// described as that one.
+    #[test]
+    fn a_capture_free_continuation_unit_receives_no_checked_ih_record() {
+        let plan =
+            plan_of(super::super::continuations::tests::contspec_capture_free_worker_fixture());
         assert!(
             !plan
                 .continuation_units()
@@ -3597,8 +3673,33 @@ mod checked_ih_captured_env_schema {
         );
         assert!(
             checked_ih_records(&plan).is_empty(),
-            "a capture-free unit has no coordinate run, so it is served by \
-             UnitBoundaryEnvironment and must receive no checked-IH record"
+            "a capture-free unit has no coordinate run, so it receives no checked-IH record"
+        );
+    }
+
+    /// A `Seed`-sourced capture is REFUSED, not admitted and not skipped.
+    ///
+    /// ⛔ The run derivation errors when a capture in the ruled run has no
+    /// source occurrence, and nothing exercised that arm: changing the refusal
+    /// to a `continue` left the whole module green. `Closure` (symbol captures)
+    /// rather than `LexicalClosure` reaches it through the natural producer.
+    #[test]
+    fn a_seed_sourced_capture_is_refused_rather_than_admitted() {
+        let expr = Box::leak(Box::new(
+            super::super::continuations::tests::contspec_seed_capture_worker_fixture(),
+        ));
+        let refusal = match plan_static_transition_graph(expr, &BTreeMap::new()) {
+            Ok(_) => panic!(
+                "a seed-sourced capture has no source occurrence, so planning must refuse \
+                 rather than admit or silently skip it"
+            ),
+            Err(refusal) => refusal,
+        };
+        let rendered = format!("{refusal:?}");
+        assert!(
+            rendered.contains("has no source occurrence"),
+            "the refusal must be the checked-IH capture-source one, not an unrelated \
+             planner failure that happens to also fail: got {rendered}"
         );
     }
 

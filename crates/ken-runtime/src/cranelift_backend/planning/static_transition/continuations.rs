@@ -7563,6 +7563,39 @@ pub(in crate::cranelift_backend::planning::static_transition) mod tests {
     #[allow(unused_imports)]
     use crate::{RuntimeComputationalMatchCase, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
 
+pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_seed_capture_worker_fixture() -> RuntimeExpr {
+        // `Closure` rather than `LexicalClosure`: its captures are SYMBOLS, so
+        // the ruled run's capture sources are `Seed`, not `Lexical`. That is the
+        // one arm of the run derivation that refuses rather than admitting, and
+        // without a fixture that reaches it the refusal is only ever read, never
+        // exercised -- changing it to a `continue` leaves the suite green.
+        let worker = RuntimeExpr::Closure {
+            captures: vec!["seed_a".to_string(), "seed_b".to_string()],
+            params: vec!["worker".to_string()],
+            body: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::Contspec::Leaf".to_string(),
+                args: Vec::new(),
+            }),
+        };
+        RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: vec!["continuation_input".to_string()],
+            body: Box::new(RuntimeExpr::ComputationalMatch {
+                scrutinee: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    args: vec![worker],
+                }),
+                cases: vec![RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    argument_binders: 1,
+                    recursive_positions: vec![0],
+                    body: unit(),
+                }],
+                default: trap("seed capture worker"),
+            }),
+        }
+    }
+
 pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_capture_free_worker_fixture() -> RuntimeExpr {
         // Identical to the captured fixtures EXCEPT the worker captures
         // nothing. This is the negative half of the discriminating pair, and it
