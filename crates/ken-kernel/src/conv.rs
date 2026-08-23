@@ -512,6 +512,10 @@ fn conv_struct(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> bool {
         }
         (Term::Proj1(p1), Term::Proj1(p2)) => conv_struct(env, ctx, p1, p2),
         (Term::Proj2(p1), Term::Proj2(p2)) => conv_struct(env, ctx, p1, p2),
+        // Truncation congruence (`16 §6`): the former compares its underlying
+        // type, and `|a|` compares its sole introduction operand.
+        (Term::Trunc(a1), Term::Trunc(a2)) => conv_struct(env, ctx, a1, a2),
+        (Term::TruncProj(t1), Term::TruncProj(t2)) => conv_struct(env, ctx, t1, t2),
         (
             Term::Elim {
                 fam: f1,
@@ -700,5 +704,58 @@ mod tests {
         let p = Term::var(0);
         let eta = Term::pair(Term::proj1(p.clone()), Term::proj2(p.clone()));
         assert!(convert(&env, &c, &sig_ty, &p, &eta));
+    }
+
+    fn beta_identity(domain: Term, argument: Term) -> Term {
+        Term::app(Term::lam(domain, Term::var(0)), argument)
+    }
+
+    /// Durable invariant (`16 §6`): `Trunc` is congruent exactly when its
+    /// interior is; a distinct universe remains distinct.
+    #[test]
+    fn trunc_congruence_accepts_convertible_interior_and_rejects_distinct_interior() {
+        let env = GlobalEnv::new();
+        let ctx = Context::new();
+        let type_zero = Term::Type(Level::zero());
+        let type_one = Term::Type(Level::suc(Level::zero()));
+        let beta_type_zero = beta_identity(type_one.clone(), type_zero.clone());
+
+        assert!(convert_type(
+            &env,
+            &ctx,
+            &Term::Trunc(Box::new(beta_type_zero)),
+            &Term::Trunc(Box::new(type_zero.clone())),
+        ));
+        assert!(!convert_type(
+            &env,
+            &ctx,
+            &Term::Trunc(Box::new(type_zero)),
+            &Term::Trunc(Box::new(type_one)),
+        ));
+    }
+
+    /// Durable invariant (`16 §6`): structural `TruncProj` congruence recurses
+    /// through its sole introduction operand; distinct open operands reject.
+    #[test]
+    fn trunc_proj_congruence_accepts_convertible_interior_and_rejects_distinct_interior() {
+        let env = GlobalEnv::new();
+        let mut ctx = Context::new();
+        let type_zero = Term::Type(Level::zero());
+        ctx.push(type_zero.clone());
+        ctx.push(type_zero.clone());
+        let beta_var_zero = beta_identity(type_zero, Term::var(0));
+
+        assert!(conv_struct(
+            &env,
+            &ctx,
+            &Term::TruncProj(Box::new(beta_var_zero)),
+            &Term::TruncProj(Box::new(Term::var(0))),
+        ));
+        assert!(!conv_struct(
+            &env,
+            &ctx,
+            &Term::TruncProj(Box::new(Term::var(0))),
+            &Term::TruncProj(Box::new(Term::var(1))),
+        ));
     }
 }
