@@ -246,6 +246,11 @@ impl ElabEnv {
         // freshly built environment, so such an addition reddens there.
         elab.prelude_env.native_trusted_base = elab.env.trusted_base().into_iter().collect();
         elab.module_state.install_prelude_floor();
+        elab.module_state.capture_strict_builtin_names(
+            &elab.env,
+            &elab.globals,
+            &elab.prelude_env.native_trusted_base,
+        );
         Ok(elab)
     }
 
@@ -337,6 +342,18 @@ impl ElabEnv {
         entry: &str,
     ) -> Result<Vec<GlobalId>, ElabError> {
         modules::elaborate_module_from_roots(self, roots, entry)
+    }
+
+    /// Elaborate a roots-loaded unit with strict bare-name resolution.
+    ///
+    /// This is opt-in until WP-4 migrates the real catalog dependency census;
+    /// [`Self::elaborate_module_from_roots`] retains its legacy behavior.
+    pub fn elaborate_module_from_roots_strict(
+        &mut self,
+        roots: &[PathBuf],
+        entry: &str,
+    ) -> Result<Vec<GlobalId>, ElabError> {
+        modules::elaborate_module_from_roots_strict(self, roots, entry)
     }
 
     /// Execute checked-fence obligations for an already-loaded dotted entry.

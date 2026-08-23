@@ -92,6 +92,30 @@ fn module_elaborates_to_identical_flat_sigma() {
         matches!(imported_body, Term::Const { id, .. } if id == provider),
         "the imported name must retain the provider's existing GlobalId"
     );
+
+    let mut strict = mk_env();
+    strict
+        .elaborate_module_from_roots_strict(&[address.root], &address.entry)
+        .expect("opt-in strict roots program elaborates");
+    assert_eq!(
+        strict.env.decls().count(),
+        b.env.decls().count(),
+        "strict resolution adds no kernel declaration to flat Sigma"
+    );
+    assert_eq!(
+        strict.env.trusted_base(),
+        b.env.trusted_base(),
+        "strict resolution preserves the zero-trust boundary"
+    );
+    let strict_provider = strict.globals["M.foo"];
+    let (_, strict_body) = strict
+        .env
+        .transparent_body(strict.globals["Entry.bar"])
+        .expect("strict entry binding is transparent");
+    assert!(
+        matches!(strict_body, Term::Const { id, .. } if id == strict_provider),
+        "strict import must retain the provider's existing GlobalId"
+    );
     fs::remove_dir_all(fixture_parent).expect("remove catalog fixture");
 }
 
