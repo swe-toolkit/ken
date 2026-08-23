@@ -11,6 +11,21 @@ github: null
 origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect's pre-committed conditional ruling (evt_2f4bbmt7qfde1) after the decisive ESCAPE measurement (runtime-implementer evt_79jd1nxamqd95) returned ESCAPING. Supersedes RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT (closed; both its Closure-A operand-seat mechanism and its NULLARY_FORCE re-reading were refuted -- the realized IH value escapes into a constructor, a capability gap, not a seam fix). HS=5 (Steward of record); ESCAPING is a scoping decision, not a hard-stop increment. Steward-filed per COORDINATION section 2."
 ---
 
+> # PREDECESSOR MERGED 2026-08-23 — tier-3 UNBLOCKED + shovel-ready; ring HELD at
+> # the runtime→pi reseat seam (Steward call, operator offline). Supersedes the
+> # "Re-flip ready + kick then" line in the HELD banner below.
+>
+> [[RT-CHECKED-IH-CAPTURED-ENV-SCHEMA]] landed origin/main 7426bb1f2 (auto-closed
+> ce6c23369), so tier-3 (Record build + defunctionalize at core.rs:11674,
+> dispatcher AC-REPR PR #2802) is buildable; the build also adds the production
+> EMITTER constructing SynthesizedArgument::WorkerCaptureOperand at the force seam
+> (the tier-1 reconcile machinery is DORMANT until it exists). NOT kicked yet: the
+> tier-1 merge IS the operator-named runtime→pi reseat seam (ring quiescent;
+> reseating mid-build discards context). "Runtime unblocked" (operator offline
+> directive #1) is satisfied — this node is shovel-ready. The operator runs the pi
+> reseat on return, then the fresh pi ring builds tier-3. Operator override: flip
+> ready + kick to build now on the current ring. M3/M4 stay gated on M6.
+>
 > # HELD 2026-08-22 — tier-3 blocked on a predecessor (Case-C reach fork)
 >
 > Reverted active -> draft. The build reached deliverable 2 and measured the
