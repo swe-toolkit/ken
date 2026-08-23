@@ -684,6 +684,82 @@ Not reverting."
     "$(git rev-parse --short 'origin/main^{tree}')"
 }
 
+# ---------------------------------------------------------------------------
+# Keep the PRIMARY checkout current with main.
+#
+# The publisher runs inside the LIEUTENANT's worktree and merges to the REMOTE
+# main, so the primary checkout at /workspaces/ken -- the one humans and `moot`
+# read -- drifts behind origin/main after every merge. This advances it, and is
+# called only AFTER verify_landed_tree has confirmed the landed tree (so it
+# never runs while main is in an alarm state).
+#
+# ⛔ NON-FATAL BY CONSTRUCTION. The merge has already happened and is verified
+#    by the time this runs; a sync failure must NEVER fail an already-succeeded
+#    publish. Every path returns 0. Mirrors report_failing_job_logs's discipline
+#    (see the `|| true` at its two call sites).
+#
+# ⛔ ROBUST TO A LOCAL moot.toml OVERRIDE. moot.toml is the version-controlled
+#    launch profile, but a live reseat can sit UNCOMMITTED in the primary's
+#    working tree for a window. A fast-forward that would overwrite a dirty
+#    tracked file is refused by git; we let it refuse and skip (logged), never
+#    clobber. Once the reseat is committed and lands, the tree is clean and the
+#    sync resumes on its own on the next merge.
+#
+# ⛔ ONLY EVER FAST-FORWARDS branch `main`. If the primary is detached, on some
+#    other branch, or carries local commits on main (HEAD not an ancestor of
+#    origin/main), it is left untouched -- advancing it could discard work.
+# ---------------------------------------------------------------------------
+sync_primary_checkout() {
+  local primary="/workspaces/ken"
+
+  if [ ! -e "$primary/.git" ]; then
+    printf 'primary-sync: %s is not a git checkout; skipping (non-fatal).\n' "$primary" >&2
+    return 0
+  fi
+
+  if ! git -C "$primary" fetch origin main --quiet 2>/dev/null; then
+    printf 'primary-sync: fetch of origin/main failed; skipping (non-fatal).\n' >&2
+    return 0
+  fi
+
+  local primary_head origin_main primary_branch
+  primary_head="$(git -C "$primary" rev-parse HEAD 2>/dev/null || true)"
+  origin_main="$(git -C "$primary" rev-parse origin/main 2>/dev/null || true)"
+  if [ -z "$primary_head" ] || [ -z "$origin_main" ]; then
+    printf 'primary-sync: could not resolve HEAD/origin/main; skipping (non-fatal).\n' >&2
+    return 0
+  fi
+
+  if [ "$primary_head" = "$origin_main" ]; then
+    printf 'primary-sync: %s already at origin/main (%s).\n' \
+      "$primary" "$(git -C "$primary" rev-parse --short HEAD 2>/dev/null || echo '?')"
+    return 0
+  fi
+
+  primary_branch="$(git -C "$primary" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  if [ "$primary_branch" != "main" ]; then
+    printf 'primary-sync: %s is not on branch main (on: %s); skipping (non-fatal).\n' \
+      "$primary" "${primary_branch:-detached}" >&2
+    return 0
+  fi
+
+  if ! git -C "$primary" merge-base --is-ancestor "$primary_head" "$origin_main" 2>/dev/null; then
+    printf 'primary-sync: %s HEAD is not an ancestor of origin/main (local commits on main?); skipping (non-fatal). Reconcile by hand.\n' \
+      "$primary" >&2
+    return 0
+  fi
+
+  local ff_err
+  if ff_err="$(git -C "$primary" merge --ff-only origin/main 2>&1)"; then
+    printf 'primary-sync: advanced %s to %s (ff-only).\n' \
+      "$primary" "$(git -C "$primary" rev-parse --short HEAD 2>/dev/null || echo '?')"
+  else
+    printf 'primary-sync: ff-only advance refused (likely a dirty tracked file, e.g. an uncommitted moot.toml reseat); skipping (non-fatal). Reconcile by hand.\n  git said: %s\n' \
+      "$ff_err" >&2
+  fi
+  return 0
+}
+
 refuse_if_frozen
 
 if [ "$doc_only" -eq 1 ]; then
@@ -716,6 +792,7 @@ if [ "$doc_only" -eq 1 ]; then
   merge_pr
   printf 'Doc-only PR #%s merge command succeeded.\n' "$pr_number"
   verify_landed_tree
+  sync_primary_checkout
   exit 0
 fi
 
@@ -791,6 +868,7 @@ while :; do
     merge_pr
     printf 'PR #%s checks passed and merge command succeeded.\n' "$pr_number"
     verify_landed_tree
+    sync_primary_checkout
     exit 0
   fi
 
