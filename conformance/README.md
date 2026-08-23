@@ -253,11 +253,15 @@ claim with no conformance case is a claim no one can rely on
   surface diagnostics that **never reach the kernel**. N3 pins explicit
   resolution by positive de-selection or per-name rename, keeps narrower
   lexical binder shadowing innermost-wins, and rejects `hiding` at parse time.
-  N2 adds the in-repo cross-file loader golden: an import resolves another leaf
-  file through the plural root API with
-  exactly one root (red until N2 Lane B), while adding only a back-edge flips
-  the same fixture to the specific `ImportCycle` diagnostic naming
-  `A → B → A`. N4 adds source-world anonymous `program`/`package` boundaries,
+  N2's landed in-repo cross-file loader golden resolves another leaf through
+  the plural root API with exactly one root, while adding only a back-edge
+  flips the same fixture to the specific `ImportCycle` diagnostic naming
+  `A → B → A`. The module/import contract-completion fold adds controlled
+  suffix/`pub` eligibility, fresh dependency-closed scopes, closed-floor versus
+  arbitrary-global resolution, root/source refusal, lazy poisoned-sibling, and
+  catalog-front-end reachability cases without duplicating the existing
+  identity/cycle/flat-`Σ` homes. N4 adds source-world anonymous
+  `program`/`package` boundaries,
   explicit `admits`, the direct-use-versus-transitive-coherence discriminator,
   self-admission, defining-package provenance, intra-package overlap, and
   MRES-4f's source `ImportCycle` construction. A both-package collision oracle

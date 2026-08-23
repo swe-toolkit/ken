@@ -254,6 +254,16 @@ is a **surface error** (`24`) — it never reaches the kernel:
   a narrower lexical scope still shadows an outer or imported name. Resolution
   is lexical (innermost wins) and is never a module-level clash error; this
   term-language rule is orthogonal to the preceding top-level rule.
+- **Per-unit dependency closure.** Each source unit resolves its body in its own
+  module scope: its local declarations, its explicit imports, the kernel and
+  built-in vocabulary, and the closed prelude floor from `30-taxonomy §4`.
+  Among Ken-defined names that floor is exactly `{Bool, Char, List}`. Loading a
+  dependency is not an implicit import: the dependency cannot borrow imports
+  from its caller, and its own imports do not enter the caller's scope. An
+  implementation-private convenience registered outside the closed floor is
+  not ambient authority for name resolution. A package must import such a name
+  from its defining public interface; otherwise the reference is unbound even
+  if the implementation happens to hold a global entry with that spelling.
 - Every failure — unresolved name, **`AmbiguousReference`** from a top-level
   clash, or an out-of-scope private name (`§4`) — is a **surface diagnostic**;
   the flattened `Σ` the kernel receives contains only resolved, in-scope

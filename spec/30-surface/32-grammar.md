@@ -15,8 +15,9 @@ package_hdr ::= "package" admits_clause?
 admits_clause ::= "admits" ModPath ("," ModPath)*
 capabilities_clause ::= "capabilities" capability_decl ("," capability_decl)*
 capability_decl ::= ConId ConId
-import ::= "import" ModPath ("as" ConId)?
-                          ("(" import_item ("," import_item)* ")")?
+import ::= "import" ModPath import_suffix?
+import_suffix ::= "as" ConId
+                | "(" import_item ("," import_item)* ")"
 import_item ::= name | name "as" rename
 rename ::= name
 export_decl ::= "export" ( ModPath selection_list | export_item_list )
@@ -24,7 +25,9 @@ selection_list   ::= "(" export_item ("," export_item)* ")"
 export_item_list ::= export_item ("," export_item)*
 export_item      ::= name ( "as" name )?
 
-decl ::=
+visibility ::= "pub"
+decl ::= visibility? decl_core
+decl_core ::=
     "const" ident binder* (":" type)? contract* constraint_clause? "=" expr  -- pure value (36 §1.6)
   | "fn"    ident binder* (":" type)? contract* constraint_clause? "=" expr  -- pure function
   | "proc"  ident binder* (":" type)? effects? contract* constraint_clause? "=" expr  -- effectful / imperative
@@ -76,11 +79,24 @@ prop_block ::= "where" "{" prop_intro (";" prop_intro)* "}"
 prop_intro ::= ident ":" type
 ```
 
+The two `import_suffix` alternatives are mutually exclusive. One import may
+alias the module or select and rename exported names, never both.
+
 In `export_decl`, `ModPath` is governed by the same role-blind path identity as
 an `import` target (`33 §3.2`). Neither form of `export_decl`, including a
 renamed item, mints a new `GlobalId`: it republishes the declaration's
 defined-at identity. The dedicated `export` declaration is the selected
-surface; `pub import` and per-item `pub` are not productions.
+surface. `pub import` is not a valid declaration, and per-item `pub` is not a
+production.
+
+The optional `visibility` prefix is grammar factoring, not blanket `pub`
+eligibility. `pub` is well formed only where `33 §4` and the declaration's own
+section give the declaration an importable module-interface name. A form with no
+such name rejects `pub` as a surface error; the prefix is never accepted and
+ignored. In particular, `pub` is not an alternate spelling for an `import`,
+`export`, `module`, `instance`, `derive`, `program`/`package` header, or fixity
+declaration. An attached `pub proof` also retains `33 §8.2`'s requirement that
+its subject be public.
 
 `program` and `package` are anonymous file-role markers. Neither production
 accepts a name token: the enclosing file path is the boundary's identity. A
