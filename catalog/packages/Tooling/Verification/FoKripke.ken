@@ -30,6 +30,106 @@ data FokIForm =
   | FokIImp FokIForm FokIForm
   | FokIForall FokIForm
 
+-- The slice's one-sort, one-predicate signature. Keeping the signature as an
+-- index makes the source-side families state their common profile even though
+-- this first vertical slice has exactly one profile.
+data FokSignature : Type where {
+  FokSliceSignature : FokSignature
+}
+
+-- The closed rigid carrier for the slice's object sort A. The carrier may be
+-- empty; no inhabitant is stored or synthesized here.
+data FokCarriers (sigma : FokSignature) : Type 1 where {
+  FokMkCarriers : Type -> FokCarriers sigma
+}
+
+fn fok_sort_a (sigma : FokSignature) (c : FokCarriers sigma) : Type =
+  match c {
+    FokMkCarriers a ↦ a
+  }
+
+-- The slice's unary predicate P, proposition-valued over the selected carrier.
+class FokAtomPred (a : Type) {
+  pred_p : a -> Omega
+}
+
+-- An atom interpretation is indexed by the same signature and carrier value.
+data FokAtomEnv (sigma : FokSignature) (c : FokCarriers sigma) : Type 1 where {
+  FokMkAtomEnv : FokAtomPred (fok_sort_a sigma c) -> FokAtomEnv sigma c
+}
+
+fn fok_pred_p
+    (sigma : FokSignature)
+    (c : FokCarriers sigma)
+    (rho : FokAtomEnv sigma c)
+    : fok_sort_a sigma c -> Omega =
+  match rho {
+    FokMkAtomEnv d ↦ d.pred_p
+  }
+
+-- A bounded de Bruijn object-variable index. `FokFin Zero` has no
+-- constructor, so a closed formula cannot contain a free object atom.
+data FokFin : Nat -> Type where {
+  FokFinZero : (n : Nat) -> FokFin (Suc n);
+  FokFinSuc : (n : Nat) -> FokFin n -> FokFin (Suc n)
+}
+
+fn fok_fin_to_nat (n : Nat) (i : FokFin n) : Nat =
+  match i {
+    FokFinZero m ↦ Zero;
+    FokFinSuc m j ↦ Suc (fok_fin_to_nat m j)
+  }
+
+-- A length-indexed environment of actual carrier values. Lookup by `FokFin`
+-- is total: neither `Option` nor a default carrier value occurs in its type.
+data FokObjectEnv
+    (sigma : FokSignature)
+    (c : FokCarriers sigma)
+    : Nat -> Type 1 where {
+  FokObjectEnvNil : FokObjectEnv sigma c Zero;
+  FokObjectEnvCons :
+    (n : Nat)
+    -> fok_sort_a sigma c
+    -> FokObjectEnv sigma c n
+    -> FokObjectEnv sigma c (Suc n)
+}
+
+fn fok_object_env_lookup
+    (sigma : FokSignature)
+    (c : FokCarriers sigma)
+    (n : Nat)
+    (xs : FokObjectEnv sigma c n)
+    (i : FokFin n)
+    : fok_sort_a sigma c =
+  match i {
+    FokFinZero m ↦
+      match xs {
+        FokObjectEnvCons k x rest ↦ x
+      };
+    FokFinSuc m j ↦
+      match xs {
+        FokObjectEnvCons k x rest ↦
+          fok_object_env_lookup sigma c m rest j
+      }
+  }
+
+-- The intrinsically-scoped source form `IForm Sigma n` from 23 section 4.4.
+-- `n` counts enclosing object binders. Implication keeps that count unchanged;
+-- forall checks its body at one additional object slot.
+data FokScopedIForm (sigma : FokSignature) (n : Nat) : Type where {
+  FokScopedBottom : FokScopedIForm sigma n;
+  FokScopedAtom : FokFin n -> FokScopedIForm sigma n;
+  FokScopedOr :
+    FokScopedIForm sigma n
+    -> FokScopedIForm sigma n
+    -> FokScopedIForm sigma n;
+  FokScopedImp :
+    FokScopedIForm sigma n
+    -> FokScopedIForm sigma n
+    -> FokScopedIForm sigma n;
+  FokScopedForall : FokScopedIForm sigma (Suc n) -> FokScopedIForm sigma n
+}
+
 -- === D0: quoted target data (23 section 4.3, slice subset) ===
 
 -- A quoted-target variable, de Bruijn bound or a certificate-local free
@@ -197,6 +297,68 @@ fn fok_w_forces (world : Nat) (object_env : List Nat) (f : FokIForm) : FokForm =
 -- emitted outside `fok_embed`'s own `FokForm` -- mirrors `fo_kripke::embed`.
 fn fok_embed (f : FokIForm) : FokForm =
   FokImp fok_k_sigma (FokForallWorld (fok_w_forces Zero (Nil Nat) f))
+
+-- Source denotation under an environment whose length is the source scope.
+-- The environment is returned as a function argument so each recursive call
+-- remains directly beneath the constructor match that exposes its subform.
+fn fok_denote_at
+    (sigma : FokSignature)
+    (c : FokCarriers sigma)
+    (rho : FokAtomEnv sigma c)
+    (n : Nat)
+    (f : FokScopedIForm sigma n)
+    : FokObjectEnv sigma c n -> Omega =
+  match f {
+    FokScopedBottom ↦ λxs. Bottom;
+    FokScopedAtom i ↦ λxs.
+      fok_pred_p sigma c rho (fok_object_env_lookup sigma c n xs i);
+    FokScopedOr p q ↦ λxs.
+      ‖Or
+        ((fok_denote_at sigma c rho n p) xs)
+        ((fok_denote_at sigma c rho n q) xs)‖;
+    FokScopedImp p q ↦ λxs.
+      (fok_denote_at sigma c rho n p xs)
+        -> (fok_denote_at sigma c rho n q xs);
+    FokScopedForall p ↦ λxs.
+      (x : fok_sort_a sigma c) ->
+        (fok_denote_at sigma c rho (Suc n) p)
+          (FokObjectEnvCons sigma c n x xs)
+  }
+
+-- Public denotation starts from a closed source form and the unique empty
+-- object environment. Every atom is therefore reached only below a forall.
+fn fok_denote
+    (sigma : FokSignature)
+    (c : FokCarriers sigma)
+    (rho : FokAtomEnv sigma c)
+    (f : FokScopedIForm sigma Zero)
+    : Omega =
+  fok_denote_at sigma c rho Zero f (FokObjectEnvNil sigma c)
+
+-- Forget only the scope evidence. Constructor order and atom identity are
+-- unchanged, and the bounded index becomes the same de Bruijn `Nat`.
+fn fok_erase_n
+    (sigma : FokSignature)
+    (n : Nat)
+    (f : FokScopedIForm sigma n)
+    : FokIForm =
+  match f {
+    FokScopedBottom ↦ FokIBottom;
+    FokScopedAtom i ↦ FokIAtom (FokMkIVar (fok_fin_to_nat n i));
+    FokScopedOr p q ↦
+      FokIOr (fok_erase_n sigma n p) (fok_erase_n sigma n q);
+    FokScopedImp p q ↦
+      FokIImp (fok_erase_n sigma n p) (fok_erase_n sigma n q);
+    FokScopedForall p ↦ FokIForall (fok_erase_n sigma (Suc n) p)
+  }
+
+-- The target leg uses the already-landed embedding verbatim on the forgetful
+-- image; denotation above never passes through erasure.
+fn fok_scoped_embed
+    (sigma : FokSignature)
+    (f : FokScopedIForm sigma Zero)
+    : FokForm =
+  fok_embed (fok_erase_n sigma Zero f)
 
 -- === D2: check_cert -- computable (23 section 4.3) ===
 --
@@ -711,6 +873,17 @@ fn fok_derives (s : FokSequent) : Omega = ‖FokDerivation s‖
 
 fn fok_classically_valid (q : FokForm) : Omega =
   fok_derives (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm)))
+
+-- The D1 adequacy statement. Its kernel-checked proof is the following
+-- increment; this proposition adds no assumption or trusted declaration.
+fn fok_embedding_adequacy_statement
+    (sigma : FokSignature)
+    (c : FokCarriers sigma)
+    (rho : FokAtomEnv sigma c)
+    (f : FokScopedIForm sigma Zero)
+    : Omega =
+  fok_classically_valid (fok_scoped_embed sigma f)
+    -> fok_denote sigma c rho f
 
 -- === D2: Bool-inversion infrastructure (23 section 4.3) ===
 --
