@@ -1283,10 +1283,20 @@ impl Parser {
     }
 
     /// `pub <decl>` — export marker (`33 §4.1`).
-    fn parse_pub_decl(&mut self, _start: usize) -> Result<Decl, ElabError> {
+    fn parse_pub_decl(&mut self, start: usize) -> Result<Decl, ElabError> {
         self.advance(); // consume 'pub'
         let inner = self.parse_decl()?;
-        Ok(Decl::Pub(Box::new(inner)))
+        match pub_eligibility(&inner) {
+            PubEligibility::Eligible => Ok(Decl::Pub(Box::new(inner))),
+            PubEligibility::Ineligible(kind) => Err(ElabError::ParseError {
+                msg: format!("`pub` is not permitted on {kind}"),
+                span: Span::new(start, inner.span().end),
+            }),
+            PubEligibility::PublicSpace => Err(ElabError::UnsupportedSpacePlacement {
+                placement: "public".to_string(),
+                span: Span::new(start, inner.span().end),
+            }),
+        }
     }
 
     /// `data D p₁…pₙ = C₁ τ₁₁… | C₂ τ₂₁… | …`
@@ -2660,6 +2670,58 @@ impl Parser {
 }
 
 // ---- public parse functions ----
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PubEligibility {
+    Eligible,
+    Ineligible(&'static str),
+    /// P1 already promises a role-specific public-space surface diagnostic.
+    PublicSpace,
+}
+
+/// Classify every parsed declaration kind at the first seam where `pub` has
+/// an inner declaration. This match deliberately has no catch-all: adding a
+/// `Decl` variant creates a compile-time visibility-classification obligation.
+fn pub_eligibility(decl: &Decl) -> PubEligibility {
+    match decl {
+        // Top-level name-introducing definitions with module-interface
+        // identity (`33 §4` and §8).
+        Decl::ViewDecl { .. }
+        | Decl::LetDecl { .. }
+        | Decl::PropDecl { .. }
+        | Decl::TheoremDecl { .. }
+        | Decl::AxiomDecl { .. }
+        | Decl::AttachedProofDecl { .. }
+        | Decl::DataDecl { .. }
+        | Decl::ExplicitDataDecl { .. }
+        | Decl::TypeAlias { .. }
+        | Decl::ClassDecl { .. } => PubEligibility::Eligible,
+
+        // Anonymous headers, structural scope forms, generated instances,
+        // status-bearing obligations, and declaration forms without a module
+        // interface rule cannot carry visibility.
+        Decl::BoundaryDecl {
+            kind: BoundaryKind::Program,
+            ..
+        } => PubEligibility::Ineligible("a `program` header"),
+        Decl::BoundaryDecl {
+            kind: BoundaryKind::Package,
+            ..
+        } => PubEligibility::Ineligible("a `package` header"),
+        Decl::SpaceDecl { .. } => PubEligibility::PublicSpace,
+        Decl::ProveDecl { .. } => PubEligibility::Ineligible("a `prove` obligation"),
+        Decl::LawDecl { .. } => PubEligibility::Ineligible("a `law` declaration"),
+        Decl::ForeignDecl { .. } => PubEligibility::Ineligible("a `foreign` declaration"),
+        Decl::TemporalDecl { .. } => PubEligibility::Ineligible("a `temporal` obligation"),
+        Decl::RecordDecl { .. } => PubEligibility::Ineligible("a `record` declaration"),
+        Decl::InstanceDecl { .. } => PubEligibility::Ineligible("an `instance` declaration"),
+        Decl::DeriveDecl { .. } => PubEligibility::Ineligible("a `derive` declaration"),
+        Decl::ModuleDecl { .. } => PubEligibility::Ineligible("a `module` declaration"),
+        Decl::ImportDecl { .. } => PubEligibility::Ineligible("an `import` declaration"),
+        Decl::ExportDecl { .. } => PubEligibility::Ineligible("an `export` declaration"),
+        Decl::Pub(_) => PubEligibility::Ineligible("another `pub` marker"),
+    }
+}
 
 /// Is `s` a contextual `temporal{}` operator word? (Atoms are idents that are
 /// NOT one of these; `top`/`true` are atoms, not operators.) Pinning the
