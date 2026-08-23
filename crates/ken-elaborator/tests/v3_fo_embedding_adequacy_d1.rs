@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::KernelError;
+use ken_kernel::{convert_type, normalize, Context, KernelError};
 
 const FOK_SOURCE: &str =
     include_str!("../../../catalog/packages/Tooling/Verification/FoKripke.ken");
@@ -11,6 +11,34 @@ fn env_with_fok() -> ElabEnv {
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke including the D1 apparatus");
     env
+}
+
+/// Rust-side schema for the quotation-preservation judgment. For a
+/// constructed accepted-shape quotation, compare the intrinsic denotation
+/// directly with the original Pi-closed obligation by kernel conversion.
+fn assert_quotation_preservation_conversion(
+    env: &mut ElabEnv,
+    fixture_name: &str,
+    denotation: &str,
+    pi_closed_obligation: &str,
+) {
+    let (denotation_term, denotation_sort) = env
+        .elaborate_expr(format!("{fixture_name}-denotation"), denotation)
+        .unwrap_or_else(|error| panic!("failed to elaborate denotation `{denotation}`: {error:?}"));
+    let (obligation_term, obligation_sort) = env
+        .elaborate_expr(format!("{fixture_name}-obligation"), pi_closed_obligation)
+        .unwrap_or_else(|error| {
+            panic!("failed to elaborate obligation `{pi_closed_obligation}`: {error:?}")
+        });
+    let context = Context::new();
+    assert!(
+        convert_type(&env.env, &context, &denotation_sort, &obligation_sort),
+        "quotation sides inhabit different sorts for {fixture_name}"
+    );
+    assert!(
+        convert_type(&env.env, &context, &denotation_term, &obligation_term),
+        "intrinsic denotation does not convert to the Pi-closed obligation for {fixture_name}"
+    );
 }
 
 fn add_bool_model(env: &mut ElabEnv) {
@@ -31,6 +59,11 @@ fn add_bool_model(env: &mut ElabEnv) {
            (FokScopedForall FokSliceSignature (Suc Zero) \
              (FokScopedAtom FokSliceSignature (Suc (Suc Zero)) \
                (FokFinZero (Suc Zero))))",
+        "const fok_d1_same_atom_imp : FokScopedIForm FokSliceSignature Zero = \
+         FokScopedForall FokSliceSignature Zero \
+           (FokScopedImp FokSliceSignature (Suc Zero) \
+             (FokScopedAtom FokSliceSignature (Suc Zero) (FokFinZero Zero)) \
+             (FokScopedAtom FokSliceSignature (Suc Zero) (FokFinZero Zero)))",
     ];
     for decl in decls {
         env.elaborate_decl(decl)
@@ -117,6 +150,30 @@ fn fin_lookup_preserves_binder_order_and_atom_identity() {
             panic!("binder/erasure control failed for `{decl}`: {error:?}")
         });
     }
+
+    assert_quotation_preservation_conversion(
+        &mut env,
+        "fok_d1_outer_quote_conversion",
+        "fok_denote FokSliceSignature fok_d1_bool_carriers fok_d1_bool_atoms \
+         fok_d1_outer_atom",
+        "(x : Bool) -> (y : Bool) -> match x { True ↦ Top; False ↦ Bottom }",
+    );
+    assert_quotation_preservation_conversion(
+        &mut env,
+        "fok_d1_inner_quote_conversion",
+        "fok_denote FokSliceSignature fok_d1_bool_carriers fok_d1_bool_atoms \
+         fok_d1_inner_atom",
+        "(x : Bool) -> (y : Bool) -> match y { True ↦ Top; False ↦ Bottom }",
+    );
+    assert_quotation_preservation_conversion(
+        &mut env,
+        "fok_d1_imp_quote_conversion",
+        "fok_denote FokSliceSignature fok_d1_bool_carriers fok_d1_bool_atoms \
+         fok_d1_same_atom_imp",
+        "(x : Bool) -> \
+         (match x { True ↦ Top; False ↦ Bottom }) -> \
+         match x { True ↦ Top; False ↦ Bottom }",
+    );
 }
 
 #[test]
@@ -155,6 +212,46 @@ fn intrinsic_connectives_and_adequacy_statement_are_live() {
             panic!("connective/statement control failed for `{decl}`: {error:?}")
         });
     }
+}
+
+#[test]
+fn truncation_conversion_is_the_remaining_quotation_hard_stop() {
+    let mut env = env_with_fok();
+    add_bool_model(&mut env);
+    let denotation_source = "fok_denote FokSliceSignature fok_d1_bool_carriers fok_d1_bool_atoms \
+         (FokScopedOr FokSliceSignature Zero \
+           (FokScopedBottom FokSliceSignature Zero) \
+           (FokScopedImp FokSliceSignature Zero \
+             (FokScopedBottom FokSliceSignature Zero) \
+             (FokScopedBottom FokSliceSignature Zero)))";
+    let obligation_source = "‖Or Bottom (Bottom -> Bottom)‖";
+    let (denotation, denotation_sort) = env
+        .elaborate_expr("fok-d1-or-denotation", denotation_source)
+        .expect("the intrinsic Or denotation");
+    let (obligation, obligation_sort) = env
+        .elaborate_expr("fok-d1-or-obligation", obligation_source)
+        .expect("the original truncated-Or obligation");
+    let context = Context::new();
+
+    assert!(
+        convert_type(&env.env, &context, &denotation_sort, &obligation_sort),
+        "both sides must inhabit the same Omega sort"
+    );
+    assert!(
+        convert_type(&env.env, &context, &obligation, &obligation),
+        "positive control: the kernel conversion harness must accept identity"
+    );
+    assert_eq!(
+        normalize(&env.env, &context, &denotation),
+        normalize(&env.env, &context, &obligation),
+        "full normalization must expose the same truncated Or"
+    );
+    assert!(
+        !convert_type(&env.env, &context, &denotation, &obligation),
+        "transition sentinel: ordinary kernel conversion currently lacks \
+         congruence for Trunc terms whose interiors become equal only after \
+         recursive denotation unfolds"
+    );
 }
 
 #[test]
