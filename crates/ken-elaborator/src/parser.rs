@@ -154,8 +154,8 @@ impl Parser {
     pub fn parse_decls(&mut self) -> Result<Vec<Decl>, ElabError> {
         let mut decls = Vec::new();
         while !self.at_eof() {
-            let decl = self.parse_decl()?;
-            if let Decl::BoundaryDecl { span, .. } = &decl {
+            let group = self.parse_decl_group()?;
+            if let Some(Decl::BoundaryDecl { span, .. }) = group.first() {
                 if !decls.is_empty() {
                     return Err(ElabError::ParseError {
                         msg: "an anonymous program/package boundary must be \
@@ -165,9 +165,80 @@ impl Parser {
                     });
                 }
             }
-            decls.push(decl);
+            decls.extend(group);
         }
         Ok(decls)
+    }
+
+    /// Parse one written declaration plus any postfix derive clause it owns.
+    /// Postfix derive lowers to the existing real `DeriveDecl` generator path;
+    /// it does not add a second derivation mechanism.
+    fn parse_decl_group(&mut self) -> Result<Vec<Decl>, ElabError> {
+        let decl = self.parse_decl()?;
+        let derive_target = match decl.unwrap_pub() {
+            Decl::DataDecl { name, .. } | Decl::ExplicitDataDecl { name, .. } => {
+                Some(name.clone())
+            }
+            _ => None,
+        };
+        let Some(data_name) = derive_target else {
+            return Ok(vec![decl]);
+        };
+
+        let pub_start = if matches!(self.peek(), Token::KwPub)
+            && matches!(self.lookahead(1), Token::KwDerive)
+            && matches!(self.lookahead(2), Token::LParen)
+        {
+            let start = self.peek_span().start;
+            self.advance();
+            Some(start)
+        } else {
+            None
+        };
+
+        let mut group = vec![decl];
+        if matches!(self.peek(), Token::KwDerive)
+            && matches!(self.lookahead(1), Token::LParen)
+        {
+            let derives = self.parse_postfix_derives(data_name)?;
+            if let Some(start) = pub_start {
+                let end = derives
+                    .last()
+                    .expect("a parsed postfix derive has at least one class")
+                    .span()
+                    .end;
+                return Err(ElabError::ParseError {
+                    msg: "`pub` is not permitted on a postfix `derive` clause".to_string(),
+                    span: Span::new(start, end),
+                });
+            }
+            group.extend(derives);
+        }
+        Ok(group)
+    }
+
+    fn parse_postfix_derives(&mut self, data_name: String) -> Result<Vec<Decl>, ElabError> {
+        let start = self.peek_span().start;
+        self.advance(); // consume `derive`
+        self.expect(&Token::LParen)?;
+        let mut class_names = Vec::new();
+        loop {
+            class_names.push(self.expect_ident()?.0);
+            if matches!(self.peek(), Token::Comma) {
+                self.advance();
+                continue;
+            }
+            break;
+        }
+        let end = self.expect(&Token::RParen)?.end;
+        Ok(class_names
+            .into_iter()
+            .map(|class_name| Decl::DeriveDecl {
+                class_name,
+                data_name: data_name.clone(),
+                span: Span::new(start, end),
+            })
+            .collect())
     }
 
     fn parse_decl(&mut self) -> Result<Decl, ElabError> {
@@ -1176,7 +1247,7 @@ impl Parser {
         self.expect(&Token::LBrace)?;
         let mut decls = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
-            decls.push(self.parse_decl()?);
+            decls.extend(self.parse_decl_group()?);
             if matches!(self.peek(), Token::Semicolon) {
                 self.advance();
             }
