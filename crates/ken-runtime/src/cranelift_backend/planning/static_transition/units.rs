@@ -21,6 +21,16 @@ use super::{
 #[repr(transparent)]
 pub(in crate::cranelift_backend) struct PredeclaredFunctionId(pub(super) u32);
 
+impl PredeclaredFunctionId {
+    /// Construct a function id for a TEST only. `cfg(test)`, compiled out of
+    /// the real artifact; the field stays `pub(super)` so production code
+    /// cannot mint an id the planner never issued.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) const fn for_test(id: u32) -> Self {
+        Self(id)
+    }
+}
+
 /// **`RT-FNSPLIT-B2F` `D1` — the emitter's read-only view of ONE validated
 /// function unit.**
 ///
