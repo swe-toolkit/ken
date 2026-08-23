@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-LOADER-ENTRY
 title: "WP-1 — route ken check catalog files through elaborate_module_from_roots instead of the direct single-file call; behavior-preserving, non-strict"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
