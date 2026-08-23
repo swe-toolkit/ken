@@ -105,6 +105,47 @@ origin: "Steward, 2026-08-22, cutting the Case-C reach-fork predecessor from the
 > priority needing ken-elaborator work while the language ring is on the
 > module/import campaign — an operator sequencing question).
 >
+> # TIER-1 IS KEN-RUNTIME, NOT KEN-ELABORATOR 2026-08-23 (Architect
+> # evt_6h5ndf9hxf22f, confirming Steward measurement). Supersedes every
+> # "elaborator / language-track / §9a spillover / language-QA+language-leader"
+> # classification above and below (the SCHEMA UN-FUSED dispatch note, TIERS
+> # step 1, and the AC Required-reviewers line).
+>
+> The dispatch note above assigned tier-1 to the LANGUAGE ring as a
+> "ken-elaborator captured-env emit (COORDINATION §9a spillover)." That rests on
+> the node's premise "the elaborator built the StaticWorker and knows the free
+> variables" — FALSE at the code layer. Measured at origin/main 5a74301f4: the
+> emit is entirely ken-runtime. StaticWorker is built ONLY in ken-runtime
+> (cranelift_backend/lowering); CaptureSymbol is interned in ken-runtime
+> semantic_ir.rs:2870 (from RuntimeExpr::Closure captures); FieldIdentity (:159),
+> identity_span (:1657), flatten_allocation_reachable_uses, and the Constructor
+> precedent declared_children: Some(semantic_use.children) (aggregates.rs:1312)
+> are all ken-runtime; ken-elaborator carries NONE of this capture-semantic
+> machinery (its only "capture" hits are capture_canonical_term, an unrelated
+> byte-capture of canonical terms). The node's own scope-down ("reuse the
+> EXISTING CaptureSymbol atoms; the machinery already exists; NOT a new layer")
+> agrees.
+>
+> CORRECTED OWNERSHIP + DELIVERABLE (Architect evt_6h5ndf9hxf22f): tier-1 is a
+> RUNTIME-ring deliverable — (1) emit the checked-IH captured-environment
+> semantic_use so tier-2 reads declared_children = Some(its children), the shape
+> tree; (2) add the capture_field_identity(origin, position) = FieldIdentity(
+> identity_span(origin, CaptureSymbol, position)) producer — both reusing the
+> existing semantic_ir CaptureSymbol atoms. NO ken-elaborator diff. BUILD NOTE:
+> confirm the CaptureSymbol atoms are reachable for the checked-IH
+> Var->StaticWorker route specifically; if that route needs them additionally
+> surfaced, that is still in-lane runtime, not a reason to reach for the
+> elaborator.
+>
+> REVIEWERS: Architect + runtime-QA + conformance-validator + Adversary (NO
+> language-QA/language-leader — there is no ken-elaborator diff to review).
+> PACKAGING (Architect): tier-1 + the tier-2 completion (declared_children/
+> field_identity None -> Some, built on top of the landed tier-2 partial
+> 2d9a96ad7) return to Architect + CV TOGETHER as the AC-SCHEMA / AC-M6-UNBLOCK
+> discharge; tier-1 alone does not close the node. There is NO cross-lane
+> conflict: the language ring stays on the module/import campaign (ken-elaborator)
+> in parallel.
+>
 > # RELEASED 2026-08-23 — AC-ENTRY satisfied (enclave GO); refined slice below
 > # (mechanism now per the DESIGN CORRECTED banner above where they differ)
 >
@@ -319,8 +360,9 @@ landing an elaborator interface the planner then has to adapt to.
   12). Local targeted `-p` only, never `--workspace`.
 - **Required reviewers.** Architect (soundness of the environment
   admission — the identities trace to real occurrences, no invention, the
-  sealed set is not fractured) + language-QA/language-leader (the tier-1
-  elaborator diff) + the Adversary (invention-in-costume: a fabricated
+  sealed set is not fractured) + runtime-QA + conformance-validator (tier-1 is
+  ken-runtime, NOT an elaborator diff — see the TIER-1 IS KEN-RUNTIME banner;
+  Architect evt_6h5ndf9hxf22f) + the Adversary (invention-in-costume: a fabricated
   occurrence, a widened `declared_children` for a population the concept
   did not model, a Constructor repurpose).
 
