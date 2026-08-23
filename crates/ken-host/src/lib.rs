@@ -56,6 +56,103 @@ pub struct AbiFact {
     pub value: u64,
 }
 
+/// **`ABI-M1` `D0` -- the sealed ABI fact-family set.**
+///
+/// The v1 manifest carried 23 facts in one flat list whose family structure was
+/// real but unenforced: a new fact joined silently, exactly the shape `ABI-R3`
+/// removed from the operation inventory one layer down.
+///
+/// This enum is the single source for that structure. It lives HERE, not in
+/// `build.rs`, and that placement is the load-bearing part -- see
+/// [`AbiFamily::next_in_inventory`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub enum AbiFamily {
+    TargetIdentity,
+    OpenFlags,
+    AtFlags,
+    Mode,
+    SyscallNumber,
+    Errno,
+}
+
+impl AbiFamily {
+    const FIRST: Self = Self::TargetIdentity;
+
+    /// The successor of one family, or `None` at the end.
+    ///
+    /// Exhaustive, no wildcard: adding an `AbiFamily` variant without threading
+    /// it here is `error[E0004]`. This is `HostOpV1::next_in_inventory`
+    /// (`ABI-R3`) applied to the manifest's family axis.
+    const fn next_in_inventory(self) -> Option<Self> {
+        match self {
+            Self::TargetIdentity => Some(Self::OpenFlags),
+            Self::OpenFlags => Some(Self::AtFlags),
+            Self::AtFlags => Some(Self::Mode),
+            Self::Mode => Some(Self::SyscallNumber),
+            Self::SyscallNumber => Some(Self::Errno),
+            Self::Errno => None,
+        }
+    }
+
+    pub const COUNT: usize = {
+        let mut count = 1usize;
+        let mut current = Self::FIRST;
+        loop {
+            match current.next_in_inventory() {
+                Some(next) => {
+                    count += 1;
+                    current = next;
+                }
+                None => break,
+            }
+        }
+        count
+    };
+
+    /// Every family, derived by walking the chain -- never a hand-written array.
+    pub const ALL: [Self; Self::COUNT] = {
+        let mut all = [Self::FIRST; Self::COUNT];
+        let mut index = 1usize;
+        let mut current = Self::FIRST;
+        loop {
+            match current.next_in_inventory() {
+                Some(next) => {
+                    all[index] = next;
+                    current = next;
+                    index += 1;
+                }
+                None => break,
+            }
+        }
+        all
+    };
+
+    /// The canonical spelling `build.rs` emits and the manifest hashes over.
+    ///
+    /// Exhaustive, no wildcard: a new family must be named explicitly.
+    pub const fn canonical_name(self) -> &'static str {
+        match self {
+            Self::TargetIdentity => "target_identity",
+            Self::OpenFlags => "open_flags",
+            Self::AtFlags => "at_flags",
+            Self::Mode => "mode",
+            Self::SyscallNumber => "syscall_number",
+            Self::Errno => "errno",
+        }
+    }
+}
+
+/// One family's projection: its facts, its facility ABI version, and the
+/// canonical hash that composes into the whole-manifest hash.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AbiFamilyProjection {
+    pub family: AbiFamily,
+    pub facility_version: u32,
+    pub facts: &'static [AbiFact],
+    pub projection_hash: [u8; 32],
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TargetAbi {
     pub schema_version: u32,
@@ -1505,5 +1602,62 @@ mod tests {
             ))
         ));
         std::fs::remove_dir_all(parent).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod abi_m1_d0_probe {
+    use super::*;
+
+    /// **`ABI-M1` `D0` -- the family schema is derived, not hand-maintained.**
+    ///
+    /// Asserts named memberships and a structural property, never a count:
+    /// a count is a proxy a compensating duplicate defeats, and `ABI-R3` `D3`
+    /// removed exactly that shape from the operation inventory.
+    #[test]
+    fn the_family_inventory_is_derived_and_duplicate_free() {
+        for named in [
+            AbiFamily::TargetIdentity,
+            AbiFamily::OpenFlags,
+            AbiFamily::AtFlags,
+            AbiFamily::Mode,
+            AbiFamily::SyscallNumber,
+            AbiFamily::Errno,
+        ] {
+            assert!(
+                AbiFamily::ALL.contains(&named),
+                "{named:?} must appear in the derived family inventory"
+            );
+        }
+        let mut seen: Vec<AbiFamily> = Vec::new();
+        for family in AbiFamily::ALL {
+            assert!(
+                !seen.contains(&family),
+                "{family:?} appears twice in the derived inventory, which is exactly \
+                 the defect a length check cannot see"
+            );
+            seen.push(family);
+        }
+    }
+
+    /// Every family names itself canonically, and the names are distinct --
+    /// the manifest hashes over these spellings, so an alias would silently
+    /// merge two families' projections.
+    #[test]
+    fn canonical_family_names_are_distinct() {
+        let mut seen: Vec<&'static str> = Vec::new();
+        for family in AbiFamily::ALL {
+            let name = family.canonical_name();
+            assert!(
+                !name.is_empty(),
+                "{family:?} must carry a canonical spelling"
+            );
+            assert!(
+                !seen.contains(&name),
+                "canonical name {name:?} is shared by two families; the manifest \
+                 hashes over it, so an alias would merge their projections"
+            );
+            seen.push(name);
+        }
     }
 }
