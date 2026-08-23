@@ -33,9 +33,19 @@ origin: "Operator directive 2026-08-22: module/import is its own campaign and, b
 > - [[LANG-MOD-STRICT-RESOLUTION]] (WP-2) — strict root-loaded resolution (the
 >   soundness core); D0 probe then D1. Rides on WP-1 for catalog observability.
 > - [[LANG-MOD-CATALOG-REALIZATION]] (WP-4) — Arithmetic/Order/Gcd import the
->   canonical operations. Gated on WP-1..3 AND the Or/Inl/Inr fork.
+>   canonical operations. Gated on WP-1..3 AND the Or realization chain.
+>
+> OR REALIZATION CHAIN (operator ruled the Or/Inl/Inr fork arm (b),
+> evt_6b9wrt1kwswcp — canonical package home, not refactor-away; the six consumers
+> and the proof-relevant `total_leq_nat` reuse made refactor-away the wrong call):
+> - [[LANG-MOD-OR-OMEGA-PARAM-ELAB]] (NODE A) — teach explicit-data param/index
+>   elaboration to honor an Omega-sorted binder (Architect finding
+>   evt_21gve67p385jh; enclave sort-discipline GO evt_3j02n0pkgze3a). Buildable now.
+> - [[LANG-MOD-OR-CANONICAL-HOME]] (NODE B) — author `Core.Logic.Or`, migrate the
+>   six consumers, retire the prelude registration. Feeds WP-4.
 >
 > Ring order: WP-1 -> WP-3 -> WP-2 -> WP-4 (or WP-2's D0 parallel with WP-1/WP-3).
+> Or chain sequenced NODE A -> WP-2 D1 -> NODE B, all before WP-4.
 > Every WP: Architect (soundness/component fit) + conformance-validator
 > (resolution/visibility discriminators). Cross-cutting invariant on every WP:
 > flat-Σ / zero trusted_base delta (extend `module_elaborates_to_identical_flat_
