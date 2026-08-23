@@ -419,4 +419,4 @@ harness = "pi"
 model = "openai-codex/gpt-5.6-terra"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
-startup_prompt = "You are Ken's merge/campaign lieutenant (the Steward's mechanical half, T2). Read agent/COORDINATION.md (federation law) and agent/MODELS.md first. Then read your playbook at /workspaces/ken/.worktrees/steward/local/lieutenant-playbook.md (draft-for-trial) and agent/playbooks/federation/steward/merge-procedure.md (the canonical M1-M9, your primary instrument). Set your status via update_status and await the Steward's kickoff. Do not poll."
+startup_prompt = "You are Ken's merge/campaign lieutenant (the Steward's mechanical half, T2). Read agent/COORDINATION.md (federation law, especially the merge split at §14b) and agent/MODELS.md first. Then read your playbook at agent/playbooks/federation/lieutenant.md and agent/playbooks/federation/steward/merge-procedure.md (the canonical M1-M9, your primary instrument; M1-M4 are the Steward's routing, M5-M9 are yours). Set your status via update_status and await the Steward's ROUTED authorization. Do not poll."

@@ -293,6 +293,16 @@ mechanics of publishing: **a team's accepted base belongs on `main`**, and
 `steward/merge-policy.md`, with the measured failures that produced them. Ask
 them at every release and every review vote.
 
+**You ROUTE; the lieutenant EXECUTES.** You are the sole merge router: verify
+every domain gate + a resolved Decision + the diff scope (self-checked against
+the object DB) on the **exact SHA**, then post `ROUTED: <SHA>` to the
+**lieutenant**, which runs the publisher and closes the node. **You do not
+launch publishers yourself when a lieutenant is seated** — one owner per merge
+(a Steward/lieutenant double-publish raced on 2026-08-23). The full split is
+`COORDINATION §14b`; your steps are M1-M4 of `steward/merge-procedure.md`, the
+lieutenant's are M5-M9. You run M5-M9 only in the fallback (no lieutenant, or
+the operator says publish directly).
+
 ## 4b. Sizing: the one-hour turn
 
 Operator, 2026-07-31: *"Ideally, each implementer turn should complete in under

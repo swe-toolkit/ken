@@ -8,6 +8,28 @@ None is conditional on how routine the merge feels.**
 
 **M1-M3 run before you publish, M4-M5 publish, M6-M9 run after it lands.**
 
+> ### THE SPLIT: you ROUTE (M1-M4), the lieutenant EXECUTES (M5-M9)
+>
+> `COORDINATION §14b` is binding. **M1-M4 are your routing work** — verify the
+> Decision (M1), the exact SHA and its shape (M2), the cited sources (M3), then
+> **post the exact-SHA authorization** (`ROUTED: <SHA>` with the gates, Decision,
+> base, and self-verified diff scope, mentioning the **lieutenant**). M4's token
+> mint and **M5-M9 are the lieutenant's** — it runs the publisher, verifies the
+> landed tree, flips the node, compacts the Adversary, and closes the loop with
+> the ring. **You do not launch the publisher when a lieutenant is seated.**
+>
+> **Why:** one owner per merge. Measured 2026-08-23 — a Steward-launched
+> publisher raced the lieutenant on the same PR (caught in the pre-lock wait).
+> Once you route a SHA, the lieutenant owns its execution end-to-end; you stop
+> and learn the outcome from a mention (landed SHA, or a CI-red relay you
+> re-route on a *new* SHA).
+>
+> **M5-M9 below are still yours to run in the FALLBACK case — no lieutenant
+> seated, or the operator tells you to publish directly** (e.g. your own §6a
+> corpus route). The steps are identical; only the seat that runs them changes.
+> Read M5-M9 as "the executor does X" — you when there is no lieutenant, the
+> lieutenant otherwise.
+
 Whether a thing *should* land, and where the cut goes, is `merge-policy.md`.
 This file assumes that decision is made.
 
@@ -101,6 +123,12 @@ export GH_TOKEN="$(/workspaces/ken/.devcontainer/mint-gh-token.sh)"
 ```
 
 ## M5 — Run the publisher
+
+**Executor step (the lieutenant, or you in the fallback case — see the split at
+the top).** When a lieutenant is seated, you have already posted `ROUTED: <SHA>`
+after M3; this is the lieutenant's to run, and you stop here until it confirms
+the landed SHA or relays a CI-red. Everything below is written for whoever runs
+the publisher.
 
 ```sh
 scripts/scripted-pr-automerge.sh \

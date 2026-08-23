@@ -664,8 +664,11 @@ edges exist** is operator-owned and fixed. The sanctioned edges are exactly:
   workflow/process, and research requests.
 - any team → **Steward** — merge status or publisher-path workflow questions.
 - any team → **Steward** — `git_request`: a ready WP branch for publisher-path
-  merge. The Steward is the **sole merge router** — route every `git_request`
-  there. No other seat holds a GitHub credential.
+  merge. The Steward is the **sole merge ROUTER** — route every `git_request`
+  there; the Steward verifies gates/Decision/scope on the exact SHA and routes
+  it to the **lieutenant**, the **sole merge EXECUTOR** that runs the publisher
+  path. The split is §14b. Only the publisher path holds a GitHub credential,
+  and the lieutenant is the seat that invokes it — no ring touches GitHub.
 
 **There is NO enclave → build-team edge — the enclave elaborates autonomously
 (operator, 2026-07-03).** The clean-room enclave (spec-leader / spec-author / CV)
@@ -1028,12 +1031,18 @@ Rules for every layer:
 **Only the publisher path has GitHub credentials.** Build/spec agents do
 **local git only** in their worktrees (commit, rebase onto the already-fetched
 `origin/main`) — no `gh`, no push, no fetch, no token, no PR. Under explicit
-operator direction, the Steward runs the checked-in scripted publisher path
-(`scripts/scripted-pr-automerge.sh`) with only these inputs: an exact approved
-branch/SHA, public PR title, public PR body, and the docs-only flag. This keeps
-one GitHub identity; it does not give teams GitHub access, does not make the
-Steward a code author, and does not replace the mootup review/Decision record
-(`../docs/program/04-git-and-integration.md`).
+operator direction, the checked-in scripted publisher path
+(`scripts/scripted-pr-automerge.sh`) merges accepted work with only these
+inputs: an exact approved branch/SHA, public PR title, public PR body, and the
+docs-only flag. This keeps one GitHub identity; it does not give teams GitHub
+access, does not make its caller a code author, and does not replace the mootup
+review/Decision record (`../docs/program/04-git-and-integration.md`).
+
+**The merge splits into two seats: the Steward ROUTES, the lieutenant
+EXECUTES.** See §14b — this is the binding division. The Steward decides *what*
+merges and posts the exact-SHA authorization; the lieutenant is the seat that
+*runs* the publisher script and closes the books. The Steward no longer launches
+publishers directly.
 
 ### 14a. THE ARCHITECT DOES NOT VOTE ON DOC-ONLY WPs
 
@@ -1126,6 +1135,38 @@ and publishes.
 **Steward duty:** when a track is nominally concurrent, check that its *review
 and merge path* is disjoint too — not just its file paths. **Concurrency that
 funnels into one reviewer is sequencing with extra steps.**
+
+### 14b. The merge split: the Steward routes, the lieutenant executes
+
+**The merge is two seats, one boundary.** Added when the lieutenant seat was
+introduced; binding on both seats and on every ring that hands off a candidate.
+
+| seat | owns | never does |
+|---|---|---|
+| **Steward** — sole merge **ROUTER** | Decides *what* merges. Verifies, on the **exact SHA**, every required domain gate + a **resolved Decision** + the **diff scope** (self-checked against the object DB, never trusting the prose). Posts the exact-SHA authorization (`ROUTED: <SHA>` with the gates, Decision, base, and verified scope). | Does **not** run the publisher script, watch CI, or close the node. Does not route on approvals for a *different* SHA, an unresolved Decision, or an unverified scope. |
+| **lieutenant** — sole merge **EXECUTOR** | Runs `scripts/scripted-pr-automerge.sh` on the routed SHA; watches CI; merges after green; verifies the landed tree; then **corpus-closes** the node (flip status, regen progress, publish the closeout) and confirms the landed SHA back to the ring. | Has **no gate-verification authority** — executes only what the Steward routed, on the SHA routed. Does **not** re-adjudicate, respin, or widen scope. On CI-red it **stops and relays** to the ring + Steward; it never fixes the candidate itself. |
+
+**Why the split exists, stated so it holds:**
+
+- **It preserves merge-router discipline.** The *decision* to land is the
+  Steward's (the single point where gates + Decision + scope are checked on the
+  exact object); the *mechanics* are the lieutenant's. Neither seat can merge
+  alone: the Steward has no credentials, the lieutenant has no authority.
+- **One owner per merge.** A merge has exactly one executor. **Measured
+  2026-08-23:** the Steward launched a publisher for a kernel PR while the
+  lieutenant was already executing the same merge — a double-publish race,
+  caught in the pre-lock wait. The rule: once the Steward routes a SHA, the
+  lieutenant owns its execution end-to-end; the Steward does not also launch it.
+- **The Steward stays out of the CI-watch loop.** After routing, the Steward
+  stops and learns the outcome from a mention (§14 bullets below) — landed SHA,
+  or a CI-red relay. The Steward re-routes only on a *new* SHA the ring respins.
+
+**The handoff, concretely:** ring posts a `git_request` (ready `wp/<ID>` branch +
+SHA) → Steward verifies gates/Decision/scope on that exact SHA and posts
+`ROUTED: <SHA>` mentioning the lieutenant → lieutenant executes, merges,
+corpus-closes, confirms the landed SHA. A CI-red bounces back to the ring for a
+respin, and the cycle repeats on the new SHA — the Steward re-verifies and
+re-routes; it is a fresh authorization, not a retry of the old one.
 
 The publisher path pushes `wp/<ID>` branches to trigger CI, reads checks,
 merges, fetches `main`, and mirrors GitHub state into mootup. If GitHub reports
