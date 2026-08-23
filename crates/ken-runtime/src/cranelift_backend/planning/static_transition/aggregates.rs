@@ -17,6 +17,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::continuations::{ContinuationOrdinaryEnvelopeRole, ContinuationWorkerCaptureSource};
+
 use super::{
     occurrence_authority, planner_capacity_error, planner_error,
     synthesized_seat_emission_owners, BoundaryReferentOwner,
@@ -115,6 +117,17 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRole {
     Constructor(SynthesizedConstructorRole),
     /// The captured-environment Record introduced at a generated-unit input.
     UnitBoundaryEnvironment,
+    /// **`RT-CHECKED-IH-CAPTURED-ENV-SCHEMA` tier 2 -- the checked-IH's
+    /// CAPTURED environment.**
+    ///
+    /// A SIBLING of [`Self::UnitBoundaryEnvironment`], not a widening of it.
+    /// That role is the capture-FREE unit-boundary case, and its sole
+    /// production consumer gates on `captures.is_empty()` before emitting an
+    /// empty-fields Record -- so a captured environment pushed through the same
+    /// role would meet a consumer that both tests emptiness and builds no
+    /// fields. The two populations share the owner/escape DERIVATION and
+    /// nothing else.
+    CheckedIhCapturedEnvironment,
 }
 /// Which aggregate shape one producer occurrence builds.
 ///
@@ -329,6 +342,7 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRoot {
     /// The environment record nested at one field of a source constructor
     /// whose closed result reaches a generated-unit call input.
     UnitBoundaryEnvironment,
+    CheckedIhCapturedEnvironment,
 }
 /// One step from a synthesized aggregate to one of its ordered children.
 ///
@@ -714,7 +728,8 @@ impl SynthesizedHostResultTree {
             // not from a host operation's synthesized tree. Returning the
             // absent node keeps the host-tree resolver fail-closed if the two
             // domains are ever accidentally mixed.
-            SynthesizedAggregateRoot::UnitBoundaryEnvironment => {
+            SynthesizedAggregateRoot::UnitBoundaryEnvironment
+            | SynthesizedAggregateRoot::CheckedIhCapturedEnvironment => {
                 SynthesizedAggregateNode::Absent
             }
         }
@@ -1088,6 +1103,67 @@ fn fixed_node_selected_owner_of(
 /// callee fixes the generated-unit boundary, the call argument fixes the result
 /// root, and the closed producer analysis fixes each concrete constructor field.
 /// No lowering-order ordinal participates.
+/// **`RT-CHECKED-IH-CAPTURED-ENV-SCHEMA` tier 2 -- the schema's DOMAIN, stated
+/// as its coordinate source rather than as a proxy for it.**
+///
+/// Membership in the checked-IH captured-env schema IS the existence of the
+/// tier-1 ci<->oi coordinate run. This returns that run when it exists and
+/// `None` when it does not, so the issuance below admits exactly the units the
+/// coordinates admit -- membership equals coordinate-existence by
+/// construction, not by a separate filter that could drift from it.
+///
+/// Two earlier framings of this domain were both wrong the same way, and both
+/// cost a hard stop: first "the UnitBoundaryEnvironment population", then
+/// "units with captures". Each named a PROXY. A unit may carry captures and
+/// still have no ruled ordered-worker envelope -- the continuation can declare
+/// fewer ordinary parameters than the worker has captures -- and then no
+/// complete run exists, because the run IS the envelope's nonrecursive
+/// prefix. Such a unit is OUTSIDE this schema by construction, exactly as it is
+/// invisible to tier 1, which also derives its run from that envelope. "Has
+/// captures" over-approximates the domain, and that over-approximation was the
+/// whole defect.
+///
+/// `Err` is reserved for a capture that IS in the run but cannot be sourced --
+/// a seed capture. That is a refusal, not an absence, and it must not be
+/// confused with being out of domain.
+fn checked_ih_coordinate_run(
+    unit: &super::continuations::ContinuationUnitView<'_>,
+) -> Result<Option<(StaticOriginId, Vec<(u32, StaticOriginId)>)>, CraneliftBackendError> {
+    // No ruled envelope means no nonrecursive prefix, so no run, so no
+    // membership. Not a skip of an in-domain unit -- there is no record such a
+    // unit could have.
+    let Ok(envelope) = unit.ordinary_envelope() else {
+        return Ok(None);
+    };
+    let mut closure_origin = None;
+    let mut run = Vec::new();
+    for role in &envelope {
+        let ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+            ordinal,
+            closure_origin: origin,
+            source,
+            ..
+        } = role
+        else {
+            continue;
+        };
+        let ContinuationWorkerCaptureSource::Lexical(sourced) = source else {
+            return Err(planner_error(
+                "checked-IH captured environment: a capture in the ruled run has no source \
+                 occurrence, so its field identity cannot be admitted from the plan",
+            ));
+        };
+        closure_origin = Some(*origin);
+        run.push((*ordinal, *sourced));
+    }
+    // An envelope with no worker captures is the capture-free unit-boundary
+    // population, which UnitBoundaryEnvironment serves. No run, no membership.
+    match closure_origin {
+        Some(origin) if !run.is_empty() => Ok(Some((origin, run))),
+        _ => Ok(None),
+    }
+}
+
 fn unit_boundary_environment_fields(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<BTreeSet<(StaticOriginId, u32)>, CraneliftBackendError> {
@@ -1341,6 +1417,77 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 children: Vec::new(),
                 meet: PlannedReferentLifetime::Persistent,
                 allocation: PlannedAggregateAllocation::PersistentGround,
+            });
+        }
+    }
+    // **`RT-CHECKED-IH-CAPTURED-ENV-SCHEMA` tier 2 -- issue for exactly the
+    // units the coordinates admit.**
+    //
+    // Every property is admitted from its authority: the run and its source
+    // occurrences from the planner's own `WorkerCapture` roles, each child's
+    // lifetime from the occurrence-authority plane, and `meet`/`allocation`
+    // from the SAME escape derivation the constructor branch above uses.
+    // Nothing is assigned a lifetime here -- a hard-coded answer, even the
+    // right one, is the defect this slice exists to remove, and the empty
+    // children of the sibling population are why its hard-coded `Persistent`
+    // agreed with a derivation run over no evidence.
+    for unit in plan.continuation_units()? {
+        let Some((seat, run)) = checked_ih_coordinate_run(&unit)? else {
+            continue;
+        };
+        let mut children = Vec::with_capacity(run.len());
+        for (ordinal, sourced) in &run {
+            let authority = occurrence_authority(plan, *sourced)?;
+            let child_authority = PlannedOccurrenceChildAuthority {
+                origin: *sourced,
+                position: *ordinal,
+                owner: authority.owner,
+                lifetime: authority.lifetime,
+            };
+            let owners = aggregate_child_referent_owners(plan, &child_authority)?;
+            children.push(PlannedAggregateChild {
+                position: *ordinal,
+                origin: Some(*sourced),
+                field_identity: None,
+                lifetime: if owners.contains(&BoundaryReferentOwner::InvocationArena) {
+                    PlannedReferentLifetime::ActivationOwned
+                } else {
+                    PlannedReferentLifetime::Persistent
+                },
+                owners,
+            });
+        }
+        let escapes = children
+            .iter()
+            .any(|child| child.owners.contains(&BoundaryReferentOwner::InvocationArena));
+        let (meet, allocation) = if escapes {
+            (
+                PlannedReferentLifetime::ActivationOwned,
+                PlannedAggregateAllocation::InvocationAggregate,
+            )
+        } else {
+            (
+                PlannedReferentLifetime::Persistent,
+                PlannedAggregateAllocation::PersistentGround,
+            )
+        };
+        for owner in synthesized_seat_emission_owners(plan, seat)? {
+            records.push(PlannedAggregateOwnership {
+                id: AggregateOccurrenceId(0),
+                producer: AggregateOccurrenceProducer::SynthesizedUse {
+                    owner,
+                    seat,
+                    path: SynthesizedAggregatePath::root(
+                        SynthesizedAggregateRoot::CheckedIhCapturedEnvironment,
+                    ),
+                    role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                },
+                owner: plan.semantic.function_owner(seat)?,
+                shape: PlannedAggregateShape::Record,
+                declared_children: None,
+                children: children.clone(),
+                meet,
+                allocation,
             });
         }
     }
@@ -3174,5 +3321,97 @@ mod tests {
             | SynthesizedAggregateNode::SiteOperand(_)
             | SynthesizedAggregateNode::Absent => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod checked_ih_captured_env_schema {
+    use super::*;
+    use crate::cranelift_backend::planning::static_transition::plan_static_transition_graph;
+    use std::collections::BTreeMap;
+
+    fn checked_ih_records<'plan>(
+        plan: &'plan StaticTransitionPlan<'_>,
+    ) -> Vec<&'plan PlannedAggregateOwnership> {
+        plan.aggregate_ownership
+            .iter()
+            .filter(|record| {
+                matches!(
+                    record.producer,
+                    AggregateOccurrenceProducer::SynthesizedUse {
+                        role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                        ..
+                    }
+                )
+            })
+            .collect()
+    }
+
+    /// **The half of the option-(c) control that this instrument can honestly
+    /// carry: plan construction still succeeds.**
+    ///
+    /// This fixture contains a unit that has worker captures and, DURING plan
+    /// construction, no ruled ordered-worker envelope -- measured live at the
+    /// issuance site as `captures=2 ordinary_params=1`. Propagating that
+    /// precondition failure (option (a)) fails plan construction for a program
+    /// that is compile-valid, so this `expect` is what reds under (a).
+    ///
+    /// LIMIT, stated rather than implied: the out-of-domain unit is NOT
+    /// observable through `continuation_units()` on the FINISHED plan -- the
+    /// set there carries no envelope-less unit, so a test cannot assert "this
+    /// seat received no record" about it from here. The anti-(b) evidence is
+    /// therefore carried by the equivalence test below (issued seats equal
+    /// coordinate-run units) and by the code shape -- membership is derived
+    /// from the run's existence, with no separate captures filter that could
+    /// drift -- not by this fixture. A control that cannot see the case it
+    /// names is worth less than saying so.
+    #[test]
+    fn a_program_with_an_envelope_less_captured_unit_still_plans() {
+        let expr = Box::leak(Box::new(
+            super::super::continuations::tests::contspec_multiple_worker_captures_fixture(),
+        ));
+        let plan = plan_static_transition_graph(expr, &BTreeMap::new())
+            .expect("a compile-valid program must still plan when a unit is out of this domain");
+        for record in checked_ih_records(&plan) {
+            assert!(
+                !record.children.is_empty(),
+                "a checked-IH record is issued only for a unit with a coordinate run, so it \
+                 can never carry an empty child run -- an empty one would mean the record was \
+                 issued for a unit outside the domain"
+            );
+        }
+    }
+
+    /// Membership EQUALS coordinate-existence, checked per unit against the
+    /// coordinate source rather than against a proxy for it.
+    ///
+    /// This is the anti-(b) shape: it asserts the two sets agree unit by unit,
+    /// so a filter that admitted a unit with no run, or dropped one with a run,
+    /// would red here.
+    #[test]
+    fn every_issued_record_corresponds_to_a_unit_with_a_coordinate_run() {
+        let expr = Box::leak(Box::new(super::super::continuations::tests::contspec_multiple_worker_captures_fixture()));
+        let plan = plan_static_transition_graph(expr, &BTreeMap::new()).expect("plans");
+        let mut expected = 0usize;
+        for unit in plan.continuation_units().expect("units") {
+            if checked_ih_coordinate_run(&unit)
+                .expect("the run derivation does not refuse on this fixture")
+                .is_some()
+            {
+                expected += 1;
+            }
+        }
+        let issued: std::collections::BTreeSet<StaticOriginId> = checked_ih_records(&plan)
+            .iter()
+            .filter_map(|record| match record.producer {
+                AggregateOccurrenceProducer::SynthesizedUse { seat, .. } => Some(seat),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            issued.len(),
+            expected,
+            "the issued seats must be exactly the units whose coordinate run exists"
+        );
     }
 }

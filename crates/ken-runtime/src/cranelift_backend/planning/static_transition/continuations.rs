@@ -7530,7 +7530,7 @@ impl<'src> StaticTransitionPlan<'src> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(in crate::cranelift_backend::planning::static_transition) mod tests {
     #[allow(unused_imports)]
     use super::super::tests::*;
     use super::super::*;
@@ -7538,7 +7538,7 @@ mod tests {
     #[allow(unused_imports)]
     use crate::{RuntimeComputationalMatchCase, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
 
-    fn contspec_multiple_worker_captures_fixture() -> RuntimeExpr {
+pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_multiple_worker_captures_fixture() -> RuntimeExpr {
         let worker = RuntimeExpr::LexicalClosure {
             captures: vec![unit(), unit()],
             params: vec!["worker".to_string()],
