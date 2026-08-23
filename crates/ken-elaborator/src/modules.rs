@@ -57,6 +57,14 @@ pub struct ModuleState {
     catalog_roots: Vec<PathBuf>,
     /// Successfully elaborated file units, keyed by dotted module path.
     loaded_units: HashMap<String, Vec<ken_kernel::GlobalId>>,
+    /// Raw source and the one authoritative extraction for loaded literate
+    /// units. Loading does not execute checked fences; an entry front end may
+    /// request that separate document-check step after the module graph loads.
+    loaded_literate_units: HashMap<String, (String, crate::literate::KenMdExtraction)>,
+    /// Completed per-unit scopes. The loader does not install these as the
+    /// ambient isolated-file scope; an entry document check installs only its
+    /// selected unit so checked fences see the declarations they follow.
+    loaded_unit_scopes: HashMap<String, Scope>,
     /// Units currently being discovered/elaborated, in entry-rooted edge order.
     active_imports: Vec<String>,
     /// The unshadowable prelude floor (`30-taxonomy §4`, `33 §3.3`).
@@ -421,13 +429,57 @@ fn admission_boundary(decls: &[Decl]) -> Result<Option<(BoundaryHeader, Span)>, 
     Ok(found)
 }
 
+fn valid_module_component(component: &str) -> bool {
+    let mut chars = component.chars();
+    chars.next().is_some_and(|first| first.is_ascii_uppercase())
+        && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '\'')
+}
+
+/// The single catalog root and dotted module entry named by a source path.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CatalogModulePath {
+    pub root: PathBuf,
+    pub entry: String,
+}
+
+/// Invert the catalog-root path mapping used by [`source_path`].
+///
+/// The nearest `catalog/packages` ancestor is the root. Paths outside such a
+/// root, paths without a source extension, and paths containing an invalid
+/// module component are not catalog module paths and return `None` so callers
+/// can retain their isolated-file behavior.
+pub fn catalog_module_from_path(path: &Path) -> Option<CatalogModulePath> {
+    let parent = path.parent()?;
+    let root = parent.ancestors().find(|ancestor| {
+        ancestor.file_name().is_some_and(|name| name == "packages")
+            && ancestor
+                .parent()
+                .and_then(Path::file_name)
+                .is_some_and(|name| name == "catalog")
+    })?;
+    let relative = path.strip_prefix(root).ok()?;
+    let mut components = relative.iter().collect::<Vec<_>>();
+    let leaf = components.pop()?.to_str()?;
+    let leaf = leaf
+        .strip_suffix(".ken.md")
+        .or_else(|| leaf.strip_suffix(".ken"))?;
+
+    let mut module = components
+        .into_iter()
+        .map(|component| component.to_str())
+        .collect::<Option<Vec<_>>>()?;
+    module.push(leaf);
+    if module.is_empty() || !module.iter().copied().all(valid_module_component) {
+        return None;
+    }
+    Some(CatalogModulePath {
+        root: root.to_path_buf(),
+        entry: module.join("."),
+    })
+}
+
 fn source_path(root: &Path, module: &str, span: &Span) -> Result<PathBuf, ElabError> {
-    let valid_component = |component: &str| {
-        let mut chars = component.chars();
-        chars.next().is_some_and(|first| first.is_ascii_uppercase())
-            && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '\'')
-    };
-    if module.is_empty() || !module.split('.').all(valid_component) {
+    if module.is_empty() || !module.split('.').all(valid_module_component) {
         return Err(ElabError::ParseError {
             msg: format!("invalid dotted module path '{module}'"),
             span: span.clone(),
@@ -465,7 +517,12 @@ fn source_path(root: &Path, module: &str, span: &Span) -> Result<PathBuf, ElabEr
     }
 }
 
-fn parse_unit_source(path: &Path, span: &Span) -> Result<Vec<Decl>, ElabError> {
+struct ParsedUnit {
+    decls: Vec<Decl>,
+    literate: Option<(String, crate::literate::KenMdExtraction)>,
+}
+
+fn parse_unit_source(path: &Path, span: &Span) -> Result<ParsedUnit, ElabError> {
     let source = std::fs::read_to_string(path).map_err(|error| ElabError::ParseError {
         msg: format!("failed to read module source '{}': {error}", path.display()),
         span: span.clone(),
@@ -473,9 +530,16 @@ fn parse_unit_source(path: &Path, span: &Span) -> Result<Vec<Decl>, ElabError> {
     if path.to_string_lossy().ends_with(".ken.md") {
         let extracted = crate::literate::extract_ken_md(&source)?;
         crate::literate::validate_ken_md_fences(&extracted)?;
-        crate::parser::parse_decls(&extracted.source)
+        let decls = crate::parser::parse_decls(&extracted.source)?;
+        Ok(ParsedUnit {
+            decls,
+            literate: Some((source, extracted)),
+        })
     } else {
-        crate::parser::parse_decls(&source)
+        Ok(ParsedUnit {
+            decls: crate::parser::parse_decls(&source)?,
+            literate: None,
+        })
     }
 }
 
@@ -533,7 +597,7 @@ fn load_unit(
         .expect("N2 root count is checked at the public entry point")
         .clone();
     let path = source_path(&root, module, span)?;
-    let decls = parse_unit_source(&path, span)?;
+    let ParsedUnit { decls, literate } = parse_unit_source(&path, span)?;
 
     let previous_package = elab.class_env.current_package.clone();
     let previous_direct_use = elab.class_env.direct_use_packages.clone();
@@ -602,6 +666,9 @@ fn load_unit(
         elab.module_state
             .exports
             .insert(module.to_string(), exports);
+        elab.module_state
+            .loaded_unit_scopes
+            .insert(module.to_string(), scope);
         Ok(ids)
     })();
     let popped = elab.module_state.active_imports.pop();
@@ -618,7 +685,44 @@ fn load_unit(
     elab.module_state
         .loaded_units
         .insert(module.to_string(), ids.clone());
+    if let Some(literate) = literate {
+        elab.module_state
+            .loaded_literate_units
+            .insert(module.to_string(), literate);
+    }
     Ok(ids)
+}
+
+/// Execute the document-check obligations for one already-loaded entry unit.
+///
+/// Dependency loading never calls this function. A front end calls it only for
+/// the dotted module selected as its entry, preserving the isolated `.ken.md`
+/// contract without turning checked fences into part of a module's interface.
+pub(crate) fn execute_loaded_entry_checked_fences(
+    elab: &mut ElabEnv,
+    entry: &str,
+) -> Result<(), ElabError> {
+    if !elab.module_state.loaded_units.contains_key(entry) {
+        return Err(ElabError::Internal(format!(
+            "cannot check fences for unloaded module entry '{entry}'"
+        )));
+    }
+    let Some((source, extracted)) = elab.module_state.loaded_literate_units.get(entry).cloned()
+    else {
+        return Ok(());
+    };
+    let scope = elab
+        .module_state
+        .loaded_unit_scopes
+        .get(entry)
+        .cloned()
+        .ok_or_else(|| {
+            ElabError::Internal(format!(
+                "loaded module entry '{entry}' has no completed scope"
+            ))
+        })?;
+    elab.module_state.root_scope = scope;
+    elab.execute_ken_md_checked_fences(&source, &extracted)
 }
 
 /// Plural-root entry point for the N2 in-repo loader (`33 §3.2`).

@@ -3,7 +3,7 @@
 mod repl;
 
 use std::ffi::{OsStr, OsString};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
     // `RT-MATCH-RECURSOR-CONSUMERS` 4a.1. The census scope wraps the whole
@@ -230,12 +230,12 @@ fn os_bytes(value: &OsStr) -> Vec<u8> {
     value.to_string_lossy().into_owned().into_bytes()
 }
 
-/// Read `<file>` and elaborate it (`` .ken.md `` via the literate path,
-/// otherwise the plain `.ken` path) — the shared front half of both `ken run`
-/// and `ken check`. Exits 1 on a missing argument, an unreadable file,
-/// elaborator init failure, or an elaboration error, with a message prefixed
-/// by `cmd` (`"run"`/`"check"`) so a user sees the subcommand they actually
-/// typed, not a borrowed one.
+/// Read `<file>` and elaborate it. A path with a derivable `catalog/packages`
+/// module address uses the roots loader and then executes only that entry's
+/// checked-fence roles; every other path retains the direct `.ken.md`/`.ken`
+/// dispatch. Exits 1 on a missing argument, an unreadable file, elaborator init
+/// failure, or an elaboration error, with a message prefixed by `cmd` so a user
+/// sees the subcommand they actually typed, not a borrowed one.
 fn elaborate_cli_file(
     cmd: &str,
     path: Option<&OsStr>,
@@ -265,7 +265,16 @@ fn elaborate_cli_file(
         }
     };
 
-    let ids_result = if path.to_string_lossy().ends_with(".ken.md") {
+    let catalog_module = ken_elaborator::modules::catalog_module_from_path(Path::new(path));
+    let ids_result = if let Some(catalog_module) = catalog_module {
+        let roots = [catalog_module.root];
+        elab_env
+            .elaborate_module_from_roots(&roots, &catalog_module.entry)
+            .and_then(|ids| {
+                elab_env.execute_loaded_entry_checked_fences(&catalog_module.entry)?;
+                Ok(ids)
+            })
+    } else if path.to_string_lossy().ends_with(".ken.md") {
         elab_env.elaborate_ken_md_file(&src)
     } else {
         elab_env.elaborate_file(&src)
@@ -295,12 +304,12 @@ fn elaborate_cli_file(
 /// `ken check <file>` — FR-3 (`docs/program/wp/ds-1-findings-remediation.md`):
 /// a library check-mode for pure-library catalog entries, which have no
 /// natural IO `main` and so cannot satisfy `ken run`'s literal exit-0
-/// contract. Runs the identical `elaborate_ken_md_file`/`elaborate_file` path
-/// `ken run` calls before its own separate IO-execution step, then stops
-/// before the IO-drive — no new checking logic, the fence-role verdicts
-/// (`ken reject` must fail, `ken example` must elaborate) are already that
-/// call's job. Exits 0 iff elaboration + every fence behaved; inherits the
-/// shared front half's `Err -> exit 1` verbatim. Never drives IO, so a
+/// contract. Catalog-addressed files load their import closure through the
+/// roots API; other paths retain the direct isolated-file dispatch. The entry's
+/// existing fence-role verdicts (`ken reject` must fail, `ken example` must
+/// elaborate) run after roots loading; dependency document roles do not. Exits
+/// 0 iff elaboration + every entry fence behaved and inherits the shared front
+/// half's `Err -> exit 1` verbatim. Never drives IO, so a
 /// runnable program's `main` is simply never executed here (`ken run` is
 /// still how you run it) — `ken run` itself is unchanged, strict, and has no
 /// auto-detect fallthrough to this mode.
