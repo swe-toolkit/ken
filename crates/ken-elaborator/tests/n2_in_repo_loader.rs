@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use ken_elaborator::modules::{catalog_module_from_path, CatalogModulePath};
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::Term;
 
@@ -131,6 +132,50 @@ fn plural_api_fail_closed_until_multi_root_precedence_is_defined() {
             .expect_err("N2 accepts exactly one entry in the plural root input");
         assert!(matches!(err, ElabError::ParseError { .. }));
     }
+}
+
+/// Durable invariant: path inversion selects the nearest catalog root and is
+/// the exact inverse of the loader's component-to-path mapping.
+#[test]
+fn catalog_source_path_inverts_to_nearest_root_and_dotted_entry() {
+    let path =
+        Path::new("outer/catalog/packages/Shadow/catalog/packages/Data/Collections/Map.ken.md");
+    assert_eq!(
+        catalog_module_from_path(path),
+        Some(CatalogModulePath {
+            root: PathBuf::from("outer/catalog/packages/Shadow/catalog/packages"),
+            entry: "Data.Collections.Map".to_string(),
+        })
+    );
+    assert_eq!(
+        catalog_module_from_path(Path::new("catalog/packages/Core/Logic/Transport.ken")),
+        Some(CatalogModulePath {
+            root: PathBuf::from("catalog/packages"),
+            entry: "Core.Logic.Transport".to_string(),
+        })
+    );
+}
+
+/// Durable invariant: the inverse fails closed outside the catalog grammar so
+/// front ends can preserve their isolated-file fallback.
+#[test]
+fn non_catalog_or_invalid_component_path_has_no_module_address() {
+    assert_eq!(
+        catalog_module_from_path(Path::new("scratch/Entry.ken.md")),
+        None
+    );
+    assert_eq!(
+        catalog_module_from_path(Path::new("catalog/packages/lowercase/Entry.ken.md")),
+        None
+    );
+    assert_eq!(
+        catalog_module_from_path(Path::new("catalog/packages/Core/entry.ken.md")),
+        None
+    );
+    assert_eq!(
+        catalog_module_from_path(Path::new("catalog/packages/Core/Entry.txt")),
+        None
+    );
 }
 
 #[test]

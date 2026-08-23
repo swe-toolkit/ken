@@ -7,6 +7,9 @@
 //! resolution path via `ElabEnv::elaborate_file`/`elaborate_decl` — never a
 //! hand-constructed `M.foo -> GlobalId` binding.
 
+use std::fs;
+
+use ken_elaborator::modules::catalog_module_from_path;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::env::Decl as KernelDecl;
 use ken_kernel::{Level, Term};
@@ -52,6 +55,44 @@ fn module_elaborates_to_identical_flat_sigma() {
         b.env.trusted_base(),
         "AC1: module wrapping must not perturb trusted_base() at all"
     );
+
+    let fixture = std::env::temp_dir().join(format!(
+        "ken-es3-loader-flat-sigma-{}/catalog/packages",
+        std::process::id()
+    ));
+    let fixture_parent = fixture.parent().expect("fixture has parent");
+    let _ = fs::remove_dir_all(fixture_parent);
+    fs::create_dir_all(&fixture).expect("create catalog fixture");
+    fs::write(fixture.join("M.ken"), "pub const foo : Int = 0")
+        .expect("write provider");
+    let entry_path = fixture.join("Entry.ken");
+    fs::write(&entry_path, "import M\nconst bar : Int = M.foo")
+        .expect("write entry");
+    let address = catalog_module_from_path(&entry_path)
+        .expect("derive catalog module address");
+    let mut c = mk_env();
+    c.elaborate_module_from_roots(&[address.root.clone()], &address.entry)
+        .expect("roots-loaded module program elaborates");
+
+    assert_eq!(
+        c.env.decls().count(),
+        b.env.decls().count(),
+        "AC1: the roots-loaded entry and dependency add the same flat Σ count"
+    );
+    assert_eq!(
+        c.env.trusted_base(),
+        b.env.trusted_base(),
+        "AC1: roots loading must preserve the flattened zero-trust boundary"
+    );
+    let provider = c.globals["M.foo"];
+    let (_, imported_body) = c.env
+        .transparent_body(c.globals["Entry.bar"])
+        .expect("entry binding is transparent");
+    assert!(
+        matches!(imported_body, Term::Const { id, .. } if id == provider),
+        "the imported name must retain the provider's existing GlobalId"
+    );
+    fs::remove_dir_all(fixture_parent).expect("remove catalog fixture");
 }
 
 // ─────────────────────────────────────────────────────────────────────────

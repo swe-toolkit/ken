@@ -339,6 +339,16 @@ impl ElabEnv {
         modules::elaborate_module_from_roots(self, roots, entry)
     }
 
+    /// Execute checked-fence obligations for an already-loaded dotted entry.
+    ///
+    /// The roots loader records but never executes literate document roles.
+    /// Calling this after a successful roots load preserves the directly-checked
+    /// entry's `ken reject`/`ken example` contract without executing roles from
+    /// imported dependency documents. Plain `.ken` entries are a no-op.
+    pub fn execute_loaded_entry_checked_fences(&mut self, entry: &str) -> Result<(), ElabError> {
+        modules::execute_loaded_entry_checked_fences(self, entry)
+    }
+
     /// Number of successfully loaded cross-file units in this elaboration run.
     /// Exposed so acceptance tests and drivers can verify at-most-once loading.
     pub fn loaded_module_count(&self) -> usize {
@@ -375,6 +385,21 @@ impl ElabEnv {
         let results = modules::expand_and_elaborate(self, &decls)?;
         let ids = results.into_iter().map(|r| r.def_id).collect();
 
+        self.execute_ken_md_checked_fences(src, &extracted)?;
+
+        Ok(ids)
+    }
+
+    /// Execute one literate entry's checked-but-not-tangled fence roles.
+    ///
+    /// The extraction carries byte ranges into `src`; callers reuse the
+    /// extraction that produced the entry's compiled source. This is separate
+    /// from module loading because dependency documents do not execute roles.
+    pub fn execute_ken_md_checked_fences(
+        &mut self,
+        src: &str,
+        extracted: &literate::KenMdExtraction,
+    ) -> Result<(), ElabError> {
         for range in &extracted.reject_ranges {
             if self.elaborate_file(&src[range.clone()]).is_ok() {
                 return Err(ElabError::ParseError {
@@ -392,8 +417,7 @@ impl ElabEnv {
                     span: Span::new(range.start, range.end),
                 })?;
         }
-
-        Ok(ids)
+        Ok(())
     }
 
     /// Try to discharge an obligation hole with a certificate term.
