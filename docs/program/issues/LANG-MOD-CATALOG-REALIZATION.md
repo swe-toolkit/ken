@@ -5,20 +5,33 @@ status: draft
 owner: language
 size: M
 gate: none
-depends_on: [LANG-MOD-LOADER-ENTRY, LANG-MOD-PUB-ELIGIBILITY, LANG-MOD-STRICT-RESOLUTION]
+depends_on: [LANG-MOD-LOADER-ENTRY, LANG-MOD-PUB-ELIGIBILITY, LANG-MOD-STRICT-RESOLUTION, LANG-MOD-OR-CANONICAL-HOME]
 blocks: [CAT-GCD-REFACTOR]
 github: null
 origin: "Architect component framing evt_hpnhqy1ex286 (WP-4), under [[LANG-MODULE-IMPORT-SYSTEM]]. Steward-filed per COORDINATION section 2, 2026-08-23. FRAMED; release HELD (see campaign root release gate + the Or/Inl/Inr fork)."
 ---
 
-> # FRAMED — HELD FOR RELEASE. Last in ring order; TWO extra gates.
+> # FRAMED — HELD FOR RELEASE. Last in ring order.
 >
 > Gated on WP-1..3 ([[LANG-MOD-LOADER-ENTRY]], [[LANG-MOD-PUB-ELIGIBILITY]],
-> [[LANG-MOD-STRICT-RESOLUTION]]) AND the Or/Inl/Inr fork (escalated to operator,
-> evt_6b9wrt1kwswcp — under strict there is no global-fallback escape hatch, so
-> any file using Or/Inl/Inr, e.g. Order, cannot be strict-clean until the fork
-> gives them a public home or refactors them away). Also held under the campaign
-> finish-then-switch gate. This WP is the campaign's success criterion.
+> [[LANG-MOD-STRICT-RESOLUTION]]) AND the Or realization chain. This WP is the
+> campaign's success criterion.
+>
+> THE OR/INL/INR FORK IS RESOLVED (operator ruled arm (b), evt_6b9wrt1kwswcp):
+> `Or`/`Inl`/`Inr` get a canonical package home, not a refactor-away. Under strict
+> there is no global-fallback escape hatch, so any file using them (e.g. `Order`)
+> cannot be strict-clean until they resolve through a legal import. The Architect
+> found arm (b) is UNSPELLABLE in surface data syntax today (Omega-sorted params;
+> the data elaborator has no Omega arm), so the realization is TWO prerequisite
+> nodes, sequenced A -> WP-2 D1 -> B:
+> - [[LANG-MOD-OR-OMEGA-PARAM-ELAB]] (NODE A) — teach explicit-data param/index
+>   elaboration to honor an Omega-sorted binder (enclave sort-discipline GO
+>   evt_3j02n0pkgze3a). Buildable now; release-ordered behind WP-2 D1.
+> - [[LANG-MOD-OR-CANONICAL-HOME]] (NODE B) — author `Core.Logic.Or`, migrate the
+>   six consumers, retire the prelude registration (one identity). WP-4 depends on
+>   NODE B; once it lands, `Order` is dependency-closed.
+>
+> Also held under the campaign finish-then-switch gate.
 
 # Objective
 
@@ -35,12 +48,19 @@ loader.
 - Gcd selectively imports `add`/`mul` + `leq_nat`/`sub` and REMOVES its four
   local reimplementations.
 
-# The census (Architect evt_xtscdw8r3q3k)
+# The census (Architect evt_xtscdw8r3q3k; measured by WP-2 D0)
 
 WP-4's migration set is CENSUS-DRIVEN, not the Gcd trio alone: measure EVERY
 catalog file that the strict flip breaks (every file that currently resolves a
 non-floor name through the global passthrough) and migrate all of them, so WP-2's
 strict flip and WP-4's migration co-gate to CI-green together.
+
+WP-2 D0 measured the census (landed `c64c62190`, recorded on
+[[LANG-MOD-STRICT-RESOLUTION]]): a 12-route ambient-name inventory
+(`COMPLETE_AMBIENT_NAME_ROUTES`, keyed on representation + consumer, not surface
+spelling), partitioned disjoint/exhaustive into 2 floor-clean units, 10
+ambient-dependent units to migrate, and 32 baseline-red residuals. That 32-residual
+bucket is the triage obligation below (AC-3a).
 
 # Acceptance criteria
 
@@ -49,6 +69,13 @@ strict flip and WP-4's migration co-gate to CI-green together.
   competing identity — establish no-reimplementation by IDENTITY, not repo text.
 - AC-3. The full census set migrates and the whole catalog is strict-green in CI
   (the co-gate with [[LANG-MOD-STRICT-RESOLUTION]]).
+- AC-3a (residual triage — Adversary flag, D0 post-merge sweep evt_1e3tpt44qxjkm).
+  Completion must range over the 32-residual bucket: each residual is either
+  migrated to strict-green OR explicitly excluded with a stated reason. "Every
+  census vector empty" is NOT sufficient as a completion signal — the D0 vectors
+  cover only the 12-route ambient inventory, so an empty-vectors verdict would
+  declare done while the 32 residuals (73% of the 44 discovered) stay unmeasured.
+  Enumerate the disposition of all 32.
 - AC-4 (cross-cutting invariant). Zero `trusted_base()` delta; flat-Σ pin stays
   green.
 - AC-NO-REGRESSION. Whole-suite green in CI; local targeted `-p` only.
@@ -61,5 +88,6 @@ Architect (component fit; no invented identity) + conformance-validator
 # Capability tier
 
 T2 for the mechanical import/pub edits + census execution; the SOUNDNESS is
-carried by WP-2/WP-3. Size M (may grow with census breadth). The Or/Inl/Inr fork
-must resolve before Order is dependency-closed.
+carried by WP-2/WP-3. Size M (may grow with census breadth). `Order` is
+dependency-closed once [[LANG-MOD-OR-CANONICAL-HOME]] (NODE B) lands `Core.Logic.Or`
+and the six-consumer migration; WP-4 depends on it.
