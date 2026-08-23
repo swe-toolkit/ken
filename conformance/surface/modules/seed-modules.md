@@ -14,17 +14,19 @@ substrate with an **in-repo cross-file loader**. N4 adds the source-world
 `program` / `package` admission boundary over that loader. The
 content-addressed package manager remains out of scope.
 
-**Build state — RED UNTIL N2 LANE B.** The cross-file accept arm in §D states
-the N2 Lane-B target and currently fails because no loader follows an import
-path to another file. The cycle arm pins the fail-closed behavior Lane B must
-establish once that loader exists. Both are specification/conformance cases in
-this Lane-A seed; neither claims the current elaborator implements N2.
+**Build state — N2 LANE B LANDED; contract completion mixed.** The cross-file
+accept and active-stack cycle arms in §D drive the landed roots loader. Its
+existing producer already supplies the valid anchor, one-root refusal, lazy
+poison control, and per-run cache used by §D1–§D4. Unsupported `pub` placement,
+the arbitrary-global fallback, and catalog-entry front-end routing remain
+**RED UNTIL the module/import repair campaign**. Each new case records its own
+reachable gate; a direct-loader success is not credited for a missing boundary.
 
-The original ES3 module resolver and the kernel mechanisms it rides — the flat
-`Σ`, opaque constants, and `trusted_base()` — are landed. N2 adds the missing
-file-discovery producer without changing those mechanisms. The cases therefore
-retain the ES3 design discriminants and add a controlled cross-file
-accept↔cycle-reject pair for Lane B.
+The original ES3 module resolver, the N2 file-discovery producer, and the kernel
+mechanisms they ride — the flat `Σ`, opaque constants, and `trusted_base()` —
+are landed. The cases retain the ES3 design discriminants, the N2 controlled
+cross-file accept↔cycle-reject pair, and add verdict-flipping controls for the
+sharpened surface/loader contract without changing the kernel mechanisms.
 
 **Build state — RED UNTIL N4 LANE B.** The §E source-world cases state N4's
 anonymous boundary headers, direct-use admission gate, self-admission,
@@ -34,10 +36,12 @@ instance manifests and re-export-carried instance surfaces are deliberately not
 asserted as live: they remain package-manager/post-MRES-9 work.
 
 Grounding (landed `§`-bodies + landed code, content-reconciled — not the
-plan): `33 §3`
-(`module`/`import M`/`import M as N`/`import M (foo, Bar as Baz)`; the kernel
-sees a single flattened `Σ`), `33 §4` (visibility: module-private by default +
-`pub`; abstract export = opaque interface), `11 §4` (the append-only acyclic
+plan): `32 §1` (exclusive import suffixes and declaration-specific `pub`
+eligibility), `33 §3` (`module`/`import M`/`import M as N`/
+`import M (foo, Bar as Baz)`; dependency-closed source scopes; the kernel sees
+a single flattened `Σ`), `33 §4` (visibility: module-private by default +
+`pub`; abstract export = opaque interface), `39 §2.0` (the source-unit loader
+algorithm and catalog-entry reachability), `11 §4` (the append-only acyclic
 flat `Σ`; the opaque constant `c : A` that introduces abstract interfaces),
 ES1 `minimality.md` (the `trusted_base()`-delta invariant ES3 must not
 perturb), ADR 0014 MRES-1/MRES-2/MRES-3a, and the total role-blind dotted-path
@@ -249,7 +253,7 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   real resolver, not a hand-constructed `M.foo → GlobalId` map. The fourth arm
   is **RED UNTIL N3 LANE B**; the retained three arms remain live.
 
-## D. In-repo cross-file loader (N2; RED UNTIL LANE B)
+## D. In-repo cross-file loader (N2; landed producer)
 
 These two cases are one controlled experiment. The root list, `A` unit, and
 exported declaration in `B` are fixed. The reject arm changes only `B` by
@@ -293,9 +297,8 @@ fixture's payload as `A → B → A`.
 - expect: **accepted**. Loading `A` follows its `import B` edge lazily, maps
   `B` to the unique `B.ken.md` leaf under the sole populated entry of the
   plural root list, and resolves `B.value` to that file's exported `value`.
-  Each unit is loaded and elaborated once in this run. **RED UNTIL N2 LANE B:**
-  before the loader lands, the same fixture fails with `UnboundName` for `B`
-  rather than reaching the exported declaration.
+  Each unit is loaded and elaborated once in this run. A loaderless
+  `UnboundName` for `B` does not satisfy the case.
 - why: this drives the real cross-file producer: the consumer does not declare
   or pre-load `B.value`, and the harness does not hand-feed an export map.
   A singleton-only API, an eager whole-tree scan, a declaration-role-dependent
@@ -318,9 +321,9 @@ fixture's payload as `A → B → A`.
   ```
 
 - expect: **rejected at the surface** with the specific `ImportCycle`
-  diagnostic kind and the closed cycle payload **`A → B → A`**. **RED UNTIL
-  N2 LANE B at diagnostic granularity:** a loaderless `UnboundName`, a warning,
-  silent SCC acceptance, or a bare `is_err` does not satisfy the case. The
+  diagnostic kind and the closed cycle payload **`A → B → A`**. At diagnostic
+  granularity, a loaderless `UnboundName`, a warning, silent SCC acceptance, or
+  a bare `is_err` does not satisfy the case. The
   diagnostic must arise from the active import-stack cycle gate before either
   unit is admitted to the flattened `Σ`.
 - why: this is an absence/rejection assertion with an exact gate. The active
@@ -330,6 +333,287 @@ fixture's payload as `A → B → A`.
   that gate. The acyclic arm above disconfirms coincidental `UnboundName` or
   fixture-syntax rejection: identical `A`, root input, and `B.value` accept
   when the sole back-edge is absent.
+
+## D1. Completed grammar and visibility boundaries
+
+These cases add only the boundaries sharpened by `32 §1`, `33 §3.3`, and
+`39 §2.0`. They reuse the existing import, visibility, identity, cycle, and
+flat-`Σ` fixtures above rather than making a second home for those properties.
+Every rejection has an accepted control that reaches the same production or
+loader path; a generic parse failure, missing fixture, or loaderless
+`UnboundName` cannot satisfy the set.
+
+### surface/modules/import-module-alias-and-selection-are-exclusive
+
+- spec: `32 §1` (mutually exclusive `import_suffix` alternatives), `33 §3.2`
+  (the three import forms)
+- given: reuse the `M.foo` provider and the separately accepted
+  `import M as N` and `import M (foo)` arms of
+  `import-spellings-resolve-to-one-binding`. Against that same provider, a
+  third client writes `import M as N (foo)`.
+- expect: the two existing controls continue to reach module-alias and
+  selective resolution respectively. The combined-suffix client rejects at
+  the surface grammar gate before import resolution or kernel admission. The
+  spec does not lock a diagnostic message or token span, so the case pins only
+  the surface rejection and its phase.
+- why: the controls prove that neither suffix is being rejected wholesale. The
+  third arm changes only their forbidden combination. A grammar that parses an
+  alias and then also consumes a selection list accepts the third arm and
+  fails this case; a grammar that rejects every suffix fails a control.
+
+### surface/modules/pub-eligibility-rejects-enumerated-ineligible-placements
+
+- spec: `32 §1` (`visibility` is factoring, not blanket eligibility), `33 §4`
+  (public module-interface names)
+- given: first parse and elaborate `pub const visible : Bool = True`; it is the
+  positive control that proves `pub` itself is live. Then take the smallest
+  independently valid positive fixture for each row below and apply only the
+  `pub` insertion shown. The source without that insertion must still reach its
+  ordinary production in the same run.
+
+  | ordinary accepted form | controlled mutation |
+  |---|---|
+  | `import M` from `import-spellings-resolve-to-one-binding` | `pub import M` |
+  | `import M (foo)` from the same case | `import M (pub foo)` |
+  | `export M (foo)` from `facade-reexport-preserves-global-id` | `pub export M (foo)` |
+  | `export M (foo)` from the same case | `export M (pub foo)` |
+  | the module from `module-elaborates-to-identical-flat-sigma` | `pub module M { … }` |
+  | a positive `instance C T { … }` from `../classes/seed-classes.md` | `pub instance C T { … }` |
+  | a positive `derive C for T` from `../classes/seed-classes.md` | `pub derive C for T` |
+  | the ordinary anonymous `program` header fixture below | `pub program` |
+  | the ordinary anonymous `package` header fixture below | `pub package` |
+  | a positive `infixl 6 +` declaration `(gated: fixity surface)` | `pub infixl 6 +` |
+
+- expect: `pub const visible` accepts and exports `visible`. Every ordinary row
+  retains its independently pinned behavior. Every `pub`-bearing mutation
+  rejects as a surface error attributable to an unsupported `pub` placement;
+  **RED UNTIL the module/import repair campaign** at this eligibility gate;
+  no mutation is accepted and ignored, and none reaches the kernel. The exact
+  diagnostic variant is not pinned because `32 §1` locks eligibility and phase,
+  not error spelling. The fixity row becomes live with its ordinary positive
+  control when `fixity_decl` is reachable; until then both arms are explicitly
+  gated rather than crediting an unrelated unknown-keyword error.
+- why: this is an allowed-inventory check over the forms explicitly forbidden
+  by `32 §1`, not a token grep. The eligible declaration prevents an
+  implementation from satisfying the matrix by rejecting all `pub`. The
+  per-row ordinary controls prevent a missing base production from masquerading
+  as visibility enforcement. The matrix catches both a blanket `Decl::Pub`
+  wrapper that accepts and later ignores unsupported declarations and item
+  parsers that silently admit per-item visibility.
+
+## D2. Fresh dependency-closed scopes
+
+The next three cases distinguish a fresh per-unit scope from a shared
+compilation-run global map. They use the real loader and real imported
+interfaces. A harness that hand-feeds an export map or starts each source in an
+unrelated `ElabEnv` does not satisfy them.
+
+### surface/modules/dependency-cannot-borrow-callers-selective-import
+
+- spec: `33 §3.3` (per-unit dependency closure), `39 §2.0` step 4
+- fixture: the resolver receives `roots = [<fixture-root>]` and entry `A`, with
+  these units:
+
+  `<fixture-root>/C.ken.md`:
+
+  ```ken
+  pub const helper : Bool = True
+  ```
+
+  `<fixture-root>/A.ken.md` in both arms:
+
+  ```ken
+  import C (helper)
+  import B
+
+  pub const result : Bool = B.value
+  ```
+
+  `<fixture-root>/B.ken.md` in the reject arm:
+
+  ```ken
+  pub const value : Bool = helper
+  ```
+
+  The accept control adds only `import C (helper)` to `B` before its
+  declaration.
+- expect: the reject arm reports `helper` unbound while resolving `B`'s surface
+  body and admits neither `B` nor `A`. The control accepts and resolves
+  `B.value`. `A`'s selective import is unchanged in both arms.
+- why: loading `B` because `A` imports it is not scope inheritance. A loader
+  that reuses `A`'s import bindings while elaborating `B` accepts both arms;
+  adding the one explicit edge to `B` must be what flips rejection to
+  acceptance.
+
+### surface/modules/dependency-import-does-not-leak-back-to-caller
+
+- spec: `33 §3.3` (imports are non-transitive in both directions), `39 §2.0`
+  step 4
+- fixture: use the same `C.ken.md`. `B.ken.md` is fixed in both arms:
+
+  ```ken
+  import C (helper)
+
+  pub const value : Bool = helper
+  ```
+
+  The reject arm's entry unit is:
+
+  ```ken
+  import B
+
+  pub const result : Bool = helper
+  ```
+
+  The accept control adds only `import C (helper)` to `A`.
+- expect: `B` accepts in both arms. The reject arm then reports `helper` unbound
+  in `A`'s surface scope; the control accepts. Loading `B` does not itself bind
+  `helper` in `A`.
+- why: this is the converse orientation of the preceding case. A loader that
+  unions a dependency's selective bindings into its caller accepts the reject
+  arm. Keeping `B` byte-identical and changing only `A`'s explicit import makes
+  the verdict attributable to caller scope construction.
+
+### surface/modules/closed-floor-accepts-arbitrary-global-does-not
+
+- spec: `30-taxonomy §4` (closed prelude floor), `33 §3.3` (exact
+  `{Bool, Char, List}` Ken-defined floor and no convenience-global fallback),
+  `39 §2.0` step 4
+- given: in a fresh harness arm, first use the ordinary non-loader elaboration
+  path to register the transparent Ken definition `def Ambient = Bool` under
+  the bare implementation-global spelling `Ambient`. Then invoke the roots
+  loader. The controlled arms are:
+
+  1. entry `Floor` contains only `pub def B = Bool`, `pub def C = Char`, and
+     `pub def L = List Bool`;
+  2. entry `Leaky` contains only `pub def X = Ambient`;
+  3. entry `Explicit` contains `import Provider (Ambient)` followed by
+     `pub def X = Ambient`, while `Provider.ken.md` contains
+     `pub def Ambient = Bool`.
+
+  Arms 2 and 3 both retain the pre-registered bare `Ambient` in the same kind
+  of `ElabEnv`; no test-only export map is installed.
+- expect: arm 1 accepts, proving all three Ken-defined floor names are present.
+  Arm 2 rejects `Ambient` as unbound at surface resolution even though the
+  implementation global exists. **RED UNTIL the module/import repair campaign**
+  at this strict-resolution gate. Arm 3 accepts and resolves `X` through the
+  imported provider declaration, not through the pre-registered bare global.
+  None changes `trusted_base()`.
+- why: `Bool` and `Ambient` are definitionally the same type in this fixture,
+  so kernel typing cannot distinguish the reject. Only the source-scope
+  boundary can. A resolver whose `resolve_ref` leaves an unbound bare name for
+  a later global-table lookup accepts arm 2; a resolver that removes the whole
+  prelude fails arm 1; a resolver that forbids all non-floor names fails arm 3.
+
+## D3. Root, source-path, and lazy-discovery boundaries
+
+The valid anchor for this matrix is
+`cross-file-import-resolves-through-single-root-list`: one root, entry `A`, one
+unique `A.ken.md` source leaf, and a real `A → B` dependency. The rows below
+modify only the named root/path axis. They do not choose precedence among
+multiple roots.
+
+### surface/modules/root-and-source-leaf-refusal-matrix
+
+- spec: `33 §3.2` (one-root source-world round and strict path bijection),
+  `39 §2.0` steps 1-2
+- given: apply these mutations independently to the valid anchor:
+
+  | row | root/path mutation |
+  |---|---|
+  | zero-root | pass `roots = []` with entry `A` |
+  | two-root | pass `[r1, r2]`, with a valid byte-identical `A` leaf in both |
+  | invalid-component | pass entry `A.lower`, whose lowercase component is not a module component |
+  | no-leaf | pass entry `Missing`, with no corresponding source leaf |
+  | dual-extension | add byte-identical valid `A.ken` beside `A.ken.md` |
+  | leaf-directory | add directory `A/` beside the valid `A.ken.md` leaf |
+
+- expect: the unchanged anchor accepts. Each mutation rejects at the surface
+  before any declaration from the offending entry is admitted. Zero-root and
+  two-root reject at root cardinality without probing for precedence.
+  Invalid-component rejects path validation; no-leaf rejects source lookup;
+  dual-extension and leaf-directory reject the corresponding non-unique source
+  identity. The spec locks these concepts and phases, not diagnostic strings,
+  so exact messages are not part of the oracle.
+- why: the accepted anchor proves the loader, source syntax, and file contents
+  are otherwise viable. Each row isolates one guard. Picking the first root,
+  preferring `.ken` over `.ken.md`, treating a path as both leaf and directory,
+  normalizing a lowercase component, or falling through after no leaf makes its
+  row accept or reach the wrong phase.
+
+### surface/modules/unimported-poison-is-lazy-imported-poison-rejects
+
+- spec: `33 §3.2` (lazy edge discovery), `39 §2.0` steps 1-2
+- fixture: retain the accepted `A → B` root from
+  `cross-file-import-resolves-through-single-root-list`. Add an otherwise
+  unrelated module `Z` with both `Z.ken` and `Z.ken.md` present and
+  byte-identical, so resolving `Z` has the dual-extension surface error from
+  the preceding matrix.
+- expect: with `A.ken.md` unchanged and no edge to `Z`, elaborating entry `A`
+  accepts; the poison is not inspected. Add only `import Z` to `A` and the same
+  run rejects at `Z`'s dual-extension source-identity gate. It does not accept,
+  report a later name error, or admit `A` first.
+- why: a pure successful result cannot reveal an eager scan, so the inert
+  poisoned sibling is the structural discriminator. An eager tree walk rejects
+  both arms; a loader that never follows imports accepts or misattributes the
+  second; only entry-rooted lazy discovery produces accept then reject when the
+  sole edge is added.
+
+## D4. Catalog-entry front-end reachability
+
+### surface/modules/catalog-root-entry-check-drives-real-loader
+
+- spec: `39 §2.0` (catalog-root-addressed front ends use the source loader),
+  `33 §3.2` (entry-rooted cross-file graph)
+- given: reuse the exact root, `A.ken.md`, and `B.ken.md` from
+  `cross-file-import-resolves-through-single-root-list`, but invoke the public
+  front-end operation that checks module `A` as an entry addressed through that
+  catalog root. Supply only the root and entry identity; do not pre-load `B`,
+  hand-feed exports, or pass `A` as an isolated file. The concrete CLI/API
+  token spelling is `(oracle)` because the spec locks the addressing mode and
+  behavior, not a command-line flag.
+- expect: the front end accepts and `A`'s reference resolves to `B.value`
+  through the same loader contract as the direct N2 harness. Deleting or
+  bypassing catalog-root loader routing makes this fixture reject with `B`
+  unbound and therefore fails the case. **RED UNTIL the catalog-entry front-end
+  route lands:** an isolated-file checker is not a partial pass.
+- why: the direct roots-loader case proves the producer works when called; this
+  case proves the public catalog-addressed consumer actually calls it. The
+  input contains no second route by which `B.value` can appear. The adjacent
+  poison pair separately prevents an eager whole-tree scan from satisfying
+  reachability by accident.
+
+## D5. Existing module properties retained by reference
+
+This fold does not restate the existing module substrate:
+
+- canonical provider identity and no replacement `GlobalId` remain pinned by
+  `import-spellings-resolve-to-one-binding` and
+  `../declarations/seed-namespace-export.md`;
+- active-stack cycle rejection remains pinned by
+  `import-cycle-rejected-naming-closed-path`;
+- the flat append-only `Σ` and identical `trusted_base()` delta remain pinned by
+  `module-elaborates-to-identical-flat-sigma` and
+  `../taxonomy/minimality.md`.
+
+The new cases compose with those homes. A passing strict-scope, path, or
+front-end row never substitutes for identity, cycle, or trust-root evidence,
+and those existing cases do not substitute for the new boundary flips above.
+
+For pin design, these are the explicit measured/claimed seams. “Measured” here
+names what the completed case observes; it does not claim a red-until arm is
+already built.
+
+| case group | MEASURED by the case | CLAIMED | THE GAP closed by |
+|---|---|---|---|
+| suffix | two separate suffixes accept; their combination rejects | suffix alternatives are exclusive | same provider and two independently reaching controls |
+| `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
+| caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
+| dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
+| floor/global | three floor names accept; bare ambient rejects; explicit import accepts | floor is closed and arbitrary globals do not resolve | definitionally equal type, real pre-registration, imported control |
+| root/path | valid anchor accepts; each one-axis mutation rejects at its guard | root and source identities fail closed | one valid loader input plus independent matrix rows |
+| laziness | inert poison accepts; adding its sole edge rejects at the poison | discovery follows only entry-rooted edges | identical poisoned tree in both arms |
+| front end | root-addressed entry resolves its otherwise unavailable dependency | catalog entry reaches the roots loader | only root and entry supplied; direct-loader producer control separate |
 
 ## E. Source-world program/package admission (N4; RED UNTIL LANE B)
 
@@ -804,6 +1088,15 @@ monotone-downward and revocation management actions remain runner/host-internal
 - **N2** (cross-file path resolution + cycle hard-error + plural-ready roots):
   `cross-file-import-resolves-through-single-root-list` and
   `import-cycle-rejected-naming-closed-path`.
+- **Module/import contract completion** (`32 §1`, `33 §3.3`, `39 §2.0`):
+  `import-module-alias-and-selection-are-exclusive`,
+  `pub-eligibility-rejects-enumerated-ineligible-placements`,
+  `dependency-cannot-borrow-callers-selective-import`,
+  `dependency-import-does-not-leak-back-to-caller`,
+  `closed-floor-accepts-arbitrary-global-does-not`,
+  `root-and-source-leaf-refusal-matrix`,
+  `unimported-poison-is-lazy-imported-poison-rejects`, and
+  `catalog-root-entry-check-drives-real-loader`.
 - **N3** (module clash error + explicit resolution, lexical boundary, prelude
   floor, and grammar): `top-level-local-import-clash-rejected`,
   `import-de-selection-leaves-local-sole-binding`,
@@ -870,6 +1163,24 @@ monotone-downward and revocation management actions remain runner/host-internal
   appear in both arms. With no `B → A` edge, `B.value` resolves and accepts;
   with that sole edge, the active stack closes `A → B → A` and the specific
   cycle gate rejects. No other case in this seed changes that verdict.
+- **Fresh scopes cut both transitive directions.** One pair holds the caller's
+  selective import fixed and changes only whether the dependency imports it;
+  the converse holds the dependency fixed and changes only the caller's import.
+  The floor/global case independently separates allowed ambient vocabulary from
+  an arbitrary pre-registered Ken global. None can be implemented by clearing
+  all imports or disabling the prelude.
+- **Root refusal does not decide multi-root precedence.** The root/path matrix
+  accepts the one-root anchor and rejects zero or two populated roots in this
+  source-world round. It says nothing about how a later package-manager round
+  orders two roots after that round makes the input legal.
+- **Lazy discovery is observable through poison reachability.** The same
+  dual-extension poison exists in both arms and only the import edge changes.
+  Acceptance without the edge and source-identity rejection with it are
+  incompatible with both eager scanning and never following imports.
+- **Front-end reachability and loader correctness are separate.** The direct
+  N2 case proves the roots loader's behavior. The catalog-entry case supplies
+  the same semantic input only through the public front end; both must pass,
+  while the poison pair prevents eager scanning from standing in for routing.
 - **N4 keeps names, admission, and coherence as three distinct gates.**
   `import` makes a package's exported names available; it does not admit the
   package's instances. The explicit root grants direct dispatch; it does not
@@ -937,21 +1248,37 @@ monotone-downward and revocation management actions remain runner/host-internal
   source path lands; this seed does not invent entry syntax.
 - **The N3 clash/rename suite does not re-pin the loader.** Its fixtures use
   loaded module interfaces but assert only binding-time diagnostics and target
-  identities. The N2 pair remains the sole home for root/path traversal and
-  cycle behavior.
-- **Multi-root precedence** is deferred. The N2 accept case proves only that a
-  plural root input with exactly one populated entry resolves; it does not
-  choose how two roots compete.
+  identities. The N2 pair remains the home for cross-file success and active-
+  stack cycle behavior; §D3 owns the newly explicit root/path/laziness
+  boundaries.
+- **Canonical identity, cycle behavior, and flat-`Σ` trust posture are not
+  duplicated by §D1–§D4.** Their existing homes are enumerated in §D5. The new
+  cases assert only grammar eligibility, scope closure, loader refusal, lazy
+  discovery, and public front-end reachability.
+- **Multi-root precedence** is deferred. The valid current input has one
+  populated root. Rejecting the two-populated-root matrix row in this round does
+  not choose how a future round resolves or orders that input once it becomes
+  legal.
 
-## Build-forward (N2 Lane B)
+## Build realization (N2 Lane B)
 
-This Lane A is **spec + conformance only** (no crate). N2 Lane B implements the
-in-repo loader. Its producer gate is the real import-edge traversal from the
-plural root input: the accept arm flips from `UnboundName` to acceptance, and
-the cycle arm rejects specifically at `ImportCycle` with `A → B → A`. The
+N2 Lane B implements the in-repo loader. Its producer gate is the real
+import-edge traversal from the plural root input: the accept arm resolves `B`,
+and the cycle arm rejects specifically at `ImportCycle` with `A → B → A`. The
 existing `Σ` / `trusted_base()` identity (AC1), abstract-export identity (AC2),
 and visibility diagnostics (AC3) remain unchanged. No hand-constructed export
-map satisfies the new pair.
+map satisfies the pair.
+
+## Build-forward (module/import contract completion)
+
+The follow-on implements §D1–§D4 without replacing the landed N2 producer. It
+makes import suffixes exclusive, rejects `pub` outside the allowed declaration
+inventory, constructs a fresh strict scope for every root-loaded unit, fails
+closed on root/source-path ambiguity, preserves lazy edge discovery, and routes
+the public catalog-entry checker through the roots loader. The three existing
+identity/cycle/flat-`Σ` homes in §D5 remain unchanged. A direct call to the
+loader does not discharge the front-end row, and an eager scan does not
+discharge the lazy-poison pair.
 
 ## Build-forward (N3 Lane B)
 
