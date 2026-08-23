@@ -1409,22 +1409,30 @@ impl<'plan> ContinuationUnitView<'plan> {
     /// Each role is recompared against the validated slot run before it is
     /// returned: the count of `Parameter` slots must equal
     /// `header.parameters`, which must equal the envelope length.
-    pub(in crate::cranelift_backend) fn ordinary_envelope(
+    /// ⛔ **The absent nonrecursive prefix is `Ok(None)`, not `Err`, and that
+    /// distinction is the whole point of this method existing beside
+    /// [`Self::ordinary_envelope`].** A caller that has already established a
+    /// unit is enveloped wants the failure; a caller deciding **membership**
+    /// needs the two apart. "Fewer ordinary parameters than the selected worker
+    /// has captures" is the ruled boundary of a domain — no prefix means no
+    /// capture-to-ordinary-parameter correspondence, hence no coordinate run —
+    /// while every other failure here is an integrity defect about a unit that
+    /// IS in the domain. Collapsing them makes a malformed envelope read as a
+    /// non-member and silently issue nothing, which is fail-open.
+    ///
+    /// There is deliberately no second copy of the capture subtraction at the
+    /// membership call site: this is the one authority, and a caller that
+    /// re-derived the predicate could drift from it.
+    pub(in crate::cranelift_backend) fn ruled_ordinary_envelope(
         &self,
-    ) -> Result<Vec<ContinuationOrdinaryEnvelopeRole>, CraneliftBackendError> {
+    ) -> Result<Option<Vec<ContinuationOrdinaryEnvelopeRole>>, CraneliftBackendError> {
         let captures = u32::try_from(self.key.worker.captures.len()).map_err(|_| {
             planner_error("worker capture count exceeds addressable range")
         })?;
-        let nonrecursive_field_count = self
-            .key
-            .ordinary_parameters
-            .checked_sub(captures)
-            .ok_or_else(|| {
-                planner_error(
-                    "a continuation declares fewer ordinary parameters than its selected worker \
-                     has captures, so the ruled envelope has no nonrecursive prefix",
-                )
-            })?;
+        let Some(nonrecursive_field_count) = self.key.ordinary_parameters.checked_sub(captures)
+        else {
+            return Ok(None);
+        };
 
         let parameter_slots = self
             .slots
@@ -1612,7 +1620,24 @@ impl<'plan> ContinuationUnitView<'plan> {
                 "the ruled ordinary envelope does not cover its Parameter slot run exactly",
             ));
         }
-        Ok(envelope)
+        Ok(Some(envelope))
+    }
+
+    /// The ruled envelope of a unit already established to have one.
+    ///
+    /// Delegates to [`Self::ruled_ordinary_envelope`] and restates its one
+    /// non-membership disposition as the error every existing caller already
+    /// expects. The arithmetic, the slot recomparison and the message all live
+    /// there; this is the projection, not a second derivation.
+    pub(in crate::cranelift_backend) fn ordinary_envelope(
+        &self,
+    ) -> Result<Vec<ContinuationOrdinaryEnvelopeRole>, CraneliftBackendError> {
+        self.ruled_ordinary_envelope()?.ok_or_else(|| {
+            planner_error(
+                "a continuation declares fewer ordinary parameters than its selected worker \
+                 has captures, so the ruled envelope has no nonrecursive prefix",
+            )
+        })
     }
 
     /// **The ordered continuation inputs**, re-exposed from the immutable key
@@ -7530,7 +7555,7 @@ impl<'src> StaticTransitionPlan<'src> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(in crate::cranelift_backend::planning::static_transition) mod tests {
     #[allow(unused_imports)]
     use super::super::tests::*;
     use super::super::*;
@@ -7538,7 +7563,128 @@ mod tests {
     #[allow(unused_imports)]
     use crate::{RuntimeComputationalMatchCase, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
 
-    fn contspec_multiple_worker_captures_fixture() -> RuntimeExpr {
+pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_seed_capture_worker_fixture() -> RuntimeExpr {
+        // `Closure` rather than `LexicalClosure`: its captures are SYMBOLS, so
+        // the ruled run's capture sources are `Seed`, not `Lexical`. That is the
+        // one arm of the run derivation that refuses rather than admitting, and
+        // without a fixture that reaches it the refusal is only ever read, never
+        // exercised -- changing it to a `continue` leaves the suite green.
+        let worker = RuntimeExpr::Closure {
+            captures: vec!["seed_a".to_string(), "seed_b".to_string()],
+            params: vec!["worker".to_string()],
+            body: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::Contspec::Leaf".to_string(),
+                args: Vec::new(),
+            }),
+        };
+        RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: vec!["continuation_input".to_string()],
+            body: Box::new(RuntimeExpr::ComputationalMatch {
+                scrutinee: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    args: vec![worker],
+                }),
+                cases: vec![RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    argument_binders: 1,
+                    recursive_positions: vec![0],
+                    body: unit(),
+                }],
+                default: trap("seed capture worker"),
+            }),
+        }
+    }
+
+pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_capture_free_worker_fixture() -> RuntimeExpr {
+        // Identical to the captured fixtures EXCEPT the worker captures
+        // nothing. This is the negative half of the discriminating pair, and it
+        // is non-degenerate on purpose: it still builds a continuation unit with
+        // a ruled envelope, so "no checked-IH record" here is a statement about
+        // the CAPTURE-FREE population rather than about a program that produced
+        // no units at all.
+        let worker = RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: vec!["worker".to_string()],
+            body: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::Contspec::Leaf".to_string(),
+                args: Vec::new(),
+            }),
+        };
+        RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: vec!["continuation_input".to_string()],
+            body: Box::new(RuntimeExpr::ComputationalMatch {
+                scrutinee: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    args: vec![worker],
+                }),
+                cases: vec![RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    argument_binders: 1,
+                    recursive_positions: vec![0],
+                    body: unit(),
+                }],
+                default: trap("capture free worker"),
+            }),
+        }
+    }
+
+pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_activation_owned_worker_captures_fixture() -> RuntimeExpr {
+        // ⛔ The captures are `Construct`s WITH A FIELD, not `unit()`, and that
+        // is the entire point of this fixture existing beside
+        // `contspec_multiple_worker_captures_fixture`. A `unit()` capture is a
+        // persistent ground value, so every child of the record it produces is
+        // `Persistent` and the record is `PersistentGround` -- which exercises
+        // exactly one side of the lifetime/allocation derivation and leaves the
+        // escaping side, the side the checked-IH population actually lives on,
+        // untested. An allocated aggregate is owned by the invocation arena.
+        // The run ALTERNATES the two lifetime arms rather than committing to
+        // one. An all-escaping run would test the escaping side but would still
+        // be satisfied by a record-wide constant; a MIXED run is refuted by any
+        // constant, in either direction, because the record must carry both
+        // answers at once. `Effect` is `ActivationOwned` by the occurrence
+        // plane's own expression-kind rule; `unit()` is persistent ground.
+        let capture = |tag: usize| {
+            if tag % 2 == 0 {
+                RuntimeExpr::Effect {
+                    family: "Console".to_string(),
+                    operation: ken_host::HostOpV1::ConsoleRead,
+                    capability: None,
+                    args: Vec::new(),
+                }
+            } else {
+                unit()
+            }
+        };
+        let worker = RuntimeExpr::LexicalClosure {
+            captures: (0..9).map(capture).collect(),
+            params: vec!["worker".to_string()],
+            body: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::Contspec::Leaf".to_string(),
+                args: Vec::new(),
+            }),
+        };
+        RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: vec!["continuation_input".to_string()],
+            body: Box::new(RuntimeExpr::ComputationalMatch {
+                scrutinee: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    args: vec![worker],
+                }),
+                cases: vec![RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::Contspec::Node".to_string(),
+                    argument_binders: 1,
+                    recursive_positions: vec![0],
+                    body: unit(),
+                }],
+                default: trap("activation owned worker captures"),
+            }),
+        }
+    }
+
+pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_multiple_worker_captures_fixture() -> RuntimeExpr {
         let worker = RuntimeExpr::LexicalClosure {
             captures: vec![unit(), unit()],
             params: vec!["worker".to_string()],
