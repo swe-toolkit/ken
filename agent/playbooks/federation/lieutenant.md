@@ -192,6 +192,11 @@ implementer -> leader -> {QA, Architect}      (review routing, UNCHANGED)
 
 ## §7. Anti-stall discipline
 
+- **Rest on `lieutenant/work` at `origin/main`, never detached.** After every
+  merge run M9a (`merge-procedure.md`): switch back to `lieutenant/work`, reset
+  to `origin/main`, and reap the synthetic `wp/scripted-merge-*` ref. A worktree
+  left detached on a close commit accretes stale refs and misleads "what landed"
+  reads (measured 2026-08-23).
 - **Event-driven, never poll** (COORDINATION §1). Post, set status, stop.
 - **A hold must have an address** (§1a). If you cannot name both the event you
   wait on and the seat that owes it, you are stalled — find out.
