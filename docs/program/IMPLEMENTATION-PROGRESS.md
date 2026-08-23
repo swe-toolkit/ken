@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-23 22:14:22Z — from 433 issue file(s) in `docs/program/issues/`.
+2026-08-23 23:10:24Z — from 433 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -163,7 +163,7 @@ the committed file matches the generator's output.
 | `LANG-MEMBERSHIP-OPERATOR-SURFACE` | membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator | ready | language | M | none | — |
 | `LANG-MOD-CATALOG-REALIZATION` | WP-4 — catalog realization: mark pub on Arithmetic/Order, add the imports, and make Gcd import add/mul + leq_nat/sub instead of reimplementing them; each checks standalone through the real loader (campaign SUCCESS) | draft | language | M | none | — |
 | `LANG-MOD-LOADER-ENTRY` | WP-1 — route ken check catalog files through elaborate_module_from_roots instead of the direct single-file call; behavior-preserving, non-strict | merged | language | M | none | — |
-| `LANG-MOD-OR-CANONICAL-HOME` | Or arm (b), NODE B — author Core.Logic.Or (data Or (a:Omega)(b:Omega):Type with Inl/Inr, field-for-field the prelude shape), migrate the six catalog consumers to import it, and retire the Rust prelude Or/Inl/Inr registration so exactly one catalog Or identity exists | ready | language | M | none | — |
+| `LANG-MOD-OR-CANONICAL-HOME` | Or arm (b), NODE B — author Core.Logic.Or (data Or (a:Omega)(b:Omega):Type with Inl/Inr, field-for-field the prelude shape), migrate every checked-source consumer to import it, and retire the Rust prelude Or/Inl/Inr registration so exactly one catalog Or identity exists | ready | language | L | none | — |
 | `LANG-MOD-OR-OMEGA-PARAM-ELAB` | Or arm (b), NODE A (prerequisite) — teach explicit-data parameter/index elaboration to honor an Omega-sorted binder, so a catalog package can declare Or : Omega -> Omega -> Type; the result-sort admission is unchanged, preserving the ban on proof-relevant multi-constructor Omega-valued families | merged | language | S | none | — |
 | `LANG-MOD-PUB-ELIGIBILITY` | WP-3 — semantic gate rejecting pub on ineligible placements with a surface diagnostic; pub proof retains the subject-must-be-public rule | merged | language | M | none | — |
 | `LANG-MOD-STRICT-RESOLUTION` | WP-2 — strict root-loaded resolution: a bare name in a loader-built scope resolves only through locals, explicit imports, kernel vocabulary, and the closed prelude floor; no fall-through to arbitrary program globals (the soundness core) | ready | language | L | none | — |
