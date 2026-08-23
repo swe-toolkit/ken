@@ -11,6 +11,15 @@ github: null
 origin: "Steward, 2026-08-22, cutting the Case-C reach-fork predecessor from the Architect's ruling (evt_2e11sk1jvp8mv) on RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION (M6). The M6 build measured the escaped IH environment NON-EMPTY (StaticWorker declared_arity=1, captures=9) and the existing admitted-env concept bounded to empty captures by construction (implementer evt_svjnmypxr4j5, leader evt_4jg3k6r75mhvz). Design shape ruled by the Architect; BUILD gated on the enclave denotational-faithfulness confirmation (AC-ENTRY). Steward-filed per COORDINATION section 2. HS 5."
 ---
 
+> # MERGED + CLOSED 2026-08-23 — tier-1 (B) landed origin/main 7426bb1f2
+> # (auto-closed ce6c23369); with the tier-2 partial (2d9a96ad7) it discharges
+> # AC-SCHEMA + AC-M6-UNBLOCK. Four exact-SHA APPROVEs on ebb0bbc48 (Architect
+> # evt_34pw9rkmfnbz7, Adversary evt_2cpytwaswq7qk, runtime-QA evt_67x7bjmsa6ae7,
+> # CV evt_633vzbew0xh5); Decision dec_2304df97xzbp5 resolved APPROVE; CI green.
+> # The WorkerCaptureOperand variant + two-authorities reconcile is DORMANT in
+> # production until M6 tier-3 lands an emitter. Unblocks
+> # [[RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION]] tier-3.
+>
 > # DESIGN CORRECTED 2026-08-23 — the "extend UnitBoundaryEnvironment"
 > # premise is FALSIFIED; tier 2 issues a DISTINCT record. Supersedes the
 > # MECHANISM (not the intent) wherever passages below still say "same role /
