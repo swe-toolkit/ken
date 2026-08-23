@@ -40,13 +40,10 @@ impl Drop for FixtureRoot {
     }
 }
 
-/// Durable D0 measurement: root-loaded and isolated entry paths are already
-/// observably distinct, while both still retain the same ambient passthrough.
-/// The type-only and inductive-constructor cases prove `RType::RCon` has direct
-/// global fall-throughs in both `elab.rs` and `data.rs`, in addition to the
-/// value `RExpr::RCon` seam.
+/// D1 transition sentinel: root-loaded and isolated entry paths are already
+/// observably distinct, while D0 still retains the same ambient passthrough.
 #[test]
-fn root_and_legacy_are_distinct_entries_with_all_fallbacks_still_live() {
+fn root_and_legacy_are_distinct_entries_with_ambient_passthrough_still_live() {
     let root = FixtureRoot::new("mode-key");
     root.write("Value.ken", "const leaked : Int = ambient_value");
     root.write(
@@ -97,6 +94,170 @@ fn root_and_legacy_are_distinct_entries_with_all_fallbacks_still_live() {
         .transparent_body(legacy.globals["leaked"])
         .expect("legacy value is transparent");
     assert!(matches!(body, Term::Const { id, .. } if id == legacy_ambient));
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum AmbientNameRoute {
+    ExprConToGlobals,
+    TypeConToElabGlobals,
+    TypeConToDataGlobals,
+    PatternCtorToGlobals,
+    AttachedDeclSubjectToGlobals,
+    AttachedExprSubjectToGlobals,
+    ExportInScopeToGlobals,
+    DeriveClassToClassEnv,
+    DeriveDataToGlobals,
+    InstanceClassToClassEnv,
+    InstanceConstraintClassToClassEnv,
+    ViewConstraintClassToClassEnv,
+}
+
+const COMPLETE_AMBIENT_NAME_ROUTES: [AmbientNameRoute; 12] = [
+    AmbientNameRoute::ExprConToGlobals,
+    AmbientNameRoute::TypeConToElabGlobals,
+    AmbientNameRoute::TypeConToDataGlobals,
+    AmbientNameRoute::PatternCtorToGlobals,
+    AmbientNameRoute::AttachedDeclSubjectToGlobals,
+    AmbientNameRoute::AttachedExprSubjectToGlobals,
+    AmbientNameRoute::ExportInScopeToGlobals,
+    AmbientNameRoute::DeriveClassToClassEnv,
+    AmbientNameRoute::DeriveDataToGlobals,
+    AmbientNameRoute::InstanceClassToClassEnv,
+    AmbientNameRoute::InstanceConstraintClassToClassEnv,
+    AmbientNameRoute::ViewConstraintClassToClassEnv,
+];
+
+/// D1 transition sentinel inventory of every resolved surface representation
+/// that can reach arbitrary ambient declaration state during roots loading.
+///
+/// The inventory is by representation and consumer, rather than spelling:
+/// `RExpr::RCon`, `RType::RCon`'s two consumers, `RPatKind::Ctor`, the attached
+/// declaration/reference forms, and in-scope export all pass through the module
+/// resolver before reaching `globals`; derive, instance, and both constraint
+/// consumers retain class/data names and consult `class_env`/`globals` directly.
+///
+/// All other name-bearing fields are non-ambient by construction: declaration
+/// and constructor names introduce bindings; `RVar`/`RVarTy`/pattern variables,
+/// cells, and recursive-result names are lexically indexed; record/class field
+/// and projection names are structural labels; qualified imports and facade
+/// exports consult only module export tables; effect-row names, temporal atoms,
+/// foreign symbols, and library names inhabit separate non-global namespaces.
+#[test]
+fn every_ambient_name_representation_reaches_its_current_route() {
+    let mut observed = BTreeSet::new();
+
+    let root = FixtureRoot::new("name-routes");
+    root.write("Expr.ken", "const leaked : Int = ambient_value");
+    root.write(
+        "Type.ken",
+        "fn identity (x : AmbientType) : AmbientType = x",
+    );
+    root.write("Data.ken", "data Boxed = Box AmbientType");
+    root.write(
+        "Pattern.ken",
+        "fn inspect (x : Bool) : Bool = match x { AmbientTrue |-> True ; False |-> False }",
+    );
+    root.write("Export.ken", "export ambient_value");
+    root.write(
+        "AttachedDecl.ken",
+        "proof rooted for ambient_id (x : Int) : Equal Int (ambient_id x) x = Refl",
+    );
+    root.write(
+        "AttachedExpr.ken",
+        "theorem consume (x : Int) : Equal Int (ambient_id x) x = ambient_id::stable x",
+    );
+
+    let mut globals = ElabEnv::new().expect("base environment");
+    let int = Term::const_(globals.globals["Int"], vec![]);
+    globals
+        .declare_postulate_raw("ambient_value", int)
+        .expect("declare ambient value");
+    globals
+        .declare_postulate_raw("AmbientType", Term::ty(Level::Zero))
+        .expect("declare ambient type");
+    let true_id = globals.globals["True"];
+    globals.globals.insert("AmbientTrue".to_string(), true_id);
+    globals
+        .elaborate_file(
+            "fn ambient_id (x : Int) : Int = x \
+             proof stable for ambient_id (x : Int) : Equal Int (ambient_id x) x = Refl",
+        )
+        .expect("declare ambient attached-proof subject and proof");
+
+    for (entry, routes) in [
+        ("Expr", &[AmbientNameRoute::ExprConToGlobals][..]),
+        ("Type", &[AmbientNameRoute::TypeConToElabGlobals][..]),
+        ("Data", &[AmbientNameRoute::TypeConToDataGlobals][..]),
+        ("Pattern", &[AmbientNameRoute::PatternCtorToGlobals][..]),
+        ("Export", &[AmbientNameRoute::ExportInScopeToGlobals][..]),
+        (
+            "AttachedDecl",
+            &[AmbientNameRoute::AttachedDeclSubjectToGlobals][..],
+        ),
+        (
+            "AttachedExpr",
+            &[AmbientNameRoute::AttachedExprSubjectToGlobals][..],
+        ),
+    ] {
+        globals
+            .elaborate_module_from_roots(&[root.0.clone()], entry)
+            .unwrap_or_else(|error| panic!("{entry} ambient route remains live in D0: {error}"));
+        observed.extend(routes.iter().copied());
+    }
+
+    let derive_root = FixtureRoot::new("derive-routes");
+    derive_root.write("Entry.ken", "derive AmbientDerive for AmbientData");
+    let mut derive = ElabEnv::new().expect("base environment");
+    derive
+        .elaborate_file("class AmbientDerive a {} data AmbientData = MkAmbientData")
+        .expect("declare ambient derive class and data");
+    derive
+        .elaborate_module_from_roots(&[derive_root.0.clone()], "Entry")
+        .expect("derive class/data names retain direct ambient routes in D0");
+    observed.extend([
+        AmbientNameRoute::DeriveClassToClassEnv,
+        AmbientNameRoute::DeriveDataToGlobals,
+    ]);
+
+    let instance_root = FixtureRoot::new("instance-routes");
+    instance_root.write(
+        "Entry.ken",
+        "data Local = MkLocal \
+         instance AmbientInstance Local where (d : AmbientConstraint Local) {}",
+    );
+    let mut instance = ElabEnv::new().expect("base environment");
+    instance
+        .elaborate_file("class AmbientInstance a {} class AmbientConstraint a {}")
+        .expect("declare ambient instance and constraint classes");
+    instance
+        .elaborate_module_from_roots(&[instance_root.0.clone()], "Entry")
+        .expect("instance and prerequisite class names retain direct class routes in D0");
+    observed.extend([
+        AmbientNameRoute::InstanceClassToClassEnv,
+        AmbientNameRoute::InstanceConstraintClassToClassEnv,
+    ]);
+
+    let view_root = FixtureRoot::new("view-constraint-route");
+    view_root.write(
+        "Provider.ken",
+        "class AmbientView a {} instance AmbientView Bool {}",
+    );
+    view_root.write(
+        "Entry.ken",
+        "fn constrained (x : Bool) : Bool where AmbientView Bool = x",
+    );
+    let mut view = ElabEnv::new().expect("base environment");
+    view.elaborate_module_from_roots(&[view_root.0.clone()], "Provider")
+        .expect("load the ambient class/dictionary without importing it into Entry");
+    view.elaborate_module_from_roots(&[view_root.0.clone()], "Entry")
+        .expect("view constraint class retains direct class route in D0");
+    observed.insert(AmbientNameRoute::ViewConstraintClassToClassEnv);
+
+    assert_eq!(
+        observed,
+        COMPLETE_AMBIENT_NAME_ROUTES.into_iter().collect(),
+        "every ambient-capable name representation has a live D0 route probe"
+    );
 }
 
 /// Durable D0 measurement: the floor predicate is exactly the installer's
@@ -188,12 +349,14 @@ fn ambient_dependencies(root: &Path, entry: &str) -> Result<Vec<String>, String>
 fn catalog_ambient_passthrough_migration_census() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let root = repo.join("catalog/packages");
+    let mut discovered = BTreeSet::new();
     let mut census = Vec::new();
     let mut clean = Vec::new();
     let mut residuals = Vec::new();
 
     for path in source_leaves(&root) {
         let address = catalog_module_from_path(&path).expect("catalog leaf has a module address");
+        discovered.insert(address.entry.clone());
         let mut baseline = ElabEnv::new().expect("base environment");
         if let Err(error) = baseline
             .elaborate_module_from_roots(std::slice::from_ref(&address.root), &address.entry)
@@ -339,6 +502,79 @@ fn catalog_ambient_passthrough_migration_census() {
         "WP-4 migration sentinel: ambient dependencies changed"
     );
 
+    let ambient = census
+        .iter()
+        .map(|(entry, _)| entry.clone())
+        .collect::<BTreeSet<_>>();
+    let clean = clean.into_iter().collect::<BTreeSet<_>>();
+    let residual_names = residuals
+        .iter()
+        .map(|(entry, _)| entry.clone())
+        .collect::<BTreeSet<_>>();
+    let expected_clean = [
+        "Core.Logic.Transport",
+        "Tooling.Verification.ProofErasureBoundaryChecker",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect::<BTreeSet<_>>();
+    let expected_residuals = [
+        "Algorithm.Numeric.Gcd",
+        "Algorithm.Sorting.InsertionSort",
+        "Application.CommandLine.ArgParse",
+        "Application.Configuration.Decoder",
+        "Application.Input.Schema",
+        "Capability.Diagnostics.Core",
+        "Capability.Diagnostics.Render",
+        "Capability.Filesystem.Path.Posix",
+        "Capability.Formatting.Doc",
+        "Capability.Parsing.Cursor",
+        "Capability.Parsing.Decoder",
+        "Capability.Parsing.Numeric",
+        "Capability.Parsing.Parsing",
+        "Capability.Process.Arguments",
+        "Capability.System.IO",
+        "Core.Classes.EffectfulClasses",
+        "Core.Classes.LawfulClasses",
+        "Core.Classes.LawfulFunctors",
+        "Data.Binary.BytesKeys",
+        "Data.Collections.Derived",
+        "Data.Collections.Map",
+        "Data.Collections.NonEmpty",
+        "Data.Numeric.Nat.Arithmetic",
+        "Data.Numeric.Nat.Order",
+        "Data.Serialization.Json",
+        "Data.Sums.Combinators",
+        "Data.Sums.Validation",
+        "Data.Text.Codec",
+        "Data.Text.StringBijection",
+        "Data.Text.StringKeys",
+        "Tooling.Testing.Property",
+        "Tooling.Verification.FoKripke",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect::<BTreeSet<_>>();
+    assert_eq!(clean, expected_clean, "WP-4 strict-floor-clean sentinel");
+    assert_eq!(
+        residual_names, expected_residuals,
+        "WP-4 baseline-red residual sentinel"
+    );
+    assert!(ambient.is_disjoint(&clean));
+    assert!(ambient.is_disjoint(&residual_names));
+    assert!(clean.is_disjoint(&residual_names));
+    let partition = ambient
+        .union(&clean)
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .union(&residual_names)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        partition, discovered,
+        "ambient, clean, and residual sets exhaust discovered catalog addresses"
+    );
+
     let library = repo.join("library");
     for path in source_leaves(&library) {
         assert!(
@@ -348,10 +584,5 @@ fn catalog_ambient_passthrough_migration_census() {
         );
     }
 
-    println!("D0 strict-floor clean = {clean:#?}");
     println!("D0 residuals = {residuals:#?}");
-    assert!(
-        !residuals.is_empty(),
-        "baseline-red catalog units are an explicit D0 residual, not silently census-clean"
-    );
 }
