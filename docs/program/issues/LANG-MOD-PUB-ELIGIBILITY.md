@@ -1,23 +1,24 @@
 ---
 id: LANG-MOD-PUB-ELIGIBILITY
 title: "WP-3 — semantic gate rejecting pub on ineligible placements with a surface diagnostic; pub proof retains the subject-must-be-public rule"
-status: draft
+status: ready
 owner: language
 size: M
 gate: none
 depends_on: []
 blocks: [LANG-MOD-CATALOG-REALIZATION]
 github: null
-origin: "Architect component framing evt_hpnhqy1ex286 (WP-3), under [[LANG-MODULE-IMPORT-SYSTEM]]. Steward-filed per COORDINATION section 2, 2026-08-23. FRAMED; release HELD (see campaign root release gate)."
+origin: "Architect component framing evt_hpnhqy1ex286 (WP-3), under [[LANG-MODULE-IMPORT-SYSTEM]]. Steward-filed per COORDINATION section 2, 2026-08-23. RELEASED 2026-08-23 (WP-1 merged be321d40b; language ring free; next in ring order WP-1->WP-3)."
 ---
 
-> # FRAMED — HELD FOR RELEASE
+> # RELEASED 2026-08-23 — module/import WP-3
 >
-> Independent, can lead the campaign (parallel with WP-1). Release held until the
-> language ring finishes [[V3-FO-EMBEDDING-ADEQUACY]] (finish-then-switch). The
-> eligible/ineligible placement list is fixed by spec-author's grammar repair
-> (SPEC REPAIR 1) in candidate 860c605; author the wp/ frame against the MERGED
-> spec so the AC roster matches CV's landed conformance fold.
+> Full frame: `docs/program/wp/LANG-MOD-PUB-ELIGIBILITY.md`, fixed inputs at
+> `origin/main be321d40b`. WP-1 ([[LANG-MOD-LOADER-ENTRY]]) merged, so the
+> single-threaded language ring takes WP-3 next. The eligible/ineligible `pub`
+> placement rules are normative in the merged spec surface (`def16ecf4`,
+> `spec/30-surface/32-grammar.md:92-99`); this WP implements the surface
+> rejection they describe.
 
 # Objective
 
