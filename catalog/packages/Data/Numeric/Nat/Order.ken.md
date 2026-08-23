@@ -34,6 +34,8 @@ recursive law is attached to `leq_nat` and uses its `leq_nat::name` path for
 self-reference.
 
 ```ken
+import Core.Logic.Or (Or, Inl, Inr)
+
 fn leq_nat (m : Nat) (n : Nat) : Bool =
   match m {
     Zero ↦ True;

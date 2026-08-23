@@ -2,6 +2,9 @@
 //! proof-carrying `Pair` and `List` instances, computes on concrete values,
 //! and keeps its neutral proof paths dictionary-directed.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::{trusted_base_delta, ElabEnv};
 use ken_kernel::env::Decl;
 
@@ -13,6 +16,7 @@ const LAWFUL_CLASSES_KEN_MD: &str =
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("Core/Logic/Transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

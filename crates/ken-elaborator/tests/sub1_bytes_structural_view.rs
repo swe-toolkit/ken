@@ -1,5 +1,8 @@
 //! SUB-1 acceptance: the bounded `Bytes ↔ List UInt8` structural view.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
@@ -221,6 +224,7 @@ fn ac2_trusted_base_delta_is_exactly_the_named_pair_and_propositions() {
 #[test]
 fn ac1_ac3_structural_fold_terminates_runs_and_adds_no_axiom() {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_ken_md_file(TRANSPORT)
         .expect("Transport package");
@@ -315,6 +319,7 @@ fn ac4_both_runtime_roundtrip_directions_are_real_and_total() {
 #[test]
 fn ac4_roundtrip_propositions_are_usable_but_not_refl_reductions() {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
 
     env.elaborate_decl(

@@ -77,6 +77,8 @@ and closes with `Proved` — the same non-inductive shape as
 immediate since `empty = Leaf`. Neither needs induction or a comparison.
 
 ```ken
+import Core.Logic.Or (Or, Inl, Inr)
+
 data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
 
 const empty (k : Type) (v : Type) : Tree k v = Leaf k v

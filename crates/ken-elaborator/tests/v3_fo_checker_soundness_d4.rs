@@ -6,6 +6,9 @@
 //! these accepted derivations and the eigenparameter discriminator remain part
 //! of the checker contract.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
@@ -15,6 +18,7 @@ const FOK_SOURCE: &str =
 
 fn elaborate_fok() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("the real FoKripke source must pass full admission");
     env

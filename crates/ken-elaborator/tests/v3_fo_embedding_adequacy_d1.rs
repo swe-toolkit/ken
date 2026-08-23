@@ -1,16 +1,27 @@
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{convert_type, normalize, Context, KernelError};
+use ken_kernel::{convert_type, normalize, Context, KernelError, Level, Term};
 
 const FOK_SOURCE: &str =
     include_str!("../../../catalog/packages/Tooling/Verification/FoKripke.ken");
 
 fn env_with_fok() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke including the D1 apparatus");
     env
+}
+
+fn applied_head(term: &Term) -> &Term {
+    match term {
+        Term::App(function, _) => applied_head(function),
+        other => other,
+    }
 }
 
 /// Rust-side schema for the quotation-preservation judgment. For a
@@ -74,6 +85,7 @@ fn add_bool_model(env: &mut ElabEnv) {
 #[test]
 fn intrinsic_apparatus_passes_full_admission_with_zero_trust_delta() {
     let mut env = ElabEnv::new().expect("base environment");
+    catalog_or::load_core_logic_or(&mut env);
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(FOK_SOURCE)
         .expect("D1 source must elaborate, kernel-check, and pass SCT");
@@ -224,7 +236,7 @@ fn truncation_conversion_preserves_quotation() {
            (FokScopedImp FokSliceSignature Zero \
              (FokScopedBottom FokSliceSignature Zero) \
              (FokScopedBottom FokSliceSignature Zero)))";
-    let obligation_source = "‖Or Bottom (Bottom -> Bottom)‖";
+    let obligation_source = "‖Core.Logic.Or.Or Bottom (Bottom -> Bottom)‖";
     let (denotation, denotation_sort) = env
         .elaborate_expr("fok-d1-or-denotation", denotation_source)
         .expect("the intrinsic Or denotation");
@@ -232,6 +244,18 @@ fn truncation_conversion_preserves_quotation() {
         .elaborate_expr("fok-d1-or-obligation", obligation_source)
         .expect("the original truncated-Or obligation");
     let context = Context::new();
+
+    let or_id = env.globals["Core.Logic.Or.Or"];
+    let Term::Trunc(or_term) = &obligation else {
+        panic!("the quoted FokScopedOr obligation must remain truncated");
+    };
+    assert!(
+        matches!(applied_head(or_term), Term::IndFormer { id, .. } if *id == or_id),
+        "the FO quotation must use the canonical catalog Or GlobalId"
+    );
+    let or_decl = env.env.inductive(or_id).expect("canonical Or family");
+    assert_eq!(or_decl.params, vec![Term::omega(Level::Zero); 2]);
+    assert_eq!(or_decl.level, Level::Zero);
 
     assert!(
         convert_type(&env.env, &context, &denotation_sort, &obligation_sort),
@@ -241,9 +265,17 @@ fn truncation_conversion_preserves_quotation() {
         convert_type(&env.env, &context, &obligation, &obligation),
         "positive control: the kernel conversion harness must accept identity"
     );
+    let normalized_denotation = normalize(&env.env, &context, &denotation);
+    let normalized_obligation = normalize(&env.env, &context, &obligation);
+    let Term::Trunc(denoted_or) = &normalized_denotation else {
+        panic!("FokScopedOr denotation must normalize to a truncated Or");
+    };
+    assert!(
+        matches!(applied_head(denoted_or), Term::IndFormer { id, .. } if *id == or_id),
+        "FokScopedOr must resolve to the canonical catalog Or GlobalId"
+    );
     assert_eq!(
-        normalize(&env.env, &context, &denotation),
-        normalize(&env.env, &context, &obligation),
+        normalized_denotation, normalized_obligation,
         "full normalization must expose the same truncated Or"
     );
     assert!(

@@ -489,13 +489,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 .map(str::to_string)
                 .collect(),
         ),
-        (
-            "Core.Logic.EmptyDec".to_string(),
-            ["Dec", "Empty", "Equal", "IsTrue", "No", "Proved", "Yes"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
-        ),
     ];
     assert_eq!(
         census, expected,
@@ -537,6 +530,8 @@ fn catalog_ambient_passthrough_migration_census() {
         "Core.Classes.EffectfulClasses",
         "Core.Classes.LawfulClasses",
         "Core.Classes.LawfulFunctors",
+        "Core.Logic.EmptyDec",
+        "Core.Logic.Or",
         "Data.Binary.BytesKeys",
         "Data.Collections.Derived",
         "Data.Collections.Map",

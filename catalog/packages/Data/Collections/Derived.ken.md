@@ -64,6 +64,8 @@ FS-effect, `crates/ken-elaborator/src/bytes.rs` — this is the pure
 them.
 
 ```ken
+import Core.Logic.Or (Or, Inl, Inr)
+
 data OrdResult = Lt | Eq | Gt
 
 const ord_eq : OrdResult = Eq

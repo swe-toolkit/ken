@@ -4,6 +4,9 @@
 //! byte-artifact `Source`, half-open byte `Span`, explicit validity proofs,
 //! located values, total parse results, and zero trusted-base delta.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::Decl;
@@ -23,6 +26,7 @@ const DECODER_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("Transport must elaborate first");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

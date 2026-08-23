@@ -1205,64 +1205,6 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     })
     .map_err(|e| ElabError::Internal(format!("prelude Perm_rel failed: {}", e)))?;
 
-    // `Or : Ω → Ω → Type` — the two-constructor sum over PROPOSITIONS
-    // (`map-verified-laws`' `boolDichotomy` reflect-combinator envelope,
-    // `54-map-verified-laws.md §3`). Must be `Type`-valued (proof-relevant:
-    // case-splitting on WHICH disjunct holds must be informative, unlike an
-    // `Ω`-valued disjunction which would make `Inl`/`Inr` proof-irrelevantly
-    // equal — `[[proof-relevant-inductive-cannot-be-declared-at-omega]]`),
-    // but its two PAYLOADS are themselves `Ω`-classified propositions (e.g.
-    // `Equal Bool (leq k k') True`) — a strictly different shape from every
-    // other sum in this catalog (`Option`/`Result`, whose payloads are
-    // `Type`-classified). The surface `data` sugar (`data.rs::elab_data_decl`)
-    // hardcodes every parameter to `Type 0` (no way to spell an `Ω`-sorted
-    // parameter there), so — mirroring `Perm_rel` immediately above, the
-    // SAME "kernel `declare_inductive` directly, one level below the
-    // elaborator's surface convenience wrapper" technique — `Or` is built
-    // against the kernel API, which DOES support arbitrary parameter sorts.
-    // Zero trusted_base delta: an ordinary `declare_inductive` admission,
-    // kernel-rechecked, identical trust category to every other `data`.
-    // Unlike `Perm_rel`'s ctors (internal plumbing, never surface-matched),
-    // `Or`/`Inl`/`Inr` ARE surface-referenced (pattern-matched by
-    // `boolDichotomy`'s callers), so all three are registered in
-    // `elab.globals` below.
-    let or_id = ken_kernel::declare_inductive(&mut elab.env, |_or_id| {
-        ken_kernel::InductiveSpec {
-            level_params: vec![],
-            // `Δ_p = [a : Ω₀, b : Ω₀]` — params innermost-first: ctor-arg
-            // context has `b` at `Var(0)` (last param), `a` at `Var(1)`
-            // (first param), per `data.rs`'s own documented convention.
-            params: vec![omega0.clone(), omega0.clone()],
-            indices: vec![],
-            level: Level::Zero,
-            constructors: vec![
-                // `Inl : a -> Or a b`, ctx `[a,b]`: `a` = Var(1).
-                ken_kernel::CtorSpec {
-                    args: vec![Term::var(1)],
-                    target_indices: vec![],
-                },
-                // `Inr : b -> Or a b`, ctx `[a,b]`: `b` = Var(0).
-                ken_kernel::CtorSpec {
-                    args: vec![Term::var(0)],
-                    target_indices: vec![],
-                },
-            ],
-        }
-    })
-    .map_err(|e| ElabError::Internal(format!("prelude Or failed: {}", e)))?;
-    elab.globals.insert("Or".to_string(), or_id);
-    let or_ind = elab
-        .env
-        .inductive(or_id)
-        .ok_or_else(|| {
-            ElabError::Internal("prelude: 'Or' inductive not found after declare".into())
-        })?
-        .clone();
-    elab.globals
-        .insert("Inl".to_string(), or_ind.constructors[0].id);
-    elab.globals
-        .insert("Inr".to_string(), or_ind.constructors[1].id);
-
     // `Empty : Type0` — the computational false (DS-1, `docs/program/wp/
     // catalog-ds-1-empty-dec.md` Fork 1), zero params/zero constructors.
     // Bootstrapped here — same as every other prelude `data` above
@@ -1296,12 +1238,10 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     .map_err(|e| ElabError::Internal(format!("prelude Empty failed: {}", e)))?;
 
     // `Dec (P : Omega) : Type0 = Yes P | No (P -> Empty)` (DS-1 Fork 2) —
-    // Lean's `Decidable` shape, kernel-direct (`declare_inductive`) because
-    // surface `data` hardcodes every param to `Type0`
-    // (`crates/ken-elaborator/src/data.rs:45`) and has no way to spell the
-    // Ω-sorted `P`. Zero new trusted-base category: an ordinary
-    // `declare_inductive` admission, kernel-rechecked, identical trust
-    // category to `Or`/`Perm_rel` immediately above. Confirmed to admit and
+    // Lean's `Decidable` shape, kernel-direct (`declare_inductive`) because it
+    // is part of the bootstrapped prelude rather than a catalog package. Zero
+    // new trusted-base category: an ordinary `declare_inductive` admission,
+    // kernel-rechecked, identical trust category to surface `data`. Confirmed to admit and
     // to large-eliminate into a `Type0` motive by the DS-1 build-step-1
     // smoke test (`crates/ken-elaborator/tests/ds1_smoke_test.rs`).
     let dec_id = ken_kernel::declare_inductive(&mut elab.env, |_dec_id| {

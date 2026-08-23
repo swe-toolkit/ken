@@ -12,6 +12,9 @@
 //! - **AC5** — the catalog entry's `` ```ken ``/`` ```ken example ``/
 //!   `` ```ken reject `` fences all check via the real literate extractor.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::ElabEnv;
 use ken_kernel::conv::whnf;
 use ken_kernel::env::Context;
@@ -191,6 +194,7 @@ fn ac1_mechanism_probe_no_method_wrong_domain_rejected() {
 #[test]
 fn ac2_empty_and_absurd_empty_elaborate() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     assert!(env.globals.contains_key("Empty"), "Empty must be a prelude global");
     assert!(env.globals.contains_key("Dec"), "Dec must be a prelude global");
     assert!(env.globals.contains_key("Yes"), "Yes must be a prelude global");
@@ -258,6 +262,7 @@ fn ac3_trusted_base_delta_is_ordinary_inductive_admission_only() {
 #[test]
 fn ac4_bridge_demonstrated_over_deceq_bool_not_only_deceq_int() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(EMPTY_DEC_KEN_MD)
         .expect("catalog/packages/Core/Logic/EmptyDec.ken.md must elaborate standalone (Definition + every checked fence)");
 
@@ -280,6 +285,7 @@ fn ac4_bridge_demonstrated_over_deceq_bool_not_only_deceq_int() {
 #[test]
 fn landed_lawful_classes_package_still_elaborates_with_dependencies() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("catalog/packages/Core/Logic/Transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

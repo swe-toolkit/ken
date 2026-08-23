@@ -27,6 +27,9 @@
 //! independently serialized to Ken source and run through `fok_check_cert` --
 //! the Rust and Ken checkers never share an evaluation path.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::fo_kripke::{check_cert, embed, Cert, Form, IForm, IVar, QTerm, Rule, Sequent};
@@ -415,6 +418,7 @@ fn cases() -> Vec<(&'static str, IForm)> {
 #[test]
 fn fok_embed_agrees_with_rust_embed_on_quoted_inputs() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     let before_trust: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
@@ -439,6 +443,7 @@ fn fok_embed_agrees_with_rust_embed_on_quoted_inputs() {
 #[test]
 fn fok_iform_has_exactly_five_slice_constructors() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ind = env
@@ -455,6 +460,7 @@ fn fok_iform_has_exactly_five_slice_constructors() {
 #[test]
 fn fok_rule_has_exactly_three_slice_variants() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ind = env
@@ -480,6 +486,7 @@ fn fok_rule_has_exactly_three_slice_variants() {
 #[test]
 fn fok_sequent_and_init_preserve_positional_field_order() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ids = FokIds::resolve(&env);
@@ -536,6 +543,7 @@ fn fok_sequent_and_init_preserve_positional_field_order() {
 #[test]
 fn fok_check_cert_kernel_checks_with_no_trusted_base_delta() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     let before_trust: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
@@ -563,6 +571,7 @@ fn fok_check_cert_kernel_checks_with_no_trusted_base_delta() {
 #[test]
 fn fok_check_cert_accepts_genuine_derivations() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ids = FokIds::resolve(&env);
@@ -614,6 +623,7 @@ fn fok_check_cert_accepts_genuine_derivations() {
 #[test]
 fn fok_check_cert_totally_rejects_malformed_certificates() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ids = FokIds::resolve(&env);
@@ -795,6 +805,7 @@ fn differential_check_cert(
 #[test]
 fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ids = FokIds::resolve(&env);
@@ -1139,6 +1150,7 @@ fn differential_form_eq(
 #[test]
 fn fok_form_eq_agrees_with_rust_partial_eq_field_level() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ids = FokIds::resolve(&env);
@@ -1271,6 +1283,7 @@ fn fok_form_eq_agrees_with_rust_partial_eq_field_level() {
 #[test]
 fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ids = FokIds::resolve(&env);
@@ -1363,6 +1376,7 @@ fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
 #[test]
 fn fok_check_cert_serializer_discriminates_qterm_bound_parameter_collision() {
     let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ids = FokIds::resolve(&env);

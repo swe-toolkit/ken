@@ -18,6 +18,9 @@
 //! derivation table); `spec/50-stdlib/52-map.md` §1.1/§9 (Map-build's
 //! supersession + AC1 net-negative TCB).
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv};
 use ken_kernel::env::Decl;
 use ken_kernel::{whnf, Term};
@@ -27,11 +30,14 @@ const TRANSPORT_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logi
 const MAP_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Map.ken.md");
 
 fn mk_env() -> ElabEnv {
-    ElabEnv::new().expect("base env construction failed")
+    let mut env = ElabEnv::new().expect("base env construction failed");
+    catalog_or::load_core_logic_or(&mut env);
+    env
 }
 
 fn mk_env_with_map() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD).expect("transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD).expect("Derived.ken.md must elaborate");
     env.elaborate_ken_md_file(MAP_KEN_MD).expect("map.ken.md must elaborate");

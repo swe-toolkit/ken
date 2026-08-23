@@ -1,6 +1,9 @@
 //! CAT-1 package checks for the landed lawful-functors source.
 //! This loads the real package files through the production elaborator path.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::ElabEnv;
 use ken_kernel::Term;
 
@@ -12,6 +15,7 @@ const LAWFUL_FUNCTORS_KEN_MD: &str =
 
 fn mk_env_with_lawful_functors() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("catalog/packages/Core/Logic/Transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

@@ -19,6 +19,9 @@
 //! - DS-AC6 distinct pure `list_append`/`bytes_concat` operations.
 //! - DS-AC7 `concat-slice-compose-and-floor-totality`.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
@@ -29,6 +32,7 @@ const TRANSPORT_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logi
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("catalog/packages/Core/Logic/Transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

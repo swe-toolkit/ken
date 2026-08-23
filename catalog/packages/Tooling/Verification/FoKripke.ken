@@ -12,6 +12,8 @@
 -- any FO `Proved` verdict, any new kernel primitive or trusted axiom, and any
 -- widening of the five-constructor / three-rule slice below.
 
+import Core.Logic.Or (Or, Inl, Inr)
+
 -- === D0: quoted source data (23 section 4.3, slice subset) ===
 
 -- A bound source object variable, de Bruijn (23 section 4.3 `IVar`).

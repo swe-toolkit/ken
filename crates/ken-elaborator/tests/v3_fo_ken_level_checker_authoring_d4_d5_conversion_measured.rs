@@ -137,6 +137,9 @@
 //! program in the capped corpus terminates and is accepted once given
 //! enough native stack, exactly the distinction `AC-5` requires.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::{
     fo_kripke::{
         discover_and_quote_fo, find_certificate, Cert, Form, IForm, IVar, QTerm, Rule, Sequent,
@@ -362,6 +365,7 @@ fn measure_one(env: &mut ElabEnv, label: &str, source: &str, formula_depth: usiz
 fn measure_kernel_conversion_load_on_real_source_programs() {
     run_with_big_stack(|| {
         let mut env = ElabEnv::new().expect("base env");
+        catalog_or::load_core_logic_or(&mut env);
         env.elaborate_file(FOK_SOURCE)
             .expect("FoKripke.ken failed to elaborate/kernel-check");
         declare_fo_vocabulary(&mut env, "A", "P");

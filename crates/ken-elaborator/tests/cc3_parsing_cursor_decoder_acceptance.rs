@@ -1,5 +1,8 @@
 //! CC3 (`Capability.Parsing.Cursor` + `Capability.Parsing.Decoder`) ordered shared-environment acceptance.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
@@ -19,6 +22,7 @@ const PARSING_KEN_MD: &str =
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("Transport must elaborate first");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

@@ -5,6 +5,9 @@
 //! `take`/`drop`, `map` length, and `take` length/min laws.
 //! D2 adds the verified `List Bool` insertion-sort/count-permutation slice.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv};
 use ken_kernel::Decl;
 
@@ -14,6 +17,7 @@ const COLLECTIONS_KEN_MD: &str =
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("catalog/packages/Core/Logic/Transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

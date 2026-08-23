@@ -1,5 +1,8 @@
 //! CC8 ordered shared-environment acceptance for Schema's two real clients.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
@@ -40,6 +43,7 @@ const EXAMPLE: &str = include_str!("../../../catalog/examples/CommandLine/Forge.
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     for (source, label) in [
         (TRANSPORT, "Core.Logic.Transport"),
         (COLLECTIONS, "Data.Collections"),

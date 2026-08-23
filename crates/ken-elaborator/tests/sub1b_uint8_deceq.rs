@@ -1,6 +1,9 @@
 //! SUB-1b acceptance: lawful `DecEq UInt8` and `DecEq Bytes` from one
 //! conversion-layer retraction postulate.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError};
@@ -16,6 +19,7 @@ const BYTES_KEYS: &str =
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT)
         .expect("Transport package");
     env.elaborate_ken_md_file(COLLECTIONS)
@@ -160,6 +164,7 @@ fn ac4_deceq_bytes_decides_raw_bytes_non_vacuously() {
 #[test]
 fn ac5_postulate_is_usable_but_refl_remains_rejected() {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_decl(
         "theorem use_uint8_retract (x : UInt8) : \
          Equal UInt8 (int_to_uint8_raw (uint8_to_int x)) x = \

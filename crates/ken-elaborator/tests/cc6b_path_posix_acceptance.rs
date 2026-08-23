@@ -1,5 +1,8 @@
 //! CC6b `Capability.Filesystem.Path.Posix` acceptance.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
@@ -17,6 +20,7 @@ const PATH_POSIX: &str = include_str!("../../../catalog/packages/Capability/File
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     for (name, source) in [
         ("Core.Logic.Transport", TRANSPORT),
         ("Data.Collections", COLLECTIONS),
