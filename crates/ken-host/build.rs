@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 
 fn main() {
     println!("cargo:rerun-if-changed=abi_probe.c");
@@ -80,7 +80,8 @@ fn main() {
     let effect_catalog = parse_effect_catalog();
     write_host_effect_generated(&target, &effect_catalog, &effect_layout);
 
-    let canonical = canonical_manifest(&target, &target_os, backend, &dependencies, &facts);
+    let families = group_facts_by_family(&facts);
+    let canonical = canonical_manifest(&target, &target_os, backend, &dependencies, &families);
     let hash: [u8; 32] = Sha256::digest(canonical.as_bytes()).into();
     write_generated(
         &target,
@@ -88,6 +89,7 @@ fn main() {
         backend,
         &dependencies,
         &facts,
+        &families,
         &canonical,
         &hash,
     );
@@ -342,6 +344,79 @@ fn package_identity(
     panic!("Cargo.lock lacks exact {name} {version}");
 }
 
+/// **`ABI-M1` `D1` -- the family schema, one row per `AbiFamily` variant.**
+///
+/// `build.rs` cannot import `ken_host::AbiFamily`, so it names each family by
+/// the VARIANT PATH it emits into `OUT_DIR`. That text is compiler-checked
+/// where `lib.rs` includes it: a family named here that the enum does not have
+/// fails to compile, and a variant added to the enum without threading is
+/// `error[E0004]` in `lib.rs`. Neither side keeps a private list the other can
+/// drift from.
+///
+/// The prefix is how a fact is assigned to its family. Assignment is TOTAL and
+/// checked at generation: a fact matching no prefix aborts the build rather
+/// than landing in a default family, because a silent default is exactly the
+/// omission this WP exists to remove.
+const FAMILY_SCHEMA: &[(&str, &str, u32, &[&str])] = &[
+    // (canonical name, emitted variant path, facility ABI version, fact prefixes)
+    ("target_identity", "AbiFamily::TargetIdentity", 1, &["POINTER_WIDTH", "C_INT_WIDTH"]),
+    ("open_flags", "AbiFamily::OpenFlags", 1, &["O_"]),
+    ("at_flags", "AbiFamily::AtFlags", 1, &["AT_"]),
+    ("mode", "AbiFamily::Mode", 1, &["MODE_"]),
+    ("syscall_number", "AbiFamily::SyscallNumber", 1, &["SYS_"]),
+    ("errno", "AbiFamily::Errno", 1, &["ERRNO_"]),
+];
+
+/// Assign every fact to exactly one family, in schema order.
+///
+/// Fails closed on an unassigned fact: a new fact whose prefix no family claims
+/// aborts generation, so it cannot be absorbed silently.
+fn group_facts_by_family<'a>(
+    facts: &[(&'a str, u64)],
+) -> Vec<(&'static str, &'static str, u32, Vec<(&'a str, u64)>)> {
+    let mut grouped = Vec::new();
+    let mut claimed = vec![false; facts.len()];
+    for (canonical, variant, version, prefixes) in FAMILY_SCHEMA {
+        let mut members = Vec::new();
+        for (index, (name, value)) in facts.iter().enumerate() {
+            if claimed[index] {
+                continue;
+            }
+            if prefixes.iter().any(|prefix| name.starts_with(prefix)) {
+                claimed[index] = true;
+                members.push((*name, *value));
+            }
+        }
+        grouped.push((*canonical, *variant, *version, members));
+    }
+    let unassigned: Vec<&str> = facts
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| !claimed[*index])
+        .map(|(_, (name, _))| *name)
+        .collect();
+    assert!(
+        unassigned.is_empty(),
+        "ABI-M1: these manifest facts belong to no family and would be dropped \
+         from every projection: {unassigned:?}. Add the fact to a family's \
+         prefixes in FAMILY_SCHEMA, or add its family."
+    );
+    grouped
+}
+
+/// One family's canonical projection -- the bytes its projection hash covers.
+fn canonical_family_projection(
+    canonical: &str,
+    facility_version: u32,
+    facts: &[(&str, u64)],
+) -> String {
+    let mut out = format!("family={canonical}\nfacility_version={facility_version}\nfact_count={}\n", facts.len());
+    for (name, value) in facts {
+        out.push_str(&format!("fact={name}|{value}\n"));
+    }
+    out
+}
+
 #[cfg(target_os = "linux")]
 fn linux_raw_facts() -> Vec<(&'static str, u64)> {
     use linux_raw_sys::{errno, general};
@@ -431,12 +506,23 @@ fn run_probe(target: &str, host: &str, expected: &[(&str, u64)]) {
         .expect("system headers disagree with linux-raw-sys");
 }
 
+/// **`ABI-M1` `D1` -- the v2 manifest hash COMPOSES per-family projections.**
+///
+/// v1 hashed one flat fact list, so every fact was in one undifferentiated
+/// digest and nothing could say which family moved. v2 hashes each family's own
+/// canonical projection, then hashes over those projection digests. That is
+/// what makes `AC-2` checkable: mutating one family's fact flips exactly that
+/// family's projection and the composed top hash, and no other family's.
+///
+/// The flat fact lines are deliberately NOT repeated here -- they are covered
+/// transitively through the projections. Listing them twice would still hash
+/// correctly and would quietly make the composition decorative.
 fn canonical_manifest(
     target: &str,
     target_os: &str,
     backend: &str,
     dependencies: &[(String, String, String, String)],
-    facts: &[(&str, u64)],
+    families: &[(&str, &str, u32, Vec<(&str, u64)>)],
 ) -> String {
     let mut out = format!(
         "schema={SCHEMA_VERSION}\ntarget={target}\ntarget_os={target_os}\nbackend={backend}\n"
@@ -446,9 +532,23 @@ fn canonical_manifest(
             "dependency={name}|{version}|{checksum}|{features}\n"
         ));
     }
-    out.push_str(&format!("fact_count={}\n", facts.len()));
-    for (name, value) in facts {
-        out.push_str(&format!("fact={name}|{value}\n"));
+    out.push_str(&format!("family_count={}\n", families.len()));
+    for (canonical, _variant, facility_version, facts) in families {
+        let projection = canonical_family_projection(canonical, *facility_version, facts);
+        let digest: [u8; 32] = Sha256::digest(projection.as_bytes()).into();
+        out.push_str(&format!(
+            "family={canonical}|{facility_version}|{}|{}\n",
+            facts.len(),
+            hex_lower(&digest)
+        ));
+    }
+    out
+}
+
+fn hex_lower(bytes: &[u8; 32]) -> String {
+    let mut out = String::with_capacity(64);
+    for byte in bytes {
+        out.push_str(&format!("{byte:02x}"));
     }
     out
 }
@@ -459,6 +559,7 @@ fn write_generated(
     backend: &str,
     dependencies: &[(String, String, String, String)],
     facts: &[(&str, u64)],
+    families: &[(&str, &str, u32, Vec<(&str, u64)>)],
     canonical: &str,
     hash: &[u8; 32],
 ) {
@@ -469,10 +570,29 @@ fn write_generated(
         .iter()
         .map(|(name, value)| format!("AbiFact {{ name: {name:?}, value: {value} }},"))
         .collect::<String>();
+    // `ABI-M1` `D1` -- each family emits its own projection hash. The variant
+    // path comes from FAMILY_SCHEMA and is compiler-checked where lib.rs
+    // includes this file, so a family this generator names that the enum does
+    // not have fails to compile rather than landing as data.
+    let families = families
+        .iter()
+        .map(|(canonical_name, variant, facility_version, members)| {
+            let projection =
+                canonical_family_projection(canonical_name, *facility_version, members);
+            let digest: [u8; 32] = Sha256::digest(projection.as_bytes()).into();
+            let member_facts = members
+                .iter()
+                .map(|(name, value)| format!("AbiFact {{ name: {name:?}, value: {value} }},"))
+                .collect::<String>();
+            format!(
+                "AbiFamilyProjection {{ family: {variant}, facility_version: {facility_version}, facts: &[{member_facts}], projection_hash: {digest:?} }},"
+            )
+        })
+        .collect::<String>();
     let generated = format!(
         "pub const TARGET_ABI_CANONICAL: &str = {canonical:?};\n\
          pub const TARGET_ABI_MANIFEST_HASH: [u8; 32] = {hash:?};\n\
-         pub const TARGET_ABI: TargetAbi = TargetAbi {{ schema_version: {SCHEMA_VERSION}, target: {target:?}, target_os: {target_os:?}, backend: {backend:?}, dependencies: &[{dependencies}], fact_count: {fact_count}, facts: &[{facts}], manifest_hash: TARGET_ABI_MANIFEST_HASH }};\n",
+         pub const TARGET_ABI: TargetAbi = TargetAbi {{ schema_version: {SCHEMA_VERSION}, target: {target:?}, target_os: {target_os:?}, backend: {backend:?}, dependencies: &[{dependencies}], fact_count: {fact_count}, facts: &[{facts}], families: &[{families}], manifest_hash: TARGET_ABI_MANIFEST_HASH }};\n",
         fact_count = facts.matches("AbiFact").count(),
     );
     fs::write(
