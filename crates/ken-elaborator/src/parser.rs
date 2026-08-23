@@ -154,8 +154,8 @@ impl Parser {
     pub fn parse_decls(&mut self) -> Result<Vec<Decl>, ElabError> {
         let mut decls = Vec::new();
         while !self.at_eof() {
-            let decl = self.parse_decl()?;
-            if let Decl::BoundaryDecl { span, .. } = &decl {
+            let group = self.parse_decl_group()?;
+            if let Some(Decl::BoundaryDecl { span, .. }) = group.first() {
                 if !decls.is_empty() {
                     return Err(ElabError::ParseError {
                         msg: "an anonymous program/package boundary must be \
@@ -165,9 +165,80 @@ impl Parser {
                     });
                 }
             }
-            decls.push(decl);
+            decls.extend(group);
         }
         Ok(decls)
+    }
+
+    /// Parse one written declaration plus any postfix derive clause it owns.
+    /// Postfix derive lowers to the existing real `DeriveDecl` generator path;
+    /// it does not add a second derivation mechanism.
+    fn parse_decl_group(&mut self) -> Result<Vec<Decl>, ElabError> {
+        let decl = self.parse_decl()?;
+        let derive_target = match decl.unwrap_pub() {
+            Decl::DataDecl { name, .. } | Decl::ExplicitDataDecl { name, .. } => {
+                Some(name.clone())
+            }
+            _ => None,
+        };
+        let Some(data_name) = derive_target else {
+            return Ok(vec![decl]);
+        };
+
+        let pub_start = if matches!(self.peek(), Token::KwPub)
+            && matches!(self.lookahead(1), Token::KwDerive)
+            && matches!(self.lookahead(2), Token::LParen)
+        {
+            let start = self.peek_span().start;
+            self.advance();
+            Some(start)
+        } else {
+            None
+        };
+
+        let mut group = vec![decl];
+        if matches!(self.peek(), Token::KwDerive)
+            && matches!(self.lookahead(1), Token::LParen)
+        {
+            let derives = self.parse_postfix_derives(data_name)?;
+            if let Some(start) = pub_start {
+                let end = derives
+                    .last()
+                    .expect("a parsed postfix derive has at least one class")
+                    .span()
+                    .end;
+                return Err(ElabError::ParseError {
+                    msg: "`pub` is not permitted on a postfix `derive` clause".to_string(),
+                    span: Span::new(start, end),
+                });
+            }
+            group.extend(derives);
+        }
+        Ok(group)
+    }
+
+    fn parse_postfix_derives(&mut self, data_name: String) -> Result<Vec<Decl>, ElabError> {
+        let start = self.peek_span().start;
+        self.advance(); // consume `derive`
+        self.expect(&Token::LParen)?;
+        let mut class_names = Vec::new();
+        loop {
+            class_names.push(self.expect_ident()?.0);
+            if matches!(self.peek(), Token::Comma) {
+                self.advance();
+                continue;
+            }
+            break;
+        }
+        let end = self.expect(&Token::RParen)?.end;
+        Ok(class_names
+            .into_iter()
+            .map(|class_name| Decl::DeriveDecl {
+                class_name,
+                data_name: data_name.clone(),
+                span: Span::new(start, end),
+            })
+            .collect())
     }
 
     fn parse_decl(&mut self) -> Result<Decl, ElabError> {
@@ -1176,7 +1247,7 @@ impl Parser {
         self.expect(&Token::LBrace)?;
         let mut decls = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
-            decls.push(self.parse_decl()?);
+            decls.extend(self.parse_decl_group()?);
             if matches!(self.peek(), Token::Semicolon) {
                 self.advance();
             }
@@ -1283,10 +1354,20 @@ impl Parser {
     }
 
     /// `pub <decl>` — export marker (`33 §4.1`).
-    fn parse_pub_decl(&mut self, _start: usize) -> Result<Decl, ElabError> {
+    fn parse_pub_decl(&mut self, start: usize) -> Result<Decl, ElabError> {
         self.advance(); // consume 'pub'
         let inner = self.parse_decl()?;
-        Ok(Decl::Pub(Box::new(inner)))
+        match pub_eligibility(&inner) {
+            PubEligibility::Eligible => Ok(Decl::Pub(Box::new(inner))),
+            PubEligibility::Ineligible(kind) => Err(ElabError::ParseError {
+                msg: format!("`pub` is not permitted on {kind}"),
+                span: Span::new(start, inner.span().end),
+            }),
+            PubEligibility::PublicSpace => Err(ElabError::UnsupportedSpacePlacement {
+                placement: "public".to_string(),
+                span: Span::new(start, inner.span().end),
+            }),
+        }
     }
 
     /// `data D p₁…pₙ = C₁ τ₁₁… | C₂ τ₂₁… | …`
@@ -2660,6 +2741,58 @@ impl Parser {
 }
 
 // ---- public parse functions ----
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PubEligibility {
+    Eligible,
+    Ineligible(&'static str),
+    /// P1 already promises a role-specific public-space surface diagnostic.
+    PublicSpace,
+}
+
+/// Classify every parsed declaration kind at the first seam where `pub` has
+/// an inner declaration. This match deliberately has no catch-all: adding a
+/// `Decl` variant creates a compile-time visibility-classification obligation.
+fn pub_eligibility(decl: &Decl) -> PubEligibility {
+    match decl {
+        // Top-level name-introducing definitions with module-interface
+        // identity (`33 §4` and §8).
+        Decl::ViewDecl { .. }
+        | Decl::LetDecl { .. }
+        | Decl::PropDecl { .. }
+        | Decl::TheoremDecl { .. }
+        | Decl::AxiomDecl { .. }
+        | Decl::AttachedProofDecl { .. }
+        | Decl::DataDecl { .. }
+        | Decl::ExplicitDataDecl { .. }
+        | Decl::TypeAlias { .. }
+        | Decl::ClassDecl { .. } => PubEligibility::Eligible,
+
+        // Anonymous headers, structural scope forms, generated instances,
+        // status-bearing obligations, and declaration forms without a module
+        // interface rule cannot carry visibility.
+        Decl::BoundaryDecl {
+            kind: BoundaryKind::Program,
+            ..
+        } => PubEligibility::Ineligible("a `program` header"),
+        Decl::BoundaryDecl {
+            kind: BoundaryKind::Package,
+            ..
+        } => PubEligibility::Ineligible("a `package` header"),
+        Decl::SpaceDecl { .. } => PubEligibility::PublicSpace,
+        Decl::ProveDecl { .. } => PubEligibility::Ineligible("a `prove` obligation"),
+        Decl::LawDecl { .. } => PubEligibility::Ineligible("a `law` declaration"),
+        Decl::ForeignDecl { .. } => PubEligibility::Ineligible("a `foreign` declaration"),
+        Decl::TemporalDecl { .. } => PubEligibility::Ineligible("a `temporal` obligation"),
+        Decl::RecordDecl { .. } => PubEligibility::Ineligible("a `record` declaration"),
+        Decl::InstanceDecl { .. } => PubEligibility::Ineligible("an `instance` declaration"),
+        Decl::DeriveDecl { .. } => PubEligibility::Ineligible("a `derive` declaration"),
+        Decl::ModuleDecl { .. } => PubEligibility::Ineligible("a `module` declaration"),
+        Decl::ImportDecl { .. } => PubEligibility::Ineligible("an `import` declaration"),
+        Decl::ExportDecl { .. } => PubEligibility::Ineligible("an `export` declaration"),
+        Decl::Pub(_) => PubEligibility::Ineligible("another `pub` marker"),
+    }
+}
 
 /// Is `s` a contextual `temporal{}` operator word? (Atoms are idents that are
 /// NOT one of these; `top`/`true` are atoms, not operators.) Pinning the
