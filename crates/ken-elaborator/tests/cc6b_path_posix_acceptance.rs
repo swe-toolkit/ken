@@ -9,7 +9,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
 
-const TRANSPORT: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
 const COLLECTIONS: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 const LAWFUL_CLASSES: &str = include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
@@ -21,8 +20,8 @@ const PATH_POSIX: &str = include_str!("../../../catalog/packages/Capability/File
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env);
     for (name, source) in [
-        ("Core.Logic.Transport", TRANSPORT),
         ("Data.Collections", COLLECTIONS),
         ("Core.Classes.LawfulClasses", LAWFUL_CLASSES),
         ("Core.Classes.LawfulFunctors", LAWFUL_FUNCTORS),
