@@ -56,17 +56,27 @@ This SUPERSEDES deliverable 3 / AC-GREEN below with the permitted continuation:
   applies to all four census rows, not only the two started), and for each
   measure whether it crosses AND greens end-to-end — a row's capture shape may
   or may not hit the borrowed-input seam.
-- **Re-point, do not un-ignore, the carry-forward rows.** Any censused row that
-  crosses but reds ONLY at the borrowed-input execution seam re-points its
-  `#[ignore]` string to [[RT-BORROWED-INPUT-CARRIER-DURABILITY]] as owner —
-  exactly as M6 re-pointed `rt_write_writable_stage` to M3. An honest advancing
-  refusal, not a regression; do not un-ignore it.
+- **Re-point, do not un-ignore, any row that crosses then reds at a KNOWN,
+  already-classified seam.** After M4's crossing, a row may advance to a deeper
+  seam that another node already owns; re-point its `#[ignore]` string to that
+  owner (an honest advancing refusal, exactly as M6 re-pointed
+  `rt_write_writable_stage` to M3), do not un-ignore it, and do not fold that
+  node's work into M4. The classification is by EXACT refusal string:
+  - `Effect: seat Argument(1) of FsOpen needs ConstructorTag, which it cannot
+    observe in CarriedWord` ⇒ M3 [[RT-CARRIED-IH-DISPATCH-SITEOP]].
+  - `malformed borrowed process input` (native value -1) ⇒
+    [[RT-BORROWED-INPUT-CARRIER-DURABILITY]].
 - **Un-ignore ONLY rows that cross AND green end-to-end.** Those land green.
-- **M4 is landable as accepted work per COORDINATION section 8a** even if some
-  rows carry forward to the successor: the crossing mechanism plus the honest
-  re-points is a complete M4 deliverable. Any row that stays red at a NEW seam
-  beyond the borrowed-input trap is still a stop-and-report to Architect +
-  Steward.
+- **Stop-and-report only on a genuinely UNCLASSIFIED seam** — a refusal string
+  matching none of the known owners above. A row advancing to a known seam is a
+  re-point (proceed autonomously); a row advancing to an unclassified seam is a
+  stop-and-report to Architect + Steward, so the Steward can place it.
+- **M4 is landable as accepted work per COORDINATION section 8a** even if rows
+  carry forward: the crossing mechanism plus the honest re-points is a complete
+  M4 deliverable. Measured @ WIP `9de8397a`: `px8f_buffer_native` crosses then
+  advances to M3's exact seam (re-point to M3); the two `px8l_recursive_decl`
+  rows re-point to the borrowed-input successor; `px8ta_oriented_subcontinuation`
+  is measured under this rule to complete the widening.
 
 ## Why the population must be CENSUSED, not inherited (measured @ `011bf2a95`)
 
