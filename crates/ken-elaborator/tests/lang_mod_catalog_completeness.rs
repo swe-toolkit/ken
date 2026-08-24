@@ -180,8 +180,23 @@ fn lawful_local_pair_proofs_do_not_extend_the_derived_subject_namespace() {
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert!(!after.contains(&eq_sound));
     assert!(!after.contains(&lt_asym));
-    assert!(
-        after.is_superset(&before),
-        "loading must preserve the existing trusted base"
+    let added_opaque_names: BTreeSet<_> = after
+        .difference(&before)
+        .map(|id| match env.env.lookup(*id) {
+            Some(Decl::Opaque { name, .. }) => name.as_str(),
+            other => panic!(
+                "every LawfulClasses trust addition must have opaque provenance, got {other:?}"
+            ),
+        })
+        .collect();
+    assert_eq!(
+        added_opaque_names,
+        BTreeSet::from([
+            "Ord.Int.antisym",
+            "Ord.Int.refl",
+            "Ord.Int.total",
+            "Ord.Int.trans",
+        ]),
+        "LawfulClasses may add exactly its four audited Ord Int law postulates"
     );
 }
