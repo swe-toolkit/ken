@@ -100,10 +100,25 @@ states the authoritative list. In brief:
   representation, a relabeled/weakened arity gate, a `_`/fallback arm on the kind
   match, or an apply site bypassing the plan lookup, must be detectable and is a
   reject.
-- **AC-REENUM.** Rerun report-2's checked-family runner end-to-end. Both
-  checked-family programs green => the family is bounded; re-point both runner
-  tables from the advancing-refusal pins to green. Any FURTHER refusal => STOP
-  and report to Architect + Steward.
+- **AC-REENUM.** Close over EVERY consumer of the retired
+  `ESCAPING_FUNCTIONAL_IH` refusal oracle, not only report-2's four-pin
+  checked-family source. The Architect ruled (`evt_6eztb270x0067`, part 3)
+  that the eight entry-substituted `rt_cold_lowering_path_enumeration` rows
+  (`rt_cold_lowering_path_enumeration.rs:575-583`) are a DISTINCT checked-IH
+  content population — distinct proc bodies, not byte-copies of the four-pin
+  identity — that the original four-fixture reconciliation under-enumerated.
+  The re-enumeration is therefore CENSUS-driven, not a fixed roster: grep the
+  retired oracle constant across the whole test tree and, after the Part-1 /
+  Part-2 repairs make them complete, reconcile EVERY consumer so that (a) both
+  report-2 checked-family programs are green with their runner tables
+  re-pointed off the advancing-refusal pins; (b) all eight
+  `rt_cold_lowering_path_enumeration` rows land as `Disposition::Completes`;
+  and (c) no surviving consumer of that oracle anywhere in the test tree still
+  expects an `ESCAPING_FUNCTIONAL_IH` / advancing-refusal disposition — the
+  grep census is complete by construction, so a leftover refusal-expecting
+  consumer FAILS this AC. The implementer reports the full consumer census
+  with the respin. Any program that does NOT complete after the repair is a
+  genuine FURTHER refusal => STOP and report to Architect + Steward.
 - **AC-NO-REGRESSION.** Whole-suite green in CI (COORDINATION section 12).
   Local targeted `-p` only, never `--workspace`.
 - **Required reviewers.** Architect — design D0 confirmation AND soundness
@@ -117,8 +132,17 @@ Per the Architect's reach ruling (`evt_4sp2xftkmc1mz`), this representation
 is the WHOLE remaining PX8-closure critical path: every native checked-IO full
 program carries the checked continuation closure, so this D0 gates ALL FOUR
 native witnesses (ReadEof/ReadSome/Wrote AND SemanticErrorV1). This WP's OWN
-scope is the representation plus the two checked-family programs green
-(AC-REENUM). The consumers `RT-CARRIED-IH-DISPATCH-SITEOP` (M3) and
+scope is the representation plus the FULL retired-oracle consumer census green
+(AC-REENUM) — the two report-2 checked-family programs AND the eight
+`rt_cold_lowering_path_enumeration` rows, per the Architect's part-3 census
+ruling (`evt_6eztb270x0067`). That ruling also named THE PREDICATE the respin
+is authored to: M6 lacked a single closed characterization of its checked-IH
+transport POPULATION, so the transform over-applied (forwarding-reorder reached
+the transport-free population) and the census under-enumerated (the eight rows).
+The respin defines that population per-producer
+(`checked_ih_environment_transport_at`), applies the transform EXACTLY to it,
+keeps the old fast path for everything else, and censuses EXACTLY its consumers.
+The consumers `RT-CARRIED-IH-DISPATCH-SITEOP` (M3) and
 `RT-CLOSURE-BOUNDARY-RESIDUAL` (M4) stay gated on it; whether they collapse to
 re-measure/re-point work (as Track-0's rows did) or remain distinct builds is
 a post-landing assessment for the Architect, not prejudged here.
