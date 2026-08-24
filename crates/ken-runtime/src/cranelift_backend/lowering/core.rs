@@ -35,18 +35,6 @@ use super::calls::{recursive_position_unit_calls, RECURSIVE_POSITION_UNIT_CALLS}
 
 mod primitive;
 
-thread_local! {
-    static M6_DIAGNOSTIC_PRODUCER_DEPTH: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
-
-struct M6DiagnosticProducerDepthGuard;
-
-impl Drop for M6DiagnosticProducerDepthGuard {
-    fn drop(&mut self) {
-        M6_DIAGNOSTIC_PRODUCER_DEPTH.with(|depth| depth.set(depth.get() - 1));
-    }
-}
-
 // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D2` -- `source::tests` (a sibling
 // subtree, not a descendant of `core`) reaches this module's widened
 // shared fixtures by path, so the module itself must be nameable from
@@ -3136,21 +3124,6 @@ impl<'a> Lowering<'a> {
             expr: scrutinee,
             static_origin,
         } = occurrence;
-        let diagnostic_depth = M6_DIAGNOSTIC_PRODUCER_DEPTH.with(|depth| {
-            let next = depth.get() + 1;
-            depth.set(next);
-            next
-        });
-        let _diagnostic_depth_guard = M6DiagnosticProducerDepthGuard;
-        if diagnostic_depth > 32 {
-            return Err(unsupported(
-                "ComputationalMatch",
-                format!(
-                    "diagnostic producer call depth exceeded 32 at {static_origin:?}: \
-                     {scrutinee:?}"
-                ),
-            ));
-        }
         if eliminators.is_empty() {
             return Err(unsupported(
                 "ComputationalMatch",
@@ -4265,42 +4238,7 @@ impl<'a> Lowering<'a> {
                 default: producer_default,
             } => {
                 let scrutinee = self.child_occurrence(static_origin, 0, scrutinee)?;
-                let producer_route = requires_heterogeneous_deforestation(scrutinee.expr)
-                    || self.declaration_call_produces_deforestable_aggregate(scrutinee.expr);
-                if producer_route {
-                    let mut composed = Vec::with_capacity(eliminators.len() + 1);
-                    composed.push(EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
-                        cases: producer_cases,
-                        default: producer_default,
-                        env: producer_env,
-                        static_origin,
-                        retained_scrutinee_index: None,
-                        deferred_constructor_case: None,
-                    }));
-                    composed.extend_from_slice(eliminators);
-                    return self.lower_computational_producer_expr(
-                        builder,
-                        scrutinee,
-                        producer_env,
-                        &composed,
-                    );
-                }
                 let selected = self.lower_expr(builder, scrutinee, producer_env)?;
-                // An escaping checked-IH environment makes its enclosing source
-                // constructor cross as a carrier. This producer route is selected
-                // from the source expression before phase is known, so it must
-                // delegate the carried result to the same emitted elimination as
-                // the direct and composed ordinary-match consumers.
-                if let LoweringOperand::Carried(word) = selected {
-                    return self.lower_carried_match(
-                        builder,
-                        word,
-                        producer_cases,
-                        producer_default,
-                        static_origin,
-                        producer_env,
-                    );
-                }
                 if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = selected {
                     let true_case = producer_cases.iter().enumerate().find(|(_, case)| {
                         case.binders == 0 && case.constructor.ends_with("::Bool::True")
@@ -4510,20 +4448,13 @@ impl<'a> Lowering<'a> {
                         &composed,
                     );
                 }
-                let actual_kind = match &selected {
-                    LoweringOperand::Specialized(value) => lowered_value_kind(value),
-                    LoweringOperand::Carried(_) => "Carried",
-                };
                 let LoweringOperand::Specialized(Lowered::Constructor {
                     constructor, args, ..
                 }) = selected
                 else {
                     return Err(unsupported(
                         "ComputationalMatch",
-                        format!(
-                            "tree-producing match scrutinee at {static_origin:?} is \
-                             {actual_kind}, not Bool or a constructor"
-                        ),
+                        "tree-producing match scrutinee is not Bool or a constructor",
                     ));
                 };
                 let Some((case_index, producer_case)) = producer_cases
@@ -10471,56 +10402,9 @@ impl<'a> Lowering<'a> {
         // both checks are pure, take no coordinate, and are exactly the two
         // `transfer_into_carrier` runs on the same value one step later. What
         // moves is *when*, and nothing else.
-        for (position, argument) in args.iter().enumerate() {
+        for argument in args {
             if let LoweringOperand::Specialized(value) = argument {
-                if let Err(error) = value.boundary_transfer_admissibility() {
-                    let closure = match value {
-                        Lowered::Closure {
-                            captures,
-                            params,
-                            body,
-                        } => Some((
-                            captures
-                                .iter()
-                                .map(|capture| match capture {
-                                    LoweringOperand::Specialized(value) => lowered_value_kind(value),
-                                    LoweringOperand::Carried(_) => "Carried",
-                                })
-                                .collect::<Vec<_>>(),
-                            params.len(),
-                            *body,
-                        )),
-                        _ => None,
-                    };
-                    let child_origin = self
-                        .static_transition_plan
-                        .child_static_origin(origin, position)?;
-                    let unit_environment = self
-                        .defining_emission_owner
-                        .and_then(|owner| {
-                            u32::try_from(position).ok().and_then(|position| {
-                                self.static_transition_plan
-                                    .unit_boundary_environment_occurrence(owner, origin, position)
-                            })
-                        });
-                    let checked_environment = self.defining_emission_owner.and_then(|owner| {
-                        self.static_transition_plan
-                            .checked_ih_captured_environment_record(owner, child_origin)
-                            .ok()
-                            .map(|record| record.id)
-                    });
-                    return Err(unsupported(
-                        "BoundaryTransferDiagnostic",
-                        format!(
-                            "constructor={constructor} origin={origin:?} child={position} \
-                             child_origin={child_origin:?} owner={:?} unit_env={unit_environment:?} \
-                             checked_env={checked_environment:?} kind={} closure={closure:?}; \
-                             inner={error}",
-                            self.defining_emission_owner,
-                            lowered_value_kind(value)
-                        ),
-                    ));
-                }
+                value.boundary_transfer_admissibility()?;
                 self.source_aggregate_preflight(value)?;
             }
         }
