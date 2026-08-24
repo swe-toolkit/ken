@@ -11,6 +11,19 @@ github: null
 origin: "Architect component framing evt_hpnhqy1ex286 (WP-4), under [[LANG-MODULE-IMPORT-SYSTEM]]. Steward-filed per COORDINATION section 2, 2026-08-23. RE-FRAMED 2026-08-24 to Component A after a structural hard stop (below); the strict whole-catalog co-gate + consumer migration are re-homed to [[LANG-MOD-CATALOG-COMPLETENESS]] (Component B)."
 ---
 
+> # MERGED 2026-08-24 at `574eb90c0` (code) — auto-closed at `ee2631ff8`.
+>
+> Reduced Component A landed byte-identical to the cleared candidate `16f064381`
+> (+394/-65, 7 paths): the uniform local-scope prebind fix
+> (crates/ken-elaborator/src/modules.rs — both ResolutionMode gates removed over
+> ClassDecl/DataDecl/ExplicitDataDecl; resolve_ref external fallback unchanged),
+> the Arithmetic-only provider surface (Transport cong/sym/trans pub + import,
+> add/mul pub), and the four envelope pins. Gate on exact SHA `16f064381`: QA
+> (evt_5br39aed5h3ny) + Architect (evt_36fbg3k6759e1) + Adversary CLEAN
+> (evt_1ssbm8sh1vvng) + CV (evt_3gy08qhe00fsj); Decision `dec_13aega29mp9d4`;
+> landed-squash fidelity re-confirmed (evt_23gz863qng0jk). Zero trusted_base
+> delta. Component B ([[LANG-MOD-CATALOG-COMPLETENESS]]) is released.
+>
 > # RE-FRAMED 2026-08-24 — Component A; migration + strict co-gate re-homed to Component B.
 >
 > WP-4 as originally released hit a GENUINE STRUCTURAL HARD STOP at base

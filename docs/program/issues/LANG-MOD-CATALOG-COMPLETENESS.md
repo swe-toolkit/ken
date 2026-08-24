@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-CATALOG-COMPLETENESS
 title: "WP-4 Component B — catalog completeness: give Nat and OrdResult (dedup two private copies) canonical public homes plus the fixpoint homeless-convenience census, deliver Order's provider surface + identity, migrate the consuming units (Gcd imports add/mul + leq_nat/sub + Nat and drops its reimplementations), and satisfy whole-catalog strict-green. The module/import campaign's catalog-reuse success step."
-status: draft
+status: ready
 owner: language
 size: L
 gate: none
@@ -11,7 +11,7 @@ github: null
 origin: "Architect ruling evt_214z6r6qnwme0 (2026-08-24), unbundling the WP-4 strict whole-catalog co-gate off Component A. The co-gate gates a deliverable outside WP-4's authorized surface (a canonical home for the type Nat), so it is re-homed here. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
-> # DRAFT — held on Component A; released when A lands.
+> # RELEASED 2026-08-24 — Component A merged (574eb90c0 / ee2631ff8); B is ready.
 >
 > Component B carries the substance the WP-4 hard stop exposed
 > (language-implementer evt_3j60e77n0ahsy, Architect ruling evt_214z6r6qnwme0):
