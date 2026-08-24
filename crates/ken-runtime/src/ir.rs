@@ -544,6 +544,64 @@ pub enum CheckedComputationalIHInvocationKind {
     CheckedHostVisContinuation,
 }
 
+/// The explicit source-to-runtime binder map for one checked computational-IH
+/// invocation.
+///
+/// The checked plan names a method binder by its ordinal inside the IH-only
+/// suffix of the source method telescope. Runtime IR names the same binder by a
+/// de Bruijn index after erasure, reordering, and any inserted runtime binders.
+/// This compiler-private map keeps those coordinate frames distinct and brings
+/// the plan authority into the runtime frame before native lowering compares it
+/// with the emitted `Var`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CheckedComputationalIHBinderMorphism {
+    /// Number of constructor-argument binders preceding the IH suffix in the
+    /// source method telescope.
+    pub method_argument_count: u64,
+    /// Number of IH binders in the source method telescope.
+    pub method_ih_count: u64,
+    /// De Bruijn start of this method's binder group in the source context.
+    pub source_start: u64,
+    /// The selected slot's binder in the source de Bruijn frame.
+    pub source_binder_index: u64,
+    /// That same binder after the erasure remap and inserted runtime binders.
+    pub runtime_binder_index: u64,
+}
+
+impl CheckedComputationalIHBinderMorphism {
+    /// Translate an IH-suffix method ordinal into the source de Bruijn frame.
+    pub fn source_index(self, method_binder_ordinal: u64) -> Option<u64> {
+        let method_position = self
+            .method_argument_count
+            .checked_add(method_binder_ordinal)?;
+        let telescope_count = self
+            .method_argument_count
+            .checked_add(self.method_ih_count)?;
+        self.source_start
+            .checked_add(telescope_count.checked_sub(method_position.checked_add(1)?)?)
+    }
+
+    /// Translate the plan's IH-suffix ordinal through this invocation's explicit
+    /// source-to-runtime point map.
+    pub fn runtime_index(self, method_binder_ordinal: u64) -> Option<u64> {
+        (self.source_index(method_binder_ordinal)? == self.source_binder_index)
+            .then_some(self.runtime_binder_index)
+    }
+
+    /// Account for runtime-only binders inserted around the marked call.
+    pub fn shifted_runtime(self, by: u32, cutoff: u32) -> Option<Self> {
+        let runtime_binder_index = if self.runtime_binder_index >= u64::from(cutoff) {
+            self.runtime_binder_index.checked_add(u64::from(by))?
+        } else {
+            self.runtime_binder_index
+        };
+        Some(Self {
+            runtime_binder_index,
+            ..self
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum RuntimeExpr {
     #[doc(hidden)]
@@ -583,6 +641,7 @@ pub enum RuntimeExpr {
         call_template_id: u64,
         checked_occurrence_path: Vec<u64>,
         kind: CheckedComputationalIHInvocationKind,
+        binder_morphism: CheckedComputationalIHBinderMorphism,
         body: Box<RuntimeExpr>,
     },
     Value(RuntimeValue),

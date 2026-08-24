@@ -646,6 +646,7 @@ impl<'a> Lowering<'a> {
                     RuntimeExpr::CheckedComputationalIHInvocation {
                         call_template_id,
                         kind,
+                        binder_morphism,
                         body,
                         ..
                     } => {
@@ -656,6 +657,7 @@ impl<'a> Lowering<'a> {
                         self.enter_checked_computational_ih_invocation(
                             call_template_id,
                             kind,
+                            binder_morphism,
                             &body.expr,
                             body.static_origin,
                         )?;

@@ -3443,6 +3443,11 @@ impl<'a> Lowering<'a> {
                 )
             })?;
             let seat = worker.closure_origin;
+            eprintln!(
+                "M6_DIAG checked-env owner={owner:?} seat={seat:?} body={:?} captures={}",
+                worker.body_origin,
+                worker.captures.len()
+            );
             let record = self
                 .static_transition_plan
                 .checked_ih_captured_environment_record(owner, seat)?
@@ -3503,11 +3508,19 @@ impl<'a> Lowering<'a> {
             // Screen the whole environment before allocating its parent. A
             // refusal on capture i must not leave fields 0..i-1 published.
             for argument in &arguments {
-                let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
+                let SynthesizedArgument::WorkerCaptureOperand { origin, value, .. } = argument else {
                     unreachable!("this emitter constructs only worker-capture arguments")
                 };
                 if let LoweringOperand::Specialized(value) = value {
-                    value.boundary_transfer_admissibility()?;
+                    if let Err(error) = value.boundary_transfer_admissibility() {
+                        return Err(unsupported(
+                            "CheckedIhCapturedEnvironment",
+                            format!(
+                                "capture at {origin:?} has kind {} and cannot cross: {error}",
+                                lowered_value_kind(value)
+                            ),
+                        ));
+                    }
                     self.source_aggregate_preflight(value)?;
                 }
             }
