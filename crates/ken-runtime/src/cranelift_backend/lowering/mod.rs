@@ -6509,15 +6509,7 @@ impl<'a> Lowering<'a> {
             invoking_site: D2K_BOUNDARY_TRANSFER_INVOKING_SITE
                 .with(std::cell::Cell::get),
         });
-        if let Err(error) = value.boundary_transfer_admissibility() {
-            return Err(unsupported(
-                "BoundaryTransferDiagnostic",
-                format!(
-                    "origin={origin:?} root_kind={}; inner={error}",
-                    lowered_value_kind(value)
-                ),
-            ));
-        }
+        value.boundary_transfer_admissibility()?;
         self.source_aggregate_preflight(value)?;
         self.emit_carrier_transfer(builder, origin, value)
     }
