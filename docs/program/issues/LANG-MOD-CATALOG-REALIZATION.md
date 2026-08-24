@@ -92,16 +92,37 @@ strict, and the authorized providers (Arithmetic `add`/`mul`, Order
   declaration kinds — ordinary-data ctors (DataDecl), explicit-data ctors
   (ExplicitDataDecl), and class locals (ClassDecl) — NOT an `Inl`/`Inr`
   point-fix (a ctor-only repair just surfaces the next declaration-kind refusal).
-- ADD the provider-INTERNAL dependency imports (additive to the loader fix,
-  Architect ruling evt_47t9dwz0chstv — ABSENT at base f0e0b92fa, load-bearing:
-  without resolving `cong`/`sym`/`trans` the provider proof bodies fail and a
-  recursive-group rollback can remove the just-allocated `add`/`mul` ids):
-  Arithmetic (no import line at base) -> `import Core.Logic.Transport (cong, sym,
-  trans)`; Order (imports only `Core.Logic.Or` at base) -> `import
-  Core.Logic.Transport (cong, trans)`, retaining its Or import. NOT LawfulClasses
-  (no such reference in Order at base). Identity-preserving (definitions
-  unchanged; they only resolve already-unqualified names), zero `trusted_base()`
-  delta.
+- ADD the provider-INTERNAL transitive closure (Architect §1b structural
+  closure, evt_3pfr8hgp29m69 — this SUPERSEDES enumerating edges one at a time:
+  an `UnresolvedCon` names only the FIRST missing name, so per-edge authorization
+  guarantees another hard stop). PRE-AUTHORIZED as Component A work: every import
+  edge AND pub marking that the genuine providers (Arithmetic, Order) and their
+  transitive PROVIDER dependencies (Transport, Or, LawfulClasses, and anything
+  THOSE in turn require) need to FULLY ELABORATE under the legacy real loader.
+  Author each to its ACTUAL unresolved names, grounded by RESOLUTION not spelling,
+  and proceed through the whole closure WITHOUT hard-stopping on mechanical edges
+  until the genuine providers legacy-elaborate and publish. Known members at base:
+  - Arithmetic (no import line at base) -> `import Core.Logic.Transport (cong,
+    sym, trans)`.
+  - Order (imports only `Core.Logic.Or` at base) -> retain Or, add `import
+    Core.Logic.Transport (cong, trans)` AND `import Core.Classes.LawfulClasses
+    (IsTrue, bool_or, Ord)`. Order uses `IsTrue`/`bool_or`/`Ord` UNQUALIFIED
+    (defs in LawfulClasses.ken.md:43/92/108); the earlier "NOT LawfulClasses"
+    premise was spelling-scoped and is WITHDRAWN (Architect owns it). `absurd`/`J`
+    are kernel reserved sugar, not edges.
+  - Make exactly the provider names each dep exposes `pub` (add/mul; leq_nat/sub;
+    Transport's cong/sym/trans; LawfulClasses's IsTrue/bool_or/Ord). Additive,
+    identity-preserving, zero `trusted_base()` delta (same as the Transport pub).
+  A/B DISCRIMINATOR (keeps the closure bounded): IN A = an edge/pub a GENUINE
+  PROVIDER's own body or interface needs to elaborate and publish (Order's proofs
+  need `bool_or`; LawfulClasses's proofs need `Or`). IN B = consumer reuse (Gcd
+  importing add/mul/leq_nat/sub), the canonical `Nat` home, the strict-caller
+  move, whole-catalog strict-green, the 34-residual triage. THE ONE REMAINING
+  STOP: if a provider-internal dep itself needs a HOMELESS catalog convenience
+  (no defining public interface — the `Nat`-home situation), hard-stop there (that
+  IS the true A/B boundary). Expected not to occur: `Nat`/Zero/Suc are native
+  prelude (legacy-resolvable), the floor is {Bool,Char,List}, Int is an opaque
+  primitive, Or binds post-fix, and absurd/J/Equal/Refl/Proved are kernel.
 - Mark `pub` on Arithmetic (`add`, `mul`) + Order (`leq_nat`, `sub`) and make
   Transport's `cong`/`sym`/`trans` `pub` — the provider SURFACE Component B's
   consumer migration will consume.
@@ -186,6 +207,19 @@ AC required that the boundary withheld:
 3. HS#3 — legacy Order -> Or `Inl`/`Inr` unbindable (ctor prebind was
    strict-only): A's AC required the providers' transitive CLOSURE to elaborate
    under ONE coherent mode.
+4. HS#4 — legacy Order -> `UnresolvedCon{bool_or}` (Order's unqualified
+   `IsTrue`/`bool_or`/`Ord` resolve to `Core.Classes.LawfulClasses`, an edge a
+   spelling-scoped premise missed): A's AC required a provider-internal import
+   edge not yet authorized. Same class as HS#2.
+
+§1b STRUCTURAL CLOSURE (Architect evt_3pfr8hgp29m69, ending the per-edge chain):
+HS#2 and HS#4 are the same defect — authorizing provider-internal edges one at a
+time, where an `UnresolvedCon` names only the FIRST missing name, so each
+authorization guarantees the next stop. The ruling pre-authorizes the ENTIRE
+provider-internal transitive closure to legacy-elaborability as Component A work
+(see the Deliverable), with the A/B discriminator and the homeless-convenience
+seam as the only remaining genuine stop. The HS#3 loader fix is build-CONFIRMED
+(canonical Or loads under legacy; Arithmetic proceeds).
 
 SHARED PREDICATE (confirmed): a `GlobalId` is signature-gated (elab.rs:7702-7733)
 and exists only after the provider FULLY elaborates; full elaboration pulls the
