@@ -7,8 +7,6 @@ mod catalog_or;
 use ken_elaborator::ElabEnv;
 use ken_kernel::Term;
 
-const COLLECTIONS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 const LAWFUL_FUNCTORS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
 
@@ -16,8 +14,7 @@ fn mk_env_with_lawful_functors() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
-        .expect("catalog/packages/Data/Collections/Derived.ken.md must elaborate");
+    catalog_or::load_derived_fixture(&mut env);
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
         .expect("catalog/packages/Core/Classes/LawfulFunctors.ken.md must elaborate");
     env

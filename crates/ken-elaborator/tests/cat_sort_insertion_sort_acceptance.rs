@@ -13,8 +13,6 @@ use ken_elaborator::ElabEnv;
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::Decl;
 
-const COLLECTIONS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 const LAWFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const INSERTION_SORT_KEN_MD: &str =
@@ -24,8 +22,7 @@ fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
-        .expect("Data/Collections/Derived.ken.md must elaborate");
+    catalog_or::load_derived_fixture(&mut env);
     env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD)
         .expect("Core/Classes/LawfulClasses.ken.md must elaborate");
     // The current sequential package harness has no module namespace. Hide the

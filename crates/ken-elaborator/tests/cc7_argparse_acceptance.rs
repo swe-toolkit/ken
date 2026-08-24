@@ -9,8 +9,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const COLLECTIONS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 const LAWFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const LAWFUL_FUNCTORS_KEN_MD: &str =
@@ -43,8 +41,8 @@ fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
+    catalog_or::load_derived_fixture(&mut env);
     for (source, label) in [
-        (COLLECTIONS_KEN_MD, "Data.Collections"),
         (LAWFUL_CLASSES_KEN_MD, "Core.Classes.LawfulClasses"),
         (LAWFUL_FUNCTORS_KEN_MD, "Core.Classes.LawfulFunctors"),
         (EFFECTFUL_CLASSES_KEN_MD, "Core.Classes.EffectfulClasses"),

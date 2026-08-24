@@ -3,7 +3,7 @@
 //! Pins `conformance/surface/collections/seed-collections.md`'s "Derived
 //! string surface (slice 2)" section, DS-AC1–7
 //! (`spec/30-surface/37-strings-collections.md` §2.4/§2.5/§2.5.1/§4.1). Drives
-//! the actual package file via `include_str!` (never a hand-copied
+//! the actual package through the production roots loader (never a hand-copied
 //! reimplementation, matching `es4_classes_acceptance.rs`'s discipline):
 //! - DS-AC1/AC5 `list-combinator-floor-derived-over-real-elim` — the 7-combinator
 //!   floor + `compare_char` are real derived defs over the generic `Term::Elim`,
@@ -26,15 +26,12 @@ use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const COLLECTIONS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
-        .expect("catalog/packages/Data/Collections/Derived.ken.md must elaborate");
+    catalog_or::load_derived_fixture(&mut env);
     env
 }
 

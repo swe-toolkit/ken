@@ -55,6 +55,25 @@ pub fn load_core_logic_compare(env: &mut ElabEnv) {
     }
 }
 
+pub fn load_derived_fixture(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
+        .expect("Data.Collections.Derived must load through its real provider closure");
+
+    // These legacy fixture suites append declarations in a synthetic flat
+    // scope. Bind each real module declaration's exact GlobalId under its old
+    // fixture spelling; no duplicate catalog declaration is elaborated.
+    let prefix = "Data.Collections.Derived.";
+    let aliases: Vec<_> = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            name.strip_prefix(prefix)
+                .map(|suffix| (suffix.to_owned(), *id))
+        })
+        .collect();
+    env.globals.extend(aliases);
+}
+
 pub fn expose_core_logic_transport(env: &mut ElabEnv) {
     for name in ["cong", "sym", "trans"] {
         let id = env.globals[&format!("Core.Logic.Transport.{name}")];

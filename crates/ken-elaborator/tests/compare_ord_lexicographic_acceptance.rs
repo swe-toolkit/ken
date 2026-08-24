@@ -12,8 +12,6 @@ mod catalog_or;
 use ken_elaborator::{trusted_base_delta, ElabEnv};
 use ken_kernel::env::Decl;
 
-const COLLECTIONS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 const LAWFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 
@@ -21,8 +19,7 @@ fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
-        .expect("Data/Collections/Derived.ken must elaborate");
+    catalog_or::load_derived_fixture(&mut env);
     env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD)
         .expect("Core/Classes/LawfulClasses.ken must elaborate after its dependencies");
     env

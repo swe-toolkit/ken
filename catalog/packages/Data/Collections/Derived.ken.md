@@ -63,6 +63,9 @@ import Core.Logic.Compare (list_compare, list_eq)
 import Core.Logic.Or (Or, Inl, Inr)
 import Core.Logic.OrdResult (
   OrdResult,
+  Lt,
+  Eq,
+  Gt,
   ord_eq,
   ord_lt,
   ord_gt,

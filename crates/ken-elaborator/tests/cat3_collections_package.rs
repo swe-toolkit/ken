@@ -20,8 +20,7 @@ fn mk_env() -> ElabEnv {
     let provider_state = catalog_or::core_logic_or_module_state(&env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
-    env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
-        .expect("catalog/packages/Data/Collections/Derived.ken.md must elaborate");
+    catalog_or::load_derived_fixture(&mut env);
     catalog_or::assert_transparent_result_uses_core_logic_or(
         &env,
         "pair_compare_lt_cases",

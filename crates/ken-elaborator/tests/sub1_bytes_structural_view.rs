@@ -10,8 +10,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, PrimReduction, Term};
 
-const COLLECTIONS: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 
 fn make_store(env: &ElabEnv) -> EvalStore {
     let mut store = EvalStore::new();
@@ -226,8 +224,7 @@ fn ac1_ac3_structural_fold_terminates_runs_and_adds_no_axiom() {
     catalog_or::load_core_logic_compare(&mut env);
     let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     catalog_or::expose_core_logic_transport(&mut env);
-    env.elaborate_ken_md_file(COLLECTIONS)
-        .expect("Collections package with derived Bytes fold");
+    catalog_or::load_derived_fixture(&mut env);
     let trust_after_package: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         trust_after_package, trust_before,

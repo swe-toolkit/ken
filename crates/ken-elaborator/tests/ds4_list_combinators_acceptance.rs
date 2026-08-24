@@ -21,7 +21,7 @@ fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    env.elaborate_ken_md_file(COLLECTIONS_KEN_MD).expect("Data/Collections/Derived.ken.md must elaborate");
+    catalog_or::load_derived_fixture(&mut env);
     env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD).expect("Core/Classes/LawfulClasses.ken must elaborate");
     env
 }
@@ -71,7 +71,7 @@ fn trusted_base_delta_is_empty_across_the_file() {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     let before: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(COLLECTIONS_KEN_MD).expect("Data/Collections/Derived.ken.md must elaborate");
+    catalog_or::load_derived_fixture(&mut env);
     let after: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         before, after,
