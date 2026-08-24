@@ -39,23 +39,14 @@ ES2; `Prop` is the prelude's surface-nameable alias for `Omega_0`).
 
 ```ken
 import Core.Logic.Or (Or, Inl, Inr)
-import Core.Logic.OrdResult (
-  OrdResult,
-  ord_eq,
-  ord_lt,
-  ord_gt,
-  ord_result_leq,
-  ord_result_elim,
-  ord_result_elim2
-)
+
+import Core.Logic.OrdResult
+  (OrdResult, ord_eq, ord_lt, ord_gt, ord_result_leq, ord_result_elim, ord_result_elim2)
+
 import Core.Logic.Transport (cong, sym)
-import Core.Logic.Compare (
-  list_compare,
-  list_eq,
-  pair_compare,
-  pair_compare_lt_cases,
-  pair_compare_result_of
-)
+
+import Core.Logic.Compare
+  (list_compare, list_eq, pair_compare, pair_compare_lt_cases, pair_compare_result_of)
 
 pub fn IsTrue (b : Bool) : Prop = Equal Bool b True
 ```
@@ -1273,8 +1264,7 @@ proof antisym for pair_ord_leq
     (pair_compare a b (compare a da) (compare b db) x y)
     (pair_compare a b (compare a da) (compare b db) y x)
     (λpx. λpy. λhx. λhy. absurd (pair_compare_lt_asym a b da db x y px py))
-    (λpx.
-      λpy. λhx. λhy. sym (Pair a b) y x (pair_compare_eq_sound a b da db y x py))
+    (λpx. λpy. λhx. λhy. sym (Pair a b) y x (pair_compare_eq_sound a b da db y x py))
     (λpx. λpy. λhx. λhy. absurd hy)
     (λpx. λpy. λhx. λhy. pair_compare_eq_sound a b da db x y px)
     (λpx. λpy. λhx. λhy. pair_compare_eq_sound a b da db x y px)

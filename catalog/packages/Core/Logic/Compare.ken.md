@@ -8,7 +8,9 @@ class instances so each consumer reuses the same checked provider identities.
 
 ```ken
 import Core.Logic.Or (Or, Inl, Inr)
+
 import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)
+
 import Core.Logic.Transport (sym)
 
 pub fn pair_compare
@@ -382,7 +384,9 @@ pub fn list_eq (a : Type) (eqf : a → a → Bool) (xs : List a) (ys : List a) :
       }
   }
 
-pub fn list_compare (a : Type) (cmp : a → a → OrdResult) (xs : List a) (ys : List a) : OrdResult =
+pub fn list_compare
+      (a : Type) (cmp : a → a → OrdResult) (xs : List a) (ys : List a)
+    : OrdResult =
   match xs {
     Nil ↦
       match ys {

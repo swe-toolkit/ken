@@ -101,7 +101,9 @@ theorem ord_result_elim2
       }
   }
 
-export OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt, ord_result_leq, ord_result_dispatch2, ord_result_elim, ord_result_elim2
+export OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt
+
+export ord_result_leq, ord_result_dispatch2, ord_result_elim, ord_result_elim2
 ```
 
 The type, constructors, aliases, and eliminators form one public interface.
