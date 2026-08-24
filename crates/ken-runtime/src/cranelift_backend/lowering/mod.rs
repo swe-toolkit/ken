@@ -3719,6 +3719,10 @@ struct PendingCheckedIhCall {
     /// The compiler-private checked-IH use shape. This is consumed by a static
     /// exhaustive dispatcher and never enters the crossing value.
     kind: crate::CheckedComputationalIHInvocationKind,
+    /// Explicit source-to-runtime binder map for this invocation. The plan's
+    /// IH-subsequence ordinal is translated through it before comparison with
+    /// the emitted runtime `Var`.
+    binder_morphism: crate::CheckedComputationalIHBinderMorphism,
     /// The occurrence of the application this marker denotes. Only a call being
     /// lowered AT this occurrence may consume the marker.
     application_origin: StaticOriginId,
@@ -6505,7 +6509,15 @@ impl<'a> Lowering<'a> {
             invoking_site: D2K_BOUNDARY_TRANSFER_INVOKING_SITE
                 .with(std::cell::Cell::get),
         });
-        value.boundary_transfer_admissibility()?;
+        if let Err(error) = value.boundary_transfer_admissibility() {
+            return Err(unsupported(
+                "BoundaryTransferDiagnostic",
+                format!(
+                    "origin={origin:?} root_kind={}; inner={error}",
+                    lowered_value_kind(value)
+                ),
+            ));
+        }
         self.source_aggregate_preflight(value)?;
         self.emit_carrier_transfer(builder, origin, value)
     }
@@ -10362,6 +10374,7 @@ impl<'a> Lowering<'a> {
         &mut self,
         call_template_id: u64,
         kind: crate::CheckedComputationalIHInvocationKind,
+        binder_morphism: crate::CheckedComputationalIHBinderMorphism,
         body: &RuntimeExpr,
         // `D8f` — the occurrence of the application this marker denotes,
         // supplied by the caller from the same `child_origin(marker, 0)` it
@@ -10376,6 +10389,7 @@ impl<'a> Lowering<'a> {
             .replace(PendingCheckedIhCall {
                 call_template_id,
                 kind,
+                binder_morphism,
                 application_origin,
             })
             .is_some()
@@ -10610,12 +10624,26 @@ impl<'a> Lowering<'a> {
                 ),
             ));
         }
-        if slot.method_binder_ordinal != binder_index {
+        let planned_runtime_index = pending
+            .binder_morphism
+            .runtime_index(slot.method_binder_ordinal)
+            .ok_or_else(|| {
+                unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    format!(
+                        "the checked computational-IH slot's method ordinal {} is outside the \
+                         invocation's source-to-runtime binder map {:#?}",
+                        slot.method_binder_ordinal, pending.binder_morphism
+                    ),
+                )
+            })?;
+        if planned_runtime_index != binder_index {
             return Err(unsupported(
                 "OrientedSubcontinuationPlanV1",
                 format!(
-                    "the checked computational-IH slot seats its method binder at ordinal {} but \
-                     the consuming call reads `Var({binder_index})`",
+                    "the checked computational-IH slot maps method ordinal {} to runtime \
+                     `Var({planned_runtime_index})` but the consuming call reads \
+                     `Var({binder_index})`",
                     slot.method_binder_ordinal
                 ),
             ));
