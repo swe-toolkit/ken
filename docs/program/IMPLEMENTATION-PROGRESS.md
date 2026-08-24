@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-24 09:22:47Z — from 437 issue file(s) in `docs/program/issues/`.
+2026-08-24 12:23:20Z — from 438 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -164,6 +164,7 @@ the committed file matches the generator's output.
 | `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` | Attached-proof namespace closure: normative clarification that a proof's attached namespace is closed under its subject's defining module (a nonlocal attached-declaration head rejects at declaration time), with paired conformance. The coupled durable artifact of the Component B convert-to-local ruling. | draft | spec | S | none | — |
 | `LANG-MOD-CATALOG-COMPLETENESS` | WP-4 Component B — catalog completeness: give Nat and OrdResult (dedup two private copies) canonical public homes plus the fixpoint homeless-convenience census, deliver Order's provider surface + identity, migrate the consuming units (Gcd imports add/mul + leq_nat/sub + Nat and drops its reimplementations), and satisfy whole-catalog strict-green. The module/import campaign's catalog-reuse success step. | ready | language | L | none | — |
 | `LANG-MOD-CATALOG-REALIZATION` | WP-4 (Component A) — module-graph/roots loader realization: the uniform local-scope prebind fix (decouple local-declaration binding from ResolutionMode) so canonical Or binds under legacy, the self-contained green set checks standalone-strict, and Arithmetic add/mul publish genuine legacy loader-resolved identity. Order + OrdResult + consumer migration + whole-catalog strict-green are Component B. | merged | language | M | none | — |
+| `LANG-MOD-KENFMT-DECL-LAYOUT` | kenfmt breakable layout for the module/import declaration surface: Doc-builders for ExportDecl and ImportDecl (and selective-import / re-export name lists) so an overflowing name list wraps under CANONICAL_WIDTH and round-trips as a formatter fixed point. The Component B formatter-gate gap. | draft | language | M | none | — |
 | `LANG-MOD-LOADER-ENTRY` | WP-1 — route ken check catalog files through elaborate_module_from_roots instead of the direct single-file call; behavior-preserving, non-strict | merged | language | M | none | — |
 | `LANG-MOD-NAT-PROVIDER-INTERFACE` | Compiler-realized package-provider interface for the canonical Nat home: a closed registry binding one designated module path to the existing kernel-checked {Nat, Zero, Suc} identities under Strict, with the coupled 30/33/39 normative amendments and identity/strict-rejection/zero-allocation conformance pins. The Component B Nat prerequisite. | draft | spec | L | none | — |
 | `LANG-MOD-OR-CANONICAL-HOME` | Or arm (b), NODE B — author Core.Logic.Or (data Or (a:Omega)(b:Omega):Type with Inl/Inr, field-for-field the prelude shape), migrate every checked-source consumer to import it, and retire the Rust prelude Or/Inl/Inr registration so exactly one catalog Or identity exists | merged | language | L | none | — |

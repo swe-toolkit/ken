@@ -48,8 +48,9 @@ origin: "Operator directive 2026-08-22: module/import is its own campaign and, b
 >   campaign's catalog criterion.
 >
 > B PREREQUISITE NODES (discovered during Component B build, 2026-08-24 — two
-> structural mechanism/contract gaps the strict-migration surfaced; §1b
-> full-closure now governs the remaining cluster, Steward evt_21bem2w7rzj2k):
+> structural mechanism/contract gaps the strict-migration surfaced plus one
+> formatter-surface gap the respin CI surfaced; §1b full-closure now governs the
+> remaining cluster, Steward evt_21bem2w7rzj2k):
 > - [[LANG-MOD-NAT-PROVIDER-INTERFACE]] — a compiler-realized package-provider
 >   registry binding one module path to the existing kernel-checked
 >   {Nat,Zero,Suc} identities under Strict, + coupled 30/33/39 normative
@@ -62,6 +63,13 @@ origin: "Operator directive 2026-08-22: module/import is its own campaign and, b
 >   nonlocal attached head rejects), + conformance. Codifies EXISTING behavior;
 >   does NOT gate B's build (B converts its two foreign attachments to
 >   Lawful-local theorems, AC-B8). Enclave-owned, sequenced alongside B.
+> - [[LANG-MOD-KENFMT-DECL-LAYOUT]] — kenfmt has no breakable layout for the
+>   module/import declaration surface (export/import name lists render as a flat
+>   unbreakable run; a >96-col line cannot reflow), so the Component B respin's
+>   "run the formatter" fix is invalid for its width failure. Language-owned,
+>   buildable now. Its `blocks` edge onto B is set by the ring's determination of
+>   whether B can author its module-surface decls idempotent-and-<=96 without the
+>   fix. Steward-confirmed from the Doc-construction; no `trusted_base()` impact.
 >
 > OR REALIZATION CHAIN (operator ruled the Or/Inl/Inr fork arm (b),
 > evt_6b9wrt1kwswcp — canonical package home, not refactor-away; the six consumers
