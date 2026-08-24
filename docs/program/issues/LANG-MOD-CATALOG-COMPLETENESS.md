@@ -41,10 +41,22 @@ strict-green through the real loader.
   constraint, ruling point 5).
 - Canonical public homes for the OTHER conveniences the 42 red leaves consume
   (census-driven — see the triage AC below).
-- Migrate the consuming units to import their providers: Arithmetic imports
-  `Core.Logic.Transport (cong, sym, trans)`; Order imports Transport +
-  `Classes.LawfulClasses`; Gcd selectively imports `add`/`mul` (Arithmetic) +
-  `leq_nat`/`sub` (Order) + `Nat`, and REMOVES its four local reimplementations.
+- Migrate the consuming units to import the canonical `Nat` home so they resolve
+  under strict: Arithmetic/Order/Gcd import the canonical `Nat` (the
+  provider-INTERNAL Transport imports on Arithmetic/Order are already delivered by
+  Component A and carry forward — B does NOT re-add them). Gcd selectively
+  imports `add`/`mul` (Arithmetic) + `leq_nat`/`sub` (Order) + `Nat`, and REMOVES
+  its four local reimplementations.
+- Move the real caller to STRICT (`elaborate_module_from_roots` strict mode)
+  after the dependency census has migrated — this is the flag-day the legacy A
+  loader defers.
+- FORWARD-COMPAT identity preservation (Architect ruling evt_47t9dwz0chstv):
+  strict excludes the native prelude `Nat`, so B re-homes `Nat` to a canonical
+  catalog interface and migrates the providers to import it — but B MUST PRESERVE
+  the provider identities (`add`/`mul`/`leq_nat`/`sub`) that Component A's pub
+  surface already exposed and measured under AC-A2. No competing provider
+  identity is minted by the `Nat` re-home. This is the NODE B canonical-home
+  pattern (as `Core.Logic.Or` replaced the prelude `Or`).
 
 # The census (re-homed from WP-4; drift corrected)
 
