@@ -5847,10 +5847,7 @@ mod checked_ih_captured_env_schema {
         bind_continuation_fixture_with_case_body(field, RuntimeExpr::Var(0))
     }
 
-    fn captured_bind_closure_with_captures(
-        result: i64,
-        captures: Vec<RuntimeExpr>,
-    ) -> RuntimeExpr {
+    fn captured_bind_closure_with_captures(result: i64, captures: Vec<RuntimeExpr>) -> RuntimeExpr {
         RuntimeExpr::LexicalClosure {
             captures,
             params: vec!["response".to_string()],
@@ -5942,9 +5939,9 @@ mod checked_ih_captured_env_schema {
     /// the three production-corruption controls below reach each one directly.
     #[test]
     fn bind_continuation_authorization_is_reaching_and_not_generic() {
-        let direct = Box::leak(Box::new(bind_continuation_fixture(
-            captured_bind_closure(1),
-        )));
+        let direct = Box::leak(Box::new(bind_continuation_fixture(captured_bind_closure(
+            1,
+        ))));
         let direct_plan = plan_static_transition_graph(direct, &BTreeMap::new())
             .expect("the direct bind-continuation fixture plans");
         let (seat, _, _, owner, environment) = direct_bind_coordinates(&direct_plan);
@@ -5969,8 +5966,7 @@ mod checked_ih_captured_env_schema {
         )));
         let mut plan = plan_static_transition_graph(source, &BTreeMap::new())
             .expect("the two-body bind-continuation fixture plans");
-        let (seat, resume_site, position, owner, environment) =
-            direct_bind_coordinates(&plan);
+        let (seat, resume_site, position, owner, environment) = direct_bind_coordinates(&plan);
         assert_direct_bind_is_authorized(&plan, owner, seat, &environment);
         assert!(matches!(
             plan.planned_occurrence_expr(resume_site)
@@ -5980,13 +5976,12 @@ mod checked_ih_captured_env_schema {
         let response_record = plan
             .aggregate_ownership
             .iter()
-            .find(|record| {
-                record.producer == AggregateOccurrenceProducer::Source(resume_site)
-            })
+            .find(|record| record.producer == AggregateOccurrenceProducer::Source(resume_site))
             .expect("the response constructor retains its ownership record");
-        assert!(response_record.children.iter().any(|child| {
-            child.position as usize == position && child.origin == Some(seat)
-        }));
+        assert!(response_record
+            .children
+            .iter()
+            .any(|child| { child.position as usize == position && child.origin == Some(seat) }));
 
         let mut competing = plan
             .abi
@@ -6049,13 +6044,12 @@ mod checked_ih_captured_env_schema {
     /// population; the mutation proof is recorded in the candidate handoff.
     #[test]
     fn bind_continuation_production_rejects_response_field_origin_mismatch() {
-        let source = Box::leak(Box::new(bind_continuation_fixture(
-            captured_bind_closure(1),
-        )));
+        let source = Box::leak(Box::new(bind_continuation_fixture(captured_bind_closure(
+            1,
+        ))));
         let mut plan = plan_static_transition_graph(source, &BTreeMap::new())
             .expect("the direct bind-continuation fixture plans");
-        let (seat, resume_site, position, owner, environment) =
-            direct_bind_coordinates(&plan);
+        let (seat, resume_site, position, owner, environment) = direct_bind_coordinates(&plan);
         assert_direct_bind_is_authorized(&plan, owner, seat, &environment);
         let other_child = plan
             .semantic
@@ -6065,9 +6059,7 @@ mod checked_ih_captured_env_schema {
         let response_record = plan
             .aggregate_ownership
             .iter_mut()
-            .find(|record| {
-                record.producer == AggregateOccurrenceProducer::Source(resume_site)
-            })
+            .find(|record| record.producer == AggregateOccurrenceProducer::Source(resume_site))
             .expect("the response constructor retains its ownership record");
         let paired_field = response_record
             .children
@@ -6110,8 +6102,7 @@ mod checked_ih_captured_env_schema {
         )));
         let mut plan = plan_static_transition_graph(source, &BTreeMap::new())
             .expect("the activation-capturing bind fixture plans");
-        let (seat, resume_site, position, owner, environment) =
-            direct_bind_coordinates(&plan);
+        let (seat, resume_site, position, owner, environment) = direct_bind_coordinates(&plan);
         assert_direct_bind_is_authorized(&plan, owner, seat, &environment);
         let environment_record = plan
             .aggregate_ownership
@@ -6125,18 +6116,17 @@ mod checked_ih_captured_env_schema {
         let response_record = plan
             .aggregate_ownership
             .iter_mut()
-            .find(|record| {
-                record.producer == AggregateOccurrenceProducer::Source(resume_site)
-            })
+            .find(|record| record.producer == AggregateOccurrenceProducer::Source(resume_site))
             .expect("the response constructor retains its ownership record");
         let paired_field = response_record
             .children
             .iter_mut()
-            .find(|child| {
-                child.position as usize == position && child.origin == Some(seat)
-            })
+            .find(|child| child.position as usize == position && child.origin == Some(seat))
             .expect("the response record retains the exact recursive field");
-        assert_eq!(paired_field.lifetime, PlannedReferentLifetime::ActivationOwned);
+        assert_eq!(
+            paired_field.lifetime,
+            PlannedReferentLifetime::ActivationOwned
+        );
         paired_field.lifetime = PlannedReferentLifetime::Persistent;
 
         assert_eq!(
