@@ -199,6 +199,95 @@ origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect'
 > VarId + IndexRenaming; no further research round). Everything already proved
 > (owner records, schema 12/12, both new controls) stands. Returns to Architect + CV
 > + Adversary.
+>
+> AXIS #2 RESOLUTION — SINGLE MATERIALIZATION + AUTHORIZED TRANSPORT (Architect
+> ruling evt_7v0e2e32ssfk4, 2026-08-24; Steward folds it, cut evt_1kwvp2wqr5eka
+> unchanged — stays in M6). The closed-schema census surfaced axis #2's design fork
+> (the escaping ITree::Vis crossing at Specialization(2), parent 648, captures
+> [Constructor, Carried x7]) UP FRONT, exactly as intended. RULED: the crossing is
+> TRANSPORT, not a second emission.
+>
+> FINDING (Architect, verified at cc8cac02): the environment is physically
+> materialized ONCE, at the force seam (owner=Spec(1), seat=643). The Vis crossing
+> does NOT materialize (calls.rs:233-235 CheckedHostVisContinuation => Ok(None)); the
+> sole materializer emit_checked_ih_captured_environment (aggregates.rs:3434) has
+> exactly two callers, both FORCE dispositions (calls.rs:219 OrdinaryApplication,
+> :227 CheckedHostComputationTail), never the crossing. The raw Lowered::Closure
+> survives at the Vis child because the force-materialized record was NOT SUBSTITUTED
+> there — not because a second materialization occurred. The preflight
+> (boundary_transfer_admissibility, boundary.rs:1036-1047) correctly refuses the
+> unsubstituted raw closure.
+>
+> REJECT ARM (A) UNION: there is no second emission, so issuing a record under
+> owner=Spec(2) would falsely claim Spec(2) emits the environment — the exact
+> cross-owner false-emission hard-stop #1 prohibited. Emission-accuracy now FORBIDS
+> the union. (The Architect grounded specifically because their own
+> emission-accuracy lean pointed at (A); the transport fact inverts it.)
+>
+> MECHANISM (build input): a first-class AUTHORIZED TRANSPORT EDGE,
+> threading between both hard-stop-#1 prohibitions — NOT
+> borrow-Spec(1)'s-record-under-Spec(2) (issues a record for a
+> non-emitting owner); NOT seat-only fallback ("any record for seat 643"
+> drops the owner-key authorization); INSTEAD an explicit edge naming
+> BOTH endpoints — source = force materialization (owner=Spec(1),
+> seat=643); destination = crossing (owner=Spec(2), parent=648) — so
+> the boundary substitution at the crossing follows the edge to the
+> force-emitted record. The edge IS the authorization (names the source
+> owner; issues no new record under Spec(2)). Derive it from the SEAL-2
+> producer-closure escape certificate (the escape analysis that already knows the
+> closure escapes to the Vis crossing); keep the carrier axis fail-closed. This is
+> research's defunctionalization framing: the transformation judgment carries the
+> variable translation TOGETHER WITH the closure environment.
+>
+> AXIS #1 STABLE IDENTITY: the join is the SEAT closure-origin StaticOriginId (643),
+> NOT the body id (634). It is the value both resolve_recursive_unit_body passes
+> through (core.rs:10967+, argument.static_origin before descending to body=634) AND
+> the captured-environment record is keyed on (seat=worker.closure_origin,
+> aggregates.rs:3445). Key the transport edge on the seat StaticOriginId; tie the
+> dispatcher body to the record through this one stable id, not two independent
+> derivations.
+>
+> AXIS #2 LIFETIME OBLIGATION: the force materialization (Spec(1)) must
+> dominate/outlive every transport destination (the Spec(2) crossing) —
+> the environment must be reachable and live where transported to.
+> Per-owner content is moot (one materialization; the run is canonical
+> per seat, checked_ih_force_emissions aggregates.rs:1436-1462) — do NOT
+> clone into a second owner record; there is no second owner record.
+>
+> AXIS #4 FIELD ORDER: emitted environment field order and call_declared_context's
+> capture suffix (calls.rs:872; ordering :1050-1054/:1129-1142) are TWO INDEPENDENT
+> authorities, both tracing to the ordinary envelope's WorkerCapture ordinals
+> (neither derives from the other). Validate their equality in a COMMON FRAME at the
+> point the record's field order is reconciled — not by deriving one from the other
+> (vacuity), not across frames (false negative). Same two-authorities-common-frame
+> discipline as the binder map.
+>
+> AXIS #5 (result/interface) + STACK: the ProcessExitStatus-where-Option-expected
+> mismatch is an ARTIFACT of lowering out of frame, NOT a dispatcher/apply
+> interface-identity defect (ProcessExitStatus is legitimate only inside the
+> process-object frame; the ExitCode join is "unavailable outside
+> process-object lowering", joins.rs:1978-1982; has_checked_root_exit_representation
+> == self.process_object, mod.rs:11406). FIX: lower the nested producer in
+> the composed process-object frame; do NOT reconcile two interfaces. STACK:
+> a stack increase is NOT the repair — the overflow is a symptom of the
+> composition path reaching the currently-refused crossing; resolving the
+> transport lets composition complete. If a legitimate residual depth
+> remains, pin it with a stated-stack test, never an ambient RUST_MIN_STACK
+> bump.
+>
+> DISPOSITION: STAYS IN M6, no successor, no new D0. §1b: the
+> closed-schema census WORKING — axis #2's conflict surfaced up front,
+> not as a 4th sequential hard-stop; the transport invariant of the one
+> closure-conversion correctness statement, not a new predicate; not a
+> §1a re-trigger (research's defunctionalization framing already covers
+> the transport). Still ken-runtime codegen (a planner transport edge +
+> escape-derived authorization), no new representation route, no
+> trusted_base delta — no operator TCB gate. Auditability: a
+> discriminating pair showing the crossing now substitutes the
+> force-materialized record (was the raw-closure boundary refusal) via
+> the authorized edge, plus a control that NO record is issued under
+> the transport owner (Spec(2) stays record-free; the edge, not a
+> record, authorizes the crossing). Returns to Architect + CV + Adversary.
 
 > # D0 RULED 2026-08-22 — DEFUNCTIONALIZE; re-homed as native-program Track-1
 >
