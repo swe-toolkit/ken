@@ -56,17 +56,86 @@ This SUPERSEDES deliverable 3 / AC-GREEN below with the permitted continuation:
   applies to all four census rows, not only the two started), and for each
   measure whether it crosses AND greens end-to-end — a row's capture shape may
   or may not hit the borrowed-input seam.
-- **Re-point, do not un-ignore, the carry-forward rows.** Any censused row that
-  crosses but reds ONLY at the borrowed-input execution seam re-points its
-  `#[ignore]` string to [[RT-BORROWED-INPUT-CARRIER-DURABILITY]] as owner —
-  exactly as M6 re-pointed `rt_write_writable_stage` to M3. An honest advancing
-  refusal, not a regression; do not un-ignore it.
+- **Re-point, do not un-ignore, any row that crosses then reds at a KNOWN,
+  already-classified seam.** After M4's crossing, a row may advance to a deeper
+  seam that another node already owns; re-point its `#[ignore]` string to that
+  owner (an honest advancing refusal, exactly as M6 re-pointed
+  `rt_write_writable_stage` to M3), do not un-ignore it, and do not fold that
+  node's work into M4. The classification is by EXACT refusal string:
+  - `Effect: seat Argument(1) of FsOpen needs ConstructorTag, which it cannot
+    observe in CarriedWord` ⇒ M3 [[RT-CARRIED-IH-DISPATCH-SITEOP]].
+  - `malformed borrowed process input` (native value -1) ⇒
+    [[RT-BORROWED-INPUT-CARRIER-DURABILITY]].
 - **Un-ignore ONLY rows that cross AND green end-to-end.** Those land green.
-- **M4 is landable as accepted work per COORDINATION section 8a** even if some
-  rows carry forward to the successor: the crossing mechanism plus the honest
-  re-points is a complete M4 deliverable. Any row that stays red at a NEW seam
-  beyond the borrowed-input trap is still a stop-and-report to Architect +
-  Steward.
+- **Stop-and-report only on a genuinely UNCLASSIFIED seam** — a refusal string
+  matching none of the known owners above. A row advancing to a known seam is a
+  re-point (proceed autonomously); a row advancing to an unclassified seam is a
+  stop-and-report to Architect + Steward, so the Steward can place it.
+- **M4 is landable as accepted work per COORDINATION section 8a** even if rows
+  carry forward: the crossing mechanism plus the honest re-points is a complete
+  M4 deliverable. Measured @ WIP `9de8397a`: `px8f_buffer_native` crosses then
+  advances to M3's exact seam (re-point to M3); the two `px8l_recursive_decl`
+  rows re-point to the borrowed-input successor; `px8ta_oriented_subcontinuation`
+  is a test-structure fix (see the third-stop disposition below).
+
+## Third-stop disposition (Architect evt_4tdex7kqzk2w9) — px8ta is a test fix
+
+The `px8ta` row
+`px8ds_real_same_depth_path_rejects_flat_order_and_runs_exact_edges` bundles two
+independent assertions, and its retired-flat NEGATIVE control panics before M4's
+real subject runs. The Architect ruled M4 must NOT represent the retired-flat
+closure — wiring the crossing into a control that asserts a rejection would
+invert it. This is a test-structure fix on M4's own surface, not a mechanism
+representation and not a successor; the classifier's "unclassified → stop" fired
+correctly, surfacing a genuinely new case (a correct negative-control refusal).
+
+Permitted continuation (M4's surface — no successor, no widening):
+
+- **HALF A, the retired-flat negative control** (`with_px8ds_retired_flat_order`,
+  `mod.rs:8807`): stays a REJECTION assertion and receives NO M4 representation.
+  Since M4 legitimately leaves the retired-flat path un-wired, update HALF A's
+  `expect_err` content to the refusal it now truly reaches, OR reconfigure it to
+  still exercise the "…do not compose" splice rejection it was built to prove.
+  The runtime ring authors the exact assertion; the invariant is that it still
+  asserts a rejection and folds no retired-path representation into M4.
+- **HALF B, M4's real subject** (the ordinary oriented plan): split so it runs
+  independently of HALF A, then classify it by the standing exact-string rule
+  above. Its stale ignore reason is `RT-SITEOP-CARRIED-WITNESS` D2 (a
+  carried-recursive-hypothesis refusal), so it most likely RE-POINTS to M3
+  rather than greening — measure, do not assume green.
+- Does not fold M3 or borrowed-input work into M4 and does not gate M4 on the
+  retired-flat path. M4 lands per COORDINATION section 8a; the Architect reviews
+  the candidate at soundness.
+
+## Fourth-stop disposition (Architect hold evt_7vxzx3b82k7kk; Steward partial-land)
+
+After the third-stop split, `px8ta` HALF B
+(`px8ds_real_same_depth_path_runs_exact_edges`) runs independently and STILL
+reaches the generic Closure refusal — the ordinary plan's own remaining
+crossing, not control contamination. It fails M4's crossing by the PREDICATE'S
+DESIGN, grounded by the Architect: HALF B's checked continuation is over a
+self-recursive producer (`countdown` calls itself), instantiated as TWO
+same-depth sibling IH instances, and applied as a bind continuation — so it is
+not structurally contained in the emitted owner's result value, and M4's
+capture-only single-static-descriptor model has no single descriptor for a
+multi-instance same-depth recursive continuation. Not a mechanism bug.
+
+The Architect HOLDS the same-contract-vs-successor ruling under its §1a trigger
+(fourth hard-stop, a representation-scope fork), pending a research prior-art
+advisory (Research picked it up, evt_64rxg73jq6651); its leaning is
+distinct-successor. HALF B stays ignored + re-pointed to this node (M4) as
+holding owner; no M4 extension may be attempted while the advisory is out.
+
+Steward framing call: LAND THE PROVEN PARTIAL NOW (COORDINATION section 8a). The
+proven mechanism — the px8f/px8l crossing + honest re-points (px8f→M3,
+2×px8l→borrowed-input) + the px8ta split (HALF A independent rejection control) +
+any genuinely cross-and-green un-ignores — assembles into an accepted-partial
+candidate and lands, with the recursive-continuation population (HALF B + any
+sibling rows sharing its shape) carried forward. On landing, M4's node goes
+`active` (authorized partial, holding owner), NOT `merged`. When the Architect's
+post-research ruling lands: distinct-successor ⇒ HALF B re-points to the new node
+and M4 closes `merged`; same-contract ⇒ M4 takes a follow-up increment. HALF B
+does not gate the proven mechanism.
 
 ## Why the population must be CENSUSED, not inherited (measured @ `011bf2a95`)
 
