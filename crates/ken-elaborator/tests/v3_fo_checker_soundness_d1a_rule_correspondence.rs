@@ -13,6 +13,9 @@
 //! natural input and requires the unchanged checker to reject it. No row
 //! constructs or applies the `FokDerivation` eliminator/recursor.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
@@ -22,6 +25,7 @@ const FOK_SOURCE: &str =
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken with FokDerivation must elaborate and kernel-check");

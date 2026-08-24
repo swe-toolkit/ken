@@ -14,6 +14,9 @@
 //! The trusted-base control separately compares the kernel registry before and
 //! after loading the complete file.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
@@ -24,6 +27,7 @@ const FOK_SOURCE: &str =
 
 fn load_fok() -> (ElabEnv, BTreeSet<ken_kernel::GlobalId>) {
     let mut env = ElabEnv::new().expect("base env construction failed");
+    catalog_or::load_core_logic_or(&mut env);
     let before = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken with D1b reflection must elaborate and kernel-check");

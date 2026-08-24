@@ -17,8 +17,11 @@
 //! has no `ImportDecl`/`ModuleDecl` handling). Examples that reuse
 //! `catalog/packages/Data/Collections/Derived.ken.md` (per the frame's DRY rule) need its symbols
 //! concatenated ahead of their own source before `ken run`. `Derived.ken`
-//! now carries proof terms using `cong`, so the proof-only transport package
-//! must precede collections in that concatenated prelude.
+//! carries proof terms using `cong` and imports the canonical `Core.Logic.Or`.
+//! Because this legacy runner deliberately flattens packages into one source
+//! unit rather than invoking the roots loader, it extracts both providers,
+//! removes that now-redundant module edge from the flattened Derived source,
+//! and orders Transport + Or before collections.
 //!
 //! **This concatenation is NOT applied blanket to every example.**
 //! Empirically, unconditionally prepending declarations that a given
@@ -61,14 +64,34 @@ fn collections_prelude() -> String {
     let transport = ken_elaborator::literate::extract_ken_md(&transport_md)
         .expect("catalog/packages/Core/Logic/Transport.ken.md must extract")
         .source;
+    let or_md = fs::read_to_string(workspace_root().join("catalog/packages/Core/Logic/Or.ken.md"))
+        .expect("catalog/packages/Core/Logic/Or.ken.md must be readable");
+    let or_source = ken_elaborator::literate::extract_ken_md(&or_md)
+        .expect("catalog/packages/Core/Logic/Or.ken.md must extract")
+        .source;
     let collections_md = fs::read_to_string(
         workspace_root().join("catalog/packages/Data/Collections/Derived.ken.md"),
     )
     .expect("catalog/packages/Data/Collections/Derived.ken.md must be readable");
-    let collections = ken_elaborator::literate::extract_ken_md(&collections_md)
+    let mut collections = ken_elaborator::literate::extract_ken_md(&collections_md)
         .expect("catalog/packages/Data/Collections/Derived.ken.md must extract")
         .source;
-    format!("{transport}\n{collections}")
+
+    // `ken run` still consumes one flat source unit here; executing the module
+    // graph belongs to WP-4. Remove exactly the import edge whose provider
+    // source this compatibility runner has just flattened in.
+    const OR_IMPORT: &str = "import Core.Logic.Or (Or, Inl, Inr)";
+    let mut imports = collections.match_indices(OR_IMPORT);
+    let (start, _) = imports
+        .next()
+        .expect("Derived must carry its Core.Logic.Or import");
+    assert!(
+        imports.next().is_none(),
+        "Derived must carry exactly one Core.Logic.Or import"
+    );
+    collections.replace_range(start..start + OR_IMPORT.len(), "");
+
+    format!("{transport}\n{or_source}\n{collections}")
 }
 
 enum Oracle {

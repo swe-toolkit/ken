@@ -1,5 +1,8 @@
 //! CC7 (`ArgParse`) ordered shared-environment acceptance.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
@@ -39,6 +42,7 @@ const EXAMPLE_KEN_MD: &str = include_str!("../../../catalog/examples/CommandLine
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     for (source, label) in [
         (TRANSPORT_KEN_MD, "Core.Logic.Transport"),
         (COLLECTIONS_KEN_MD, "Data.Collections"),

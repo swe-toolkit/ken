@@ -23,6 +23,9 @@
 //! No change to `fok_check_cert`/the checker, no FO `Proved` verdict, no new
 //! primitive/postulate/axiom/trusted-base entry (`AC-1`, `AC-3`, `AC-4`).
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
@@ -31,7 +34,9 @@ const FOK_SOURCE: &str =
     include_str!("../../../catalog/packages/Tooling/Verification/FoKripke.ken");
 
 fn mk_env() -> ElabEnv {
-    ElabEnv::new().expect("base env construction failed")
+    let mut env = ElabEnv::new().expect("base env construction failed");
+    catalog_or::load_core_logic_or(&mut env);
+    env
 }
 
 fn load_fok(env: &mut ElabEnv) {

@@ -43,9 +43,10 @@
 //!     root's checked fences and marks a root non-exempt when any declaration
 //!     references a carrier-closure name in any type **or body** position (the
 //!     body axis is load-bearing — Ken's bottom eliminator can inhabit a carrier
-//!     from an ex-falso body), or uses a form the certificate cannot resolve
-//!     (`module`/`import`/`export` → fail closed). Its
-//!     soundness is the conjunction on [`RootFacts`], not "every producer names
+//!     from an ex-falso body), or uses a form the certificate cannot resolve.
+//!     Selective imports/exports contribute explicit name edges; nested modules
+//!     and non-selective imports fail closed. Its soundness is the conjunction
+//!     on [`RootFacts`], not "every producer names
 //!     the carrier". A single flat all-catalog `ElabEnv` is not achievable (the
 //!     catalog is layered and co-load collides) and is not required; each
 //!     non-exempt root is instead enumerated and checked by [`closed_producers`].
@@ -69,7 +70,7 @@ use std::path::{Path, PathBuf};
 
 use ken_elaborator::{
     extract_ken_md, parser, validate_ken_md_fences, ConstructorSignatureArg, Decl as SurfaceDecl,
-    ElabEnv, ExplicitDataCtor, Expr, Type as SurfaceType,
+    ElabEnv, ExplicitDataCtor, ExportForm, Expr, ImportKind, Type as SurfaceType,
 };
 use ken_kernel::{infer, whnf, Context, Decl, GlobalEnv, GlobalId, Term};
 
@@ -538,8 +539,10 @@ pub fn read_package_source(path: &Path) -> String {
 //   3. A root is NON-EXEMPT when any declaration references a carrier-closure
 //      name in any type OR body position (`walk_decl` scans both — the bottom
 //      eliminator makes the body load-bearing), OR uses a form the certificate
-//      cannot resolve (`module`/`import`/`export` → `requires_semantic_resolution`,
-//      FAIL CLOSED — no surface-string resolver graph). Every non-exempt root is
+//      cannot resolve (`module` or a non-selective `import` →
+//      `requires_semantic_resolution`, FAIL CLOSED). Selective imports and
+//      exports contribute explicit name edges to the same closure. Every
+//      non-exempt root is
 //      named (root + declaration/form + carrier/reason) and must be explicitly
 //      enumerated, loaded through its known dependency environment, and run
 //      through `closed_producers` — never silently accepted. The soundness of
@@ -749,10 +752,11 @@ pub struct RootFacts {
     /// such a class or data type is itself a carrier reference).
     pub propagators: Vec<(String, BTreeSet<String>)>,
     /// A binding form the certificate cannot resolve without the production
-    /// resolver — any `module`, `import`, or `export`. Such a root is
-    /// conservatively non-exempt regardless of its references — FAIL CLOSED on
-    /// the undecidable form rather than recreate resolver identity with a surface
-    /// string graph. (No catalog package uses these today; this guards the form.)
+    /// resolver — a `module` or non-selective `import`. Such a root is
+    /// conservatively non-exempt regardless of its references. Selective imports
+    /// and exports instead contribute explicit source-name → local-name edges to
+    /// `decl_refs`/`propagators`, so an imported or re-exported carrier alias joins
+    /// the same closure while an unrelated selective edge remains exempt.
     pub requires_semantic_resolution: Option<String>,
 }
 
@@ -1044,17 +1048,40 @@ fn walk_decl(decl: &SurfaceDecl, facts: &mut RootFacts) {
             }
         }
         SurfaceDecl::BoundaryDecl { .. } => {}
-        // `module` / `import` / `export` carry cross-module identity the
-        // certificate does not resolve — fail closed rather than recreate the
-        // resolver with a surface string graph. (Zero catalog packages use these.)
+        // A nested module carries a scope graph this certificate does not
+        // reproduce, so it remains fail-closed.
         SurfaceDecl::ModuleDecl { name, .. } => {
             facts.requires_semantic_resolution = Some(format!("module `{name}`"));
         }
-        SurfaceDecl::ImportDecl { module, .. } => {
-            facts.requires_semantic_resolution = Some(format!("import of `{module}`"));
-        }
-        SurfaceDecl::ExportDecl { .. } => {
-            facts.requires_semantic_resolution = Some("re-export".to_string());
+        SurfaceDecl::ImportDecl { module, kind, .. } => match kind {
+            ImportKind::Selective(items) => {
+                for item in items {
+                    let local = item.rename.as_ref().unwrap_or(&item.name);
+                    facts
+                        .propagators
+                        .push((local.clone(), BTreeSet::from([item.name.clone()])));
+                    refs.insert(item.name.clone());
+                }
+                facts
+                    .decl_refs
+                    .push((format!("import of `{module}`"), refs));
+            }
+            ImportKind::Qualified | ImportKind::Aliased(_) => {
+                facts.requires_semantic_resolution = Some(format!("import of `{module}`"));
+            }
+        },
+        SurfaceDecl::ExportDecl { form, .. } => {
+            let items = match form {
+                ExportForm::Facade { items, .. } | ExportForm::InScope { items } => items,
+            };
+            for item in items {
+                let exported = item.rename.as_ref().unwrap_or(&item.name);
+                facts
+                    .propagators
+                    .push((exported.clone(), BTreeSet::from([item.name.clone()])));
+                refs.insert(item.name.clone());
+            }
+            facts.decl_refs.push(("re-export".to_string(), refs));
         }
         SurfaceDecl::Pub(inner) => walk_decl(inner, facts),
     }

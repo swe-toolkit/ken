@@ -13,6 +13,9 @@
 //! (`ken-elaborator/src/prelude.rs`) those two ops route through. Extended
 //! once the generic-dictionary gap resolves.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
@@ -36,12 +39,16 @@ const D1_LEGACY_MAP_STACK_RESERVATION_BYTES: usize = 512;
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
+    let provider_state = catalog_or::core_logic_or_module_state(&env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("catalog/packages/Core/Logic/Transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
         .expect("catalog/packages/Data/Collections/Derived.ken.md must elaborate");
+    catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     env.elaborate_ken_md_file(MAP_KEN_MD)
         .expect("catalog/packages/Data/Collections/Map.ken.md must elaborate");
+    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "bool_dichotomy");
     env
 }
 
@@ -768,6 +775,42 @@ fn lookupassocagree_law5_is_a_real_general_proof_term() {
 // ─────────────────────────────────────────────────────────────────────────────
 // CAT-4 (`58`) — Layer-2 keyed collections / sets / relations
 // ─────────────────────────────────────────────────────────────────────────────
+
+/// Promise class: durable invariant. The Map package's reused total-order
+/// witness remains proof-relevant: case analysis distinguishes the side chosen
+/// by `total_leq_nat`.
+///
+/// **MEASURED:** the real Map package's `total_leq_nat` produces opposite Bool
+/// tags for a left witness and a right witness. **CLAIMED:** its imported
+/// catalog `Or` retains distinguishable `Inl`/`Inr` computation. **THE GAP:**
+/// merely type-checking both constructors would not prove informative
+/// elimination; `map_or_tag` consumes the actual witness by case analysis.
+#[test]
+fn map_total_leq_nat_preserves_proof_relevant_or_tags() {
+    let mut env = mk_env();
+    env.elaborate_decl(
+        "fn map_or_tag (a : Omega) (b : Omega) (choice : Or a b) : Bool = \
+         match choice { Inl p |-> True ; Inr q |-> False }",
+    )
+    .expect("Map Or tag observer must elaborate");
+    env.elaborate_file(
+        "theorem map_total_left_tag \
+           : Equal Bool \
+               (map_or_tag \
+                 (Equal Bool (leq_nat Zero (Suc Zero)) True) \
+                 (Equal Bool (leq_nat (Suc Zero) Zero) True) \
+                 (total_leq_nat Zero (Suc Zero))) \
+               True = Proved \
+         theorem map_total_right_tag \
+           : Equal Bool \
+               (map_or_tag \
+                 (Equal Bool (leq_nat (Suc Zero) Zero) True) \
+                 (Equal Bool (leq_nat Zero (Suc Zero)) True) \
+                 (total_leq_nat (Suc Zero) Zero)) \
+               False = Proved",
+    )
+    .expect("both Map Or tags must remain distinguishable by case analysis");
+}
 
 #[test]
 fn cat4_new_api_is_derived_and_axiom_free() {

@@ -1,5 +1,8 @@
 //! CC5 (`Capability.Formatting.Doc`) ordered shared-environment acceptance.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
@@ -13,10 +16,13 @@ const PRETTY_DOC_KEN_MD: &str = include_str!("../../../catalog/packages/Capabili
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
+    let provider_state = catalog_or::core_logic_or_module_state(&env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("Core.Logic.Transport must elaborate first");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
         .expect("Data.Collections must elaborate second");
+    catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     env
 }
 
@@ -24,6 +30,7 @@ fn full_env() -> ElabEnv {
     let mut env = dependency_env();
     env.elaborate_ken_md_file(PRETTY_DOC_KEN_MD)
         .expect("Capability.Formatting.Doc and every checked fence must elaborate third");
+    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "pretty_bool_cases");
     env
 }
 

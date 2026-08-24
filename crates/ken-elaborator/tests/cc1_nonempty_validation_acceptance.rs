@@ -6,6 +6,9 @@
 //! elaborate the dependency closure in order into one shared `ElabEnv`, then
 //! elaborate both CC1 entries (including every checked literate fence).
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
@@ -26,6 +29,7 @@ const VALIDATION_KEN_MD: &str =
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("Core/Logic/Transport.ken.md must elaborate first");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

@@ -65,6 +65,15 @@ fn module_elaborates_to_identical_flat_sigma() {
     fs::create_dir_all(&fixture).expect("create catalog fixture");
     fs::write(fixture.join("M.ken"), "pub const foo : Int = 0")
         .expect("write provider");
+    let core_logic = fixture.join("Core/Logic");
+    fs::create_dir_all(&core_logic).expect("create Core.Logic fixture path");
+    fs::write(
+        core_logic.join("Or.ken"),
+        "data Or (a : Omega) (b : Omega) : Type where { \
+           Inl : a -> Or a b; Inr : b -> Or a b \
+         } export Or, Inl, Inr",
+    )
+    .expect("write proof-relevant Or provider");
     let entry_path = fixture.join("Entry.ken");
     fs::write(&entry_path, "import M\nconst bar : Int = M.foo")
         .expect("write entry");
@@ -95,7 +104,7 @@ fn module_elaborates_to_identical_flat_sigma() {
 
     let mut strict = mk_env();
     strict
-        .elaborate_module_from_roots_strict(&[address.root], &address.entry)
+        .elaborate_module_from_roots_strict(&[address.root.clone()], &address.entry)
         .expect("opt-in strict roots program elaborates");
     assert_eq!(
         strict.env.decls().count(),
@@ -116,6 +125,25 @@ fn module_elaborates_to_identical_flat_sigma() {
         matches!(strict_body, Term::Const { id, .. } if id == strict_provider),
         "strict import must retain the provider's existing GlobalId"
     );
+
+    // Extend the same flat-Sigma pin over NODE B's exact relevant-data shape.
+    // Legacy and strict roots loading both erase the module/export layer; the
+    // flat program emits the identical three kernel declarations.
+    strict
+        .elaborate_module_from_roots_strict(&[address.root], "Core.Logic.Or")
+        .expect("strict roots load proof-relevant Or");
+    b.elaborate_file(
+        "data Or (a : Omega) (b : Omega) : Type where { \
+           Inl : a -> Or a b; Inr : b -> Or a b \
+         }",
+    )
+    .expect("flat proof-relevant Or elaborates");
+    assert_eq!(
+        strict.env.decls().count(),
+        b.env.decls().count(),
+        "strict roots Or adds only its flat family and two constructors"
+    );
+    assert_eq!(strict.env.trusted_base(), b.env.trusted_base());
     fs::remove_dir_all(fixture_parent).expect("remove catalog fixture");
 }
 

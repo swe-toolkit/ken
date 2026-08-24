@@ -55,6 +55,9 @@
 //! trusted-base addition, no `embedding_adequacy`/`denote`/`Carriers`/
 //! `AtomEnv`, no slice widening, no sort validation.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
@@ -64,6 +67,7 @@ const FOK_SOURCE: &str =
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken (with D2's Bool-inversion lemmas) must elaborate/kernel-check");
     env
@@ -78,6 +82,7 @@ fn mk_env() -> ElabEnv {
 #[test]
 fn all_five_lemmas_elaborate_with_zero_trusted_base_delta() {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken with D2's lemmas must elaborate/kernel-check");

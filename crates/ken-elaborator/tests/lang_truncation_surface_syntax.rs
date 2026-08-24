@@ -21,6 +21,9 @@
 //! No kernel change (`AC-2`): every construction below goes through ordinary
 //! `ken_kernel::infer`/`check` on ALREADY-EXISTING `Term` variants.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
@@ -30,7 +33,9 @@ const FOK_SOURCE: &str =
     include_str!("../../../catalog/packages/Tooling/Verification/FoKripke.ken");
 
 fn mk_env() -> ElabEnv {
-    ElabEnv::new().expect("base env construction failed")
+    let mut env = ElabEnv::new().expect("base env construction failed");
+    catalog_or::load_core_logic_or(&mut env);
+    env
 }
 
 fn trust(env: &ElabEnv) -> BTreeSet<ken_kernel::GlobalId> {

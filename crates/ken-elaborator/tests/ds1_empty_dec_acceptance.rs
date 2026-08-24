@@ -12,6 +12,9 @@
 //! - **AC5** — the catalog entry's `` ```ken ``/`` ```ken example ``/
 //!   `` ```ken reject `` fences all check via the real literate extractor.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::ElabEnv;
 use ken_kernel::conv::whnf;
 use ken_kernel::env::Context;
@@ -191,6 +194,7 @@ fn ac1_mechanism_probe_no_method_wrong_domain_rejected() {
 #[test]
 fn ac2_empty_and_absurd_empty_elaborate() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     assert!(env.globals.contains_key("Empty"), "Empty must be a prelude global");
     assert!(env.globals.contains_key("Dec"), "Dec must be a prelude global");
     assert!(env.globals.contains_key("Yes"), "Yes must be a prelude global");
@@ -248,6 +252,28 @@ fn ac3_trusted_base_delta_is_ordinary_inductive_admission_only() {
     assert!(env.globals.contains_key("Empty"), "Empty must be a registered global");
 }
 
+/// Promise class: durable invariant. The otherwise-unused selective import in
+/// the real EmptyDec unit must bind the canonical provider, not an inherited
+/// ambient name or a synthetic replacement unit.
+#[test]
+fn real_empty_dec_import_binds_the_canonical_or_identity() {
+    let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
+    let source_with_import_witness = format!(
+        "{EMPTY_DEC_KEN_MD}\n\n```ken\n\
+         fn node_b_empty_dec_or_witness (x : Bool) \
+           : Or (Eq Bool x x) (Eq Bool x x) = \
+             Inl (Eq Bool x x) (Eq Bool x x) Refl\n\
+         ```\n"
+    );
+    env.elaborate_ken_md_file(&source_with_import_witness)
+        .expect("the real EmptyDec source and its canonical-Or import witness must elaborate");
+    catalog_or::assert_transparent_result_uses_core_logic_or(
+        &env,
+        "node_b_empty_dec_or_witness",
+    );
+}
+
 // AC4 — the bridge is demonstrated over `DecEq Bool` (inductive carrier,
 // honest via no-confusion/K7), not only `DecEq Int` (`Axiom`-backed) — the
 // showcase must not be vacuous. The entry inlines its own `DecEq`/`DecEq
@@ -258,8 +284,9 @@ fn ac3_trusted_base_delta_is_ordinary_inductive_admission_only() {
 #[test]
 fn ac4_bridge_demonstrated_over_deceq_bool_not_only_deceq_int() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(EMPTY_DEC_KEN_MD)
-        .expect("catalog/packages/Core/Logic/EmptyDec.ken.md must elaborate standalone (Definition + every checked fence)");
+        .expect("catalog/packages/Core/Logic/EmptyDec.ken.md must elaborate standalone");
 
     // `trueIsTrue`/`trueIsNotFalse` (from the §3 worked examples) both
     // instantiate `decEqDecides` at `DecEq_instance_Bool` — confirm the
@@ -280,12 +307,16 @@ fn ac4_bridge_demonstrated_over_deceq_bool_not_only_deceq_int() {
 #[test]
 fn landed_lawful_classes_package_still_elaborates_with_dependencies() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
+    let provider_state = catalog_or::core_logic_or_module_state(&env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("catalog/packages/Core/Logic/Transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
         .expect("catalog/packages/Data/Collections/Derived.ken must elaborate");
+    catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD)
         .expect("catalog/packages/Core/Classes/LawfulClasses.ken must elaborate");
+    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "compare_bool_cases");
     assert!(
         env.globals.contains_key("DecEq_instance_Bool"),
         "the landed package's own DecEq_instance_Bool must be a real registered global"

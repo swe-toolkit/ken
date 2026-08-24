@@ -64,6 +64,8 @@ identifier is reserved checked-mode surface sugar for `Ω`-classified
 `absurd_empty` is the clear, reachable name this entry uses instead:
 
 ```ken
+import Core.Logic.Or (Or, Inl, Inr)
+
 fn absurd_empty (C : Type) (e : Empty) : C = match e {}
 ```
 

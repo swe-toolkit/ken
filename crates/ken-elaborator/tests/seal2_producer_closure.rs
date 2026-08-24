@@ -268,8 +268,9 @@ fn closed_oracle_reaches_the_class_field_namespace() {
 // root's checked fences and mark a root NON-EXEMPT when any declaration
 // references a carrier-closure name in any type OR body position (the body axis
 // is load-bearing — Ken's bottom eliminator inhabits a carrier from an ex-falso
-// body), OR uses a form the certificate cannot resolve (`module`/`import`/
-// `export` → fail closed). Its
+// body), OR uses a form the certificate cannot resolve (nested `module` or a
+// non-selective `import` → fail closed). Selective imports/exports contribute
+// explicit name edges. Its
 // soundness is the conjunction documented on `RootFacts`, NOT "every producer
 // names the carrier" (which is false for a term forwarder `fn leak = makeSpan`).
 // Every non-exempt root must be explicitly enumerated, loaded through its known
@@ -447,6 +448,34 @@ fn certificate_fails_closed_on_an_unresolvable_module_form() {
          fn leak (s : M.SpanAlias) : M.SpanAlias = s\n```",
     )];
     assert_confined(&facts, &[]);
+}
+
+/// Selective imports are resolved as explicit name edges rather than making
+/// every importing root non-exempt. An unrelated canonical import therefore
+/// stays exempt, while an imported carrier alias joins the closure and is
+/// rejected unless its root is enumerated.
+#[test]
+fn certificate_resolves_selective_import_name_edges() {
+    let unrelated = vec![synthetic_facts(
+        "Pseudo/Import/Or.ken.md",
+        "```ken\nimport Core.Logic.Or (Or, Inl, Inr)\n```",
+    )];
+    assert_confined(&unrelated, &[]);
+
+    let carrier_alias = vec![synthetic_facts(
+        "Pseudo/Import/Carrier.ken.md",
+        "```ken\nimport Capability.System.Buffer (BufferSpan as Safe)\n```",
+    )];
+    let closure = carrier_closure(&carrier_alias);
+    assert!(closure.contains("Safe"));
+    assert_eq!(
+        reaching_roots(&carrier_alias, &closure),
+        vec![(
+            "Pseudo/Import/Carrier.ken.md".to_string(),
+            "import of `Capability.System.Buffer`".to_string(),
+            "BufferSpan".to_string(),
+        )]
+    );
 }
 
 /// PROSE CONTROL. A carrier named only in Markdown prose (outside a checked

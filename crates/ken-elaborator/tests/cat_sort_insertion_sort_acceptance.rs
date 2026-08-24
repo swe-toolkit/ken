@@ -4,6 +4,9 @@
 //! behavior, and trust assertions are durable invariants: implementation and
 //! proof structure may change while those properties remain fixed.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
@@ -21,6 +24,7 @@ const INSERTION_SORT_KEN_MD: &str =
 
 fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("Core/Logic/Transport.ken.md must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

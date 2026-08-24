@@ -9,6 +9,9 @@
 //! themselves live in `es4_classes_acceptance.rs` (the existing home for
 //! this file's law-field producer-grep gates).
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::ElabEnv;
 use ken_kernel::env::{Context, Decl as KernelDecl};
 use ken_kernel::term::Term;
@@ -22,6 +25,7 @@ const TRANSPORT_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logi
 
 fn mk_env_with_package() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("catalog/packages/Core/Logic/Transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

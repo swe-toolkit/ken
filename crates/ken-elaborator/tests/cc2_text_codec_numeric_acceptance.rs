@@ -5,6 +5,9 @@
 //! in one ordered shared `ElabEnv`, including the separately-homed bijection
 //! prerequisite, then elaborate every checked fence.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
@@ -27,6 +30,7 @@ const NUMERIC_SEED: &str = include_str!("../../../conformance/stdlib/text/seed-t
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
         .expect("Core/Logic/Transport.ken.md must elaborate first");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)

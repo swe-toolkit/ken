@@ -20,6 +20,8 @@ The algebra is closed at six constructors. `Text` stores characters directly;
 content.
 
 ```ken
+import Core.Logic.Or (Or, Inl, Inr)
+
 data Doc : Type where {
   Text : List Char → Doc;
   Line : Doc;

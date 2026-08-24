@@ -29,6 +29,9 @@
 //! `embedding_adequacy`/`denote`/`Carriers`/`AtomEnv`, no slice widening, no
 //! sort validation. `FoKripke.ken` remains unchanged.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
@@ -38,6 +41,7 @@ const FOK_SOURCE: &str =
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken must still elaborate/kernel-check unmodified");
     env

@@ -10,6 +10,9 @@
 //! - The entry's `` ```ken ``/`` ```ken example ``/`` ```ken reject ``
 //!   fences all check via the real literate extractor.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::ElabEnv;
 
 const TRANSPORT_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
@@ -21,9 +24,12 @@ const ORD_NAT_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Numeri
 
 fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    catalog_or::load_core_logic_or(&mut env);
+    let provider_state = catalog_or::core_logic_or_module_state(&env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD).expect("Core/Logic/Transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD).expect("Data/Collections/Derived.ken.md must elaborate");
     env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD).expect("Core/Classes/LawfulClasses.ken must elaborate");
+    catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     env
 }
 
@@ -32,7 +38,42 @@ fn entry_elaborates_with_every_checked_fence() {
     let mut env = base_env();
     env.elaborate_ken_md_file(ORD_NAT_KEN_MD)
         .expect("catalog/packages/Data/Numeric/Nat/Order.ken.md must elaborate (Definition + every checked fence)");
+    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "total_leq_nat");
     assert!(env.globals.contains_key("Ord_instance_Nat"), "Ord_instance_Nat must be a real registered global");
+}
+
+/// Promise class: durable invariant. `total_leq_nat` returns informative
+/// catalog `Or` data, so case analysis recovers which ordering side holds.
+///
+/// **MEASURED:** the real Order package's left and right concrete witnesses
+/// reduce through `Inl` and `Inr` to opposite Bool tags. **CLAIMED:** the
+/// catalog migration preserves proof-relevant disjunction. **THE GAP:**
+/// constructor admission alone would not prove informative elimination; the
+/// two checked equalities consume the actual `total_leq_nat` results.
+#[test]
+fn total_leq_nat_preserves_proof_relevant_or_tags() {
+    let mut env = base_env();
+    env.elaborate_ken_md_file(ORD_NAT_KEN_MD)
+        .expect("Order package must elaborate");
+    env.elaborate_file(
+        "fn order_or_tag (a : Omega) (b : Omega) (choice : Or a b) : Bool = \
+           match choice { Inl p |-> True ; Inr q |-> False } \
+         theorem order_total_left_tag \
+           : Equal Bool \
+               (order_or_tag \
+                 (Equal Bool (leq_nat Zero (Suc Zero)) True) \
+                 (Equal Bool (leq_nat (Suc Zero) Zero) True) \
+                 (total_leq_nat Zero (Suc Zero))) \
+               True = Proved \
+         theorem order_total_right_tag \
+           : Equal Bool \
+               (order_or_tag \
+                 (Equal Bool (leq_nat (Suc Zero) Zero) True) \
+                 (Equal Bool (leq_nat Zero (Suc Zero)) True) \
+                 (total_leq_nat (Suc Zero) Zero)) \
+               False = Proved",
+    )
+    .expect("both catalog Or tags must remain distinguishable by case analysis");
 }
 
 // Zero-Axiom acceptance bar: no `Axiom` literal appears anywhere in the
