@@ -1420,6 +1420,49 @@ fn checked_ih_coordinate_run(
     }
 }
 
+/// The canonical capture run and every exact context that forces its worker.
+///
+/// A continuation specialization `u` emits its selected case body under
+/// `Specialization(u.id())`, and that body binds and may force exactly
+/// `u.worker_closure_origin()`. This is the real force edge. It differs from
+/// [`synthesized_seat_emission_owners`], whose subtree-containment rule is the
+/// right authority only for aggregates emitted inline at their own seat.
+///
+/// Runs are canonical per closure seat. If two specialization edges select the
+/// same closure, their environment records clone that one run; a disagreement
+/// refuses rather than letting the owner key hide two definitions of the
+/// captured environment.
+fn checked_ih_force_emissions(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<
+    BTreeMap<
+        StaticOriginId,
+        (
+            Vec<(u32, StaticOriginId)>,
+            BTreeSet<ContinuationEmissionOwner>,
+        ),
+    >,
+    CraneliftBackendError,
+> {
+    let mut emissions = BTreeMap::new();
+    for unit in plan.continuation_units()? {
+        let Some((seat, run)) = checked_ih_coordinate_run(&unit)? else {
+            continue;
+        };
+        let (canonical, owners) = emissions
+            .entry(seat)
+            .or_insert_with(|| (run.clone(), BTreeSet::new()));
+        if *canonical != run {
+            return Err(planner_error(
+                "two force edges for one checked-IH worker closure disagree on its canonical \
+                 capture run",
+            ));
+        }
+        owners.insert(ContinuationEmissionOwner::Specialization(unit.id()));
+    }
+    Ok(emissions)
+}
+
 fn unit_boundary_environment_fields(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<BTreeSet<(StaticOriginId, u32)>, CraneliftBackendError> {
@@ -1687,10 +1730,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
     // right one, is the defect this slice exists to remove, and the empty
     // children of the sibling population are why its hard-coded `Persistent`
     // agreed with a derivation run over no evidence.
-    for unit in plan.continuation_units()? {
-        let Some((seat, run)) = checked_ih_coordinate_run(&unit)? else {
-            continue;
-        };
+    for (seat, (run, force_owners)) in checked_ih_force_emissions(plan)? {
         // Refuse an arity the positional model cannot state, BEFORE building
         // anything that would have to agree with it.
         let declared = checked_ih_declared_children(run.len())?;
@@ -1730,7 +1770,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 PlannedAggregateAllocation::PersistentGround,
             )
         };
-        for owner in synthesized_seat_emission_owners(plan, seat)? {
+        for owner in force_owners {
             records.push(PlannedAggregateOwnership {
                 id: AggregateOccurrenceId(0),
                 producer: AggregateOccurrenceProducer::SynthesizedUse {
@@ -1993,7 +2033,10 @@ impl<'src> StaticTransitionPlan<'src> {
                 AggregateOccurrenceProducer::Source(_) => false,
             })
             .ok_or_else(|| {
-                planner_error("synthesized aggregate use has no planned ownership record")
+                planner_error(format!(
+                    "synthesized aggregate use has no planned ownership record for owner \
+                     {owner:?}, seat {seat:?}, path {path:?}, and role {role:?}"
+                ))
             })
     }
     /// The declared child model of one modelled synthesized role.
@@ -3623,11 +3666,55 @@ mod checked_ih_captured_env_schema {
             .collect()
     }
 
-    fn record_seat(record: &PlannedAggregateOwnership) -> StaticOriginId {
+    fn record_key(
+        record: &PlannedAggregateOwnership,
+    ) -> (ContinuationEmissionOwner, StaticOriginId) {
         match record.producer {
-            AggregateOccurrenceProducer::SynthesizedUse { seat, .. } => seat,
+            AggregateOccurrenceProducer::SynthesizedUse { owner, seat, .. } => (owner, seat),
             _ => unreachable!("checked_ih_records filters on SynthesizedUse"),
         }
+    }
+
+    fn record_seat(record: &PlannedAggregateOwnership) -> StaticOriginId {
+        record_key(record).1
+    }
+
+    /// The ruled force-edge population, derived directly from continuation
+    /// units rather than through `checked_ih_force_emissions`.
+    fn authoritative_force_edges(
+        plan: &StaticTransitionPlan<'_>,
+    ) -> BTreeSet<(ContinuationEmissionOwner, StaticOriginId)> {
+        let mut edges = BTreeSet::new();
+        for unit in plan.continuation_units().expect("the plan exposes its units") {
+            let Some(envelope) = unit
+                .ruled_ordinary_envelope()
+                .expect("no fixture here has a malformed envelope")
+            else {
+                continue;
+            };
+            let seats = envelope
+                .iter()
+                .filter_map(|role| match role {
+                    ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+                        closure_origin,
+                        source: ContinuationWorkerCaptureSource::Lexical(_),
+                        ..
+                    } => Some(*closure_origin),
+                    ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField { .. }
+                    | ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+                        source: ContinuationWorkerCaptureSource::Seed,
+                        ..
+                    } => None,
+                })
+                .collect::<BTreeSet<_>>();
+            if let Some(seat) = seats.iter().next().filter(|_| seats.len() == 1) {
+                edges.insert((
+                    ContinuationEmissionOwner::Specialization(unit.id()),
+                    *seat,
+                ));
+            }
+        }
+        edges
     }
 
     /// **The ORACLE: the planner's own `WorkerCapture` roles, read directly.**
@@ -3753,6 +3840,7 @@ mod checked_ih_captured_env_schema {
             super::super::continuations::tests::contspec_multiple_worker_captures_fixture(),
             super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(
             ),
+            super::super::tests::contspec_nested_fixture(),
         ] {
             let plan = plan_of(fixture);
             let runs = authoritative_runs(&plan);
@@ -3785,6 +3873,66 @@ mod checked_ih_captured_env_schema {
                 );
             }
         }
+    }
+
+    /// The producer key is the exact FORCE edge, not the containment proxy.
+    ///
+    /// The nested fixture supplies the discriminating pair: at least one
+    /// generated context contains another worker closure but does not force
+    /// that closure. The force pair receives a record; the containment-only
+    /// pair must not. Set equality also proves no real force edge was omitted.
+    #[test]
+    fn records_are_keyed_by_exact_force_edges_not_containment() {
+        let plan = plan_of(super::super::tests::contspec_nested_fixture());
+        let forced = authoritative_force_edges(&plan);
+        let actual = checked_ih_records(&plan)
+            .into_iter()
+            .map(record_key)
+            .collect::<BTreeSet<_>>();
+        assert!(!forced.is_empty(), "the fixture must carry real force edges");
+        assert_eq!(actual, forced, "record keys must equal the force edges");
+
+        let mut containment_only = BTreeSet::new();
+        for (_, seat) in &forced {
+            for owner in synthesized_seat_emission_owners(&plan, *seat)
+                .expect("the containment population derives")
+            {
+                if !forced.contains(&(owner, *seat)) {
+                    containment_only.insert((owner, *seat));
+                }
+            }
+        }
+        assert!(
+            !containment_only.is_empty(),
+            "the fixture must contain a worker seat under an owner that does not force it, or \
+             force and containment are degenerate and the negative arm proves nothing"
+        );
+        assert!(
+            actual.is_disjoint(&containment_only),
+            "a contained-but-not-forced owner must not receive checked-env authority"
+        );
+    }
+
+    /// A force owner cannot borrow the canonical run of another worker seat.
+    #[test]
+    fn capture_origin_rejects_a_force_owner_paired_with_the_wrong_seat() {
+        let plan = plan_of(super::super::tests::contspec_nested_fixture());
+        let edges = authoritative_force_edges(&plan).into_iter().collect::<Vec<_>>();
+        let (owner, seat) = *edges.first().expect("the fixture has a force edge");
+        let wrong_seat = edges
+            .iter()
+            .map(|(_, seat)| *seat)
+            .find(|candidate| *candidate != seat)
+            .expect("the fixture has a second, distinct forced worker seat");
+        let refusal = plan
+            .checked_ih_capture_origin(owner, wrong_seat, 0)
+            .expect_err("a force owner has authority only for the exact worker seat it forces");
+        assert!(
+            format!("{refusal:?}").contains(
+                "no checked-IH captured-environment record is planned for this owner and seat"
+            ),
+            "the wrong owner-seat pair must reach the exact authority refusal: {refusal:?}"
+        );
     }
 
     /// The escaping arm, on a run that carries BOTH lifetimes at once.
