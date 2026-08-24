@@ -335,9 +335,29 @@ unsupported runtime-IR lowering: Effect: seat Argument(1) of FsOpen needs Constr
 That refusal is owned by `RT-CARRIED-IH-DISPATCH-SITEOP` (M3), not
 `RT-BORROWED-INPUT-CARRIER-DURABILITY`. It is therefore a new seam under the
 amended continuation rule and fires the second stop before the fourth census
-row is attempted. No ignore was removed; the PX8L rows remain pointed at their
-borrowed-input successor disposition, and the PX8TA row remains unchanged
-pending the Runtime leader's scope ruling.
+row is attempted. No ignore was removed at that checkpoint.
+
+## Authorized continuation attempt — third stop disposition
+
+The Steward's next disposition authorized the PX8F row to be re-pointed to
+`RT-CARRIED-IH-DISPATCH-SITEOP` and both PX8L rows to be re-pointed to
+`RT-BORROWED-INPUT-CARRIER-DURABILITY`, without un-ignoring any of them and
+without folding either successor's work into M4. The test bodies and
+expectations remain unchanged.
+
+The fourth census row, target `px8ta_oriented_subcontinuation`, row
+`px8ds_real_same_depth_path_rejects_flat_order_and_runs_exact_edges`, was then
+run in full under the default ambient stack classification. Its test-only
+retired-flat-order control reaches the helper thread and stops at the exact M4
+refusal before the ordinary-plan half can run:
+
+```text
+unsupported runtime-IR lowering: Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane
+```
+
+This is neither native end-to-end green nor either authorized successor string.
+It therefore fires the explicit third stop condition. PX8TA remains unchanged;
+no row was un-ignored, and this checkpoint is not an accepted M4 candidate.
 
 ## Acceptance criteria and controls
 

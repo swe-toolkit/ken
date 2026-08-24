@@ -179,40 +179,36 @@ fn assert_agreement(arguments: &[&str], expected_exit: i32) {
     assert!(native.effect_trace.is_empty());
 }
 
-// Ignored pending RT-CLOSURE-BOUNDARY-LANE.
+// Ignored pending RT-BORROWED-INPUT-CARRIER-DURABILITY.
 //
-// Observed signature, exactly:
-//   Closure: a closure cannot cross the boundary: it is runtime-local and
-//     live-domain only, and it has no durable lane
+// Observed native diagnostic, exactly:
+//   ken native trap: malformed borrowed process input
 //
-// Owner node: RT-CLOSURE-BOUNDARY-LANE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
+// Owner node: RT-BORROWED-INPUT-CARRIER-DURABILITY.
+// M4's positional captured-environment representation retires the prior
+// closure-boundary refusal and native object construction succeeds. The
+// BorrowedOpaque capture then reaches emit_carrier_tag as native value -1, so
+// this row remains ignored rather than being silenced as green.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-CLOSURE-BOUNDARY-LANE: a runtime-local closure has no durable lane across the boundary; fails at base 21fd46dc"]
+#[ignore = "RT-BORROWED-INPUT-CARRIER-DURABILITY: closure crossing succeeds; BorrowedOpaque reaches emit_carrier_tag as native value -1 and traps as \"ken native trap: malformed borrowed process input\""]
 fn dynamic_zero_seed_takes_the_base_case() {
     assert_agreement(&[], 0);
 }
 
-// Ignored pending RT-CLOSURE-BOUNDARY-LANE.
+// Ignored pending RT-BORROWED-INPUT-CARRIER-DURABILITY.
 //
-// Observed signature, exactly:
-//   Closure: a closure cannot cross the boundary: it is runtime-local and
-//     live-domain only, and it has no durable lane
+// Observed native diagnostic, exactly:
+//   ken native trap: malformed borrowed process input
 //
-// Owner node: RT-CLOSURE-BOUNDARY-LANE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
+// Owner node: RT-BORROWED-INPUT-CARRIER-DURABILITY.
+// M4's positional captured-environment representation retires the prior
+// closure-boundary refusal and native object construction succeeds. The
+// BorrowedOpaque capture then reaches emit_carrier_tag as native value -1, so
+// this row remains ignored rather than being silenced as green.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-CLOSURE-BOUNDARY-LANE: a runtime-local closure has no durable lane across the boundary; fails at base 21fd46dc"]
+#[ignore = "RT-BORROWED-INPUT-CARRIER-DURABILITY: closure crossing succeeds; BorrowedOpaque reaches emit_carrier_tag as native value -1 and traps as \"ken native trap: malformed borrowed process input\""]
 fn dynamic_multistep_seed_preserves_updated_parameter_order() {
     assert_agreement(&["three"], 7);
 }
