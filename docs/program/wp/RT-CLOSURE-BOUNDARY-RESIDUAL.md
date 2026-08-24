@@ -300,9 +300,44 @@ the capture run.
 This is deliverable 3's named stop: a censused row does not green after honest
 representation wiring. No ignore was removed, the remaining two population
 rows were not widened into this newly exposed runtime debt, and no
-`ComputationalRecursorClosure` disposition changed. The checkpoint remains a
-non-candidate until the Runtime leader and the design authorities disposition
-the post-crossing carried-match failure.
+`ComputationalRecursorClosure` disposition changed. At that point the checkpoint
+remained a non-candidate pending the disposition now recorded above.
+
+## Authorized continuation attempt — second stop disposition
+
+The branch was rebased onto the landed disposition at `b745c2c93`, then the
+representation was widened to the next censused row without changing either
+production closure-refusal arm. Planner ownership records remain available for
+validation, while crossing authority is narrower: a lexical closure must carry
+a non-empty positional environment and be structurally contained in the exact
+emitted owner's result value. The exact generated-unit result and mixed carried-
+constructor paths replace only such an authorized capsule with its positional
+environment. The ordinary one-way producer and the generic closure refusal stay
+unchanged.
+
+Two existing controls remain green: a capture-free source closure stored as
+constructor data still reaches the exact closure-boundary refusal, and an
+ordinary specialized constructor child still crosses through the direct
+one-way producer. These distinguish the new route from blanket closure
+admission and from blanket replacement of constructor-child transfer.
+
+The next census row — target `px8f_buffer_native`, row
+`linked_checked_write_all_observes_short_progress_and_matches_interpreter` —
+then crosses the M4 seam: the exact `Closure: a closure cannot cross the
+boundary` refusal is gone. It does not green end-to-end and does not reach the
+borrowed-input successor. It advances at object emission to the distinct exact
+refusal:
+
+```text
+unsupported runtime-IR lowering: Effect: seat Argument(1) of FsOpen needs ConstructorTag, which it cannot observe in CarriedWord
+```
+
+That refusal is owned by `RT-CARRIED-IH-DISPATCH-SITEOP` (M3), not
+`RT-BORROWED-INPUT-CARRIER-DURABILITY`. It is therefore a new seam under the
+amended continuation rule and fires the second stop before the fourth census
+row is attempted. No ignore was removed; the PX8L rows remain pointed at their
+borrowed-input successor disposition, and the PX8TA row remains unchanged
+pending the Runtime leader's scope ruling.
 
 ## Acceptance criteria and controls
 

@@ -1470,6 +1470,30 @@ impl StaticTransitionPlan<'_> {
         }))
     }
 
+    /// Resolve an environment descriptor only when the exact owner returns a
+    /// value graph structurally containing this closure occurrence. Records are
+    /// issued broadly enough for planner ownership validation; this separate
+    /// predicate is the crossing authority and keeps ordinary local closures on
+    /// the unchanged refusal route.
+    pub(in crate::cranelift_backend) fn boundary_closure_crossing_environment(
+        &self,
+        owner: ContinuationEmissionOwner,
+        seat: StaticOriginId,
+    ) -> Result<Option<BoundaryClosureEnvironment>, CraneliftBackendError> {
+        let RuntimeExpr::LexicalClosure { captures, .. } =
+            self.planned_occurrence_expr(seat)?
+        else {
+            return Ok(None);
+        };
+        // M4's checked continuations carry a real positional environment. A
+        // capture-free source closure remains in the generic refusal population
+        // guarded by `a_closure_stored_as_constructor_data_cannot_cross_a_unit_boundary`.
+        if captures.is_empty() || !boundary_closure_owner_returns_seat(self, owner, seat)? {
+            return Ok(None);
+        }
+        self.boundary_closure_environment(owner, seat)
+    }
+
     /// Resolve the descriptor behind one planner-issued positional environment
     /// identity. The record itself supplies owner and seat; no body lookup or
     /// same-shaped search is accepted from lowering.
@@ -2656,6 +2680,127 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
 /// seat's allocation and the lane chosen for one node would govern a different
 /// one. Two uses of a role at two seats must be two occurrences; two records for
 /// ONE use is the same failure seen from the other side.
+/// Whether one lexical closure occurrence is structurally contained in a
+/// value returned by the exact emitted owner.
+///
+/// This is the authorization boundary for `BoundaryClosureEnvironment` records.
+/// It follows result flow through control wrappers and descends only through
+/// value-container fields. A closure merely present in an emitted body is not a
+/// boundary value and receives no record.
+fn boundary_result_value_contains_closure(
+    plan: &StaticTransitionPlan<'_>,
+    root: StaticOriginId,
+    closure: StaticOriginId,
+) -> Result<bool, CraneliftBackendError> {
+    let mut pending = vec![root];
+    let mut seen = BTreeSet::new();
+    while let Some(origin) = pending.pop() {
+        if !seen.insert(origin) {
+            continue;
+        }
+        let expr = plan.planned_occurrence_expr(origin)?;
+        let child = |position| plan.semantic.child_origin(origin, position);
+        match expr {
+            RuntimeExpr::CheckedJoinSite { .. }
+            | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+            | RuntimeExpr::CheckedRecursiveInvocation { .. }
+            | RuntimeExpr::CheckedComputationalIHSlots { .. }
+            | RuntimeExpr::CheckedComputationalIHInvocation { .. } => {
+                pending.push(child(0)?);
+            }
+            RuntimeExpr::Let { .. } => pending.push(child(1)?),
+            RuntimeExpr::If { .. } => {
+                pending.push(child(1)?);
+                pending.push(child(2)?);
+            }
+            RuntimeExpr::Match { cases, .. } => {
+                for ordinal in 0..cases.len() {
+                    pending.push(child(1 + ordinal)?);
+                }
+            }
+            RuntimeExpr::ComputationalMatch { cases, .. } => {
+                for ordinal in 0..cases.len() {
+                    pending.push(child(1 + ordinal)?);
+                }
+            }
+            RuntimeExpr::Construct { args, .. } => {
+                for ordinal in 0..args.len() {
+                    pending.push(child(ordinal)?);
+                }
+            }
+            RuntimeExpr::Record { fields } => {
+                for ordinal in 0..fields.len() {
+                    pending.push(child(ordinal)?);
+                }
+            }
+            RuntimeExpr::LexicalClosure { captures, .. } => {
+                if origin == closure {
+                    return Ok(true);
+                }
+                // The body is code, not a value field. Captures begin at child 1.
+                for ordinal in 0..captures.len() {
+                    pending.push(child(1 + ordinal)?);
+                }
+            }
+            RuntimeExpr::Value(_)
+            | RuntimeExpr::Var(_)
+            | RuntimeExpr::PrimitiveCall { .. }
+            | RuntimeExpr::Project { .. }
+            | RuntimeExpr::Closure { .. }
+            | RuntimeExpr::DeclarationRef { .. }
+            | RuntimeExpr::ImportedDeclarationRef { .. }
+            | RuntimeExpr::Call { .. }
+            | RuntimeExpr::Effect { .. }
+            | RuntimeExpr::Trap(_) => {}
+        }
+    }
+    Ok(false)
+}
+
+/// Does this exact emitted owner return a value graph containing `closure`?
+///
+/// The candidate owner population is independently derived by
+/// `inline_synthesized_seat_emission_owners`; this second predicate narrows it
+/// from body containment to boundary-result containment.
+fn boundary_closure_owner_returns_seat(
+    plan: &StaticTransitionPlan<'_>,
+    owner: ContinuationEmissionOwner,
+    closure: StaticOriginId,
+) -> Result<bool, CraneliftBackendError> {
+    let mut body_roots = Vec::new();
+    match owner {
+        ContinuationEmissionOwner::Predeclared(function) => {
+            body_roots.extend(
+                plan.emittable_units()?
+                    .into_iter()
+                    .filter(|unit| unit.function() == function)
+                    .map(|unit| unit.body_occurrence()),
+            );
+        }
+        ContinuationEmissionOwner::Specialization(specialization) => {
+            body_roots.extend(
+                plan.continuation_units()?
+                    .into_iter()
+                    .filter(|unit| unit.id() == specialization)
+                    .map(|unit| unit.worker_body_origin()),
+            );
+        }
+        ContinuationEmissionOwner::Fusion(_) => {
+            // The inline-owner derivation does not issue Fusion candidates.
+            // Keep this explicit so widening that producer is a reviewed choice.
+            return Ok(false);
+        }
+    }
+    for body in body_roots {
+        for result in plan.source_result_origins_in_owner_subtree(body)? {
+            if boundary_result_value_contains_closure(plan, result, closure)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
 pub(in crate::cranelift_backend::planning::static_transition) fn validate_aggregate_producers_are_unique(
     records: &[PlannedAggregateOwnership],
 ) -> Result<(), CraneliftBackendError> {

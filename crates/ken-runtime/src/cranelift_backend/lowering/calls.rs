@@ -1491,6 +1491,22 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+        /// Planner-issued environment identity for one lexical closure lowered
+        /// in the body currently being emitted. Absence is ordinary for every
+        /// closure that is not structurally contained in that owner's boundary
+        /// result value.
+        pub(super) fn boundary_closure_environment_record(
+            &self,
+            origin: StaticOriginId,
+        ) -> Result<Option<AggregateOccurrenceId>, CraneliftBackendError> {
+            let Some(owner) = self.defining_emission_owner else {
+                return Ok(None);
+            };
+            self.static_transition_plan
+                .boundary_closure_crossing_environment(owner, origin)
+                .map(|environment| environment.map(|environment| environment.record()))
+        }
+
         /// Transfer the terminal value returned by one declared generated unit.
         ///
         /// Process exit constructors are the one result-edge representation that
@@ -1509,35 +1525,6 @@ impl<'a> Lowering<'a> {
                 "  UNIT-RESULT transfer origin={origin:?} value={}",
                 lowered_value_kind(value)
             ));
-            if let Lowered::Closure {
-                captures,
-                params,
-                body,
-                ..
-            } = value
-            {
-                if let Some(owner) = self.defining_emission_owner {
-                    if let Some(environment) = self
-                        .static_transition_plan
-                        .boundary_closure_environment(owner, origin)?
-                    {
-                        if environment.body_origin() != *body
-                            || environment.params() != params
-                            || environment.capture_origins().len() != captures.len()
-                        {
-                            return Err(unsupported(
-                                "BoundaryClosureEnvironment",
-                                "the lowered closure disagrees with its planner-issued code identity or captured-environment schema",
-                            ));
-                        }
-                        return self.emit_boundary_closure_environment(
-                            builder,
-                            &environment,
-                            captures,
-                        );
-                    }
-                }
-            }
             let process_exit = self.process_object
                 && matches!(
                     value,
@@ -1549,7 +1536,11 @@ impl<'a> Lowering<'a> {
                 let status = self.emit_process_exit_status(builder, value.clone());
                 self.emit_carrier_immediate(builder, BoundaryTag::ImmediateExitStatus, status)
             } else {
-                self.transfer_into_carrier(builder, origin, value)
+                // The ordinary boundary walk remains fail-closed for every
+                // closure. This exact unit-result seam has the planner-issued
+                // environment identity needed to replace an authorized closure
+                // (including one nested in a result aggregate) before emission.
+                self.transfer_represented_boundary_value(builder, origin, value)
             }
         }
 }

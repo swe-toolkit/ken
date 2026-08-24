@@ -727,6 +727,72 @@ impl SynthesizedArgument {
 }
 
 
+impl Lowered {
+        /// Whether this value graph contains a closure carrying the exact
+        /// planner-issued boundary-environment identity. This selects the
+        /// represented route; ordinary closures remain on the unchanged
+        /// `boundary_transfer_admissibility` refusal path.
+        pub(super) fn contains_boundary_closure_environment(
+            &self,
+        ) -> Result<bool, CraneliftBackendError> {
+            match self {
+                Lowered::Closure {
+                    boundary_environment,
+                    ..
+                } => Ok(boundary_environment.is_some()),
+                Lowered::Constructor { args, .. } => {
+                    for field in specialized_field_refs_at(
+                        args,
+                        "a constructor field inspected for a boundary environment",
+                    )? {
+                        if field.contains_boundary_closure_environment()? {
+                            return Ok(true);
+                        }
+                    }
+                    Ok(false)
+                }
+                Lowered::Record { fields, .. } => {
+                    for field in fields {
+                        if field.value.contains_boundary_closure_environment()? {
+                            return Ok(true);
+                        }
+                    }
+                    Ok(false)
+                }
+                Lowered::HostResult { error, ok, .. } => Ok(
+                    error.contains_boundary_closure_environment()?
+                        || ok.contains_boundary_closure_environment()?,
+                ),
+                Lowered::DynamicConstructor(dynamic) => {
+                    for alternative in &dynamic.alternatives {
+                        for field in &alternative.fields {
+                            if field.contains_boundary_closure_environment()? {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                    Ok(false)
+                }
+                Lowered::DeclarationClosure { .. }
+                | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::Int { .. }
+                | Lowered::Bool { .. }
+                | Lowered::ProcessExitStatus { .. }
+                | Lowered::CapabilityToken { .. }
+                | Lowered::ResourceToken { .. }
+                | Lowered::BoundedNat(_)
+                | Lowered::StructuralNat(_)
+                | Lowered::ResponseBytes { .. }
+                | Lowered::Bytes(_)
+                | Lowered::BorrowedNativeValue { .. }
+                | Lowered::BorrowedOption { .. }
+                | Lowered::String(_)
+                | Lowered::RecursiveBackedge
+                | Lowered::Trap(_) => Ok(false),
+            }
+        }
+}
+
 impl<'a> Lowering<'a> {
         /// **`RT-DECL-CLOSURE-PORT` `D7` — reconcile every aggregate in a template
         /// against its OWN producer's planned ownership record, before anything is
@@ -843,6 +909,116 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+        /// Admissibility for the exact generated-unit RESULT seam.
+        ///
+        /// The ordinary boundary walk remains unchanged and refuses every
+        /// `Lowered::Closure`. This separate route recognizes only a closure
+        /// carrying a planner-issued positional-environment identity, validates
+        /// that identity before any parent allocation, and recursively screens
+        /// the environment captures. No other crossing calls this method.
+        pub(super) fn represented_boundary_admissibility(
+            &self,
+            value: &Lowered,
+        ) -> Result<(), CraneliftBackendError> {
+            match value {
+                Lowered::Closure {
+                    captures,
+                    params,
+                    body,
+                    boundary_environment: Some(record),
+                } => {
+                    let environment = self
+                        .static_transition_plan
+                        .boundary_closure_environment_by_record(*record)?;
+                    let owner = self.defining_emission_owner.ok_or_else(|| {
+                        unsupported(
+                            "BoundaryClosureEnvironment",
+                            "a represented boundary closure is being transferred outside a declared owner",
+                        )
+                    })?;
+                    if environment.owner() != owner
+                        || environment.body_origin() != *body
+                        || environment.params() != params
+                        || environment.capture_origins().len() != captures.len()
+                    {
+                        return Err(unsupported(
+                            "BoundaryClosureEnvironment",
+                            "a represented boundary closure disagrees with its exact owner, code identity, or captured-environment schema",
+                        ));
+                    }
+                    for capture in captures {
+                        if let LoweringOperand::Specialized(value) = capture {
+                            self.represented_boundary_admissibility(value)?;
+                            self.source_aggregate_preflight(value)?;
+                        }
+                    }
+                    Ok(())
+                }
+                Lowered::Constructor { args, .. } => {
+                    for field in specialized_field_refs_at(
+                        args,
+                        "a constructor field in a represented unit result",
+                    )? {
+                        self.represented_boundary_admissibility(field)?;
+                    }
+                    Ok(())
+                }
+                Lowered::Record { fields, .. } => {
+                    for field in fields {
+                        self.represented_boundary_admissibility(&field.value)?;
+                    }
+                    Ok(())
+                }
+                Lowered::HostResult { error, ok, .. } => {
+                    self.represented_boundary_admissibility(error)?;
+                    self.represented_boundary_admissibility(ok)
+                }
+                Lowered::DynamicConstructor(dynamic) => {
+                    for alternative in &dynamic.alternatives {
+                        for field in &alternative.fields {
+                            self.represented_boundary_admissibility(field)?;
+                        }
+                    }
+                    Ok(())
+                }
+                Lowered::Closure {
+                    boundary_environment: None,
+                    ..
+                }
+                | Lowered::DeclarationClosure { .. }
+                | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::Int { .. }
+                | Lowered::Bool { .. }
+                | Lowered::ProcessExitStatus { .. }
+                | Lowered::CapabilityToken { .. }
+                | Lowered::ResourceToken { .. }
+                | Lowered::BoundedNat(_)
+                | Lowered::StructuralNat(_)
+                | Lowered::ResponseBytes { .. }
+                | Lowered::Bytes(_)
+                | Lowered::BorrowedNativeValue { .. }
+                | Lowered::BorrowedOption { .. }
+                | Lowered::String(_)
+                | Lowered::RecursiveBackedge
+                | Lowered::Trap(_) => value.boundary_transfer_admissibility(),
+            }
+        }
+
+        /// Emit a boundary value after replacing only planner-authorized closure
+        /// capsules by their positional environments. The ordinary producer is
+        /// deliberately not called: its unchanged admissibility walk must keep
+        /// refusing raw closures on every other route.
+        pub(super) fn transfer_represented_boundary_value(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            origin: StaticOriginId,
+            value: &Lowered,
+        ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+            self.represented_boundary_admissibility(value)?;
+            self.source_aggregate_preflight(value)?;
+            self.emit_carrier_transfer(builder, origin, value)
+        }
+
         /// Reconcile ONE source aggregate node against the ownership record its own
         /// producer occurrence names.
         ///
@@ -1693,7 +1869,30 @@ impl<'a> Lowering<'a> {
                 // anyway because exhaustiveness is the mechanism that makes a 22nd
                 // variant a compile error — ⛔ collapsing them into a `_` arm would
                 // buy three lines and spend the whole closure property.
-                Lowered::Closure { .. }
+                Lowered::Closure {
+                    captures,
+                    params,
+                    body,
+                    boundary_environment: Some(record),
+                } => {
+                    let environment = self
+                        .static_transition_plan
+                        .boundary_closure_environment_by_record(*record)?;
+                    if environment.body_origin() != *body
+                        || environment.params() != params
+                        || environment.capture_origins().len() != captures.len()
+                    {
+                        return Err(unsupported(
+                            "BoundaryClosureEnvironment",
+                            "a represented boundary closure changed after unit-result preflight",
+                        ));
+                    }
+                    self.emit_boundary_closure_environment(builder, &environment, captures)
+                }
+                Lowered::Closure {
+                    boundary_environment: None,
+                    ..
+                }
                 | Lowered::DeclarationClosure { .. }
                 | Lowered::ComputationalRecursorClosure { .. } => Err(unsupported(
                     lowered_value_kind(value),
