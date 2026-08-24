@@ -1,21 +1,40 @@
 ---
 id: LANG-MOD-CATALOG-REALIZATION
 title: "WP-4 — catalog realization: mark pub on Arithmetic/Order, add the imports, and make Gcd import add/mul + leq_nat/sub instead of reimplementing them; each checks standalone through the real loader (campaign SUCCESS)"
-status: draft
+status: ready
 owner: language
 size: M
 gate: none
-depends_on: [LANG-MOD-LOADER-ENTRY, LANG-MOD-PUB-ELIGIBILITY, LANG-MOD-STRICT-RESOLUTION, LANG-MOD-OR-CANONICAL-HOME]
+depends_on: [LANG-MOD-LOADER-ENTRY, LANG-MOD-PUB-ELIGIBILITY, LANG-MOD-OR-CANONICAL-HOME]
 blocks: [CAT-GCD-REFACTOR]
 github: null
 origin: "Architect component framing evt_hpnhqy1ex286 (WP-4), under [[LANG-MODULE-IMPORT-SYSTEM]]. Steward-filed per COORDINATION section 2, 2026-08-23. FRAMED; release HELD (see campaign root release gate + the Or/Inl/Inr fork)."
 ---
 
-> # FRAMED — HELD FOR RELEASE. Last in ring order.
+> # RELEASED 2026-08-24 — module/import campaign SUCCESS step; kicked on the language ring.
 >
-> Gated on WP-1..3 ([[LANG-MOD-LOADER-ENTRY]], [[LANG-MOD-PUB-ELIGIBILITY]],
-> [[LANG-MOD-STRICT-RESOLUTION]]) AND the Or realization chain. This WP is the
-> campaign's success criterion.
+> All predecessors are landed: [[LANG-MOD-LOADER-ENTRY]] merged,
+> [[LANG-MOD-PUB-ELIGIBILITY]] merged, and
+> [[LANG-MOD-OR-CANONICAL-HOME]] merged (NODE B respin e1509b88d,
+> closed cf8dc2724) — so `Order` is dependency-closed. The
+> finish-then-switch gate is satisfied: the language ring finished its
+> then-current WP (NODE B) and this is the module/import completion it
+> switches to.
+>
+> STRICT-RESOLUTION IS A CO-GATE, NOT A PREDECESSOR (Steward ruling
+> evt_6adrfngmdq3b5, on the language-leader's grounded answer
+> evt_ptbmn70tymsf). Its consumed D1 strict machinery is LANDED
+> (5a74301f4, ancestor of main); [[LANG-MOD-STRICT-RESOLUTION]] stays
+> `ready`/open only because its remaining whole-catalog strict enforcement /
+> CI closure co-closes WITH this WP's catalog migration (AC-3). Keeping it
+> in this node's hard `depends_on` would circularly block it
+> (STRICT-RESOLUTION cannot close until WP-4 delivers), so it is dropped
+> from `depends_on` — the code dependency is already satisfied — and WP-4
+> CO-DELIVERS STRICT-RESOLUTION's remaining closure. STRICT-RESOLUTION
+> closes when this WP lands its co-gated strict-green.
+>
+> This WP is the campaign's success criterion, and closing it unblocks foundation
+> [[CAT-GCD-REFACTOR]].
 >
 > THE OR/INL/INR FORK IS RESOLVED (operator ruled arm (b), evt_6b9wrt1kwswcp):
 > `Or`/`Inl`/`Inr` get a canonical package home, not a refactor-away. Under strict
