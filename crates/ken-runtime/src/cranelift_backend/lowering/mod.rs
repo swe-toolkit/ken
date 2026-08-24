@@ -238,7 +238,8 @@ pub(in crate::cranelift_backend) use super::planning::{
     // eliminator checks its assembled run against it. ⛔ Ungated here and in
     // `planning.rs`, because a `cfg(test)` re-export of an item production reads
     // is an unresolved import the test profile cannot see.
-    CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhEnvironmentTransport,
+    BoundaryClosureEnvironment, CheckedCaseBinderLayout, CheckedCaseBinderRole,
+    CheckedIhEnvironmentTransport,
     CheckedIhTransportInputDestination, CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
     DeclarationCallTargetClass,
     ContinuationContextId, ContinuationEmissionOwner,
@@ -3308,6 +3309,11 @@ enum Lowered {
         captures: Vec<LoweringOperand>,
         params: Vec<String>,
         body: StaticOriginId,
+        /// Planner-issued identity of the positional boundary environment this
+        /// capsule was reconstructed from. `None` for every ordinary local
+        /// closure. This is environment authority, not body identity; `body`
+        /// remains the sole code identity and the word carries no runtime tag.
+        boundary_environment: Option<AggregateOccurrenceId>,
     },
     DeclarationClosure {
         /// **`RT-DECL-CLOSURE-PORT` `D4` — the planner-issued

@@ -268,8 +268,41 @@ non-M4 refusals, so the frame's former green-or-M4 binary was incomplete:
 
 The bounded M4 population is therefore four rows: one more than the thin
 approximately-three estimate, not a material expansion. The size return fork
-does not fire. Deliverables 2 and 3 remain intentionally untouched pending
-post-census authorization.
+does not fire. The Runtime leader accepted this census and authorized the
+representation wiring at `evt_7383v69fb6e5q`.
+
+## Deliverables 2–3 attempt — stop disposition
+
+The first direct-result subpopulation was wired without touching either
+`boundary.rs` refusal arm. The planner issues a positional environment record
+for the exact lexical-closure occurrence and emission owner. The producer emits
+only its capture words in that aggregate, with no runtime code tag. The caller
+retains only the planner-issued environment-record identity as compiler
+metadata, resolves the static body from the same descriptor, projects the
+capture words, and dispatches directly to the declared worker body. `body`
+remains `Lowered::Closure`'s sole code identity.
+
+Both `px8l_recursive_decl_native` rows then pass native object construction:
+the exact `Closure: a closure cannot cross the boundary` refusal is retired.
+Both remain red at execution, however, with the newly exposed exact observation
+`ken native trap: malformed borrowed process input`, an empty effect trace,
+`RuntimeTrap(1)`, and exit status 1. The zero-seed row expected normal exit 0;
+the multistep row expected returned error 7.
+
+A temporary, byte-restored diagnostic assigned distinct sentinels to the
+emitted carrier guards and localized the new runtime sentinel to
+`emit_carrier_tag`, on the generic carried-match path rather than either closure
+boundary arm. A separate capture-class probe at the static dispatcher observed
+the three transported captures in source order as `Int`, `Constructor`, and
+`BorrowedOpaque`; the environment projection itself did not collapse or reorder
+the capture run.
+
+This is deliverable 3's named stop: a censused row does not green after honest
+representation wiring. No ignore was removed, the remaining two population
+rows were not widened into this newly exposed runtime debt, and no
+`ComputationalRecursorClosure` disposition changed. The checkpoint remains a
+non-candidate until the Runtime leader and the design authorities disposition
+the post-crossing carried-match failure.
 
 ## Acceptance criteria and controls
 

@@ -366,6 +366,7 @@ fn run_px8j_malformed_recursor_consumer(
             // the whole of it — and since B2A-S the carrier *is* the origin, the
             // fixture can no longer pair an arbitrary term with an unrelated tag.
             body: inert_test_static_origin(),
+            boundary_environment: None,
         })),
         activation: ContinuationActivationId(8),
         invocation: RecursorInvocationSegment::new(
@@ -661,6 +662,7 @@ fn run_px8ds_edge_consumer(
             // An inert residual body, as in the PX8J fixture above: the carrier is
             // the origin, and this test never lowers the body.
             body: inert_test_static_origin(),
+            boundary_environment: None,
         })),
         activation,
         invocation: segment,

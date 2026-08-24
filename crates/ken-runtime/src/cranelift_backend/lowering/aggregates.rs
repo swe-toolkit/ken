@@ -3387,9 +3387,34 @@ impl<'a> Lowering<'a> {
                         if *bound != seat || ordinal != declared_ordinal {
                             false
                         } else {
-                            let planned = self
-                                .static_transition_plan
-                                .checked_ih_capture_origin(owner, seat, *declared_ordinal)?;
+                            let planned = match path.root_kind() {
+                                SynthesizedAggregateRoot::CheckedIhCapturedEnvironment => self
+                                    .static_transition_plan
+                                    .checked_ih_capture_origin(owner, seat, *declared_ordinal)?,
+                                SynthesizedAggregateRoot::BoundaryClosureEnvironment => self
+                                    .static_transition_plan
+                                    .boundary_closure_environment(owner, seat)?
+                                    .and_then(|environment| {
+                                        environment
+                                            .capture_origins()
+                                            .get(*declared_ordinal as usize)
+                                            .copied()
+                                    })
+                                    .ok_or_else(|| {
+                                        unsupported(
+                                            "BoundaryClosureEnvironment",
+                                            "a boundary closure capture has no exact planned source occurrence",
+                                        )
+                                    })?,
+                                SynthesizedAggregateRoot::HostResultError
+                                | SynthesizedAggregateRoot::HostResultOk
+                                | SynthesizedAggregateRoot::UnitBoundaryEnvironment => {
+                                    return Err(unsupported(
+                                        "BoundaryClosureEnvironment",
+                                        "a positional closure capture was reconciled under a non-capture aggregate root",
+                                    ));
+                                }
+                            };
                             *origin == planned
                         }
                     }
@@ -3546,6 +3571,134 @@ impl<'a> Lowering<'a> {
                 self.emit_carrier_store_field(builder, word, position, child)?;
             }
             Ok(LoweringOperand::Carried(word))
+        }
+
+        /// Materialize only the positional environment of one statically
+        /// described lexical closure crossing a generated-unit boundary.
+        ///
+        /// The descriptor is compile-time code identity. The emitted aggregate
+        /// contains captures only and deliberately has no tag id, body word, or
+        /// callable identity. A consumer can reconstruct the compiler-private
+        /// closure capsule only from the same descriptor.
+        pub(super) fn emit_boundary_closure_environment(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            environment: &BoundaryClosureEnvironment,
+            captures: &[LoweringOperand],
+        ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+            let owner = self.defining_emission_owner.ok_or_else(|| {
+                unsupported(
+                    "BoundaryClosureEnvironment",
+                    "a boundary closure environment is being emitted outside a declared owner",
+                )
+            })?;
+            if owner != environment.owner() {
+                return Err(unsupported(
+                    "BoundaryClosureEnvironment",
+                    "a boundary closure environment descriptor names another emission owner",
+                ));
+            }
+            let seat = environment.seat();
+            let record = self
+                .static_transition_plan
+                .aggregate_record_view(environment.record())?;
+            if record.shape() != PlannedAggregateShape::Constructor {
+                return Err(unsupported(
+                    "BoundaryClosureEnvironment",
+                    "a boundary closure environment is not planned as a positional aggregate",
+                ));
+            }
+            let declared = record.declared_children().ok_or_else(|| {
+                unsupported(
+                    "BoundaryClosureEnvironment",
+                    "a boundary closure environment has no declared positional child model",
+                )
+            })?;
+            if declared.len() != captures.len()
+                || environment.capture_origins().len() != captures.len()
+            {
+                return Err(unsupported(
+                    "BoundaryClosureEnvironment",
+                    "the boundary closure descriptor, planned record, and captured operand run disagree on arity",
+                ));
+            }
+
+            let mut arguments = Vec::with_capacity(captures.len());
+            for (position, (origin, value)) in environment
+                .capture_origins()
+                .iter()
+                .copied()
+                .zip(captures.iter().cloned())
+                .enumerate()
+            {
+                let ordinal = u32::try_from(position).map_err(|_| {
+                    unsupported(
+                        "BoundaryClosureEnvironment",
+                        "a boundary closure capture ordinal exceeds the positional identity space",
+                    )
+                })?;
+                arguments.push(SynthesizedArgument::WorkerCaptureOperand {
+                    seat,
+                    ordinal,
+                    origin,
+                    value,
+                });
+            }
+            let path = SynthesizedAggregatePath::root(
+                SynthesizedAggregateRoot::BoundaryClosureEnvironment,
+            );
+            self.reconcile_declared_children(
+                owner,
+                seat,
+                &path,
+                declared,
+                &arguments,
+                &ClaimedEffectSeats::none(),
+            )?;
+
+            // The complete environment is screened before its parent exists.
+            for argument in &arguments {
+                let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
+                    unreachable!("this emitter constructs only positional capture arguments")
+                };
+                if let LoweringOperand::Specialized(value) = value {
+                    value.boundary_transfer_admissibility()?;
+                    self.source_aggregate_preflight(value)?;
+                }
+            }
+
+            let template = Lowered::Constructor {
+                constructor: RuntimeSymbol::from("compiler:boundary-closure-environment"),
+                synthesized_identity: None,
+                occurrence: Some(environment.record()),
+                args: Vec::new(),
+            };
+            let (occurrence, class) = self.aggregate_carrier_authority(
+                seat,
+                &template,
+                PlannedAggregateShape::Constructor,
+            )?;
+            let word = self.emit_checked_aggregate_alloc(
+                builder,
+                GovernedAllocationSite::SourceConstructor,
+                occurrence,
+                PlannedAggregateShape::Constructor,
+                class,
+                arguments.len(),
+            )?;
+            for (position, argument) in arguments.into_iter().enumerate() {
+                let SynthesizedArgument::WorkerCaptureOperand { origin, value, .. } = argument else {
+                    unreachable!("this emitter constructs only positional capture arguments")
+                };
+                let child = match value {
+                    LoweringOperand::Carried(word) => word,
+                    LoweringOperand::Specialized(value) => {
+                        self.transfer_into_carrier(builder, origin, &value)?
+                    }
+                };
+                self.emit_carrier_store_field(builder, word, position, child)?;
+            }
+            Ok(word)
         }
 
         /// Build one alternative of a compiler-synthesized dynamic constructor.

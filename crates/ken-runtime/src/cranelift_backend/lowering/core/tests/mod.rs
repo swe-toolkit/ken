@@ -1395,6 +1395,11 @@ fn retained_closures_carry_a_static_origin_and_no_body_term() {
             "captures: Vec<LoweringOperand>,",
             "params: Vec<String>,",
             "body: StaticOriginId,",
+            // M4 carries only the planner-issued positional ENVIRONMENT
+            // identity. It holds no term and no body origin; `body` above stays
+            // the sole code authority, and the descriptor resolver checks the
+            // environment record agrees with it before static dispatch.
+            "boundary_environment: Option<AggregateOccurrenceId>,",
         ],
         "AC-1: `Lowered::Closure`'s field inventory changed. A second body \
          authority beside the tag is exactly what this WP removed, so an added \

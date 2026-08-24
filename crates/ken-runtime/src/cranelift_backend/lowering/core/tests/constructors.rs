@@ -2087,6 +2087,7 @@ fn c1_d3_producer_screens_admissibility_before_it_touches_the_carrier() {
             captures: Vec::new(),
             params: Vec::new(),
             body: closure_body,
+            boundary_environment: None,
         })],
     };
     let refused = compiler
@@ -4359,6 +4360,7 @@ fn c1_d3_ac_c4_the_recursor_capsule_is_refused_before_its_residual_is_read() {
                 captures: Vec::new(),
                 params: Vec::new(),
                 body: inert_test_static_origin(),
+                boundary_environment: None,
             }),
         ),
         (

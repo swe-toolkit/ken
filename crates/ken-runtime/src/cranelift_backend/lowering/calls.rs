@@ -1509,6 +1509,35 @@ impl<'a> Lowering<'a> {
                 "  UNIT-RESULT transfer origin={origin:?} value={}",
                 lowered_value_kind(value)
             ));
+            if let Lowered::Closure {
+                captures,
+                params,
+                body,
+                ..
+            } = value
+            {
+                if let Some(owner) = self.defining_emission_owner {
+                    if let Some(environment) = self
+                        .static_transition_plan
+                        .boundary_closure_environment(owner, origin)?
+                    {
+                        if environment.body_origin() != *body
+                            || environment.params() != params
+                            || environment.capture_origins().len() != captures.len()
+                        {
+                            return Err(unsupported(
+                                "BoundaryClosureEnvironment",
+                                "the lowered closure disagrees with its planner-issued code identity or captured-environment schema",
+                            ));
+                        }
+                        return self.emit_boundary_closure_environment(
+                            builder,
+                            &environment,
+                            captures,
+                        );
+                    }
+                }
+            }
             let process_exit = self.process_object
                 && matches!(
                     value,
@@ -1541,6 +1570,66 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+        /// Statically dispatch a closure reconstructed from a transported
+        /// positional environment. The descriptor selects the body; the
+        /// runtime supplies captures only. No code tag or body identity is
+        /// read from the carrier word.
+        pub(super) fn call_boundary_closure_environment(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            environment_record: AggregateOccurrenceId,
+            body: StaticOriginId,
+            inputs: &[LoweringOperand],
+        ) -> Result<LoweringOperand, CraneliftBackendError> {
+            let environment = self
+                .static_transition_plan
+                .boundary_closure_environment_by_record(environment_record)?;
+            if environment.body_origin() != body {
+                return Err(unsupported(
+                    "BoundaryClosureEnvironment",
+                    "a reconstructed boundary closure disagrees with its compile-time body identity",
+                ));
+            }
+            let expected = environment
+                .params()
+                .len()
+                .checked_add(environment.capture_origins().len())
+                .ok_or_else(|| {
+                    unsupported(
+                        "BoundaryClosureEnvironment",
+                        "a boundary closure input arity overflowed",
+                    )
+                })?;
+            if inputs.len() != expected {
+                return Err(unsupported(
+                    "BoundaryClosureEnvironment",
+                    format!(
+                        "the boundary closure descriptor expects {expected} parameter-plus-capture inputs but the call assembled {}",
+                        inputs.len()
+                    ),
+                ));
+            }
+            let target = self
+                .function_local
+                .worker_calls
+                .get(&body)
+                .cloned()
+                .ok_or_else(|| {
+                    unsupported(
+                        "BoundaryClosureEnvironment",
+                        "the statically selected boundary closure body has no declared target in this function",
+                    )
+                })?;
+            self.call_declared_unit_target(
+                builder,
+                target,
+                inputs,
+                #[cfg(test)]
+                None,
+            )
+            .map(|(operand, _)| operand)
+        }
+
         pub(super) fn call_declared_unit(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
@@ -1752,6 +1841,12 @@ impl<'a> Lowering<'a> {
             inputs: &[LoweringOperand],
             #[cfg(test)] launch_ingress: Option<cranelift_codegen::ir::Value>,
         ) -> Result<(LoweringOperand, cranelift_codegen::ir::Inst), CraneliftBackendError> {
+            // Compile-time result identity, resolved before the call. The callee
+            // returns only its positional environment word; no code tag crosses
+            // in the frame and no runtime lookup selects the body.
+            let boundary_closure = self
+                .static_transition_plan
+                .predeclared_boundary_closure_environment(target.origin)?;
             let payload = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
                 target.header.frame_bytes,
@@ -2032,6 +2127,24 @@ impl<'a> Lowering<'a> {
             builder.switch_to_block(result_block);
             builder.seal_block(result_block);
             let word = builder.ins().stack_load(types::I64, payload, result_offset);
+            if let Some(environment) = boundary_closure {
+                let environment_word = CarriedBoundaryWord { word };
+                let captures = (0..environment.capture_origins().len())
+                    .map(|position| {
+                        self.emit_carrier_field(builder, environment_word, position)
+                            .map(LoweringOperand::Carried)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                return Ok((
+                    LoweringOperand::Specialized(Lowered::Closure {
+                        captures,
+                        params: environment.params().to_vec(),
+                        body: environment.body_origin(),
+                        boundary_environment: Some(environment.record()),
+                    }),
+                    call,
+                ));
+            }
             Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), call))
         }
 }

@@ -129,6 +129,49 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRole {
     /// fields. The two populations share the owner/escape DERIVATION and
     /// nothing else.
     CheckedIhCapturedEnvironment,
+    /// The positional captured environment of a statically known lexical
+    /// closure crossing a generated-unit result edge. The runtime aggregate
+    /// carries captures only; code identity remains in the compiler-issued
+    /// descriptor and never becomes a carrier tag.
+    BoundaryClosureEnvironment,
+}
+
+/// Compile-time identity and positional environment schema for one lexical
+/// closure that may cross a generated-unit boundary.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct BoundaryClosureEnvironment {
+    owner: ContinuationEmissionOwner,
+    seat: StaticOriginId,
+    body_origin: StaticOriginId,
+    params: Vec<String>,
+    capture_origins: Vec<StaticOriginId>,
+    record: AggregateOccurrenceId,
+}
+
+impl BoundaryClosureEnvironment {
+    pub(in crate::cranelift_backend) fn owner(&self) -> ContinuationEmissionOwner {
+        self.owner
+    }
+
+    pub(in crate::cranelift_backend) fn seat(&self) -> StaticOriginId {
+        self.seat
+    }
+
+    pub(in crate::cranelift_backend) fn body_origin(&self) -> StaticOriginId {
+        self.body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn params(&self) -> &[String] {
+        &self.params
+    }
+
+    pub(in crate::cranelift_backend) fn capture_origins(&self) -> &[StaticOriginId] {
+        &self.capture_origins
+    }
+
+    pub(in crate::cranelift_backend) fn record(&self) -> AggregateOccurrenceId {
+        self.record
+    }
 }
 
 /// One authorized transport of a force-materialized checked-IH environment.
@@ -286,6 +329,14 @@ impl<'plan> PlannedAggregateView<'plan> {
     pub(in crate::cranelift_backend) fn children(&self) -> &'plan [PlannedAggregateChild] {
         &self.record.children
     }
+
+    /// The closed positional child recipe for a compiler-synthesized
+    /// aggregate. Source aggregates have no such recipe.
+    pub(in crate::cranelift_backend) fn declared_children(
+        &self,
+    ) -> Option<&'static [SynthesizedAggregateNode]> {
+        self.record.declared_children
+    }
 }
 /// The allocation lane the ruled lifetime meet selects for one aggregate.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -436,6 +487,9 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRoot {
     /// whose closed result reaches a generated-unit call input.
     UnitBoundaryEnvironment,
     CheckedIhCapturedEnvironment,
+    /// A positional captured environment crossing in place of a lexical
+    /// closure whose body is selected statically.
+    BoundaryClosureEnvironment,
 }
 /// One step from a synthesized aggregate to one of its ordered children.
 ///
@@ -487,6 +541,10 @@ impl SynthesizedAggregatePath {
             root,
             steps: Vec::new(),
         }
+    }
+
+    pub(in crate::cranelift_backend) fn root_kind(&self) -> SynthesizedAggregateRoot {
+        self.root
     }
 
     /// This path extended by one ordered field of a fixed constructor.
@@ -847,7 +905,8 @@ impl SynthesizedHostResultTree {
             // absent node keeps the host-tree resolver fail-closed if the two
             // domains are ever accidentally mixed.
             SynthesizedAggregateRoot::UnitBoundaryEnvironment
-            | SynthesizedAggregateRoot::CheckedIhCapturedEnvironment => {
+            | SynthesizedAggregateRoot::CheckedIhCapturedEnvironment
+            | SynthesizedAggregateRoot::BoundaryClosureEnvironment => {
                 SynthesizedAggregateNode::Absent
             }
         }
@@ -1341,6 +1400,130 @@ impl StaticTransitionPlan<'_> {
         })
     }
 
+    /// Resolve the compile-time code identity and positional captured
+    /// environment for one exact lexical-closure occurrence.
+    ///
+    /// Absence preserves the ordinary refusal. A present descriptor joins the
+    /// source occurrence with the independently issued ownership record before
+    /// lowering can replace the closure crossing by an environment crossing.
+    pub(in crate::cranelift_backend) fn boundary_closure_environment(
+        &self,
+        owner: ContinuationEmissionOwner,
+        seat: StaticOriginId,
+    ) -> Result<Option<BoundaryClosureEnvironment>, CraneliftBackendError> {
+        let mut records = self.aggregate_ownership.iter().filter(|record| {
+            matches!(
+                &record.producer,
+                AggregateOccurrenceProducer::SynthesizedUse {
+                    owner: record_owner,
+                    seat: record_seat,
+                    path,
+                    role: SynthesizedAggregateRole::BoundaryClosureEnvironment,
+                } if *record_owner == owner
+                    && *record_seat == seat
+                    && path.root == SynthesizedAggregateRoot::BoundaryClosureEnvironment
+                    && path.steps.is_empty()
+            )
+        });
+        let Some(record) = records.next() else {
+            return Ok(None);
+        };
+        if records.next().is_some() {
+            return Err(planner_error(
+                "two boundary closure environments name one emission owner and source seat",
+            ));
+        }
+        let RuntimeExpr::LexicalClosure {
+            captures, params, ..
+        } = self.planned_occurrence_expr(seat)?
+        else {
+            return Err(planner_error(
+                "a boundary closure environment record names a non-lexical-closure source seat",
+            ));
+        };
+        let body_origin = self.semantic.child_origin(seat, 0)?;
+        let capture_origins = (0..captures.len())
+            .map(|ordinal| self.semantic.child_origin(seat, 1 + ordinal))
+            .collect::<Result<Vec<_>, _>>()?;
+        if record.shape != PlannedAggregateShape::Constructor
+            || record.children.len() != capture_origins.len()
+            || record
+                .children
+                .iter()
+                .zip(&capture_origins)
+                .enumerate()
+                .any(|(ordinal, (child, origin))| {
+                    child.position as usize != ordinal || child.origin != Some(*origin)
+                })
+        {
+            return Err(planner_error(
+                "a boundary closure environment record disagrees with its source capture run",
+            ));
+        }
+        Ok(Some(BoundaryClosureEnvironment {
+            owner,
+            seat,
+            body_origin,
+            params: params.clone(),
+            capture_origins,
+            record: record.id,
+        }))
+    }
+
+    /// Resolve the descriptor behind one planner-issued positional environment
+    /// identity. The record itself supplies owner and seat; no body lookup or
+    /// same-shaped search is accepted from lowering.
+    pub(in crate::cranelift_backend) fn boundary_closure_environment_by_record(
+        &self,
+        record: AggregateOccurrenceId,
+    ) -> Result<BoundaryClosureEnvironment, CraneliftBackendError> {
+        let record_view = self.aggregate_record_view(record)?;
+        let AggregateOccurrenceProducer::SynthesizedUse {
+            owner,
+            seat,
+            path,
+            role: SynthesizedAggregateRole::BoundaryClosureEnvironment,
+        } = record_view.producer()
+        else {
+            return Err(planner_error(
+                "a boundary closure capsule names an aggregate record from another role",
+            ));
+        };
+        if path.root != SynthesizedAggregateRoot::BoundaryClosureEnvironment
+            || !path.steps.is_empty()
+        {
+            return Err(planner_error(
+                "a boundary closure capsule names a non-root environment path",
+            ));
+        }
+        let environment = self
+            .boundary_closure_environment(*owner, *seat)?
+            .ok_or_else(|| {
+                planner_error(
+                    "a boundary closure capsule's environment record has no descriptor",
+                )
+            })?;
+        if environment.record != record {
+            return Err(planner_error(
+                "a boundary closure capsule resolved a different environment record",
+            ));
+        }
+        Ok(environment)
+    }
+
+    /// Resolve a direct predeclared unit result's boundary closure descriptor.
+    /// The owner comes from the seat's function membership, never from the
+    /// caller or from a body-identity search.
+    pub(in crate::cranelift_backend) fn predeclared_boundary_closure_environment(
+        &self,
+        seat: StaticOriginId,
+    ) -> Result<Option<BoundaryClosureEnvironment>, CraneliftBackendError> {
+        let Some(owner) = self.semantic.function_owner(seat)? else {
+            return Ok(None);
+        };
+        self.boundary_closure_environment(ContinuationEmissionOwner::Predeclared(owner), seat)
+    }
+
     /// Resolve one exact two-endpoint checked-IH environment transport.
     ///
     /// The destination tuple is the crossing lowering holds; the source
@@ -1629,12 +1812,12 @@ static CHECKED_IH_CAPTURE_OPERANDS: [SynthesizedAggregateNode;
 };
 
 /// The declared positional child model for one unit's capture arity.
-fn checked_ih_declared_children(
+fn positional_capture_declared_children(
     arity: usize,
 ) -> Result<&'static [SynthesizedAggregateNode], CraneliftBackendError> {
     if arity > CHECKED_IH_CAPTURE_OPERAND_LIMIT {
         return Err(planner_capacity_error(format!(
-            "a checked-IH captured environment has {arity} captures, more than the \
+            "a captured environment has {arity} captures, more than the \
              {CHECKED_IH_CAPTURE_OPERAND_LIMIT} its positional child model can state -- \
              refusing rather than declaring a shorter run than the record carries"
         )));
@@ -2009,6 +2192,80 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
             });
         }
     }
+    // The generated-unit boundary closure half. One positional environment
+    // record per exact lexical-closure occurrence and emission owner. Issuing
+    // the record does not authorize a crossing: lowering consumes it only when
+    // that same occurrence is the statically described result or child at a
+    // generated-unit edge, and the ordinary Closure refusal remains the
+    // fail-closed answer everywhere else.
+    for occurrence in plan.source_occurrences.iter().flatten() {
+        let RuntimeExpr::LexicalClosure { captures, .. } = occurrence.expr else {
+            continue;
+        };
+        let seat = occurrence.static_origin;
+        let declared = positional_capture_declared_children(captures.len())?;
+        let mut children = Vec::with_capacity(captures.len());
+        for (ordinal, _) in captures.iter().enumerate() {
+            let ordinal = u32::try_from(ordinal).map_err(|_| {
+                planner_capacity_error(
+                    "a boundary closure capture ordinal exceeds the position space",
+                )
+            })?;
+            let sourced = plan.semantic.child_origin(seat, 1 + ordinal as usize)?;
+            let authority = occurrence_authority(plan, sourced)?;
+            let child_authority = PlannedOccurrenceChildAuthority {
+                origin: sourced,
+                position: ordinal,
+                owner: authority.owner,
+                lifetime: authority.lifetime,
+            };
+            let owners = aggregate_child_referent_owners(plan, &child_authority)?;
+            children.push(PlannedAggregateChild {
+                position: ordinal,
+                origin: Some(sourced),
+                field_identity: None,
+                lifetime: if owners.contains(&BoundaryReferentOwner::InvocationArena) {
+                    PlannedReferentLifetime::ActivationOwned
+                } else {
+                    PlannedReferentLifetime::Persistent
+                },
+                owners,
+            });
+        }
+        let escapes = children
+            .iter()
+            .any(|child| child.owners.contains(&BoundaryReferentOwner::InvocationArena));
+        let (meet, allocation) = if escapes {
+            (
+                PlannedReferentLifetime::ActivationOwned,
+                PlannedAggregateAllocation::InvocationAggregate,
+            )
+        } else {
+            (
+                PlannedReferentLifetime::Persistent,
+                PlannedAggregateAllocation::PersistentGround,
+            )
+        };
+        for owner in inline_synthesized_seat_emission_owners(plan, seat)? {
+            records.push(PlannedAggregateOwnership {
+                id: AggregateOccurrenceId(0),
+                producer: AggregateOccurrenceProducer::SynthesizedUse {
+                    owner,
+                    seat,
+                    path: SynthesizedAggregatePath::root(
+                        SynthesizedAggregateRoot::BoundaryClosureEnvironment,
+                    ),
+                    role: SynthesizedAggregateRole::BoundaryClosureEnvironment,
+                },
+                owner: plan.semantic.function_owner(seat)?,
+                shape: PlannedAggregateShape::Constructor,
+                declared_children: Some(declared),
+                children: children.clone(),
+                meet,
+                allocation,
+            });
+        }
+    }
     // **`RT-CHECKED-IH-CAPTURED-ENV-SCHEMA` tier 2 -- issue for exactly the
     // units the coordinates admit.**
     //
@@ -2023,7 +2280,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
     for (seat, (run, force_owners)) in checked_ih_force_emissions(plan)? {
         // Refuse an arity the positional model cannot state, BEFORE building
         // anything that would have to agree with it.
-        let declared = checked_ih_declared_children(run.len())?;
+        let declared = positional_capture_declared_children(run.len())?;
         let mut children = Vec::with_capacity(run.len());
         for (ordinal, sourced) in &run {
             let authority = occurrence_authority(plan, *sourced)?;
@@ -4910,11 +5167,11 @@ mod checked_ih_captured_env_schema {
     /// serve, one past it must refuse.
     #[test]
     fn an_arity_above_the_positional_run_refuses_rather_than_truncating() {
-        let at_limit = checked_ih_declared_children(CHECKED_IH_CAPTURE_OPERAND_LIMIT)
+        let at_limit = positional_capture_declared_children(CHECKED_IH_CAPTURE_OPERAND_LIMIT)
             .expect("an arity exactly at the limit is still expressible");
         assert_eq!(at_limit.len(), CHECKED_IH_CAPTURE_OPERAND_LIMIT);
 
-        let over = checked_ih_declared_children(CHECKED_IH_CAPTURE_OPERAND_LIMIT + 1);
+        let over = positional_capture_declared_children(CHECKED_IH_CAPTURE_OPERAND_LIMIT + 1);
         assert!(
             over.is_err(),
             "one capture past the run must REFUSE; returning a {}-long prefix for a longer \

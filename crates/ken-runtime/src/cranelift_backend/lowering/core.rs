@@ -3007,6 +3007,7 @@ impl<'a> Lowering<'a> {
             captures,
             params,
             body,
+            ..
         } = residual
         else {
             return Err(unsupported(
@@ -5184,6 +5185,7 @@ impl<'a> Lowering<'a> {
                 captures,
                 params,
                 body,
+                ..
             }) => {
                 if params.len() != args.len() {
                     return Err(unsupported(
@@ -5353,6 +5355,7 @@ impl<'a> Lowering<'a> {
                     captures,
                     params,
                     body,
+                    ..
                 } = base
                 else {
                     return Err(unsupported(
@@ -8602,6 +8605,7 @@ impl<'a> Lowering<'a> {
                 captures,
                 params,
                 body,
+                ..
             }) => (captures, *body, params.len()),
             _ => {
                 return Err(unsupported(
@@ -10905,6 +10909,7 @@ impl<'a> Lowering<'a> {
                         .collect(),
                     params: params.clone(),
                     body: body.static_origin,
+                    boundary_environment: None,
                 }),
             ));
         }
@@ -13474,6 +13479,7 @@ impl<'a> Lowering<'a> {
                     captures: lowered_captures,
                     params: params.clone(),
                     body: body.static_origin,
+                    boundary_environment: None,
                 }))
             }
             // D7, site 2 of 3.
@@ -13537,6 +13543,7 @@ impl<'a> Lowering<'a> {
                     captures,
                     params: params.clone(),
                     body: body.static_origin,
+                    boundary_environment: None,
                 }))
             }
             RuntimeExpr::DeclarationRef { symbol } => {
@@ -13845,6 +13852,7 @@ impl<'a> Lowering<'a> {
                         captures,
                         params,
                         body,
+                        boundary_environment,
                     }) => {
                         let mut call_inputs = args
                             .iter()
@@ -13880,6 +13888,14 @@ impl<'a> Lowering<'a> {
                         // environment role is the bare installation with no
                         // enclosing spine behind it.
                         call_inputs.extend(captures);
+                        if let Some(environment) = boundary_environment {
+                            return self.call_boundary_closure_environment(
+                                builder,
+                                environment,
+                                body,
+                                &call_inputs,
+                            );
+                        }
                         self.call_declared_unit(
                             builder,
                             body,
@@ -13990,6 +14006,7 @@ impl<'a> Lowering<'a> {
                             captures,
                             params,
                             body,
+                            ..
                         } = base
                         else {
                             return Err(unsupported(

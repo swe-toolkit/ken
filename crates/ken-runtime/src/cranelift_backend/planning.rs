@@ -70,7 +70,8 @@ pub(super) use static_transition::{
 // `RT-DECL-CLOSURE-PORT` `D7` — the aggregate ownership lane, read by the
 // carrier producers. Namespace re-export only.
 pub(super) use static_transition::{
-    AggregateOccurrenceId, CheckedIhEnvironmentTransport, CheckedIhTransportInputDestination,
+    AggregateOccurrenceId, BoundaryClosureEnvironment, CheckedIhEnvironmentTransport,
+    CheckedIhTransportInputDestination,
     FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape, PlannedAggregateOwnership,
     PlannedReferentLifetime, SynthesizedAggregateNode, SynthesizedAggregatePath,
     SynthesizedAggregateRoot,
