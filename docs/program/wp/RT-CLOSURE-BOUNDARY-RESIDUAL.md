@@ -276,13 +276,17 @@ measurement the build performs first, not a roster this frame pins.
   ignored, and no row outside the censused population is touched.
 - **AC-NO-REGRESSION.** Whole-suite green in CI (COORDINATION section 12).
   Local targeted `-p` / `--test` only, never `--workspace`.
-- **Required reviewers.** Architect — soundness review that the boundary
-  crossing is honest (the value is genuinely transferable, not a refusal
-  loosened), with specific attention to the second arm's fail-closed
-  singleton+pairing proof and the exactness pin (AC-EXTENSION). Adversary —
-  over-accept hunt (a relaxed boundary arm; the second arm degraded to generic
-  admission; a non-singleton/unpaired bind continuation admitted; a row
-  un-ignored without a real green run; a non-transferable value admitted).
+- **Gate reviewers (the merge Decision resolves on these).** Fresh QA (runtime)
+  — APPROVE on the exact candidate SHA. Architect — soundness that the boundary
+  crossing is honest (genuinely transferable, not a refusal loosened), with
+  specific attention to the second arm's fail-closed singleton+pairing proof and
+  the exactness pin (AC-EXTENSION). CV — conformance validation per the runtime
+  gate. The over-accept guards are the IN-CANDIDATE controls of AC-CROSSING and
+  AC-EXTENSION (a relaxed boundary arm; the second arm degraded to generic
+  admission; a non-singleton/unpaired admission; a row un-ignored without a real
+  green run; a non-transferable value admitted), authored in the candidate and
+  verified at the gate. The Adversary is NOT a per-candidate gate (COORDINATION
+  section 10⁻a): its independent over-accept hunt is the post-merge channel.
 
 ## Contention check
 
