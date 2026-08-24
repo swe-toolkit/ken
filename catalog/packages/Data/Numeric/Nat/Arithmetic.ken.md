@@ -13,13 +13,15 @@ proof follows the operation whose public theory it belongs to and uses that
 operation's `S::name` namespace for recursive and cross-law references.
 
 ```ken
-fn add (a : Nat) (b : Nat) : Nat =
+import Core.Logic.Transport (cong, sym, trans)
+
+pub fn add (a : Nat) (b : Nat) : Nat =
   match b {
     Zero ↦ a;
     Suc b2 ↦ Suc (add a b2)
   }
 
-fn mul (a : Nat) (b : Nat) : Nat =
+pub fn mul (a : Nat) (b : Nat) : Nat =
   match b {
     Zero ↦ Zero;
     Suc b2 ↦ add (mul a b2) a

@@ -1148,25 +1148,25 @@ fn cat4_union_intersection_difference_execute_over_nat() {
     assert_eq!(list_pair_nat_nat(&env, &v), vec![(2, 20)], "difference keeps left-only keys");
 }
 
-/// Regression for LANG-MOD-STRICT-RESOLUTION D1: strict-only prebinding
-/// temporaries must not enlarge `expand_scope`'s long-lived legacy frame.
-/// The union application below is the smallest existing Map acceptance arm
-/// that crossed the CI worker's stack limit when those temporaries lived in
-/// that frame.
+/// Regression for LANG-MOD-CATALOG-REALIZATION: persistent local declaration
+/// bindings must not enlarge `expand_scope`'s long-lived legacy frame. The
+/// union application below is the smallest existing Map acceptance arm that
+/// crossed the CI worker's stack limit when prebinding temporaries lived in
+/// that recursive frame.
 ///
-/// Promise class: durable invariant. Intended strict-resolution extensions
-/// remain green while any change that restores the enlarged legacy frame goes
-/// red at the stated stack.
+/// Promise class: durable invariant. Intended local-scope extensions remain
+/// green while any change that restores the enlarged legacy frame goes red at
+/// the stated stack.
 ///
 /// **MEASURED:** this legacy Map workload elaborates and evaluates on the
 /// explicit [`D1_LEGACY_MAP_STACK_BYTES`] thread stack.
-/// **CLAIMED:** strict-only prebinding does not consume the repaired legacy
-/// frame budget.
+/// **CLAIMED:** mode-independent local declaration prebinding stays in the
+/// persistent scope and does not consume the repaired legacy frame budget.
 /// **THE GAP:** the workload must reach the affected `expand_scope` recursion;
 /// the exact inline-parent mutation closes that gap by making this test abort
 /// with SIGABRT while the candidate remains green.
 #[test]
-fn d1_strict_prebinding_preserves_legacy_map_union_stack_budget() {
+fn local_prebinding_preserves_legacy_map_union_stack_budget() {
     std::thread::Builder::new()
         .stack_size(D1_LEGACY_MAP_STACK_BYTES)
         .spawn(|| {
