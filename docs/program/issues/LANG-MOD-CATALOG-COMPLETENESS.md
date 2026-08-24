@@ -168,32 +168,99 @@ ranges over the real population, not the stale count.
   consumer resolves `Nat`/`Zero`/`Suc` to the single native GlobalId and
   `OrdResult`/`Lt`/`Eq`/`Gt`/`ord_*` to the single OrdResult GlobalId. No second
   identity, no ambient/floor `Nat`.
-- AC-B5a (Nat native-export mechanism — CONFIRMED Spec prerequisite, fired at
-  3a7114cf7; Architect evt_22r45y0x8nzbh). Grounded: `export Nat, Zero, Suc`
-  succeeds under Legacy (binds native identities) but under STRICT fails at the
-  export declaration with `UnboundName Nat` — the facade unit's own strict scope
-  has no native Nat (non-floor, unimported, non-ambient), and dependency units
-  inherit one coherent ResolutionMode (no strict-consumer-loads-facade-via-legacy
-  escape). The elaborator has NO strict-capable identity-preserving native export
-  facade today. Nat-home authoring is HELD pending a Spec mechanism ruling on the
-  SHARP QUESTION: under Strict, how does a non-floor native inductive
-  (Nat/Zero/Suc) acquire a strict-resolvable public defining interface WITHOUT
-  forking its canonical identity? Two candidate mechanisms (Spec rules which):
-  (a) make strict export-name resolution bind a kernel/native global (an
-  elaborator change — §4.3 preserves identity but never runs because the export
-  cannot RESOLVE the native name under strict); (b) a real `data Nat = Zero | Suc
-  Nat` the elaborator RECOGNIZES as the native inductive by identity coincidence
-  (the ES2/Bool path, LawfulClasses.ken.md:215) — if that recognition generalizes
-  to Nat it is NOT the forbidden fork but the canonical native identity (still
-  requiring an import, Nat being non-floor). Architect leans (b)/ES2-Bool as the
-  likely clean answer; Spec first determines whether native-inductive recognition
-  already covers Nat or must be extended. B does NOT improvise a redeclaration
-  that forks identity. OrdResult migration + census + Gcd reuse are UNAFFECTED and
-  proceed as a partial increment while Nat waits (COORDINATION §10-).
+- AC-B5a (Nat native-export mechanism — RULED a Spec+build PREREQUISITE, not an
+  in-WP fix; spec-author evt_33bwgcx226bxv, spec-leader evt_7nvtrx1fs6wf0,
+  Architect deferred evt_22r45y0x8nzbh). Grounded at 3a7114cf7: under STRICT
+  `export Nat, Zero, Suc` has no lawful source (Nat is non-floor native,
+  unimported, non-ambient); Legacy cannot cross the mode boundary; a fresh
+  `data Nat` allocates a SECOND family (forks the canonical kernel identity —
+  structural similarity is not canonical identity); ambient/prelude promotion
+  contradicts the closed-floor/package contract. The Architect's ES2-Bool
+  recognition lean is FORECLOSED by that identity reasoning. The enclave RULED
+  the mechanism: a narrowly-scoped compiler-realized package-provider registry
+  binding one designated module path to the existing kernel-checked
+  {Nat,Zero,Suc} identities (constructor-parent-validated), local to the
+  provider unit under Strict, with ordinary export/import/re-export thereafter;
+  NO new Decl / GlobalId / `trusted_base()` entry / surface syntax /
+  mixed-resolution escape; all invalid registry/origin states fail closed.
+  Durable artifact: coupled normative amendments to spec 30-taxonomy §5,
+  33 §3.3/§4.3, 39 §2.0 + identity / strict-rejection / zero-allocation
+  conformance pins. This is now the prerequisite node
+  [[LANG-MOD-NAT-PROVIDER-INTERFACE]] (a spec-surface WP + a build WP), whose
+  material mechanism/scope is escalated to the operator (Decision
+  dec_1kqwn6hdvn7d2: build the registry vs descope Nat from the trial). B does
+  NOT improvise a redeclaration; Nat authoring, strict-caller migration, and
+  whole-catalog strict-green stay STOPPED until the prerequisite lands. Per the
+  Architect one-pass ruling (evt_1d2cwjd3e4tjx, AC-B9): the OrdResult home + the
+  relocated Core/Logic combinators + Derived + LawfulClasses + the census
+  proceed as the partial increment meanwhile; ALL of Order and Gcd's Order/Nat
+  imports are held with Nat (COORDINATION §10-).
 - AC-B7 (homeless census closed). The fixpoint homeless-convenience census (see
   the Deliverable) is run and its FULL set is enumerated with a canonical home
   authored for each — not rediscovered one hard-stop at a time. An empty
   next-iteration census is the completion signal.
+- AC-B8 (foreign-subject attached proofs — RULED convert-to-local; spec-author
+  evt_6wbz5eeh5v1y6, Architect evt_7d90kztv4n7hv part I, spec-leader
+  evt_2fgr39s4ghebn). A consumer may NOT attach a proof to an IMPORTED subject:
+  spec 33 §8.2 closes the attached namespace under the subject's defining module
+  (attachment is namespacing with ZERO soundness weight), and
+  `resolve_attached_ref`'s provider-anchored lookup is the DESIGNED ownership
+  rule, not a defect. B converts LawfulClasses' `proof eq_sound for pair_compare`
+  and `proof lt_asym for pair_compare` to ordinary private Lawful-local
+  `theorem`s (`pair_compare_eq_sound`, `pair_compare_lt_asym`), repointing the
+  one `lt_asym` and three `eq_sound` selector uses in `pair_ord_leq`; same proof
+  bodies, no pub/export/import edge, `pair_compare` keeps its exact Derived
+  identity, no `Data.Collections.Derived.pair_compare::{eq_sound,lt_asym}`
+  identity/export minted, zero `trusted_base()` delta. A roots-loader acceptance
+  control pins it (both Lawful-local theorem identities exist and are used by
+  `pair_ord_leq`; the two forbidden Derived attached identities/exports absent).
+  The coupled durable enclave artifact — the 33 §8.2 / 39 §2.0 closure
+  clarification + its provider-local-accept / consumer-foreign-reject /
+  consumer-local-theorem-accept conformance — is node
+  [[LANG-MOD-ATTACHED-PROOF-OWNERSHIP]]; it codifies the existing reject path
+  and does NOT gate B's build.
+- AC-B9 (cluster placement — §1b full-closure RULED in ONE pass; Architect
+  evt_1d2cwjd3e4tjx on the ring's fixpoint report evt_407n7demb9ppm; Steward
+  adjudication evt_21bem2w7rzj2k). After three surface-mechanism walls (pub-data
+  spelling, class-Eq collision, attached-proof ownership), the remaining
+  OrdResult/Order/LawfulClasses/Derived placement was ruled in one pass, not
+  per-wall (§1b accumulate-then-rule, NOT the §1a stuck-pair trigger). Five
+  rulings:
+  1. The Lawful-INDEPENDENT combinators (`pair_compare`,
+     `pair_compare_result_of`, the `pair_compare_lt_cases` family + its
+     provider-owned `eq`/`eq_cases` attachments, `list_compare`, `list_eq` —
+     OrdResult-only, no Ord/compare dep) move DOWN into Core/Logic (the OrdResult
+     home or a dedicated `Core/Logic/Compare` sibling — team's factoring choice),
+     imported thence by both Derived and LawfulClasses. The compound
+     `Ord (Pair a b)`/`Ord (List a)` instances DO NOT move (they need Lawful
+     Ord/compare) — they stay in LawfulClasses and import the combinators
+     downward. This removes the Core/Classes -> Data/Collections inversion by
+     relocating combinators, not instances; do NOT leave them in Derived.
+  2. `instance Ord Nat` is HEAD-SIDE (orphan check, spec 33 §5.3) — it lands with
+     the Nat home once the Nat mechanism makes Nat head-local. The class-side
+     move to LawfulClasses is REJECTED (does not unblock Order; couples a
+     Nat-specific instance into the general class module). All of Order stays in
+     the Nat-blocked bucket.
+  3. Order's `proof eq_true_of_or for bool_or` converts to a private Order-local
+     `theorem bool_or_eq_true_of_or` (same closed-attachment law as AC-B8) —
+     part of Order's held content.
+  4. `Prop -> Omega` on the two promoted eliminator motives
+     (`ord_result_elim`/`elim2`) is PERMITTED as an identity-preserving
+     strict-spelling repair (Omega is the reserved kernel proposition former, in
+     strict scope; `Prop` is the non-floor native alias strict correctly refuses
+     — same class as Nat). It is checker-guarded: a non-coinciding sort would red
+     every consuming proof, not go unsound.
+  5. UNBLOCKED partial-B (proceed now): the OrdResult home (type + ctors + consts
+     + the four promoted eliminators with Prop->Omega) + the relocated Core/Logic
+     combinators + Derived (97 decls) + LawfulClasses (106) with the
+     `pair_compare_{eq_sound,lt_asym}` local-theorem conversions + the homeless
+     census. HELD on the Nat prerequisite (Decision dec_1kqwn6hdvn7d2): all of
+     Order (`leq_nat`/`sub`/`compare` + `instance Ord Nat` +
+     `bool_or_eq_true_of_or`) and Gcd's Order/Nat imports. Per-consumer OrdResult
+     selective imports (Architect evt_6apbbf5bmfcj0): LawfulClasses
+     `(OrdResult, ord_eq, ord_lt, ord_gt)` consts-only (avoids the `class Eq`
+     collision); Order `(OrdResult, Lt, Eq, Gt)`; Derived all seven. Hand the
+     unblocked increment back at the merge gate; Architect + CV review.
 - AC-B6 (cross-cutting invariant). Zero `trusted_base()` delta; flat-Σ pin stays
   green.
 - AC-B-NO-REGRESSION. Whole-suite green in CI; local targeted `-p` only.
