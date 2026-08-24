@@ -5,23 +5,18 @@
 //! seats as CARRIED words, the three `ResourceScalar` seats
 //! (`ResourceRelease`, `FsHandleMetadata`, `FsReadAt` `Argument(0)`) are
 //! observed and the compile advances past them.
-//! CLAIMED: the new route PROVES observability for the `ResourceScalar` need in
-//! the carried phase; it does not admit carried seats generally, and it does not
-//! relax the seat's `Need`-subset-`Avail` membership.
+//! CLAIMED: the new route proves observability for the `ResourceScalar` need in
+//! the carried phase without relaxing the seat's `Need`-subset-`Avail`
+//! membership. The ledger still derives that key structurally; this fixture no
+//! longer has a different-need refusal with which to re-prove the keying.
 //!
-//! **The two assertions are a non-degenerate PAIR on ONE witness, and that is
-//! the whole design.** A single "it compiles further now" row is green-vs-green
-//! under the mutation this must catch -- a route that admitted ANY carried seat
-//! would pass it. So the pair asserts an ABSENCE and a PRESENCE that move in
-//! opposite directions:
+//! **The pair after the sibling readers and M6 closure:**
 //!
 //! - the `ResourceScalar` refusal is GONE -- if the route stopped firing, this
 //!   inverts;
-//! - a carried seat of a DIFFERENT need (`ExactIntU64`) is STILL REFUSED -- if
-//!   the route stopped being keyed on the need and admitted carried seats
-//!   generally, this inverts.
-//!
-//! Neither can be satisfied by a predicate that answers uniformly.
+//! - native-program construction COMPLETES -- the positive non-vacuity anchor
+//!   proving this shared witness traverses the resource reader, the exact-Int
+//!   sibling reader, and the M6 representation.
 //!
 //! **The phase axis is not tested here and the reason is structural, not an
 //! omission.** The route's condition requires `CarriedWord`, and in the
@@ -141,7 +136,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
 #[test]
-fn the_carried_resource_route_observes_resource_scalar_and_still_refuses_a_different_need() {
+fn the_carried_resource_route_observes_resource_scalar_and_completes_native_construction() {
     let root = tempfile::tempdir().expect("temporary native-build root");
     let result = ken_cli::build_native_program(
         WITNESS_SOURCE,
@@ -174,46 +169,8 @@ fn the_carried_resource_route_observes_resource_scalar_and_still_refuses_a_diffe
          firing: {error}"
     );
 
-    // The route is KEYED ON THE NEED. A carried seat of a different need is
-    // still refused by the unchanged strict membership test -- so the route
-    // proved observability for one need rather than admitting carried seats
-    // generally. This is the half that fails if the key is ever loosened to
-    // "any carried seat", and it is why the row above cannot pass vacuously.
-    // WEAKENED, DELIBERATELY AND WITH THE LOSS NAMED. This half used to assert
-    // that a carried seat of a DIFFERENT need (`ExactIntU64`) still refused at
-    // the claim gate -- the half that failed if the route were ever loosened to
-    // "any carried seat". `RT-EXACTINT-CARRIED-OBSERVE` closed that need, so
-    // this witness no longer contains a different-need claim-gate refusal, and
-    // the discriminator it provided is GONE rather than merely relocated.
-    //
-    // What remains is a non-vacuity anchor: the compile still stops, at a
-    // measured later blocker, so the absence above is not satisfied by a
-    // compile that failed upstream of the route. That is strictly less than the
-    // keying property it replaces.
-    //
-    // The property itself still holds IN CODE -- the ledger's second
-    // admissibility independently re-derives `(CarriedWord, ResourceScalar)`,
-    // byte-unchanged by the node that dropped this row's witness -- so what was
-    // lost is persistent regression DETECTION, not the route's keying.
-    //
-    // RESTORATION HOME: `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`, tracked as an
-    // AC rather than left to this comment (Architect `evt_4wkc748vgfhhf`). That
-    // node removes the Arg(2) gate, which is what produces a COMPLETING witness
-    // to carry a durable discriminator. Durable means a POSITIVE CROSS-KEY form
-    // -- one witness where a `ResourceScalar` carried seat and an `ExactIntU64`
-    // carried seat each route through their OWN decoder -- rather than this
-    // vanishing-contrast shape, which is inherently fragile precisely because
-    // it is spent the moment the contrasting need is closed.
-    // REPOINTED by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`, and the direction is
-    // the licence: the old terminal was the Arg(2) gate that THIS node removes,
-    // named directly above as this row's restoration home. The witness advances
-    // past its own former stop into a strictly deeper one -- the checked-IH
-    // nullary force of an ESCAPING functional IH, a deferred capability gap
-    // owned by `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`. Downstream by
-    // construction, not by assertion.
-    assert!(
-        error.contains("static worker expects 1 arguments but call provides 0"),
-        "the compile must still stop at the measured later blocker, so the absence above is \
-         not satisfied vacuously by a failure upstream of the route: {error}"
-    );
+    // Completion is now the positive non-vacuity anchor for the ResourceScalar
+    // assertion above: the witness traverses the carried resource reader and
+    // the exact-Int sibling reader before M6 closes the former terminal refusal.
+    result.expect("the carried resource-scalar reader and M6 representation must complete");
 }
