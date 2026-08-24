@@ -678,7 +678,7 @@ pub(super) enum SynthesizedArgument {
         seat: StaticOriginId,
         ordinal: u32,
         origin: StaticOriginId,
-        value: Lowered,
+        value: LoweringOperand,
     },
 }
 
@@ -700,17 +700,28 @@ pub(super) enum SiteOperandSource {
 impl SynthesizedArgument {
     /// The `Lowered` child this argument becomes once its provenance has been
     /// reconciled and discarded.
-    fn into_lowered(self) -> Lowered {
+    fn into_lowered(self) -> Result<Lowered, CraneliftBackendError> {
         match self {
-            Self::Scalar(value) | Self::Nested(value) | Self::Dynamic(value) => value,
-            Self::SiteOperand { value, .. } | Self::WorkerCaptureOperand { value, .. } => value,
+            Self::Scalar(value) | Self::Nested(value) | Self::Dynamic(value) => Ok(value),
+            Self::SiteOperand { value, .. } => Ok(value),
+            Self::WorkerCaptureOperand { .. } => Err(unsupported(
+                "CheckedIhCapturedEnvironment",
+                "a checked-IH capture operand reached an ordinary synthesized constructor; \
+                 the checked-IH environment emitter must consume its provenance directly",
+            )),
         }
     }
 
-    fn lowered(&self) -> &Lowered {
+    fn value_kind(&self) -> &'static str {
         match self {
-            Self::Scalar(value) | Self::Nested(value) | Self::Dynamic(value) => value,
-            Self::SiteOperand { value, .. } | Self::WorkerCaptureOperand { value, .. } => value,
+            Self::Scalar(value) | Self::Nested(value) | Self::Dynamic(value) => {
+                lowered_value_kind(value)
+            }
+            Self::SiteOperand { value, .. } => lowered_value_kind(value),
+            Self::WorkerCaptureOperand { value, .. } => match value {
+                LoweringOperand::Specialized(value) => lowered_value_kind(value),
+                LoweringOperand::Carried(_) => "carried boundary word",
+            },
         }
     }
 }
@@ -3057,8 +3068,8 @@ impl<'a> Lowering<'a> {
                     args: args
                         .into_iter()
                         .map(SynthesizedArgument::into_lowered)
-                        .map(ConstructorField::specialized)
-                        .collect(),
+                        .map(|value| value.map(ConstructorField::specialized))
+                        .collect::<Result<Vec<_>, _>>()?,
                 });
             };
             // ⛔ **`?`, never `.ok()`.** With a live emission owner, every
@@ -3111,8 +3122,8 @@ impl<'a> Lowering<'a> {
                 args: args
                         .into_iter()
                         .map(SynthesizedArgument::into_lowered)
-                        .map(ConstructorField::specialized)
-                        .collect(),
+                        .map(|value| value.map(ConstructorField::specialized))
+                        .collect::<Result<Vec<_>, _>>()?,
             })
         }
 
@@ -3404,12 +3415,137 @@ impl<'a> Lowering<'a> {
                             "synthesized aggregate child {position} is planned as {child:?} but the \
                              emitter built a {}, so the meet was taken over a different node than \
                              the one being allocated",
-                            lowered_value_kind(argument.lowered())
+                            argument.value_kind()
                         ),
                     ));
                 }
             }
             Ok(())
+        }
+
+        /// Materialize the captured environment of one escaping checked IH.
+        ///
+        /// The planner supplies the environment occurrence, its positional
+        /// child model, and each capture's source occurrence. The emitter
+        /// supplies the actual capture operand. Reconciliation joins those
+        /// independent authorities before allocation; the resulting carrier
+        /// node stores only the ordered environment fields and deliberately
+        /// stores no code-identity tag.
+        pub(super) fn emit_checked_ih_captured_environment(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            worker: &StaticWorkerBinding,
+        ) -> Result<LoweringOperand, CraneliftBackendError> {
+            let owner = self.defining_emission_owner.ok_or_else(|| {
+                unsupported(
+                    "CheckedIhCapturedEnvironment",
+                    "an escaping checked IH is being materialized outside a declared emission owner",
+                )
+            })?;
+            let seat = worker.closure_origin;
+            let record = self
+                .static_transition_plan
+                .checked_ih_captured_environment_record(owner, seat)?
+                .clone();
+            if record.shape != PlannedAggregateShape::Constructor {
+                return Err(unsupported(
+                    "CheckedIhCapturedEnvironment",
+                    "the checked-IH captured environment is not planned as a positional aggregate",
+                ));
+            }
+            let declared = record.declared_children.ok_or_else(|| {
+                unsupported(
+                    "CheckedIhCapturedEnvironment",
+                    "the checked-IH captured environment has no declared positional child model",
+                )
+            })?;
+            if declared.len() != worker.captures.len() {
+                return Err(unsupported(
+                    "CheckedIhCapturedEnvironment",
+                    format!(
+                        "the checked-IH environment declares {} captures but the selected worker carries {}",
+                        declared.len(),
+                        worker.captures.len()
+                    ),
+                ));
+            }
+
+            let mut arguments = Vec::with_capacity(worker.captures.len());
+            for (position, value) in worker.captures.iter().cloned().enumerate() {
+                let ordinal = u32::try_from(position).map_err(|_| {
+                    unsupported(
+                        "CheckedIhCapturedEnvironment",
+                        "the checked-IH capture run exceeds the positional identity space",
+                    )
+                })?;
+                let origin = self
+                    .static_transition_plan
+                    .checked_ih_capture_origin(owner, seat, ordinal)?;
+                arguments.push(SynthesizedArgument::WorkerCaptureOperand {
+                    seat,
+                    ordinal,
+                    origin,
+                    value,
+                });
+            }
+            let path = SynthesizedAggregatePath::root(
+                SynthesizedAggregateRoot::CheckedIhCapturedEnvironment,
+            );
+            self.reconcile_declared_children(
+                owner,
+                seat,
+                &path,
+                declared,
+                &arguments,
+                &ClaimedEffectSeats::none(),
+            )?;
+
+            // Screen the whole environment before allocating its parent. A
+            // refusal on capture i must not leave fields 0..i-1 published.
+            for argument in &arguments {
+                let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
+                    unreachable!("this emitter constructs only worker-capture arguments")
+                };
+                if let LoweringOperand::Specialized(value) = value {
+                    value.boundary_transfer_admissibility()?;
+                    self.source_aggregate_preflight(value)?;
+                }
+            }
+
+            let template = Lowered::Constructor {
+                // Compiler-only diagnostic spelling. It is never interned or
+                // emitted: the environment node intentionally has no tag id.
+                constructor: RuntimeSymbol::from("compiler:checked-ih-captured-environment"),
+                synthesized_identity: None,
+                occurrence: Some(record.id),
+                args: Vec::new(),
+            };
+            let (occurrence, class) = self.aggregate_carrier_authority(
+                seat,
+                &template,
+                PlannedAggregateShape::Constructor,
+            )?;
+            let word = self.emit_checked_aggregate_alloc(
+                builder,
+                GovernedAllocationSite::SourceConstructor,
+                occurrence,
+                PlannedAggregateShape::Constructor,
+                class,
+                arguments.len(),
+            )?;
+            for (position, argument) in arguments.into_iter().enumerate() {
+                let SynthesizedArgument::WorkerCaptureOperand { origin, value, .. } = argument else {
+                    unreachable!("this emitter constructs only worker-capture arguments")
+                };
+                let child = match value {
+                    LoweringOperand::Carried(word) => word,
+                    LoweringOperand::Specialized(value) => {
+                        self.transfer_into_carrier(builder, origin, &value)?
+                    }
+                };
+                self.emit_carrier_store_field(builder, word, position, child)?;
+            }
+            Ok(LoweringOperand::Carried(word))
         }
 
         /// Build one alternative of a compiler-synthesized dynamic constructor.
@@ -3448,7 +3584,10 @@ impl<'a> Lowering<'a> {
                 constructor,
                 identity: self.static_transition_plan.synthesized_constructor_identity(role)?,
                 occurrence,
-                fields: fields.into_iter().map(SynthesizedArgument::into_lowered).collect(),
+                fields: fields
+                    .into_iter()
+                    .map(SynthesizedArgument::into_lowered)
+                    .collect::<Result<Vec<_>, _>>()?,
             })
         }
 
@@ -3700,7 +3839,10 @@ impl<'a> Lowering<'a> {
                             .static_transition_plan
                             .synthesized_constructor_identity(role)?,
                         occurrence,
-                        fields: fields.into_iter().map(SynthesizedArgument::into_lowered).collect(),
+                        fields: fields
+                            .into_iter()
+                            .map(SynthesizedArgument::into_lowered)
+                            .collect::<Result<Vec<_>, _>>()?,
                     })
                 })
                 .collect()

@@ -3716,6 +3716,9 @@ impl StaticWorkerBinding {
 #[derive(Clone, Copy)]
 struct PendingCheckedIhCall {
     call_template_id: u64,
+    /// The compiler-private checked-IH use shape. This is consumed by a static
+    /// exhaustive dispatcher and never enters the crossing value.
+    kind: crate::CheckedComputationalIHInvocationKind,
     /// The occurrence of the application this marker denotes. Only a call being
     /// lowered AT this occurrence may consume the marker.
     application_origin: StaticOriginId,
@@ -7949,7 +7952,6 @@ impl<'a> ClaimedEffectSeats<'a> {
     /// spelling of what `&[]` used to say: this caller claimed no seat, so any
     /// declared `SiteOperand` child refuses. A tree with no site-bound child —
     /// which is every tree these tests build — asks it for nothing.
-    #[cfg(test)]
     fn none() -> ClaimedEffectSeats<'static> {
         static NONE: BTreeMap<EffectSeatSlot, PlannedEffectSeat> = BTreeMap::new();
         ClaimedEffectSeats { claimed: &NONE, capability: None, arguments: &[] }
@@ -10359,6 +10361,7 @@ impl<'a> Lowering<'a> {
     fn enter_checked_computational_ih_invocation(
         &mut self,
         call_template_id: u64,
+        kind: crate::CheckedComputationalIHInvocationKind,
         body: &RuntimeExpr,
         // `D8f` — the occurrence of the application this marker denotes,
         // supplied by the caller from the same `child_origin(marker, 0)` it
@@ -10372,6 +10375,7 @@ impl<'a> Lowering<'a> {
             .pending_computational_ih_call
             .replace(PendingCheckedIhCall {
                 call_template_id,
+                kind,
                 application_origin,
             })
             .is_some()

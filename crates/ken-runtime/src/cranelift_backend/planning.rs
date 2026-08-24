@@ -587,6 +587,7 @@ pub(super) fn collect_checked_oriented_markers(
             call_template_id,
             checked_occurrence_path,
             body,
+            ..
         } => {
             if !markers
                 .computational_ih_calls

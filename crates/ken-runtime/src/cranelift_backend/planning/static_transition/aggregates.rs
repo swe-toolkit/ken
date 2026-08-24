@@ -1206,6 +1206,48 @@ impl StaticTransitionPlan<'_> {
         })
     }
 
+    /// The exact planned aggregate record for a checked-IH captured
+    /// environment.
+    ///
+    /// The full key is the emission owner plus the closure occurrence that
+    /// serves as this population's seat. Absence is a refusal: a functional IH
+    /// with no issued environment record has no admitted value to carry.
+    pub(in crate::cranelift_backend) fn checked_ih_captured_environment_record(
+        &self,
+        owner: ContinuationEmissionOwner,
+        seat: StaticOriginId,
+    ) -> Result<&PlannedAggregateOwnership, CraneliftBackendError> {
+        let path = SynthesizedAggregatePath::root(
+            SynthesizedAggregateRoot::CheckedIhCapturedEnvironment,
+        );
+        self.synthesized_aggregate_record(
+            owner,
+            seat,
+            &path,
+            SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+        )
+        .map_err(|_| {
+            let available = self
+                .aggregate_ownership
+                .iter()
+                .filter_map(|record| match &record.producer {
+                    AggregateOccurrenceProducer::SynthesizedUse {
+                        owner,
+                        seat,
+                        role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                        ..
+                    } => Some((*owner, *seat)),
+                    AggregateOccurrenceProducer::Source(_)
+                    | AggregateOccurrenceProducer::SynthesizedUse { .. } => None,
+                })
+                .collect::<Vec<_>>();
+            planner_error(format!(
+                "no checked-IH captured-environment record exists for owner {owner:?} and \
+                 closure seat {seat:?}; available checked-IH records are {available:?}"
+            ))
+        })
+    }
+
     /// The capture occurrence the ruled run places at `ordinal`, for one
     /// checked-IH captured-environment record.
     ///

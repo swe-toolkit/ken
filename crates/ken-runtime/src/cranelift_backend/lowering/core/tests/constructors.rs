@@ -6391,14 +6391,14 @@ fn a_capture_operand_reconciles_only_against_its_own_ruled_position() {
             seat,
             ordinal,
             origin,
-            value: Lowered::Constructor {
+            value: LoweringOperand::Specialized(Lowered::Constructor {
                 constructor: crate::NativeProcessSymbols::legacy_prelude()
                     .private_transfer_count
                     .clone(),
                 synthesized_identity: None,
                 occurrence: None,
                 args: Vec::new(),
-            },
+            }),
         }]
     };
 

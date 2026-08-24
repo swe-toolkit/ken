@@ -707,6 +707,22 @@ enum ComputationalIHConsumptionRoute {
 }
 
 impl ComputationalIHConsumptionRoute {
+    /// The closed Runtime-IR shape consumed by native lowering's static
+    /// checked-IH dispatcher.
+    fn runtime_kind(self) -> ken_runtime::CheckedComputationalIHInvocationKind {
+        match self {
+            Self::OrdinaryApplication => {
+                ken_runtime::CheckedComputationalIHInvocationKind::OrdinaryApplication
+            }
+            Self::CheckedHostComputationTail => {
+                ken_runtime::CheckedComputationalIHInvocationKind::CheckedHostComputationTail
+            }
+            Self::CheckedHostVisContinuation => {
+                ken_runtime::CheckedComputationalIHInvocationKind::CheckedHostVisContinuation
+            }
+        }
+    }
+
     /// How many operands this route APPENDS that the source application never
     /// wrote.
     ///
@@ -1898,6 +1914,7 @@ fn collect_oriented_runtime_marker_locations(
             call_template_id,
             checked_occurrence_path,
             body,
+            ..
         } => {
             locations
                 .computational_ih_calls
@@ -2323,6 +2340,7 @@ fn lower_body_term_with_plans(
         return Ok(RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
             checked_occurrence_path: path.to_vec(),
+            kind: ComputationalIHConsumptionRoute::OrdinaryApplication.runtime_kind(),
             body: Box::new(body),
         });
     }
@@ -2855,6 +2873,7 @@ fn lower_checked_host_computation(
         return Ok(RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
             checked_occurrence_path: path.to_vec(),
+            kind: ComputationalIHConsumptionRoute::CheckedHostComputationTail.runtime_kind(),
             body: Box::new(body),
         });
     }
@@ -3294,6 +3313,8 @@ fn lower_checked_host_computation(
                 RuntimeExpr::CheckedComputationalIHInvocation {
                     call_template_id,
                     checked_occurrence_path: continuation_path,
+                    kind: ComputationalIHConsumptionRoute::CheckedHostVisContinuation
+                        .runtime_kind(),
                     body: Box::new(RuntimeExpr::Call {
                         callee: Box::new(callee),
                         args,
@@ -4574,10 +4595,12 @@ fn shift_runtime_vars(expr: RuntimeExpr, by: u32, cutoff: u32) -> RuntimeExpr {
         RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
             checked_occurrence_path,
+            kind,
             body,
         } => RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
             checked_occurrence_path,
+            kind,
             body: Box::new(shift_runtime_vars(*body, by, cutoff)),
         },
         RuntimeExpr::Var(index) if index >= cutoff => RuntimeExpr::Var(index + by),
