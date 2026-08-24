@@ -11,17 +11,20 @@ github: null
 origin: "Component B (LANG-MOD-CATALOG-COMPLETENESS) f5be017f7 CI red on two kenfmt gates (kenfmt_b3_layout::ac7 width-bound on a 125-col OrdResult export line; kenfmt_c_capstone canonical-fixed-point on LawfulClasses import/proof wrapping). Diagnosed candidate-only REAL by the language ring (evt_7exmbjsvfrk7f); Steward-confirmed as a formatter-surface gap by reading the Doc-construction code, not the symptom. Filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
-> # DRAFT — release + B-sequencing pending the ring's stopgap call
+> # DRAFT — buildable; the RECOMBINATION TRIGGER for Component B's split stopgap
 >
 > This node records a CONFIRMED gap: the module/import surface shipped its
 > grammar/AST/elaboration (`l4-export-reexport-declaration`, merged) without a
 > matching kenfmt layout, so the formatter cannot lay out its own new decls.
-> Whether it BLOCKS [[LANG-MOD-CATALOG-COMPLETENESS]] (Component B) depends on
-> whether B's catalog module-surface decls can be authored idempotent-under-
-> kenfmt AND <=96 columns without this fix (the language ring + Architect
-> determine that on the respin). If no such stopgap authoring exists, set
-> `blocks: [LANG-MOD-CATALOG-COMPLETENESS]` and B's whole-catalog formatter-clean
-> closure gates here. No `trusted_base()` impact either way: kenfmt is a
+> The Architect ruled path (a) (evt_qapcbnjm7m2g): Component B does NOT block on
+> this fix — it authors its wide module-surface decls as adjacent partitioned
+> declarations (each line <=96 and a kenfmt fixed point), a semantics-preserving
+> additive-fold stopgap (`crates/ken-elaborator/src/modules.rs:1752-1772`), so
+> `blocks: []` stands. THIS node is the recombination trigger: when the
+> Doc-builder lands, recombine Component B's split OrdResult export and Derived
+> selective import back to the single canonical name-list form and let kenfmt
+> reflow it (the Architect took this tracked node, in place of an inline TODO, as
+> the durable recombination record). No `trusted_base()` impact: kenfmt is a
 > source-to-source formatter whose output is re-checked; it is not in the TCB.
 
 ## The gap (Steward-confirmed at f5be017f7 / formatter source at d5ad700b7)
@@ -95,6 +98,6 @@ token-kind gates stay green.
 Buildable now — the formatter and the AST variants both exist; this only adds
 the missing layout arms. It is [[LANG-MODULE-IMPORT-SYSTEM]] campaign work
 (completing the surface the campaign introduced), so framing/sequencing it is
-lane work, not a competing claim. Its relationship to Component B is the open
-`blocks` edge above, set by the ring's stopgap determination on the f5be017f7
-respin.
+lane work, not a competing claim. Its relationship to Component B is RESOLVED
+(Architect path (a), evt_qapcbnjm7m2g): no `blocks` edge — B ships the
+partitioned stopgap on 4a79dc0fe and this node is B's recombination trigger.
