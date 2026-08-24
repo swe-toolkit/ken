@@ -193,31 +193,14 @@ const FAMILY: &[(&str, &str)] = &[
     ("branched-scrutinee (distinct source)", BRANCHED_SCRUTINEE_SOURCE),
 ];
 
-/// The refusal each program is expected to reach, and what retires it.
+/// The terminal disposition each program must reach.
 ///
-/// Same discipline as the sibling report: assert the exact disposition rather
-/// than "everything completes", so a landing successor, a newly surfaced layer,
-/// and a by-design refusal are three distinguishable reds instead of one
-/// permanent one.
-/// Both programs advanced past the marker seam when the producer fix landed,
-/// and now refuse at the real gap underneath it: the marker is a nullary_force
-/// of an ESCAPING functional induction hypothesis.
-///
-/// MEASURED escaping, not assumed: the realized IH value's immediate parent is
-/// a `Construct`, so it is stored straight into a constructor field and there is
-/// no in-frame application site to specialize it to. What refuses is the
-/// static-worker arity gate, seeing the arity-1 worker forced with zero
-/// arguments.
-///
-/// Retired by `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`, which owns the missing
-/// representation (a materialized closure value or a defunctionalized carried
-/// tag). This is a deferred capability gap, not unfinished work in this
-/// candidate.
-const ESCAPING_FUNCTIONAL_IH: &str = "static worker expects 1 arguments but call provides 0";
-
+/// `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION` retires the advancing-refusal
+/// sentinel: both closed programs now complete through the static checked-IH
+/// dispatcher and its transported positional environment.
 const EXPECTED: &[(&str, &str)] = &[
-    ("checked-capture (shared by three pins)", ESCAPING_FUNCTIONAL_IH),
-    ("branched-scrutinee (distinct source)", ESCAPING_FUNCTIONAL_IH),
+    ("checked-capture (shared by three pins)", "OK"),
+    ("branched-scrutinee (distinct source)", "OK"),
 ];
 
 #[test]
@@ -264,12 +247,12 @@ fn every_checked_family_program_reaches_its_expected_terminal_state() {
             .find(|(entry, _)| entry == name)
             .map(|(_, key)| *key)
             .expect("covered by the_expectation_table_covers_exactly_the_family");
-        if outcome == "OK" {
+        if key == "OK" && outcome != "OK" {
             mismatches.push(format!(
-                "{name}: now COMPLETES. If RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION landed, \
-                 this row is retired and the program joins the completing set."
+                "{name}: expected the closed checked-IH representation to complete, got: \
+                 {outcome}"
             ));
-        } else if !outcome.contains(key) {
+        } else if key != "OK" && !outcome.contains(key) {
             mismatches.push(format!(
                 "{name}: refuses for a DIFFERENT reason than the expected {key:?}. \
                  Note this population cannot bound its own depth -- one program per \

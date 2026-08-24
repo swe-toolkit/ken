@@ -7931,6 +7931,27 @@ mod px7l_tests {
     }
 
     #[test]
+    fn checked_ih_morphism_preserves_the_plan_ordinal_and_maps_it_to_runtime_four() {
+        let mut remap = BranchBinderRemap::default().enter_match(2, 1, true, vec![77]);
+        for _ in 0..4 {
+            remap = remap.enter_binding();
+        }
+        let (ordinal, morphism) = remap
+            .computational_ih_binder_morphism(77)
+            .expect("the slot is retained at runtime");
+        assert_eq!(ordinal, 0, "the plan authority remains an IH ordinal");
+        assert_eq!(morphism.method_argument_count, 2);
+        assert_eq!(morphism.method_ih_count, 1);
+        assert_eq!(morphism.source_start, 4);
+        assert_eq!(morphism.source_binder_index, 4);
+        assert_eq!(morphism.runtime_index(ordinal as u64), Some(4));
+        assert!(
+            remap.computational_ih_binder_morphism(78).is_none(),
+            "a different slot must not inherit this morphism"
+        );
+    }
+
+    #[test]
     fn runtime_selected_response_binder_is_not_shifted_with_its_free_environment() {
         let continuation = RuntimeExpr::Construct {
             constructor: "px7l::ResponseAndOuter".to_string(),

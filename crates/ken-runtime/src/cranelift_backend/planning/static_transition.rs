@@ -112,10 +112,10 @@ use continuations::ContinuationProductionMutation;
 // this module, unchanged from before the move.
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use aggregates::{
-    AggregateOccurrenceId, AggregateOccurrenceProducer, PlannedAggregateAllocation,
-    PlannedAggregateOwnership, PlannedAggregateShape, SynthesizedAggregateNode,
-    SynthesizedAggregatePath, SynthesizedAggregateRole, SynthesizedAggregateRoot,
-    SynthesizedDynamicSet,
+    AggregateOccurrenceId, AggregateOccurrenceProducer, CheckedIhEnvironmentTransport,
+    CheckedIhTransportInputDestination, PlannedAggregateAllocation, PlannedAggregateOwnership,
+    PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
+    SynthesizedAggregateRole, SynthesizedAggregateRoot, SynthesizedDynamicSet,
 };
 use aggregates::lifetime_referent_affinity;
 #[cfg(test)]
@@ -539,6 +539,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// HAS a lowering accessor — the allocation lane is unreadable at the
     /// producer without it.
     aggregate_ownership: Vec<PlannedAggregateOwnership>,
+    /// The exact two-endpoint transports that carry a force-materialized
+    /// checked-IH environment to an escaping closure crossing. These reference
+    /// `aggregate_ownership`; they never issue a second record.
+    checked_ih_environment_transports: Vec<CheckedIhEnvironmentTransport>,
     /// `RT-DECL-CLOSURE-PORT` `D7`. One record per capability/argument seat of
     /// every admitted host effect occurrence. Read by lowering, which claims
     /// exactly one of these per seat it consumes.
@@ -984,6 +988,8 @@ mod tests {
                     call_template_id: call,
                     checked_occurrence_path: path,
                     kind: crate::CheckedComputationalIHInvocationKind::OrdinaryApplication,
+                    binder_morphism:
+                        crate::CheckedComputationalIHBinderMorphism::identity_for_test(0),
                     body: Box::new(body),
                 }
             } else {
@@ -1469,6 +1475,7 @@ mod tests {
                 call_template_id,
                 checked_occurrence_path,
                 kind,
+                binder_morphism,
                 body,
             } => RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id: if cause == D2jCause::Invocation {
@@ -1478,6 +1485,7 @@ mod tests {
                 },
                 checked_occurrence_path,
                 kind,
+                binder_morphism,
                 body: Box::new(d2j_rewrite_body(*body, cause, in_case_body)),
             },
             RuntimeExpr::ComputationalMatch {

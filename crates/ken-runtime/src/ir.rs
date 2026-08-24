@@ -569,6 +569,17 @@ pub struct CheckedComputationalIHBinderMorphism {
 }
 
 impl CheckedComputationalIHBinderMorphism {
+    #[cfg(test)]
+    pub(crate) const fn identity_for_test(runtime_binder_index: u64) -> Self {
+        Self {
+            method_argument_count: 0,
+            method_ih_count: 1,
+            source_start: 0,
+            source_binder_index: 0,
+            runtime_binder_index,
+        }
+    }
+
     /// Translate an IH-suffix method ordinal into the source de Bruijn frame.
     pub fn source_index(self, method_binder_ordinal: u64) -> Option<u64> {
         let method_position = self
@@ -1553,6 +1564,46 @@ mod tests {
             compiler_private_computational_match_frame_fingerprint(&computational, &default),
             "AC-F3: the two eliminator families must not collide"
         );
+    }
+
+    #[test]
+    fn checked_ih_binder_morphism_maps_the_lawful_ordinal_zero_to_runtime_four() {
+        let morphism = CheckedComputationalIHBinderMorphism {
+            method_argument_count: 2,
+            method_ih_count: 1,
+            source_start: 0,
+            source_binder_index: 0,
+            runtime_binder_index: 4,
+        };
+        assert_eq!(morphism.source_index(0), Some(0));
+        assert_eq!(morphism.runtime_index(0), Some(4));
+        assert_eq!(morphism.runtime_index(1), None);
+    }
+
+    #[test]
+    fn checked_ih_binder_morphism_refuses_a_stale_source_occurrence() {
+        let morphism = CheckedComputationalIHBinderMorphism {
+            method_argument_count: 2,
+            method_ih_count: 1,
+            source_start: 0,
+            source_binder_index: 1,
+            runtime_binder_index: 4,
+        };
+        assert_eq!(morphism.source_index(0), Some(0));
+        assert_eq!(morphism.runtime_index(0), None);
+    }
+
+    #[test]
+    fn checked_ih_binder_morphism_shifts_only_beneath_inserted_runtime_binders() {
+        let morphism = CheckedComputationalIHBinderMorphism {
+            method_argument_count: 2,
+            method_ih_count: 1,
+            source_start: 0,
+            source_binder_index: 0,
+            runtime_binder_index: 4,
+        };
+        assert_eq!(morphism.shifted_runtime(1, 0).unwrap().runtime_index(0), Some(5));
+        assert_eq!(morphism.shifted_runtime(1, 5).unwrap().runtime_index(0), Some(4));
     }
 
     #[test]

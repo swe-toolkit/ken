@@ -3770,6 +3770,23 @@ fn d8f_the_remaining_checked_marker_refusals() {
     );
 }
 
+#[test]
+fn checked_ih_misbinding_refuses_after_mapping_both_authorities_to_runtime() {
+    let refusal = format!(
+        "{:?}",
+        d8f_compile_with(
+            false,
+            D8fPerturbation::WrongRuntimeBinder,
+            D8fPerturbation::WrongRuntimeBinder,
+        )
+    );
+    assert!(
+        refusal.contains("maps method ordinal")
+            && refusal.contains("but the consuming call reads"),
+        "a wrong mapped runtime index must stop at the common-frame comparison: {refusal}"
+    );
+}
+
 /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8g` — the functionized population's table
 /// choice and suffix contract, keyed at the shared emitter.**
 ///
@@ -5311,6 +5328,9 @@ enum D8fPerturbation {
     /// The marker moved onto the inner ordinary call, with the plan still built
     /// for the outer one.
     MarkerMovedInward,
+    /// The explicit source-to-runtime morphism points one binder past the
+    /// emitted `Var`, while every call/slot identity remains exact.
+    WrongRuntimeBinder,
 }
 
 #[cfg(test)]
@@ -5421,16 +5441,34 @@ fn d8f_marked_application(
             args.to_vec()
         },
     };
+    let runtime_binder_index = match callee {
+        RuntimeExpr::Var(index) => *index,
+        _ => 0,
+    };
+    let runtime_binder_index = if perturbation == D8fPerturbation::WrongRuntimeBinder {
+        runtime_binder_index.wrapping_add(1)
+    } else {
+        runtime_binder_index
+    };
     let marker = |call_template_id: u64, path: Vec<u64>, body: RuntimeExpr| {
         RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
             checked_occurrence_path: path,
             kind: crate::CheckedComputationalIHInvocationKind::OrdinaryApplication,
+            binder_morphism: crate::CheckedComputationalIHBinderMorphism {
+                method_argument_count: 0,
+                method_ih_count: 5,
+                source_start: 0,
+                source_binder_index: 0,
+                runtime_binder_index: u64::from(runtime_binder_index),
+            },
             body: Box::new(body),
         }
     };
     match perturbation {
-        D8fPerturbation::None => marker(100, vec![30], application(callee)),
+        D8fPerturbation::None | D8fPerturbation::WrongRuntimeBinder => {
+            marker(100, vec![30], application(callee))
+        }
         // A second marker inside the first, on the same application.
         // The outer marker wraps a complete application, as entry requires; its
         // ARGUMENT carries a second marker. So the inner marker is entered while

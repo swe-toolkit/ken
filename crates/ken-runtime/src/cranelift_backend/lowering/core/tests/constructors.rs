@@ -263,6 +263,7 @@ fn run_dynamic_constructor_dispatch_fixture(
             raw_worker_calls: BTreeMap::new(),
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
+            checked_ih_transport_emissions: Vec::new(),
             pending_composed_discharges: Vec::new(),
             composed_discharges: BTreeMap::new(),
             declaration_calls: BTreeMap::new(),
@@ -976,13 +977,16 @@ fn constructor_field_binder_shift_mutation_recovers_exact_refusal() {
         "ken_px7p_constructor_field_wrong_binder",
     )
     .expect_err("the aggregate-looking sibling is not the selected field consumer");
-    assert!(matches!(
-        err,
-        CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "Match",
-            reason,
-        }) if reason == "scrutinee is not a constructor value"
-    ));
+    assert!(
+        matches!(
+            err,
+            CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "ComputationalMatch",
+                ref reason,
+            }) if reason == "tree-producing match scrutinee is not Bool or a constructor"
+        ),
+        "{err:?}"
+    );
 }
 #[test]
 fn constructor_field_bridge_removal_recovers_exact_refusal() {
@@ -1008,13 +1012,16 @@ fn constructor_field_bridge_removal_recovers_exact_refusal() {
         "ken_px7p_constructor_field_bridge_removed",
     )
     .expect_err("eager field lowering must recover the pre-PX7-P boundary");
-    assert!(matches!(
-        err,
-        CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "Match",
-            reason,
-        }) if reason == "scrutinee is not a constructor value"
-    ));
+    assert!(
+        matches!(
+            err,
+            CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "ComputationalMatch",
+                ref reason,
+            }) if reason == "tree-producing match scrutinee is not Bool or a constructor"
+        ),
+        "{err:?}"
+    );
 }
 #[test]
 fn constructor_field_outer_arity_rejects_before_field_lowering() {
@@ -1974,6 +1981,7 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             raw_worker_calls: BTreeMap::new(),
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
+            checked_ih_transport_emissions: Vec::new(),
             pending_composed_discharges: Vec::new(),
             composed_discharges: BTreeMap::new(),
             declaration_calls: BTreeMap::new(),
@@ -2788,6 +2796,7 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
                 },
                 match_origin,
                 &[],
+                None,
             )?;
             let LoweringOperand::Carried(observed) = lowered else {
                 return Err(unsupported(

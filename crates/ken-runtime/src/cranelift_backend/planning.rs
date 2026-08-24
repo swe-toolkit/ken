@@ -70,9 +70,10 @@ pub(super) use static_transition::{
 // `RT-DECL-CLOSURE-PORT` `D7` — the aggregate ownership lane, read by the
 // carrier producers. Namespace re-export only.
 pub(super) use static_transition::{
-    AggregateOccurrenceId, FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape,
-    PlannedAggregateOwnership, PlannedReferentLifetime,
-    SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot,
+    AggregateOccurrenceId, CheckedIhEnvironmentTransport, CheckedIhTransportInputDestination,
+    FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape, PlannedAggregateOwnership,
+    PlannedReferentLifetime, SynthesizedAggregateNode, SynthesizedAggregatePath,
+    SynthesizedAggregateRoot,
 };
 // `RT-DECL-CLOSURE-PORT` `D7` — the host-effect semantic-seat authority, read
 // by the effect emitter. Namespace re-export only.

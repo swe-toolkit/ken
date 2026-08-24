@@ -38,11 +38,12 @@ use super::aggregates::{
 };
 #[allow(unused_imports)]
 use super::aggregates::{
-    build_aggregate_ownership_plan, lifetime_referent_affinity, validate_aggregate_ownership_plan,
-    AggregateOccurrenceId, AggregateOccurrenceProducer, PlannedAggregateAllocation,
-    PlannedAggregateOwnership, PlannedAggregateShape, SynthesizedAggregateNode,
-    SynthesizedAggregatePath, SynthesizedAggregateRole, SynthesizedAggregateRoot,
-    SynthesizedDynamicSet,
+    build_aggregate_ownership_plan, build_checked_ih_environment_transports,
+    lifetime_referent_affinity, validate_aggregate_ownership_plan,
+    validate_checked_ih_environment_transports, AggregateOccurrenceId, AggregateOccurrenceProducer,
+    PlannedAggregateAllocation, PlannedAggregateOwnership, PlannedAggregateShape,
+    SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,
+    SynthesizedAggregateRoot, SynthesizedDynamicSet,
 };
 #[cfg(test)]
 use super::closure::apply_static_worker_member_mutation;
@@ -268,6 +269,7 @@ impl<'src> Planner<'src> {
                 join_results: Vec::new(),
                 case_emissions: Vec::new(),
                 aggregate_ownership: Vec::new(),
+                checked_ih_environment_transports: Vec::new(),
                 host_effect_seats: Vec::new(),
                 occurrence_authorities: Vec::new(),
                 continuation_specializations: Vec::new(),
@@ -1207,6 +1209,12 @@ impl<'src> Planner<'src> {
         // call-shaped child look arena-owned.
         self.plan.aggregate_ownership = build_aggregate_ownership_plan(&self.plan)?;
         validate_aggregate_ownership_plan(&self.plan, &self.plan.aggregate_ownership)?;
+        self.plan.checked_ih_environment_transports =
+            build_checked_ih_environment_transports(&self.plan)?;
+        validate_checked_ih_environment_transports(
+            &self.plan,
+            &self.plan.checked_ih_environment_transports,
+        )?;
         // ⛔ After `join_results` for the same reason the ownership plan is: a
         // seat's consumer phase is a fact about the child's planned result
         // representation, which does not exist until that line.

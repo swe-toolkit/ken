@@ -21,11 +21,12 @@ use super::continuations::{ContinuationOrdinaryEnvelopeRole, ContinuationWorkerC
 
 use super::{
     inline_synthesized_seat_emission_owners, occurrence_authority,
-    planner_capacity_error, planner_error, BoundaryReferentOwner,
-    ContinuationEmissionOwner, CraneliftBackendError, FieldIdentity, JoinResultRepresentation,
-    PlannedOccurrenceChildAuthority, PlannedReferentLifetime, PredeclaredFunctionId,
-    StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
-    SynthesizedFixedConstructorRole,
+    planner_capacity_error, planner_error, BoundaryReferentOwner, ContinuationCallIdentity,
+    ContinuationEmissionOwner, ContinuationEnvironmentClaim, ContinuationFrameIdentity,
+    ContinuationSourceCoordinate, ContinuationSpecializationId, CraneliftBackendError,
+    FieldIdentity, JoinResultRepresentation, PlannedOccurrenceChildAuthority,
+    PlannedReferentLifetime, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
+    SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
 use super::closure::{derive_case_producer_fact, CaseProducerSet};
 use crate::boundary_value::{BoundaryClass, BoundaryTag};
@@ -128,6 +129,98 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRole {
     /// fields. The two populations share the owner/escape DERIVATION and
     /// nothing else.
     CheckedIhCapturedEnvironment,
+}
+
+/// One authorized transport of a force-materialized checked-IH environment.
+///
+/// This is not another aggregate emission record. `source_owner + seat` names
+/// the sole materialization; `destination_owner + destination_construct_origin
+/// + recursive_position` names the exact crossing where the continuation call
+/// result substitutes for the raw closure. Both endpoints are planner facts,
+/// so lowering neither borrows by owner nor searches by seat.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct CheckedIhEnvironmentTransport {
+    source_owner: ContinuationEmissionOwner,
+    source_specialization: ContinuationSpecializationId,
+    source_call_identity: ContinuationCallIdentity,
+    seat: StaticOriginId,
+    source_result_origin: StaticOriginId,
+    source_worker_body_origin: StaticOriginId,
+    source_continuation_origin: StaticOriginId,
+    source_recursive_position: u32,
+    destination_owner: ContinuationEmissionOwner,
+    destination_body_origin: StaticOriginId,
+    destination_construct_origin: StaticOriginId,
+    recursive_position: u32,
+    source_record: AggregateOccurrenceId,
+    source_lifetime: PlannedReferentLifetime,
+    destination_lifetime: PlannedReferentLifetime,
+    continuation_input_morphism: Vec<(
+        u32,
+        ContinuationSourceCoordinate,
+        CheckedIhTransportInputDestination,
+    )>,
+}
+
+/// Which destination environment one transported continuation input indexes.
+/// The domain tag is part of the morphism; the same integer in these two
+/// frames is not the same coordinate.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum CheckedIhTransportInputDestination {
+    LexicalEnvironment(u32),
+    EntryFrame(u32),
+}
+
+impl CheckedIhEnvironmentTransport {
+    pub(in crate::cranelift_backend) fn source_owner(&self) -> ContinuationEmissionOwner {
+        self.source_owner
+    }
+
+    pub(in crate::cranelift_backend) fn source_specialization(
+        &self,
+    ) -> ContinuationSpecializationId {
+        self.source_specialization
+    }
+
+    pub(in crate::cranelift_backend) fn source_call_identity(&self) -> &ContinuationCallIdentity {
+        &self.source_call_identity
+    }
+
+    pub(in crate::cranelift_backend) fn seat(&self) -> StaticOriginId {
+        self.seat
+    }
+
+    pub(in crate::cranelift_backend) fn source_record(&self) -> AggregateOccurrenceId {
+        self.source_record
+    }
+
+    pub(in crate::cranelift_backend) fn destination_owner(&self) -> ContinuationEmissionOwner {
+        self.destination_owner
+    }
+
+    pub(in crate::cranelift_backend) fn destination_construct_origin(&self) -> StaticOriginId {
+        self.destination_construct_origin
+    }
+
+    pub(in crate::cranelift_backend) fn recursive_position(&self) -> u32 {
+        self.recursive_position
+    }
+
+    pub(in crate::cranelift_backend) fn continuation_input_index(
+        &self,
+        ordinal: u32,
+        coordinate: ContinuationSourceCoordinate,
+    ) -> Option<CheckedIhTransportInputDestination> {
+        self.continuation_input_morphism.iter().find_map(
+            |(held_ordinal, held_coordinate, destination)| {
+                (*held_ordinal == ordinal && *held_coordinate == coordinate).then_some(*destination)
+            },
+        )
+    }
+
+    pub(in crate::cranelift_backend) fn continuation_input_count(&self) -> usize {
+        self.continuation_input_morphism.len()
+    }
 }
 /// Which aggregate shape one producer occurrence builds.
 ///
@@ -1248,6 +1341,155 @@ impl StaticTransitionPlan<'_> {
         })
     }
 
+    /// Resolve one exact two-endpoint checked-IH environment transport.
+    ///
+    /// The destination tuple is the crossing lowering holds; the source
+    /// specialization is the opaque continuation-call identity's target. No
+    /// seat-only search is expressible through this accessor. `None` means the
+    /// claimed continuation result is ordinary and the existing path remains.
+    pub(in crate::cranelift_backend) fn checked_ih_environment_transport(
+        &self,
+        destination_owner: ContinuationEmissionOwner,
+        destination_construct_origin: StaticOriginId,
+        recursive_position: u32,
+        source_specialization: ContinuationSpecializationId,
+    ) -> Result<Option<&CheckedIhEnvironmentTransport>, CraneliftBackendError> {
+        let source_owner = ContinuationEmissionOwner::Specialization(source_specialization);
+        let mut matched = self
+            .checked_ih_environment_transports
+            .iter()
+            .filter(|transport| {
+                transport.source_owner == source_owner
+                    && transport.source_specialization == source_specialization
+                    && transport.source_call_identity.target() == source_specialization
+                    && transport.destination_owner == destination_owner
+                    && transport.destination_construct_origin == destination_construct_origin
+                    && transport.recursive_position == recursive_position
+            });
+        let Some(transport) = matched.next() else {
+            return Ok(None);
+        };
+        if matched.next().is_some() {
+            return Err(planner_error(
+                "two checked-IH environment transports name one source and destination edge",
+            ));
+        }
+        let source_record = self
+            .aggregate_ownership
+            .get(transport.source_record.0 as usize)
+            .ok_or_else(|| {
+                planner_error("a checked-IH transport names an unknown source record")
+            })?;
+        if !matches!(
+            source_record.producer,
+            AggregateOccurrenceProducer::SynthesizedUse {
+                owner,
+                seat,
+                role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                ..
+            } if owner == transport.source_owner && seat == transport.seat
+        ) || source_record.meet != transport.source_lifetime
+            || transport.source_lifetime > transport.destination_lifetime
+        {
+            return Err(planner_error(
+                "a checked-IH transport no longer agrees with its force record or lifetime dominance proof",
+            ));
+        }
+        if !checked_ih_escape_subtree_contains(
+            self,
+            transport.destination_body_origin,
+            transport.source_result_origin,
+        )? || !checked_ih_escape_subtree_contains(
+            self,
+            transport.destination_body_origin,
+            transport.destination_construct_origin,
+        )? {
+            return Err(planner_error(
+                "a checked-IH transport destination no longer contains both the source result and crossing constructor",
+            ));
+        }
+        Ok(Some(transport))
+    }
+
+    pub(in crate::cranelift_backend) fn checked_ih_environment_transport_source_identities(
+        &self,
+    ) -> BTreeSet<ContinuationCallIdentity> {
+        self.checked_ih_environment_transports
+            .iter()
+            .map(|transport| transport.source_call_identity.clone())
+            .collect()
+    }
+
+    pub(in crate::cranelift_backend) fn checked_ih_environment_transport_source(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Option<&CheckedIhEnvironmentTransport> {
+        self.checked_ih_environment_transports
+            .iter()
+            .find(|transport| &transport.source_call_identity == identity)
+    }
+
+    pub(in crate::cranelift_backend) fn checked_ih_environment_transport_for_invocation(
+        &self,
+        destination_owner: ContinuationEmissionOwner,
+        worker_body_origin: Option<StaticOriginId>,
+        continuation_origin: StaticOriginId,
+        recursive_position: u32,
+    ) -> Result<Option<&CheckedIhEnvironmentTransport>, CraneliftBackendError> {
+        let mut matched = self
+            .checked_ih_environment_transports
+            .iter()
+            .filter(|transport| {
+                transport.destination_owner == destination_owner
+                    && worker_body_origin
+                        .is_none_or(|body| transport.source_worker_body_origin == body)
+                    && transport.source_continuation_origin == continuation_origin
+                    && transport.source_recursive_position == recursive_position
+            });
+        let Some(transport) = matched.next() else {
+            return Ok(None);
+        };
+        if matched.next().is_some() {
+            return Err(planner_error(
+                "one checked-IH invocation resolves more than one authorized environment transport",
+            ));
+        }
+        Ok(Some(transport))
+    }
+
+    pub(in crate::cranelift_backend) fn checked_ih_environment_transport_at(
+        &self,
+        destination_owner: ContinuationEmissionOwner,
+        destination_construct_origin: StaticOriginId,
+    ) -> Result<Option<&CheckedIhEnvironmentTransport>, CraneliftBackendError> {
+        let mut matched = self
+            .checked_ih_environment_transports
+            .iter()
+            .filter(|transport| {
+                transport.destination_owner == destination_owner
+                    && transport.destination_construct_origin == destination_construct_origin
+            });
+        let Some(transport) = matched.next() else {
+            return Ok(None);
+        };
+        if matched.next().is_some() {
+            return Err(planner_error(
+                "one terminal checked-IH crossing has more than one authorized transport; one result cannot substitute two environments",
+            ));
+        }
+        Ok(Some(transport))
+    }
+
+    pub(in crate::cranelift_backend) fn checked_ih_environment_transports_owned_by(
+        &self,
+        destination_owner: ContinuationEmissionOwner,
+    ) -> Vec<&CheckedIhEnvironmentTransport> {
+        self.checked_ih_environment_transports
+            .iter()
+            .filter(|transport| transport.destination_owner == destination_owner)
+            .collect()
+    }
+
     /// The capture occurrence the ruled run places at `ordinal`, for one
     /// checked-IH captured-environment record.
     ///
@@ -1304,6 +1546,53 @@ impl StaticTransitionPlan<'_> {
                  to reconcile the emitter's operand against",
             )
         })
+    }
+
+    /// Compare the call assembler's independently projected WorkerCapture
+    /// suffix with the force-materialized environment record in their common
+    /// `(ordinal, source occurrence)` frame.
+    ///
+    /// `Ok(false)` is an ordinary continuation outside this population. Once a
+    /// record exists, any short, long, moved or reordered suffix refuses.
+    pub(in crate::cranelift_backend) fn validate_checked_ih_capture_suffix(
+        &self,
+        owner: ContinuationEmissionOwner,
+        seat: StaticOriginId,
+        suffix: &[(u32, StaticOriginId)],
+    ) -> Result<bool, CraneliftBackendError> {
+        let Some(record) = self.aggregate_ownership.iter().find(|record| {
+            matches!(
+                record.producer,
+                AggregateOccurrenceProducer::SynthesizedUse {
+                    owner: record_owner,
+                    seat: record_seat,
+                    role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                    ..
+                } if record_owner == owner && record_seat == seat
+            )
+        }) else {
+            return Ok(false);
+        };
+        let planned = record
+            .children
+            .iter()
+            .map(|child| {
+                child
+                    .origin
+                    .map(|origin| (child.position, origin))
+                    .ok_or_else(|| {
+                        planner_error(
+                            "a checked-IH environment field has no source occurrence in its positional run",
+                        )
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        if planned != suffix {
+            return Err(planner_error(format!(
+                "the checked-IH environment fields are {planned:?}, but the continuation call's independently assembled WorkerCapture suffix is {suffix:?}"
+            )));
+        }
+        Ok(true)
     }
 }
 
@@ -1810,6 +2099,298 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
     }
     Ok(records)
 }
+
+/// Whether an occurrence is reachable from one emitted body without entering
+/// a nested closure or an ordinary Match arm the closed producer analysis
+/// eliminated.
+fn checked_ih_escape_subtree_contains(
+    plan: &StaticTransitionPlan<'_>,
+    root: StaticOriginId,
+    needle: StaticOriginId,
+) -> Result<bool, CraneliftBackendError> {
+    let mut seen = BTreeSet::new();
+    let mut pending = vec![root];
+    while let Some(origin) = pending.pop() {
+        if origin == needle {
+            return Ok(true);
+        }
+        if !seen.insert(origin) {
+            continue;
+        }
+        match plan.planned_occurrence_expr(origin)? {
+            RuntimeExpr::Closure { .. } | RuntimeExpr::LexicalClosure { .. } => {}
+            RuntimeExpr::Match { cases, .. } => {
+                pending.push(plan.semantic.child_origin(origin, 0)?);
+                for ordinal in 0..cases.len() {
+                    match plan.case_emission_status(origin, ordinal)? {
+                        Some(super::CaseEmissionStatus::Reachable) => pending
+                            .push(plan.semantic.child_origin(origin, 1 + ordinal)?),
+                        Some(super::CaseEmissionStatus::Eliminated) => {}
+                        None => {
+                            return Err(planner_error(
+                                "an ordinary Match in the checked-IH escape certificate has no case-emission verdict",
+                            ));
+                        }
+                    }
+                }
+            }
+            RuntimeExpr::ComputationalMatch { cases, .. } => {
+                let scrutinee = plan.semantic.child_origin(origin, 0)?;
+                pending.push(scrutinee);
+                let mut match_scrutinees = BTreeMap::new();
+                let fact = derive_case_producer_fact(
+                    plan,
+                    scrutinee,
+                    &[],
+                    &mut match_scrutinees,
+                )?;
+                for ordinal in 0..cases.len() {
+                    let reachable = match &fact.producers {
+                        CaseProducerSet::Open => true,
+                        CaseProducerSet::Closed(producers) => producers.contains(
+                            &plan.case_constructor_identity(origin, ordinal)?,
+                        ),
+                    };
+                    if reachable {
+                        pending.push(plan.semantic.child_origin(origin, 1 + ordinal)?);
+                    }
+                }
+            }
+            _ => {
+                if let Ok(children) = plan.semantic.child_origins(origin) {
+                    pending.extend(children.iter().copied());
+                }
+            }
+        }
+    }
+    Ok(false)
+}
+
+/// Derive the exact checked-IH environment transports from the closed
+/// continuation-unit occurrence graph.
+///
+/// A source unit supplies the sole force materialization at
+/// `Specialization(source.id())`. A destination exists only when another
+/// specialization's worker body contains both that source unit's result and its
+/// producer constructor: the result can reach the constructor's recursive
+/// position in that emitted body. The two containment checks are the existing
+/// closed producer/escape certificate; neither lowering phase nor a reached
+/// value participates.
+pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_ih_environment_transports(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<CheckedIhEnvironmentTransport>, CraneliftBackendError> {
+    let units = plan.continuation_units()?;
+    let mut transports = Vec::new();
+    for source in &units {
+        let Some((seat, _)) = checked_ih_coordinate_run(source)? else {
+            continue;
+        };
+        let source_owner = ContinuationEmissionOwner::Specialization(source.id());
+        let source_record = plan
+            .aggregate_ownership
+            .iter()
+            .find(|record| {
+                matches!(
+                    record.producer,
+                    AggregateOccurrenceProducer::SynthesizedUse {
+                        owner,
+                        seat: record_seat,
+                        role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                        ..
+                    } if owner == source_owner && record_seat == seat
+                )
+            })
+            .ok_or_else(|| {
+                planner_error("a checked-IH transport source has no force-owner environment record")
+            })?;
+        let parent = source.producer_construct_origin();
+        let source_call_identity = plan
+            .continuation_call_binding_for(
+                parent,
+                source.continuation_origin(),
+                source.producer_alternative(),
+                source.recursive_position(),
+            )?
+            .ok_or_else(|| {
+                planner_error(
+                    "a checked-IH transport source has no causal call identity for its own producer edge",
+                )
+            })?;
+        if source_call_identity.target() != source.id() {
+            return Err(planner_error(
+                "a checked-IH transport's causal identity targets a different specialization than its force materialization",
+            ));
+        }
+        let parent_record = plan
+            .aggregate_ownership
+            .iter()
+            .find(|record| {
+                record.producer == AggregateOccurrenceProducer::Source(parent)
+                    && record.shape == PlannedAggregateShape::Constructor
+            })
+            .ok_or_else(|| {
+                planner_error(
+                    "a checked-IH transport source has no producer-constructor ownership record",
+                )
+            })?;
+        let recursive_position = source.recursive_position();
+        let parent_child = parent_record
+            .children
+            .iter()
+            .find(|child| child.position == recursive_position)
+            .ok_or_else(|| {
+                planner_error(
+                    "a checked-IH transport's recursive position is absent from its producer constructor",
+                )
+            })?;
+        if parent_child.origin != Some(seat) {
+            return Err(planner_error(
+                "a checked-IH transport's stable closure seat is not the source constructor child at its recursive position",
+            ));
+        }
+        if source_record.meet > parent_record.meet {
+            return Err(planner_error(
+                "a force-materialized checked-IH environment is shorter-lived than the producer crossing it must replace",
+            ));
+        }
+
+        for destination in &units {
+            if destination.id() == source.id() {
+                continue;
+            }
+            let body = destination.worker_body_origin();
+            if !checked_ih_escape_subtree_contains(plan, body, parent)?
+                || !checked_ih_escape_subtree_contains(
+                    plan,
+                    body,
+                    source.producer_result_origin(),
+                )?
+            {
+                continue;
+            }
+            let destination_owner = ContinuationEmissionOwner::Specialization(destination.id());
+            if plan.aggregate_ownership.iter().any(|record| {
+                matches!(
+                    record.producer,
+                    AggregateOccurrenceProducer::SynthesizedUse {
+                        owner,
+                        seat: record_seat,
+                        role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                        ..
+                    } if owner == destination_owner && record_seat == seat
+                )
+            }) {
+                return Err(planner_error(
+                    "a checked-IH transport destination also owns an environment record for the transported seat; transport must not become a second emission",
+                ));
+            }
+            let mut continuation_input_morphism = Vec::new();
+            let mut seen_indices = BTreeSet::new();
+            for (position, input) in source.continuation_inputs()?.into_iter().enumerate() {
+                if u32::try_from(position).ok() != Some(input.ordinal) {
+                    return Err(planner_error(
+                        "a checked-IH transport source's continuation inputs are not in ordinal order",
+                    ));
+                }
+                let destination = match input.availability.direct_emission {
+                    Some(ContinuationEnvironmentClaim::CurrentLexical {
+                        emission_owner,
+                        producer_result_origin,
+                        emission_origin,
+                        lexical_environment_origin,
+                        nearest_alias_index,
+                    }) => {
+                        if ContinuationEmissionOwner::Predeclared(emission_owner)
+                            != source.emission_owner()
+                            || producer_result_origin != source.producer_result_origin()
+                            || emission_origin != parent
+                            || lexical_environment_origin != body
+                        {
+                            return Err(planner_error(
+                                "a checked-IH transport input's current-lexical claim names different source or destination endpoints than the transport edge",
+                            ));
+                        }
+                        CheckedIhTransportInputDestination::LexicalEnvironment(nearest_alias_index)
+                    }
+                    Some(ContinuationEnvironmentClaim::EntryFrame {
+                        frame:
+                            ContinuationFrameIdentity::GeneratedContext {
+                                specialization,
+                                worker_body_origin,
+                                ..
+                            },
+                        declared_slot,
+                    }) => {
+                        if specialization != destination.id() || worker_body_origin != body {
+                            return Err(planner_error(
+                                "a checked-IH transport input's entry-frame claim names a different generated destination than the transport edge",
+                            ));
+                        }
+                        CheckedIhTransportInputDestination::EntryFrame(declared_slot)
+                    }
+                    Some(ContinuationEnvironmentClaim::EntryFrame {
+                        frame: ContinuationFrameIdentity::Predeclared(_),
+                        ..
+                    })
+                    | None => {
+                        return Err(planner_error(format!(
+                            "checked-IH transport source {:?} to destination {:?} input {} at {:?} has no morphism into destination body {body:?}; availability is {:?}",
+                            source.id(),
+                            destination.id(),
+                            input.ordinal,
+                            input.coordinate,
+                            input.availability,
+                        )));
+                    }
+                };
+                if !seen_indices.insert(destination) {
+                    return Err(planner_error(
+                        "two checked-IH transport inputs map to one destination environment coordinate",
+                    ));
+                }
+                continuation_input_morphism.push((input.ordinal, input.coordinate, destination));
+            }
+            transports.push(CheckedIhEnvironmentTransport {
+                source_owner,
+                source_specialization: source.id(),
+                source_call_identity: source_call_identity.clone(),
+                seat,
+                source_result_origin: source.producer_result_origin(),
+                source_worker_body_origin: source.worker_body_origin(),
+                source_continuation_origin: source.continuation_origin(),
+                source_recursive_position: source.recursive_position(),
+                destination_owner,
+                destination_body_origin: body,
+                destination_construct_origin: parent,
+                recursive_position,
+                source_record: source_record.id,
+                source_lifetime: source_record.meet,
+                destination_lifetime: parent_record.meet,
+                continuation_input_morphism,
+            });
+        }
+    }
+    transports.sort();
+    if transports.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(planner_error(
+            "the checked-IH transport derivation issued one two-endpoint edge twice",
+        ));
+    }
+    Ok(transports)
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn validate_checked_ih_environment_transports(
+    plan: &StaticTransitionPlan<'_>,
+    transports: &[CheckedIhEnvironmentTransport],
+) -> Result<(), CraneliftBackendError> {
+    if transports != build_checked_ih_environment_transports(plan)? {
+        return Err(planner_error(
+            "checked-IH environment transports are not the exact closed escape derivation",
+        ));
+    }
+    Ok(())
+}
+
 /// Every record names a DISTINCT producer.
 ///
 /// This is the non-aliasing law of the occurrence domain, and it is production
@@ -4365,6 +4946,157 @@ mod checked_ih_captured_env_schema {
             rendered.contains("has no source occurrence"),
             "the refusal must be the checked-IH capture-source one, not an unrelated \
              planner failure that happens to also fail: got {rendered}"
+        );
+    }
+
+    /// Promise class: durable invariant. A checked-IH transport names both
+    /// endpoints and references the sole force-owner record; the destination
+    /// remains record-free.
+    #[test]
+    fn transport_edges_reference_one_force_record_and_issue_no_destination_record() {
+        let plan = plan_of(super::super::tests::contspec_nested_fixture());
+        let transports = &plan.checked_ih_environment_transports;
+        assert!(
+            !transports.is_empty(),
+            "the nested fixture must contain an escaping checked-IH transport"
+        );
+        for transport in transports {
+            let source = plan
+                .aggregate_ownership
+                .get(transport.source_record.0 as usize)
+                .expect("the transport source record exists");
+            assert!(matches!(
+                source.producer,
+                AggregateOccurrenceProducer::SynthesizedUse {
+                    owner,
+                    seat,
+                    role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                    ..
+                } if owner == transport.source_owner && seat == transport.seat
+            ));
+            assert!(
+                source.meet <= transport.destination_lifetime,
+                "the materialized environment must outlive its destination"
+            );
+            assert!(
+                plan.aggregate_ownership.iter().all(|record| !matches!(
+                    record.producer,
+                    AggregateOccurrenceProducer::SynthesizedUse {
+                        owner,
+                        seat,
+                        role: SynthesizedAggregateRole::CheckedIhCapturedEnvironment,
+                        ..
+                    } if owner == transport.destination_owner && seat == transport.seat
+                )),
+                "the transport edge, not a second destination record, authorizes the crossing"
+            );
+        }
+    }
+
+    /// Promise class: durable invariant. Transport selection uses the complete
+    /// source/destination tuple; changing the source specialization cannot fall
+    /// back to the same closure seat.
+    #[test]
+    fn transport_lookup_is_exact_and_has_no_seat_fallback() {
+        let plan = plan_of(super::super::tests::contspec_nested_fixture());
+        let transport = plan
+            .checked_ih_environment_transports
+            .first()
+            .expect("the nested fixture has a transport");
+        assert_eq!(
+            plan.checked_ih_environment_transport(
+                transport.destination_owner,
+                transport.destination_construct_origin,
+                transport.recursive_position,
+                transport.source_specialization,
+            )
+            .expect("the exact transport lookup is valid"),
+            Some(transport),
+        );
+        assert_eq!(
+            plan.checked_ih_environment_transport(
+                transport.destination_owner,
+                transport.destination_construct_origin,
+                transport.recursive_position,
+                match transport.destination_owner {
+                    ContinuationEmissionOwner::Specialization(id) => id,
+                    ContinuationEmissionOwner::Predeclared(_)
+                    | ContinuationEmissionOwner::Fusion(_) => {
+                        unreachable!("transport destinations are specializations")
+                    }
+                },
+            )
+            .expect("the wrong-source lookup is still a valid question"),
+            None,
+            "the destination and seat cannot authorize a transport from another source"
+        );
+    }
+
+    /// Promise class: durable invariant. The environment record and call
+    /// assembler state their ordered WorkerCapture run independently and meet
+    /// only in the `(ordinal, source occurrence)` frame.
+    #[test]
+    fn transport_field_order_and_input_morphism_are_fail_closed() {
+        let field_plan = plan_of(
+            super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(),
+        );
+        let record = checked_ih_records(&field_plan)
+            .into_iter()
+            .find(|record| record.children.len() > 1)
+            .expect("the field-order fixture has a multi-field checked-IH record");
+        let (field_owner, field_seat) = record_key(record);
+        let exact = record
+            .children
+            .iter()
+            .map(|child| {
+                (
+                    child.position,
+                    child.origin.expect("a checked-IH field names its source"),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            field_plan.validate_checked_ih_capture_suffix(field_owner, field_seat, &exact)
+            .expect("the exact suffix validates")
+        );
+        let mut reordered = exact.clone();
+        reordered.reverse();
+        assert!(
+            field_plan.validate_checked_ih_capture_suffix(field_owner, field_seat, &reordered)
+            .is_err(),
+            "reordering the independently assembled call suffix must refuse"
+        );
+
+        let plan = plan_of(super::super::tests::contspec_nested_fixture());
+        let transport = plan
+            .checked_ih_environment_transports
+            .iter()
+            .find(|transport| transport.continuation_input_count() > 0)
+            .expect("the nested fixture has a transport with continuation inputs");
+        let source = plan
+            .continuation_units()
+            .expect("the plan exposes its units")
+            .into_iter()
+            .find(|unit| unit.id() == transport.source_specialization)
+            .expect("the transport source unit exists");
+        let inputs = source
+            .continuation_inputs()
+            .expect("the source inputs project");
+        assert_eq!(inputs.len(), transport.continuation_input_count());
+        for input in &inputs {
+            assert!(
+                transport
+                    .continuation_input_index(input.ordinal, input.coordinate)
+                    .is_some(),
+                "every declared source input must have one destination coordinate"
+            );
+        }
+        let first = &inputs[0];
+        assert!(
+            transport
+                .continuation_input_index(first.ordinal.wrapping_add(1), first.coordinate)
+                .is_none(),
+            "a moved ordinal must not resolve by coordinate alone"
         );
     }
 

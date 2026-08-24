@@ -38,10 +38,10 @@ use super::aggregates::{
 #[allow(unused_imports)]
 use super::aggregates::{
     build_aggregate_ownership_plan, lifetime_referent_affinity, validate_aggregate_ownership_plan,
-    AggregateOccurrenceId, AggregateOccurrenceProducer, PlannedAggregateAllocation,
-    PlannedAggregateOwnership, PlannedAggregateShape, SynthesizedAggregateNode,
-    SynthesizedAggregatePath, SynthesizedAggregateRole, SynthesizedAggregateRoot,
-    SynthesizedDynamicSet,
+    validate_checked_ih_environment_transports, AggregateOccurrenceId, AggregateOccurrenceProducer,
+    PlannedAggregateAllocation, PlannedAggregateOwnership, PlannedAggregateShape,
+    SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,
+    SynthesizedAggregateRoot, SynthesizedDynamicSet,
 };
 use super::continuations::validate_continuation_specialization_plan;
 #[allow(unused_imports)]
@@ -2069,14 +2069,20 @@ impl<'src> StaticTransitionPlan<'src> {
         self.validate_source_occurrence_table()?;
         validate_case_emission_plan(self, &self.case_emissions)?;
         validate_occurrence_authority_plan(self, &self.occurrence_authorities)?;
+        // Transport derivation consumes continuation identities, so the
+        // continuation plane must close before any transport validator may
+        // interpret it. This preserves the originating plane's exact refusal
+        // under continuation mutations instead of masking it with a derivative
+        // transport error.
+        validate_continuation_specialization_plan(self)?;
         validate_aggregate_ownership_plan(self, &self.aggregate_ownership)?;
+        validate_checked_ih_environment_transports(self, &self.checked_ih_environment_transports)?;
         validate_host_effect_seat_plan(self, &self.host_effect_seats)?;
         validate_substrate_preallocation_closure(
             self,
             &self.case_emissions,
             &self.occurrence_authorities,
         )?;
-        validate_continuation_specialization_plan(self)?;
         self.abi
             .validate_continuation_specializations(&self.continuation_specializations)?;
         self.validate_join_result_plan()?;
