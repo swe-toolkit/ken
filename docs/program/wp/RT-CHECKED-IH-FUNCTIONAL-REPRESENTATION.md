@@ -34,9 +34,10 @@ closure exchange (constraining only the durable lane). The checked continuation
   program at `core.rs:11699` — distinct from the 12 well-behaved
   `template=4, arity=1` markers at `source.rs:655`.
 - Escape measurement (runtime-implementer `evt_79jd1nxamqd95`): the realized
-  IH value's `parent_chain` immediate parent is `Expression(Construct)` on BOTH
-  checked-family programs — it is stored straight into a constructor field, so
-  it escapes; the non-escaping use-site-specialization remedy cannot apply.
+  IH value's `parent_chain` immediate parent is `Expression(Construct)` in the
+  content-distinct checked-family program — it is stored straight into a
+  constructor field, so it escapes; the non-escaping use-site-specialization
+  remedy cannot apply.
 - The refusal today: `core.rs:11699` lowers the marker body as an ordinary
   value-producing expression, so `Call(Var(0), args=[])` resolves `Var(0)` to
   the arity-1 StaticWorker and calls it with zero args; the seam passes (0==0)
@@ -67,9 +68,9 @@ closure exchange (constraining only the durable lane). The checked continuation
    at the nullary_force seam (`core.rs:11699`), so the arity-1 worker is never
    called with zero args.
 3. **Application at the escaped use sites.** Apply the representation across
-   the `Construct` boundary at the escaped uses, so the two checked-family
-   programs' checked-IH invocations lower and run correctly on the native
-   backend.
+   the `Construct` boundary at the escaped uses, so the content-distinct
+   checked-family program's checked-IH invocations lower and run correctly on
+   the native backend.
 4. **Likely language spillover** on the marker/planner emission
    (`compiler_driver.rs:1718-1743`) — assigned by this node's owner at
    framing per COORDINATION section 9a if the change reaches the elaborator.
@@ -100,10 +101,12 @@ states the authoritative list. In brief:
   representation, a relabeled/weakened arity gate, a `_`/fallback arm on the kind
   match, or an apply site bypassing the plan lookup, must be detectable and is a
   reject.
-- **AC-REENUM.** Rerun report-2's checked-family runner end-to-end. Both
-  checked-family programs green => the family is bounded; re-point both runner
-  tables from the advancing-refusal pins to green. Any FURTHER refusal => STOP
-  and report to Architect + Steward.
+- **AC-REENUM.** Rerun report-2's checked-family runner end-to-end. Every
+  content-distinct checked-family program green => the family is bounded; the
+  current source-content census has one member. The runner pins one row per
+  byte-distinct source so labels cannot inflate the population, and re-points
+  both runner tables from the advancing-refusal pins to green. Any FURTHER
+  refusal => STOP and report to Architect + Steward.
 - **AC-NO-REGRESSION.** Whole-suite green in CI (COORDINATION section 12).
   Local targeted `-p` only, never `--workspace`.
 - **Required reviewers.** Architect — design D0 confirmation AND soundness
@@ -117,8 +120,8 @@ Per the Architect's reach ruling (`evt_4sp2xftkmc1mz`), this representation
 is the WHOLE remaining PX8-closure critical path: every native checked-IO full
 program carries the checked continuation closure, so this D0 gates ALL FOUR
 native witnesses (ReadEof/ReadSome/Wrote AND SemanticErrorV1). This WP's OWN
-scope is the representation plus the two checked-family programs green
-(AC-REENUM). The consumers `RT-CARRIED-IH-DISPATCH-SITEOP` (M3) and
+scope is the representation plus the content-distinct checked-family program
+being green (AC-REENUM). The consumers `RT-CARRIED-IH-DISPATCH-SITEOP` (M3) and
 `RT-CLOSURE-BOUNDARY-RESIDUAL` (M4) stay gated on it; whether they collapse to
 re-measure/re-point work (as Track-0's rows did) or remain distinct builds is
 a post-landing assessment for the Architect, not prejudged here.
@@ -137,6 +140,6 @@ merge window with the Steward. Workspace-green means green in CI, not a local
 
 ## No-regression
 
-The two checked-family programs advance from a documented advancing refusal
-to green; no previously-green row may red. `--locked` and conformance run in
-CI.
+The content-distinct checked-family program advances from a documented
+advancing refusal to green; no previously-green row may red. `--locked` and
+conformance run in CI.
