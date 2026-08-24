@@ -12,16 +12,14 @@
 //!   findings summary printed at the end.
 //! - Neither present -> hard error (never a silent skip).
 //!
-//! Ken has no working cross-file import (`import`/`module` parse but are
-//! never elaborated — confirmed empirically, `ken-elaborator/src/elab.rs`
-//! has no `ImportDecl`/`ModuleDecl` handling). Examples that reuse
-//! `catalog/packages/Data/Collections/Derived.ken.md` (per the frame's DRY rule) need its symbols
-//! concatenated ahead of their own source before `ken run`. `Derived.ken`
-//! carries proof terms using `cong` and imports the canonical `Core.Logic.Or`.
-//! Because this legacy runner deliberately flattens packages into one source
-//! unit rather than invoking the roots loader, it extracts both providers,
-//! removes that now-redundant module edge from the flattened Derived source,
-//! and orders Transport + Or before collections.
+//! `ken run` still elaborates one flat source unit rather than loading a
+//! catalog roots closure. Examples that reuse
+//! `catalog/packages/Data/Collections/Derived.ken.md` (per the frame's DRY
+//! rule) therefore need its provider closure concatenated ahead of their own
+//! source. This legacy runner extracts the canonical closure, removes every
+//! now-redundant import edge from the flattened provider sources with exact
+//! cardinality checks, and orders Transport, Or, OrdResult, Compare, then
+//! Derived.
 //!
 //! **This concatenation is NOT applied blanket to every example.**
 //! Empirically, unconditionally prepending declarations that a given
@@ -57,41 +55,54 @@ fn rosetta_dir() -> PathBuf {
 /// slug here without measuring it first (see the module doc).
 const NEEDS_COLLECTIONS: &[&str] = &["palindrome", "closures", "merge-sort", "tree-traversal"];
 
-fn collections_prelude() -> String {
-    let transport_md =
-        fs::read_to_string(workspace_root().join("catalog/packages/Core/Logic/Transport.ken.md"))
-            .expect("catalog/packages/Core/Logic/Transport.ken.md must be readable");
-    let transport = ken_elaborator::literate::extract_ken_md(&transport_md)
-        .expect("catalog/packages/Core/Logic/Transport.ken.md must extract")
-        .source;
-    let or_md = fs::read_to_string(workspace_root().join("catalog/packages/Core/Logic/Or.ken.md"))
-        .expect("catalog/packages/Core/Logic/Or.ken.md must be readable");
-    let or_source = ken_elaborator::literate::extract_ken_md(&or_md)
-        .expect("catalog/packages/Core/Logic/Or.ken.md must extract")
-        .source;
-    let collections_md = fs::read_to_string(
-        workspace_root().join("catalog/packages/Data/Collections/Derived.ken.md"),
-    )
-    .expect("catalog/packages/Data/Collections/Derived.ken.md must be readable");
-    let mut collections = ken_elaborator::literate::extract_ken_md(&collections_md)
-        .expect("catalog/packages/Data/Collections/Derived.ken.md must extract")
-        .source;
+fn catalog_source(path: &str) -> String {
+    let markdown = fs::read_to_string(workspace_root().join(path))
+        .unwrap_or_else(|error| panic!("{path} must be readable: {error}"));
+    ken_elaborator::literate::extract_ken_md(&markdown)
+        .unwrap_or_else(|error| panic!("{path} must extract: {error:?}"))
+        .source
+}
 
-    // `ken run` still consumes one flat source unit here; executing the module
-    // graph belongs to WP-4. Remove exactly the import edge whose provider
-    // source this compatibility runner has just flattened in.
-    const OR_IMPORT: &str = "import Core.Logic.Or (Or, Inl, Inr)";
-    let mut imports = collections.match_indices(OR_IMPORT);
+fn remove_flattened_import(source: &mut String, owner: &str, import: &str) {
+    let mut imports = source.match_indices(import);
     let (start, _) = imports
         .next()
-        .expect("Derived must carry its Core.Logic.Or import");
+        .unwrap_or_else(|| panic!("{owner} must carry import `{import}`"));
     assert!(
         imports.next().is_none(),
-        "Derived must carry exactly one Core.Logic.Or import"
+        "{owner} must carry exactly one import `{import}`"
     );
-    collections.replace_range(start..start + OR_IMPORT.len(), "");
+    source.replace_range(start..start + import.len(), "");
+}
 
-    format!("{transport}\n{or_source}\n{collections}")
+fn collections_prelude() -> String {
+    let transport = catalog_source("catalog/packages/Core/Logic/Transport.ken.md");
+    let or_source = catalog_source("catalog/packages/Core/Logic/Or.ken.md");
+    let ord_result = catalog_source("catalog/packages/Core/Logic/OrdResult.ken.md");
+    let mut compare = catalog_source("catalog/packages/Core/Logic/Compare.ken.md");
+    let mut collections = catalog_source("catalog/packages/Data/Collections/Derived.ken.md");
+
+    // `ken run` consumes one flat source unit here. Remove every import whose
+    // provider source this compatibility runner has flattened immediately
+    // above it, failing closed if a provider edge changes shape or cardinality.
+    for import in [
+        "import Core.Logic.Or (Or, Inl, Inr)",
+        "import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)",
+        "import Core.Logic.Transport (sym)",
+    ] {
+        remove_flattened_import(&mut compare, "Compare", import);
+    }
+    for import in [
+        "import Core.Logic.Compare (list_compare, list_eq)",
+        "import Core.Logic.Or (Or, Inl, Inr)",
+        "import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)",
+        "import Core.Logic.OrdResult\n  (ord_result_leq, ord_result_dispatch2, ord_result_elim, ord_result_elim2)",
+        "import Core.Logic.Transport (cong, sym, trans)",
+    ] {
+        remove_flattened_import(&mut collections, "Derived", import);
+    }
+
+    format!("{transport}\n{or_source}\n{ord_result}\n{compare}\n{collections}")
 }
 
 enum Oracle {

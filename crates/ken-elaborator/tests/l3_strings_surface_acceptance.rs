@@ -3,7 +3,7 @@
 //! Pins `conformance/surface/collections/seed-collections.md`'s "Derived
 //! string surface (slice 2)" section, DS-AC1–7
 //! (`spec/30-surface/37-strings-collections.md` §2.4/§2.5/§2.5.1/§4.1). Drives
-//! the actual package file via `include_str!` (never a hand-copied
+//! the actual package through the production roots loader (never a hand-copied
 //! reimplementation, matching `es4_classes_acceptance.rs`'s discipline):
 //! - DS-AC1/AC5 `list-combinator-floor-derived-over-real-elim` — the 7-combinator
 //!   floor + `compare_char` are real derived defs over the generic `Term::Elim`,
@@ -26,17 +26,12 @@ use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const COLLECTIONS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
-const TRANSPORT_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_or(&mut env);
-    env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
-        .expect("catalog/packages/Core/Logic/Transport.ken must elaborate");
-    env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
-        .expect("catalog/packages/Data/Collections/Derived.ken.md must elaborate");
+    catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env);
+    catalog_or::load_derived_fixture(&mut env);
     env
 }
 
@@ -350,7 +345,7 @@ fn string_compare_3way_lexicographic_triple() {
     let mut env = mk_env();
     let mut store = make_store(&env);
     let lt_id = env.globals["Lt"];
-    let eq_id = env.globals["Eq"];
+    let eq_id = env.globals["Core.Logic.OrdResult.Eq"];
     let gt_id = env.globals["Gt"];
 
     let v = eval_view(&mut env, &mut store, "t_cmp1", "OrdResult", "compare \"a\" \"ab\"");

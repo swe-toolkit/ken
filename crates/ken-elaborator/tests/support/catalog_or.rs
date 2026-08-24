@@ -14,6 +14,73 @@ pub fn load_core_logic_or(env: &mut ElabEnv) {
         .expect("Core.Logic.Or must load through strict catalog resolution");
 }
 
+pub fn load_core_logic_compare(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Compare")
+        .expect("the Core.Logic comparison provider closure must load");
+
+    // Older acceptance fixtures elaborate a catalog consumer as a flat source
+    // and then append declarations in the same synthetic scope. Preserve that
+    // harness shape while reusing the real providers' exact GlobalIds.
+    for (module, names) in [
+        (
+            "Core.Logic.OrdResult",
+            &[
+                "OrdResult",
+                "Lt",
+                "Gt",
+                "ord_eq",
+                "ord_lt",
+                "ord_gt",
+                "ord_result_leq",
+                "ord_result_dispatch2",
+                "ord_result_elim",
+                "ord_result_elim2",
+            ][..],
+        ),
+        (
+            "Core.Logic.Compare",
+            &[
+                "pair_compare",
+                "pair_compare_result_of",
+                "pair_compare_lt_cases",
+                "list_eq",
+                "list_compare",
+            ][..],
+        ),
+    ] {
+        for name in names {
+            let id = env.globals[&format!("{module}.{name}")];
+            env.globals.insert((*name).to_owned(), id);
+        }
+    }
+}
+
+pub fn load_derived_fixture(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
+        .expect("Data.Collections.Derived must load through its real provider closure");
+
+    // These legacy fixture suites append declarations in a synthetic flat
+    // scope. Bind each real module declaration's exact GlobalId under its old
+    // fixture spelling; no duplicate catalog declaration is elaborated.
+    let prefix = "Data.Collections.Derived.";
+    let aliases: Vec<_> = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            name.strip_prefix(prefix)
+                .map(|suffix| (suffix.to_owned(), *id))
+        })
+        .collect();
+    env.globals.extend(aliases);
+}
+
+pub fn expose_core_logic_transport(env: &mut ElabEnv) {
+    for name in ["cong", "sym", "trans"] {
+        let id = env.globals[&format!("Core.Logic.Transport.{name}")];
+        env.globals.insert(name.to_owned(), id);
+    }
+}
+
 /// Snapshot the provider-only module state before loading a consumer's legacy
 /// dependency environment. Restoring it immediately before the real consumer
 /// prevents an earlier dependency's selective import from laundering a missing

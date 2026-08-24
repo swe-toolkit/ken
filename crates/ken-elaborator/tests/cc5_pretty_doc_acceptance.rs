@@ -9,19 +9,14 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
 
-const TRANSPORT_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
-const COLLECTIONS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 const PRETTY_DOC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     let provider_state = catalog_or::core_logic_or_module_state(&env);
-    env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
-        .expect("Core.Logic.Transport must elaborate first");
-    env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
-        .expect("Data.Collections must elaborate second");
+    catalog_or::expose_core_logic_transport(&mut env);
+    catalog_or::load_derived_fixture(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     env
 }

@@ -10,9 +10,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, PrimReduction, Term};
 
-const COLLECTIONS: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
-const TRANSPORT: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
 
 fn make_store(env: &ElabEnv) -> EvalStore {
     let mut store = EvalStore::new();
@@ -224,12 +221,10 @@ fn ac2_trusted_base_delta_is_exactly_the_named_pair_and_propositions() {
 #[test]
 fn ac1_ac3_structural_fold_terminates_runs_and_adds_no_axiom() {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(TRANSPORT)
-        .expect("Transport package");
-    env.elaborate_ken_md_file(COLLECTIONS)
-        .expect("Collections package with derived Bytes fold");
+    catalog_or::expose_core_logic_transport(&mut env);
+    catalog_or::load_derived_fixture(&mut env);
     let trust_after_package: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         trust_after_package, trust_before,
@@ -319,7 +314,7 @@ fn ac4_both_runtime_roundtrip_directions_are_real_and_total() {
 #[test]
 fn ac4_roundtrip_propositions_are_usable_but_not_refl_reductions() {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
 
     env.elaborate_decl(

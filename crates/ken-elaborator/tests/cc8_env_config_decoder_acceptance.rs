@@ -10,9 +10,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
 
-const TRANSPORT: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
-const COLLECTIONS: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 const LAWFUL_CLASSES: &str = include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const BYTES_KEYS: &str =
     include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
@@ -43,10 +40,10 @@ const EXAMPLE: &str = include_str!("../../../catalog/examples/CommandLine/Forge.
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env);
+    catalog_or::load_derived_fixture(&mut env);
     for (source, label) in [
-        (TRANSPORT, "Core.Logic.Transport"),
-        (COLLECTIONS, "Data.Collections"),
         (LAWFUL_CLASSES, "Core.Classes.LawfulClasses"),
         (BYTES_KEYS, "Data.Binary.BytesKeys"),
         (LAWFUL_FUNCTORS, "Core.Classes.LawfulFunctors"),
