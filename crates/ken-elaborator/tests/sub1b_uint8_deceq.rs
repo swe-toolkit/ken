@@ -10,7 +10,6 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::Decl;
 
-const TRANSPORT: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
 const COLLECTIONS: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 const LAWFUL_CLASSES: &str = include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
@@ -19,9 +18,8 @@ const BYTES_KEYS: &str =
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_or(&mut env);
-    env.elaborate_ken_md_file(TRANSPORT)
-        .expect("Transport package");
+    catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env);
     env.elaborate_ken_md_file(COLLECTIONS)
         .expect("Collections package");
     env.elaborate_ken_md_file(LAWFUL_CLASSES)
@@ -164,7 +162,7 @@ fn ac4_deceq_bytes_decides_raw_bytes_non_vacuously() {
 #[test]
 fn ac5_postulate_is_usable_but_refl_remains_rejected() {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     env.elaborate_decl(
         "theorem use_uint8_retract (x : UInt8) : \
          Equal UInt8 (int_to_uint8_raw (uint8_to_int x)) x = \

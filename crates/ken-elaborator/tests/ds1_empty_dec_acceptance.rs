@@ -23,7 +23,6 @@ use ken_kernel::{declare_inductive, infer, CtorSpec, GlobalEnv, InductiveSpec};
 
 const LAWFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
-const TRANSPORT_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
 const COLLECTIONS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 const EMPTY_DEC_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logic/EmptyDec.ken.md");
@@ -194,7 +193,7 @@ fn ac1_mechanism_probe_no_method_wrong_domain_rejected() {
 #[test]
 fn ac2_empty_and_absurd_empty_elaborate() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     assert!(env.globals.contains_key("Empty"), "Empty must be a prelude global");
     assert!(env.globals.contains_key("Dec"), "Dec must be a prelude global");
     assert!(env.globals.contains_key("Yes"), "Yes must be a prelude global");
@@ -258,7 +257,7 @@ fn ac3_trusted_base_delta_is_ordinary_inductive_admission_only() {
 #[test]
 fn real_empty_dec_import_binds_the_canonical_or_identity() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     let source_with_import_witness = format!(
         "{EMPTY_DEC_KEN_MD}\n\n```ken\n\
          fn node_b_empty_dec_or_witness (x : Bool) \
@@ -284,7 +283,7 @@ fn real_empty_dec_import_binds_the_canonical_or_identity() {
 #[test]
 fn ac4_bridge_demonstrated_over_deceq_bool_not_only_deceq_int() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     env.elaborate_ken_md_file(EMPTY_DEC_KEN_MD)
         .expect("catalog/packages/Core/Logic/EmptyDec.ken.md must elaborate standalone");
 
@@ -307,10 +306,9 @@ fn ac4_bridge_demonstrated_over_deceq_bool_not_only_deceq_int() {
 #[test]
 fn landed_lawful_classes_package_still_elaborates_with_dependencies() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     let provider_state = catalog_or::core_logic_or_module_state(&env);
-    env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
-        .expect("catalog/packages/Core/Logic/Transport.ken must elaborate");
+    catalog_or::expose_core_logic_transport(&mut env);
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
         .expect("catalog/packages/Data/Collections/Derived.ken must elaborate");
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);

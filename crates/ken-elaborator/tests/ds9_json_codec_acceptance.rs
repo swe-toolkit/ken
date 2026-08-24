@@ -31,7 +31,7 @@ const JSON_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Serializa
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     for (name, source) in [
         ("Core.Logic.Transport", TRANSPORT_KEN_MD),
         ("Data.Collections.Derived", COLLECTIONS_KEN_MD),

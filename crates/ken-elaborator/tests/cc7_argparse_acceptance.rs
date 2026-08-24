@@ -42,7 +42,7 @@ const EXAMPLE_KEN_MD: &str = include_str!("../../../catalog/examples/CommandLine
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     for (source, label) in [
         (TRANSPORT_KEN_MD, "Core.Logic.Transport"),
         (COLLECTIONS_KEN_MD, "Data.Collections"),

@@ -39,8 +39,25 @@ ES2; `Prop` is the prelude's surface-nameable alias for `Omega_0`).
 
 ```ken
 import Core.Logic.Or (Or, Inl, Inr)
+import Core.Logic.OrdResult (
+  OrdResult,
+  ord_eq,
+  ord_lt,
+  ord_gt,
+  ord_result_leq,
+  ord_result_elim,
+  ord_result_elim2
+)
+import Core.Logic.Transport (cong, sym)
+import Core.Logic.Compare (
+  list_compare,
+  list_eq,
+  pair_compare,
+  pair_compare_lt_cases,
+  pair_compare_result_of
+)
 
-fn IsTrue (b : Bool) : Prop = Equal Bool b True
+pub fn IsTrue (b : Bool) : Prop = Equal Bool b True
 ```
 
 `Eq a` is decidable Boolean equality, an equivalence (`51 §2.1`). `eq` is
@@ -89,7 +106,7 @@ carrier's `total` instance be proved by case-split while costing nothing
 extra — it's ordinary Ken, not a new kernel feature.
 
 ```ken
-fn bool_or (a : Bool) (b : Bool) : Bool =
+pub fn bool_or (a : Bool) (b : Bool) : Bool =
   match a {
     True ↦ True;
     False ↦ b
@@ -105,7 +122,7 @@ be proof-relevant (which side holds is content) and need `||.||` to reach
 `Omega`; the decidable `Bool` `bool_or` sidesteps that entirely.
 
 ```ken
-class Ord a {
+pub class Ord a {
   leq : a → a → Bool;
   refl : (x : a) → IsTrue (leq x x);
   antisym : (x : a) → (y : a) → IsTrue (leq x y) → IsTrue (leq y x) → Equal a x y;
@@ -1151,7 +1168,7 @@ theorem compare_eq_lt_absurd
       ((proof eq_sound for compare_with) a d x y hxy))
     ((proof lt_reverse_false for compare_raw) a d.leq y x hyx)
 
-proof eq_sound for pair_compare
+theorem pair_compare_eq_sound
       (a : Type)
       (b : Type)
       (da : Ord a)
@@ -1186,7 +1203,7 @@ proof eq_sound for pair_compare
         (Equal OrdResult (compare b db (pair_snd a b x) (pair_snd a b y)) ord_eq)
         ((proof eq_cases for pair_compare) a b (compare a da) (compare b db) x y h)))
 
-proof lt_asym for pair_compare
+theorem pair_compare_lt_asym
       (a : Type)
       (b : Type)
       (da : Ord a)
@@ -1255,12 +1272,12 @@ proof antisym for pair_ord_leq
         → IsTrue (ord_result_leq r) → IsTrue (ord_result_leq s) → Equal (Pair a b) x y)
     (pair_compare a b (compare a da) (compare b db) x y)
     (pair_compare a b (compare a da) (compare b db) y x)
-    (λpx. λpy. λhx. λhy. absurd ((proof lt_asym for pair_compare) a b da db x y px py))
+    (λpx. λpy. λhx. λhy. absurd (pair_compare_lt_asym a b da db x y px py))
     (λpx.
-      λpy. λhx. λhy. sym (Pair a b) y x ((proof eq_sound for pair_compare) a b da db y x py))
+      λpy. λhx. λhy. sym (Pair a b) y x (pair_compare_eq_sound a b da db y x py))
     (λpx. λpy. λhx. λhy. absurd hy)
-    (λpx. λpy. λhx. λhy. proof eq_sound for pair_compare a b da db x y px)
-    (λpx. λpy. λhx. λhy. proof eq_sound for pair_compare a b da db x y px)
+    (λpx. λpy. λhx. λhy. pair_compare_eq_sound a b da db x y px)
+    (λpx. λpy. λhx. λhy. pair_compare_eq_sound a b da db x y px)
     (λpx. λpy. λhx. λhy. absurd hy)
     (λpx. λpy. λhx. λhy. absurd hx)
     (λpx. λpy. λhx. λhy. absurd hx)

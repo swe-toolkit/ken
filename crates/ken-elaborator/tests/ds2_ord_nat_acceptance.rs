@@ -15,7 +15,6 @@ mod catalog_or;
 
 use ken_elaborator::ElabEnv;
 
-const TRANSPORT_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
 const LAWFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const COLLECTIONS_KEN_MD: &str =
@@ -24,9 +23,9 @@ const ORD_NAT_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Numeri
 
 fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     let provider_state = catalog_or::core_logic_or_module_state(&env);
-    env.elaborate_ken_md_file(TRANSPORT_KEN_MD).expect("Core/Logic/Transport.ken must elaborate");
+    catalog_or::expose_core_logic_transport(&mut env);
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD).expect("Data/Collections/Derived.ken.md must elaborate");
     env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD).expect("Core/Classes/LawfulClasses.ken must elaborate");
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);

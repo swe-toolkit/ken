@@ -43,7 +43,7 @@ const EXAMPLE: &str = include_str!("../../../catalog/examples/CommandLine/Forge.
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     for (source, label) in [
         (TRANSPORT, "Core.Logic.Transport"),
         (COLLECTIONS, "Data.Collections"),

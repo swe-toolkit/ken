@@ -28,13 +28,11 @@ use ken_kernel::{Decl, GlobalId, Term};
 
 const COLLECTIONS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
-const TRANSPORT_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logic/Transport.ken.md");
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_or(&mut env);
-    env.elaborate_ken_md_file(TRANSPORT_KEN_MD)
-        .expect("catalog/packages/Core/Logic/Transport.ken must elaborate");
+    catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env);
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD)
         .expect("catalog/packages/Data/Collections/Derived.ken.md must elaborate");
     env
@@ -350,7 +348,7 @@ fn string_compare_3way_lexicographic_triple() {
     let mut env = mk_env();
     let mut store = make_store(&env);
     let lt_id = env.globals["Lt"];
-    let eq_id = env.globals["Eq"];
+    let eq_id = env.globals["Core.Logic.OrdResult.Eq"];
     let gt_id = env.globals["Gt"];
 
     let v = eval_view(&mut env, &mut store, "t_cmp1", "OrdResult", "compare \"a\" \"ab\"");

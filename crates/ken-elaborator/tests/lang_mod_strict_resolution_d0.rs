@@ -506,6 +506,41 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
+            "Core.Classes.LawfulClasses".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Pair",
+                "Prop",
+                "Proved",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "mk_pair",
+                "pair_fst",
+                "pair_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
+            "Core.Logic.Compare".to_string(),
+            [
+                "And",
+                "Equal",
+                "Pair",
+                "Proved",
+                "and_intro",
+                "pair_fst",
+                "pair_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Core.Logic.EmptyDec".to_string(),
             ["Dec", "Empty", "Equal", "IsTrue", "No", "Proved", "Yes"]
                 .into_iter()
@@ -564,6 +599,7 @@ fn catalog_ambient_passthrough_migration_census() {
         .collect::<BTreeSet<_>>();
     let expected_clean = [
         "Core.Logic.Or",
+        "Core.Logic.OrdResult",
         "Core.Logic.Transport",
         "Tooling.Verification.ProofErasureBoundaryChecker",
     ]
@@ -585,7 +621,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Capability.Process.Arguments",
         "Capability.System.IO",
         "Core.Classes.EffectfulClasses",
-        "Core.Classes.LawfulClasses",
         "Core.Classes.LawfulFunctors",
         "Data.Binary.BytesKeys",
         "Data.Collections.Derived",

@@ -20,7 +20,7 @@ const PATH_POSIX: &str = include_str!("../../../catalog/packages/Capability/File
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude bootstrap");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_core_logic_compare(&mut env);
     for (name, source) in [
         ("Core.Logic.Transport", TRANSPORT),
         ("Data.Collections", COLLECTIONS),
