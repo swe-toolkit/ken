@@ -169,3 +169,31 @@ arity fix and its soundness is genuinely open (tracing a real decrease that
 rotates across slots is not a structure-preserving peel). This is a status fact
 for the operator, not a decision request; a TCB authorization arises only if D0
 rules in arm (b) or (c).
+
+## QUEUED FOLLOW-UP (non-blocking, from NODE B review) — fo_kripke.rs internal abstract Or
+
+Attached by the Steward, 2026-08-24, at the Architect's request in the
+[[LANG-MOD-OR-CANONICAL-HOME]] (NODE B) APPROVE (evt_7f2gt5dv2wycv, relayed by
+language-leader evt_4gh9ddgnynk55). NON-BLOCKING and NOT part of this node's SCT
+scope — parked here because this is the active FO-soundness home and the reconcile
+question below is a soundness-design call the FO-soundness owner should make. It
+did NOT gate NODE B (FokScopedOr correctly binds the canonical catalog Or).
+
+Finding: after NODE B retires the Rust-prelude `Or`/`Inl`/`Inr` and homes a single
+canonical `Core.Logic.Or`, `crates/.../fo_kripke.rs` still carries a SECOND
+Or-shaped inductive — `FoSliceSignature.or_id`, a Rust-level `declare_inductive`
+with a distinct GlobalId. It is the FO-Kripke soundness checker's INTERNAL abstract
+slice signature for obligation-signature discovery (structural-shape matching
+against a private template), not any consumer's Or denotation, so NODE B's
+single-identity invariant is intact.
+
+Two follow-ups for this node's owner (both non-blocking, address when the FO lane
+is next active — do NOT interrupt an active lane for them):
+- (a) Comment refresh: fo_kripke.rs comments now cite "the prelude's own Or
+  declaration (prelude.rs)" as their pattern; that prelude Or no longer exists
+  after NODE B. Refresh the stale citations.
+- (b) Soundness-design decision: should the FO checker's internal abstract Or
+  reconcile with the canonical catalog `Core.Logic.Or` GlobalId, or is
+  structural-shape-matching against a private template the intended design? This
+  is a soundness question for this node / the enclave, not for the canonical-home
+  migration. Decide with the enclave when the FO soundness work resumes.
