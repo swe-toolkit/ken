@@ -517,6 +517,35 @@ Do not let its findings become a shadow gate; merges still turn on QA, CV, and
 Architect review. It is a standing seat, not a per-task dispatch: you do not
 kick it per WP.
 
+> ### THE ADVERSARY IS NOT A MERGE GATE. DO NOT DISPATCH IT PER CANDIDATE.
+>
+> **Measured 2026-08-24: this seat spent a whole session treating "Adversary
+> §10a CLEAN" as a required fourth merge approval — posting `@adversary re-gate
+> exact <SHA> ... hunt the delta ... return a verdict` on every candidate AND
+> every respin.** There is no `§10a` gate: it is not in this playbook, in
+> `merge-policy.md`, or in `COORDINATION.md`. The dispatch itself is the failure.
+>
+> - It violates `COORDINATION §10⁻a`. The edge is report-only and
+>   one-directional: *"do not ask the adversary to hunt something ... a request
+>   for an attack is a conversation — the Steward does not make one."* The only
+>   permitted Steward→adversary traffic is the M8 merge notification.
+> - The merge gate set is **QA + CV + Architect** (the opening of this section).
+>   The adversary is advisory and **does not gate** — a CLEAN adversary verdict
+>   is not one of the approvals you resolve a merge Decision on.
+> - It is the exact token sink `§10⁻a` was written to prevent. The only
+>   sanctioned adversary compaction is the merge notification (`§15`,
+>   `merge-procedure.md` M8), so a per-candidate / per-respin hunt has no
+>   compaction seam and a rejected or respun candidate never reaches one — the
+>   hunts pile up in one context. Three stacked on a single Component B partial
+>   before the operator caught the cost.
+>
+> **The enforcement, so the statement above stops being re-violated:** before
+> you post ANYTHING to the adversary, check it is the M8 merge notification. If
+> it is a "re-gate", a "hunt this SHA", a "return a verdict", or any bounded
+> attack request — STOP; that post is the anti-pattern. The adversary hunts
+> autonomously and reports on its one inbound edge; you notify it once, at the
+> code merge (M8), which compacts it first. Nothing else crosses the edge.
+
 **You send its merge notifications, and that is step M8 of the merge
 procedure.** Its reports also do not surface in the space-level event read, so
 M8 carries both halves — notifying it and never reading it back is the same
