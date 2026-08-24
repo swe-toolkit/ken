@@ -32,8 +32,16 @@ origin: "Operator directive 2026-08-22: module/import is its own campaign and, b
 >   `pub` placements. Independent, can lead.
 > - [[LANG-MOD-STRICT-RESOLUTION]] (WP-2) — strict root-loaded resolution (the
 >   soundness core); D0 probe then D1. Rides on WP-1 for catalog observability.
-> - [[LANG-MOD-CATALOG-REALIZATION]] (WP-4) — Arithmetic/Order/Gcd import the
->   canonical operations. Gated on WP-1..3 AND the Or realization chain.
+> - [[LANG-MOD-CATALOG-REALIZATION]] (WP-4 Component A) — module-graph/roots
+>   loader realization + provider public surface (the self-contained green set
+>   checks standalone-strict; Arithmetic/Order providers made public). Gated on
+>   WP-1..3 AND the Or realization chain. RE-FRAMED 2026-08-24 (hard stop): `Nat`
+>   has no catalog home, so the consumer migration + whole-catalog strict co-gate
+>   split off to Component B (Architect ruling evt_214z6r6qnwme0).
+> - [[LANG-MOD-CATALOG-COMPLETENESS]] (WP-4 Component B) — one canonical `Nat`
+>   home (+ other convenience homes), migrate Arithmetic/Order/Gcd to import their
+>   providers, whole-catalog strict-green. The catalog-reuse SUCCESS step; depends
+>   on Component A. Closing B closes the campaign's catalog criterion.
 >
 > OR REALIZATION CHAIN (operator ruled the Or/Inl/Inr fork arm (b),
 > evt_6b9wrt1kwswcp — canonical package home, not refactor-away; the six consumers
@@ -59,9 +67,11 @@ origin: "Operator directive 2026-08-22: module/import is its own campaign and, b
 > Mode threads from the ENTRY: `elaborate_module_from_roots` ⇒ strict;
 > `elaborate_file`/`elaborate_ken_md_file` (isolated-file) ⇒ legacy passthrough
 > verbatim. The flag-day is SEQUENCING, not impossibility: co-gate WP-2's
-> CI-greenness with WP-4's catalog migration, and make WP-4's migration set
+> CI-greenness with the catalog migration, and make the migration set
 > CENSUS-driven (every catalog file the strict flip breaks, measured — not just
-> the Gcd trio).
+> the Gcd trio). NOTE 2026-08-24: that migration + strict co-gate is Component B
+> ([[LANG-MOD-CATALOG-COMPLETENESS]]), not Component A — the hard stop showed the
+> census population needs a canonical `Nat` home first (34 baseline-red, not 32).
 >
 > RELEASE GATE (all members): held until the language ring FINISHES
 > embedding-adequacy ([[V3-FO-EMBEDDING-ADEQUACY]]) per operator finish-then-
