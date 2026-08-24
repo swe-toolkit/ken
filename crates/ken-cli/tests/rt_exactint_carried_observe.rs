@@ -8,35 +8,23 @@
 //! CLAIMED: the `Avail` move is paired with a reader that is TOTAL over both
 //! phases, so no seat is admitted in a phase this cannot decode.
 //!
-//! **The pair, and why it is not the previous nodes' shape.** This need has no
-//! "REFUSE" half to assert: an out-of-range carried `Int` is not an error, it
-//! returns `valid = 0` into the operation's EXISTING narrow-failure lane
-//! (`InvalidOffset` / `InvalidBounds`) exactly as an out-of-range specialized
-//! `Int` already did. So the two assertions are:
+//! **The pair after M6 closure.** This need has no "REFUSE" half to assert: an
+//! out-of-range carried `Int` is not an error, it returns `valid = 0` into the
+//! operation's EXISTING narrow-failure lane (`InvalidOffset` /
+//! `InvalidBounds`) exactly as an out-of-range specialized `Int` already did.
+//! The fixture therefore asserts:
 //!
 //! - the `ExactIntU64` carried refusal is GONE -- if the `Avail` move or the
 //!   reader were reverted, this inverts;
-//! - the terminal is the NEXT distinct blocker and not something upstream -- if
-//!   the seats were admitted without the paired reader, the compile would stop
-//!   at `ClaimedEffectSeats::specialized`'s tripwire instead, which is the
-//!   claim-admitted-read-refuses shape this pairing exists to prevent.
+//! - native-program construction COMPLETES -- the positive non-vacuity anchor
+//!   proving the shared witness traverses this reader and the M6 representation.
 //!
-//! **WHAT IS NOT OBSERVABLE YET, stated rather than left as a gap.** The
-//! runtime discrimination the Architect specified -- in-range carried `Int`
-//! advances, out-of-range yields `valid = 0` into the narrow-failure lane --
-//! CANNOT be observed on this witness today, because the compile does not
-//! complete: it now terminates at `FsReadAt` `Argument(2)`'s buffer reply-path
-//! gate, which is `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`'s to remove. The
-//! fixture for that half is a runtime observation and it becomes writable the
-//! moment that node lands.
-//!
-//! RESTORATION HOME: `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`, tracked as an AC
-//! there rather than left to this comment (Architect `evt_4wkc748vgfhhf`).
-//! Removing the Arg(2) gate is what lets the compile complete, which is exactly
-//! when the runtime half becomes observable end-to-end. Note what IS already
-//! proven: `narrow_carried_int_u64` is the same decoder `BufferAllocate` `0`
-//! ships and runs today, so what is missing is end-to-end coverage ON THIS
-//! OPERATION, not an unproven mechanism.
+//! **WHAT THIS FIXTURE DOES NOT CLAIM.** `build_native_program` constructs the
+//! executable but does not run it, so it does not independently observe the
+//! in-range/out-of-range runtime split on `FsReadAt`. The shipped reader remains
+//! `narrow_carried_int_u64`, the same decoder used by the executing
+//! `BufferAllocate` path; this fixture pins reader admission plus completed
+//! lowering, not runtime result values.
 //!
 //! **On the representation fail-close** (a word at the seat that is not a
 //! decodable `Int` at all): NOT expressible in well-typed Ken -- what may reach
@@ -120,7 +108,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
 #[test]
-fn the_positioned_int_seats_decode_carried_and_stop_at_the_next_distinct_blocker() {
+fn the_positioned_int_seats_decode_carried_and_complete_native_construction() {
     let root = tempfile::tempdir().expect("temporary native-build root");
     let result = ken_cli::build_native_program(
         WITNESS_SOURCE,
@@ -157,21 +145,8 @@ fn the_positioned_int_seats_decode_carried_and_stop_at_the_next_distinct_blocker
         "an ExactIntU64 seat must not be admitted in a phase its reader cannot decode: {error}"
     );
 
-    // The measured next distinct blocker, which is what keeps the absences
-    // above non-vacuous: without it they would also hold on a compile that
-    // failed for some unrelated earlier reason.
-    //
-    // REPOINTED by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`. The old terminal was
-    // the Arg(2) gate this very node removes -- named above as the next node's
-    // to remove, and this candidate is that node -- so the witness advances past
-    // its own former stop and the move is downstream by construction. The new
-    // terminal is a different subsystem again: the checked-IH nullary force of
-    // an ESCAPING functional IH, a deferred capability gap owned by
-    // `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`.
-    assert!(
-        error.contains("static worker expects 1 arguments but call provides 0"),
-        "the expected terminal after this node is the checked-IH nullary force of an \
-         escaping functional IH -- a different need and reader again, and a deferred \
-         capability gap: {error}"
-    );
+    // Completion is now the positive non-vacuity anchor for both reader
+    // assertions above: M6 retired the terminal checked-IH refusal without
+    // weakening either exact-Int observation boundary.
+    result.expect("the carried exact-Int readers and M6 representation must complete");
 }
