@@ -29,6 +29,40 @@ origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect'
 > the earlier "not startable / skeleton" prose further down is superseded. M3/M4
 > stay gated on M6.
 
+> # TIER-3 BUILD — SYMPTOM INVENTORY + RESOLUTIONS (accumulating)
+>
+> Ruled resolutions the Architect seeds at each M6 tier-3 hard-stop. Read
+> alongside AC-REPR; CV + Adversary review each respin against these.
+>
+> RESOLUTION — owner-key axis (Architect evt_6pft1vh77ww1z, 2026-08-24). The frame
+> was silent on WHICH emission owner keys the CheckedIhCapturedEnvironment record
+> while framing it as (a) captured free variables and (b) force-seam-constructed.
+> RULED: for the CheckedIhCapturedEnvironment role the authorizing emission owner
+> is the FORCE-emission owner (the owner that forces the worker whose closure_origin
+> is the seat), NOT the containment owner. The owner in the key names which context
+> EMITS the aggregate (the force seam), not the values' definition origin. The
+> force-seam emitter the implementer built is CORRECT and stays; the fix is entirely
+> producer-side — repoint the tier-2 CheckedIhCapturedEnvironment owner enumeration
+> to the force-emission owners (walk real force edges), clone the seat's single
+> canonical run byte-identical across owner keys so the tier-1 two-authorities
+> cross-check (checked_ih_capture_origin) stays intact, and authorize a force owner
+> ONLY for the seat it actually forces (reject a seat-only lookup fallback — that
+> weakens the shared check). Prefer keying by the force owner and dropping the
+> unconsumed containment-keyed records for this role, reconciled with the tier-1
+> records.len()==1 fixture (its seat must be force-reachable); if a consumer needs
+> the containment key, keep both additively and state which. This is a bounded
+> planner-enumeration repoint — NOT a new representation route, NOT a node scope
+> change, no trusted_base delta (no operator TCB gate). Returns to Architect + CV +
+> Adversary. Auditability on the respin: (a) the force-owner record's run is
+> byte-identical to the seat's canonical run; (b) checked_ih_capture_origin reds if
+> pointed at the wrong seat's run; (c) a discriminating pair — a FORCED checked-IH
+> seat gets a force-owner record while a contained-but-not-forced seat does not.
+>
+> Symptom #1 (Architect): the captured-env authority population keyed emission
+> owners by CONTAINMENT (a proxy inherited from the inline-emitted siblings), which
+> under-covers the FORCE-emission owner the frame's force-seam construction actually
+> uses — the wrong axis (containment) for a force-emitted role.
+
 > # D0 RULED 2026-08-22 — DEFUNCTIONALIZE; re-homed as native-program Track-1
 >
 > The Architect ruled the D0 this node carried (materialized closure value vs
