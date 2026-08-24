@@ -62,6 +62,49 @@ origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect'
 > owners by CONTAINMENT (a proxy inherited from the inline-emitted siblings), which
 > under-covers the FORCE-emission owner the frame's force-seam construction actually
 > uses — the wrong axis (containment) for a force-emitted role.
+>
+> SHARED-CAUSE PREDICATE (§1b, Architect evt_36k7yzf27t67x, 2026-08-24 — named at
+> hard-stop #2 rather than waiting for a 3rd). A synthesized-aggregate's
+> Specialization-owner enumeration must be EMISSION-ACCURATE: it must produce the
+> same owner set the consumer keys by (defining_emission_owner = the lowered units).
+> The continuation_contexts subtree-containment proxy (synthesized_seat_emission_owners,
+> static_transition.rs:589) is a valid authority ONLY for aggregates emitted inline
+> at their own seat; for any role emitted otherwise it under-covers, and the consumer
+> fail-closes at a legitimately-emitted seat. #1 (checked-IH, force-seam) and #2
+> (host-result-error, emitted non-inline from a specialization body) are two
+> instances of this ONE predicate.
+>
+> Symptom #2 (Architect): host-result-error (Constructor role) Specialization-owner
+> enumeration uses the continuation_contexts subtree-containment proxy, which
+> under-covers the lowered-unit emission owner the consumer keys by (seat 264 under
+> Specialization(2) is genuinely lowered and emits FileOperationRead inline, but the
+> proxy does not yield Specialization(2)) — same predicate as #1.
+>
+> SCOPE RECUT (Steward, on the Architect's §1b closure ruling). This SUPERSEDES the
+> per-role "repoint the checked-IH owner axis" framing of RESOLUTION #1: the tier-3
+> reconciliation is a STRUCTURAL CLOSURE over the shared predicate, not a second
+> per-role patch. Reconcile the synthesized-aggregate Specialization-owner
+> enumeration axis with the consumer's defining_emission_owner axis for ALL affected
+> roles — host-result-error (Constructor) fixed via the emission-accurate
+> (lowered-unit) authority checked_ih_force_emissions already uses; UnitBoundaryEnvironment
+> AUDITED against the inline-at-own-seat predicate in the SAME pass (state with
+> evidence whether it stays on the subtree proxy or takes the emission-accurate
+> enumeration) to prevent the predictable hard-stop #3. Retain everything already
+> proved (checked-IH force-owner records, schema 12/12, controls). Two hard constraints
+> the Architect flags as the unsound-if-careless places: (i) do NOT clone content
+> across owners for Constructor — its children/meet/allocation may differ per
+> specialization (lifetime lanes); the emission-accurate enumeration fixes WHICH
+> owners get records, per-owner content is still computed per owner; (ii) authorize
+> tightly — a record only for owners that genuinely emit the seat (walk real
+> lowered-unit emissions), never a blanket over all specializations; preserve
+> validate_aggregate_producers_are_unique. STILL IN M6 (no successor node): same
+> class, mechanically determined, and the closure is meant to END the chain. Bounded
+> planner-enumeration reconciliation, no new representation route, no trusted_base
+> delta (codegen) — no operator TCB gate. Returns to Architect + CV + Adversary.
+> Auditability: a discriminating pair proving a Specialization that lowers a
+> non-inline host-effect seat now GETS its record (was the refusal), and a control
+> that the emission-accurate owner set equals the consumer's defining_emission_owner
+> set for the fixture.
 
 > # D0 RULED 2026-08-22 — DEFUNCTIONALIZE; re-homed as native-program Track-1
 >
