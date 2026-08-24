@@ -1,6 +1,6 @@
 ---
 id: LANG-MOD-CATALOG-COMPLETENESS
-title: "WP-4 Component B — catalog completeness: give Nat one canonical public home (and the other required convenience homes), migrate the consuming units to import them (Gcd imports add/mul + leq_nat/sub + Nat and drops its reimplementations), and satisfy whole-catalog strict-green. This is the module/import campaign's catalog-reuse success step."
+title: "WP-4 Component B — catalog completeness: give Nat and OrdResult (dedup two private copies) canonical public homes plus the fixpoint homeless-convenience census, deliver Order's provider surface + identity, migrate the consuming units (Gcd imports add/mul + leq_nat/sub + Nat and drops its reimplementations), and satisfy whole-catalog strict-green. The module/import campaign's catalog-reuse success step."
 status: draft
 owner: language
 size: L
@@ -39,24 +39,52 @@ strict-green through the real loader.
   canonical home, the NODE B (`Core.Logic.Or`) canonical-home pattern — NOT
   per-consumer copies, NOT ambient, NOT an invented identity (Architect design
   constraint, ruling point 5).
-- Canonical public homes for the OTHER conveniences the 42 red leaves consume
-  (census-driven — see the triage AC below).
-- Migrate the consuming units to import the canonical `Nat` home so they resolve
-  under strict: Arithmetic/Order/Gcd import the canonical `Nat` (the
-  provider-INTERNAL Transport imports on Arithmetic/Order are already delivered by
-  Component A and carry forward — B does NOT re-add them). Gcd selectively
-  imports `add`/`mul` (Arithmetic) + `leq_nat`/`sub` (Order) + `Nat`, and REMOVES
-  its four local reimplementations.
+- ONE canonical `OrdResult` (Architect HS#5 ruling evt_613d9fm7j45qj) — `data
+  OrdResult = Lt | Eq | Gt` plus `ord_eq`/`ord_lt`/`ord_gt`, in a SINGLE defining
+  public interface, DEDUPing the two private competing declarations at base
+  (Data.Collections.Derived.ken.md:69 with its ord_* constants at :71/:73/:75,
+  and Data.Numeric.Nat.Order.ken.md:188). One home serving BOTH
+  `Data.Numeric.Nat.Order` AND `Data.Collections.Derived` (list/string/char
+  compare) — a SHARED location both import (likely a Core/shared home, not under
+  Numeric or Collections; B's placement call). Same charter/class as the
+  canonical `Nat` home; migrate Order, Derived, and LawfulClasses to import it.
+- Canonical public homes for the OTHER homeless conveniences the provider +
+  consumer closure requires — census-driven, see the homeless-convenience closed
+  predicate below.
+- Order's PROVIDER SURFACE (moved from Component A, HS#5 — Order is not
+  self-measurable in A because its closure needs homeless `OrdResult`): make
+  `leq_nat`/`sub` `pub`; add Order's provider-internal imports `import
+  Core.Logic.Transport (cong, trans)` (retaining Or) and `import
+  Core.Classes.LawfulClasses (IsTrue, bool_or, Ord)`; make Transport's cong/trans
+  and LawfulClasses's IsTrue/bool_or/Ord `pub` as needed. (Arithmetic's provider
+  surface — Transport import + pub add/mul — is delivered by Component A and
+  carries forward; B does NOT re-add it.)
+- Migrate the consuming units to import the canonical `Nat` (and `OrdResult`)
+  homes so they resolve under strict. Gcd selectively imports `add`/`mul`
+  (Arithmetic) + `leq_nat`/`sub` (Order) + `Nat`, and REMOVES its four local
+  reimplementations.
 - Move the real caller to STRICT (`elaborate_module_from_roots` strict mode)
   after the dependency census has migrated — this is the flag-day the legacy A
   loader defers.
+- HOMELESS-CONVENIENCE CENSUS as a CLOSED PREDICATE (Architect HS#5 ruling
+  evt_613d9fm7j45qj — census all at once, not one hard-stop at a time). A name is
+  a homeless convenience iff it is referenced within a genuine provider closure an
+  AC requires, has NO defining PUBLIC interface in any catalog module, and is not
+  native-prelude / floor {Bool,Char,List} / kernel. METHOD (mechanical): run the
+  legacy roots-load of B's full provider+consumer closure to FIXPOINT, collecting
+  EVERY `UnresolvedCon`/`UnboundName` that is not native/floor/kernel — that set
+  IS the homeless census; author a canonical home for each. Known members:
+  `OrdResult` (+ `ord_eq`/`ord_lt`/`ord_gt`). `Nat` is NOT homeless for the legacy
+  path (native prelude) but IS a strict-home item here. Do not rediscover members
+  one stop at a time.
 - FORWARD-COMPAT identity preservation (Architect ruling evt_47t9dwz0chstv):
   strict excludes the native prelude `Nat`, so B re-homes `Nat` to a canonical
   catalog interface and migrates the providers to import it — but B MUST PRESERVE
-  the provider identities (`add`/`mul`/`leq_nat`/`sub`) that Component A's pub
-  surface already exposed and measured under AC-A2. No competing provider
-  identity is minted by the `Nat` re-home. This is the NODE B canonical-home
-  pattern (as `Core.Logic.Or` replaced the prelude `Or`).
+  Arithmetic's provider identities (`add`/`mul`) that Component A's pub surface
+  already exposed and measured under AC-A2, when it re-homes `Nat` and moves the
+  caller to strict. No competing provider identity is minted by the `Nat`/
+  `OrdResult` re-homes. This is the NODE B canonical-home pattern (as
+  `Core.Logic.Or` replaced the prelude `Or`).
 
 # The census (re-homed from WP-4; drift corrected)
 
@@ -73,17 +101,27 @@ ranges over the real population, not the stale count.
   strict enforcement / CI closure co-closes here. Local targeted `-p` only;
   whole-catalog strict-green is a CI gate, never a local `--workspace` run.
 - AC-B2. Arithmetic, Order, and Gcd each check STANDALONE through the real loader
-  under strict (the AC-1 re-homed from WP-4 — now satisfiable because `Nat`
-  resolves through its canonical home).
+  under strict (the AC-1 re-homed from WP-4 — now satisfiable because `Nat` and
+  `OrdResult` resolve through their canonical homes).
+- AC-B2a (Order provider identity — moved from A's AC-A2, HS#5). Order's
+  `leq_nat`/`sub` FULLY elaborate and publish their genuine `GlobalId`s through
+  the real loader, observed by IDENTITY (not repo text, not a frozen id, no
+  competing identity) — measurable in B once Order's closure (Transport +
+  LawfulClasses + canonical OrdResult) resolves.
 - AC-B3 (residual triage). Completion ranges over the 34-residual population:
   each residual is either migrated to strict-green OR explicitly excluded with a
   stated reason. "Every census vector empty" is NOT sufficient — enumerate the
   disposition of all 34.
 - AC-B4. Gcd's four imports resolve to the exact provider IDs with no Gcd-owned
   competing identity — establish no-reimplementation by IDENTITY, not repo text.
-- AC-B5 (canonical-home identity). Exactly one `data Nat` exists in the catalog
-  (one defining interface); every consumer resolves `Nat` to it. No second
-  `Nat` identity, no ambient/floor `Nat`.
+- AC-B5 (canonical-home identity). Exactly one `data Nat` AND exactly one `data
+  OrdResult` exist in the catalog (one defining interface each); every consumer
+  resolves `Nat`/`OrdResult` to it; the two private `OrdResult` copies at base are
+  deduped away. No second identity, no ambient/floor `Nat`.
+- AC-B7 (homeless census closed). The fixpoint homeless-convenience census (see
+  the Deliverable) is run and its FULL set is enumerated with a canonical home
+  authored for each — not rediscovered one hard-stop at a time. An empty
+  next-iteration census is the completion signal.
 - AC-B6 (cross-cutting invariant). Zero `trusted_base()` delta; flat-Σ pin stays
   green.
 - AC-B-NO-REGRESSION. Whole-suite green in CI; local targeted `-p` only.
