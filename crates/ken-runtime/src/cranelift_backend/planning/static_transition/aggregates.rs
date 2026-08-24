@@ -5817,7 +5817,10 @@ mod checked_ih_captured_env_schema {
         );
     }
 
-    fn bind_continuation_fixture(field: RuntimeExpr) -> RuntimeExpr {
+    fn bind_continuation_fixture_with_case_body(
+        field: RuntimeExpr,
+        case_body: RuntimeExpr,
+    ) -> RuntimeExpr {
         let constructor = "ctor:fixture::Bind::Resume".to_string();
         RuntimeExpr::CheckedSubcontinuationFrame {
             frame_id: 91,
@@ -5830,7 +5833,7 @@ mod checked_ih_captured_env_schema {
                     constructor,
                     argument_binders: 2,
                     recursive_positions: vec![1],
-                    body: RuntimeExpr::Var(0),
+                    body: case_body,
                 }],
                 default: crate::RuntimeTrap {
                     code: crate::RuntimeTrapCode::PatternMatchFailure,
@@ -5840,23 +5843,103 @@ mod checked_ih_captured_env_schema {
         }
     }
 
-    fn captured_bind_closure(result: i64) -> RuntimeExpr {
+    fn bind_continuation_fixture(field: RuntimeExpr) -> RuntimeExpr {
+        bind_continuation_fixture_with_case_body(field, RuntimeExpr::Var(0))
+    }
+
+    fn captured_bind_closure_with_captures(
+        result: i64,
+        captures: Vec<RuntimeExpr>,
+    ) -> RuntimeExpr {
         RuntimeExpr::LexicalClosure {
-            captures: vec![RuntimeExpr::Value(RuntimeValue::Int(result.into()))],
+            captures,
             params: vec!["response".to_string()],
             body: Box::new(RuntimeExpr::Value(RuntimeValue::Int(result.into()))),
         }
     }
 
+    fn captured_bind_closure(result: i64) -> RuntimeExpr {
+        captured_bind_closure_with_captures(
+            result,
+            vec![RuntimeExpr::Value(RuntimeValue::Int(result.into()))],
+        )
+    }
+
+    fn direct_bind_coordinates(
+        plan: &StaticTransitionPlan<'_>,
+    ) -> (
+        StaticOriginId,
+        StaticOriginId,
+        usize,
+        ContinuationEmissionOwner,
+        BoundaryClosureEnvironment,
+    ) {
+        let mut direct = Vec::new();
+        for occurrence in plan.source_occurrences.iter().flatten() {
+            if !matches!(occurrence.expr, RuntimeExpr::Construct { .. }) {
+                continue;
+            }
+            for (position, child) in plan
+                .semantic
+                .child_origins(occurrence.static_origin)
+                .expect("the fixture's constructor children resolve")
+                .iter()
+                .copied()
+                .enumerate()
+            {
+                if matches!(
+                    plan.planned_occurrence_expr(child)
+                        .expect("the fixture child resolves"),
+                    RuntimeExpr::LexicalClosure { .. }
+                ) {
+                    direct.push((child, occurrence.static_origin, position));
+                }
+            }
+        }
+        let [(seat, resume_site, position)] = direct.as_slice() else {
+            panic!("the fixture must have exactly one direct lexical-closure response field");
+        };
+        let owner = ContinuationEmissionOwner::Predeclared(
+            plan.semantic
+                .function_owner(*seat)
+                .expect("the closure owner resolves")
+                .expect("the closure belongs to a predeclared unit"),
+        );
+        let environment = plan
+            .boundary_closure_environment(owner, *seat)
+            .expect("the direct environment query is valid")
+            .expect("the direct closure has an owner-specific environment record");
+        (*seat, *resume_site, *position, owner, environment)
+    }
+
+    fn assert_direct_bind_is_authorized(
+        plan: &StaticTransitionPlan<'_>,
+        owner: ContinuationEmissionOwner,
+        seat: StaticOriginId,
+        environment: &BoundaryClosureEnvironment,
+    ) {
+        assert!(
+            !boundary_closure_owner_returns_seat(plan, owner, seat)
+                .expect("result containment is a valid query"),
+            "the positive fixture must reach the new bind arm, not the older result arm"
+        );
+        assert_eq!(
+            plan.boundary_bind_continuation_environment_by_record(environment.record())
+                .expect("the bind proof is valid"),
+            Some(environment.clone()),
+            "the exact recursive field must prove its singleton target and pairing"
+        );
+    }
+
     /// Promise class: durable invariant.
     ///
-    /// MEASURED: a real planned direct recursive field resolves the bind record;
-    /// deleting its pairing or inserting two closure bodies makes the same
-    /// crossing accessor return `None`.
-    /// CLAIMED: the exactness law is reached by the planner population and is
-    /// not a generic captured-closure admission.
-    /// THE GAP: the fixture must genuinely declare the field recursive and
-    /// contain distinct closure units; both are asserted in the test.
+    /// MEASURED: a real planned direct recursive response field resolves the
+    /// bind record through the production accessor, while result containment is
+    /// independently false.
+    /// CLAIMED: the new bind authorization arm is production-reaching rather
+    /// than an alias for the preserved result-containment arm.
+    /// THE GAP: the negative target and pairing decisions are separate arms;
+    /// the three production-corruption controls below reach each one directly.
     #[test]
     fn bind_continuation_authorization_is_reaching_and_not_generic() {
         let direct = Box::leak(Box::new(bind_continuation_fixture(
@@ -5864,89 +5947,209 @@ mod checked_ih_captured_env_schema {
         )));
         let direct_plan = plan_static_transition_graph(direct, &BTreeMap::new())
             .expect("the direct bind-continuation fixture plans");
-        let direct_seat = direct_plan
-            .source_occurrences
-            .iter()
-            .flatten()
-            .find(|occurrence| matches!(occurrence.expr, RuntimeExpr::LexicalClosure { .. }))
-            .expect("the direct fixture has one closure seat")
-            .static_origin;
-        let direct_owner = ContinuationEmissionOwner::Predeclared(
-            direct_plan
-                .semantic
-                .function_owner(direct_seat)
-                .expect("the closure owner resolves")
-                .expect("the closure belongs to a predeclared unit"),
-        );
-        assert!(
-            !boundary_closure_owner_returns_seat(&direct_plan, direct_owner, direct_seat)
-                .expect("result containment is a valid query"),
-            "the positive fixture must reach the new bind arm, not the older result arm"
-        );
-        let direct_environment = direct_plan
-            .boundary_closure_environment(direct_owner, direct_seat)
-            .expect("the direct environment query is valid")
-            .expect("the direct closure has an owner-specific environment record");
-        assert_eq!(
-            direct_plan
-                .boundary_bind_continuation_environment_by_record(
-                    direct_environment.record(),
-                )
-                .expect("the bind proof is valid"),
-            Some(direct_environment),
-            "the exact recursive field must prove its singleton target and pairing"
-        );
-        let mut unpaired_plan = direct_plan.clone();
-        unpaired_plan.aggregate_ownership.retain(|record| {
-            !matches!(
-                record.producer,
-                AggregateOccurrenceProducer::SynthesizedUse {
-                    owner,
-                    seat,
-                    role: SynthesizedAggregateRole::BoundaryClosureEnvironment,
-                    ..
-                } if owner == direct_owner && seat == direct_seat
-            )
-        });
-        assert_eq!(
-            unpaired_plan
-                .boundary_closure_crossing_environment(direct_owner, direct_seat)
-                .expect("the unpaired query is valid"),
-            None,
-            "removing the exact response environment pairing must restore the refusal"
-        );
+        let (seat, _, _, owner, environment) = direct_bind_coordinates(&direct_plan);
+        assert_direct_bind_is_authorized(&direct_plan, owner, seat, &environment);
+    }
 
-        let multiple = Box::leak(Box::new(bind_continuation_fixture(RuntimeExpr::If {
-            scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
-            then_expr: Box::new(captured_bind_closure(1)),
-            else_expr: Box::new(captured_bind_closure(2)),
-        })));
-        let multiple_plan = plan_static_transition_graph(multiple, &BTreeMap::new())
-            .expect("the multi-target bind fixture plans");
-        let multiple_seats = multiple_plan
-            .source_occurrences
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: the production bind accessor receives an actual `Construct`
+    /// response, an intact owner/pairing proof, and two distinct ABI
+    /// `ClosureBody` targets for that response seat, then returns `None`.
+    /// CLAIMED: a capture-only bind response cannot select among multiple
+    /// compile-time code identities.
+    /// THE GAP: the second target is injected into the ABI population after a
+    /// valid plan is built; it is a corruption witness, not source syntax that
+    /// an earlier parent-shape guard can reject.
+    #[test]
+    fn bind_continuation_production_rejects_multiple_static_targets() {
+        let source = Box::leak(Box::new(bind_continuation_fixture_with_case_body(
+            captured_bind_closure(1),
+            captured_bind_closure(2),
+        )));
+        let mut plan = plan_static_transition_graph(source, &BTreeMap::new())
+            .expect("the two-body bind-continuation fixture plans");
+        let (seat, resume_site, position, owner, environment) =
+            direct_bind_coordinates(&plan);
+        assert_direct_bind_is_authorized(&plan, owner, seat, &environment);
+        assert!(matches!(
+            plan.planned_occurrence_expr(resume_site)
+                .expect("the resume site resolves"),
+            RuntimeExpr::Construct { .. }
+        ));
+        let response_record = plan
+            .aggregate_ownership
             .iter()
-            .flatten()
-            .filter(|occurrence| matches!(occurrence.expr, RuntimeExpr::LexicalClosure { .. }))
-            .map(|occurrence| occurrence.static_origin)
-            .collect::<Vec<_>>();
-        assert_eq!(multiple_seats.len(), 2, "the negative fixture needs two bodies");
-        for seat in multiple_seats {
-            let owner = ContinuationEmissionOwner::Predeclared(
-                multiple_plan
-                    .semantic
-                    .function_owner(seat)
-                    .expect("the closure owner resolves")
-                    .expect("the closure belongs to a predeclared unit"),
-            );
-            assert_eq!(
-                multiple_plan
-                    .boundary_closure_crossing_environment(owner, seat)
-                    .expect("the multi-target query is valid"),
-                None,
-                "a closure selected behind a multi-target resume field must fail closed"
-            );
-        }
+            .find(|record| {
+                record.producer == AggregateOccurrenceProducer::Source(resume_site)
+            })
+            .expect("the response constructor retains its ownership record");
+        assert!(response_record.children.iter().any(|child| {
+            child.position as usize == position && child.origin == Some(seat)
+        }));
+
+        let mut competing = plan
+            .abi
+            .descriptors
+            .iter()
+            .copied()
+            .find(|descriptor| {
+                matches!(
+                    descriptor.definition,
+                    AbiUnitDefinition::ClosureBody {
+                        defining_origin,
+                        provenance: AbiCaptureProvenance::Lexical,
+                    } if defining_origin != seat
+                )
+            })
+            .expect("the case body supplies a distinct real closure unit");
+        competing.definition = AbiUnitDefinition::ClosureBody {
+            defining_origin: seat,
+            provenance: AbiCaptureProvenance::Lexical,
+        };
+        plan.abi.descriptors.push(competing);
+
+        let target_bodies = plan
+            .emittable_units()
+            .expect("the corrupted ABI population still projects")
+            .into_iter()
+            .filter_map(|unit| {
+                matches!(
+                    unit.definition(),
+                    AbiUnitDefinition::ClosureBody {
+                        defining_origin,
+                        provenance: AbiCaptureProvenance::Lexical,
+                    } if defining_origin == seat
+                )
+                .then_some(unit.body_occurrence())
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            target_bodies.len(),
+            2,
+            "the negative population must reach target derivation with two distinct bodies"
+        );
+        assert_eq!(
+            plan.boundary_bind_continuation_environment_by_record(environment.record())
+                .expect("the multi-target production query is valid"),
+            None,
+            "two static closure-body targets must restore the generic refusal"
+        );
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: an otherwise valid direct response retains its resolvable
+    /// environment descriptor and source record, but the record's exact field
+    /// origin names a different real child and production authorization returns
+    /// `None`.
+    /// CLAIMED: position equality cannot substitute for exact response-instance
+    /// origin pairing.
+    /// THE GAP: removing `child.origin == Some(seat)` must admit this unchanged
+    /// population; the mutation proof is recorded in the candidate handoff.
+    #[test]
+    fn bind_continuation_production_rejects_response_field_origin_mismatch() {
+        let source = Box::leak(Box::new(bind_continuation_fixture(
+            captured_bind_closure(1),
+        )));
+        let mut plan = plan_static_transition_graph(source, &BTreeMap::new())
+            .expect("the direct bind-continuation fixture plans");
+        let (seat, resume_site, position, owner, environment) =
+            direct_bind_coordinates(&plan);
+        assert_direct_bind_is_authorized(&plan, owner, seat, &environment);
+        let other_child = plan
+            .semantic
+            .child_origin(resume_site, 0)
+            .expect("the response has a distinct real non-closure child");
+        assert_ne!(other_child, seat);
+        let response_record = plan
+            .aggregate_ownership
+            .iter_mut()
+            .find(|record| {
+                record.producer == AggregateOccurrenceProducer::Source(resume_site)
+            })
+            .expect("the response constructor retains its ownership record");
+        let paired_field = response_record
+            .children
+            .iter_mut()
+            .find(|child| child.position as usize == position)
+            .expect("the response record retains the recursive field");
+        paired_field.origin = Some(other_child);
+
+        assert_eq!(
+            plan.boundary_closure_environment_by_record(environment.record())
+                .expect("the environment descriptor remains resolvable"),
+            environment
+        );
+        assert_eq!(
+            plan.boundary_bind_continuation_environment_by_record(environment.record())
+                .expect("the mismatched-origin production query is valid"),
+            None,
+            "a response field naming another instance must restore the generic refusal"
+        );
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: a direct response retains its exact field origin and resolvable
+    /// environment record, but the response field's lifetime authority is
+    /// narrowed so it no longer admits the activation-owned environment.
+    /// CLAIMED: a response cannot carry an environment whose planned lifetime
+    /// is shorter than the field requires.
+    /// THE GAP: removing the production lifetime comparison must admit this
+    /// unchanged population; the mutation proof is recorded in the handoff.
+    #[test]
+    fn bind_continuation_production_rejects_response_lifetime_mismatch() {
+        let activation_capture = RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: vec!["captured".to_string()],
+            body: Box::new(RuntimeExpr::Var(0)),
+        };
+        let source = Box::leak(Box::new(bind_continuation_fixture(
+            captured_bind_closure_with_captures(1, vec![activation_capture]),
+        )));
+        let mut plan = plan_static_transition_graph(source, &BTreeMap::new())
+            .expect("the activation-capturing bind fixture plans");
+        let (seat, resume_site, position, owner, environment) =
+            direct_bind_coordinates(&plan);
+        assert_direct_bind_is_authorized(&plan, owner, seat, &environment);
+        let environment_record = plan
+            .aggregate_ownership
+            .get(environment.record().0 as usize)
+            .expect("the environment record remains present");
+        assert_eq!(
+            environment_record.meet,
+            PlannedReferentLifetime::ActivationOwned,
+            "the fixture must make the environment lifetime genuinely activation-owned"
+        );
+        let response_record = plan
+            .aggregate_ownership
+            .iter_mut()
+            .find(|record| {
+                record.producer == AggregateOccurrenceProducer::Source(resume_site)
+            })
+            .expect("the response constructor retains its ownership record");
+        let paired_field = response_record
+            .children
+            .iter_mut()
+            .find(|child| {
+                child.position as usize == position && child.origin == Some(seat)
+            })
+            .expect("the response record retains the exact recursive field");
+        assert_eq!(paired_field.lifetime, PlannedReferentLifetime::ActivationOwned);
+        paired_field.lifetime = PlannedReferentLifetime::Persistent;
+
+        assert_eq!(
+            plan.boundary_closure_environment_by_record(environment.record())
+                .expect("the environment descriptor remains resolvable"),
+            environment
+        );
+        assert_eq!(
+            plan.boundary_bind_continuation_environment_by_record(environment.record())
+                .expect("the mismatched-lifetime production query is valid"),
+            None,
+            "a response field that cannot carry the environment must restore the refusal"
+        );
     }
 
     /// **A MALFORMED ENVELOPE MUST REFUSE, NOT READ AS A NON-MEMBER.**
