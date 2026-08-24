@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-24 14:51:23Z — from 438 issue file(s) in `docs/program/issues/`.
+2026-08-24 15:15:11Z — from 438 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -162,7 +162,7 @@ the committed file matches the generator's output.
 | `LANG-MATCH-PATTERN-FORMS-ABSENT` | spec 34 §3 normatively lists nine pattern forms and the elaborator's PatKind has three -- literals, tuple/record patterns, as-patterns, or-patterns and guards are all absent from the AST, with no deferral statement anywhere in a chapter marked impl-ready and high-priority, and no tracker row for any of them | draft | language | unsized | none | — |
 | `LANG-MEMBERSHIP-OPERATOR-SURFACE` | membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator | ready | language | M | none | — |
 | `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` | Attached-proof namespace closure: normative clarification that a proof's attached namespace is closed under its subject's defining module (a nonlocal attached-declaration head rejects at declaration time), with paired conformance. The coupled durable artifact of the Component B convert-to-local ruling. | draft | spec | S | none | — |
-| `LANG-MOD-CATALOG-COMPLETENESS` | WP-4 Component B — catalog completeness: give Nat and OrdResult (dedup two private copies) canonical public homes plus the fixpoint homeless-convenience census, deliver Order's provider surface + identity, migrate the consuming units (Gcd imports add/mul + leq_nat/sub + Nat and drops its reimplementations), and satisfy whole-catalog strict-green. The module/import campaign's catalog-reuse success step. | merged | language | L | none | — |
+| `LANG-MOD-CATALOG-COMPLETENESS` | WP-4 Component B — catalog completeness: give Nat and OrdResult (dedup two private copies) canonical public homes plus the fixpoint homeless-convenience census, deliver Order's provider surface + identity, migrate the consuming units (Gcd imports add/mul + leq_nat/sub + Nat and drops its reimplementations), and satisfy whole-catalog strict-green. The module/import campaign's catalog-reuse success step. | active | language | L | none | — |
 | `LANG-MOD-CATALOG-REALIZATION` | WP-4 (Component A) — module-graph/roots loader realization: the uniform local-scope prebind fix (decouple local-declaration binding from ResolutionMode) so canonical Or binds under legacy, the self-contained green set checks standalone-strict, and Arithmetic add/mul publish genuine legacy loader-resolved identity. Order + OrdResult + consumer migration + whole-catalog strict-green are Component B. | merged | language | M | none | — |
 | `LANG-MOD-KENFMT-DECL-LAYOUT` | kenfmt breakable layout for the module/import declaration surface: Doc-builders for ExportDecl and ImportDecl (and selective-import / re-export name lists) so an overflowing name list wraps under CANONICAL_WIDTH and round-trips as a formatter fixed point. The Component B formatter-gate gap. | draft | language | M | none | — |
 | `LANG-MOD-LOADER-ENTRY` | WP-1 — route ken check catalog files through elaborate_module_from_roots instead of the direct single-file call; behavior-preserving, non-strict | merged | language | M | none | — |

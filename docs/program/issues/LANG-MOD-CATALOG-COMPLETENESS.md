@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-CATALOG-COMPLETENESS
 title: "WP-4 Component B — catalog completeness: give Nat and OrdResult (dedup two private copies) canonical public homes plus the fixpoint homeless-convenience census, deliver Order's provider surface + identity, migrate the consuming units (Gcd imports add/mul + leq_nat/sub + Nat and drops its reimplementations), and satisfy whole-catalog strict-green. The module/import campaign's catalog-reuse success step."
-status: merged
+status: active
 owner: language
 size: L
 gate: none
@@ -11,7 +11,32 @@ github: null
 origin: "Architect ruling evt_214z6r6qnwme0 (2026-08-24), unbundling the WP-4 strict whole-catalog co-gate off Component A. The co-gate gates a deliverable outside WP-4's authorized surface (a canonical home for the type Nat), so it is re-homed here. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
-> # RELEASED 2026-08-24 — Component A merged (574eb90c0 / ee2631ff8); B is ready.
+> # ACTIVE — authorized PARTIAL landed; remainder HELD. Not terminally closed.
+>
+> ## AUTHORIZED PARTIAL LANDED 2026-08-24 at squash `76426e9f9`
+>
+> The unblocked partial-B increment MERGED: the OrdResult canonical home + the
+> homeless-convenience census + the Rosetta flat-source compat repair. Gates on
+> exact `1c68a1ad`: QA `evt_1nwzamjjrw2pq`, Architect `evt_533cq9p3jx0ew`, CV
+> `evt_1tvvfenq4gmfa`; Decision `dec_7j5v11ejfh933`; Adversary M8 CLEAN
+> `evt_ryrmff37zene`.
+>
+> This node is NOT terminally closed. The corpus close `526e920e8` ("corpus:
+> close LANG-MOD-CATALOG-COMPLETENESS") was an M7 over-close of an authorized
+> PARTIAL and is corrected here (status merged -> active): the whole-catalog
+> strict-green criterion and the Nat home (AC-B5a) remain HELD on operator
+> Decision `dec_1kqwn6hdvn7d2`. `active` (accepted-partial, in-flight), not
+> `ready`, because the remainder is held on an operator decision, not startable.
+> The node closes only when that Decision resolves and the Nat prerequisite lands.
+>
+> Post-merge follow-up (Adversary `evt_ryrmff37zene`, non-blocking, for the
+> record): the Rosetta compat harness guards the stripped Compare/Derived import
+> edges with exact-cardinality panics, but has NO guard that the three un-stripped
+> providers (Transport/Or/OrdResult) carry zero import edges — a future catalog
+> import on any of the three would silently regress the harness to the UnboundName
+> CI-red class (the same consumer-under-CI family as the two prior walls). Cheap
+> hardening for the ring's next `rosetta.rs` touch: assert no residual `import`
+> line remains in those three sources after extraction.
 >
 > Component B carries the substance the WP-4 hard stop exposed
 > (language-implementer evt_3j60e77n0ahsy, Architect ruling evt_214z6r6qnwme0):
