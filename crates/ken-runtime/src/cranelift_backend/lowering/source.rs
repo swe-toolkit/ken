@@ -645,6 +645,7 @@ impl<'a> Lowering<'a> {
                     }
                     RuntimeExpr::CheckedComputationalIHInvocation {
                         call_template_id,
+                        kind,
                         body,
                         ..
                     } => {
@@ -654,6 +655,7 @@ impl<'a> Lowering<'a> {
                         let body = self.owned_child_occurrence(static_origin, 0, *body)?;
                         self.enter_checked_computational_ih_invocation(
                             call_template_id,
+                            kind,
                             &body.expr,
                             body.static_origin,
                         )?;

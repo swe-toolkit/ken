@@ -964,6 +964,7 @@ mod tests {
                 RuntimeExpr::CheckedComputationalIHInvocation {
                     call_template_id: call,
                     checked_occurrence_path: path,
+                    kind: crate::CheckedComputationalIHInvocationKind::OrdinaryApplication,
                     body: Box::new(body),
                 }
             } else {
@@ -1448,6 +1449,7 @@ mod tests {
             RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id,
                 checked_occurrence_path,
+                kind,
                 body,
             } => RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id: if cause == D2jCause::Invocation {
@@ -1456,6 +1458,7 @@ mod tests {
                     call_template_id
                 },
                 checked_occurrence_path,
+                kind,
                 body: Box::new(d2j_rewrite_body(*body, cause, in_case_body)),
             },
             RuntimeExpr::ComputationalMatch {

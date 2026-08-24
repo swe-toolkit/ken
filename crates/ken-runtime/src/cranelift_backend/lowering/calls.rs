@@ -170,6 +170,72 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+        /// Consume the compiler-private checked-IH use kind at a static-worker
+        /// edge.
+        ///
+        /// This match is intentionally exhaustive with no fallback. Adding a
+        /// checked-IH use kind makes native lowering fail to compile until its
+        /// representation is decided. The kind never enters the emitted value.
+        pub(super) fn materialize_checked_ih_static_worker_application(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            pending: PendingCheckedIhCall,
+            disposition: CheckedApplicationDisposition,
+            worker: &StaticWorkerBinding,
+        ) -> Result<Option<LoweringOperand>, CraneliftBackendError> {
+            if disposition != CheckedApplicationDisposition::ConsumedHere {
+                return Ok(None);
+            }
+            let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(|| {
+                unsupported(
+                    "CheckedIhFunctionalRepresentation",
+                    "a consumed checked-IH application has no oriented plan",
+                )
+            })?;
+            let call = plan
+                .computational_ih_call(pending.call_template_id)
+                .ok_or_else(|| {
+                    unsupported(
+                        "CheckedIhFunctionalRepresentation",
+                        "a consumed checked-IH application has no checked call template",
+                    )
+                })?;
+            plan.computational_ih_slot(call.slot_template_id)
+                .ok_or_else(|| {
+                    unsupported(
+                        "CheckedIhFunctionalRepresentation",
+                        "a consumed checked-IH application names a slot the plan does not hold",
+                    )
+                })?;
+
+            match pending.kind {
+                crate::CheckedComputationalIHInvocationKind::OrdinaryApplication => {
+                    // A bare computational-IH variable reaches the ordinary
+                    // erasure route as a zero-operand application. When its
+                    // planner-selected worker is functional, that exact
+                    // checked disagreement is the defunctionalization seam,
+                    // not permission to weaken the worker's arity gate.
+                    if call.arity == 0 && worker.declared_arity == 1 {
+                        self.emit_checked_ih_captured_environment(builder, worker)
+                            .map(Some)
+                    } else {
+                        Ok(None)
+                    }
+                }
+                crate::CheckedComputationalIHInvocationKind::CheckedHostComputationTail => {
+                    if call.arity == 0 && worker.declared_arity == 1 {
+                        self.emit_checked_ih_captured_environment(builder, worker)
+                            .map(Some)
+                    } else {
+                        Ok(None)
+                    }
+                }
+                crate::CheckedComputationalIHInvocationKind::CheckedHostVisContinuation => {
+                    Ok(None)
+                }
+            }
+        }
+
         /// **The route-selected static-worker emitter, from evaluated arguments
         /// onward.** Shared verbatim by the direct descent and by `D8e`'s
         /// source-machine consumer; neither reassembles any part of it.

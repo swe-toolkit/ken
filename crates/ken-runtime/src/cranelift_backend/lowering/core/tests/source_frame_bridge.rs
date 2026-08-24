@@ -5425,6 +5425,7 @@ fn d8f_marked_application(
         RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
             checked_occurrence_path: path,
+            kind: crate::CheckedComputationalIHInvocationKind::OrdinaryApplication,
             body: Box::new(body),
         }
     };

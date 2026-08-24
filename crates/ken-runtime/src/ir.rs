@@ -529,6 +529,21 @@ pub enum RuntimePartiality {
 /// [`RuntimeValue`], whose closure arm may not expose structural equality
 /// (`spec/40-runtime/41-values.md §2.1`, `D2`). Compare a closure-free
 /// projection such as [`RuntimeGroundValue`] instead.
+/// The closed compiler-private shape of a checked computational-IH use.
+///
+/// This is carried in Runtime IR only. It is not a runtime value tag: native
+/// lowering consumes it while choosing the static dispatcher arm, and the
+/// crossing value remains only the captured environment.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckedComputationalIHInvocationKind {
+    /// An ordinary source application, with exactly its source operands.
+    OrdinaryApplication,
+    /// A checked host computation whose IH stands as the computation tail.
+    CheckedHostComputationTail,
+    /// A checked `Vis` continuation, with the host result appended.
+    CheckedHostVisContinuation,
+}
+
 #[derive(Clone, Debug)]
 pub enum RuntimeExpr {
     #[doc(hidden)]
@@ -567,6 +582,7 @@ pub enum RuntimeExpr {
     CheckedComputationalIHInvocation {
         call_template_id: u64,
         checked_occurrence_path: Vec<u64>,
+        kind: CheckedComputationalIHInvocationKind,
         body: Box<RuntimeExpr>,
     },
     Value(RuntimeValue),

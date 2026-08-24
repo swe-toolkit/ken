@@ -3211,6 +3211,7 @@ impl<'a> Lowering<'a> {
             }
             RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id,
+                kind,
                 body,
                 ..
             } => {
@@ -3221,6 +3222,7 @@ impl<'a> Lowering<'a> {
                 let body = self.child_occurrence(static_origin, 0, body)?;
                 self.enter_checked_computational_ih_invocation(
                     *call_template_id,
+                    *kind,
                     body.expr,
                     body.static_origin,
                 )?;
@@ -11673,6 +11675,7 @@ impl<'a> Lowering<'a> {
             }
             RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id,
+                kind,
                 body,
                 ..
             } => {
@@ -11680,6 +11683,7 @@ impl<'a> Lowering<'a> {
                 let body = self.child_occurrence(static_origin, 0, body)?;
                 self.enter_checked_computational_ih_invocation(
                     *call_template_id,
+                    *kind,
                     body.expr,
                     body.static_origin,
                 )?;
@@ -12516,11 +12520,24 @@ impl<'a> Lowering<'a> {
                         // consumed only by the application the plan issued it
                         // for. An ordinary selected-argument call reaching this
                         // seat with a marker pending leaves it pending.
-                        self.consume_checked_ih_marker_at_static_worker_call(
+                        let pending = self.pending_computational_ih_call;
+                        let disposition = self.consume_checked_ih_marker_at_static_worker_call(
                             u64::from(*index),
                             args.len(),
                             static_origin,
                         )?;
+                        if let Some(pending) = pending {
+                            if let Some(environment) = self
+                                .materialize_checked_ih_static_worker_application(
+                                    builder,
+                                    pending,
+                                    disposition,
+                                    &worker,
+                                )?
+                            {
+                                return Ok(environment);
+                            }
+                        }
                         return self.call_static_worker(
                             builder,
                             &worker,
