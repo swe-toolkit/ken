@@ -109,9 +109,13 @@ states the authoritative list. In brief:
   identity — that the original four-fixture reconciliation under-enumerated.
   The re-enumeration is therefore CENSUS-driven, not a fixed roster: grep the
   retired oracle constant across the whole test tree and, after the Part-1 /
-  Part-2 repairs make them complete, reconcile EVERY consumer so that (a) both
-  report-2 checked-family programs are green with their runner tables
-  re-pointed off the advancing-refusal pins; (b) all eight
+  Part-2 repairs make them complete, reconcile EVERY consumer so that (a)
+  report-2's single content-distinct checked-family source is green — its four
+  fixture copies are byte-identical and collapse to one source identity, so its
+  TWO runner tests (not two content-distinct programs) are re-pointed off the
+  advancing-refusal pins, and the runner's population pin
+  (`family_rows_are_unique_by_source_content`) rejects any label-inflated row,
+  holding one row per byte-distinct source (`dbadfad74`); (b) all eight
   `rt_cold_lowering_path_enumeration` rows land as `Disposition::Completes`;
   and (c) no surviving consumer of that oracle anywhere in the test tree still
   expects an `ESCAPING_FUNCTIONAL_IH` / advancing-refusal disposition — the
