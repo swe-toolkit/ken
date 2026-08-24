@@ -25,9 +25,11 @@ const ORD_NAT_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Numeri
 fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_or(&mut env);
+    let provider_state = catalog_or::core_logic_or_module_state(&env);
     env.elaborate_ken_md_file(TRANSPORT_KEN_MD).expect("Core/Logic/Transport.ken must elaborate");
     env.elaborate_ken_md_file(COLLECTIONS_KEN_MD).expect("Data/Collections/Derived.ken.md must elaborate");
     env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD).expect("Core/Classes/LawfulClasses.ken must elaborate");
+    catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     env
 }
 
@@ -36,6 +38,7 @@ fn entry_elaborates_with_every_checked_fence() {
     let mut env = base_env();
     env.elaborate_ken_md_file(ORD_NAT_KEN_MD)
         .expect("catalog/packages/Data/Numeric/Nat/Order.ken.md must elaborate (Definition + every checked fence)");
+    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "total_leq_nat");
     assert!(env.globals.contains_key("Ord_instance_Nat"), "Ord_instance_Nat must be a real registered global");
 }
 
