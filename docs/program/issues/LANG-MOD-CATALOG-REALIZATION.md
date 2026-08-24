@@ -1,6 +1,6 @@
 ---
 id: LANG-MOD-CATALOG-REALIZATION
-title: "WP-4 (Component A) — module-graph/roots loader realization + provider public surface: the self-contained green set checks standalone-strict through the real loader, and Arithmetic add/mul + Order leq_nat/sub are made public/import-eligible. Whole-catalog strict-green + consumer migration are re-homed to Component B."
+title: "WP-4 (Component A) — module-graph/roots loader realization: the uniform local-scope prebind fix (decouple local-declaration binding from ResolutionMode) so canonical Or binds under legacy, the self-contained green set checks standalone-strict, and Arithmetic add/mul publish genuine legacy loader-resolved identity. Order + OrdResult + consumer migration + whole-catalog strict-green are Component B."
 status: ready
 owner: language
 size: M
@@ -65,10 +65,12 @@ origin: "Architect component framing evt_hpnhqy1ex286 (WP-4), under [[LANG-MODUL
 
 # Objective
 
-Realize the module-graph/roots loader against the authorized provider surface:
-the self-contained green set checks standalone through the real loader under
-strict, and the authorized providers (Arithmetic `add`/`mul`, Order
-`leq_nat`/`sub`) are made public and import-eligible for Component B to consume.
+Realize the module-graph/roots loader so it conforms to spec §3.3 — a unit's own
+local declarations bind independent of `ResolutionMode` (the uniform local-scope
+prebind fix), so canonical `Core.Logic.Or` binds its `Inl`/`Inr` under legacy;
+the self-contained green set checks standalone-strict; and the Arithmetic
+providers (`add`/`mul`) are made public and publish genuine legacy loader-resolved
+identity. Order + `OrdResult` + all consumer migration are Component B.
 
 # Deliverable (Component A)
 
@@ -92,49 +94,29 @@ strict, and the authorized providers (Arithmetic `add`/`mul`, Order
   declaration kinds — ordinary-data ctors (DataDecl), explicit-data ctors
   (ExplicitDataDecl), and class locals (ClassDecl) — NOT an `Inl`/`Inr`
   point-fix (a ctor-only repair just surfaces the next declaration-kind refusal).
-- ADD the provider-INTERNAL transitive closure (Architect §1b structural
-  closure, evt_3pfr8hgp29m69 — this SUPERSEDES enumerating edges one at a time:
-  an `UnresolvedCon` names only the FIRST missing name, so per-edge authorization
-  guarantees another hard stop). PRE-AUTHORIZED as Component A work: every import
-  edge AND pub marking that the genuine providers (Arithmetic, Order) and their
-  transitive PROVIDER dependencies (Transport, Or, LawfulClasses, and anything
-  THOSE in turn require) need to FULLY ELABORATE under the legacy real loader.
-  Author each to its ACTUAL unresolved names, grounded by RESOLUTION not spelling,
-  and proceed through the whole closure WITHOUT hard-stopping on mechanical edges
-  until the genuine providers legacy-elaborate and publish. Known members at base:
-  - Arithmetic (no import line at base) -> `import Core.Logic.Transport (cong,
-    sym, trans)`.
-  - Order (imports only `Core.Logic.Or` at base) -> retain Or, add `import
-    Core.Logic.Transport (cong, trans)` AND `import Core.Classes.LawfulClasses
-    (IsTrue, bool_or, Ord)`. Order uses `IsTrue`/`bool_or`/`Ord` UNQUALIFIED
-    (defs in LawfulClasses.ken.md:43/92/108); the earlier "NOT LawfulClasses"
-    premise was spelling-scoped and is WITHDRAWN (Architect owns it). `absurd`/`J`
-    are kernel reserved sugar, not edges.
-  - Make exactly the provider names each dep exposes `pub` (add/mul; leq_nat/sub;
-    Transport's cong/sym/trans; LawfulClasses's IsTrue/bool_or/Ord). Additive,
-    identity-preserving, zero `trusted_base()` delta (same as the Transport pub).
-  A/B DISCRIMINATOR (keeps the closure bounded): IN A = an edge/pub a GENUINE
-  PROVIDER's own body or interface needs to elaborate and publish (Order's proofs
-  need `bool_or`; LawfulClasses's proofs need `Or`). IN B = consumer reuse (Gcd
-  importing add/mul/leq_nat/sub), the canonical `Nat` home, the strict-caller
-  move, whole-catalog strict-green, the 34-residual triage. THE ONE REMAINING
-  STOP: if a provider-internal dep itself needs a HOMELESS catalog convenience
-  (no defining public interface — the `Nat`-home situation), hard-stop there (that
-  IS the true A/B boundary). Expected not to occur: `Nat`/Zero/Suc are native
-  prelude (legacy-resolvable), the floor is {Bool,Char,List}, Int is an opaque
-  primitive, Or binds post-fix, and absurd/J/Equal/Refl/Proved are kernel.
-- Mark `pub` on Arithmetic (`add`, `mul`) + Order (`leq_nat`, `sub`) and make
-  Transport's `cong`/`sym`/`trans` `pub` — the provider SURFACE Component B's
-  consumer migration will consume.
-- With the loader fix + provider-internal imports applied, the module-graph/roots
-  loader fully elaborates canonical `Core.Logic.Or` (its own `Inl`/`Inr` now bind
-  locally under legacy), Order imports Or's genuine interface and fully
-  elaborates, Arithmetic likewise (`Nat` resolves via legacy external fallback to
-  the native prelude inductive `prelude.rs:440 data Nat = Zero | Suc Nat`;
-  `cong`/`sym`/`trans` via the added Transport imports), and the genuine
-  `GlobalId`s for add/mul/leq_nat/sub publish — measurable under the LEGACY
-  real-caller resolution the loader ships (`elaborate_module_from_roots =>
-  ResolutionMode::Legacy`). Moving the real caller to STRICT is Component B.
+- ADD Arithmetic's provider-internal import (its ONLY closure dependency —
+  Architect HS#5 ruling evt_613d9fm7j45qj scoped A to Arithmetic): Arithmetic (no
+  import line at base) -> `import Core.Logic.Transport (cong, sym, trans)`, and
+  make `add`/`mul` + Transport's `cong`/`sym`/`trans` `pub`. Arithmetic has ZERO
+  OrdResult/LawfulClasses references; its provider-internal closure is
+  Transport-only, which elaborates FULLY under legacy. Identity-preserving, zero
+  `trusted_base()` delta.
+- ORDER IS NOT TOUCHED IN A. Order's provider surface (pub `leq_nat`/`sub` +
+  Transport/LawfulClasses imports) and Order's `leq_nat`/`sub` identity move to
+  Component B, because Order's closure transitively needs
+  `Core.Classes.LawfulClasses` -> the HOMELESS `OrdResult` (HS#5), so it is NOT
+  self-measurable in A.
+  A performs no Order/LawfulClasses source edits — no unverifiable-in-A changes.
+- With the loader fix + Arithmetic's Transport import applied, the
+  module-graph/roots loader fully elaborates canonical `Core.Logic.Or` (its own
+  `Inl`/`Inr` now bind locally under legacy) and Arithmetic (`Nat` resolves via
+  legacy external fallback to the native prelude inductive `prelude.rs:440 data
+  Nat = Zero | Suc Nat`; `cong`/`sym`/`trans` via the added Transport import), and
+  Arithmetic's genuine `add`/`mul` `GlobalId`s publish — measurable under the
+  LEGACY real-caller resolution the loader ships (`elaborate_module_from_roots =>
+  ResolutionMode::Legacy`). A's entire closure (loader fix + Or + Transport +
+  ProofErasureBoundaryChecker + Arithmetic) is HOMELESS-FREE — no further hard
+  stop in A. Moving the real caller to STRICT is Component B.
 
 # The self-contained green set (measured at base f0e0b92fa)
 
@@ -154,14 +136,15 @@ are Component B's population (the 34-baseline-red residual triage moves to B).
   provider-import and pub edits do not break the green set. This is the
   strict-roots check on the green set specifically, NOT a move of the real caller
   to strict over the whole catalog (that is Component B).
-- AC-A2. With the loader fix applied, Arithmetic (`add`, `mul`) and Order
-  (`leq_nat`, `sub`) FULLY elaborate through the real loader under the LEGACY
-  real-caller mode A ships, and their genuine `GlobalId`s are observed by
-  IDENTITY (Architect mechanism ruling evt_41tpyzwkc14ez) — reachability to the
-  GENUINE provider (not repo text, not a frozen numeric id, no invented/competing
-  identity), NOT Arithmetic/Order standalone-STRICT-green (which is Component B).
-  Component B must preserve these provider identities when it re-homes `Nat` and
-  moves the caller to strict (B's forward-compat constraint).
+- AC-A2 (Arithmetic only — Order's identity is Component B, HS#5). With the
+  loader fix applied, Arithmetic (`add`, `mul`) FULLY elaborates through the real
+  loader under the LEGACY real-caller mode A ships, and its genuine `GlobalId`s
+  are observed by IDENTITY (Architect ruling evt_41tpyzwkc14ez /
+  evt_613d9fm7j45qj) — reachability to the GENUINE provider (not repo text, not a
+  frozen numeric id, no invented/competing identity), NOT Arithmetic
+  standalone-STRICT-green (which is Component B). Component B must preserve
+  Arithmetic's provider identities when it re-homes `Nat` and moves the caller to
+  strict (B's forward-compat constraint).
 - AC-A4 (identity envelope). Idempotent same-identity, fail-closed
   distinct-identity: the existing prelude-collision `AmbiguousReference` check
   (modules.rs:1667-1673) must still bite — two distinct declarations of one
@@ -220,6 +203,22 @@ provider-internal transitive closure to legacy-elaborability as Component A work
 (see the Deliverable), with the A/B discriminator and the homeless-convenience
 seam as the only remaining genuine stop. The HS#3 loader fix is build-CONFIRMED
 (canonical Or loads under legacy; Arithmetic proceeds).
+
+HS#5 — the homeless-convenience seam fired exactly as designed (Architect ruling
+evt_613d9fm7j45qj): Order's closure via LawfulClasses reaches the HOMELESS
+`OrdResult` (two private competing decls, no defining public interface). The
+capability-vs-dependency discriminator classifies it on the DEPENDENCY side
+(unlike Or, whose ctors A already had and the loader just failed to bind):
+`OrdResult` must be CREATED as a canonical home = catalog completeness = B's
+charter. RESOLUTION — the chain CONVERGES: `OrdResult`'s canonical home -> B;
+AC-A2 SPLITS by self-measurability (Arithmetic add/mul identity stays in A, its
+closure being Transport-only; Order's leq_nat/sub identity + Order's provider
+surface move to B); Component A is reduced to its HOMELESS-FREE, self-measurable
+closure (loader fix + Or pin + Arithmetic + green set) with no further hard stop.
+The recurring lesson holds and is now discharged: before re-homing an AC, ask
+whether the closure member the component cannot supply is its OWN latent
+capability defect (Or -> the loader fix, kept in A) or genuinely the OTHER
+component's deliverable (Nat, OrdResult -> created in B).
 
 SHARED PREDICATE (confirmed): a `GlobalId` is signature-gated (elab.rs:7702-7733)
 and exists only after the provider FULLY elaborates; full elaboration pulls the
