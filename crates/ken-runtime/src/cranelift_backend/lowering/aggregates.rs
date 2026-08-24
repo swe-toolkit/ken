@@ -909,13 +909,13 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
-        /// Admissibility for the exact generated-unit RESULT seam.
+        /// Admissibility for a planner-issued positional-environment schema.
         ///
         /// The ordinary boundary walk remains unchanged and refuses every
-        /// `Lowered::Closure`. This separate route recognizes only a closure
-        /// carrying a planner-issued positional-environment identity, validates
-        /// that identity before any parent allocation, and recursively screens
-        /// the environment captures. No other crossing calls this method.
+        /// `Lowered::Closure`. The result-edge route calls this directly; the
+        /// bind-continuation route calls it only after separately proving its
+        /// singleton target and instance pairing. Both validate the identity
+        /// before any parent allocation and recursively screen the captures.
         pub(super) fn represented_boundary_admissibility(
             &self,
             value: &Lowered,
@@ -1002,6 +1002,102 @@ impl<'a> Lowering<'a> {
                 | Lowered::RecursiveBackedge
                 | Lowered::Trap(_) => value.boundary_transfer_admissibility(),
             }
+        }
+
+        /// Admissibility for the exact bind-continuation crossing arm.
+        ///
+        /// A closure record that is valid as a schema is not by itself bind
+        /// authority. This walk re-proves the planner's singleton target and
+        /// per-instance field pairing for every represented closure in the
+        /// value graph. A miss deliberately falls through the unchanged generic
+        /// closure refusal rather than becoming a record-only fallback.
+        pub(super) fn bind_continuation_boundary_admissibility(
+            &self,
+            value: &Lowered,
+        ) -> Result<(), CraneliftBackendError> {
+            match value {
+                Lowered::Closure {
+                    captures,
+                    boundary_environment: Some(record),
+                    ..
+                } => {
+                    if self
+                        .static_transition_plan
+                        .boundary_bind_continuation_environment_by_record(*record)?
+                        .is_none()
+                    {
+                        return value.boundary_transfer_admissibility();
+                    }
+                    self.represented_boundary_admissibility(value)?;
+                    for capture in captures {
+                        if let LoweringOperand::Specialized(value) = capture {
+                            self.bind_continuation_boundary_admissibility(value)?;
+                        }
+                    }
+                    Ok(())
+                }
+                Lowered::Constructor { args, .. } => {
+                    for field in specialized_field_refs_at(
+                        args,
+                        "a constructor field in a bind-continuation response",
+                    )? {
+                        self.bind_continuation_boundary_admissibility(field)?;
+                    }
+                    Ok(())
+                }
+                Lowered::Record { fields, .. } => {
+                    for field in fields {
+                        self.bind_continuation_boundary_admissibility(&field.value)?;
+                    }
+                    Ok(())
+                }
+                Lowered::HostResult { error, ok, .. } => {
+                    self.bind_continuation_boundary_admissibility(error)?;
+                    self.bind_continuation_boundary_admissibility(ok)
+                }
+                Lowered::DynamicConstructor(dynamic) => {
+                    for alternative in &dynamic.alternatives {
+                        for field in &alternative.fields {
+                            self.bind_continuation_boundary_admissibility(field)?;
+                        }
+                    }
+                    Ok(())
+                }
+                Lowered::Closure {
+                    boundary_environment: None,
+                    ..
+                }
+                | Lowered::DeclarationClosure { .. }
+                | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::Int { .. }
+                | Lowered::Bool { .. }
+                | Lowered::ProcessExitStatus { .. }
+                | Lowered::CapabilityToken { .. }
+                | Lowered::ResourceToken { .. }
+                | Lowered::BoundedNat(_)
+                | Lowered::StructuralNat(_)
+                | Lowered::ResponseBytes { .. }
+                | Lowered::Bytes(_)
+                | Lowered::BorrowedNativeValue { .. }
+                | Lowered::BorrowedOption { .. }
+                | Lowered::String(_)
+                | Lowered::RecursiveBackedge
+                | Lowered::Trap(_) => value.boundary_transfer_admissibility(),
+            }
+        }
+
+        /// Emit one value through the ordinary producer only after the exact
+        /// bind-continuation proof has replaced every authorized closure by its
+        /// positional environment.
+        pub(super) fn transfer_bind_continuation_boundary_value(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            origin: StaticOriginId,
+            value: &Lowered,
+        ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+            self.bind_continuation_boundary_admissibility(value)?;
+            self.source_aggregate_preflight(value)?;
+            self.emit_carrier_transfer(builder, origin, value)
         }
 
         /// Emit a boundary value after replacing only planner-authorized closure
@@ -1295,6 +1391,30 @@ impl<'a> Lowering<'a> {
             &self,
             child: &Lowered,
         ) -> Result<Vec<BoundaryReferentOwner>, CraneliftBackendError> {
+            // A planner-authorized boundary closure is emitted as its positional
+            // environment aggregate, not as the forbidden ordinary-closure
+            // shape. Read that exact record's allocation lane so the enclosing
+            // source aggregate reconciles the value it will actually store.
+            if let Lowered::Closure {
+                boundary_environment: Some(record),
+                ..
+            } = child
+            {
+                self.static_transition_plan
+                    .boundary_closure_environment_by_record(*record)?;
+                let allocation = self
+                    .static_transition_plan
+                    .aggregate_record_view(*record)?
+                    .allocation();
+                return Ok(vec![match allocation {
+                    PlannedAggregateAllocation::PersistentGround => {
+                        BoundaryReferentOwner::PersistentStore
+                    }
+                    PlannedAggregateAllocation::InvocationAggregate => {
+                        BoundaryReferentOwner::InvocationArena
+                    }
+                }]);
+            }
             match child.boundary_disposition() {
                 // An immediate with no spill class has no boundary node at any
                 // magnitude, so there is nothing for an arena or a store to own.

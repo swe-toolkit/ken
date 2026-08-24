@@ -6521,6 +6521,14 @@ impl<'a> Lowering<'a> {
             invoking_site: D2K_BOUNDARY_TRANSFER_INVOKING_SITE
                 .with(std::cell::Cell::get),
         });
+        // The test-only retired flat-order control intentionally receives no
+        // M4 representation: it is a rejection witness, not another bind edge.
+        // The switch is absent from ordinary artifacts by cfg construction.
+        if value.contains_boundary_closure_environment()?
+            && !px8ds_retired_flat_order_enabled()
+        {
+            return self.transfer_bind_continuation_boundary_value(builder, origin, value);
+        }
         value.boundary_transfer_admissibility()?;
         self.source_aggregate_preflight(value)?;
         self.emit_carrier_transfer(builder, origin, value)

@@ -359,17 +359,17 @@ fn run_px8ds_retired_flat_control() {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CLOSURE-BOUNDARY-RESIDUAL.
+// Ignored pending RT-CARRIED-IH-DISPATCH-SITEOP.
 //
 // Observed signature on the independent ordinary plan, exactly:
-//   Closure: a closure cannot cross the boundary: it is runtime-local and
-//     live-domain only, and it has no durable lane
+//   Effect: seat Argument(0) of ConsoleIsTerminal needs ConstructorTag, which
+//     it cannot observe in CarriedWord
 //
-// Owner node: RT-CLOSURE-BOUNDARY-RESIDUAL.
-// Splitting the retired-flat control proves this is the production plan's own
-// remaining M4 crossing, not a refusal inherited from the negative half.
+// Owner node: RT-CARRIED-IH-DISPATCH-SITEOP.
+// M4's exact bind-continuation arm retires the prior closure refusal. The row
+// now reaches this distinct object-emission successor and remains ignored.
 #[test]
-#[ignore = "RT-CLOSURE-BOUNDARY-RESIDUAL: the independent ordinary-plan half still refuses because a runtime-local closure has no durable lane across the boundary"]
+#[ignore = "RT-CARRIED-IH-DISPATCH-SITEOP: closure crossing succeeds; object emission refuses because seat Argument(0) of ConsoleIsTerminal needs ConstructorTag, which it cannot observe in CarriedWord"]
 fn px8ds_real_same_depth_path_runs_exact_edges() {
     std::thread::Builder::new()
         .name("px8ds-real-siblings".to_string())

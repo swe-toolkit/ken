@@ -107,35 +107,32 @@ Permitted continuation (M4's surface — no successor, no widening):
   retired-flat path. M4 lands per COORDINATION section 8a; the Architect reviews
   the candidate at soundness.
 
-## Fourth-stop disposition (Architect hold evt_7vxzx3b82k7kk; Steward partial-land)
+## Fourth-stop disposition (Architect evt_35sppt0bv08qx) — in-scope bind arm
 
-After the third-stop split, `px8ta` HALF B
-(`px8ds_real_same_depth_path_runs_exact_edges`) runs independently and STILL
-reaches the generic Closure refusal — the ordinary plan's own remaining
-crossing, not control contamination. It fails M4's crossing by the PREDICATE'S
-DESIGN, grounded by the Architect: HALF B's checked continuation is over a
-self-recursive producer (`countdown` calls itself), instantiated as TWO
-same-depth sibling IH instances, and applied as a bind continuation — so it is
-not structurally contained in the emitted owner's result value, and M4's
-capture-only single-static-descriptor model has no single descriptor for a
-multi-instance same-depth recursive continuation. Not a mechanism bug.
+The section 1a research advisory reversed the temporary partial-land call.
+Recursion and same-depth dynamic multiplicity do not require distinct runtime
+code identities: one source abstraction may have arbitrarily many capture
+environments while retaining one static body. HALF B is therefore in M4, not a
+successor, and the superseded partial candidate `0b7cab211` received no vote.
 
-The Architect HOLDS the same-contract-vs-successor ruling under its §1a trigger
-(fourth hard-stop, a representation-scope fork), pending a research prior-art
-advisory (Research picked it up, evt_64rxg73jq6651); its leaning is
-distinct-successor. HALF B stays ignored + re-pointed to this node (M4) as
-holding owner; no M4 extension may be attempted while the advisory is out.
+The permitted extension is a second exact authorization arm beside unchanged
+result-value containment. A bind response carries capture-only representation
+only when the planner proves both `Targets(resume-site) = {body_origin}` with one
+static body call edge and the exact environment-record pairing for that response
+field. Missing, multiple, mismatched, or unpaired targets retain the generic
+closure refusal; no runtime code tag or generic closure admission is added.
 
-Steward framing call: LAND THE PROVEN PARTIAL NOW (COORDINATION section 8a). The
-proven mechanism — the px8f/px8l crossing + honest re-points (px8f→M3,
-2×px8l→borrowed-input) + the px8ta split (HALF A independent rejection control) +
-any genuinely cross-and-green un-ignores — assembles into an accepted-partial
-candidate and lands, with the recursive-continuation population (HALF B + any
-sibling rows sharing its shape) carried forward. On landing, M4's node goes
-`active` (authorized partial, holding owner), NOT `merged`. When the Architect's
-post-research ruling lands: distinct-successor ⇒ HALF B re-points to the new node
-and M4 closes `merged`; same-contract ⇒ M4 takes a follow-up increment. HALF B
-does not gate the proven mechanism.
+The arm retires HALF B's M4 closure refusal. The row then advances at object
+emission to the known M3 seam:
+
+```text
+unsupported runtime-IR lowering: Effect: seat Argument(0) of ConsoleIsTerminal needs ConstructorTag, which it cannot observe in CarriedWord
+```
+
+HALF B remains ignored and re-points to `RT-CARRIED-IH-DISPATCH-SITEOP`. HALF A
+remains an independent passing rejection control and receives no M4
+representation. The temporary proven-partial route is superseded; the completed
+M4 candidate includes both authorization arms and the honest successor re-point.
 
 ## Why the population must be CENSUSED, not inherited (measured @ `011bf2a95`)
 
@@ -375,11 +372,12 @@ stops at object emission with the exact M4 refusal:
 unsupported runtime-IR lowering: Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane
 ```
 
-The refusal is therefore the production plan's own remaining M4 crossing, not
-an artifact of the retired-flat half. It is neither end-to-end green nor the
-known M3 or borrowed-input successor. This fires the explicit unclassified-
-refusal stop. The ordinary half remains ignored under M4; no censused row was
-un-ignored, and this checkpoint is not an accepted M4 candidate.
+The refusal was therefore the production plan's own remaining M4 crossing, not
+an artifact of the retired-flat half. At that checkpoint it fired the explicit
+unclassified-refusal stop and the branch was not an accepted candidate. The
+research-backed fourth-stop ruling above supersedes that hold: the exact bind
+arm now crosses, and the ordinary half remains ignored under M3 at its newly
+exposed `ConsoleIsTerminal` `ConstructorTag` seam.
 
 ## Acceptance criteria and controls
 
