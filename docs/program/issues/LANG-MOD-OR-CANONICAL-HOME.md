@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-OR-CANONICAL-HOME
 title: "Or arm (b), NODE B — author Core.Logic.Or (data Or (a:Omega)(b:Omega):Type with Inl/Inr, field-for-field the prelude shape), migrate every checked-source consumer to import it, and retire the Rust prelude Or/Inl/Inr registration so exactly one catalog Or identity exists"
-status: ready
+status: merged
 owner: language
 size: L
 gate: none
