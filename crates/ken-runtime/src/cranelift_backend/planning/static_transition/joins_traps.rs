@@ -602,6 +602,41 @@ impl<'src> StaticTransitionPlan<'src> {
             .ok_or_else(|| planner_error("static origin has no planned source join"))
     }
 
+    /// Join a nested producer's local control-flow topology with the result
+    /// interface of the composed outer frame. The local occurrence still owns
+    /// predecessor existence; the outer occurrence owns the value lanes. This
+    /// is the explicit interface morphism used when producer lowering keeps the
+    /// process-object frame composed instead of lowering the inner Match as a
+    /// standalone value.
+    pub(in crate::cranelift_backend) fn composed_join_plan_token(
+        &self,
+        local_origin: StaticOriginId,
+        result_origin: StaticOriginId,
+    ) -> Result<JoinPlanToken, CraneliftBackendError> {
+        let local = self.join_plan_token(local_origin)?;
+        let result = self.join_plan_token(result_origin)?;
+        Ok(JoinPlanToken {
+            origin: local.origin,
+            representation: result.representation,
+            has_continuing_predecessor: local.has_continuing_predecessor,
+        })
+    }
+
+    /// Use one nested producer's topology with the process-object result
+    /// interface when the active continuation stores that interface outside the
+    /// explicit eliminator suffix.
+    pub(in crate::cranelift_backend) fn process_composed_join_plan_token(
+        &self,
+        local_origin: StaticOriginId,
+    ) -> Result<JoinPlanToken, CraneliftBackendError> {
+        let local = self.join_plan_token(local_origin)?;
+        Ok(JoinPlanToken {
+            origin: local.origin,
+            representation: JoinResultRepresentation::CarrierWord,
+            has_continuing_predecessor: local.has_continuing_predecessor,
+        })
+    }
+
     /// Project the authoritative join population onto one traversal entry.
     ///
     /// `None` means this validated source occurrence is not a join. Lowering

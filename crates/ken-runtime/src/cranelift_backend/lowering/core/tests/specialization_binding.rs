@@ -466,7 +466,7 @@ fn d5a_a_plan_the_application_disagrees_with_refuses_before_the_worker_call() {
                 plan.computational_ih_slots[0].method_binder_ordinal = 1;
                 reseal(plan);
             }),
-            "seats its method binder at ordinal 1",
+            "method ordinal 1 is outside the invocation's source-to-runtime binder map",
         ),
     ];
     for (label, mutate, expected) in rows {

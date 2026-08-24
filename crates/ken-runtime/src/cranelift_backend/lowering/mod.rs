@@ -238,8 +238,8 @@ pub(in crate::cranelift_backend) use super::planning::{
     // eliminator checks its assembled run against it. ⛔ Ungated here and in
     // `planning.rs`, because a `cfg(test)` re-export of an item production reads
     // is an unresolved import the test profile cannot see.
-    CheckedCaseBinderLayout, CheckedCaseBinderRole,
-    CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
+    CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhEnvironmentTransport,
+    CheckedIhTransportInputDestination, CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
     DeclarationCallTargetClass,
     ContinuationContextId, ContinuationEmissionOwner,
     ContinuationInputView, ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
@@ -925,6 +925,7 @@ impl ArtifactHelpers<'_> {
             constructed_context_frame: None,
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
+            checked_ih_transport_emissions: Vec::new(),
             pending_composed_discharges: Vec::new(),
             composed_discharges: BTreeMap::new(),
             declaration_calls: BTreeMap::new(),
@@ -1219,6 +1220,11 @@ struct FunctionLocalRefs {
     /// that was claimed and never called leaves no entry -- which is the whole
     /// reason the emission set is kept separately from the claim ledger.
     continuation_emissions: BTreeMap<ContinuationCallIdentity, cranelift_codegen::ir::Inst>,
+    /// Calls authorized by checked-IH transport edges rather than causal-token
+    /// ownership. Multiple instructions may share one edge when mutually
+    /// exclusive runtime branches emit the same source occurrence.
+    checked_ih_transport_emissions:
+        Vec<(CheckedIhEnvironmentTransport, cranelift_codegen::ir::Inst)>,
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8j`** — composed discharges this function
     /// has CLAIMED but not yet verified.
     ///
@@ -6828,6 +6834,35 @@ impl<'a> Lowering<'a> {
             }
             *expected_by_callee.entry(planned).or_default() += 1;
         }
+        for (transport, inst) in &self.function_local.checked_ih_transport_emissions {
+            if !self
+                .static_transition_plan
+                .checked_ih_environment_transports_owned_by(transport.destination_owner())
+                .into_iter()
+                .any(|planned| planned == transport)
+            {
+                return Err(backend_module(
+                    "a recorded checked-IH transport call has no planner-issued two-endpoint edge"
+                        .to_string(),
+                ));
+            }
+            let planned = bundle
+                .continuation(transport.source_specialization())
+                .ok_or_else(|| {
+                    backend_module(
+                        "a checked-IH transport source specialization was never forward-declared"
+                            .to_string(),
+                    )
+                })?;
+            let emitted = Self::decode_direct_callee(func, *inst)?;
+            if emitted != planned {
+                return Err(backend_module(
+                    "a checked-IH transport instruction calls a different specialization than its source endpoint"
+                        .to_string(),
+                ));
+            }
+            *expected_by_callee.entry(planned).or_default() += 1;
+        }
 
         // Closure: no continuation call may be emitted that was not recorded.
         // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — over `O_t`, the ORDINARY
@@ -9759,7 +9794,7 @@ enum SourcePrefixTemplate {
         constructor: RuntimeSymbol,
         static_origin: StaticOriginId,
         remaining: Vec<OwnedSourceOccurrence>,
-        lowered: Vec<Lowered>,
+        lowered: Vec<LoweringOperand>,
         env: Vec<LoweringEnvironmentBinding>,
         next: Box<SourcePrefixTemplate>,
     },

@@ -4473,6 +4473,10 @@ pub(in crate::cranelift_backend) enum CandidateDisposition {
     /// The exact deferred bridge scope completed successfully with this
     /// candidate still unconsumed.
     InlineNoCall,
+    /// The planner issued an authorized checked-IH transport for this causal
+    /// source, but no emitted runtime branch used it in this artifact. The edge
+    /// has its own verifier and is not a causal-call obligation.
+    TransportDormant,
 }
 
 /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the binding-candidate ledger, a
@@ -4505,6 +4509,7 @@ pub(super) struct ContinuationCandidateLedger {
     /// The disposition each settled candidate took, and the seat is the only
     /// writer of each variant.
     settled: BTreeMap<ContinuationCallIdentity, CandidateDisposition>,
+    transport_candidates: BTreeSet<ContinuationCallIdentity>,
 }
 
 impl ContinuationCandidateLedger {
@@ -4532,9 +4537,15 @@ impl ContinuationCandidateLedger {
         D3_PLAN_CANDIDATES.with(|cell| {
             *cell.borrow_mut() = candidates.iter().cloned().collect();
         });
+        let transport_candidates = plan
+            .checked_ih_environment_transport_source_identities()
+            .intersection(&candidates)
+            .cloned()
+            .collect();
         Ok(Self {
             candidates,
             settled: BTreeMap::new(),
+            transport_candidates,
         })
     }
 
@@ -4588,7 +4599,12 @@ impl ContinuationCandidateLedger {
     /// selected `FunctionizedUnits` arm and only reaches this call on the
     /// success path, so plan-only rows and `Err` compilations are absent **by
     /// construction** rather than removed after the fact.
-    fn close(self) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+    fn close(mut self) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        for identity in &self.transport_candidates {
+            self.settled
+                .entry(identity.clone())
+                .or_insert(CandidateDisposition::TransportDormant);
+        }
         let unsettled = self.candidates.difference(
             &self.settled.keys().cloned().collect::<BTreeSet<_>>(),
         ).count();
@@ -4606,10 +4622,11 @@ impl ContinuationCandidateLedger {
             .settled
             .into_iter()
             .filter(|(_, disposition)| {
-                matches!(
-                    disposition,
-                    CandidateDisposition::DirectCall | CandidateDisposition::ComposedCall
-                )
+                match disposition {
+                    CandidateDisposition::DirectCall | CandidateDisposition::ComposedCall => true,
+                    CandidateDisposition::InlineNoCall
+                    | CandidateDisposition::TransportDormant => false,
+                }
             })
             .map(|(identity, _)| identity)
             .collect())
@@ -4769,9 +4786,16 @@ impl ContinuationClaimLedger {
         // `call_declared_unit_target` consumes. Reusing it is what keeps this
         // on the existing unit-call ABI instead of inventing a second one.
         let units = plan.continuation_units()?;
+        let transported = plan
+            .checked_ih_environment_transports_owned_by(defining)
+            .into_iter()
+            .map(|transport| transport.source_call_identity().clone())
+            .collect::<BTreeSet<_>>();
         self.resolved
             .iter()
-            .filter(|(identity, _)| identity.emission_owner() == defining)
+            .filter(|(identity, _)| {
+                identity.emission_owner() == defining || transported.contains(*identity)
+            })
             .map(|(identity, target)| {
                 let unit = units
                     .iter()

@@ -397,8 +397,10 @@ impl<'a> Lowering<'a> {
             default: &RuntimeTrap,
             static_origin: StaticOriginId,
             env: &[LoweringEnvironmentBinding],
+        composed_suffix: Option<&[EliminatorFrame<'_>]>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
-            let join_plan = self.consumed_join_plan_token(static_origin)?;
+        let join_plan =
+            self.consumed_composed_join_plan_token(static_origin, composed_suffix.unwrap_or(&[]))?;
             if cases.is_empty() {
                 return Ok(LoweringOperand::Specialized(Lowered::Trap(default.clone())));
             }
@@ -420,6 +422,7 @@ impl<'a> Lowering<'a> {
                     static_origin,
                     env,
                     &join_plan,
+                composed_suffix,
                 );
             }
             let class = self.emit_carrier_class(builder, scrutinee)?;
@@ -452,6 +455,14 @@ impl<'a> Lowering<'a> {
                 env,
                 &join_plan,
             )?;
+        let borrowed_result = match composed_suffix {
+            Some(suffix) if !suffix.is_empty() => self.lower_computational_match_value_composed(
+                builder,
+                RoutedAnswer::direct(borrowed_result),
+                suffix,
+            )?,
+            Some(_) | None => borrowed_result,
+        };
             if self.seal_source_trap_branch(builder, &borrowed_result)? {
                 // This runtime representation has no continuing predecessor.
             } else {
@@ -480,6 +491,7 @@ impl<'a> Lowering<'a> {
                 static_origin,
                 env,
                 &join_plan,
+            composed_suffix,
             )?;
             if self.seal_source_trap_branch(builder, &represented_result)? {
                 // This runtime representation has no continuing predecessor.
@@ -525,6 +537,7 @@ impl<'a> Lowering<'a> {
             static_origin: StaticOriginId,
             env: &[LoweringEnvironmentBinding],
             join_plan: &JoinPlanToken,
+        composed_suffix: Option<&[EliminatorFrame<'_>]>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
             // ⭐ Handled before any block is created, and that ordering matters: a
             // case-free match reaches the default unconditionally, so building a
@@ -630,7 +643,12 @@ impl<'a> Lowering<'a> {
                     let case_env = env_with_operands([LoweringOperand::Carried(payload)], env);
                     let body = self.case_body_occurrence(static_origin, index, &case.body)?;
                     let body_origin = body.static_origin;
-                    let lowered = self.lower_expr(builder, body, &case_env)?;
+                let lowered = match composed_suffix {
+                    Some(suffix) if !suffix.is_empty() => {
+                        self.lower_computational_producer_expr(builder, body, &case_env, suffix)?
+                    }
+                    Some(_) | None => self.lower_expr(builder, body, &case_env)?,
+                };
                     if self.seal_source_trap_branch(builder, &lowered)? {
                         continue;
                     }
@@ -672,6 +690,7 @@ impl<'a> Lowering<'a> {
                 static_origin,
                 env,
                 join_plan,
+            composed_suffix,
             )
         }
 }
@@ -686,6 +705,7 @@ impl<'a> Lowering<'a> {
             static_origin: StaticOriginId,
             env: &[LoweringEnvironmentBinding],
             join_plan: &JoinPlanToken,
+        composed_suffix: Option<&[EliminatorFrame<'_>]>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
             // Read identity and arity ONCE, ahead of the chain: both are properties
             // of the scrutinee, not of any case, and re-reading per case would be a
@@ -749,7 +769,12 @@ impl<'a> Lowering<'a> {
                 let case_env = env_with_operands(bindings, env);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
                 let body_origin = body.static_origin;
-                let lowered = self.lower_expr(builder, body, &case_env)?;
+            let lowered = match composed_suffix {
+                Some(suffix) if !suffix.is_empty() => {
+                    self.lower_computational_producer_expr(builder, body, &case_env, suffix)?
+                }
+                Some(_) | None => self.lower_expr(builder, body, &case_env)?,
+            };
                 if self.seal_source_trap_branch(builder, &lowered)? {
                     builder.switch_to_block(next);
                     continue;
@@ -1267,7 +1292,20 @@ impl<'a> Lowering<'a> {
                 DynamicConstructorContinuation::Ordinary { static_origin, .. }
                 | DynamicConstructorContinuation::Producer { static_origin, .. } => static_origin,
             };
-            let join_plan = self.consumed_join_plan_token(static_origin)?;
+            let join_plan = match continuation {
+                DynamicConstructorContinuation::Producer { eliminators, .. }
+                    if !self
+                        .static_transition_plan
+                        .checked_ih_environment_transport_source_identities()
+                        .is_empty() =>
+                {
+                    self.consumed_composed_join_plan_token(static_origin, eliminators)?
+                }
+                DynamicConstructorContinuation::Producer { .. }
+                | DynamicConstructorContinuation::Ordinary { .. } => {
+                    self.consumed_join_plan_token(static_origin)?
+                }
+            };
             let merge = join_plan.has_continuing_predecessor.then(|| {
                 let merge = builder.create_block();
                 self.append_planned_join_params(builder, merge, &join_plan);
@@ -1632,6 +1670,46 @@ impl<'a> Lowering<'a> {
             }
             self.static_transition_plan.join_plan_token(origin)
         }
+
+    pub(super) fn consumed_composed_join_plan_token(
+        &self,
+        local_origin: StaticOriginId,
+        suffix: &[EliminatorFrame<'_>],
+    ) -> Result<JoinPlanToken, CraneliftBackendError> {
+        let local = self.consumed_join_plan_token(local_origin)?;
+        if !self
+            .static_transition_plan
+            .checked_ih_environment_transport_source_identities()
+            .is_empty()
+        {
+            return self
+                .static_transition_plan
+                .process_composed_join_plan_token(local.origin);
+        }
+        let result_origin = suffix.iter().rev().find_map(|frame| match frame {
+            EliminatorFrame::Computational(frame) => Some(frame.static_origin),
+            EliminatorFrame::Ordinary(frame) => Some(frame.static_origin),
+            EliminatorFrame::Active(active) => active
+                .pending
+                .iter()
+                .rev()
+                .find_map(|pending| match pending {
+                    EliminatorFrame::Computational(frame) => Some(frame.static_origin),
+                    EliminatorFrame::Ordinary(frame) => Some(frame.static_origin),
+                    EliminatorFrame::PendingLet(_)
+                    | EliminatorFrame::InvocationReturn
+                    | EliminatorFrame::Active(_) => None,
+                })
+                .or_else(|| active.selected_scope.map(|scope| scope.frame.static_origin)),
+            EliminatorFrame::PendingLet(_) | EliminatorFrame::InvocationReturn => None,
+        });
+        match result_origin {
+            Some(result_origin) => self
+                .static_transition_plan
+                .composed_join_plan_token(local.origin, result_origin),
+            None => Ok(local),
+        }
+    }
 }
 
 impl<'a> Lowering<'a> {
