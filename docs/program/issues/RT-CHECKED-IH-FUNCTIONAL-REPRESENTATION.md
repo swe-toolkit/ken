@@ -11,7 +11,8 @@ github: null
 origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect's pre-committed conditional ruling (evt_2f4bbmt7qfde1) after the decisive ESCAPE measurement (runtime-implementer evt_79jd1nxamqd95) returned ESCAPING. Supersedes RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT (closed; both its Closure-A operand-seat mechanism and its NULLARY_FORCE re-reading were refuted -- the realized IH value escapes into a constructor, a capability gap, not a seam fix). HS=5 (Steward of record); ESCAPING is a scoping decision, not a hard-stop increment. Steward-filed per COORDINATION section 2."
 ---
 
-> # RELEASED 2026-08-24 — all predecessors merged + reseat done; kicked on the pi ring.
+> # RELEASED 2026-08-24 — all predecessors merged + reseat done; kicked on the pi
+> ring.
 >
 > Every gate is cleared: [[RT-CHECKED-IH-CAPTURED-ENV-SCHEMA]] merged (7426bb1f2),
 > [[RT-NATIVE-TRACK0-REARM]] merged, [[RT-IH-MARKER-PRODUCER-COMPLETE]] closed; and
@@ -63,12 +64,13 @@ origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect'
 > under-covers the FORCE-emission owner the frame's force-seam construction actually
 > uses — the wrong axis (containment) for a force-emitted role.
 >
-> SHARED-CAUSE PREDICATE (§1b, Architect evt_36k7yzf27t67x, 2026-08-24 — named at
-> hard-stop #2 rather than waiting for a 3rd). A synthesized-aggregate's
+> SHARED-CAUSE PREDICATE (§1b, Architect evt_36k7yzf27t67x, 2026-08-24 — named
+> at hard-stop #2 rather than waiting for a 3rd). A synthesized-aggregate's
 > Specialization-owner enumeration must be EMISSION-ACCURATE: it must produce the
 > same owner set the consumer keys by (defining_emission_owner = the lowered units).
-> The continuation_contexts subtree-containment proxy (synthesized_seat_emission_owners,
-> static_transition.rs:589) is a valid authority ONLY for aggregates emitted inline
+> The continuation_contexts subtree-containment proxy
+> (synthesized_seat_emission_owners, static_transition.rs:589) is a valid authority
+> ONLY for aggregates emitted inline
 > at their own seat; for any role emitted otherwise it under-covers, and the consumer
 > fail-closes at a legitimately-emitted seat. #1 (checked-IH, force-seam) and #2
 > (host-result-error, emitted non-inline from a specialization body) are two
@@ -77,21 +79,24 @@ origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect'
 > Symptom #2 (Architect): host-result-error (Constructor role) Specialization-owner
 > enumeration uses the continuation_contexts subtree-containment proxy, which
 > under-covers the lowered-unit emission owner the consumer keys by (seat 264 under
-> Specialization(2) is genuinely lowered and emits FileOperationRead inline, but the
-> proxy does not yield Specialization(2)) — same predicate as #1.
+> Specialization(2) is genuinely lowered and emits FileOperationRead inline, but
+> the proxy does not yield Specialization(2)) — same predicate as #1.
 >
-> SCOPE RECUT (Steward, on the Architect's §1b closure ruling). This SUPERSEDES the
-> per-role "repoint the checked-IH owner axis" framing of RESOLUTION #1: the tier-3
+> SCOPE RECUT (Steward, on the Architect's §1b closure ruling). This SUPERSEDES
+> the per-role "repoint the checked-IH owner axis" framing of RESOLUTION #1: the
+> tier-3
 > reconciliation is a STRUCTURAL CLOSURE over the shared predicate, not a second
 > per-role patch. Reconcile the synthesized-aggregate Specialization-owner
 > enumeration axis with the consumer's defining_emission_owner axis for ALL affected
 > roles — host-result-error (Constructor) fixed via the emission-accurate
-> (lowered-unit) authority checked_ih_force_emissions already uses; UnitBoundaryEnvironment
-> AUDITED against the inline-at-own-seat predicate in the SAME pass (state with
+> (lowered-unit) authority checked_ih_force_emissions already uses;
+> UnitBoundaryEnvironment AUDITED against the inline-at-own-seat predicate in the
+> SAME pass (state with
 > evidence whether it stays on the subtree proxy or takes the emission-accurate
 > enumeration) to prevent the predictable hard-stop #3. Retain everything already
-> proved (checked-IH force-owner records, schema 12/12, controls). Two hard constraints
-> the Architect flags as the unsound-if-careless places: (i) do NOT clone content
+> proved (checked-IH force-owner records, schema 12/12, controls). Two hard
+> constraints the Architect flags as the unsound-if-careless places: (i) do NOT
+> clone content
 > across owners for Constructor — its children/meet/allocation may differ per
 > specialization (lifetime lanes); the emission-accurate enumeration fixes WHICH
 > owners get records, per-owner content is still computed per owner; (ii) authorize
@@ -103,8 +108,97 @@ origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect'
 > delta (codegen) — no operator TCB gate. Returns to Architect + CV + Adversary.
 > Auditability: a discriminating pair proving a Specialization that lowers a
 > non-inline host-effect seat now GETS its record (was the refusal), and a control
-> that the emission-accurate owner set equals the consumer's defining_emission_owner
-> set for the fixture.
+> that the emission-accurate owner set equals the consumer's
+> defining_emission_owner set for the fixture.
+>
+> CLOSED TRANSFORMATION SCHEMA (Steward, folding Architect mechanism ruling
+> evt_1hvz3zt0ewage + Research advisory evt_724e1rh6t5wbg, 2026-08-24). This is
+> the THIRD-hard-stop response and it SUPERSEDES this inventory's accumulating
+> one-wall-at-a-time mode: at a third distinct refusal the response is to CLOSE
+> the representation contract as a schema and census it up front, not to keep
+> discovering walls one at a time. The three advancing refusals are three
+> independent invariants of ONE defunctionalization/closure-conversion
+> correctness statement — #1 owner-of-code and #2 owner-of-aggregate-enumeration
+> are the
+> dynamic-provenance face; #3 binder-map is the lexical-scoping face — same
+> capability, distinct invariants, jointly establishing that the new representation
+> denotes the original closure. Defunctionalize was NOT the wrong D0; no successor
+> node; no re-decomposition.
+>
+> THE DEEPER §1b CAUSE shared by all three walls (Architect): the M6
+> representation cross-checks independently-authored coordinates but never stated
+> the FRAME each
+> lives in nor the morphism joining them, so each axis surfaces as a separate
+> wall the first time its cross-frame comparison is reached. Closing the schema
+> = stating,
+> PER AXIS, the two independent authorities AND the common frame/morphism (or
+> stable identity) that joins them, and validating AFTER the map.
+>
+> THE SCHEMA (census all five up front; the build proves the whole schema, not
+> the next occurrence). For each axis: name the two independent authorities, name
+> the
+> common frame + morphism (or stable identity) that joins them, compare only in
+> that one frame, and reject any bare cross-frame comparison.
+> 1. code/plan identity;
+> 2. ordered environment fields + owner/lifetime;
+> 3. source-binder -> target-binder map under every inserted context;
+> 4. apply-argument arity/order;
+> 5. result/interface identity + every dispatcher/apply site.
+>
+> TWO-AUTHORITIES DISCIPLINE this establishes (Architect, general form — durable
+> beyond M6): a two-authorities cross-check MUST compare in a COMMON FRAME.
+> Cross-frame comparison gives FALSE NEGATIVES (spurious rejection — this bug,
+> #3); deriving one authority FROM the other gives FALSE POSITIVES (vacuity — the
+> trap
+> ruled against at tier-1, dec_2304df97xzbp5). Correct discipline = two
+> authorities + explicit frame morphism + validate-after-map. Keep the
+> independent oracle; do
+> NOT collapse it.
+>
+> Symptom #3 / §1b INVENTORY ENTRY #3 (Architect, verified at 064133e45):
+> method_binder_ordinal (plan-authored IH-subsequence ordinal,
+> compiler_driver.rs:1637 = binder_ordinal - argument_count) compared by bare !=
+> (lowering/mod.rs:10613)
+> against binder_index (consumer runtime de Bruijn index, ALREADY mapped via
+> BranchBinderRemap, erasure.rs:2302/2836/3258) — a coordinate-join across two
+> frames without the morphism. `0 != 4` does NOT establish the call names the
+> wrong binder; it can be the same binder after enclosing runtime binders
+> (lawful
+> weakening). Corroboration the frame is under-specified (not the values wrong):
+> fixtures already disagree on the ordinal's frame — 0 (plan), 4
+> (source_frame_bridge.rs:881/1873/5569), 1 (specialization_binding.rs:469).
+> Shares the deeper predicate with #1/#2.
+>
+> REPAIR CLASS / MECHANISM (Architect ruling — the build input). Keep BOTH
+> authorities; reconcile their FRAMES before comparing. Apply the SAME context
+> morphism the consumer already used to bring the plan's ordinal into the runtime
+> frame, then validate equality in that one frame. All pieces EXIST: the
+> argument_count offset (compiler_driver.rs:1637, inverted to recover the
+> source-frame position) + the enclosing-binder history the consumer already
+> threads + BranchBinderRemap::runtime_index (erasure.rs:4200). Compose them into
+> the
+> explicit source->target morphism at lowering/mod.rs:10613. Do NOT relabel the
+> ordinal, do NOT special-case 0->4, do NOT delete the oracle (GHC Unique / Lean
+> VarId.alphaEqv precedent).
+>
+> DECISIVE CHECK — build STEP 1, FAIL-CLOSED (the lawful-weakening vs
+> misbinding fork; held fail-closed, not assumed): for the failing occurrence,
+> compose the
+> morphism and compute where plan slot ordinal 0 lands in the runtime frame. Lands
+> on 4 -> LAWFUL WEAKENING — the seam was joining two frames without the map;
+> apply the morphism, validate after, it greens correctly. Does NOT land on 4 ->
+> GENUINE
+> MISBINDING — STOP and report, do NOT force-green. (Architect's prior, from
+> uniform planner-authored 0 vs varying consumer indices, leans
+> lawful-weakening, but the check is fail-closed.)
+>
+> DISPOSITION: STILL IN M6, no successor, no new D0, no trusted_base delta
+> (codegen) — no operator TCB gate. Research §1a discharged (standard
+> scoping-discipline
+> repair class; typed closure conversion / defunctionalization; GHC Unique; Lean
+> VarId + IndexRenaming; no further research round). Everything already proved
+> (owner records, schema 12/12, both new controls) stands. Returns to Architect + CV
+> + Adversary.
 
 > # D0 RULED 2026-08-22 — DEFUNCTIONALIZE; re-homed as native-program Track-1
 >
@@ -132,8 +226,9 @@ origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect'
 >
 > REACH BROADER THAN FIRST FRAMED (Architect evt_4sp2xftkmc1mz, 2026-08-22): this
 > D0 is the WHOLE remaining PX8-closure critical path. Track-0 measurement showed
-> every native checked-IO full program carries the checked continuation closure,
-> so this representation gates ALL FOUR native witnesses (ReadEof/ReadSome/Wrote
+> every native checked-IO full program carries the checked continuation
+> closure, so this representation gates ALL FOUR native witnesses
+> (ReadEof/ReadSome/Wrote
 > AND SemanticErrorV1), not just the positioned one — discharging M3+M4+M6 at
 > their three seats across every native checked-IO program.
 >
@@ -176,8 +271,9 @@ boundary. This node builds that object.
   distinct from the 12 fine `template=4, arity=1` markers (`source.rs:655`).
 - `core.rs:11699` lowers the marker body as an ordinary value-producing
   expression, so `Call(Var(0), args=[])` resolves `Var(0)` to the arity-1
-  StaticWorker and calls it with zero args; the seam passes (0==0), the refusal is
-  the worker gate at `calls.rs:220`. Confirmed independently by the Architect
+  StaticWorker and calls it with zero args; the seam passes (0==0), the refusal
+  is the worker gate at `calls.rs:220`. Confirmed independently by the
+  Architect
   (evt_5wvex36s7nm6d).
 - The non-escaping remedy (use-site specialization with the actual response) is
   inapplicable HERE: at this use there is no response argument and no in-frame
@@ -225,19 +321,23 @@ node's owner at framing per COORDINATION section 9a.
   evt_3k0bv5px3m097, refining the earlier single-match fold-in which was
   unbuildable — Rust exhaustiveness is over TYPES, not over the u64 template ids):
   - **KIND (compile-time, type-structural):** the lowering dispatch is a match
-    over the SEALED checked-IH code-identity shape set (the checked-IH RuntimeExpr
-    family) with NO `_`/fallback arm, so a new shape is a ken-runtime build error
+    over the SEALED checked-IH code-identity shape set (the checked-IH
+    RuntimeExpr family) with NO `_`/fallback arm, so a new shape is a
+    ken-runtime build error
     (the ABI-R3 next_in_inventory discipline applied where it CAN live — over a
     sealed type; COORDINATION section 7 exhaustive-by-construction).
-  - **INSTANCE (lowering-time, fail-closed):** the template id is resolved through
-    the EXISTING plan lookup (`computational_ih_call` / `computational_ih_slot`,
+  - **INSTANCE (lowering-time, fail-closed):** the template id is resolved
+    through the EXISTING plan lookup (`computational_ih_call` /
+    `computational_ih_slot`,
     `lowering/mod.rs` ~10576-10592), so an id the plan does not hold is refused
-    fail-closed — the SAME point `erasure.rs`'s double bijection is asserted, so
-    the roster and the bijection are one fact with no parallel list to drift.
+    fail-closed — the SAME point `erasure.rs`'s double bijection is asserted,
+    so the roster and the bijection are one fact with no parallel list to
+    drift.
   - **VALUE:** the escaped IH crosses as the admitted environment `Record` only,
     with NO runtime code-identity tag.
-  Every apply and slot site MUST resolve its id through the plan lookup — a single
-  site that reads `call_template_id` and uses it directly reopens the off-roster
+  Every apply and slot site MUST resolve its id through the plan lookup — a
+  single site that reads `call_template_id` and uses it directly reopens the
+  off-roster
   hole. This delivers the property the earlier fold-in protected (no off-roster
   identity silently admitted) with no drift surface. The Adversary hunts
   over-accept shapes: a boundary crossing dressed as the representation, a
@@ -247,7 +347,10 @@ node's owner at framing per COORDINATION section 9a.
   Rerun report-2's checked-family runner end-to-end. Both checked-family programs
   green ⇒ the family is bounded; re-point both runner tables from the
   advancing-refusal pins (set by the co-land) to green. Any FURTHER refusal ⇒ STOP
-  and report to Architect + Steward.
+  and report to Architect + Steward. As of the third-hard-stop ruling, the census
+  is the CLOSED TRANSFORMATION SCHEMA (five axes, TIER-3 block above): the build
+  proves the whole schema up front, not the next occurrence, so a further refusal
+  on an un-censused axis is a schema-closure miss, not a new capability gap.
 - **AC-NO-REGRESSION.** Whole-suite green in CI (COORDINATION section 12). Local
   targeted `-p` only, never `--workspace`.
 - **Required reviewer.** Architect -- design D0 ruling AND soundness review of the
@@ -263,8 +366,9 @@ HOLDS, no return-fork; Architect verified independently via the double bijection
 The implementer then flagged, rather than silently resolving, that AC-REPR's
 original single-match fold-in was UNBUILDABLE as an instance-level mechanism: Rust
 exhaustiveness is over types, the template ids are u64 plan data, and the only way
-to fake a no-wildcard match over them — an enum mirroring the plan's current ids —
-is the hand-maintained parallel roster the Architect had warned against (and it
+to fake a no-wildcard match over them — an enum mirroring the plan's current
+ids — is the hand-maintained parallel roster the Architect had warned against
+(and it
 still needs a u64->enum fallback, so it collapses to a runtime check that can
 drift). Keyed on: mechanism specified over the wrong DOMAIN (runtime ids vs sealed
 types). Refined to the KIND-exhaustive + INSTANCE-fail-closed + VALUE-env-only
