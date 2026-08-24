@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION
 title: "Give Ken a first-class representation for an ESCAPING functional induction hypothesis, so the nullary_force of a checked computational IH whose realized value is stored into a constructor (escapes its frame) can be lowered honestly. The decisive escape measurement (runtime-implementer evt_79jd1nxamqd95) proved the realized IH value's immediate parent is a Construct in the content-distinct checked-family program -- it is stored straight into a constructor field, so the non-escaping use-site-specialization remedy cannot apply (no in-frame application site, no response argument at the use). Ken has no first-class functional-IH value: StaticWorkerBinding is compiler metadata with no runtime word/tag/layout/env-pointer/callable identity (lowering/mod.rs:3578-3603), LoweringOperand is exactly {Specialized(Lowered), Carried(CarriedBoundaryWord)} with no closure/worker arm, and an ordinary carried word cannot hold `lambda response. rec (k response)`. This node introduces the genuine new representation. It carries a design D0 the Architect rules before build: materialized closure value vs defunctionalized carried tag (code identity + environment + apply dispatcher). Successor to the closed RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT."
-status: ready
+status: merged
 owner: runtime
 size: L
 gate: none
