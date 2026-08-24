@@ -72,12 +72,31 @@ strict, and the authorized providers (Arithmetic `add`/`mul`, Order
 
 # Deliverable (Component A)
 
+- ADD the provider-INTERNAL dependency imports the provider modules need to
+  elaborate and publish their own bodies (Architect ruling evt_47t9dwz0chstv,
+  premise correction 1 — these are ABSENT at base f0e0b92fa and are load-bearing,
+  not optional scaffolding: without resolving `cong`/`sym`/`trans` the provider
+  proof bodies fail and a recursive-group rollback can remove the just-allocated
+  `add`/`mul` ids, defeating AC-A2):
+  - Arithmetic (no import line at base) -> `import Core.Logic.Transport (cong,
+    sym, trans)`.
+  - Order (imports only `Core.Logic.Or` at base) -> `import Core.Logic.Transport
+    (cong, trans)`. NOT LawfulClasses — no `Classes.LawfulClasses` reference
+    exists in Order at base (premise correction 2). Author to the ACTUAL
+    unresolved names.
+  These are identity-preserving (definitions unchanged; they only resolve
+  already-unqualified names) and carry zero `trusted_base()` delta.
 - Mark `pub` on Arithmetic (`add`, `mul`) + Order (`leq_nat`, `sub`) and their
-  required provider names public / import-eligible — the provider SURFACE that
-  Component B's migration will consume. (Marking `pub` does not require `Nat` to
-  resolve; validating Arithmetic/Order standalone-strict does, and that is B.)
+  required provider names public / import-eligible — the provider SURFACE
+  Component B's consumer migration will consume.
 - Deliver the module-graph/roots loader realization so the self-contained green
-  set checks standalone through the REAL loader under strict.
+  set checks standalone through the real loader (the strict-roots check runnable
+  at base), and the providers publish reachable identity under the LEGACY
+  real-caller resolution the loader ships (`elaborate_module_from_roots =>
+  ResolutionMode::Legacy`; under legacy a bare `Nat` resolves to the native
+  prelude inductive `data Nat = Zero | Suc Nat`, so the provider signatures over
+  `Nat` elaborate and their ids publish). Moving the real caller to STRICT is
+  Component B, not A.
 
 # The self-contained green set (measured at base f0e0b92fa)
 
@@ -92,12 +111,20 @@ are Component B's population (the 34-baseline-red residual triage moves to B).
 
 - AC-A1. Each unit in the self-contained green set (`Core.Logic.Or`,
   `Core.Logic.Transport`, `Tooling.Verification.ProofErasureBoundaryChecker`)
-  checks STANDALONE through the real loader under strict.
+  checks STANDALONE through the real loader via the strict-roots check that is
+  runnable at base (these three pass at f0e0b92fa) — a regression guard that A's
+  provider-import and pub edits do not break the green set. This is the
+  strict-roots check on the green set specifically, NOT a move of the real caller
+  to strict over the whole catalog (that is Component B).
 - AC-A2. Arithmetic (`add`, `mul`) and Order (`leq_nat`, `sub`) plus their
-  required provider names are `pub` / import-eligible through the real loader's
-  resolution — established by IDENTITY (the exact provider IDs are reachable),
-  NOT by repo text and NOT by Arithmetic/Order standalone-strict-green (which is
-  Component B).
+  required provider names are `pub` / import-eligible, established by IDENTITY
+  through the real loader's resolution under the LEGACY real-caller mode A ships
+  (Architect ruling evt_47t9dwz0chstv, option (i)) — the exact provider ids are
+  reachable, resolving to the GENUINE provider (reachability to the real
+  provider, not a frozen numeric id, and no invented/competing identity), NOT by
+  repo text and NOT by Arithmetic/Order standalone-STRICT-green (which is
+  Component B). Component B must preserve these provider identities when it
+  re-homes `Nat` and moves the caller to strict (B's forward-compat constraint).
 - AC-A3 (cross-cutting invariant). Zero `trusted_base()` delta; flat-Σ pin stays
   green.
 - AC-A-NO-REGRESSION. Whole-suite green in CI; local targeted `-p` only.
@@ -106,6 +133,21 @@ are Component B's population (the 34-baseline-red residual triage moves to B).
   34-residual triage are NOT in Component A. Component A MUST NOT reintroduce
   ambient resolution, invent competing identities, or restore prelude fallback to
   make any red unit appear green — that is the ruled-out option 3 in disguise.
+
+# The boundary predicate (Architect §1b, evt_47t9dwz0chstv)
+
+A's acceptance must be SELF-MEASURABLE and SELF-SATISFIABLE: Component A retains
+everything needed to OBSERVE and SATISFY its own deliverables under the loader
+mode it ships (legacy real-caller). The A/B cut removes only the
+STRICT-COMPLETENESS SURPLUS — the canonical `Nat` catalog home, consumer
+migration, the strict-caller move, the whole-catalog strict co-gate, and
+standalone-strict-green — never the provider-internal imports A needs to publish
+and measure identity. The two hard stops were both violations of this predicate:
+HS#1 placed a gate in WP-4 whose satisfaction needed B's `Nat` home; HS#2 (this
+Steward boundary call) placed the provider-internal imports A needs to measure
+AC-A2 into B. Every AC above has been re-audited against this predicate:
+AC-A1/AC-A2 measured under the legacy mode A ships; AC-A3/AC-A-NO-REGRESSION are
+pins/CI self-measurable in A.
 
 # Reviewers
 
