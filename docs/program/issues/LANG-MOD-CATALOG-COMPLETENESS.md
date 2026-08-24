@@ -33,21 +33,67 @@ strict-green through the real loader.
 
 # Deliverable
 
-- ONE canonical `Nat` — `data Nat` with `Zero`/`Suc`, exported from a SINGLE
-  defining public interface at the right catalog location, imported by
-  Arithmetic/Order/Gcd and every other consumer. Subsume-don't-proliferate: one
-  canonical home, the NODE B (`Core.Logic.Or`) canonical-home pattern — NOT
-  per-consumer copies, NOT ambient, NOT an invented identity (Architect design
-  constraint, ruling point 5).
-- ONE canonical `OrdResult` (Architect HS#5 ruling evt_613d9fm7j45qj) — `data
-  OrdResult = Lt | Eq | Gt` plus `ord_eq`/`ord_lt`/`ord_gt`, in a SINGLE defining
-  public interface, DEDUPing the two private competing declarations at base
-  (Data.Collections.Derived.ken.md:69 with its ord_* constants at :71/:73/:75,
-  and Data.Numeric.Nat.Order.ken.md:188). One home serving BOTH
-  `Data.Numeric.Nat.Order` AND `Data.Collections.Derived` (list/string/char
-  compare) — a SHARED location both import (likely a Core/shared home, not under
-  Numeric or Collections; B's placement call). Same charter/class as the
-  canonical `Nat` home; migrate Order, Derived, and LawfulClasses to import it.
+- ONE canonical `Nat` HOME (Architect canonical-home ruling evt_60na0wbpydg0y,
+  base 3a7114cf70) — a SINGLE public defining interface for `Nat`/`Zero`/`Suc` in
+  the `Data/Numeric/Nat` package (recommend a dedicated facade
+  `Data/Numeric/Nat/Nat.ken.md`, sibling to Arithmetic/Order; name is the team's
+  to finalize). Every strict consumer (Arithmetic/Order/Gcd/InsertionSort/
+  Diagnostics) imports `Nat` (and `Zero`/`Suc`) from this one interface.
+  Grounded basis: spec §33 §3.3 (declarations.md:259-263) — the closed prelude
+  floor is EXACTLY {Bool,Char,List}; `Nat` is native/kernel but NOT in the floor,
+  so under Strict it is unbound unless imported from a defining public interface.
+  IDENTITY CONSTRAINT (decisive): the home must yield the SINGLE canonical native
+  `Nat` GlobalId the kernel/native-arithmetic/existing proofs already use — it
+  must NOT mint a second `Nat` identity. A fresh `data Nat = Zero | Suc Nat` the
+  elaborator treats as a NEW type forks identity and breaks unification — that is
+  the one outcome forbidden. Spec-sanctioned vehicle: an `export`/re-export facade
+  (§33 §4.3 "re-export preserves identity and visibility"); `pub import` is NOT a
+  valid declaration (grammar.md:89), so the vehicle is `export`, not `pub import`.
+  NAT MECHANISM PREREQUISITE (potential hard stop — Architect left this to Spec's
+  lane, not ruled): the census must confirm the elaborator today realizes EITHER
+  (a) an `export` facade naming the native global (identity by §4.3), OR (b) a
+  `pub data Nat` the elaborator RECOGNIZES as the native inductive by identity
+  coincidence (the ES2/Bool pattern, LawfulClasses.ken.md:215). If NEITHER is
+  implemented for a non-floor native type, STOP before authoring the `Nat` home
+  and hand back that precise hard stop to Spec + Steward — do NOT improvise a
+  redeclaration to work around it (the redeclaration IS the identity-fork this
+  forbids). Location (`Data/Numeric/Nat`) and the single-native-GlobalId
+  constraint stand regardless of which mechanism Spec confirms.
+- ONE canonical `OrdResult` HOME = a NEW leaf module in the `Core/Logic` package
+  (Architect ruling evt_60na0wbpydg0y; recommend `Core/Logic/OrdResult.ken.md`,
+  sibling to `Or.ken.md`; AVOID the module name "Ordering" — the type name
+  `OrdResult` was chosen deliberately and "Ordering" explicitly rejected at
+  Derived.ken.md:45-52). Author EXACTLY this interface, mirroring the landed
+  canonical-Or shape (Architect correction evt_22r45y0x8nzbh — NOT `pub data`,
+  which is an ABSTRACT export that WITHHOLDS the constructors per spec §33 §4.2,
+  producing the implementer's `UnresolvedCon OrdResult.Eq`): ordinary `data`,
+  three `const`s, and ONE `export` line naming the type + its constructors + the
+  consts — `data OrdResult = Lt | Eq | Gt`; `const ord_eq : OrdResult = Eq`;
+  `const ord_lt : OrdResult = Lt`; `const ord_gt : OrdResult = Gt`;
+  `export OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt`. Identity-preserving
+  (§33 §4: `export foo` has the same interface effect as `pub foo` with no second
+  identity) AND constructor-publishing (the Or precedent, Core/Logic/Or.ken.md:
+  13-18). OrdResult authoring is UNBLOCKED.
+  WHY Core/Logic (not LawfulClasses, not Derived): OrdResult is a foundational
+  3-way comparison-result primitive, a sibling of `Core.Logic.Or`, and sits BELOW
+  the Ord class layer (the Ord class returns it, never the reverse). Core/Logic
+  already homes exactly these primitives (Or/Transport/EmptyDec) and is already
+  imported by all three consumers — ZERO new package edge, no cycle. Homing in
+  LawfulClasses forces Derived onto the whole Ord-class module; homing in Derived
+  creates a backwards Numeric/Order -> Collections edge.
+  DEDUP BOUNDARY: DELETE the two private competing decls (Derived.ken.md:69 data +
+  :71/:73/:75 consts; Order.ken.md:188 data); ADD `import Core.Logic.OrdResult
+  (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)` to Derived, Order, AND
+  LawfulClasses (the last closes its homeless references; it declares none today).
+  Derived's derived helpers (ord_result_leq, ord_result_dispatch2, eliminators,
+  pair_compare + lemmas) STAY in Derived — not cross-referenced at base; promote
+  one later only if the census shows a second importer.
+  IDENTITY CONSTRAINT: after dedup EXACTLY ONE defining `data OrdResult` => ONE
+  canonical GlobalId; every consumer resolves OrdResult/Lt/Eq/Gt/ord_* to THAT
+  single identity, else LawfulClasses's `Equal OrdResult (compare ...) ord_eq`,
+  Order's `compare : Nat -> Nat -> OrdResult`, and Derived's `pair_compare`
+  do not unify. Migration is identity-preserving: only the DECL relocates; consumer
+  bodies are byte-unchanged apart from the added import line.
 - Canonical public homes for the OTHER homeless conveniences the provider +
   consumer closure requires — census-driven, see the homeless-convenience closed
   predicate below.
@@ -114,10 +160,36 @@ ranges over the real population, not the stale count.
   disposition of all 34.
 - AC-B4. Gcd's four imports resolve to the exact provider IDs with no Gcd-owned
   competing identity — establish no-reimplementation by IDENTITY, not repo text.
-- AC-B5 (canonical-home identity). Exactly one `data Nat` AND exactly one `data
-  OrdResult` exist in the catalog (one defining interface each); every consumer
-  resolves `Nat`/`OrdResult` to it; the two private `OrdResult` copies at base are
-  deduped away. No second identity, no ambient/floor `Nat`.
+- AC-B5 (canonical-home identity — Architect ruling evt_60na0wbpydg0y). Exactly
+  one defining `data OrdResult` exists in the catalog (at `Core/Logic/OrdResult`),
+  the two private copies at base deduped away; and `Nat` is served by a single
+  `Data/Numeric/Nat` public interface that RE-EXPORTS the native identity (NO new
+  catalog `data Nat` — a redeclared/forked `Nat` GlobalId is forbidden). Every
+  consumer resolves `Nat`/`Zero`/`Suc` to the single native GlobalId and
+  `OrdResult`/`Lt`/`Eq`/`Gt`/`ord_*` to the single OrdResult GlobalId. No second
+  identity, no ambient/floor `Nat`.
+- AC-B5a (Nat native-export mechanism — CONFIRMED Spec prerequisite, fired at
+  3a7114cf7; Architect evt_22r45y0x8nzbh). Grounded: `export Nat, Zero, Suc`
+  succeeds under Legacy (binds native identities) but under STRICT fails at the
+  export declaration with `UnboundName Nat` — the facade unit's own strict scope
+  has no native Nat (non-floor, unimported, non-ambient), and dependency units
+  inherit one coherent ResolutionMode (no strict-consumer-loads-facade-via-legacy
+  escape). The elaborator has NO strict-capable identity-preserving native export
+  facade today. Nat-home authoring is HELD pending a Spec mechanism ruling on the
+  SHARP QUESTION: under Strict, how does a non-floor native inductive
+  (Nat/Zero/Suc) acquire a strict-resolvable public defining interface WITHOUT
+  forking its canonical identity? Two candidate mechanisms (Spec rules which):
+  (a) make strict export-name resolution bind a kernel/native global (an
+  elaborator change — §4.3 preserves identity but never runs because the export
+  cannot RESOLVE the native name under strict); (b) a real `data Nat = Zero | Suc
+  Nat` the elaborator RECOGNIZES as the native inductive by identity coincidence
+  (the ES2/Bool path, LawfulClasses.ken.md:215) — if that recognition generalizes
+  to Nat it is NOT the forbidden fork but the canonical native identity (still
+  requiring an import, Nat being non-floor). Architect leans (b)/ES2-Bool as the
+  likely clean answer; Spec first determines whether native-inductive recognition
+  already covers Nat or must be extended. B does NOT improvise a redeclaration
+  that forks identity. OrdResult migration + census + Gcd reuse are UNAFFECTED and
+  proceed as a partial increment while Nat waits (COORDINATION §10-).
 - AC-B7 (homeless census closed). The fixpoint homeless-convenience census (see
   the Deliverable) is run and its FULL set is enumerated with a canonical home
   authored for each — not rediscovered one hard-stop at a time. An empty
