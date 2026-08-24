@@ -37,11 +37,15 @@ origin: "Operator directive 2026-08-22: module/import is its own campaign and, b
 >   checks standalone-strict; Arithmetic/Order providers made public). Gated on
 >   WP-1..3 AND the Or realization chain. RE-FRAMED 2026-08-24 (hard stop): `Nat`
 >   has no catalog home, so the consumer migration + whole-catalog strict co-gate
->   split off to Component B (Architect ruling evt_214z6r6qnwme0).
-> - [[LANG-MOD-CATALOG-COMPLETENESS]] (WP-4 Component B) — one canonical `Nat`
->   home (+ other convenience homes), migrate Arithmetic/Order/Gcd to import their
->   providers, whole-catalog strict-green. The catalog-reuse SUCCESS step; depends
->   on Component A. Closing B closes the campaign's catalog criterion.
+>   split off to Component B (Architect ruling evt_214z6r6qnwme0). MERGED
+>   2026-08-24 at `574eb90c0` (auto-closed ee2631ff8); reduced to the loader fix
+>   + Arithmetic-only provider surface after the HS#5 convergence.
+> - [[LANG-MOD-CATALOG-COMPLETENESS]] (WP-4 Component B, RELEASED 2026-08-24) —
+>   one canonical `Nat` AND `OrdResult` home (+ other convenience homes via the
+>   fixpoint census), Order's provider surface + identity, migrate
+>   Arithmetic/Order/Gcd to import their providers, whole-catalog strict-green.
+>   The catalog-reuse SUCCESS step; depends on Component A. Closing B closes the
+>   campaign's catalog criterion.
 >
 > OR REALIZATION CHAIN (operator ruled the Or/Inl/Inr fork arm (b),
 > evt_6b9wrt1kwswcp — canonical package home, not refactor-away; the six consumers
