@@ -576,17 +576,20 @@ fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetim
 }
 
 
-/// Every emission owner under which one effect seat's body may be lowered.
+/// Every emission owner under which an inline synthesized aggregate is built.
 ///
-/// A seat is always emitted by its own predeclared unit. It is ALSO emitted
-/// inside every generated specialization context whose selected worker body
-/// contains it — that is the `D5a` case, and those two emissions are different
-/// occurrences of the same static seat.
+/// A seat is emitted by its own predeclared unit. It is also emitted under each
+/// continuation specialization whose exact selected case body contains it.
+/// Those specialization bodies are the population lowering actually enters
+/// under `defining_emission_owner = Specialization(unit.id())`; generated
+/// continuation contexts are a narrower, post-hoc population and therefore
+/// cannot authorize these records.
 ///
-/// Both halves are enumerated so neither needs a default. A seat reached under
-/// an owner this misses has no record and refuses loudly at its allocation,
-/// which is the fail-closed direction.
-fn synthesized_seat_emission_owners(
+/// This authority applies to synthesized aggregates constructed inline at
+/// `seat`: host-result constructors and unit-boundary environments. A checked-IH
+/// environment is force-emitted at a different seat and uses its explicit force
+/// relation instead.
+fn inline_synthesized_seat_emission_owners(
     plan: &StaticTransitionPlan<'_>,
     seat: StaticOriginId,
 ) -> Result<Vec<ContinuationEmissionOwner>, CraneliftBackendError> {
@@ -594,11 +597,27 @@ fn synthesized_seat_emission_owners(
     if let Some(predeclared) = plan.semantic.function_owner(seat)? {
         owners.push(ContinuationEmissionOwner::Predeclared(predeclared));
     }
-    for context in &plan.continuation_contexts {
-        if occurrence_subtree_contains(plan, context.worker_body_origin, seat)? {
-            owners.push(ContinuationEmissionOwner::Specialization(
-                context.enclosing_specialization,
+    for unit in plan.continuation_units()? {
+        let frame = plan.planned_occurrence_expr(unit.continuation_origin())?;
+        let RuntimeExpr::ComputationalMatch { cases, .. } = frame else {
+            return Err(planner_error(
+                "a continuation specialization's continuation origin is not a computational \
+                 frame, so its emitted body cannot be identified",
             ));
+        };
+        let alternative = unit.producer_alternative() as usize;
+        if cases.get(alternative).is_none() {
+            return Err(planner_error(
+                "a continuation specialization's selected alternative is outside its \
+                 computational frame",
+            ));
+        }
+        let body_position = alternative
+            .checked_add(1)
+            .ok_or_else(|| planner_capacity_error("continuation case position overflows"))?;
+        let body = plan.semantic.child_origin(unit.continuation_origin(), body_position)?;
+        if occurrence_subtree_contains(plan, body, seat)? {
+            owners.push(ContinuationEmissionOwner::Specialization(unit.id()));
         }
     }
     owners.sort();

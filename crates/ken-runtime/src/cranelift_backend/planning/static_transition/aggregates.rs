@@ -20,8 +20,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::continuations::{ContinuationOrdinaryEnvelopeRole, ContinuationWorkerCaptureSource};
 
 use super::{
-    occurrence_authority, planner_capacity_error, planner_error,
-    synthesized_seat_emission_owners, BoundaryReferentOwner,
+    inline_synthesized_seat_emission_owners, occurrence_authority,
+    planner_capacity_error, planner_error, BoundaryReferentOwner,
     ContinuationEmissionOwner, CraneliftBackendError, FieldIdentity, JoinResultRepresentation,
     PlannedOccurrenceChildAuthority, PlannedReferentLifetime, PredeclaredFunctionId,
     StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
@@ -1425,8 +1425,9 @@ fn checked_ih_coordinate_run(
 /// A continuation specialization `u` emits its selected case body under
 /// `Specialization(u.id())`, and that body binds and may force exactly
 /// `u.worker_closure_origin()`. This is the real force edge. It differs from
-/// [`synthesized_seat_emission_owners`], whose subtree-containment rule is the
-/// right authority only for aggregates emitted inline at their own seat.
+/// [`inline_synthesized_seat_emission_owners`] is the authority for aggregates
+/// emitted inline at their own seat; this environment is emitted at the force
+/// seam instead.
 ///
 /// Runs are canonical per closure seat. If two specialization edges select the
 /// same closure, their environment records clone that one run; a disagreement
@@ -1626,7 +1627,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
             continue;
         };
         let seat = occurrence.static_origin;
-        for owner in synthesized_seat_emission_owners(plan, seat)? {
+        for owner in inline_synthesized_seat_emission_owners(plan, seat)? {
             for semantic_use in flatten_allocation_reachable_uses(plan, *operation) {
                 let mut children = Vec::with_capacity(semantic_use.children.len());
                 for (position, child) in semantic_use.children.iter().enumerate() {
@@ -1698,7 +1699,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
     // record has no fields, so no compiler-created field-name authority is
     // needed or inferred.
     for (seat, position) in unit_boundary_environment_fields(plan)? {
-        for owner in synthesized_seat_emission_owners(plan, seat)? {
+        for owner in inline_synthesized_seat_emission_owners(plan, seat)? {
             records.push(PlannedAggregateOwnership {
                 id: AggregateOccurrenceId(0),
                 producer: AggregateOccurrenceProducer::SynthesizedUse {
@@ -2427,7 +2428,7 @@ mod tests {
             .find(|occurrence| matches!(occurrence.expr, RuntimeExpr::Effect { .. }))
             .expect("the fixture has an effect seat")
             .static_origin;
-        let owner = *synthesized_seat_emission_owners(&plan, seat)
+        let owner = *inline_synthesized_seat_emission_owners(&plan, seat)
             .expect("the seat has emission owners")
             .first()
             .expect("a seat is emitted by at least its own predeclared unit");
@@ -3570,6 +3571,172 @@ mod tests {
 
 
 
+    /// A host-result constructor emitted from a specialization's selected body
+    /// receives the exact owner the consumer binds while lowering that body.
+    ///
+    /// Promise class: durable invariant. The fixture is discriminating because
+    /// no generated continuation context contains the effect seat: the retired
+    /// context-containment proxy omits the specialization owner while the real
+    /// lowered-unit body contains it.
+    #[test]
+    fn non_inline_host_effect_records_equal_their_actual_emission_owner_set() {
+        let expression = super::super::tests::contspec_parameter_match(RuntimeExpr::Effect {
+            family: "FS".to_string(),
+            operation: ken_host::HostOpV1::FsReadFile,
+            capability: None,
+            args: vec![unit()],
+        });
+        let plan = plan_static_transition_graph(&expression, &BTreeMap::new())
+            .expect("the host-effect specialization fixture plans");
+        let seat = plan
+            .source_occurrences
+            .iter()
+            .flatten()
+            .find(|occurrence| matches!(occurrence.expr, RuntimeExpr::Effect { .. }))
+            .expect("the fixture has one effect seat")
+            .static_origin;
+        let units = plan.continuation_units().expect("the plan exposes its units");
+        assert_eq!(
+            units.len(),
+            1,
+            "the fixture must have one exact specialization owner"
+        );
+        let specialization = ContinuationEmissionOwner::Specialization(units[0].id());
+        let selected_body = plan
+            .semantic
+            .child_origin(
+                units[0].continuation_origin(),
+                1 + units[0].producer_alternative() as usize,
+            )
+            .expect("the selected case body has a planned origin");
+        assert!(
+            super::super::occurrence_subtree_contains(&plan, selected_body, seat)
+                .expect("the selected body subtree is valid"),
+            "positive control: the body lowered under the specialization must contain the seat"
+        );
+        assert!(
+            plan.continuation_contexts.iter().all(|context| {
+                context.enclosing_specialization != units[0].id()
+                    || !super::super::occurrence_subtree_contains(
+                        &plan,
+                        context.worker_body_origin,
+                        seat,
+                    )
+                    .expect("the context subtree is valid")
+            }),
+            "negative discriminator: the context-containment proxy must omit this real emission"
+        );
+
+        let path = SynthesizedAggregatePath::root(
+            SynthesizedAggregateRoot::HostResultError,
+        )
+        .field(0);
+        let actual = plan
+            .aggregate_ownership
+            .iter()
+            .filter_map(|record| match &record.producer {
+                AggregateOccurrenceProducer::SynthesizedUse {
+                    owner,
+                    seat: record_seat,
+                    path: record_path,
+                    role: SynthesizedAggregateRole::Constructor(
+                        SynthesizedConstructorRole::Fixed(
+                            SynthesizedFixedConstructorRole::FileOperationRead,
+                        ),
+                    ),
+                } if *record_seat == seat && record_path == &path => Some(*owner),
+                AggregateOccurrenceProducer::Source(_)
+                | AggregateOccurrenceProducer::SynthesizedUse { .. } => None,
+            })
+            .collect::<BTreeSet<_>>();
+        let predeclared = ContinuationEmissionOwner::Predeclared(
+            plan.semantic
+                .function_owner(seat)
+                .expect("the seat owner resolves")
+                .expect("the seat belongs to a predeclared unit"),
+        );
+        assert_eq!(
+            actual,
+            BTreeSet::from([predeclared, specialization]),
+            "the FileOperationRead record owners must equal the ordinary and specialization \
+             bodies that actually emit this seat"
+        );
+    }
+
+    /// Unit-boundary environments are inline at their source-constructor seat.
+    /// Therefore the same selected-body authority used for host-result
+    /// constructors is both necessary and sufficient for this sibling role.
+    ///
+    /// Promise class: durable invariant. Placing the producer inside a selected
+    /// specialization body exercises the owner axis that a root-only UBE
+    /// fixture cannot distinguish.
+    #[test]
+    fn unit_boundary_environment_uses_the_same_inline_emission_authority() {
+        let body = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["value".to_string()],
+                body: Box::new(RuntimeExpr::Var(0)),
+            }),
+            args: vec![RuntimeExpr::Construct {
+                constructor: "ctor:fixture::Environment::Wrap".to_string(),
+                args: vec![RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["unit".to_string()],
+                    body: Box::new(unit()),
+                }],
+            }],
+        };
+        let expression = super::super::tests::contspec_parameter_match(body);
+        let plan = plan_static_transition_graph(&expression, &BTreeMap::new())
+            .expect("the UBE specialization fixture plans");
+        let producer = plan
+            .source_occurrences
+            .iter()
+            .flatten()
+            .find_map(|occurrence| match occurrence.expr {
+                RuntimeExpr::Construct { args, .. }
+                    if matches!(args.as_slice(), [RuntimeExpr::LexicalClosure { .. }]) =>
+                {
+                    Some(occurrence.static_origin)
+                }
+                _ => None,
+            })
+            .expect("the fixture has one UBE producer seat");
+        let units = plan.continuation_units().expect("the plan exposes its units");
+        assert_eq!(units.len(), 1, "the fixture has one specialization");
+        let specialization = ContinuationEmissionOwner::Specialization(units[0].id());
+        let path = SynthesizedAggregatePath::root(
+            SynthesizedAggregateRoot::UnitBoundaryEnvironment,
+        )
+        .field(0);
+        let actual = plan
+            .aggregate_ownership
+            .iter()
+            .filter_map(|record| match &record.producer {
+                AggregateOccurrenceProducer::SynthesizedUse {
+                    owner,
+                    seat,
+                    path: record_path,
+                    role: SynthesizedAggregateRole::UnitBoundaryEnvironment,
+                } if *seat == producer && record_path == &path => Some(*owner),
+                AggregateOccurrenceProducer::Source(_)
+                | AggregateOccurrenceProducer::SynthesizedUse { .. } => None,
+            })
+            .collect::<BTreeSet<_>>();
+        let predeclared = ContinuationEmissionOwner::Predeclared(
+            plan.semantic
+                .function_owner(producer)
+                .expect("the producer owner resolves")
+                .expect("the producer belongs to a predeclared unit"),
+        );
+        assert_eq!(
+            actual,
+            BTreeSet::from([predeclared, specialization]),
+            "the UBE record owners must equal the bodies that lower its source producer inline"
+        );
+    }
+
     /// Every operation whose tree this module states.
     pub(super) fn measured_tree_operations() -> Vec<ken_host::HostOpV1> {
         use ken_host::HostOpV1 as Op;
@@ -3677,6 +3844,36 @@ mod checked_ih_captured_env_schema {
 
     fn record_seat(record: &PlannedAggregateOwnership) -> StaticOriginId {
         record_key(record).1
+    }
+
+    /// The retired context-subtree proxy, retained only as the negative oracle
+    /// proving the force relation does not accidentally collapse back onto it.
+    fn legacy_context_containment_owners(
+        plan: &StaticTransitionPlan<'_>,
+        seat: StaticOriginId,
+    ) -> BTreeSet<ContinuationEmissionOwner> {
+        let mut owners = BTreeSet::new();
+        if let Some(predeclared) = plan
+            .semantic
+            .function_owner(seat)
+            .expect("the seat owner resolves")
+        {
+            owners.insert(ContinuationEmissionOwner::Predeclared(predeclared));
+        }
+        for context in &plan.continuation_contexts {
+            if super::super::occurrence_subtree_contains(
+                plan,
+                context.worker_body_origin,
+                seat,
+            )
+            .expect("the context subtree is valid")
+            {
+                owners.insert(ContinuationEmissionOwner::Specialization(
+                    context.enclosing_specialization,
+                ));
+            }
+        }
+        owners
     }
 
     /// The ruled force-edge population, derived directly from continuation
@@ -3894,9 +4091,7 @@ mod checked_ih_captured_env_schema {
 
         let mut containment_only = BTreeSet::new();
         for (_, seat) in &forced {
-            for owner in synthesized_seat_emission_owners(&plan, *seat)
-                .expect("the containment population derives")
-            {
+            for owner in legacy_context_containment_owners(&plan, *seat) {
                 if !forced.contains(&(owner, *seat)) {
                     containment_only.insert((owner, *seat));
                 }
