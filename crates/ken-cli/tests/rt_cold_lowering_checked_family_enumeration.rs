@@ -8,46 +8,42 @@
 //!
 //! The `rt_parity` population was closed because its harness substitutes an
 //! entry at exactly one placeholder, so one name determined the program. **That
-//! basis does NOT transfer here and assuming it would have been wrong**: these
-//! sources have NO substitution placeholder. Each is a fixed program whose
-//! `main` dispatches to a named entry directly.
+//! basis does NOT transfer here and assuming it would have been wrong**: this
+//! source has NO substitution placeholder. It is a fixed program whose `main`
+//! dispatches to a named entry directly.
 //!
 //! So admissibility is defined differently, and the population is bounded by a
-//! different fact: each source contains exactly ONE declaration bearing the
+//! different fact: the source contains exactly ONE declaration bearing the
 //! entry signature `proc <name> (cap : Cap AFull)` -- the shape `main`'s
 //! `MkProgramCaps cap |-> <entry> cap` position requires. Every other
-//! declaration in these sources takes a resource, a buffer or an outcome, so
-//! none is admissible at that site. One admissible entry per source, no
-//! placeholder to vary, therefore **one program per source**.
+//! declaration takes a resource, a buffer or an outcome, so none is admissible
+//! at that site. One admissible entry and no placeholder to vary means one
+//! program for this source.
 //!
-//! # The family is TWO programs, not one
+//! # The family is one content identity
 //!
-//! Four tests carry this family. Three share a byte-identical source
-//! (`rt_capture_projection_grow`, `rt_exactint_carried_observe`,
-//! `rt_resource_release_carried_observe`); the fourth
-//! (`rt_branched_scrutinee_unit_body_port`) has a DISTINCT source under a
-//! different constant name, whose entry happens to share the NAME
-//! `rt_branched_stage` while having a different body.
-//!
-//! Taking "the source the four pins share" at face value would have enumerated
-//! one program and missed the second -- the same shape as the `_stage`
-//! name-suffix near-miss in the sibling report, and the same lesson: identity by
-//! CONTENT, never by the name something is filed under.
+//! Four tests carry byte-identical source content under different constant
+//! names: `rt_capture_projection_grow`, `rt_exactint_carried_observe`,
+//! `rt_resource_release_carried_observe`, and
+//! `rt_branched_scrutinee_unit_body_port`. Names and reporting labels do not
+//! create programs. The family therefore contains one program, identified by
+//! its source bytes. The permanent population pin below rejects two rows with
+//! the same bytes, so labels cannot inflate the census.
 //!
 //! # Why this population cannot be bounded the way the sibling one was
 //!
 //! `rt_parity` had 11 entries, so one pass surfaced five distinct mechanisms --
-//! the refusals were spread across independent programs. Here each program is a
+//! the refusals were spread across independent programs. Here the family is a
 //! population of ONE, and a single compile returns a single refusal. **Whatever
-//! sits behind the first refusal in each program is invisible until that refusal
-//! is fixed.** Enumeration has no purchase on a population of one; for this
-//! family, depth can only be discovered serially, which is precisely the
-//! condition the enumeration discipline exists to avoid. That is a finding about
-//! the FIXTURES, and it is reported rather than worked around.
+//! sits behind the first refusal is invisible until that refusal is fixed.**
+//! Enumeration has no purchase on a population of one; for this family, depth
+//! can only be discovered serially, which is precisely the condition the
+//! enumeration discipline exists to avoid. That is a finding about the
+//! FIXTURES, and it is reported rather than worked around.
 
 #![cfg(target_os = "linux")]
 
-const CHECKED_CAPTURE_SOURCE: &str = r#"program capabilities FS AFull
+const CHECKED_FAMILY_SOURCE: &str = r#"program capabilities FS AFull
 fn rt_branched_body (_buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   Ret (Coproduct (FSOp AFull) AmbientOp)
@@ -116,102 +112,61 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   }
 "#;
 
-const BRANCHED_SCRUTINEE_SOURCE: &str = r#"program capabilities FS AFull
-fn rt_branched_body (_buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
-
-proc rt_branched_endpoint_buffer
-  (file : Resource FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-    (readAt AFull file (0 : Int) buffer
-      (MkBufferWindow (8 : Int) (4 : Int)))
-    (\outcome. match outcome {
-      Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-      Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
-    })
-
-proc rt_branched_after_buffer
-  (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-    Ok bracket |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-proc rt_branched_file (file : Resource FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
-    (ResourceBodyResult Unit Unit)
-    (withBuffer AFull Unit Unit (8 : Int) (rt_branched_endpoint_buffer file))
-    (\outcome. rt_branched_after_buffer outcome)
-
-proc rt_branched_done
-  (outcome : Result FileError (ResourceBracketResult Unit Unit))
-  : HostIO AFull ExitCode visits [FS] =
-  match outcome {
-    Err error |-> host_exit AFull (Failure 71);
-    Ok bracket |-> host_exit AFull (Failure 72)
-  }
-
-proc rt_branched_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-    (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_branched_file)
-    (\outcome. rt_branched_done outcome)
-
-proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  match caps {
-    MkProgramCaps cap |-> rt_branched_stage cap
-  }
-"#;
-
-/// The checked-program family: one entry per source, two distinct sources.
+/// The checked-program family: exactly one row per distinct source content.
 /// See the closure argument above for why this is the population and not a
 /// selection from it.
-const FAMILY: &[(&str, &str)] = &[
-    ("checked-capture (shared by three pins)", CHECKED_CAPTURE_SOURCE),
-    ("branched-scrutinee (distinct source)", BRANCHED_SCRUTINEE_SOURCE),
-];
+const FAMILY: &[(&str, &str)] = &[(
+    "checked capture with branched scrutinee (shared by four pins)",
+    CHECKED_FAMILY_SOURCE,
+)];
 
-/// The terminal disposition each program must reach.
+/// The terminal disposition each content-distinct program must reach.
 ///
 /// `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION` retires the advancing-refusal
-/// sentinel: both closed programs now complete through the static checked-IH
+/// sentinel: the closed program now completes through the static checked-IH
 /// dispatcher and its transported positional environment.
-const EXPECTED: &[(&str, &str)] = &[
-    ("checked-capture (shared by three pins)", "OK"),
-    ("branched-scrutinee (distinct source)", "OK"),
-];
+const EXPECTED: &[(&str, &str)] = &[(
+    "checked capture with branched scrutinee (shared by four pins)",
+    "OK",
+)];
 
+/// DURABLE INVARIANT: adding a genuinely byte-distinct source remains green;
+/// adding another label for existing bytes or an unpaired expectation reds.
+///
+/// MEASURED: `FAMILY` row count equals its byte-slice set cardinality, labels
+/// are unique, and `EXPECTED` has exactly the same unique labels.
+/// CLAIMED: reporting labels cannot inflate the declared program population,
+/// and every source-content identity has exactly one terminal disposition.
+/// THE GAP: this pin guards the declared family, not discovery of fixture files;
+/// the closure argument above independently grounds the current four fixture
+/// copies as one byte-identical source identity.
 #[test]
-fn the_expectation_table_covers_exactly_the_family() {
+fn family_rows_are_unique_by_source_content_and_have_exact_expectations() {
+    let distinct_sources: std::collections::BTreeSet<&[u8]> =
+        FAMILY.iter().map(|(_, source)| source.as_bytes()).collect();
+    assert_eq!(
+        distinct_sources.len(),
+        FAMILY.len(),
+        "each checked-family row must name a distinct source-content identity; \
+         labels cannot inflate the program population"
+    );
+
     let expected: std::collections::BTreeSet<&str> =
         EXPECTED.iter().map(|(name, _)| *name).collect();
-    let family: std::collections::BTreeSet<&str> =
-        FAMILY.iter().map(|(name, _)| *name).collect();
+    let family: std::collections::BTreeSet<&str> = FAMILY.iter().map(|(name, _)| *name).collect();
+    assert_eq!(
+        family.len(),
+        FAMILY.len(),
+        "each content-distinct program must also have one distinct reporting label"
+    );
+    assert_eq!(
+        expected.len(),
+        EXPECTED.len(),
+        "each terminal disposition must have one distinct reporting label"
+    );
     assert_eq!(
         expected, family,
-        "the disposition table and the enumerated family have diverged"
+        "the disposition table and the content-distinct family have diverged"
     );
 }
 
@@ -246,7 +201,9 @@ fn every_checked_family_program_reaches_its_expected_terminal_state() {
             .iter()
             .find(|(entry, _)| entry == name)
             .map(|(_, key)| *key)
-            .expect("covered by the_expectation_table_covers_exactly_the_family");
+            .expect(
+                "covered by family_rows_are_unique_by_source_content_and_have_exact_expectations",
+            );
         if key == "OK" && outcome != "OK" {
             mismatches.push(format!(
                 "{name}: expected the closed checked-IH representation to complete, got: \
