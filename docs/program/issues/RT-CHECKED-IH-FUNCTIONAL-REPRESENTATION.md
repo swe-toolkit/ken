@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION
 title: "Give Ken a first-class representation for an ESCAPING functional induction hypothesis, so the nullary_force of a checked computational IH whose realized value is stored into a constructor (escapes its frame) can be lowered honestly. The decisive escape measurement (runtime-implementer evt_79jd1nxamqd95) proved the realized IH value's immediate parent is a Construct on both checked-family programs -- it is stored straight into a constructor field, so the non-escaping use-site-specialization remedy cannot apply (no in-frame application site, no response argument at the use). Ken has no first-class functional-IH value: StaticWorkerBinding is compiler metadata with no runtime word/tag/layout/env-pointer/callable identity (lowering/mod.rs:3578-3603), LoweringOperand is exactly {Specialized(Lowered), Carried(CarriedBoundaryWord)} with no closure/worker arm, and an ordinary carried word cannot hold `lambda response. rec (k response)`. This node introduces the genuine new representation. It carries a design D0 the Architect rules before build: materialized closure value vs defunctionalized carried tag (code identity + environment + apply dispatcher). Successor to the closed RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT."
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
@@ -11,34 +11,23 @@ github: null
 origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect's pre-committed conditional ruling (evt_2f4bbmt7qfde1) after the decisive ESCAPE measurement (runtime-implementer evt_79jd1nxamqd95) returned ESCAPING. Supersedes RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT (closed; both its Closure-A operand-seat mechanism and its NULLARY_FORCE re-reading were refuted -- the realized IH value escapes into a constructor, a capability gap, not a seam fix). HS=5 (Steward of record); ESCAPING is a scoping decision, not a hard-stop increment. Steward-filed per COORDINATION section 2."
 ---
 
-> # PREDECESSOR MERGED 2026-08-23 — tier-3 UNBLOCKED + shovel-ready; ring HELD at
-> # the runtime→pi reseat seam (Steward call, operator offline). Supersedes the
-> # "Re-flip ready + kick then" line in the HELD banner below.
+> # RELEASED 2026-08-24 — all predecessors merged + reseat done; kicked on the pi ring.
 >
-> [[RT-CHECKED-IH-CAPTURED-ENV-SCHEMA]] landed origin/main 7426bb1f2 (auto-closed
-> ce6c23369), so tier-3 (Record build + defunctionalize at core.rs:11674,
-> dispatcher AC-REPR PR #2802) is buildable; the build also adds the production
-> EMITTER constructing SynthesizedArgument::WorkerCaptureOperand at the force seam
-> (the tier-1 reconcile machinery is DORMANT until it exists). NOT kicked yet: the
-> tier-1 merge IS the operator-named runtime→pi reseat seam (ring quiescent;
-> reseating mid-build discards context). "Runtime unblocked" (operator offline
-> directive #1) is satisfied — this node is shovel-ready. The operator runs the pi
-> reseat on return, then the fresh pi ring builds tier-3. Operator override: flip
-> ready + kick to build now on the current ring. M3/M4 stay gated on M6.
->
-> # HELD 2026-08-22 — tier-3 blocked on a predecessor (Case-C reach fork)
->
-> Reverted active -> draft. The build reached deliverable 2 and measured the
-> escaped IH environment NON-EMPTY (StaticWorker captures=9); the existing
-> admitted-env concept is bounded to empty captures by construction. The Architect
-> ruled the Case-C fork (evt_2e11sk1jvp8mv): a new predecessor slice
-> [[RT-CHECKED-IH-CAPTURED-ENV-SCHEMA]] must admit the captured environment (tiers
-> 1 elaborator-emit + 2 planner-schema) before this node's tier-3 lowering can
-> build. M6 now depends_on it. NOTHING on M6 proper regressed: AC-ENTRY discharged
-> (enumerability holds), the two-tier dispatch design is ruled and durable
-> (AC-REPR, PR #2802) — this fork is about the VALUE's schema only. Tier-3 (Record
-> build + defunctionalize at core.rs:11674) resumes, unchanged, when the
-> predecessor lands. Re-flip ready + kick then. HS 5.
+> Every gate is cleared: [[RT-CHECKED-IH-CAPTURED-ENV-SCHEMA]] merged (7426bb1f2),
+> [[RT-NATIVE-TRACK0-REARM]] merged, [[RT-IH-MARKER-PRODUCER-COMPLETE]] closed; and
+> the operator-named runtime→pi reseat is DONE (Steward-executed: implementer
+> gpt-5.6-sol high T1, leader+qa gpt-5.6-terra medium — moot.toml b7375783c). The
+> reason this node was held (predecessor + reseat seam) is gone, so it is flipped
+> draft -> ready and kicked on the fresh pi runtime ring. The captured-env fork
+> that reverted it is resolved: the predecessor admits the non-empty StaticWorker
+> capture env. Tier-3 = Record build + defunctionalize at core.rs:11674, dispatcher
+> AC-REPR (two-tier, PR #2802), plus the production EMITTER constructing
+> SynthesizedArgument::WorkerCaptureOperand at the force seam (the tier-1 reconcile
+> machinery is DORMANT until this emitter exists). Capability tier T1 (genuine
+> lowering implementation) — implementer correctly seated at sol/high. The D0
+> (DEFUNCTIONALIZE) and the two-tier dispatch design below are RULED and durable;
+> the earlier "not startable / skeleton" prose further down is superseded. M3/M4
+> stay gated on M6.
 
 > # D0 RULED 2026-08-22 — DEFUNCTIONALIZE; re-homed as native-program Track-1
 >
