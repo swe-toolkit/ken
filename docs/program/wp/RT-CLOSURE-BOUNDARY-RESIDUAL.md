@@ -107,35 +107,69 @@ Permitted continuation (M4's surface — no successor, no widening):
   retired-flat path. M4 lands per COORDINATION section 8a; the Architect reviews
   the candidate at soundness.
 
-## Fourth-stop disposition (Architect hold evt_7vxzx3b82k7kk; Steward partial-land)
+## Fourth-stop disposition (Architect ruling evt_35sppt0bv08qx — bounded extension)
 
 After the third-stop split, `px8ta` HALF B
 (`px8ds_real_same_depth_path_runs_exact_edges`) runs independently and STILL
-reaches the generic Closure refusal — the ordinary plan's own remaining
-crossing, not control contamination. It fails M4's crossing by the PREDICATE'S
-DESIGN, grounded by the Architect: HALF B's checked continuation is over a
-self-recursive producer (`countdown` calls itself), instantiated as TWO
-same-depth sibling IH instances, and applied as a bind continuation — so it is
-not structurally contained in the emitted owner's result value, and M4's
-capture-only single-static-descriptor model has no single descriptor for a
-multi-instance same-depth recursive continuation. Not a mechanism bug.
+reaches the generic Closure refusal — the ordinary plan's own remaining crossing,
+not control contamination. HALF B's checked continuation is over a self-recursive
+producer (`countdown` calls itself by static name), instantiated as TWO same-depth
+sibling IH instances, applied as a bind continuation.
 
-The Architect HOLDS the same-contract-vs-successor ruling under its §1a trigger
-(fourth hard-stop, a representation-scope fork), pending a research prior-art
-advisory (Research picked it up, evt_64rxg73jq6651); its leaning is
-distinct-successor. HALF B stays ignored + re-pointed to this node (M4) as
-holding owner; no M4 extension may be attempted while the advisory is out.
+Architect ruling (evt_35sppt0bv08qx), with research's prior-art advisory in hand
+(evt_72x4sqz19bebz): this is an IN-SCOPE BOUNDED EXTENSION of M4 — a SECOND exact
+authorization arm — NOT a distinct successor. It REVERSES the earlier
+distinct-successor leaning. Recursion and same-depth-sibling multiplicity are
+ORTHOGONAL to representation (Danvy-Nielsen: one source abstraction gives one
+constructor used n times via captures; Lean IR `pap`/`fap` share one `FunId`; GHC
+`StgRec` == `StgNonRec`). The deciding cardinality is STATIC CODE SHAPES at the
+apply site, not dynamic instances — and PX8DS has ONE continuation source (the
+producer recurses; the closure knot does not; the two IH instances are two control
+edges of ONE code shape). The Architect verified the crux at the object DB: the
+refusal is a SEPARABLE AUTHORIZATION predicate, not a representation limit —
+`boundary_closure_crossing_environment` (`aggregates.rs:1480`) refuses HALF B only
+on result-value containment (captures are non-empty), while the representation and
+apply (`call_boundary_closure_environment`, `calls.rs:1568`) are already
+capture-only singleton-per-body static dispatch and already multi-instance capable.
 
-Steward framing call: LAND THE PROVEN PARTIAL NOW (COORDINATION section 8a). The
-proven mechanism — the px8f/px8l crossing + honest re-points (px8f→M3,
-2×px8l→borrowed-input) + the px8ta split (HALF A independent rejection control) +
-any genuinely cross-and-green un-ignores — assembles into an accepted-partial
-candidate and lands, with the recursive-continuation population (HALF B + any
-sibling rows sharing its shape) carried forward. On landing, M4's node goes
-`active` (authorized partial, holding owner), NOT `merged`. When the Architect's
-post-research ruling lands: distinct-successor ⇒ HALF B re-points to the new node
-and M4 closes `merged`; same-contract ⇒ M4 takes a follow-up increment. HALF B
-does not gate the proven mechanism.
+The ruled extension (stays M4 — the frame already names all four Closure-arm rows,
+HALF B among them, as its population; this finishes M4's contract, no recut):
+
+- **Second authorization arm.** Add a second exact arm to
+  `boundary_closure_crossing_environment` for the bind-continuation edge, keeping
+  the result-value-containment arm unchanged. Authorize the capture-only crossing
+  there IFF the planner proves both (i) a SINGLETON target — `Targets(resume-site)
+  = {body_origin}`, one declared `worker_calls[body]` — and (ii) per-response
+  instance pairing: each response carries the exact environment word for its own
+  dynamic instance.
+- **Fail-closed, load-bearing.** Any bind-resume-site that may receive environments
+  from two or more body origins, or whose pairing cannot be proven, MUST fail closed
+  (stop-and-report). The arm must NOT degrade into generic closure admission and
+  carries no runtime code/body tag (Ahmed-Blume: an unknown/non-singleton target
+  must carry code identity; M4 is sound EXACTLY while the target is statically
+  singleton).
+- **Exactness pin (required for the Architect's APPROVE).** A control must RED if a
+  non-singleton OR non-paired bind continuation is admitted by the new arm — prove
+  the multi-target case is still REFUSED. Without it the extension is an unpinned
+  generic-closure hole, the exact soundness regression the boundary refusal exists
+  to prevent.
+- **Re-measure HALF B under the extension:** singleton + pairing proven ⇒ it
+  crosses; then end-to-end green ⇒ un-ignore, or a downstream exact M3 /
+  borrowed-input string ⇒ re-point per the classifier. If the proof FAILS for HALF
+  B, the multi-target case is a GENUINE successor (a code-discriminator dispatch) —
+  stop and report to the Architect; do NOT pre-split.
+- **HALF A** stays an independent passing rejection control, untouched by M4
+  representation.
+
+Steward sequencing (supersedes the partial-land route recorded above at
+`4486e109a`): M4 lands COMPLETE via the extension candidate — the
+result-value-containment crossing + the bind-continuation arm + honest re-points
+(px8f→M3, 2×px8l→borrowed-input) + only genuinely-green un-ignores — freshly gated
+(fresh QA; Architect soundness on the second arm's fail-closed proof + the exactness
+pin; Adversary over-accept). The proven-partial candidate `0b7cab211` is superseded
+(no vote). M4 closes `merged` on that landing. Only if HALF B's singleton/pairing
+proof fails does HALF B become a successor node and M4 land as the partial — the
+partial-land is now the FALLBACK, not the plan.
 
 ## Why the population must be CENSUSED, not inherited (measured @ `011bf2a95`)
 
@@ -226,6 +260,17 @@ measurement the build performs first, not a roster this frame pins.
   `Closure`/`DeclarationClosure` arm relaxed to admit a non-transferable value,
   or a row silenced (ignore removed) without actually running green, must be
   detectable and is a reject.
+- **AC-EXTENSION (bind-continuation arm, Architect `evt_35sppt0bv08qx`).** The
+  second `boundary_closure_crossing_environment` authorization arm authorizes a
+  capture-only crossing ONLY on a proven SINGLETON target (`Targets(resume-site)
+  = {body_origin}`, one `worker_calls[body]`) AND proven per-response instance
+  pairing; the result-value-containment arm is unchanged and no runtime code/body
+  tag is carried. Load-bearing exactness pin (required for the Architect's
+  APPROVE): a test REDS if a non-singleton OR non-paired bind continuation is
+  admitted — the multi-target case must still be REFUSED (fail-closed). Control
+  (Adversary): the second arm degraded into generic closure admission, a
+  non-singleton or unpaired admission, or HALF B un-ignored without genuine
+  end-to-end green, must be detectable and is a reject.
 - **AC-GREEN.** Every row the census assigned to this population runs green on
   the native backend with its `#[ignore]` removed; no row is left silently
   ignored, and no row outside the censused population is touched.
@@ -233,7 +278,10 @@ measurement the build performs first, not a roster this frame pins.
   Local targeted `-p` / `--test` only, never `--workspace`.
 - **Required reviewers.** Architect — soundness review that the boundary
   crossing is honest (the value is genuinely transferable, not a refusal
-  loosened). Adversary — over-accept hunt (a relaxed boundary arm; a row
+  loosened), with specific attention to the second arm's fail-closed
+  singleton+pairing proof and the exactness pin (AC-EXTENSION). Adversary —
+  over-accept hunt (a relaxed boundary arm; the second arm degraded to generic
+  admission; a non-singleton/unpaired bind continuation admitted; a row
   un-ignored without a real green run; a non-transferable value admitted).
 
 ## Contention check
