@@ -356,8 +356,30 @@ unsupported runtime-IR lowering: Closure: a closure cannot cross the boundary: i
 ```
 
 This is neither native end-to-end green nor either authorized successor string.
-It therefore fires the explicit third stop condition. PX8TA remains unchanged;
-no row was un-ignored, and this checkpoint is not an accepted M4 candidate.
+It therefore fired the explicit third stop condition. The Architect then ruled
+that stop to be test structure, not another closure to represent: the retired-
+flat negative control and ordinary production plan must be independent halves.
+
+## Split-half continuation — fourth stop disposition
+
+The combined PX8TA row was split without changing either program. Half A,
+`px8ds_retired_flat_order_does_not_gain_m4_representation`, keeps the retired-
+flat mutation and positively asserts its one exact generic closure refusal. It
+runs green as a negative control and receives no M4 representation.
+
+Half B, `px8ds_real_same_depth_path_runs_exact_edges`, independently builds the
+ordinary plan from the same source under the default ambient stack. It still
+stops at object emission with the exact M4 refusal:
+
+```text
+unsupported runtime-IR lowering: Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane
+```
+
+The refusal is therefore the production plan's own remaining M4 crossing, not
+an artifact of the retired-flat half. It is neither end-to-end green nor the
+known M3 or borrowed-input successor. This fires the explicit unclassified-
+refusal stop. The ordinary half remains ignored under M4; no censused row was
+un-ignored, and this checkpoint is not an accepted M4 candidate.
 
 ## Acceptance criteria and controls
 

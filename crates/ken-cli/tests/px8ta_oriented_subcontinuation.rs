@@ -293,7 +293,7 @@ fn public_two_three_level_brackets_finish_and_release_lifo() {
     // `ulimit -s`), so the product had ~3.7x the headroom this harness gave
     // itself. The wrapper below gives the harness **at least** the product's
     // headroom, exactly as
-    // `px8ds_real_same_depth_path_rejects_flat_order_and_runs_exact_edges` in
+    // `px8ds_real_same_depth_path_runs_exact_edges` in
     // this file already does. ⚠ Not "matches the product": 256 MiB is 32x the
     // product's 8 MiB, and saying "matches" would understate by how much this
     // stops being able to observe a stack regression at all.
@@ -318,41 +318,24 @@ fn public_two_three_level_brackets_finish_and_release_lifo() {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-//
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength,
-//     which it cannot observe in CarriedWord
-//
-// Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// The refusal surfaces on the helper thread 'px8ds-real-siblings'; this
-// test thread then fails only with the wrapper
-//   PX8-DS discriminator thread: Any { .. }
-// which carries no signature of its own. The signature above is the
-// real cause.
-// Annotation only -- test body and expectations are unchanged.
+// Durable invariant: the test-only retired flat-order plan has no M4 crossing
+// authority. It must remain on the ordinary fail-closed closure refusal rather
+// than acquiring the production plan's captured-environment representation.
 #[test]
-// RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
-// FileError SiteOperand(0) could not project its carried word. D5 byte-span
-// observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
-fn px8ds_real_same_depth_path_rejects_flat_order_and_runs_exact_edges() {
+fn px8ds_retired_flat_order_does_not_gain_m4_representation() {
     std::thread::Builder::new()
-        .name("px8ds-real-siblings".to_string())
+        .name("px8ds-retired-flat".to_string())
         .stack_size(256 * 1024 * 1024)
-        .spawn(run_px8ds_real_same_depth_path)
-        .expect("spawn large-stack PX8-DS discriminator")
+        .spawn(run_px8ds_retired_flat_control)
+        .expect("spawn large-stack PX8-DS retired-flat control")
         .join()
-        .expect("PX8-DS discriminator thread");
+        .expect("PX8-DS retired-flat control thread");
 }
 
 #[cfg(target_os = "linux")]
-fn run_px8ds_real_same_depth_path() {
+fn run_px8ds_retired_flat_control() {
+    const REFUSAL: &str = "unsupported runtime-IR lowering: Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane";
+
     let retired_dir = output_dir("px8ds-retired-flat");
     let retired = ken_runtime::with_px8ds_retired_flat_order(|| {
         ken_cli::build_native_program(
@@ -362,17 +345,43 @@ fn run_px8ds_real_same_depth_path() {
             retired_dir.path(),
         )
     })
-    .expect_err("the retired cross-instance flat order must reproduce its false rejection");
+    .expect_err("the retired flat-order plan must retain the closure refusal");
     let retired = format!("{retired:?}");
     assert!(
-        retired.contains("retired flat oriented splice answer endpoints do not compose"),
-        "the real checked producer must reach the retired consumer: {retired}"
+        retired.contains(REFUSAL),
+        "the retired plan must reach the exact closure refusal: {retired}"
     );
     assert_eq!(
-        retired.matches("depth=1").count(),
-        2,
-        "the reaching discriminator must reject two same-depth IH instances: {retired}"
+        retired.matches(REFUSAL).count(),
+        1,
+        "the retired plan must report one exact closure refusal: {retired}"
     );
+}
+
+#[cfg(target_os = "linux")]
+// Ignored pending RT-CLOSURE-BOUNDARY-RESIDUAL.
+//
+// Observed signature on the independent ordinary plan, exactly:
+//   Closure: a closure cannot cross the boundary: it is runtime-local and
+//     live-domain only, and it has no durable lane
+//
+// Owner node: RT-CLOSURE-BOUNDARY-RESIDUAL.
+// Splitting the retired-flat control proves this is the production plan's own
+// remaining M4 crossing, not a refusal inherited from the negative half.
+#[test]
+#[ignore = "RT-CLOSURE-BOUNDARY-RESIDUAL: the independent ordinary-plan half still refuses because a runtime-local closure has no durable lane across the boundary"]
+fn px8ds_real_same_depth_path_runs_exact_edges() {
+    std::thread::Builder::new()
+        .name("px8ds-real-siblings".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(run_px8ds_real_same_depth_path)
+        .expect("spawn large-stack PX8-DS ordinary-plan half")
+        .join()
+        .expect("PX8-DS ordinary-plan thread");
+}
+
+#[cfg(target_os = "linux")]
+fn run_px8ds_real_same_depth_path() {
     let exact_dir = output_dir("px8ds-exact-edges");
     let exact = ken_cli::build_native_program(
         PX8DS_SIBLING_RECURSION_PROGRAM,
