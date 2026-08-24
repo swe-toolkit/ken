@@ -76,7 +76,36 @@ This SUPERSEDES deliverable 3 / AC-GREEN below with the permitted continuation:
   M4 deliverable. Measured @ WIP `9de8397a`: `px8f_buffer_native` crosses then
   advances to M3's exact seam (re-point to M3); the two `px8l_recursive_decl`
   rows re-point to the borrowed-input successor; `px8ta_oriented_subcontinuation`
-  is measured under this rule to complete the widening.
+  is a test-structure fix (see the third-stop disposition below).
+
+## Third-stop disposition (Architect evt_4tdex7kqzk2w9) — px8ta is a test fix
+
+The `px8ta` row
+`px8ds_real_same_depth_path_rejects_flat_order_and_runs_exact_edges` bundles two
+independent assertions, and its retired-flat NEGATIVE control panics before M4's
+real subject runs. The Architect ruled M4 must NOT represent the retired-flat
+closure — wiring the crossing into a control that asserts a rejection would
+invert it. This is a test-structure fix on M4's own surface, not a mechanism
+representation and not a successor; the classifier's "unclassified → stop" fired
+correctly, surfacing a genuinely new case (a correct negative-control refusal).
+
+Permitted continuation (M4's surface — no successor, no widening):
+
+- **HALF A, the retired-flat negative control** (`with_px8ds_retired_flat_order`,
+  `mod.rs:8807`): stays a REJECTION assertion and receives NO M4 representation.
+  Since M4 legitimately leaves the retired-flat path un-wired, update HALF A's
+  `expect_err` content to the refusal it now truly reaches, OR reconfigure it to
+  still exercise the "…do not compose" splice rejection it was built to prove.
+  The runtime ring authors the exact assertion; the invariant is that it still
+  asserts a rejection and folds no retired-path representation into M4.
+- **HALF B, M4's real subject** (the ordinary oriented plan): split so it runs
+  independently of HALF A, then classify it by the standing exact-string rule
+  above. Its stale ignore reason is `RT-SITEOP-CARRIED-WITNESS` D2 (a
+  carried-recursive-hypothesis refusal), so it most likely RE-POINTS to M3
+  rather than greening — measure, do not assume green.
+- Does not fold M3 or borrowed-input work into M4 and does not gate M4 on the
+  retired-flat path. M4 lands per COORDINATION section 8a; the Architect reviews
+  the candidate at soundness.
 
 ## Why the population must be CENSUSED, not inherited (measured @ `011bf2a95`)
 
