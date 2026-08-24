@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-CATALOG-COMPLETENESS
 title: "WP-4 Component B — catalog completeness: give Nat and OrdResult (dedup two private copies) canonical public homes plus the fixpoint homeless-convenience census, deliver Order's provider surface + identity, migrate the consuming units (Gcd imports add/mul + leq_nat/sub + Nat and drops its reimplementations), and satisfy whole-catalog strict-green. The module/import campaign's catalog-reuse success step."
-status: ready
+status: merged
 owner: language
 size: L
 gate: none
