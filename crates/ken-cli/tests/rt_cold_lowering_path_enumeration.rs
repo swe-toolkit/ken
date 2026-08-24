@@ -530,35 +530,17 @@ enum Disposition {
     },
 }
 
-/// The checked-IH marker's producer fix landed, so these entries advanced PAST
-/// the marker seam to the real gap underneath it: the marker is a nullary_force
-/// of an ESCAPING functional induction hypothesis, and Ken has no first-class
-/// functional-IH value to realize.
-///
-/// MEASURED escaping, not assumed: the realized value's immediate parent is a
-/// `Construct` -- it is stored straight into a constructor field, so there is no
-/// in-frame application site to specialize it to. The refusal below is the
-/// static-worker arity gate seeing the arity-1 worker forced with zero
-/// arguments.
-///
-/// This is a real capability gap deferred to its own deliverable, NOT an
-/// unfinished piece of this candidate.
-const ESCAPING_FUNCTIONAL_IH: Disposition = Disposition::Refuses {
-    key: "static worker expects 1 arguments but call provides 0",
-    retired_by: "RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION",
-};
-
 const BOUNDARY_CARRIER: Disposition = Disposition::Refuses {
     key: "a carried recursive hypothesis is an eliminated value",
     retired_by: "the BoundaryCarrier need-directed-projection fold",
 };
 
-/// Not a gap. A closure is runtime-local and live-domain only, so crossing the
-/// boundary has no durable lane to cross by. This row retires only if that
-/// design decision is reversed.
-const CLOSURE_BOUNDARY: Disposition = Disposition::Refuses {
-    key: "a closure cannot cross the boundary",
-    retired_by: "nothing planned: by-design permanent refusal",
+/// The M6 transport retires the escaping closure refusal on this row too. Its
+/// next exact layer is the carried site operand whose constructor tag the
+/// effect emitter cannot yet observe.
+const CARRIED_SITEOP_CONSTRUCTOR_TAG: Disposition = Disposition::Refuses {
+    key: "seat Argument(1) of FsOpen needs ConstructorTag, which it cannot observe in CarriedWord",
+    retired_by: "RT-CARRIED-IH-DISPATCH-SITEOP",
 };
 
 /// Refused by ELABORATION, before any lowering runs. It is in this population
@@ -572,16 +554,16 @@ const ELABORATION_MISMATCH: Disposition = Disposition::Refuses {
 
 const EXPECTED: &[(&str, Disposition)] = &[
     ("rt_allocate_stage", BOUNDARY_CARRIER),
-    ("rt_cap41_endpoint_stage", ESCAPING_FUNCTIONAL_IH),
-    ("rt_cap41_offset_endpoint_stage", ESCAPING_FUNCTIONAL_IH),
-    ("rt_cap41_offset_out_of_range_stage", ESCAPING_FUNCTIONAL_IH),
-    ("rt_cap41_out_of_range_stage", ESCAPING_FUNCTIONAL_IH),
-    ("rt_read_norights_stage", ESCAPING_FUNCTIONAL_IH),
-    ("rt_read_offset_stage", ESCAPING_FUNCTIONAL_IH),
-    ("rt_read_window_stage", ESCAPING_FUNCTIONAL_IH),
+    ("rt_cap41_endpoint_stage", Disposition::Completes),
+    ("rt_cap41_offset_endpoint_stage", Disposition::Completes),
+    ("rt_cap41_offset_out_of_range_stage", Disposition::Completes),
+    ("rt_cap41_out_of_range_stage", Disposition::Completes),
+    ("rt_read_norights_stage", Disposition::Completes),
+    ("rt_read_offset_stage", Disposition::Completes),
+    ("rt_read_window_stage", Disposition::Completes),
     ("rt_write_pair_source", ELABORATION_MISMATCH),
-    ("rt_write_readonly_stage", ESCAPING_FUNCTIONAL_IH),
-    ("rt_write_writable_stage", CLOSURE_BOUNDARY),
+    ("rt_write_readonly_stage", Disposition::Completes),
+    ("rt_write_writable_stage", CARRIED_SITEOP_CONSTRUCTOR_TAG),
 ];
 
 /// The expectation table must range over exactly the population, so a new entry

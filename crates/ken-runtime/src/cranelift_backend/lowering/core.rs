@@ -2825,6 +2825,13 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     Ok(compiled)
 }
 
+enum ProducerTrampolineWork<'a> {
+    Value {
+        answer: RoutedAnswer,
+        eliminators: Vec<EliminatorFrame<'a>>,
+    },
+}
+
 impl<'a> Lowering<'a> {
     pub(super) fn resume_active_continuation(
         &mut self,
@@ -3062,12 +3069,86 @@ impl<'a> Lowering<'a> {
     /// reaches occurrences the direct descent does not — so it threads origins by
     /// exactly the same table as `lower_expr`: no guessed subset, both routes or
     /// neither.
-    pub(super) fn lower_computational_producer_expr(
+    pub(super) fn lower_computational_producer_expr<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
-        occurrence: SourceOccurrence<'_>,
-        producer_env: &[LoweringEnvironmentBinding],
-        eliminators: &[EliminatorFrame<'_>],
+        occurrence: SourceOccurrence<'b>,
+        producer_env: &'b [LoweringEnvironmentBinding],
+        eliminators: &[EliminatorFrame<'b>],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let owner_has_checked_transport = self.defining_emission_owner.is_some_and(|owner| {
+            !self
+                .static_transition_plan
+                .checked_ih_environment_transports_owned_by(owner)
+                .is_empty()
+        });
+        if !owner_has_checked_transport {
+            return self.lower_computational_producer_expr_once(
+                builder,
+                occurrence,
+                producer_env,
+                eliminators,
+                None,
+            );
+        }
+
+        let mut next = None;
+        let lowered = self.lower_computational_producer_expr_once(
+            builder,
+            occurrence,
+            producer_env,
+            eliminators,
+            Some(&mut next),
+        );
+        while let Some(ProducerTrampolineWork::Value {
+            answer,
+            eliminators,
+        }) = next
+        {
+            next = None;
+            let lowered = self.lower_computational_match_value_composed_once(
+                builder,
+                answer,
+                &eliminators,
+                Some(&mut next),
+            );
+            if next.is_none() {
+                return lowered;
+            }
+        }
+        lowered
+    }
+
+    fn continue_composed_value<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        answer: RoutedAnswer,
+        eliminators: &[EliminatorFrame<'b>],
+        producer_tail: Option<&mut Option<ProducerTrampolineWork<'b>>>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        if let Some(producer_tail) = producer_tail {
+            // This call is in tail position: once the next work item is
+            // installed, the driver's next iteration owns the answer. Return
+            // the same operand only as the ignored value of this step; never
+            // manufacture or reuse a runtime/protocol marker as trampoline
+            // control.
+            let ignored = answer.value.clone();
+            *producer_tail = Some(ProducerTrampolineWork::Value {
+                answer,
+                eliminators: eliminators.to_vec(),
+            });
+            return Ok(ignored);
+        }
+        self.lower_computational_match_value_composed(builder, answer, eliminators)
+    }
+
+    fn lower_computational_producer_expr_once<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        occurrence: SourceOccurrence<'b>,
+        producer_env: &'b [LoweringEnvironmentBinding],
+        eliminators: &[EliminatorFrame<'b>],
+        producer_tail: Option<&mut Option<ProducerTrampolineWork<'b>>>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let SourceOccurrence {
             expr: scrutinee,
@@ -3078,6 +3159,30 @@ impl<'a> Lowering<'a> {
                 "ComputationalMatch",
                 "nested computational producer has no eliminator",
             ));
+        }
+        // An invocation-return frame ordinarily marks an expression boundary:
+        // lower the producer by the ordinary expression machine and return its
+        // value unchanged.  A checked-IH transport crossing is the one exact
+        // exception.  It must reach the producer dispatcher so the destination
+        // constructor can replace its escaping closure child with the
+        // force-owned carrier word.
+        //
+        // The predicate is per producer, not per plan.  Mixed plans contain
+        // ordinary invocation returns beside transport destinations, and a
+        // plan-wide "has transports" test would route the ordinary producer
+        // through tree decomposition (where, for example, ProcessExitStatus is
+        // not a constructor scrutinee).
+        if matches!(eliminators[0], EliminatorFrame::InvocationReturn) {
+            let producer_has_transport = match self.defining_emission_owner {
+                Some(owner) => self
+                    .static_transition_plan
+                    .checked_ih_environment_transport_at(owner, static_origin)?
+                    .is_some(),
+                None => false,
+            };
+            if !producer_has_transport {
+                return self.lower_expr(builder, occurrence, producer_env);
+            }
         }
         if let EliminatorFrame::PendingLet(continuation) = eliminators[0] {
             let value = self.lower_expr(builder, occurrence, producer_env)?;
@@ -3358,10 +3463,11 @@ impl<'a> Lowering<'a> {
                                     );
                                     self.leave_oriented_semantic_region(installed.checked);
                                     let returned = returned?;
-                                    return self.lower_computational_match_value_composed(
+                                    return self.continue_composed_value(
                                         builder,
                                         RoutedAnswer::direct(returned),
                                         eliminators,
+                                        producer_tail,
                                     );
                                 }
                             }
@@ -3402,6 +3508,7 @@ impl<'a> Lowering<'a> {
                     args,
                     producer_env,
                     eliminators,
+                    producer_tail,
                 ),
             RuntimeExpr::Match {
                 scrutinee,
@@ -3555,10 +3662,11 @@ impl<'a> Lowering<'a> {
                     },
                     producer_env,
                 )?;
-                self.lower_computational_match_value_composed(
+                self.continue_composed_value(
                     builder,
                     RoutedAnswer::direct(value),
                     eliminators,
+                    producer_tail,
                 )
             }
         }
@@ -3759,11 +3867,56 @@ impl<'a> Lowering<'a> {
         lowered
     }
 
-    pub(super) fn lower_computational_match_value_composed(
+    pub(super) fn lower_computational_match_value_composed<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         scrutinee: RoutedAnswer,
-        eliminators: &[EliminatorFrame<'_>],
+        eliminators: &[EliminatorFrame<'b>],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let owner_has_checked_transport = self.defining_emission_owner.is_some_and(|owner| {
+            !self
+                .static_transition_plan
+                .checked_ih_environment_transports_owned_by(owner)
+                .is_empty()
+        });
+        if !owner_has_checked_transport {
+            return self.lower_computational_match_value_composed_once(
+                builder,
+                scrutinee,
+                eliminators,
+                None,
+            );
+        }
+        let mut next = Some(ProducerTrampolineWork::Value {
+            answer: scrutinee,
+            eliminators: eliminators.to_vec(),
+        });
+        loop {
+            let Some(ProducerTrampolineWork::Value {
+                answer,
+                eliminators,
+            }) = next.take()
+            else {
+                unreachable!("the producer trampoline carries only composed values")
+            };
+            let lowered = self.lower_computational_match_value_composed_once(
+                builder,
+                answer,
+                &eliminators,
+                Some(&mut next),
+            );
+            if next.is_none() {
+                return lowered;
+            }
+        }
+    }
+
+    fn lower_computational_match_value_composed_once<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        scrutinee: RoutedAnswer,
+        eliminators: &[EliminatorFrame<'b>],
+        producer_tail: Option<&mut Option<ProducerTrampolineWork<'b>>>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE ANSWER DISPOSITION,
         // ---- processed BEFORE phase classification and head selection.
@@ -3819,7 +3972,12 @@ impl<'a> Lowering<'a> {
                 return if remaining.is_empty() {
                     Ok(cleared.value)
                 } else {
-                    self.lower_computational_match_value_composed(builder, cleared, remaining)
+                    self.continue_composed_value(
+                        builder,
+                        cleared,
+                        remaining,
+                        producer_tail,
+                    )
                 };
             }
         }
@@ -3965,7 +4123,12 @@ impl<'a> Lowering<'a> {
                 return if remaining.is_empty() {
                     self.lower_expr(builder, body, frame.env)
                 } else {
-                    self.lower_computational_producer_expr(builder, body, frame.env, remaining)
+                    self.lower_computational_producer_expr(
+                        builder,
+                        body,
+                        frame.env,
+                        remaining,
+                    )
                 };
             }
             let join_plan =
@@ -4938,7 +5101,12 @@ impl<'a> Lowering<'a> {
                 &[EliminatorFrame::InvocationReturn],
             )
         } else {
-            self.lower_computational_producer_expr(builder, body, &case_env, remaining_eliminators)
+            self.lower_computational_producer_expr(
+                builder,
+                body,
+                &case_env,
+                remaining_eliminators,
+            )
         }
     }
 
@@ -5495,14 +5663,15 @@ impl<'a> Lowering<'a> {
         self.lower_computational_producer_expr(builder, body, &case_env, eliminators)
     }
 
-    fn lower_computational_producer_construct(
+    fn lower_computational_producer_construct<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         static_origin: StaticOriginId,
         constructor: &RuntimeSymbol,
         args: &[RuntimeExpr],
         producer_env: &[LoweringEnvironmentBinding],
-        eliminators: &[EliminatorFrame<'_>],
+        eliminators: &[EliminatorFrame<'b>],
+        producer_tail: Option<&mut Option<ProducerTrampolineWork<'b>>>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let eliminator = eliminators[0];
         let terminal_exit = constructor == &self.process_symbols.exit_success
@@ -6216,10 +6385,11 @@ impl<'a> Lowering<'a> {
                     ));
                 }
             }
-            return self.lower_computational_match_value_composed(
+            return self.continue_composed_value(
                 builder,
                 claimed.answer,
                 eliminators,
+                producer_tail,
             );
         }
 
@@ -6258,10 +6428,11 @@ impl<'a> Lowering<'a> {
         // the exact producer RAISES it. ⛔ Not a default written at the
         // consumer: a site that hard-codes `DirectScrutinee` on a path an
         // exact call result reaches would erase the fact being transported.
-        self.lower_computational_match_value_composed(
+        self.continue_composed_value(
             builder,
             RoutedAnswer::direct(produced),
             eliminators,
+            producer_tail,
         )
     }
 

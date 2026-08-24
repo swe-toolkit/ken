@@ -5032,6 +5032,42 @@ mod checked_ih_captured_env_schema {
         );
     }
 
+    /// Promise class: durable invariant. One plan may contain a transport
+    /// destination and a transport-free producer at the same time. Selection
+    /// is therefore per `(owner, producer origin)`, never plan-wide.
+    #[test]
+    fn transport_lookup_is_per_producer_inside_a_mixed_plan() {
+        let plan = plan_of(super::super::tests::contspec_nested_fixture());
+        let transport = plan
+            .checked_ih_environment_transports
+            .first()
+            .expect("the nested fixture has a transport");
+        let transport_free = plan
+            .root_static_origin()
+            .expect("the mixed fixture has a root producer");
+        assert_ne!(
+            transport_free, transport.destination_construct_origin,
+            "the negative producer must be distinct from the transport destination"
+        );
+        assert_eq!(
+            plan.checked_ih_environment_transport_at(
+                transport.destination_owner,
+                transport.destination_construct_origin,
+            )
+            .expect("the destination query is valid"),
+            Some(transport),
+        );
+        assert_eq!(
+            plan.checked_ih_environment_transport_at(
+                transport.destination_owner,
+                transport_free,
+            )
+            .expect("the transport-free producer query is valid"),
+            None,
+            "a plan-wide transport presence must not reroute another producer"
+        );
+    }
+
     /// Promise class: durable invariant. The environment record and call
     /// assembler state their ordered WorkerCapture run independently and meet
     /// only in the `(ordinal, source occurrence)` frame.

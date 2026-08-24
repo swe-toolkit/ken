@@ -981,9 +981,9 @@ fn constructor_field_binder_shift_mutation_recovers_exact_refusal() {
         matches!(
             err,
             CraneliftBackendError::Unsupported(UnsupportedLowering {
-                construct: "ComputationalMatch",
+                construct: "Match",
                 ref reason,
-            }) if reason == "tree-producing match scrutinee is not Bool or a constructor"
+            }) if reason == "scrutinee is not a constructor value"
         ),
         "{err:?}"
     );
@@ -1016,9 +1016,9 @@ fn constructor_field_bridge_removal_recovers_exact_refusal() {
         matches!(
             err,
             CraneliftBackendError::Unsupported(UnsupportedLowering {
-                construct: "ComputationalMatch",
+                construct: "Match",
                 ref reason,
-            }) if reason == "tree-producing match scrutinee is not Bool or a constructor"
+            }) if reason == "scrutinee is not a constructor value"
         ),
         "{err:?}"
     );
