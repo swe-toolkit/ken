@@ -210,6 +210,67 @@ measurement the build performs first, not a roster this frame pins.
    native backend). Any row that does NOT green after the wiring is a genuine
    further refusal ⇒ STOP and report to Architect + Steward.
 
+## Deliverable 1 result — post-M6 entry census
+
+Measured on current release `main` `cf86ed061` (whose only delta from the M6
+close `011bf2a95` is this node's release documentation). The Runtime staticlib
+was materialized first. Every row ran individually under
+`env -u RUST_MIN_STACK` and host `umask 0022` through:
+
+```text
+scripts/ken-cargo build -p ken-runtime --lib
+scripts/ken-cargo test -p ken-cli --test <target> <row> \
+  -- --exact --ignored --nocapture
+```
+
+The bounded input inventory was all seven ignored rows in `px8*.rs`, all six
+ignored rows in `rt_escape_second_resource_native.rs`, and all six ignored rows
+in `rt_parity_native.rs`: 19 rows total. This deliberately exceeds the stale
+seven-row label roster. `px8f_write_partition` is a `ken-verify` target, not a
+`ken-cli` native-witness target, and is outside this CLI census.
+
+Exactly four rows reach the M4 boundary seam. Each emits the exact same
+object-emission refusal and therefore reaches the combined
+`Lowered::Closure { .. } | Lowered::DeclarationClosure { .. }` arm:
+
+| CLI target | row | exact refusal | exact arm |
+|---|---|---|---|
+| `px8f_buffer_native` | `linked_checked_write_all_observes_short_progress_and_matches_interpreter` | `unsupported runtime-IR lowering: Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane` | `Lowered::Closure { .. } | Lowered::DeclarationClosure { .. }` |
+| `px8l_recursive_decl_native` | `dynamic_zero_seed_takes_the_base_case` | `unsupported runtime-IR lowering: Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane` | `Lowered::Closure { .. } | Lowered::DeclarationClosure { .. }` |
+| `px8l_recursive_decl_native` | `dynamic_multistep_seed_preserves_updated_parameter_order` | `unsupported runtime-IR lowering: Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane` | `Lowered::Closure { .. } | Lowered::DeclarationClosure { .. }` |
+| `px8ta_oriented_subcontinuation` | `px8ds_real_same_depth_path_rejects_flat_order_and_runs_exact_edges` | `unsupported runtime-IR lowering: Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane` | `Lowered::Closure { .. } | Lowered::DeclarationClosure { .. }` |
+
+The fourth row was absent from the stale roster because its ignore label still
+names the earlier `RT-SITEOP-CARRIED-WITNESS` refusal. Its test first runs a
+test-only retired-flat-order negative control, so the production path was
+checked separately by temporarily removing only that wrapper: the ordinary
+plan emitted the same exact closure refusal. The test file was then restored
+byte-identically. This row is a real production residual, not an artifact of
+its negative control.
+
+No censused row emits the neighbouring exact refusal
+`unsupported runtime-IR lowering: ComputationalMatch: a computational recursor
+closure names an in-flight activation, not a transferable value`; the
+`Lowered::ComputationalRecursorClosure { .. }` return fork is empty.
+
+The six stale `RT-CLOSURE-BOUNDARY-LANE` rows classify as follows. None is now
+green. Two moved to M4; four moved past the old closure refusal to distinct,
+non-M4 refusals, so the frame's former green-or-M4 binary was incomplete:
+
+| row | measured disposition |
+|---|---|
+| `px8l_recursive_decl_native::dynamic_zero_seed_takes_the_base_case` | M4 residual: exact `Closure` refusal above |
+| `px8l_recursive_decl_native::dynamic_multistep_seed_preserves_updated_parameter_order` | M4 residual: exact `Closure` refusal above |
+| `px8ta_oriented_subcontinuation::public_two_three_level_brackets_finish_and_release_lifo` | not M4: `unsupported runtime-IR lowering: Effect: seat Argument(1) of FsOpen needs ConstructorTag, which it cannot observe in CarriedWord` |
+| `rt_escape_second_resource_native::escaped_resource_used_by_fanning_host_op_matches_interpreter` | not M4: `unsupported runtime-IR lowering: ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor` |
+| `rt_escape_second_resource_native::nat_fanout_escaped_resource_matches_interpreter` | not M4: `unsupported runtime-IR lowering: ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor` |
+| `rt_parity_native::fs_write_at_malformed_offset_narrows_to_invalid_offset` | not M4: `unsupported runtime-IR lowering: Effect: seat Argument(1) of FsOpen needs ConstructorTag, which it cannot observe in CarriedWord` |
+
+The bounded M4 population is therefore four rows: one more than the thin
+approximately-three estimate, not a material expansion. The size return fork
+does not fire. Deliverables 2 and 3 remain intentionally untouched pending
+post-census authorization.
+
 ## Acceptance criteria and controls
 
 - **AC-CENSUS (this frame).** The post-M6 boundary-refusal population at
