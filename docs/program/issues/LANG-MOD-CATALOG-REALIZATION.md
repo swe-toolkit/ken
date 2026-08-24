@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-CATALOG-REALIZATION
 title: "WP-4 (Component A) — module-graph/roots loader realization: the uniform local-scope prebind fix (decouple local-declaration binding from ResolutionMode) so canonical Or binds under legacy, the self-contained green set checks standalone-strict, and Arithmetic add/mul publish genuine legacy loader-resolved identity. Order + OrdResult + consumer migration + whole-catalog strict-green are Component B."
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
