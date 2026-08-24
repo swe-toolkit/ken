@@ -56,13 +56,34 @@ enum ContinuationOperandEnvironment {
 pub(in crate::cranelift_backend::lowering) mod tests;
 
 #[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct InvocationReturnTransportDecision {
+    owner: ContinuationEmissionOwner,
+    producer: StaticOriginId,
+    has_transport: bool,
+}
+
+#[cfg(test)]
 thread_local! {
+    static INVOCATION_RETURN_TRANSPORT_DECISIONS:
+        std::cell::RefCell<Vec<InvocationReturnTransportDecision>> =
+        const { std::cell::RefCell::new(Vec::new()) };
     static C2_UNIT_EMISSION_EPOCH: std::cell::Cell<Option<u64>> =
         const { std::cell::Cell::new(None) };
     static SUPPRESS_REQUIRED_CONSUMER_ROUTE: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
     static REQUIRED_CONSUMER_ROUTE_SUPPRESSIONS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn reset_invocation_return_transport_decisions() {
+    INVOCATION_RETURN_TRANSPORT_DECISIONS.with(|decisions| decisions.borrow_mut().clear());
+}
+
+#[cfg(test)]
+fn invocation_return_transport_decisions() -> Vec<InvocationReturnTransportDecision> {
+    INVOCATION_RETURN_TRANSPORT_DECISIONS.with(|decisions| decisions.borrow().clone())
 }
 
 #[cfg(test)]
@@ -3180,6 +3201,18 @@ impl<'a> Lowering<'a> {
                     .is_some(),
                 None => false,
             };
+            #[cfg(test)]
+            if let Some(owner) = self.defining_emission_owner {
+                INVOCATION_RETURN_TRANSPORT_DECISIONS.with(|decisions| {
+                    decisions
+                        .borrow_mut()
+                        .push(InvocationReturnTransportDecision {
+                            owner,
+                            producer: static_origin,
+                            has_transport: producer_has_transport,
+                        });
+                });
+            }
             if !producer_has_transport {
                 return self.lower_expr(builder, occurrence, producer_env);
             }

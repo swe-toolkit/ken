@@ -5106,6 +5106,299 @@ fn b2f_d9_a_no_pair_spillable_crosses_on_its_own_tag() {
     );
 }
 
+/// The checked-IH nested fixture with an ordinary, transport-free
+/// `InvocationReturn` producer in the destination specialization's leaf case.
+///
+/// The two nested matches are deliberate. Lowering the outer match as an
+/// ordinary expression keeps the inner `Option` producer beneath its consumer.
+/// An owner-wide decision is indistinguishable at the final value on this
+/// fixture, so the control also reads the production routing decision recorded
+/// at the `InvocationReturn` consumer itself.
+fn checked_transport_mixed_invocation_return_fixture() -> RuntimeExpr {
+    let mut fixture = crate::cranelift_backend::planning::contspec_nested_fixture();
+    let RuntimeExpr::LexicalClosure { body, .. } = &mut fixture else {
+        panic!("the checked-IH mixed fixture root remains a lexical closure")
+    };
+    let RuntimeExpr::ComputationalMatch { cases, .. } = body.as_mut() else {
+        panic!("the checked-IH mixed fixture body remains a computational match")
+    };
+    let leaf = cases
+        .iter_mut()
+        .find(|case| case.constructor.ends_with("::Contspec::Leaf"))
+        .expect("the checked-IH mixed fixture retains its leaf case");
+    leaf.body = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Var(0)),
+            cases: vec![
+                RuntimeMatchCase {
+                    constructor: "ctor:prelude::Bool::True".to_string(),
+                    binders: 0,
+                    body: RuntimeExpr::Construct {
+                        constructor: "ctor:fixture::Option::Some".to_string(),
+                        args: vec![RuntimeExpr::Value(RuntimeValue::Int(0.into()))],
+                    },
+                },
+                RuntimeMatchCase {
+                    constructor: "ctor:prelude::Bool::False".to_string(),
+                    binders: 0,
+                    body: RuntimeExpr::Construct {
+                        constructor: "ctor:fixture::Option::None".to_string(),
+                        args: Vec::new(),
+                    },
+                },
+            ],
+            default: RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: "mixed checked-IH Bool producer".to_string(),
+            },
+        }),
+        cases: vec![
+            RuntimeMatchCase {
+                constructor: "ctor:fixture::Option::None".to_string(),
+                binders: 0,
+                body: RuntimeExpr::Construct {
+                    constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
+                    args: Vec::new(),
+                },
+            },
+            RuntimeMatchCase {
+                constructor: "ctor:fixture::Option::Some".to_string(),
+                binders: 1,
+                body: RuntimeExpr::Construct {
+                    constructor: crate::EXIT_FAILURE_CONSTRUCTOR.to_string(),
+                    args: vec![RuntimeExpr::Value(RuntimeValue::Int(41.into()))],
+                },
+            },
+        ],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "mixed checked-IH Option consumer".to_string(),
+        },
+    };
+    fixture
+}
+
+/// Promise class: durable invariant. The per-producer checked-IH transport
+/// query reaches the production `InvocationReturn` decision.
+///
+/// MEASURED: one specialization owner reaches its exact transport destination,
+/// then lowers a distinct transport-free leaf-case producer through
+/// `lower_computational_producer_expr`, records the ordinary decision at that
+/// production consumer, and returns exact success/failure constructor identities.
+///
+/// CLAIMED: transport presence at another origin owned by the same function
+/// cannot reroute this producer through tree decomposition.
+///
+/// THE GAP: this drives the production consumer directly rather than emitting
+/// a complete object. The destination half stops at the first deliberately
+/// absent function-local call target; that exact later refusal proves the same
+/// owner entered the authorized transport route. The decision trace is
+/// test-only and observes the branch actually taken, not a second query.
+#[test]
+fn invocation_return_transport_selection_is_per_producer_in_production() {
+    let source = checked_transport_mixed_invocation_return_fixture();
+    let plan = plan_static_transition_graph_with_symbols(
+        &source,
+        &BTreeMap::new(),
+        &crate::NativeProcessSymbols::legacy_prelude(),
+        AbiRootIngress::Process,
+        true,
+    )
+    .expect("the production mixed checked-IH fixture plans");
+    let (owner, transport) = plan
+        .continuation_units()
+        .expect("the mixed fixture exposes continuation units")
+        .into_iter()
+        .find_map(|unit| {
+            let owner = ContinuationEmissionOwner::Specialization(unit.id());
+            plan.checked_ih_environment_transports_owned_by(owner)
+                .first()
+                .map(|transport| (owner, (*transport).clone()))
+        })
+        .expect("the mixed fixture has an escaping checked-IH transport");
+    let ContinuationEmissionOwner::Specialization(specialization) = owner else {
+        panic!("checked-IH transport destinations are specialization-owned")
+    };
+    let unit = plan
+        .continuation_units()
+        .expect("the mixed fixture exposes continuation units")
+        .into_iter()
+        .find(|unit| unit.id() == specialization)
+        .expect("the destination specialization has a continuation unit");
+    let defining_unit = unit.consumer_owner();
+
+    let root = plan
+        .root_static_origin()
+        .expect("the mixed fixture has a root occurrence");
+    let computational = plan
+        .child_static_origin(root, 0)
+        .expect("the root closure body is the computational match");
+    assert_eq!(
+        unit.continuation_origin(),
+        computational,
+        "the destination specialization must own the frame whose leaf body is \
+         the ordinary producer; sharing only a plan is not sharing an owner"
+    );
+    let ordinary_origin = plan
+        .child_static_origin(computational, 2)
+        .expect("case 1 is the transport-free leaf-case producer");
+    let ordinary = plan
+        .source_occurrence(ordinary_origin)
+        .expect("the transport-free producer resolves");
+    let destination = plan
+        .source_occurrence(transport.destination_construct_origin())
+        .expect("the transport destination resolves");
+    let success_origin = plan
+        .child_static_origin(ordinary_origin, 1)
+        .expect("the Option::None case builds Success");
+    let failure_origin = plan
+        .child_static_origin(ordinary_origin, 2)
+        .expect("the Option::Some case builds Failure");
+    let success_identity = plan
+        .constructor_symbol_identity(success_origin)
+        .expect("Success has a planned identity")
+        .tag_abi_word()
+        .expect("Success has a carrier tag identity");
+    let failure_identity = plan
+        .constructor_symbol_identity(failure_origin)
+        .expect("Failure has a planned identity")
+        .tag_abi_word()
+        .expect("Failure has a carrier tag identity");
+    assert!(matches!(ordinary, RuntimeExpr::Match { .. }));
+    assert!(matches!(destination, RuntimeExpr::Construct { .. }));
+    assert_eq!(
+        plan.checked_ih_environment_transport_at(owner, transport.destination_construct_origin(),)
+            .expect("the destination lookup is valid"),
+        Some(&transport),
+    );
+    assert_eq!(
+        plan.checked_ih_environment_transport_at(owner, ordinary_origin)
+            .expect("the ordinary producer lookup is valid"),
+        None,
+        "the ordinary producer must remain transport-free under the same owner"
+    );
+
+    reset_invocation_return_transport_decisions();
+    let seed_env = NativeSeedEnvironment::empty();
+    let mut destination_compiler = bare_carrier_test_lowering(&seed_env, plan.clone());
+    destination_compiler.defining_emission_owner = Some(owner);
+    destination_compiler.defining_unit = Some(defining_unit);
+    destination_compiler.process_object = true;
+    let mut destination_func = Function::with_name_signature(
+        UserFuncName::user(0, 0),
+        cranelift_codegen::ir::Signature::new(cranelift_codegen::isa::CallConv::SystemV),
+    );
+    let mut destination_context = FunctionBuilderContext::new();
+    let mut destination_builder =
+        FunctionBuilder::new(&mut destination_func, &mut destination_context);
+    let destination_entry = destination_builder.create_block();
+    destination_builder.switch_to_block(destination_entry);
+    bind_bare_test_trap_lane(&mut destination_compiler, &mut destination_builder);
+    let destination_error =
+        expect_lowering_rejection(destination_compiler.lower_computational_producer_expr(
+            &mut destination_builder,
+            SourceOccurrence {
+                expr: destination,
+                static_origin: transport.destination_construct_origin(),
+            },
+            &[],
+            &[EliminatorFrame::InvocationReturn],
+        ));
+    assert!(
+        matches!(
+            destination_error,
+            CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "CheckedIhEnvironmentTransport",
+                ref reason,
+            }) if reason.contains("force-materialization target was not declared")
+        ),
+        "the same owner must enter the production transport call and stop only at \
+         the bare fixture's deliberately absent function-local target: {destination_error:?}"
+    );
+
+    let (_module, code) =
+        ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1, |compiler, builder, operands| {
+            compiler.defining_emission_owner = Some(owner);
+            compiler.defining_unit = Some(defining_unit);
+            compiler.process_object = true;
+            let ordinary_env = [LoweringEnvironmentBinding::Value(
+                LoweringOperand::Specialized(Lowered::Bool {
+                    value: operands[0],
+                    known: None,
+                }),
+            )];
+            match compiler.lower_computational_producer_expr(
+                builder,
+                SourceOccurrence {
+                    expr: ordinary,
+                    static_origin: ordinary_origin,
+                },
+                &ordinary_env,
+                &[EliminatorFrame::InvocationReturn],
+            )? {
+                LoweringOperand::Carried(word) => Ok(word.word),
+                LoweringOperand::Specialized(other) => Err(unsupported(
+                    "InvocationReturn",
+                    format!(
+                        "the transport-free mixed-owner producer returned specialized {}",
+                        lowered_value_kind(&other)
+                    ),
+                )),
+            }
+        })
+        .expect("the same owner's transport-free invocation return lowers ordinarily");
+    let run: extern "C" fn(*const u64, i64) -> i64 = unsafe { std::mem::transmute(code) };
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    let success = crate::boundary_value::BoundaryWord(run(base, 0) as u64);
+    let failure = crate::boundary_value::BoundaryWord(run(base, 1) as u64);
+    for word in [success, failure] {
+        assert_eq!(
+            word.tag(),
+            Some(BoundaryTag::PersistentGround),
+            "the ordinary mixed-owner producer returns its carrier interface"
+        );
+    }
+    let image = store.image();
+    assert_eq!(
+        image
+            .0
+            .node_field(success.payload(), crate::boundary_value::NODE_TAG_ID),
+        Some(success_identity),
+        "the false arm returns the exact Success constructor"
+    );
+    assert_eq!(
+        image
+            .0
+            .node_field(failure.payload(), crate::boundary_value::NODE_TAG_ID),
+        Some(failure_identity),
+        "the true arm returns the exact Failure constructor"
+    );
+    assert_ne!(
+        success_identity, failure_identity,
+        "the two observable constructors must be distinguishable"
+    );
+
+    let decisions = invocation_return_transport_decisions();
+    assert!(
+        decisions.iter().any(|decision| {
+            decision.owner == owner
+                && decision.producer == transport.destination_construct_origin()
+                && decision.has_transport
+        }),
+        "the exact destination must reach the production transport decision: {decisions:?}"
+    );
+    assert!(
+        decisions.iter().any(|decision| {
+            decision.owner == owner
+                && decision.producer == ordinary_origin
+                && !decision.has_transport
+        }),
+        "the same owner's distinct ordinary producer must reach the production \
+         decision as transport-free: {decisions:?}"
+    );
+}
+
 // ─── RT-WORKER-BIND `D2` — the construction route's pre-installation facts ───
 
 /// A planned `Let` whose bound value is a lexical closure with one capture.
