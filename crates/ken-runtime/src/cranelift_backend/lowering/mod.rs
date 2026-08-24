@@ -238,8 +238,8 @@ pub(in crate::cranelift_backend) use super::planning::{
     // eliminator checks its assembled run against it. ⛔ Ungated here and in
     // `planning.rs`, because a `cfg(test)` re-export of an item production reads
     // is an unresolved import the test profile cannot see.
-    CheckedCaseBinderLayout, CheckedCaseBinderRole,
-    CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
+    CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhEnvironmentTransport,
+    CheckedIhTransportInputDestination, CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
     DeclarationCallTargetClass,
     ContinuationContextId, ContinuationEmissionOwner,
     ContinuationInputView, ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
@@ -925,6 +925,7 @@ impl ArtifactHelpers<'_> {
             constructed_context_frame: None,
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
+            checked_ih_transport_emissions: Vec::new(),
             pending_composed_discharges: Vec::new(),
             composed_discharges: BTreeMap::new(),
             declaration_calls: BTreeMap::new(),
@@ -1219,6 +1220,11 @@ struct FunctionLocalRefs {
     /// that was claimed and never called leaves no entry -- which is the whole
     /// reason the emission set is kept separately from the claim ledger.
     continuation_emissions: BTreeMap<ContinuationCallIdentity, cranelift_codegen::ir::Inst>,
+    /// Calls authorized by checked-IH transport edges rather than causal-token
+    /// ownership. Multiple instructions may share one edge when mutually
+    /// exclusive runtime branches emit the same source occurrence.
+    checked_ih_transport_emissions:
+        Vec<(CheckedIhEnvironmentTransport, cranelift_codegen::ir::Inst)>,
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8j`** — composed discharges this function
     /// has CLAIMED but not yet verified.
     ///
@@ -3716,6 +3722,13 @@ impl StaticWorkerBinding {
 #[derive(Clone, Copy)]
 struct PendingCheckedIhCall {
     call_template_id: u64,
+    /// The compiler-private checked-IH use shape. This is consumed by a static
+    /// exhaustive dispatcher and never enters the crossing value.
+    kind: crate::CheckedComputationalIHInvocationKind,
+    /// Explicit source-to-runtime binder map for this invocation. The plan's
+    /// IH-subsequence ordinal is translated through it before comparison with
+    /// the emitted runtime `Var`.
+    binder_morphism: crate::CheckedComputationalIHBinderMorphism,
     /// The occurrence of the application this marker denotes. Only a call being
     /// lowered AT this occurrence may consume the marker.
     application_origin: StaticOriginId,
@@ -6821,6 +6834,35 @@ impl<'a> Lowering<'a> {
             }
             *expected_by_callee.entry(planned).or_default() += 1;
         }
+        for (transport, inst) in &self.function_local.checked_ih_transport_emissions {
+            if !self
+                .static_transition_plan
+                .checked_ih_environment_transports_owned_by(transport.destination_owner())
+                .into_iter()
+                .any(|planned| planned == transport)
+            {
+                return Err(backend_module(
+                    "a recorded checked-IH transport call has no planner-issued two-endpoint edge"
+                        .to_string(),
+                ));
+            }
+            let planned = bundle
+                .continuation(transport.source_specialization())
+                .ok_or_else(|| {
+                    backend_module(
+                        "a checked-IH transport source specialization was never forward-declared"
+                            .to_string(),
+                    )
+                })?;
+            let emitted = Self::decode_direct_callee(func, *inst)?;
+            if emitted != planned {
+                return Err(backend_module(
+                    "a checked-IH transport instruction calls a different specialization than its source endpoint"
+                        .to_string(),
+                ));
+            }
+            *expected_by_callee.entry(planned).or_default() += 1;
+        }
 
         // Closure: no continuation call may be emitted that was not recorded.
         // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — over `O_t`, the ORDINARY
@@ -7949,7 +7991,6 @@ impl<'a> ClaimedEffectSeats<'a> {
     /// spelling of what `&[]` used to say: this caller claimed no seat, so any
     /// declared `SiteOperand` child refuses. A tree with no site-bound child —
     /// which is every tree these tests build — asks it for nothing.
-    #[cfg(test)]
     fn none() -> ClaimedEffectSeats<'static> {
         static NONE: BTreeMap<EffectSeatSlot, PlannedEffectSeat> = BTreeMap::new();
         ClaimedEffectSeats { claimed: &NONE, capability: None, arguments: &[] }
@@ -9753,7 +9794,7 @@ enum SourcePrefixTemplate {
         constructor: RuntimeSymbol,
         static_origin: StaticOriginId,
         remaining: Vec<OwnedSourceOccurrence>,
-        lowered: Vec<Lowered>,
+        lowered: Vec<LoweringOperand>,
         env: Vec<LoweringEnvironmentBinding>,
         next: Box<SourcePrefixTemplate>,
     },
@@ -10359,6 +10400,8 @@ impl<'a> Lowering<'a> {
     fn enter_checked_computational_ih_invocation(
         &mut self,
         call_template_id: u64,
+        kind: crate::CheckedComputationalIHInvocationKind,
+        binder_morphism: crate::CheckedComputationalIHBinderMorphism,
         body: &RuntimeExpr,
         // `D8f` — the occurrence of the application this marker denotes,
         // supplied by the caller from the same `child_origin(marker, 0)` it
@@ -10372,6 +10415,8 @@ impl<'a> Lowering<'a> {
             .pending_computational_ih_call
             .replace(PendingCheckedIhCall {
                 call_template_id,
+                kind,
+                binder_morphism,
                 application_origin,
             })
             .is_some()
@@ -10606,12 +10651,26 @@ impl<'a> Lowering<'a> {
                 ),
             ));
         }
-        if slot.method_binder_ordinal != binder_index {
+        let planned_runtime_index = pending
+            .binder_morphism
+            .runtime_index(slot.method_binder_ordinal)
+            .ok_or_else(|| {
+                unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    format!(
+                        "the checked computational-IH slot's method ordinal {} is outside the \
+                         invocation's source-to-runtime binder map {:#?}",
+                        slot.method_binder_ordinal, pending.binder_morphism
+                    ),
+                )
+            })?;
+        if planned_runtime_index != binder_index {
             return Err(unsupported(
                 "OrientedSubcontinuationPlanV1",
                 format!(
-                    "the checked computational-IH slot seats its method binder at ordinal {} but \
-                     the consuming call reads `Var({binder_index})`",
+                    "the checked computational-IH slot maps method ordinal {} to runtime \
+                     `Var({planned_runtime_index})` but the consuming call reads \
+                     `Var({binder_index})`",
                     slot.method_binder_ordinal
                 ),
             ));

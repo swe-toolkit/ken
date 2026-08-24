@@ -96,15 +96,22 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
         )
     });
 
-    assert_eq!(route1.len(), 1, "the resolver must still be entered once");
-    assert!(
-        !route1[0].route1,
-        "D2 must advance past route 1: {route1:?}"
+    // M6 completes the whole program, so this observer now sees later composed
+    // and transport-driven resolver invocations too. Select the original
+    // semantic row by the properties this test has always asserted: it enters
+    // the plain-Match branch, walks both arms, and advances past direct route 1.
+    // Do not freeze the incidental total row count.
+    let intended: Vec<_> = route1
+        .iter()
+        .filter(|row| !row.route1 && row.match_branch_entered)
+        .collect();
+    assert_eq!(
+        intended.len(),
+        1,
+        "exactly one resolver row must be the branched-scrutinee path that advances \
+         past route 1: {route1:?}"
     );
-    assert!(
-        route1[0].match_branch_entered,
-        "D2 must enter the plain Match branch"
-    );
+    let intended = intended[0];
     // `RT-BRANCH-LOCAL-DECLARED-CALLABLE` `D1`: both arms are walked. Measured
     // at the bucket filter, arm 0 constructs `ITree::Ret` while the selected
     // case is `ITree::Vis` — the exact `Ret`/`Vis` asymmetry the node was cut
@@ -113,71 +120,17 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
     // revert of the partition returns this to 1, which is what makes the
     // assertion discriminating rather than decorative.
     assert_eq!(
-        route1[0].match_arms_walked, 2,
-        "D1 must walk past the out-of-bucket arm 0 and reach arm 1: {route1:?}"
+        intended.match_arms_walked, 2,
+        "D1 must walk past the out-of-bucket arm 0 and reach arm 1: {intended:?}"
     );
     eprintln!(
         "RT_BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1 entered={} route1={} match_arms_walked={}",
-        route1.len(),
-        route1.iter().filter(|row| row.route1).count(),
-        route1.iter().map(|row| row.match_arms_walked).sum::<usize>(),
+        1,
+        usize::from(intended.route1),
+        intended.match_arms_walked,
     );
-    let error = result.expect_err("D2 exposes the next refusal");
-    eprintln!("RT_BRANCHED_SCRUTINEE_UNIT_BODY_D2_ADVANCED {error:?}");
-    // AMENDED by `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2`.
-    //
-    // This clause pinned the BoundaryCarrier refusal as the state this witness
-    // advanced *to*. That was correct while the recursive position had no
-    // declared callable to resolve to. `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2`
-    // constructs the generated context's frame at the creation site and
-    // supplies it at the retarget, so the position now resolves and the call is
-    // emitted — the carried-residual guard is no longer reached at all.
-    //
-    // The pin's PROPERTY is unchanged and is the reason it is amended rather
-    // than deleted: this witness advances past route 1, walks both arms, and
-    // then refuses. What moved is only which refusal is the terminal one, and
-    // it moved because a stop was CLEARED. Asserting the absence keeps the
-    // "advanced past" claim as an absence, which is what it always meant.
-    let reason = format!("{error:?}");
-    assert!(
-        !reason.contains("a carried recursive hypothesis is an eliminated value, not a callable"),
-        "the carried-residual guard must no longer be this witness's stop — the \
-         recursive position resolves to a declared callable now: {error:?}"
-    );
-    // TRANSITION SENTINEL. The terminal state is now a host-effect seat
-    // refusal, in a different subsystem and under a different law: `D2` supplies
-    // the callee's frame and says nothing about the phase of the call's RESULT,
-    // which crosses a function boundary and carries only the word. Designed to
-    // go red when THAT boundary is addressed; the deliverable then is to
-    // re-measure the terminal state, not to widen this clause.
-    // REPOINTED AGAIN by `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL`. Every repoint
-    // has moved this pin STRICTLY DOWNSTREAM — ConstructorTag, ResourceRelease/
-    // ResourceScalar, ExactIntU64, the FsReadAt Arg(2) reply-path gate, and now
-    // the checked-IH nullary force — so the absence above holds each time, and
-    // more strongly. The direction is the safety argument; a repoint UPSTREAM
-    // would quietly gut it.
-    //
-    // THE DIRECTION ARGUMENT FOR THIS REPOINT, which is the whole licence for
-    // it: the previous terminal was the `FsReadAt` Arg(2) reply-path gate, and
-    // THIS WP is what cleared that gate — the need-directed carried projection
-    // now serves the seat the gate used to refuse. So the witness advances past
-    // its own former stop into a strictly deeper one, exactly as every earlier
-    // repoint did. Nothing was widened to accommodate a red.
-    //
-    // The new terminal is the escaping functional induction hypothesis: the
-    // checked-IH marker is a nullary_force whose realized value is stored
-    // straight into a `Construct`, so the arity-1 static worker is forced with
-    // zero arguments and the worker-arity gate refuses. Measured, not inferred.
-    // Retired by `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`, which owns the
-    // missing first-class functional-IH representation.
-    assert!(
-        reason.contains("static worker expects 1 arguments but call provides 0"),
-        "the expected terminal state after `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` is the \
-         checked-IH nullary force of an ESCAPING functional IH — a deferred capability gap, \
-         and a different subsystem again — which is what keeps the absence above \
-         non-vacuous: \
-         {error:?}"
-    );
+    result
+        .expect("M6 must complete after preserving the branched-scrutinee path through both arms");
 }
 
 #[test]
@@ -194,7 +147,10 @@ fn suppressing_match_branch_entry_is_a_recorder_positive_control() {
         })
     });
     assert_eq!(rows.len(), 1, "the resolver entry remains observable");
-    assert!(!rows[0].route1, "the old route-1 observation remains satisfied");
+    assert!(
+        !rows[0].route1,
+        "the old route-1 observation remains satisfied"
+    );
     assert!(
         !rows[0].match_branch_entered,
         "the pre-recorder suppression is a positive control for branch-entry recording"

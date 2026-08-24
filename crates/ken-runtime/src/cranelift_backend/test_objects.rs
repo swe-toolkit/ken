@@ -197,6 +197,9 @@ fn px8tr_nested_post_effect_fixture() -> (
                 body: Box::new(RuntimeExpr::CheckedComputationalIHInvocation {
                     call_template_id: 100,
                     checked_occurrence_path: vec![30],
+                    kind: crate::CheckedComputationalIHInvocationKind::OrdinaryApplication,
+                    binder_morphism:
+                        crate::CheckedComputationalIHBinderMorphism::identity_for_test(0),
                     body: Box::new(RuntimeExpr::Call {
                         callee: Box::new(RuntimeExpr::Var(
                             if px8tr_call_selected_recursive_argument() {

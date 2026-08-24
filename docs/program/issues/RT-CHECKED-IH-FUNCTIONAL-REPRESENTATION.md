@@ -1,6 +1,6 @@
 ---
 id: RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION
-title: "Give Ken a first-class representation for an ESCAPING functional induction hypothesis, so the nullary_force of a checked computational IH whose realized value is stored into a constructor (escapes its frame) can be lowered honestly. The decisive escape measurement (runtime-implementer evt_79jd1nxamqd95) proved the realized IH value's immediate parent is a Construct on both checked-family programs -- it is stored straight into a constructor field, so the non-escaping use-site-specialization remedy cannot apply (no in-frame application site, no response argument at the use). Ken has no first-class functional-IH value: StaticWorkerBinding is compiler metadata with no runtime word/tag/layout/env-pointer/callable identity (lowering/mod.rs:3578-3603), LoweringOperand is exactly {Specialized(Lowered), Carried(CarriedBoundaryWord)} with no closure/worker arm, and an ordinary carried word cannot hold `lambda response. rec (k response)`. This node introduces the genuine new representation. It carries a design D0 the Architect rules before build: materialized closure value vs defunctionalized carried tag (code identity + environment + apply dispatcher). Successor to the closed RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT."
+title: "Give Ken a first-class representation for an ESCAPING functional induction hypothesis, so the nullary_force of a checked computational IH whose realized value is stored into a constructor (escapes its frame) can be lowered honestly. The decisive escape measurement (runtime-implementer evt_79jd1nxamqd95) proved the realized IH value's immediate parent is a Construct in the content-distinct checked-family program -- it is stored straight into a constructor field, so the non-escaping use-site-specialization remedy cannot apply (no in-frame application site, no response argument at the use). Ken has no first-class functional-IH value: StaticWorkerBinding is compiler metadata with no runtime word/tag/layout/env-pointer/callable identity (lowering/mod.rs:3578-3603), LoweringOperand is exactly {Specialized(Lowered), Carried(CarriedBoundaryWord)} with no closure/worker arm, and an ordinary carried word cannot hold `lambda response. rec (k response)`. This node introduces the genuine new representation. It carries a design D0 the Architect rules before build: materialized closure value vs defunctionalized carried tag (code identity + environment + apply dispatcher). Successor to the closed RT-CHECKED-IH-RECURSIVE-OPERAND-SEAT."
 status: ready
 owner: runtime
 size: L
@@ -334,10 +334,11 @@ origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect'
 > DEFERRED (draft). This is a genuine new-representation deliverable, not part of
 > the RT-FSREADAT co-land set. The co-land (join half `6a45ae1a7` + producer fix
 > `64019430c` + projection/disposition/join-reconcile + the advancing-refusal
-> re-point) lands WITHOUT this node; the two checked-family programs stay a
-> documented advancing refusal until this representation lands. Its sequencing
-> into a lane is a priority call surfaced to the operator -- nothing in the
-> co-land, the NHC close, or the RT-BACKEND-MODULE-SPLIT pivot waits on it.
+> re-point) lands WITHOUT this node; the content-distinct checked-family program
+> stays a documented advancing refusal until this representation lands. Its
+> sequencing into a lane is a priority call surfaced to the operator -- nothing
+> in the co-land, the NHC close, or the RT-BACKEND-MODULE-SPLIT pivot waits on
+> it.
 >
 > It is NOT startable as framed: it is gated on the Architect's design D0 below
 > (which representation). The frame is a skeleton; the deliverable and its ACs
@@ -345,19 +346,21 @@ origin: "Cut by the Steward (scoping ruling evt_5pmk273zg5paa) on the Architect'
 
 Ken can compile a functional induction hypothesis only when the compiler can
 prove the IH does not escape -- then every use is a direct in-frame application
-and no value need exist. The two checked-family programs violate that: the
-realized IH value is stored into a constructor (`ITree.Vis`), so it escapes, and
-Ken has no object that can carry `lambda response. rec (k response)` across that
-boundary. This node builds that object.
+and no value need exist. The content-distinct checked-family program violates
+that: the realized IH value is stored into a constructor (`ITree.Vis`), so it
+escapes, and Ken has no object that can carry
+`lambda response. rec (k response)` across that boundary. This node builds that
+object.
 
 # THE CAPABILITY GAP (measured, grounded)
 
 - Decisive measurement (runtime-implementer evt_79jd1nxamqd95, on `64019430c`):
-  the force marker's `parent_chain` immediate parent is `Expression(Construct)` on
-  BOTH checked-family programs -- the realized value is stored straight into a
-  constructor argument position. Two marker populations exist; the failing one is
-  the single `template=0, arity=0` nullary_force per program (`core.rs:11699`),
-  distinct from the 12 fine `template=4, arity=1` markers (`source.rs:655`).
+  the force marker's `parent_chain` immediate parent is `Expression(Construct)`
+  in the content-distinct checked-family program -- the realized value is stored
+  straight into a constructor argument position. Two marker shapes exist; the
+  failing one is the single `template=0, arity=0` nullary_force in the program
+  (`core.rs:11699`), distinct from the 12 fine `template=4, arity=1` markers
+  (`source.rs:655`).
 - `core.rs:11699` lowers the marker body as an ordinary value-producing
   expression, so `Call(Var(0), args=[])` resolves `Var(0)` to the arity-1
   StaticWorker and calls it with zero args; the seam passes (0==0), the refusal
@@ -395,10 +398,10 @@ prejudge it.
 
 The chosen representation, its construction at the nullary_force seam
 (`core.rs:11699`), and its application at the escaped use sites, such that the
-two checked-family programs' checked-IH invocations lower and run correctly.
-Likely a language spillover on the marker/planner side (the elaborator's
-nullary_force emission, `compiler_driver.rs:1718-1743`) -- assigned by this
-node's owner at framing per COORDINATION section 9a.
+content-distinct checked-family program's checked-IH invocations lower and run
+correctly. Likely a language spillover on the marker/planner side (the
+elaborator's nullary_force emission, `compiler_driver.rs:1718-1743`) -- assigned
+by this node's owner at framing per COORDINATION section 9a.
 
 # ACCEPTANCE (terminal -- inherited from the closed predecessor)
 
@@ -433,12 +436,15 @@ node's owner at framing per COORDINATION section 9a.
   relabeled/weakened arity gate, a `_`/fallback arm on the kind match, or an apply
   site that bypasses the plan lookup.
 - **AC-REENUM (terminal; was shared with [[RT-IH-MARKER-PRODUCER-COMPLETE]]).**
-  Rerun report-2's checked-family runner end-to-end. Both checked-family programs
-  green ⇒ the family is bounded; re-point both runner tables from the
-  advancing-refusal pins (set by the co-land) to green. Any FURTHER refusal ⇒ STOP
-  and report to Architect + Steward. As of the third-hard-stop ruling, the census
-  is the CLOSED TRANSFORMATION SCHEMA (five axes, TIER-3 block above): the build
-  proves the whole schema up front, not the next occurrence, so a further refusal
+  Rerun report-2's checked-family runner end-to-end. Every content-distinct
+  checked-family program green ⇒ the family is bounded; the current
+  source-content census has one member. The runner pins one row per byte-distinct
+  source so labels cannot inflate the population, and re-points both runner
+  tables from the advancing-refusal pins (set by the co-land) to green. Any
+  FURTHER refusal ⇒ STOP and report to Architect + Steward. As of the
+  third-hard-stop ruling, the census is the CLOSED TRANSFORMATION SCHEMA (five
+  axes, TIER-3 block above): the build proves the whole schema up front, not the
+  next occurrence, so a further refusal
   on an un-censused axis is a schema-closure miss, not a new capability gap.
 - **AC-NO-REGRESSION.** Whole-suite green in CI (COORDINATION section 12). Local
   targeted `-p` only, never `--workspace`.

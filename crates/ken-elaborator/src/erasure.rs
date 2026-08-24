@@ -707,6 +707,22 @@ enum ComputationalIHConsumptionRoute {
 }
 
 impl ComputationalIHConsumptionRoute {
+    /// The closed Runtime-IR shape consumed by native lowering's static
+    /// checked-IH dispatcher.
+    fn runtime_kind(self) -> ken_runtime::CheckedComputationalIHInvocationKind {
+        match self {
+            Self::OrdinaryApplication => {
+                ken_runtime::CheckedComputationalIHInvocationKind::OrdinaryApplication
+            }
+            Self::CheckedHostComputationTail => {
+                ken_runtime::CheckedComputationalIHInvocationKind::CheckedHostComputationTail
+            }
+            Self::CheckedHostVisContinuation => {
+                ken_runtime::CheckedComputationalIHInvocationKind::CheckedHostVisContinuation
+            }
+        }
+    }
+
     /// How many operands this route APPENDS that the source application never
     /// wrote.
     ///
@@ -1898,6 +1914,7 @@ fn collect_oriented_runtime_marker_locations(
             call_template_id,
             checked_occurrence_path,
             body,
+            ..
         } => {
             locations
                 .computational_ih_calls
@@ -2280,18 +2297,25 @@ fn lower_body_term_with_plans(
             path,
             parent_oriented_frame,
         )?;
-        let runtime_index = match term_application_head(term) {
-            CheckedCoreBodyTerm::Variable { de_bruijn_index } => branch_remap
-                .and_then(|remap| remap.runtime_index(*de_bruijn_index))
-                .ok_or_else(|| {
-                    expression_lowering_error(
-                        root,
-                        "checked_computational_ih_runtime_binding",
-                        "checked computational IH has no runtime binder",
-                    )
-                })?,
+        let de_bruijn_index = match term_application_head(term) {
+            CheckedCoreBodyTerm::Variable { de_bruijn_index } => *de_bruijn_index,
             _ => unreachable!("computational IH spine has a variable head"),
         };
+        let binder_morphism = checked_computational_ih_binder_morphism(
+            root,
+            branch_remap,
+            slot_template_id,
+            de_bruijn_index,
+        )?;
+        let runtime_index = branch_remap
+            .and_then(|remap| remap.runtime_index(de_bruijn_index))
+            .ok_or_else(|| {
+                expression_lowering_error(
+                    root,
+                    "checked_computational_ih_runtime_binding",
+                    "checked computational IH has no runtime binder",
+                )
+            })?;
         let callee = RuntimeExpr::Var(u32::try_from(runtime_index).map_err(|_| {
             expression_lowering_error(
                 root,
@@ -2323,6 +2347,8 @@ fn lower_body_term_with_plans(
         return Ok(RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
             checked_occurrence_path: path.to_vec(),
+            kind: ComputationalIHConsumptionRoute::OrdinaryApplication.runtime_kind(),
+            binder_morphism,
             body: Box::new(body),
         });
     }
@@ -2814,6 +2840,12 @@ fn lower_checked_host_computation(
             CheckedCoreBodyTerm::Variable { de_bruijn_index } => *de_bruijn_index,
             _ => unreachable!("computational IH spine has a variable head"),
         };
+        let binder_morphism = checked_computational_ih_binder_morphism(
+            root,
+            branch_remap,
+            slot_template_id,
+            de_bruijn_index,
+        )?;
         let runtime_index = branch_remap
             .and_then(|remap| remap.runtime_index(de_bruijn_index))
             .ok_or_else(|| {
@@ -2855,6 +2887,8 @@ fn lower_checked_host_computation(
         return Ok(RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
             checked_occurrence_path: path.to_vec(),
+            kind: ComputationalIHConsumptionRoute::CheckedHostComputationTail.runtime_kind(),
+            binder_morphism,
             body: Box::new(body),
         });
     }
@@ -3235,6 +3269,12 @@ fn lower_checked_host_computation(
                     CheckedCoreBodyTerm::Variable { de_bruijn_index } => *de_bruijn_index,
                     _ => unreachable!("computational IH spine has a variable head"),
                 };
+                let binder_morphism = checked_computational_ih_binder_morphism(
+                    root,
+                    branch_remap,
+                    slot_template_id,
+                    de_bruijn_index,
+                )?;
                 let runtime_index = branch_remap
                     .and_then(|remap| remap.runtime_index(de_bruijn_index))
                     .ok_or_else(|| {
@@ -3294,6 +3334,17 @@ fn lower_checked_host_computation(
                 RuntimeExpr::CheckedComputationalIHInvocation {
                     call_template_id,
                     checked_occurrence_path: continuation_path,
+                    kind: ComputationalIHConsumptionRoute::CheckedHostVisContinuation
+                        .runtime_kind(),
+                    binder_morphism: binder_morphism
+                        .shifted_runtime(1, 0)
+                        .ok_or_else(|| {
+                            expression_lowering_error(
+                                root,
+                                "variable_index_overflow",
+                                "computational IH runtime binder shift overflows",
+                            )
+                        })?,
                     body: Box::new(RuntimeExpr::Call {
                         callee: Box::new(callee),
                         args,
@@ -4228,6 +4279,43 @@ impl BranchBinderRemap {
         None
     }
 
+    /// The explicit map from one plan slot's method-telescope frame into this
+    /// remap's runtime frame, together with the slot's independently-derived
+    /// method ordinal.
+    fn computational_ih_binder_morphism(
+        &self,
+        slot_template_id: u64,
+    ) -> Option<(usize, ken_runtime::CheckedComputationalIHBinderMorphism)> {
+        for group in &self.groups {
+            let Some(method_binder_ordinal) = group
+                .recursive_slot_templates
+                .iter()
+                .position(|slot| *slot == slot_template_id)
+            else {
+                continue;
+            };
+            if !group.recursive_runtime {
+                return None;
+            }
+            let source_ordinal = group
+                .recursive_count
+                .checked_sub(method_binder_ordinal.checked_add(1)?)?;
+            let source_binder_index = group.source_start.checked_add(source_ordinal)?;
+            let runtime_binder_index = self.runtime_index(source_binder_index)?;
+            return Some((
+                method_binder_ordinal,
+                ken_runtime::CheckedComputationalIHBinderMorphism {
+                    method_argument_count: u64::try_from(group.argument_count).ok()?,
+                    method_ih_count: u64::try_from(group.recursive_count).ok()?,
+                    source_start: u64::try_from(group.source_start).ok()?,
+                    source_binder_index: u64::try_from(source_binder_index).ok()?,
+                    runtime_binder_index: u64::try_from(runtime_binder_index).ok()?,
+                },
+            ));
+        }
+        None
+    }
+
     fn runtime_depth(&self, source_depth: usize) -> usize {
         (0..source_depth)
             .filter_map(|index| self.runtime_index(index))
@@ -4574,10 +4662,16 @@ fn shift_runtime_vars(expr: RuntimeExpr, by: u32, cutoff: u32) -> RuntimeExpr {
         RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
             checked_occurrence_path,
+            kind,
+            binder_morphism,
             body,
         } => RuntimeExpr::CheckedComputationalIHInvocation {
             call_template_id,
             checked_occurrence_path,
+            kind,
+            binder_morphism: binder_morphism
+                .shifted_runtime(by, cutoff)
+                .expect("compiler-private computational IH binder shift overflows"),
             body: Box::new(shift_runtime_vars(*body, by, cutoff)),
         },
         RuntimeExpr::Var(index) if index >= cutoff => RuntimeExpr::Var(index + by),
@@ -4775,6 +4869,76 @@ fn computational_ih_application_spine<'a>(
     let slot_template_id = branch_remap?.computational_ih_slot(*de_bruijn_index)?;
     arguments.reverse();
     Some((slot_template_id, arguments))
+}
+
+/// Derive both ends of the checked-IH binder map independently of the emitted
+/// `Var`, then prove that the source occurrence and the ordinary erasure remap
+/// name those same ends.
+fn checked_computational_ih_binder_morphism(
+    root: &StableSymbol,
+    branch_remap: Option<&BranchBinderRemap>,
+    slot_template_id: u64,
+    source_binder_index: usize,
+) -> Result<ken_runtime::CheckedComputationalIHBinderMorphism, ErasureError> {
+    let remap = branch_remap.ok_or_else(|| {
+        expression_lowering_error(
+            root,
+            "checked_computational_ih_binder_morphism",
+            "checked computational IH has no source-to-runtime binder map",
+        )
+    })?;
+    let (method_binder_ordinal, morphism) = remap
+        .computational_ih_binder_morphism(slot_template_id)
+        .ok_or_else(|| {
+            expression_lowering_error(
+                root,
+                "checked_computational_ih_binder_morphism",
+                "checked computational IH slot is absent from the active binder map",
+            )
+        })?;
+    let method_binder_ordinal = u64::try_from(method_binder_ordinal).map_err(|_| {
+        expression_lowering_error(
+            root,
+            "variable_index_overflow",
+            "computational IH method ordinal does not fit runtime IR",
+        )
+    })?;
+    let source_binder_index_u64 = u64::try_from(source_binder_index).map_err(|_| {
+        expression_lowering_error(
+            root,
+            "variable_index_overflow",
+            "computational IH source binder index does not fit runtime IR",
+        )
+    })?;
+    if morphism.source_index(method_binder_ordinal) != Some(source_binder_index_u64) {
+        return Err(expression_lowering_error(
+            root,
+            "checked_computational_ih_binder_morphism",
+            "checked computational IH slot does not map to the source binder occurrence",
+        ));
+    }
+    let runtime_binder_index = remap.runtime_index(source_binder_index).ok_or_else(|| {
+        expression_lowering_error(
+            root,
+            "checked_computational_ih_runtime_binding",
+            "checked computational IH has no runtime binder",
+        )
+    })?;
+    let runtime_binder_index = u64::try_from(runtime_binder_index).map_err(|_| {
+        expression_lowering_error(
+            root,
+            "variable_index_overflow",
+            "computational IH runtime index does not fit runtime IR",
+        )
+    })?;
+    if morphism.runtime_index(method_binder_ordinal) != Some(runtime_binder_index) {
+        return Err(expression_lowering_error(
+            root,
+            "checked_computational_ih_binder_morphism",
+            "checked computational IH slot map disagrees with ordinary variable erasure",
+        ));
+    }
+    Ok(morphism)
 }
 
 fn lower_recursive_declaration_call(
@@ -7763,6 +7927,27 @@ mod px7l_tests {
             under_lambda.runtime_index(2),
             under_lambda.runtime_index(3),
             "capture-order swap is discriminating"
+        );
+    }
+
+    #[test]
+    fn checked_ih_morphism_preserves_the_plan_ordinal_and_maps_it_to_runtime_four() {
+        let mut remap = BranchBinderRemap::default().enter_match(2, 1, true, vec![77]);
+        for _ in 0..4 {
+            remap = remap.enter_binding();
+        }
+        let (ordinal, morphism) = remap
+            .computational_ih_binder_morphism(77)
+            .expect("the slot is retained at runtime");
+        assert_eq!(ordinal, 0, "the plan authority remains an IH ordinal");
+        assert_eq!(morphism.method_argument_count, 2);
+        assert_eq!(morphism.method_ih_count, 1);
+        assert_eq!(morphism.source_start, 4);
+        assert_eq!(morphism.source_binder_index, 4);
+        assert_eq!(morphism.runtime_index(ordinal as u64), Some(4));
+        assert!(
+            remap.computational_ih_binder_morphism(78).is_none(),
+            "a different slot must not inherit this morphism"
         );
     }
 

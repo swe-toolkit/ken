@@ -76,7 +76,7 @@ pub(super) enum SourceContinuation<'a> {
         constructor: RuntimeSymbol,
         static_origin: StaticOriginId,
         remaining: Vec<OwnedSourceOccurrence>,
-        lowered: Vec<Lowered>,
+        lowered: Vec<LoweringOperand>,
         env: Vec<LoweringEnvironmentBinding>,
         next: Box<SourceContinuation<'a>>,
     },
@@ -645,6 +645,8 @@ impl<'a> Lowering<'a> {
                     }
                     RuntimeExpr::CheckedComputationalIHInvocation {
                         call_template_id,
+                        kind,
+                        binder_morphism,
                         body,
                         ..
                     } => {
@@ -654,6 +656,8 @@ impl<'a> Lowering<'a> {
                         let body = self.owned_child_occurrence(static_origin, 0, *body)?;
                         self.enter_checked_computational_ih_invocation(
                             call_template_id,
+                            kind,
+                            binder_morphism,
                             &body.expr,
                             body.static_origin,
                         )?;
@@ -875,12 +879,29 @@ impl<'a> Lowering<'a> {
                                 // hand so an ordinary selected-argument call
                                 // reaches the seat first and leaves the marker
                                 // for the occurrence that owns it.
+                                let pending = self.pending_computational_ih_call;
                                 let disposition = self
                                     .consume_checked_ih_marker_at_static_worker_call(
                                         binder_index,
                                         0,
                                         static_origin,
                                     )?;
+                                let materialized = match pending {
+                                    Some(pending) => self
+                                        .materialize_checked_ih_static_worker_application(
+                                            builder,
+                                            pending,
+                                            disposition,
+                                            &worker,
+                                        )?,
+                                    None => None,
+                                };
+                                if let Some(environment) = materialized {
+                                    SourceMachineState::Value {
+                                        value: RoutedAnswer::direct(environment),
+                                        control,
+                                    }
+                                } else {
                                 let before = self.live_source_continuations;
                                 let (called, emission) = self.call_static_worker_with_inputs(
                                     builder,
@@ -956,6 +977,7 @@ impl<'a> Lowering<'a> {
                                 SourceMachineState::Value {
                                     value: RoutedAnswer::direct(called),
                                     control,
+                                }
                                 }
                             } else {
                                 let first = remaining.remove(0);
@@ -1407,21 +1429,88 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             env,
                             next,
                         } => {
-                            // ⭐ A source `Construct` builds a constructor
-                            // **template**, so its arguments take the ruled
-                            // fail-closed boundary here.
-                            lowered.push(
-                                value.specialized_at("a source constructor argument")?,
-                            );
+                            if matches!(
+                                &value,
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
+                            ) {
+                                control.continuation = *next;
+                                SourceMachineState::Value {
+                                    value: RoutedAnswer {
+                                        value,
+                                        route: incoming_route,
+                                        role: incoming_role,
+                                    },
+                                    control,
+                                }
+                            } else {
+                            // A source constructor may receive the transported
+                            // checked-IH environment as a carried word. Preserve
+                            // phase in the field run; if any field is carried the
+                            // constructor itself takes the ordinary governed
+                            // carrier path instead of demanding a template.
+                            lowered.push(value);
                             control.continuation = *next;
                             if remaining.is_empty() {
-                                SourceMachineState::Value {
-                                    value: RoutedAnswer::direct(LoweringOperand::Specialized(self.finish_source_constructor(
+                                let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+                                    unsupported(
+                                        "CheckedIhEnvironmentTransport",
+                                        "a source-machine constructor crossing has no destination emission owner",
+                                    )
+                                })?;
+                                if let Some(transport) = self
+                                    .static_transition_plan
+                                    .checked_ih_environment_transport_at(
+                                        destination_owner,
+                                        static_origin,
+                                    )?
+                                    .cloned()
+                                {
+                                    let position = transport.recursive_position() as usize;
+                                    let child_origin = self
+                                        .static_transition_plan
+                                        .child_static_origin(static_origin, position)?;
+                                    if child_origin != transport.seat() || position >= lowered.len() {
+                                        return Err(unsupported(
+                                            "CheckedIhEnvironmentTransport",
+                                            "the source-machine crossing disagrees with the transport's stable closure field",
+                                        ));
+                                    }
+                                    let environment = self
+                                        .call_checked_ih_transport_from_case_environment(
+                                            builder,
+                                            &transport,
+                                            &env,
+                                        )?;
+                                    if !matches!(&environment, LoweringOperand::Carried(_)) {
+                                        return Err(unsupported(
+                                            "CheckedIhEnvironmentTransport",
+                                            "the source-machine transport did not yield an environment carrier word",
+                                        ));
+                                    }
+                                    lowered[position] = environment;
+                                }
+                                let constructed = if lowered.iter().any(|field| {
+                                    matches!(field, LoweringOperand::Carried(_))
+                                }) {
+                                    LoweringOperand::Carried(self.transfer_constructor_operands(
+                                        builder,
+                                        static_origin,
+                                        &constructor,
+                                        &lowered,
+                                    )?)
+                                } else {
+                                    LoweringOperand::Specialized(self.finish_source_constructor(
                                         builder,
                                         constructor,
                                         static_origin,
-                                        lowered,
-                                    )?)),
+                                        specialized_operands_at(
+                                            &lowered,
+                                            "a source constructor argument",
+                                        )?,
+                                    )?)
+                                };
+                                SourceMachineState::Value {
+                                    value: RoutedAnswer::direct(constructed),
                                     control,
                                 }
                             } else {
@@ -1439,6 +1528,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     env,
                                     control,
                                 }
+                            }
                             }
                         }
                         SourceContinuation::MatchScrutinee {
@@ -3741,6 +3831,74 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 Ok(SourceCallOutcome::Complete(called))
             }
             mut recursor @ Lowered::ComputationalRecursorClosure { .. } => {
+                let transport = match (self.pending_computational_ih_call, &recursor) {
+                    (Some(pending), Lowered::ComputationalRecursorClosure { invocation, .. }) => {
+                        let plan =
+                            self.oriented_subcontinuation_plan.as_ref().ok_or_else(|| {
+                                unsupported(
+                                    "CheckedIhEnvironmentTransport",
+                                    "a checked-IH recursor force has no oriented plan",
+                                )
+                            })?;
+                        let call = plan
+                            .computational_ih_call(pending.call_template_id)
+                            .ok_or_else(|| {
+                                unsupported(
+                                    "CheckedIhEnvironmentTransport",
+                                    "a checked-IH recursor force has no call template",
+                                )
+                            })?;
+                        if invocation.computational_ih_slot_template_id
+                            != Some(call.slot_template_id)
+                        {
+                            return Err(unsupported(
+                                "CheckedIhEnvironmentTransport",
+                                "a checked-IH recursor force names a different planned slot",
+                            ));
+                        }
+                        let eligible = match pending.kind {
+                            crate::CheckedComputationalIHInvocationKind::OrdinaryApplication
+                            | crate::CheckedComputationalIHInvocationKind::CheckedHostComputationTail => {
+                                call.arity == 0 && args.is_empty()
+                            }
+                            crate::CheckedComputationalIHInvocationKind::CheckedHostVisContinuation => {
+                                false
+                            }
+                        };
+                        if !eligible {
+                            None
+                        } else {
+                            let body = invocation.recursive_unit_body;
+                            let coordinates = CarriedInvocationCoordinates::of(invocation)?;
+                            let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+                                unsupported(
+                                    "CheckedIhEnvironmentTransport",
+                                    "a checked-IH transport force has no destination emission owner",
+                                )
+                            })?;
+                            self.static_transition_plan
+                                .checked_ih_environment_transport_for_invocation(
+                                    destination_owner,
+                                    body,
+                                    coordinates.continuation_origin,
+                                    coordinates.recursive_position,
+                                )?
+                                .cloned()
+                        }
+                    }
+                    (None, Lowered::ComputationalRecursorClosure { .. }) => None,
+                    (_, _) => unreachable!("this arm matched a computational recursor"),
+                };
+                if let Some(transport) = transport {
+                    self.pending_computational_ih_call.take();
+                    let returned = self.call_checked_ih_transport_from_case_environment(
+                        builder, &transport, &env,
+                    )?;
+                    return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
+                        value: RoutedAnswer::checked(returned),
+                        control,
+                    }));
+                }
                 let checked_ih_invocation =
                     self.mint_checked_computational_ih_instance(&mut recursor)?;
                 if let Some(CheckedRecursiveInvocationInstance {

@@ -35,6 +35,18 @@ use super::calls::{recursive_position_unit_calls, RECURSIVE_POSITION_UNIT_CALLS}
 
 mod primitive;
 
+struct ClaimedContinuationResult {
+    identity: ContinuationCallIdentity,
+    recursive_position: u32,
+    answer: RoutedAnswer,
+}
+
+#[derive(Clone)]
+enum ContinuationOperandEnvironment {
+    DirectEmission,
+    CheckedIhTransport(CheckedIhEnvironmentTransport),
+}
+
 // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D2` -- `source::tests` (a sibling
 // subtree, not a descendant of `core`) reaches this module's widened
 // shared fixtures by path, so the module itself must be nameable from
@@ -44,13 +56,34 @@ mod primitive;
 pub(in crate::cranelift_backend::lowering) mod tests;
 
 #[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct InvocationReturnTransportDecision {
+    owner: ContinuationEmissionOwner,
+    producer: StaticOriginId,
+    has_transport: bool,
+}
+
+#[cfg(test)]
 thread_local! {
+    static INVOCATION_RETURN_TRANSPORT_DECISIONS:
+        std::cell::RefCell<Vec<InvocationReturnTransportDecision>> =
+        const { std::cell::RefCell::new(Vec::new()) };
     static C2_UNIT_EMISSION_EPOCH: std::cell::Cell<Option<u64>> =
         const { std::cell::Cell::new(None) };
     static SUPPRESS_REQUIRED_CONSUMER_ROUTE: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
     static REQUIRED_CONSUMER_ROUTE_SUPPRESSIONS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn reset_invocation_return_transport_decisions() {
+    INVOCATION_RETURN_TRANSPORT_DECISIONS.with(|decisions| decisions.borrow_mut().clear());
+}
+
+#[cfg(test)]
+fn invocation_return_transport_decisions() -> Vec<InvocationReturnTransportDecision> {
+    INVOCATION_RETURN_TRANSPORT_DECISIONS.with(|decisions| decisions.borrow().clone())
 }
 
 #[cfg(test)]
@@ -1451,69 +1484,6 @@ fn coc_d2_suppress_continuation() -> bool {
     COC_D2_SUPPRESS_CONTINUATION.with(std::cell::Cell::get)
 }
 
-/// **`RT-SPECIALIZED-ACTIVE-RESUME` `D2` counters.**
-///
-/// **The route counter is not a convenience, it is the only thing that can
-/// tell this repair from a guard skip.** `D0` measured every member of this
-/// population at `pending.len() == 0`, and
-/// [`Lowering::resume_active_continuation`] returns its operand unchanged in
-/// that case -- so routing to the resume and simply not refusing produce
-/// IDENTICAL observable behaviour on every member that exists. A control keyed
-/// on the refusal being gone, or on the value flowing, passes either way.
-///
-/// The mechanism is chosen for what it does when `pending` is NON-empty, and
-/// nothing in this corpus exercises that. So the route itself has to be
-/// observed directly, at the decision.
-///
-/// The denominator is taken BEFORE the guard, on the chain's standing
-/// discipline, so a mutation cannot manufacture its own zero.
-#[cfg(test)]
-thread_local! {
-    /// Arrivals in the measured cell: `ProcessExitStatus` x first-`Active`.
-    static SAR_D2_CELL_ARRIVALS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-    /// Arrivals actually handed to the resume.
-    static SAR_D2_ROUTES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn sar_d2_cell_arrivals() -> usize {
-    SAR_D2_CELL_ARRIVALS.with(std::cell::Cell::get)
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn sar_d2_routes() -> usize {
-    SAR_D2_ROUTES.with(std::cell::Cell::get)
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn reset_sar_d2_counts() {
-    SAR_D2_CELL_ARRIVALS.with(|count| count.set(0));
-    SAR_D2_ROUTES.with(|count| count.set(0));
-}
-
-/// `D3`'s mutation at the repaired root: refuse instead of routing.
-///
-/// Unlike the predecessor's, this mutation does NOT have to re-spell a deleted
-/// sentence. The fifth refusal is still live production text below this route --
-/// this repair moves a case out from under it rather than removing it -- so
-/// suppressing the route lets the arrival fall through to the genuine
-/// production refusal. The mutation therefore restores the real path, not a
-/// replica of it.
-#[cfg(test)]
-thread_local! {
-    static SAR_D2_SUPPRESS_ROUTE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
-
-#[cfg(test)]
-pub(in crate::cranelift_backend) fn set_sar_d2_suppress_route(suppress: bool) {
-    SAR_D2_SUPPRESS_ROUTE.with(|cell| cell.set(suppress));
-}
-
-#[cfg(test)]
-fn sar_d2_suppress_route() -> bool {
-    SAR_D2_SUPPRESS_ROUTE.with(std::cell::Cell::get)
-}
-
 /// **`RT-CARRIER-BYTESPAN-OBSERVE` `D2` — the reply byte span, MASKED at the
 /// typed producer** (Architect `dec_12s3j2gj67c66`).
 ///
@@ -2876,6 +2846,13 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     Ok(compiled)
 }
 
+enum ProducerTrampolineWork<'a> {
+    Value {
+        answer: RoutedAnswer,
+        eliminators: Vec<EliminatorFrame<'a>>,
+    },
+}
+
 impl<'a> Lowering<'a> {
     pub(super) fn resume_active_continuation(
         &mut self,
@@ -3113,12 +3090,86 @@ impl<'a> Lowering<'a> {
     /// reaches occurrences the direct descent does not — so it threads origins by
     /// exactly the same table as `lower_expr`: no guessed subset, both routes or
     /// neither.
-    pub(super) fn lower_computational_producer_expr(
+    pub(super) fn lower_computational_producer_expr<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
-        occurrence: SourceOccurrence<'_>,
-        producer_env: &[LoweringEnvironmentBinding],
-        eliminators: &[EliminatorFrame<'_>],
+        occurrence: SourceOccurrence<'b>,
+        producer_env: &'b [LoweringEnvironmentBinding],
+        eliminators: &[EliminatorFrame<'b>],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let owner_has_checked_transport = self.defining_emission_owner.is_some_and(|owner| {
+            !self
+                .static_transition_plan
+                .checked_ih_environment_transports_owned_by(owner)
+                .is_empty()
+        });
+        if !owner_has_checked_transport {
+            return self.lower_computational_producer_expr_once(
+                builder,
+                occurrence,
+                producer_env,
+                eliminators,
+                None,
+            );
+        }
+
+        let mut next = None;
+        let lowered = self.lower_computational_producer_expr_once(
+            builder,
+            occurrence,
+            producer_env,
+            eliminators,
+            Some(&mut next),
+        );
+        while let Some(ProducerTrampolineWork::Value {
+            answer,
+            eliminators,
+        }) = next
+        {
+            next = None;
+            let lowered = self.lower_computational_match_value_composed_once(
+                builder,
+                answer,
+                &eliminators,
+                Some(&mut next),
+            );
+            if next.is_none() {
+                return lowered;
+            }
+        }
+        lowered
+    }
+
+    fn continue_composed_value<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        answer: RoutedAnswer,
+        eliminators: &[EliminatorFrame<'b>],
+        producer_tail: Option<&mut Option<ProducerTrampolineWork<'b>>>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        if let Some(producer_tail) = producer_tail {
+            // This call is in tail position: once the next work item is
+            // installed, the driver's next iteration owns the answer. Return
+            // the same operand only as the ignored value of this step; never
+            // manufacture or reuse a runtime/protocol marker as trampoline
+            // control.
+            let ignored = answer.value.clone();
+            *producer_tail = Some(ProducerTrampolineWork::Value {
+                answer,
+                eliminators: eliminators.to_vec(),
+            });
+            return Ok(ignored);
+        }
+        self.lower_computational_match_value_composed(builder, answer, eliminators)
+    }
+
+    fn lower_computational_producer_expr_once<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        occurrence: SourceOccurrence<'b>,
+        producer_env: &'b [LoweringEnvironmentBinding],
+        eliminators: &[EliminatorFrame<'b>],
+        producer_tail: Option<&mut Option<ProducerTrampolineWork<'b>>>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let SourceOccurrence {
             expr: scrutinee,
@@ -3130,8 +3181,41 @@ impl<'a> Lowering<'a> {
                 "nested computational producer has no eliminator",
             ));
         }
+        // An invocation-return frame ordinarily marks an expression boundary:
+        // lower the producer by the ordinary expression machine and return its
+        // value unchanged.  A checked-IH transport crossing is the one exact
+        // exception.  It must reach the producer dispatcher so the destination
+        // constructor can replace its escaping closure child with the
+        // force-owned carrier word.
+        //
+        // The predicate is per producer, not per plan.  Mixed plans contain
+        // ordinary invocation returns beside transport destinations, and a
+        // plan-wide "has transports" test would route the ordinary producer
+        // through tree decomposition (where, for example, ProcessExitStatus is
+        // not a constructor scrutinee).
         if matches!(eliminators[0], EliminatorFrame::InvocationReturn) {
-            return self.lower_expr(builder, occurrence, producer_env);
+            let producer_has_transport = match self.defining_emission_owner {
+                Some(owner) => self
+                    .static_transition_plan
+                    .checked_ih_environment_transport_at(owner, static_origin)?
+                    .is_some(),
+                None => false,
+            };
+            #[cfg(test)]
+            if let Some(owner) = self.defining_emission_owner {
+                INVOCATION_RETURN_TRANSPORT_DECISIONS.with(|decisions| {
+                    decisions
+                        .borrow_mut()
+                        .push(InvocationReturnTransportDecision {
+                            owner,
+                            producer: static_origin,
+                            has_transport: producer_has_transport,
+                        });
+                });
+            }
+            if !producer_has_transport {
+                return self.lower_expr(builder, occurrence, producer_env);
+            }
         }
         if let EliminatorFrame::PendingLet(continuation) = eliminators[0] {
             let value = self.lower_expr(builder, occurrence, producer_env)?;
@@ -3158,18 +3242,119 @@ impl<'a> Lowering<'a> {
             );
         }
         if let EliminatorFrame::Active(active) = eliminators[0] {
-            if !matches!(
-                scrutinee,
-                RuntimeExpr::Let { .. }
-                    | RuntimeExpr::Call { .. }
-                    | RuntimeExpr::Match { .. }
-                    | RuntimeExpr::ComputationalMatch { .. }
-                    | RuntimeExpr::If { .. }
-            ) {
+            let construct_has_transport = if matches!(scrutinee, RuntimeExpr::Construct { .. }) {
+                match self.defining_emission_owner {
+                    Some(owner) => self
+                        .static_transition_plan
+                        .checked_ih_environment_transport_at(owner, static_origin)?
+                        .is_some(),
+                    None => false,
+                }
+            } else {
+                false
+            };
+            if !construct_has_transport
+                && !matches!(
+                    scrutinee,
+                    RuntimeExpr::Let { .. }
+                        | RuntimeExpr::Call { .. }
+                        | RuntimeExpr::Match { .. }
+                        | RuntimeExpr::ComputationalMatch { .. }
+                        | RuntimeExpr::If { .. }
+                )
+            {
                 let value = self.lower_expr(builder, occurrence, producer_env)?;
                 return self.resume_active_continuation(builder, value, active);
             }
         }
+        // Peel tail-position producer matches iteratively. The previous
+        // recursive composition allocated one very large Rust stack frame per
+        // source Match; checked host programs carry long normalization chains,
+        // so the correct composed route overflowed before reaching its
+        // transport. The eliminator stack is already explicit data -- retain it
+        // on the heap and advance the source occurrence in a loop.
+        let mut current = SourceOccurrence {
+            expr: scrutinee,
+            static_origin,
+        };
+        let mut composed_eliminators = eliminators.to_vec();
+        let iterative_composition = matches!(
+            self.defining_emission_owner,
+            Some(ContinuationEmissionOwner::Specialization(_))
+        ) && !self
+            .static_transition_plan
+            .checked_ih_environment_transport_source_identities()
+            .is_empty();
+        loop {
+            if !iterative_composition {
+                break;
+            }
+            match current.expr {
+                RuntimeExpr::Match {
+                    scrutinee: nested,
+                    cases,
+                    default,
+                } => {
+                    let nested = self.child_occurrence(current.static_origin, 0, nested)?;
+                    let producer_route = (self.process_object
+                        && matches!(
+                            self.defining_emission_owner,
+                            Some(ContinuationEmissionOwner::Specialization(_))
+                        ))
+                        || requires_heterogeneous_deforestation(nested.expr)
+                        || self.declaration_call_produces_deforestable_aggregate(nested.expr);
+                    if !producer_route {
+                        break;
+                    }
+                    self.enter_source_occurrence_plan(current.static_origin)?;
+                    composed_eliminators.insert(
+                        0,
+                        EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                            cases,
+                            default,
+                            env: producer_env,
+                            static_origin: current.static_origin,
+                            retained_scrutinee_index: None,
+                            deferred_constructor_case: None,
+                        }),
+                    );
+                    current = nested;
+                }
+                RuntimeExpr::ComputationalMatch {
+                    scrutinee: nested,
+                    cases,
+                    default,
+                } => {
+                    self.enter_source_occurrence_plan(current.static_origin)?;
+                    let checked = self.checked_computational_frame(cases, default)?;
+                    let provenance = self.mint_recursor_frame_provenance();
+                    composed_eliminators.insert(
+                        0,
+                        EliminatorFrame::Computational(ComputationalEliminatorFrame {
+                            cases,
+                            default,
+                            env: producer_env,
+                            static_origin: current.static_origin,
+                            retained_scrutinee_index: None,
+                            deferred_constructor_case: None,
+                            provenance,
+                            checked_frame_id: checked.id,
+                            checked_invocation_id: checked.invocation_id,
+                            checked_invocation_source: checked.invocation_source,
+                            checked_invocation_depth: checked.invocation_depth,
+                            answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
+                        }),
+                    );
+                    current = self.child_occurrence(current.static_origin, 0, nested)?;
+                }
+                _ => break,
+            }
+        }
+        let SourceOccurrence {
+            expr: scrutinee,
+            static_origin,
+        } = current;
+        let eliminators = composed_eliminators.as_slice();
         self.enter_source_occurrence_plan(static_origin)?;
         match scrutinee {
             RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
@@ -3211,6 +3396,8 @@ impl<'a> Lowering<'a> {
             }
             RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id,
+                kind,
+                binder_morphism,
                 body,
                 ..
             } => {
@@ -3221,6 +3408,8 @@ impl<'a> Lowering<'a> {
                 let body = self.child_occurrence(static_origin, 0, body)?;
                 self.enter_checked_computational_ih_invocation(
                     *call_template_id,
+                    *kind,
+                    *binder_morphism,
                     body.expr,
                     body.static_origin,
                 )?;
@@ -3307,10 +3496,11 @@ impl<'a> Lowering<'a> {
                                     );
                                     self.leave_oriented_semantic_region(installed.checked);
                                     let returned = returned?;
-                                    return self.lower_computational_match_value_composed(
+                                    return self.continue_composed_value(
                                         builder,
                                         RoutedAnswer::direct(returned),
                                         eliminators,
+                                        producer_tail,
                                     );
                                 }
                             }
@@ -3335,1154 +3525,37 @@ impl<'a> Lowering<'a> {
                     eliminators,
                 )
             }
-            RuntimeExpr::Call { callee, args } => {
-                let join_plan = self.consumed_join_plan_token(static_origin)?;
-                let callee = self.child_occurrence(static_origin, 0, callee)?;
-                let callee = self.lower_expr(builder, callee, producer_env)?;
-                match callee {
-                    LoweringOperand::Specialized(Lowered::DeclarationClosure {
-                        reference,
-                        symbol,
-                        captures,
-                        params,
-                        body,
-                    }) => {
-                        // `RT-DECL-CLOSURE-PORT` `D4`, consumer 2 of 3.
-                        let args = args
-                            .iter()
-                            .enumerate()
-                            .map(|(position, argument)| {
-                                let argument = self.child_occurrence(
-                                    static_origin,
-                                    1 + position,
-                                    argument,
-                                )?;
-                                self.lower_expr(builder, argument, producer_env)
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        self.call_declaration_closure_unit(
-                            builder, reference, &symbol, &params, captures, args,
-                        )
-                    }
-                    LoweringOperand::Specialized(Lowered::Closure {
-                        captures,
-                        params,
-                        body,
-                    }) => {
-                        if params.len() != args.len() {
-                            return Err(unsupported(
-                                "ComputationalMatch",
-                                format!(
-                                    "tree producer expects {} args but call provides {}",
-                                    params.len(),
-                                    args.len()
-                                ),
-                            ));
-                        }
-                        let mut call_inputs = args
-                            .iter()
-                            .enumerate()
-                            .map(|(position, arg)| {
-                                let arg =
-                                    self.child_occurrence(static_origin, 1 + position, arg)?;
-                                let lowered = self.lower_expr(builder, arg, producer_env)?;
-                                Ok(match lowered {
-                                    LoweringOperand::Carried(word) => LoweringOperand::Carried(word),
-                                    LoweringOperand::Specialized(value) => {
-                                        LoweringOperand::Carried(self.transfer_into_carrier(
-                                            builder,
-                                            arg.static_origin,
-                                            &value,
-                                        )?)
-                                    }
-                                })
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        // These operands serve two different roles below: a
-                        // unit call's ordered inputs, and the prefix of a
-                        // lexical environment. They stay operands here, and
-                        // only the environment role crosses the binding
-                        // authority -- there is no route back the other way.
-                        call_inputs.extend(captures);
-                        let returned = self.call_declared_unit(
-                            builder,
-                            body,
-                            &call_inputs,
-                            #[cfg(test)]
-                            None,
-                        )?;
-                        self.lower_computational_match_value_composed(
-                            builder,
-                            RoutedAnswer::direct(returned),
-                            eliminators,
-                        )
-                    }
-                    LoweringOperand::Specialized(
-                        mut callee @ Lowered::ComputationalRecursorClosure { .. },
-                    ) => {
-                        let checked_ih_invocation =
-                            self.mint_checked_computational_ih_instance(&mut callee)?;
-                        let (base, boundary) =
-                            decompose_computational_recursor(LoweringOperand::Specialized(callee));
-                        let (activation, invocation) =
-                            boundary.expect("recursor closure carries an invocation segment");
-                        let recursive_unit_body = invocation.recursive_unit_body;
-                        // `D5a` checkpoint 4 step 1 — read the retained source
-                        // coordinates BEFORE the segment is installed, beside the
-                        // existing pre-move field read. Both are facts of the
-                        // invocation, so both are taken while it is still in hand
-                        // rather than reconstructed afterwards.
-                        let carried_coordinates = CarriedInvocationCoordinates::of(&invocation)?;
-                        let current = active_recursor_frame(eliminators).ok_or_else(|| {
-                            unsupported(
-                                "ComputationalRecursor",
-                                "recursive producer invocation has no active continuation",
-                            )
-                        })?;
-                        let _resume = find_continuation_cursor(current, invocation.resume_cursor)
-                            .ok_or_else(|| {
-                            unsupported(
-                                "ComputationalRecursor",
-                                "recursive producer invocation cursor is not active",
-                            )
-                        })?;
-                        if !recursor_invocation_is_checked(&invocation) {
-                            validate_recursor_invocation_segment(&invocation)?;
-                        }
-                        let dynamic_splice_edges = self.take_dynamic_splice_edges(&invocation)?;
-                        let installed = compose_oriented_subcontinuation(
-                            self.oriented_subcontinuation_plan.as_ref(),
-                            checked_ih_invocation
-                                .or_else(|| self.active_recursive_invocations.last().copied()),
-                            activation,
-                            invocation,
-                            dynamic_splice_edges,
-                        )?;
-                        let mut composed = installed_oriented_eliminator_frames(&installed);
-                        composed.push(EliminatorFrame::InvocationReturn);
-                        // ⭐⭐ `AC-C4` — the carried residual resumes the SAME
-                        // computational eliminator over the carried word, under
-                        // the same semantic-region bracket the specialized
-                        // `BoundedNat` arm below uses. ⛔ Not `specialized_at`,
-                        // ⛔ not a reconstructed `Lowered`, ⛔ not the producer.
-                        if let LoweringOperand::Carried(word) = base {
-                            if let Some(body) = recursive_unit_body {
-                                let inputs = args
-                                    .iter()
-                                    .enumerate()
-                                    .map(|(position, arg)| {
-                                        let arg = self.child_occurrence(
-                                            static_origin,
-                                            1 + position,
-                                            arg,
-                                        )?;
-                                        self.lower_expr(builder, arg, producer_env)
-                                    })
-                                    .collect::<Result<Vec<_>, _>>()?;
-                                self.enter_oriented_semantic_region(installed.checked);
-                                let coordinates = carried_coordinates;
-                                let returned = self
-                                    .call_declared_recursive_position_unit(
-                                        builder,
-                                        body,
-                                        &inputs,
-                                        Some(coordinates),
-                                    )
-                                    .and_then(|value| {
-                                        self.lower_computational_match_value_composed(
-                                            builder,
-                                            RoutedAnswer::direct(value),
-                                            &composed,
-                                        )
-                                    });
-                                self.leave_oriented_semantic_region(installed.checked);
-                                let returned = returned?;
-                                return self.lower_computational_match_value_composed(
-                                    builder,
-                                    RoutedAnswer::direct(returned),
-                                    eliminators,
-                                );
-                            }
-                            Self::reject_carried_residual_arguments(args.len())?;
-                            self.enter_oriented_semantic_region(installed.checked);
-                            let returned = self.lower_computational_match_value_composed(
-                                builder,
-                                RoutedAnswer::direct(LoweringOperand::Carried(word)),
-                                &composed,
-                            );
-                            self.leave_oriented_semantic_region(installed.checked);
-                            let returned = returned?;
-                            return self.lower_computational_match_value_composed(
-                                builder,
-                                RoutedAnswer::direct(returned),
-                                eliminators,
-                            );
-                        }
-                        let base = base.specialized_at("a recursor residual in a producer call")?;
-                        if let Lowered::BoundedNat(predecessor) = base {
-                            if !args.is_empty() {
-                                return Err(unsupported(
-                                    "BoundedNat",
-                                    "structural Nat recursive hypothesis takes no arguments",
-                                ));
-                            }
-                            self.enter_oriented_semantic_region(installed.checked);
-                            let returned = self.lower_bounded_nat_computational(
-                                builder,
-                                predecessor,
-                                false,
-                                &composed,
-                            );
-                            self.leave_oriented_semantic_region(installed.checked);
-                            let returned = returned?;
-                            return self.lower_computational_match_value_composed(
-                                builder,
-                                RoutedAnswer::direct(returned),
-                                eliminators,
-                            );
-                        }
-                        let Lowered::Closure {
-                            captures,
-                            params,
-                            body,
-                        } = base
-                        else {
-                            return Err(unsupported(
-                                "ComputationalMatch",
-                                "recursive constructor field is not a closure",
-                            ));
-                        };
-                        if params.len() != args.len() {
-                            return Err(unsupported(
-                                "ComputationalMatch",
-                                format!(
-                                    "recursive field expects {} args but call provides {}",
-                                    params.len(),
-                                    args.len()
-                                ),
-                            ));
-                        }
-                        let mut call_inputs = args
-                            .iter()
-                            .enumerate()
-                            .map(|(position, arg)| {
-                                let arg =
-                                    self.child_occurrence(static_origin, 1 + position, arg)?;
-                                let lowered = self.lower_expr(builder, arg, producer_env)?;
-                                Ok(match lowered {
-                                    LoweringOperand::Carried(word) => LoweringOperand::Carried(word),
-                                    LoweringOperand::Specialized(value) => {
-                                        LoweringOperand::Carried(self.transfer_into_carrier(
-                                            builder,
-                                            arg.static_origin,
-                                            &value,
-                                        )?)
-                                    }
-                                })
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        // Two roles, as above: ordered unit-call inputs, or the
-                        // prefix of a lexical environment. Only the second
-                        // crosses the binding authority.
-                        call_inputs.extend(captures);
-                        self.enter_oriented_semantic_region(installed.checked);
-                        let returned = self.call_declared_unit(
-                            builder,
-                            body,
-                            &call_inputs,
-                            #[cfg(test)]
-                            None,
-                        )?;
-                        let returned = self.lower_computational_match_value_composed(
-                            builder,
-                            RoutedAnswer::direct(returned),
-                            &composed,
-                        );
-                        self.leave_oriented_semantic_region(installed.checked);
-                        let returned = returned?;
-                        self.lower_computational_match_value_composed(
-                            builder,
-                            RoutedAnswer::direct(returned),
-                            eliminators,
-                        )
-                    }
-                    _ => Err(unsupported(
-                        "ComputationalMatch",
-                        "tree producer callee is not a closure",
-                    )),
-                }
-            }
-            RuntimeExpr::Construct { constructor, args } => {
-                let eliminator = eliminators[0];
-                let terminal_exit = constructor == &self.process_symbols.exit_success
-                    || constructor == &self.process_symbols.exit_failure;
-                let itree_frame = match eliminator {
-                    EliminatorFrame::Computational(frame) => frame
-                        .cases
-                        .iter()
-                        .any(|case| case.constructor.contains("::ITree::")),
-                    EliminatorFrame::Ordinary(frame) => frame
-                        .cases
-                        .iter()
-                        .any(|case| case.constructor.contains("::ITree::")),
-                    EliminatorFrame::PendingLet(_) => {
-                        unreachable!("pending Let continuations are consumed before dispatch")
-                    }
-                    EliminatorFrame::InvocationReturn => {
-                        unreachable!("invocation returns are consumed before dispatch")
-                    }
-                    EliminatorFrame::Active(_) => {
-                        unreachable!("active continuation cursors do not consume constructors")
-                    }
-                };
-                if terminal_exit && itree_frame {
-                    let lowered_args = args
-                        .iter()
-                        .enumerate()
-                        .map(|(position, arg)| {
-                            let arg = self.child_occurrence(static_origin, position, arg)?;
-                            self.lower_expr(builder, arg, producer_env)
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    return Ok(LoweringOperand::Specialized(Lowered::Constructor {
-                        constructor: constructor.clone(),
-                        synthesized_identity: Some(
-                            self.static_transition_plan
-                                .constructor_symbol_identity(static_origin)?,
-                        ),
-                        // `D7` -- the allocation lane is the second fact resolved
-                        // at the producer and carried with the template.
-                        occurrence: Some(self.static_transition_plan.source_aggregate_occurrence(
-                            static_origin,
-                            PlannedAggregateShape::Constructor,
-                        )?),
-                        args: specialized_constructor_fields_at(
-                            &lowered_args,
-                            "a constructor argument",
-                        )?,
-                    }));
-                }
-                // `D3` retains the selected computational case facts: the
-                // claim at the producer occurrence below needs the case index
-                // and that case's ruled recursive positions, and re-selecting
-                // them later would be a second selection authority.
-                let mut selected_computational: Option<(StaticOriginId, usize, Vec<usize>)> = None;
-                let (case_body, argument_binder_offset) = match eliminator {
-                    EliminatorFrame::Computational(eliminator) => {
-                        let (case_index, case) = match eliminator
-                            .cases
-                            .iter()
-                            .enumerate()
-                            .find(|(_, case)| case.constructor == *constructor)
-                        {
-                            Some(selected) => selected,
-                            None => {
-                                self.disposition_statically_unselected_match_cases(
-                                    eliminator.static_origin,
-                                    None,
-                                )?;
-                                return Ok(LoweringOperand::Specialized(Lowered::Trap(
-                                    eliminator.default.clone(),
-                                )));
-                            }
-                        };
-                        self.disposition_statically_unselected_match_cases(
-                            eliminator.static_origin,
-                            Some(case_index),
-                        )?;
-                        if case.argument_binders != args.len() {
-                            return Err(unsupported(
-                                "ComputationalMatch",
-                                format!(
-                                    "case {} expects {} constructor arguments but value has {}",
-                                    case.constructor,
-                                    case.argument_binders,
-                                    args.len()
-                                ),
-                            ));
-                        }
-                        let mut seen = BTreeSet::new();
-                        for position in case.recursive_positions.iter().copied() {
-                            if !seen.insert(position) || position >= args.len() {
-                                return Err(unsupported(
-                                    "ComputationalMatch",
-                                    format!(
-                                        "case {} has malformed recursive position {position}",
-                                        case.constructor
-                                    ),
-                                ));
-                            }
-                        }
-                        selected_computational = Some((
-                            eliminator.static_origin,
-                            case_index,
-                            case.recursive_positions.clone(),
-                        ));
-                        (
-                            self.case_body_occurrence(
-                                eliminator.static_origin,
-                                case_index,
-                                &case.body,
-                            )?,
-                            case.recursive_positions.len(),
-                        )
-                    }
-                    EliminatorFrame::Ordinary(eliminator) => {
-                        let (case_index, case) = match select_ordinary_case(eliminator, constructor)
-                        {
-                            Ok(selected) => selected,
-                            Err(trap) => {
-                                self.disposition_statically_unselected_match_cases(
-                                    eliminator.static_origin,
-                                    None,
-                                )?;
-                                return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
-                            }
-                        };
-                        self.disposition_statically_unselected_match_cases(
-                            eliminator.static_origin,
-                            Some(case_index),
-                        )?;
-                        if case.binders != args.len() {
-                            return Err(unsupported(
-                                "Match",
-                                format!(
-                                    "case {} expects {} binders but constructor has {} args",
-                                    case.constructor,
-                                    case.binders,
-                                    args.len()
-                                ),
-                            ));
-                        }
-                        (
-                            self.case_body_occurrence(
-                                eliminator.static_origin,
-                                case_index,
-                                &case.body,
-                            )?,
-                            0,
-                        )
-                    }
-                    EliminatorFrame::PendingLet(_) => {
-                        unreachable!("pending Let continuations are consumed before dispatch")
-                    }
-                    EliminatorFrame::InvocationReturn => {
-                        unreachable!("invocation returns are consumed before dispatch")
-                    }
-                    EliminatorFrame::Active(_) => {
-                        unreachable!("active continuation cursors do not consume constructors")
-                    }
-                };
-
-                // The bridge eliminator's cases live in the selected case body
-                // itself (`immediate_binder_eliminator` matches only a body that
-                // IS a match), so that body's origin is their parent.
-                let bridge =
-                    immediate_binder_eliminator(case_body.expr, argument_binder_offset, args.len());
-                let bridge =
-                    bridge.filter(|(field, _)| requires_heterogeneous_deforestation(&args[*field]));
-
-                if let Some((field, consumer)) = bridge {
-                    let lowered_prefix = args[..field]
-                        .iter()
-                        .enumerate()
-                        .map(|(position, arg)| {
-                            let arg = self.child_occurrence(static_origin, position, arg)?;
-                            self.lower_expr(builder, arg, producer_env)
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    if let Some(LoweringOperand::Specialized(Lowered::Trap(trap))) =
-                        lowered_prefix.iter().find(|value| {
-                            matches!(value, LoweringOperand::Specialized(Lowered::Trap(_)))
-                        })
-                    {
-                        return Ok(LoweringOperand::Specialized(Lowered::Trap(trap.clone())));
-                    }
-
-                    let splice_caller = active_recursor_frame(&eliminators[1..]);
-                    let mut selected_ancestry = splice_caller
-                        .map(|active| active.selected_ancestry.to_vec())
-                        .unwrap_or_default();
-                    if let EliminatorFrame::Computational(frame) = eliminator {
-                        selected_ancestry.push(frame.provenance);
-                    }
-                    let mut pending: Vec<_> = eliminators[1..]
-                        .iter()
-                        .copied()
-                        .filter(|frame| !matches!(frame, EliminatorFrame::Active(_)))
-                        .collect();
-                    if let Some(active) = splice_caller {
-                        pending.extend_from_slice(active.pending);
-                    }
-                    let selected_active = ActiveContinuationFrame {
-                        activation: self.mint_continuation_activation(),
-                        cursor: self.mint_continuation_cursor(),
-                        parent: splice_caller.and_then(|active| active.parent),
-                        pending: &pending,
-                        selected_ancestry: &selected_ancestry,
-                        source_lineage: splice_caller
-                            .map(|active| active.source_lineage)
-                            .unwrap_or(&[]),
-                        source_selected_cursor: splice_caller
-                            .and_then(|active| active.source_selected_cursor),
-                        selected_scope: splice_caller.and_then(|active| active.selected_scope),
-                    };
-                    // ⭐ The prefix rebuilds the enclosing constructor's own
-                    // **template** below (`outer_scrutinee`), so it is a
-                    // specialized-only surface, not a spine edge.
-                    let lowered_prefix =
-                        specialized_operands_at(&lowered_prefix, "a deferred constructor prefix")?;
-                    let deferred = DeferredConstructorCaseEnvironment {
-                        constructor,
-                        lowered_prefix: &lowered_prefix,
-                        selected_field: field,
-                        trailing_fields: &args[field + 1..],
-                        construct_origin: static_origin,
-                        producer_env,
-                        outer_eliminator: eliminator,
-                        splice_caller,
-                        selected_active,
-                    };
-                    let mut composed = Vec::with_capacity(2);
-                    composed.push(match consumer {
-                        ImmediateBinderEliminator::Computational { cases, default } => {
-                            // `D8m` — which arm this composed site took, at the
-                            // one place that knows.
-                            #[cfg(test)]
-                            crate::cranelift_backend::lowering::record_d8m_bridge_arm(
-                                self.defining_function_id,
-                                crate::cranelift_backend::lowering::D8mBridgeArm::Computational,
-                            );
-                            EliminatorFrame::Computational(ComputationalEliminatorFrame {
-                                cases,
-                                default,
-                                env: &[],
-                                static_origin: case_body.static_origin,
-                                retained_scrutinee_index: None,
-                                deferred_constructor_case: Some(&deferred),
-                                provenance: self.mint_recursor_frame_provenance(),
-                                // `D8m` — an UNWRAPPED bridge stays all-None.
-                                // The source declared no frame here, so there is
-                                // none to preserve, and inventing one is exactly
-                                // what this checkpoint forbids.
-                                checked_frame_id: None,
-                                checked_invocation_id: None,
-                                checked_invocation_source: None,
-                                checked_invocation_depth: 0,
-                                answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
-                            })
-                        }
-                        // ⭐⭐ `D8m` — THE SOURCE FRAME, PRESERVED THROUGH THE
-                        // BRIDGE.
-                        //
-                        // ⛔ Entered and consumed through the EXISTING pair, and
-                        // only here, after the existing gates have already
-                        // selected the bridge. That is deliberate: the
-                        // consumption path is where the fingerprint agreement
-                        // and the consumed-once law live, so routing through it
-                        // means this adds no second validator and cannot drift
-                        // from the one the direct path uses.
-                        ImmediateBinderEliminator::CheckedComputational {
-                            frame_id,
-                            cases,
-                            default,
-                        } => {
-                            #[cfg(test)]
-                            crate::cranelift_backend::lowering::record_d8m_bridge_arm(
-                                self.defining_function_id,
-                                crate::cranelift_backend::lowering::D8mBridgeArm::CheckedComputational,
-                            );
-                            self.enter_checked_subcontinuation_frame(frame_id)?;
-                            // ⛔ `D8m` — CONSUME WITH A SHAPE THE SOURCE MATCH
-                            // DOES NOT CARRY, under test only. Same marker, same
-                            // cases, one field of the default changed: the
-                            // consumption law must refuse, which is what makes
-                            // "the bridge is held to the match the marker
-                            // wrapped" a measured fact rather than a reading of
-                            // the call site.
-                            let consumed_default = default;
-                            #[cfg(test)]
-                            let foreign_default = RuntimeTrap {
-                                code: default.code.clone(),
-                                message: format!("{} foreign", default.message),
-                            };
-                            #[cfg(test)]
-                            let consumed_default = if d8m_foreign_consumed_shape() {
-                                &foreign_default
-                            } else {
-                                consumed_default
-                            };
-                            // ⭐ `D8m` — the SAME derivation the direct path
-                            // uses, whole. All four facts, not the id alone.
-                            let checked =
-                                self.checked_computational_frame(cases, consumed_default)?;
-                            // ⛔ `D8m` — SUPPRESS THE TRANSPORTED TUPLE, under
-                            // test only. The marker is still entered and
-                            // consumed above, so the plan side is untouched and
-                            // only the transport is withheld: the bridge then
-                            // carries what it carried before this checkpoint,
-                            // and the detached-frame refusal must come back.
-                            #[cfg(test)]
-                            let checked = if d8m_suppress_transported_tuple() {
-                                CheckedComputationalFrame {
-                                    id: None,
-                                    invocation_id: None,
-                                    invocation_source: None,
-                                    invocation_depth: 0,
-                                }
-                            } else {
-                                checked
-                            };
-                            EliminatorFrame::Computational(ComputationalEliminatorFrame {
-                                cases,
-                                default,
-                                env: &[],
-                                // ⛔ CHILD 0 of the marker occurrence, never the
-                                // wrapper's own origin. The marker names the
-                                // frame; the match IS the frame, and every
-                                // origin-keyed lookup downstream -- case bodies,
-                                // the planner's continuation origin -- must land
-                                // on the match.
-                                static_origin: {
-                                    let wrapped = self
-                                        .child_occurrence(case_body.static_origin, 0, case_body.expr)?
-                                        .static_origin;
-                                    // `D8m` — SUBSTITUTE THE WRAPPER'S OWN
-                                    // OCCURRENCE, under test only. One node off,
-                                    // and the only difference is which of two
-                                    // nested occurrences downstream lookups key
-                                    // on.
-                                    #[cfg(test)]
-                                    let wrapped = if d8m_wrapper_origin_substitution() {
-                                        case_body.static_origin
-                                    } else {
-                                        wrapped
-                                    };
-                                    wrapped
-                                },
-                                retained_scrutinee_index: None,
-                                deferred_constructor_case: Some(&deferred),
-                                provenance: self.mint_recursor_frame_provenance(),
-                                checked_frame_id: checked.id,
-                                checked_invocation_id: checked.invocation_id,
-                                checked_invocation_source: checked.invocation_source,
-                                checked_invocation_depth: checked.invocation_depth,
-                                // ⛔ UNCHANGED. Checked-frame presence is an
-                                // identity fact, not a routing one; making it
-                                // move the answer route would make the two forms
-                                // of one source match lower differently.
-                                answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
-                            })
-                        }
-                        ImmediateBinderEliminator::Ordinary { cases, default } => {
-                            #[cfg(test)]
-                            crate::cranelift_backend::lowering::record_d8m_bridge_arm(
-                                self.defining_function_id,
-                                crate::cranelift_backend::lowering::D8mBridgeArm::Ordinary,
-                            );
-                            EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
-                                cases,
-                                default,
-                                env: &[],
-                                static_origin: case_body.static_origin,
-                                retained_scrutinee_index: None,
-                                deferred_constructor_case: Some(&deferred),
-                            })
-                        }
-                    });
-                    composed.push(EliminatorFrame::Active(selected_active));
-                    let selected = self.child_occurrence(static_origin, field, &args[field])?;
-                    // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the candidates
-                    // whose call seat this bridge bypasses, read from the plan's
-                    // own binding query rather than reconstructed here.
-                    let bypassed = match selected_computational.as_ref() {
-                        None => Vec::new(),
-                        Some((frame_origin, case_index, recursive_positions)) => {
-                            let mut bypassed = Vec::new();
-                            for position in recursive_positions.iter().copied() {
-                                if let Some(identity) =
-                                    self.static_transition_plan.continuation_call_binding_for(
-                                        static_origin,
-                                        *frame_origin,
-                                        u32::try_from(*case_index).map_err(|_| {
-                                            unsupported(
-                                                "ComputationalMatch",
-                                                "continuation alternative exhausted",
-                                            )
-                                        })?,
-                                        u32::try_from(position).map_err(|_| {
-                                            unsupported(
-                                                "ComputationalMatch",
-                                                "continuation recursive position exhausted",
-                                            )
-                                        })?,
-                                    )?
-                                {
-                                    bypassed.push(identity);
-                                }
-                            }
-                            bypassed
-                        }
-                    };
-                    // `D3` — the ordered causal observation at bridge ENTRY,
-                    // recorded on EVERY run so the unmutated and armed arms are
-                    // comparable at the same seat for the same identity.
-                    #[cfg(test)]
-                    for identity in &bypassed {
-                        super::units::d3_record(super::units::D3Event::BridgeEntry {
-                            identity: identity.clone(),
-                            settled: self.d3_raw_settled(identity),
-                            pending_composed: self.d3_raw_pending_composed(identity),
-                        });
-                    }
-                    // `D3` mutation 2 — settle on ENTRY, before the scope is
-                    // known to have completed. Nothing else moves.
-                    if super::units::d3_mutation()
-                        == super::units::D3Mutation::MarkInlineBeforeBridgeCompletion
-                    {
-                        for identity in &bypassed {
-                            if !self.continuation_candidate_is_consumed(identity) {
-                                #[cfg(test)]
-                                super::units::d3_record(super::units::D3Event::Settle {
-                                    identity: identity.clone(),
-                                    disposition: super::units::CandidateDisposition::InlineNoCall,
-                                    seat: super::units::D3Seat::BridgeEntry,
-                                });
-                                self.settle_continuation_candidate(
-                                    identity,
-                                    super::units::CandidateDisposition::InlineNoCall,
-                                )?;
-                            }
-                        }
-                    }
-                    let outcome = self.lower_computational_producer_expr(
-                        builder,
-                        selected,
-                        producer_env,
-                        &composed,
-                    );
-                    // **Settled only on `Ok`, and only while still unconsumed.**
-                    // A bridge that is ENTERED and then fails is not an inline
-                    // completion -- `D0` measured 25 such candidates and folding
-                    // them in would manufacture members. And a candidate the
-                    // bridge's own body went on to discharge is already settled,
-                    // so the consumed test is what makes "unconsumed" a read of
-                    // the ledger rather than an assumption about order.
-                    let completed = match super::units::d3_mutation() {
-                        // `D3` mutation 2 -- settle as though the scope had
-                        // completed, whatever it actually did. Only this one
-                        // bit moves; the settlement itself is the production
-                        // one below.
-                        super::units::D3Mutation::MarkInlineBeforeBridgeCompletion => true,
-                        _ => outcome.is_ok(),
-                    };
-                    // `D3` — the ordered causal observation at bridge EXIT. The
-                    // two feed reads are RAW, deliberately not routed through
-                    // `continuation_candidate_is_consumed`: that is the
-                    // function mutation 3 mutates, and an instrument reading
-                    // through it would agree with the mutation instead of
-                    // exposing it.
-                    #[cfg(test)]
-                    for identity in &bypassed {
-                        super::units::d3_record(super::units::D3Event::BridgeExit {
-                            identity: identity.clone(),
-                            completed,
-                            settled: self.d3_raw_settled(identity),
-                            pending_composed: self.d3_raw_pending_composed(identity),
-                        });
-                    }
-                    if completed {
-                        for identity in &bypassed {
-                            if !self.continuation_candidate_is_consumed(identity) {
-                                #[cfg(test)]
-                                super::units::d3_record(super::units::D3Event::Settle {
-                                    identity: identity.clone(),
-                                    disposition: super::units::CandidateDisposition::InlineNoCall,
-                                    seat: super::units::D3Seat::BridgeExit,
-                                });
-                                self.settle_continuation_candidate(
-                                    identity,
-                                    super::units::CandidateDisposition::InlineNoCall,
-                                )?;
-                            }
-                        }
-                    }
-                    return outcome;
-                }
-
-                let lowered_args = args
-                    .iter()
-                    .enumerate()
-                    .map(|(position, arg)| {
-                        let arg = self.child_occurrence(static_origin, position, arg)?;
-                        self.lower_expr(builder, arg, producer_env)
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                // `RT-CONTSPEC-ACTIVATE` `D3` — THE PRODUCER OCCURRENCE.
-                //
-                // Fields are lowered; nothing has been transferred into a
-                // carrier and the identity-erasing join has not run. This is
-                // the seat where the four-field selector's operands all exist
-                // and where the exact token is claimed at most once.
-                let mut continuation_result: Option<RoutedAnswer> = None;
-                if let Some((frame_origin, case_index, recursive_positions)) =
-                    selected_computational.as_ref()
-                {
-                    // ---- `D3` — THE OUTER-REALIZATION DISPATCH, before any
-                    // ---- ordinary continuation-call resolution or emission.
-                    //
-                    // `evt_2564nv6yqqs2q`. The field run above is complete and
-                    // nothing has been emitted for this seat yet, which is the
-                    // measured precondition the ruling turns on. An `R` identity
-                    // is realized here, once, by calling the already-declared
-                    // fused target; the fused function computes the whole
-                    // composed region, so its result IS this seat's result and
-                    // the eliminator below must not run over it a second time.
-                    for position in recursive_positions.iter().copied() {
-                        if let Some(realized) = self
-                            .dispatch_fusion_owned_outer_realization(
-                                builder,
-                                static_origin,
-                                *frame_origin,
-                                *case_index,
-                                position,
-                                &lowered_args,
-                                producer_env,
-                            )?
-                        {
-                            return Ok(realized);
-                        }
-                    }
-                    for position in recursive_positions.iter().copied() {
-                        // `D9` — the WHOLE lowered field run is handed down; the
-                        // ordinary run is assembled from the planner's envelope
-                        // at the one seat that resolves the unit.
-                        //
-                        // ⛔ This site used to build the run itself, filtering
-                        // out the recursive field, under a comment claiming
-                        // *"worker captures follow in capture-ordinal order"*.
-                        // They did not: nothing here or downstream appended
-                        // them, so a continuation whose selected worker had
-                        // captures was called with its declared parameter tail
-                        // unfilled.
-                        if let Some(returned) = self.claim_and_call_continuation(
-                            builder,
-                            static_origin,
-                            *frame_origin,
-                            *case_index,
-                            position,
-                            &lowered_args,
-                            producer_env,
-                            eliminators,
-                        )? {
-                            // The call's own value is the result after the
-                            // consumed computational frame, and it is never
-                            // discarded: it is handed to the frame consumption
-                            // in place of the constructor that would have been
-                            // produced. Returning it directly here would skip
-                            // the frame's planned-join disposition, which the
-                            // emitter accounts for separately.
-                            continuation_result = Some(returned);
-                        }
-                    }
-                }
-                let produced = if lowered_args
-                    .iter()
-                    .any(|argument| matches!(argument, LoweringOperand::Carried(_)))
-                {
-                    LoweringOperand::Carried(self.transfer_constructor_operands(
-                        builder,
-                        static_origin,
-                        constructor,
-                        &lowered_args,
-                    )?)
-                } else {
-                    LoweringOperand::Specialized(Lowered::Constructor {
-                        constructor: constructor.clone(),
-                        // Carry the plan's already-resolved source identity with
-                        // the template.  A later unit boundary may receive this
-                        // result after nested producer traversal, where the
-                        // caller occurrence is not the constructor occurrence
-                        // and therefore cannot lawfully re-query its atom.
-                        synthesized_identity: Some(
-                            self.static_transition_plan
-                                .constructor_symbol_identity(static_origin)?,
-                        ),
-                        // `D7` -- the allocation lane is the second fact resolved
-                        // at the producer and carried with the template.
-                        occurrence: Some(self.static_transition_plan.source_aggregate_occurrence(
-                            static_origin,
-                            PlannedAggregateShape::Constructor,
-                        )?),
-                        args: specialized_constructor_fields_at(
-                            &lowered_args,
-                            "a constructor argument",
-                        )?,
-                    })
-                };
-                // `D6a` upstream half -- ordinary evaluation STARTS direct and
-                // the exact producer RAISES it. ⛔ Not a default written at the
-                // consumer: a site that hard-codes `DirectScrutinee` on a path an
-                // exact call result reaches would erase the fact being transported.
-                let produced =
-                    continuation_result.unwrap_or_else(|| RoutedAnswer::direct(produced));
-                self.lower_computational_match_value_composed(builder, produced, eliminators)
-            }
+            RuntimeExpr::Call { callee, args } => self.lower_computational_producer_call(
+                builder,
+                static_origin,
+                callee,
+                args,
+                producer_env,
+                eliminators,
+            ),
+            RuntimeExpr::Construct { constructor, args } => self
+                .lower_computational_producer_construct(
+                    builder,
+                    static_origin,
+                    constructor,
+                    args,
+                    producer_env,
+                    eliminators,
+                    producer_tail,
+                ),
             RuntimeExpr::Match {
                 scrutinee,
                 cases: producer_cases,
                 default: producer_default,
-            } => {
-                let scrutinee = self.child_occurrence(static_origin, 0, scrutinee)?;
-                let selected = self.lower_expr(builder, scrutinee, producer_env)?;
-                if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = selected {
-                    let true_case = producer_cases.iter().enumerate().find(|(_, case)| {
-                        case.binders == 0 && case.constructor.ends_with("::Bool::True")
-                    });
-                    let false_case = producer_cases.iter().enumerate().find(|(_, case)| {
-                        case.binders == 0 && case.constructor.ends_with("::Bool::False")
-                    });
-                    let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
-                        return Err(unsupported(
-                            "ComputationalMatch",
-                            "Bool tree producer requires True and False cases",
-                        ));
-                    };
-                    if let Some(known) = known {
-                        let (index, case) = if known { true_case } else { false_case };
-                        self.disposition_statically_unselected_match_cases(
-                            static_origin,
-                            Some(index),
-                        )?;
-                        let body = self.case_body_occurrence(static_origin, index, &case.body)?;
-                        return self.lower_computational_producer_expr(
-                            builder,
-                            body,
-                            producer_env,
-                            eliminators,
-                        );
-                    }
-                    let join_plan = self.consumed_join_plan_token(static_origin)?;
-                    let true_block = builder.create_block();
-                    let false_block = builder.create_block();
-                    let merge = join_plan
-                        .has_continuing_predecessor
-                        .then(|| builder.create_block());
-                    if let Some(merge) = merge {
-                        self.append_planned_join_params(builder, merge, &join_plan);
-                    }
-                    builder.ins().brif(value, true_block, &[], false_block, &[]);
-                    let mut merge_kind = None;
-                    for (block, (index, producer_case)) in
-                        [(true_block, true_case), (false_block, false_case)]
-                    {
-                        builder.switch_to_block(block);
-                        let body =
-                            self.case_body_occurrence(static_origin, index, &producer_case.body)?;
-                        let lowered = self.lower_computational_producer_expr(
-                            builder,
-                            body,
-                            producer_env,
-                            eliminators,
-                        )?;
-                        if self.seal_source_trap_branch(builder, &lowered)? {
-                            continue;
-                        }
-                        let merge = merge.ok_or_else(|| {
-                            backend_module(
-                                "join plan omitted a producer Bool Match merge despite a \
-                                 continuing predecessor"
-                                    .to_string(),
-                            )
-                        })?;
-                        self.jump_planned_join_arm(
-                            builder,
-                            merge,
-                            &join_plan,
-                            body.static_origin,
-                            lowered,
-                            &mut merge_kind,
-                            "ComputationalMatch",
-                        )?;
-                    }
-                    let Some(merge) = merge else {
-                        let unreachable = builder.create_block();
-                        builder.switch_to_block(unreachable);
-                        return Ok(LoweringOperand::Specialized(Lowered::Trap(
-                            producer_default.clone(),
-                        )));
-                    };
-                    return self.finish_planned_join(
-                        builder,
-                        merge,
-                        &join_plan,
-                        merge_kind,
-                        "ComputationalMatch",
-                    );
-                }
-                if let LoweringOperand::Specialized(Lowered::HostResult {
-                    success,
-                    error,
-                    ok,
-                    err_constructor,
-                    ok_constructor,
-                }) = selected
-                {
-                    let join_plan = self.consumed_join_plan_token(static_origin)?;
-                    let ok_block = builder.create_block();
-                    let err_block = builder.create_block();
-                    let merge = join_plan
-                        .has_continuing_predecessor
-                        .then(|| builder.create_block());
-                    if let Some(merge) = merge {
-                        self.append_planned_join_params(builder, merge, &join_plan);
-                    }
-                    builder.ins().brif(success, ok_block, &[], err_block, &[]);
-                    let mut merge_kind = None;
-                    for (block, constructor, payload) in [
-                        (ok_block, ok_constructor.as_str(), *ok),
-                        (err_block, err_constructor.as_str(), *error),
-                    ] {
-                        builder.switch_to_block(block);
-                        let lowered = if let Some((index, producer_case)) =
-                            dynamic_host_result_producer_case(producer_cases, constructor)?
-                        {
-                            let case_env = env_with([payload], producer_env);
-                            let body = self.case_body_occurrence(
-                                static_origin,
-                                index,
-                                &producer_case.body,
-                            )?;
-                            self.lower_computational_producer_expr(
-                                builder,
-                                body,
-                                &case_env,
-                                eliminators,
-                            )?
-                        } else {
-                            LoweringOperand::Specialized(Lowered::Trap(producer_default.clone()))
-                        };
-                        if self.seal_source_trap_branch(builder, &lowered)? {
-                            continue;
-                        }
-                        let merge = merge.ok_or_else(|| {
-                            backend_module(
-                                "join plan omitted a producer HostResult merge despite a \
-                                 continuing predecessor"
-                                    .to_string(),
-                            )
-                        })?;
-                        self.jump_planned_join_arm(
-                            builder,
-                            merge,
-                            &join_plan,
-                            static_origin,
-                            lowered,
-                            &mut merge_kind,
-                            "ComputationalMatch",
-                        )?;
-                    }
-                    let Some(merge) = merge else {
-                        let unreachable = builder.create_block();
-                        builder.switch_to_block(unreachable);
-                        return Ok(LoweringOperand::Specialized(Lowered::Trap(
-                            producer_default.clone(),
-                        )));
-                    };
-                    return self.finish_planned_join(
-                        builder,
-                        merge,
-                        &join_plan,
-                        merge_kind,
-                        "ComputationalMatch",
-                    );
-                }
-                if let LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) = selected
-                {
-                    return self.lower_dynamic_constructor_match(
-                        builder,
-                        dynamic,
-                        DynamicConstructorContinuation::Producer {
-                            cases: producer_cases,
-                            default: producer_default,
-                            env: producer_env,
-                            static_origin,
-                            eliminators,
-                        },
-                    );
-                }
-                if let LoweringOperand::Specialized(Lowered::BoundedNat(nat)) = selected {
-                    let frame = OrdinaryEliminatorFrame {
-                        cases: producer_cases,
-                        default: producer_default,
-                        env: producer_env,
-                        static_origin,
-                        retained_scrutinee_index: None,
-                        deferred_constructor_case: None,
-                    };
-                    let mut composed = Vec::with_capacity(eliminators.len() + 1);
-                    composed.push(EliminatorFrame::Ordinary(frame));
-                    composed.extend_from_slice(eliminators);
-                    return self.lower_bounded_nat_computational(builder, nat, false, &composed);
-                }
-                if let LoweringOperand::Specialized(Lowered::StructuralNat(nat)) = selected {
-                    let frame = OrdinaryEliminatorFrame {
-                        cases: producer_cases,
-                        default: producer_default,
-                        env: producer_env,
-                        static_origin,
-                        retained_scrutinee_index: None,
-                        deferred_constructor_case: None,
-                    };
-                    let mut composed = Vec::with_capacity(eliminators.len() + 1);
-                    composed.push(EliminatorFrame::Ordinary(frame));
-                    composed.extend_from_slice(eliminators);
-                    return self.lower_bounded_nat_computational(
-                        builder,
-                        BoundedNatV1::derived_from_validated(nat.value),
-                        true,
-                        &composed,
-                    );
-                }
-                let LoweringOperand::Specialized(Lowered::Constructor {
-                    constructor, args, ..
-                }) = selected
-                else {
-                    return Err(unsupported(
-                        "ComputationalMatch",
-                        "tree-producing match scrutinee is not Bool or a constructor",
-                    ));
-                };
-                let Some((case_index, producer_case)) = producer_cases
-                    .iter()
-                    .enumerate()
-                    .find(|(_, case)| case.constructor == constructor)
-                else {
-                    self.disposition_statically_unselected_match_cases(static_origin, None)?;
-                    return Ok(LoweringOperand::Specialized(Lowered::Trap(
-                        producer_default.clone(),
-                    )));
-                };
-                self.disposition_statically_unselected_match_cases(
-                    static_origin,
-                    Some(case_index),
-                )?;
-                if producer_case.binders != args.len() {
-                    return Err(unsupported(
-                        "ComputationalMatch",
-                        "tree-producing match constructor arity changed",
-                    ));
-                }
-                #[cfg(test)]
-                record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
-                    site: "bound_constructor_fields@producer-env",
-                    eliminated_origin: static_origin,
-                });
-                let case_env = self.bound_constructor_fields(&args, producer_env)?;
-                let body =
-                    self.case_body_occurrence(static_origin, case_index, &producer_case.body)?;
-                self.lower_computational_producer_expr(builder, body, &case_env, eliminators)
-            }
+            } => self.lower_computational_producer_match(
+                builder,
+                static_origin,
+                scrutinee,
+                producer_cases,
+                producer_default,
+                producer_env,
+                eliminators,
+            ),
             RuntimeExpr::ComputationalMatch {
                 scrutinee: inner_scrutinee,
                 cases: inner_cases,
@@ -4614,11 +3687,19 @@ impl<'a> Lowering<'a> {
                 // handed to `lower_expr` **as the same occurrence**, origin
                 // included — the producer-side twin of the source machine's
                 // fallback arm.
-                let value = self.lower_expr(builder, occurrence, producer_env)?;
-                self.lower_computational_match_value_composed(
+                let value = self.lower_expr(
+                    builder,
+                    SourceOccurrence {
+                        expr: scrutinee,
+                        static_origin,
+                    },
+                    producer_env,
+                )?;
+                self.continue_composed_value(
                     builder,
                     RoutedAnswer::direct(value),
                     eliminators,
+                    producer_tail,
                 )
             }
         }
@@ -4819,11 +3900,56 @@ impl<'a> Lowering<'a> {
         lowered
     }
 
-    pub(super) fn lower_computational_match_value_composed(
+    pub(super) fn lower_computational_match_value_composed<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         scrutinee: RoutedAnswer,
-        eliminators: &[EliminatorFrame<'_>],
+        eliminators: &[EliminatorFrame<'b>],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let owner_has_checked_transport = self.defining_emission_owner.is_some_and(|owner| {
+            !self
+                .static_transition_plan
+                .checked_ih_environment_transports_owned_by(owner)
+                .is_empty()
+        });
+        if !owner_has_checked_transport {
+            return self.lower_computational_match_value_composed_once(
+                builder,
+                scrutinee,
+                eliminators,
+                None,
+            );
+        }
+        let mut next = Some(ProducerTrampolineWork::Value {
+            answer: scrutinee,
+            eliminators: eliminators.to_vec(),
+        });
+        loop {
+            let Some(ProducerTrampolineWork::Value {
+                answer,
+                eliminators,
+            }) = next.take()
+            else {
+                unreachable!("the producer trampoline carries only composed values")
+            };
+            let lowered = self.lower_computational_match_value_composed_once(
+                builder,
+                answer,
+                &eliminators,
+                Some(&mut next),
+            );
+            if next.is_none() {
+                return lowered;
+            }
+        }
+    }
+
+    fn lower_computational_match_value_composed_once<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        scrutinee: RoutedAnswer,
+        eliminators: &[EliminatorFrame<'b>],
+        producer_tail: Option<&mut Option<ProducerTrampolineWork<'b>>>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE ANSWER DISPOSITION,
         // ---- processed BEFORE phase classification and head selection.
@@ -4840,7 +3966,9 @@ impl<'a> Lowering<'a> {
         // what the ruling forbids.
         match scrutinee.role {
             EliminatorRole::Scrutinee => {}
-            EliminatorRole::AnswerAfterComputationalFrame { continuation_origin } => {
+            EliminatorRole::AnswerAfterComputationalFrame {
+                continuation_origin,
+            } => {
                 // The exact head is RE-CHECKED here, against the actual stack,
                 // rather than trusted from the issuer. The composition seat
                 // closed it too; this is the consumption-side dual, and it is
@@ -4877,7 +4005,12 @@ impl<'a> Lowering<'a> {
                 return if remaining.is_empty() {
                     Ok(cleared.value)
                 } else {
-                    self.lower_computational_match_value_composed(builder, cleared, remaining)
+                    self.continue_composed_value(
+                        builder,
+                        cleared,
+                        remaining,
+                        producer_tail,
+                    )
                 };
             }
         }
@@ -4906,6 +4039,203 @@ impl<'a> Lowering<'a> {
         // compile-time template, so only that path takes the boundary.
         if matches!(eliminator, EliminatorFrame::InvocationReturn) {
             return Ok(scrutinee);
+        }
+        // A process-object producer stack must retain its outer interface while
+        // an ordinary source Match eliminates a host result. Lowering this
+        // match standalone is what produced a ProcessExitStatus in an Option
+        // frame; each branch is instead lowered under the remaining composed
+        // eliminators, then joined at this Match's own planned join.
+        if let LoweringOperand::Specialized(Lowered::HostResult {
+            success,
+            error,
+            ok,
+            err_constructor,
+            ok_constructor,
+        }) = scrutinee
+        {
+            let EliminatorFrame::Ordinary(frame) = eliminator else {
+                return Err(unsupported(
+                    "ComputationalMatch",
+                    "a specialized host result reached a non-ordinary composed eliminator",
+                ));
+            };
+            let remaining = &eliminators[1..];
+            let join_plan =
+                self.consumed_composed_join_plan_token(frame.static_origin, remaining)?;
+            let ok_block = builder.create_block();
+            let err_block = builder.create_block();
+            let merge = join_plan
+                .has_continuing_predecessor
+                .then(|| builder.create_block());
+            if let Some(merge) = merge {
+                self.append_planned_join_params(builder, merge, &join_plan);
+            }
+            builder.ins().brif(success, ok_block, &[], err_block, &[]);
+            let mut merge_kind = None;
+            for (block, constructor, payload) in [
+                (ok_block, ok_constructor.as_str(), *ok),
+                (err_block, err_constructor.as_str(), *error),
+            ] {
+                builder.switch_to_block(block);
+                let lowered = if let Some((index, case)) =
+                    dynamic_host_result_producer_case(frame.cases, constructor)?
+                {
+                    let case_env = env_with([payload], frame.env);
+                    let body = self.case_body_occurrence(frame.static_origin, index, &case.body)?;
+                    if remaining.is_empty() {
+                        self.lower_expr(builder, body, &case_env)?
+                    } else {
+                        self.lower_computational_producer_expr(builder, body, &case_env, remaining)?
+                    }
+                } else {
+                    LoweringOperand::Specialized(Lowered::Trap(frame.default.clone()))
+                };
+                if self.seal_source_trap_branch(builder, &lowered)? {
+                    continue;
+                }
+                let merge = merge.ok_or_else(|| {
+                    backend_module(
+                        "join plan omitted a composed HostResult Match merge despite a continuing predecessor"
+                            .to_string(),
+                    )
+                })?;
+                self.jump_planned_join_arm(
+                    builder,
+                    merge,
+                    &join_plan,
+                    frame.static_origin,
+                    lowered,
+                    &mut merge_kind,
+                    "ComputationalMatch",
+                )?;
+            }
+            let Some(merge) = merge else {
+                let unreachable = builder.create_block();
+                builder.switch_to_block(unreachable);
+                return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                    frame.default.clone(),
+                )));
+            };
+            return self.finish_planned_join(
+                builder,
+                merge,
+                &join_plan,
+                merge_kind,
+                "ComputationalMatch",
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = scrutinee {
+            let EliminatorFrame::Ordinary(frame) = eliminator else {
+                return Err(unsupported(
+                    "ComputationalMatch",
+                    "a specialized Bool reached a non-ordinary composed eliminator",
+                ));
+            };
+            let true_case =
+                frame.cases.iter().enumerate().find(|(_, case)| {
+                    case.binders == 0 && case.constructor.ends_with("::Bool::True")
+                });
+            let false_case =
+                frame.cases.iter().enumerate().find(|(_, case)| {
+                    case.binders == 0 && case.constructor.ends_with("::Bool::False")
+                });
+            let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
+                return Err(unsupported(
+                    "ComputationalMatch",
+                    "a composed Bool Match requires zero-binder True and False cases",
+                ));
+            };
+            let remaining = &eliminators[1..];
+            if let Some(selected) = known {
+                let (index, case) = if selected { true_case } else { false_case };
+                self.disposition_statically_unselected_match_cases(
+                    frame.static_origin,
+                    Some(index),
+                )?;
+                let body = self.case_body_occurrence(frame.static_origin, index, &case.body)?;
+                return if remaining.is_empty() {
+                    self.lower_expr(builder, body, frame.env)
+                } else {
+                    self.lower_computational_producer_expr(
+                        builder,
+                        body,
+                        frame.env,
+                        remaining,
+                    )
+                };
+            }
+            let join_plan =
+                self.consumed_composed_join_plan_token(frame.static_origin, remaining)?;
+            let true_block = builder.create_block();
+            let false_block = builder.create_block();
+            let merge = join_plan
+                .has_continuing_predecessor
+                .then(|| builder.create_block());
+            if let Some(merge) = merge {
+                self.append_planned_join_params(builder, merge, &join_plan);
+            }
+            builder.ins().brif(value, true_block, &[], false_block, &[]);
+            let mut merge_kind = None;
+            for (block, (index, case)) in [(true_block, true_case), (false_block, false_case)] {
+                builder.switch_to_block(block);
+                let body = self.case_body_occurrence(frame.static_origin, index, &case.body)?;
+                let lowered = if remaining.is_empty() {
+                    self.lower_expr(builder, body, frame.env)?
+                } else {
+                    self.lower_computational_producer_expr(builder, body, frame.env, remaining)?
+                };
+                if self.seal_source_trap_branch(builder, &lowered)? {
+                    continue;
+                }
+                let merge = merge.ok_or_else(|| {
+                    backend_module(
+                        "join plan omitted a composed Bool Match merge despite a continuing predecessor"
+                            .to_string(),
+                    )
+                })?;
+                self.jump_planned_join_arm(
+                    builder,
+                    merge,
+                    &join_plan,
+                    body.static_origin,
+                    lowered,
+                    &mut merge_kind,
+                    "ComputationalMatch",
+                )?;
+            }
+            let Some(merge) = merge else {
+                let unreachable = builder.create_block();
+                builder.switch_to_block(unreachable);
+                return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                    frame.default.clone(),
+                )));
+            };
+            return self.finish_planned_join(
+                builder,
+                merge,
+                &join_plan,
+                merge_kind,
+                "ComputationalMatch",
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) = scrutinee {
+            let EliminatorFrame::Ordinary(frame) = eliminator else {
+                return Err(unsupported(
+                    "ComputationalMatch",
+                    "a dynamic constructor reached a non-ordinary composed eliminator",
+                ));
+            };
+            return self.lower_dynamic_constructor_match(
+                builder,
+                dynamic,
+                DynamicConstructorContinuation::Producer {
+                    cases: frame.cases,
+                    default: frame.default,
+                    env: frame.env,
+                    static_origin: frame.static_origin,
+                    eliminators: &eliminators[1..],
+                },
+            );
         }
         // ⭐⭐ `D3`'s CARRIED arm for the composed route, ahead of the boundary
         // below — otherwise a carried scrutinee reaching a real eliminator
@@ -4995,8 +4325,10 @@ impl<'a> Lowering<'a> {
                     // eliminators and re-entering this same consumer -- the
                     // shape the specialized path already uses.
                     //
-                    // `lower_carried_match`'s interface is untouched: it still
-                    // takes exactly cases / default / origin / env.
+                    // The carried Match lowers each selected case body beneath
+                    // the remaining producer stack. Applying the suffix only
+                    // after standalone case lowering is too late: a raw closure
+                    // in the case body would already have crossed.
                     let suffix = &eliminators[1..];
                     #[cfg(test)]
                     if !suffix.is_empty() {
@@ -5042,25 +4374,16 @@ impl<'a> Lowering<'a> {
                         frame.default,
                         frame.static_origin,
                         frame.env,
+                        Some(suffix),
                     );
-                    if suffix.is_empty() {
-                        return eliminated;
-                    }
-                    let continued = eliminated.and_then(|value| {
-                        #[cfg(test)]
+                    #[cfg(test)]
+                    if !suffix.is_empty() && eliminated.is_ok() {
                         COC_D2_SUFFIX_CONTINUATIONS.with(|count| count.set(count.get() + 1));
-                        self.lower_computational_match_value_composed(
-                            builder,
-                            RoutedAnswer {
-                                value,
-                                route: incoming_route,
-                                role: EliminatorRole::Scrutinee,
-                            },
-                            suffix,
-                        )
-                    });
-                    self.carried_suffix_reentries -= 1;
-                    continued
+                    }
+                    if !suffix.is_empty() {
+                        self.carried_suffix_reentries -= 1;
+                    }
+                    eliminated
                 }
                 // **`RT-CARRIED-CONTINUATION-RESUME` `D2` — ROUTE THE ACTIVE
                 // FRAME TO THE EXISTING RESUME, WHICH IS PHASE-AGNOSTIC.**
@@ -5158,55 +4481,13 @@ impl<'a> Lowering<'a> {
                 })
                 .collect::<Vec<_>>(),
         ));
-        // **`RT-SPECIALIZED-ACTIVE-RESUME` `D2` — ROUTE THE MEASURED
-        // ORDINARY-LIVE CELL TO ITS RESUME, AHEAD OF THE CONSTRUCTOR-ONLY
-        // DESTRUCTURE.**
-        //
-        // The destructure below demands constructor shape BEFORE it dispatches
-        // the eliminator, so an `Active` frame never reaches its resume when the
-        // value is an ordinary live one. Constructor shape is genuinely required
-        // by `Computational` and `Ordinary` elimination -- they select a case
-        // and project fields from it. **Resuming an `Active` continuation
-        // projects nothing**, and `resume_active_continuation` takes a
-        // `LoweringOperand`, so this operand is expressible at that entry by its
-        // SIGNATURE rather than by inference. No interface widens.
-        //
-        // **The key is EXACTLY the measured cell** -- `ProcessExitStatus` x
-        // first-`Active` -- and deliberately not "any non-constructor variant"
-        // nor "all first-`Active`". Two independent reasons, either sufficient:
-        //
-        // 1. **Hoisting `Active` dispatch above the shape and terminal guards is
-        //    forbidden.** `RecursiveBackedge` must PROPAGATE and `Trap` must
-        //    SEAL; neither resumes. A key over all of first-`Active` would carry
-        //    both into the resume.
-        // 2. **`AC-5`'s committed full-equality control is discharged by
-        //    DISJOINTNESS on this key, not by re-running it.** `D0` measured its
-        //    only arrival here as `Specialized(RecursiveBackedge)` with a
-        //    first-`Ordinary` frame -- different on BOTH axes. Widening either
-        //    axis reopens that discharge and it would have to be re-measured in
-        //    the same candidate.
-        //
-        // `D0` measured `RecursiveBackedge`, `Trap`, `BoundedNat`,
-        // `StructuralNat` and every other variant at ZERO in this cell, so the
-        // narrow key leaves no measured member unrouted.
-        #[cfg(test)]
-        if matches!(
-            (&scrutinee, eliminator),
-            (
-                Lowered::ProcessExitStatus { .. },
-                EliminatorFrame::Active(_)
-            )
-        ) {
-            SAR_D2_CELL_ARRIVALS.with(|count| count.set(count.get() + 1));
-        }
+        // A specialized process status outside the M6 carried process-object
+        // interface still resumes an Active continuation without projecting a
+        // constructor. The checked process population now reaches this seam as
+        // `Carried`; this residual covers non-process callers only.
         if let (Lowered::ProcessExitStatus { .. }, EliminatorFrame::Active(active)) =
             (&scrutinee, eliminator)
         {
-            // Fail closed on a composed suffix behind the resume, exactly as the
-            // landed carried `Active` arm does and for the same reason: the
-            // resume consumes the frame's OWN pending suffix, so a remainder
-            // here would be dropped silently. Every measured member has exactly
-            // one eliminator, so this refuses only shapes outside the census.
             if !eliminators[1..].is_empty() {
                 return Err(unsupported(
                     "ComputationalMatch",
@@ -5215,24 +4496,11 @@ impl<'a> Lowering<'a> {
                      frame's own pending suffix, so the remainder would be silently dropped",
                 ));
             }
-            // `D3`'s mutation, placed AFTER the denominator above so a
-            // suppressed run still shows the cell was reached. Suppressing does
-            // not spell a replica of the refusal: it falls through to the
-            // genuine production refusal below, which this repair leaves in
-            // place for every other class.
-            #[cfg(test)]
-            let suppress_route = sar_d2_suppress_route();
-            #[cfg(not(test))]
-            let suppress_route = false;
-            if !suppress_route {
-                #[cfg(test)]
-                SAR_D2_ROUTES.with(|count| count.set(count.get() + 1));
-                return self.resume_active_continuation(
-                    builder,
-                    LoweringOperand::Specialized(scrutinee),
-                    active,
-                );
-            }
+            return self.resume_active_continuation(
+                builder,
+                LoweringOperand::Specialized(scrutinee),
+                active,
+            );
         }
         let Lowered::Constructor {
             constructor,
@@ -5640,11 +4908,9 @@ impl<'a> Lowering<'a> {
                                 // ⭐ `AC-C4` clause 1 — the SPECIALIZED caller
                                 // wraps explicitly, so the phase is stated at the
                                 // call site rather than inferred by the callee.
-                                LoweringOperand::Specialized(
-                                    operand.clone().specialized_at(
-                                        "a computational recursor's selected recursive argument",
-                                    )?,
-                                ),
+                                LoweringOperand::Specialized(operand.clone().specialized_at(
+                                    "a computational recursor's selected recursive argument",
+                                )?),
                                 eliminator.cases.to_vec(),
                                 eliminator.default.clone(),
                                 eliminator.env.to_vec(),
@@ -5777,7 +5043,12 @@ impl<'a> Lowering<'a> {
                 let lowered = if !case.recursive_positions.is_empty() {
                     self.lower_source_machine(builder, case_body, &case_env, &active_state)
                 } else if remaining_eliminators.is_empty() {
-                    self.lower_expr(builder, case_body, &case_env)
+                    self.lower_computational_producer_expr(
+                        builder,
+                        case_body,
+                        &case_env,
+                        &[EliminatorFrame::InvocationReturn],
+                    )
                 } else {
                     self.lower_computational_producer_expr(
                         builder,
@@ -5856,10 +5127,1346 @@ impl<'a> Lowering<'a> {
             }
         };
         if remaining_eliminators.is_empty() {
-            self.lower_expr(builder, body, &case_env)
+            self.lower_computational_producer_expr(
+                builder,
+                body,
+                &case_env,
+                &[EliminatorFrame::InvocationReturn],
+            )
         } else {
-            self.lower_computational_producer_expr(builder, body, &case_env, remaining_eliminators)
+            self.lower_computational_producer_expr(
+                builder,
+                body,
+                &case_env,
+                remaining_eliminators,
+            )
         }
+    }
+
+    fn lower_computational_producer_call(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        static_origin: StaticOriginId,
+        callee: &RuntimeExpr,
+        args: &[RuntimeExpr],
+        producer_env: &[LoweringEnvironmentBinding],
+        eliminators: &[EliminatorFrame<'_>],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let join_plan = self.consumed_join_plan_token(static_origin)?;
+        let callee = self.child_occurrence(static_origin, 0, callee)?;
+        let callee = self.lower_expr(builder, callee, producer_env)?;
+        match callee {
+            LoweringOperand::Specialized(Lowered::DeclarationClosure {
+                reference,
+                symbol,
+                captures,
+                params,
+                body,
+            }) => {
+                // `RT-DECL-CLOSURE-PORT` `D4`, consumer 2 of 3.
+                let args = args
+                    .iter()
+                    .enumerate()
+                    .map(|(position, argument)| {
+                                let argument = self.child_occurrence(
+                                    static_origin,
+                                    1 + position,
+                                    argument,
+                                )?;
+                        self.lower_expr(builder, argument, producer_env)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                self.call_declaration_closure_unit(
+                    builder, reference, &symbol, &params, captures, args,
+                )
+            }
+            LoweringOperand::Specialized(Lowered::Closure {
+                captures,
+                params,
+                body,
+            }) => {
+                if params.len() != args.len() {
+                    return Err(unsupported(
+                        "ComputationalMatch",
+                        format!(
+                            "tree producer expects {} args but call provides {}",
+                            params.len(),
+                            args.len()
+                        ),
+                    ));
+                }
+                let mut call_inputs = args
+                    .iter()
+                    .enumerate()
+                    .map(|(position, arg)| {
+                        let arg = self.child_occurrence(static_origin, 1 + position, arg)?;
+                        let lowered = self.lower_expr(builder, arg, producer_env)?;
+                        Ok(match lowered {
+                            LoweringOperand::Carried(word) => LoweringOperand::Carried(word),
+                            LoweringOperand::Specialized(value) => LoweringOperand::Carried(
+                                self.transfer_into_carrier(builder, arg.static_origin, &value)?,
+                            ),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                // These operands serve two different roles below: a
+                // unit call's ordered inputs, and the prefix of a
+                // lexical environment. They stay operands here, and
+                // only the environment role crosses the binding
+                // authority -- there is no route back the other way.
+                call_inputs.extend(captures);
+                let returned = self.call_declared_unit(
+                    builder,
+                    body,
+                    &call_inputs,
+                    #[cfg(test)]
+                    None,
+                )?;
+                self.lower_computational_match_value_composed(
+                    builder,
+                    RoutedAnswer::direct(returned),
+                    eliminators,
+                )
+            }
+            LoweringOperand::Specialized(
+                mut callee @ Lowered::ComputationalRecursorClosure { .. },
+            ) => {
+                let checked_ih_invocation =
+                    self.mint_checked_computational_ih_instance(&mut callee)?;
+                let (base, boundary) =
+                    decompose_computational_recursor(LoweringOperand::Specialized(callee));
+                let (activation, invocation) =
+                    boundary.expect("recursor closure carries an invocation segment");
+                let recursive_unit_body = invocation.recursive_unit_body;
+                // `D5a` checkpoint 4 step 1 — read the retained source
+                // coordinates BEFORE the segment is installed, beside the
+                // existing pre-move field read. Both are facts of the
+                // invocation, so both are taken while it is still in hand
+                // rather than reconstructed afterwards.
+                let carried_coordinates = CarriedInvocationCoordinates::of(&invocation)?;
+                let current = active_recursor_frame(eliminators).ok_or_else(|| {
+                    unsupported(
+                        "ComputationalRecursor",
+                        "recursive producer invocation has no active continuation",
+                    )
+                })?;
+                let _resume = find_continuation_cursor(current, invocation.resume_cursor)
+                    .ok_or_else(|| {
+                        unsupported(
+                            "ComputationalRecursor",
+                            "recursive producer invocation cursor is not active",
+                        )
+                    })?;
+                if !recursor_invocation_is_checked(&invocation) {
+                    validate_recursor_invocation_segment(&invocation)?;
+                }
+                let dynamic_splice_edges = self.take_dynamic_splice_edges(&invocation)?;
+                let installed = compose_oriented_subcontinuation(
+                    self.oriented_subcontinuation_plan.as_ref(),
+                    checked_ih_invocation
+                        .or_else(|| self.active_recursive_invocations.last().copied()),
+                    activation,
+                    invocation,
+                    dynamic_splice_edges,
+                )?;
+                let mut composed = installed_oriented_eliminator_frames(&installed);
+                composed.push(EliminatorFrame::InvocationReturn);
+                // ⭐⭐ `AC-C4` — the carried residual resumes the SAME
+                // computational eliminator over the carried word, under
+                // the same semantic-region bracket the specialized
+                // `BoundedNat` arm below uses. ⛔ Not `specialized_at`,
+                // ⛔ not a reconstructed `Lowered`, ⛔ not the producer.
+                if let LoweringOperand::Carried(word) = base {
+                    if let Some(body) = recursive_unit_body {
+                        let inputs = args
+                            .iter()
+                            .enumerate()
+                            .map(|(position, arg)| {
+                                let arg =
+                                    self.child_occurrence(static_origin, 1 + position, arg)?;
+                                self.lower_expr(builder, arg, producer_env)
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        self.enter_oriented_semantic_region(installed.checked);
+                        let coordinates = carried_coordinates;
+                        let returned = self
+                            .call_declared_recursive_position_unit(
+                                builder,
+                                body,
+                                &inputs,
+                                Some(coordinates),
+                            )
+                            .and_then(|value| {
+                                self.lower_computational_match_value_composed(
+                                    builder,
+                                    RoutedAnswer::direct(value),
+                                    &composed,
+                                )
+                            });
+                        self.leave_oriented_semantic_region(installed.checked);
+                        let returned = returned?;
+                        return self.lower_computational_match_value_composed(
+                            builder,
+                            RoutedAnswer::direct(returned),
+                            eliminators,
+                        );
+                    }
+                    Self::reject_carried_residual_arguments(args.len())?;
+                    self.enter_oriented_semantic_region(installed.checked);
+                    let returned = self.lower_computational_match_value_composed(
+                        builder,
+                        RoutedAnswer::direct(LoweringOperand::Carried(word)),
+                        &composed,
+                    );
+                    self.leave_oriented_semantic_region(installed.checked);
+                    let returned = returned?;
+                    return self.lower_computational_match_value_composed(
+                        builder,
+                        RoutedAnswer::direct(returned),
+                        eliminators,
+                    );
+                }
+                let base = base.specialized_at("a recursor residual in a producer call")?;
+                if let Lowered::BoundedNat(predecessor) = base {
+                    if !args.is_empty() {
+                        return Err(unsupported(
+                            "BoundedNat",
+                            "structural Nat recursive hypothesis takes no arguments",
+                        ));
+                    }
+                    self.enter_oriented_semantic_region(installed.checked);
+                    let returned = self.lower_bounded_nat_computational(
+                        builder,
+                        predecessor,
+                        false,
+                        &composed,
+                    );
+                    self.leave_oriented_semantic_region(installed.checked);
+                    let returned = returned?;
+                    return self.lower_computational_match_value_composed(
+                        builder,
+                        RoutedAnswer::direct(returned),
+                        eliminators,
+                    );
+                }
+                let Lowered::Closure {
+                    captures,
+                    params,
+                    body,
+                } = base
+                else {
+                    return Err(unsupported(
+                        "ComputationalMatch",
+                        "recursive constructor field is not a closure",
+                    ));
+                };
+                if params.len() != args.len() {
+                    return Err(unsupported(
+                        "ComputationalMatch",
+                        format!(
+                            "recursive field expects {} args but call provides {}",
+                            params.len(),
+                            args.len()
+                        ),
+                    ));
+                }
+                let mut call_inputs = args
+                    .iter()
+                    .enumerate()
+                    .map(|(position, arg)| {
+                        let arg = self.child_occurrence(static_origin, 1 + position, arg)?;
+                        let lowered = self.lower_expr(builder, arg, producer_env)?;
+                        Ok(match lowered {
+                            LoweringOperand::Carried(word) => LoweringOperand::Carried(word),
+                            LoweringOperand::Specialized(value) => LoweringOperand::Carried(
+                                self.transfer_into_carrier(builder, arg.static_origin, &value)?,
+                            ),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                // Two roles, as above: ordered unit-call inputs, or the
+                // prefix of a lexical environment. Only the second
+                // crosses the binding authority.
+                call_inputs.extend(captures);
+                self.enter_oriented_semantic_region(installed.checked);
+                let returned = self.call_declared_unit(
+                    builder,
+                    body,
+                    &call_inputs,
+                    #[cfg(test)]
+                    None,
+                )?;
+                let returned = self.lower_computational_match_value_composed(
+                    builder,
+                    RoutedAnswer::direct(returned),
+                    &composed,
+                );
+                self.leave_oriented_semantic_region(installed.checked);
+                let returned = returned?;
+                self.lower_computational_match_value_composed(
+                    builder,
+                    RoutedAnswer::direct(returned),
+                    eliminators,
+                )
+            }
+            _ => Err(unsupported(
+                "ComputationalMatch",
+                "tree producer callee is not a closure",
+            )),
+        }
+    }
+
+    fn lower_computational_producer_match(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        static_origin: StaticOriginId,
+        scrutinee: &RuntimeExpr,
+        producer_cases: &[crate::RuntimeMatchCase],
+        producer_default: &RuntimeTrap,
+        producer_env: &[LoweringEnvironmentBinding],
+        eliminators: &[EliminatorFrame<'_>],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let scrutinee = self.child_occurrence(static_origin, 0, scrutinee)?;
+        let producer_route = self.process_object
+            && !self
+                .static_transition_plan
+                .checked_ih_environment_transport_source_identities()
+                .is_empty();
+        if producer_route {
+            let mut composed = Vec::with_capacity(eliminators.len() + 1);
+            composed.push(EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                cases: producer_cases,
+                default: producer_default,
+                env: producer_env,
+                static_origin,
+                retained_scrutinee_index: None,
+                deferred_constructor_case: None,
+            }));
+            composed.extend_from_slice(eliminators);
+            return self.lower_computational_producer_expr(
+                builder,
+                scrutinee,
+                producer_env,
+                &composed,
+            );
+        }
+        let selected = self.lower_expr(builder, scrutinee, producer_env)?;
+        if let LoweringOperand::Carried(word) = selected {
+            return self.lower_carried_match(
+                builder,
+                word,
+                producer_cases,
+                producer_default,
+                static_origin,
+                producer_env,
+                None,
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = selected {
+            let true_case = producer_cases
+                .iter()
+                .enumerate()
+                .find(|(_, case)| case.binders == 0 && case.constructor.ends_with("::Bool::True"));
+            let false_case = producer_cases
+                .iter()
+                .enumerate()
+                .find(|(_, case)| case.binders == 0 && case.constructor.ends_with("::Bool::False"));
+            let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
+                return Err(unsupported(
+                    "ComputationalMatch",
+                    "Bool tree producer requires True and False cases",
+                ));
+            };
+            if let Some(known) = known {
+                let (index, case) = if known { true_case } else { false_case };
+                self.disposition_statically_unselected_match_cases(static_origin, Some(index))?;
+                let body = self.case_body_occurrence(static_origin, index, &case.body)?;
+                return self.lower_computational_producer_expr(
+                    builder,
+                    body,
+                    producer_env,
+                    eliminators,
+                );
+            }
+            let join_plan = self.consumed_join_plan_token(static_origin)?;
+            let true_block = builder.create_block();
+            let false_block = builder.create_block();
+            let merge = join_plan
+                .has_continuing_predecessor
+                .then(|| builder.create_block());
+            if let Some(merge) = merge {
+                self.append_planned_join_params(builder, merge, &join_plan);
+            }
+            builder.ins().brif(value, true_block, &[], false_block, &[]);
+            let mut merge_kind = None;
+            for (block, (index, producer_case)) in
+                [(true_block, true_case), (false_block, false_case)]
+            {
+                builder.switch_to_block(block);
+                let body = self.case_body_occurrence(static_origin, index, &producer_case.body)?;
+                let lowered = self.lower_computational_producer_expr(
+                    builder,
+                    body,
+                    producer_env,
+                    eliminators,
+                )?;
+                if self.seal_source_trap_branch(builder, &lowered)? {
+                    continue;
+                }
+                let merge = merge.ok_or_else(|| {
+                    backend_module(
+                        "join plan omitted a producer Bool Match merge despite a \
+                         continuing predecessor"
+                            .to_string(),
+                    )
+                })?;
+                self.jump_planned_join_arm(
+                    builder,
+                    merge,
+                    &join_plan,
+                    body.static_origin,
+                    lowered,
+                    &mut merge_kind,
+                    "ComputationalMatch",
+                )?;
+            }
+            let Some(merge) = merge else {
+                let unreachable = builder.create_block();
+                builder.switch_to_block(unreachable);
+                return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                    producer_default.clone(),
+                )));
+            };
+            return self.finish_planned_join(
+                builder,
+                merge,
+                &join_plan,
+                merge_kind,
+                "ComputationalMatch",
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::HostResult {
+            success,
+            error,
+            ok,
+            err_constructor,
+            ok_constructor,
+        }) = selected
+        {
+            let join_plan = self.consumed_join_plan_token(static_origin)?;
+            let ok_block = builder.create_block();
+            let err_block = builder.create_block();
+            let merge = join_plan
+                .has_continuing_predecessor
+                .then(|| builder.create_block());
+            if let Some(merge) = merge {
+                self.append_planned_join_params(builder, merge, &join_plan);
+            }
+            builder.ins().brif(success, ok_block, &[], err_block, &[]);
+            let mut merge_kind = None;
+            for (block, constructor, payload) in [
+                (ok_block, ok_constructor.as_str(), *ok),
+                (err_block, err_constructor.as_str(), *error),
+            ] {
+                builder.switch_to_block(block);
+                let lowered = if let Some((index, producer_case)) =
+                    dynamic_host_result_producer_case(producer_cases, constructor)?
+                {
+                    let case_env = env_with([payload], producer_env);
+                    let body =
+                        self.case_body_occurrence(static_origin, index, &producer_case.body)?;
+                    self.lower_computational_producer_expr(builder, body, &case_env, eliminators)?
+                } else {
+                    LoweringOperand::Specialized(Lowered::Trap(producer_default.clone()))
+                };
+                if self.seal_source_trap_branch(builder, &lowered)? {
+                    continue;
+                }
+                let merge = merge.ok_or_else(|| {
+                    backend_module(
+                        "join plan omitted a producer HostResult merge despite a \
+                         continuing predecessor"
+                            .to_string(),
+                    )
+                })?;
+                self.jump_planned_join_arm(
+                    builder,
+                    merge,
+                    &join_plan,
+                    static_origin,
+                    lowered,
+                    &mut merge_kind,
+                    "ComputationalMatch",
+                )?;
+            }
+            let Some(merge) = merge else {
+                let unreachable = builder.create_block();
+                builder.switch_to_block(unreachable);
+                return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                    producer_default.clone(),
+                )));
+            };
+            return self.finish_planned_join(
+                builder,
+                merge,
+                &join_plan,
+                merge_kind,
+                "ComputationalMatch",
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) = selected {
+            return self.lower_dynamic_constructor_match(
+                builder,
+                dynamic,
+                DynamicConstructorContinuation::Producer {
+                    cases: producer_cases,
+                    default: producer_default,
+                    env: producer_env,
+                    static_origin,
+                    eliminators,
+                },
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::BoundedNat(nat)) = selected {
+            let frame = OrdinaryEliminatorFrame {
+                cases: producer_cases,
+                default: producer_default,
+                env: producer_env,
+                static_origin,
+                retained_scrutinee_index: None,
+                deferred_constructor_case: None,
+            };
+            let mut composed = Vec::with_capacity(eliminators.len() + 1);
+            composed.push(EliminatorFrame::Ordinary(frame));
+            composed.extend_from_slice(eliminators);
+            return self.lower_bounded_nat_computational(builder, nat, false, &composed);
+        }
+        if let LoweringOperand::Specialized(Lowered::StructuralNat(nat)) = selected {
+            let frame = OrdinaryEliminatorFrame {
+                cases: producer_cases,
+                default: producer_default,
+                env: producer_env,
+                static_origin,
+                retained_scrutinee_index: None,
+                deferred_constructor_case: None,
+            };
+            let mut composed = Vec::with_capacity(eliminators.len() + 1);
+            composed.push(EliminatorFrame::Ordinary(frame));
+            composed.extend_from_slice(eliminators);
+            return self.lower_bounded_nat_computational(
+                builder,
+                BoundedNatV1::derived_from_validated(nat.value),
+                true,
+                &composed,
+            );
+        }
+        let LoweringOperand::Specialized(Lowered::Constructor {
+            constructor, args, ..
+        }) = selected
+        else {
+            return Err(unsupported(
+                "ComputationalMatch",
+                "tree-producing match scrutinee is not Bool or a constructor",
+            ));
+        };
+        let Some((case_index, producer_case)) = producer_cases
+            .iter()
+            .enumerate()
+            .find(|(_, case)| case.constructor == constructor)
+        else {
+            self.disposition_statically_unselected_match_cases(static_origin, None)?;
+            return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                producer_default.clone(),
+            )));
+        };
+        self.disposition_statically_unselected_match_cases(static_origin, Some(case_index))?;
+        if producer_case.binders != args.len() {
+            return Err(unsupported(
+                "ComputationalMatch",
+                "tree-producing match constructor arity changed",
+            ));
+        }
+        #[cfg(test)]
+        record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
+            site: "bound_constructor_fields@producer-env",
+            eliminated_origin: static_origin,
+        });
+        let case_env = self.bound_constructor_fields(&args, producer_env)?;
+        let body = self.case_body_occurrence(static_origin, case_index, &producer_case.body)?;
+        self.lower_computational_producer_expr(builder, body, &case_env, eliminators)
+    }
+
+    fn lower_computational_producer_construct<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        static_origin: StaticOriginId,
+        constructor: &RuntimeSymbol,
+        args: &[RuntimeExpr],
+        producer_env: &[LoweringEnvironmentBinding],
+        eliminators: &[EliminatorFrame<'b>],
+        producer_tail: Option<&mut Option<ProducerTrampolineWork<'b>>>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let eliminator = eliminators[0];
+        let terminal_exit = constructor == &self.process_symbols.exit_success
+            || constructor == &self.process_symbols.exit_failure;
+        let itree_frame = match eliminator {
+            EliminatorFrame::Computational(frame) => frame
+                .cases
+                .iter()
+                .any(|case| case.constructor.contains("::ITree::")),
+            EliminatorFrame::Ordinary(frame) => frame
+                .cases
+                .iter()
+                .any(|case| case.constructor.contains("::ITree::")),
+            EliminatorFrame::PendingLet(_) => {
+                unreachable!("pending Let continuations are consumed before dispatch")
+            }
+            EliminatorFrame::InvocationReturn => false,
+            EliminatorFrame::Active(_) => false,
+        };
+        if terminal_exit && itree_frame {
+            let lowered_args = args
+                .iter()
+                .enumerate()
+                .map(|(position, arg)| {
+                    let arg = self.child_occurrence(static_origin, position, arg)?;
+                    self.lower_expr(builder, arg, producer_env)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            return Ok(LoweringOperand::Specialized(Lowered::Constructor {
+                constructor: constructor.clone(),
+                synthesized_identity: Some(
+                    self.static_transition_plan
+                        .constructor_symbol_identity(static_origin)?,
+                ),
+                // `D7` -- the allocation lane is the second fact resolved
+                // at the producer and carried with the template.
+                occurrence: Some(self.static_transition_plan.source_aggregate_occurrence(
+                    static_origin,
+                    PlannedAggregateShape::Constructor,
+                )?),
+                args: specialized_constructor_fields_at(&lowered_args, "a constructor argument")?,
+            }));
+        }
+        if matches!(eliminator, EliminatorFrame::InvocationReturn) {
+            let lowered_args = args
+                .iter()
+                .enumerate()
+                .map(|(position, arg)| {
+                    let arg = self.child_occurrence(static_origin, position, arg)?;
+                    self.lower_expr(builder, arg, producer_env)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+                unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "a terminal producer crossing has no destination emission owner",
+                )
+            })?;
+            if let Some(transport) = self
+                .static_transition_plan
+                .checked_ih_environment_transport_at(destination_owner, static_origin)?
+                .cloned()
+            {
+                let child_origin = self
+                    .static_transition_plan
+                    .child_static_origin(static_origin, transport.recursive_position() as usize)?;
+                if child_origin != transport.seat() {
+                    return Err(unsupported(
+                        "CheckedIhEnvironmentTransport",
+                        "a terminal transport's stable closure seat is not the recursive child being replaced",
+                    ));
+                }
+                let claimed = self.call_checked_ih_environment_transport(
+                    builder,
+                    &transport,
+                    &lowered_args,
+                    producer_env,
+                )?;
+                if !matches!(&claimed.answer.value, LoweringOperand::Carried(_)) {
+                    return Err(unsupported(
+                        "CheckedIhEnvironmentTransport",
+                        "a terminal checked-IH transport did not return the force-materialized carrier word",
+                    ));
+                }
+                return Ok(claimed.answer.value);
+            }
+            return if lowered_args
+                .iter()
+                .any(|argument| matches!(argument, LoweringOperand::Carried(_)))
+            {
+                Ok(LoweringOperand::Carried(
+                    self.transfer_constructor_operands(
+                        builder,
+                        static_origin,
+                        constructor,
+                        &lowered_args,
+                    )?,
+                ))
+            } else {
+                Ok(LoweringOperand::Specialized(Lowered::Constructor {
+                    constructor: constructor.clone(),
+                    synthesized_identity: Some(
+                        self.static_transition_plan
+                            .constructor_symbol_identity(static_origin)?,
+                    ),
+                    occurrence: Some(self.static_transition_plan.source_aggregate_occurrence(
+                        static_origin,
+                        PlannedAggregateShape::Constructor,
+                    )?),
+                    args: specialized_constructor_fields_at(
+                        &lowered_args,
+                        "a constructor argument",
+                    )?,
+                }))
+            };
+        }
+        if let EliminatorFrame::Active(active) = eliminator {
+            let lowered_args = args
+                .iter()
+                .enumerate()
+                .map(|(position, arg)| {
+                    let arg = self.child_occurrence(static_origin, position, arg)?;
+                    self.lower_expr(builder, arg, producer_env)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+                unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "an active producer crossing has no destination emission owner",
+                )
+            })?;
+            let transport = self
+                .static_transition_plan
+                .checked_ih_environment_transport_at(
+                    destination_owner,
+                    static_origin,
+                )?
+                .cloned()
+                .ok_or_else(|| {
+                    unsupported(
+                        "CheckedIhEnvironmentTransport",
+                        "an active constructor was routed around ordinary lowering but has no authorized transport edge",
+                    )
+                })?;
+            let child_origin = self
+                .static_transition_plan
+                .child_static_origin(static_origin, transport.recursive_position() as usize)?;
+            if child_origin != transport.seat() {
+                return Err(unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "an active transport's stable closure seat is not the recursive child being replaced",
+                ));
+            }
+            let claimed = self.call_checked_ih_environment_transport(
+                builder,
+                &transport,
+                &lowered_args,
+                producer_env,
+            )?;
+            return self.resume_active_continuation(builder, claimed.answer.value, active);
+        }
+        // `D3` retains the selected computational case facts: the
+        // claim at the producer occurrence below needs the case index
+        // and that case's ruled recursive positions, and re-selecting
+        // them later would be a second selection authority.
+        let mut selected_computational: Option<(StaticOriginId, usize, Vec<usize>)> = None;
+        let (case_body, argument_binder_offset) = match eliminator {
+            EliminatorFrame::Computational(eliminator) => {
+                let (case_index, case) = match eliminator
+                    .cases
+                    .iter()
+                    .enumerate()
+                    .find(|(_, case)| case.constructor == *constructor)
+                {
+                    Some(selected) => selected,
+                    None => {
+                        self.disposition_statically_unselected_match_cases(
+                            eliminator.static_origin,
+                            None,
+                        )?;
+                        return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                            eliminator.default.clone(),
+                        )));
+                    }
+                };
+                self.disposition_statically_unselected_match_cases(
+                    eliminator.static_origin,
+                    Some(case_index),
+                )?;
+                if case.argument_binders != args.len() {
+                    return Err(unsupported(
+                        "ComputationalMatch",
+                        format!(
+                            "case {} expects {} constructor arguments but value has {}",
+                            case.constructor,
+                            case.argument_binders,
+                            args.len()
+                        ),
+                    ));
+                }
+                let mut seen = BTreeSet::new();
+                for position in case.recursive_positions.iter().copied() {
+                    if !seen.insert(position) || position >= args.len() {
+                        return Err(unsupported(
+                            "ComputationalMatch",
+                            format!(
+                                "case {} has malformed recursive position {position}",
+                                case.constructor
+                            ),
+                        ));
+                    }
+                }
+                selected_computational = Some((
+                    eliminator.static_origin,
+                    case_index,
+                    case.recursive_positions.clone(),
+                ));
+                (
+                    self.case_body_occurrence(eliminator.static_origin, case_index, &case.body)?,
+                    case.recursive_positions.len(),
+                )
+            }
+            EliminatorFrame::Ordinary(eliminator) => {
+                let (case_index, case) = match select_ordinary_case(eliminator, constructor) {
+                    Ok(selected) => selected,
+                    Err(trap) => {
+                        self.disposition_statically_unselected_match_cases(
+                            eliminator.static_origin,
+                            None,
+                        )?;
+                        return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
+                    }
+                };
+                self.disposition_statically_unselected_match_cases(
+                    eliminator.static_origin,
+                    Some(case_index),
+                )?;
+                if case.binders != args.len() {
+                    return Err(unsupported(
+                        "Match",
+                        format!(
+                            "case {} expects {} binders but constructor has {} args",
+                            case.constructor,
+                            case.binders,
+                            args.len()
+                        ),
+                    ));
+                }
+                (
+                    self.case_body_occurrence(eliminator.static_origin, case_index, &case.body)?,
+                    0,
+                )
+            }
+            EliminatorFrame::PendingLet(_) => {
+                unreachable!("pending Let continuations are consumed before dispatch")
+            }
+            EliminatorFrame::InvocationReturn => {
+                unreachable!("invocation returns are consumed before dispatch")
+            }
+            EliminatorFrame::Active(_) => {
+                unreachable!("active continuation cursors do not consume constructors")
+            }
+        };
+
+        // The bridge eliminator's cases live in the selected case body
+        // itself (`immediate_binder_eliminator` matches only a body that
+        // IS a match), so that body's origin is their parent.
+        let bridge =
+            immediate_binder_eliminator(case_body.expr, argument_binder_offset, args.len());
+        let bridge =
+            bridge.filter(|(field, _)| requires_heterogeneous_deforestation(&args[*field]));
+
+        if let Some((field, consumer)) = bridge {
+            let lowered_prefix = args[..field]
+                .iter()
+                .enumerate()
+                .map(|(position, arg)| {
+                    let arg = self.child_occurrence(static_origin, position, arg)?;
+                    self.lower_expr(builder, arg, producer_env)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            if let Some(LoweringOperand::Specialized(Lowered::Trap(trap))) = lowered_prefix
+                .iter()
+                .find(|value| matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))))
+            {
+                return Ok(LoweringOperand::Specialized(Lowered::Trap(trap.clone())));
+            }
+
+            let splice_caller = active_recursor_frame(&eliminators[1..]);
+            let mut selected_ancestry = splice_caller
+                .map(|active| active.selected_ancestry.to_vec())
+                .unwrap_or_default();
+            if let EliminatorFrame::Computational(frame) = eliminator {
+                selected_ancestry.push(frame.provenance);
+            }
+            let mut pending: Vec<_> = eliminators[1..]
+                .iter()
+                .copied()
+                .filter(|frame| !matches!(frame, EliminatorFrame::Active(_)))
+                .collect();
+            if let Some(active) = splice_caller {
+                pending.extend_from_slice(active.pending);
+            }
+            let selected_active = ActiveContinuationFrame {
+                activation: self.mint_continuation_activation(),
+                cursor: self.mint_continuation_cursor(),
+                parent: splice_caller.and_then(|active| active.parent),
+                pending: &pending,
+                selected_ancestry: &selected_ancestry,
+                source_lineage: splice_caller
+                    .map(|active| active.source_lineage)
+                    .unwrap_or(&[]),
+                source_selected_cursor: splice_caller
+                    .and_then(|active| active.source_selected_cursor),
+                selected_scope: splice_caller.and_then(|active| active.selected_scope),
+            };
+            // ⭐ The prefix rebuilds the enclosing constructor's own
+            // **template** below (`outer_scrutinee`), so it is a
+            // specialized-only surface, not a spine edge.
+            let lowered_prefix =
+                specialized_operands_at(&lowered_prefix, "a deferred constructor prefix")?;
+            let deferred = DeferredConstructorCaseEnvironment {
+                constructor,
+                lowered_prefix: &lowered_prefix,
+                selected_field: field,
+                trailing_fields: &args[field + 1..],
+                construct_origin: static_origin,
+                producer_env,
+                outer_eliminator: eliminator,
+                splice_caller,
+                selected_active,
+            };
+            let mut composed = Vec::with_capacity(2);
+            composed.push(match consumer {
+                ImmediateBinderEliminator::Computational { cases, default } => {
+                    // `D8m` — which arm this composed site took, at the
+                    // one place that knows.
+                    #[cfg(test)]
+                    crate::cranelift_backend::lowering::record_d8m_bridge_arm(
+                        self.defining_function_id,
+                        crate::cranelift_backend::lowering::D8mBridgeArm::Computational,
+                    );
+                    EliminatorFrame::Computational(ComputationalEliminatorFrame {
+                        cases,
+                        default,
+                        env: &[],
+                        static_origin: case_body.static_origin,
+                        retained_scrutinee_index: None,
+                        deferred_constructor_case: Some(&deferred),
+                        provenance: self.mint_recursor_frame_provenance(),
+                        // `D8m` — an UNWRAPPED bridge stays all-None.
+                        // The source declared no frame here, so there is
+                        // none to preserve, and inventing one is exactly
+                        // what this checkpoint forbids.
+                        checked_frame_id: None,
+                        checked_invocation_id: None,
+                        checked_invocation_source: None,
+                        checked_invocation_depth: 0,
+                        answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
+                    })
+                }
+                // ⭐⭐ `D8m` — THE SOURCE FRAME, PRESERVED THROUGH THE
+                // BRIDGE.
+                //
+                // ⛔ Entered and consumed through the EXISTING pair, and
+                // only here, after the existing gates have already
+                // selected the bridge. That is deliberate: the
+                // consumption path is where the fingerprint agreement
+                // and the consumed-once law live, so routing through it
+                // means this adds no second validator and cannot drift
+                // from the one the direct path uses.
+                ImmediateBinderEliminator::CheckedComputational {
+                    frame_id,
+                    cases,
+                    default,
+                } => {
+                    #[cfg(test)]
+                    crate::cranelift_backend::lowering::record_d8m_bridge_arm(
+                        self.defining_function_id,
+                        crate::cranelift_backend::lowering::D8mBridgeArm::CheckedComputational,
+                    );
+                    self.enter_checked_subcontinuation_frame(frame_id)?;
+                    // ⛔ `D8m` — CONSUME WITH A SHAPE THE SOURCE MATCH
+                    // DOES NOT CARRY, under test only. Same marker, same
+                    // cases, one field of the default changed: the
+                    // consumption law must refuse, which is what makes
+                    // "the bridge is held to the match the marker
+                    // wrapped" a measured fact rather than a reading of
+                    // the call site.
+                    let consumed_default = default;
+                    #[cfg(test)]
+                    let foreign_default = RuntimeTrap {
+                        code: default.code.clone(),
+                        message: format!("{} foreign", default.message),
+                    };
+                    #[cfg(test)]
+                    let consumed_default = if d8m_foreign_consumed_shape() {
+                        &foreign_default
+                    } else {
+                        consumed_default
+                    };
+                    // ⭐ `D8m` — the SAME derivation the direct path
+                    // uses, whole. All four facts, not the id alone.
+                    let checked = self.checked_computational_frame(cases, consumed_default)?;
+                    // ⛔ `D8m` — SUPPRESS THE TRANSPORTED TUPLE, under
+                    // test only. The marker is still entered and
+                    // consumed above, so the plan side is untouched and
+                    // only the transport is withheld: the bridge then
+                    // carries what it carried before this checkpoint,
+                    // and the detached-frame refusal must come back.
+                    #[cfg(test)]
+                    let checked = if d8m_suppress_transported_tuple() {
+                        CheckedComputationalFrame {
+                            id: None,
+                            invocation_id: None,
+                            invocation_source: None,
+                            invocation_depth: 0,
+                        }
+                    } else {
+                        checked
+                    };
+                    EliminatorFrame::Computational(ComputationalEliminatorFrame {
+                        cases,
+                        default,
+                        env: &[],
+                        // ⛔ CHILD 0 of the marker occurrence, never the
+                        // wrapper's own origin. The marker names the
+                        // frame; the match IS the frame, and every
+                        // origin-keyed lookup downstream -- case bodies,
+                        // the planner's continuation origin -- must land
+                        // on the match.
+                        static_origin: {
+                            let wrapped = self
+                                .child_occurrence(case_body.static_origin, 0, case_body.expr)?
+                                .static_origin;
+                            // `D8m` — SUBSTITUTE THE WRAPPER'S OWN
+                            // OCCURRENCE, under test only. One node off,
+                            // and the only difference is which of two
+                            // nested occurrences downstream lookups key
+                            // on.
+                            #[cfg(test)]
+                            let wrapped = if d8m_wrapper_origin_substitution() {
+                                case_body.static_origin
+                            } else {
+                                wrapped
+                            };
+                            wrapped
+                        },
+                        retained_scrutinee_index: None,
+                        deferred_constructor_case: Some(&deferred),
+                        provenance: self.mint_recursor_frame_provenance(),
+                        checked_frame_id: checked.id,
+                        checked_invocation_id: checked.invocation_id,
+                        checked_invocation_source: checked.invocation_source,
+                        checked_invocation_depth: checked.invocation_depth,
+                        // ⛔ UNCHANGED. Checked-frame presence is an
+                        // identity fact, not a routing one; making it
+                        // move the answer route would make the two forms
+                        // of one source match lower differently.
+                        answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
+                    })
+                }
+                ImmediateBinderEliminator::Ordinary { cases, default } => {
+                    #[cfg(test)]
+                    crate::cranelift_backend::lowering::record_d8m_bridge_arm(
+                        self.defining_function_id,
+                        crate::cranelift_backend::lowering::D8mBridgeArm::Ordinary,
+                    );
+                    EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                        cases,
+                        default,
+                        env: &[],
+                        static_origin: case_body.static_origin,
+                        retained_scrutinee_index: None,
+                        deferred_constructor_case: Some(&deferred),
+                    })
+                }
+            });
+            composed.push(EliminatorFrame::Active(selected_active));
+            let selected = self.child_occurrence(static_origin, field, &args[field])?;
+            // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the candidates
+            // whose call seat this bridge bypasses, read from the plan's
+            // own binding query rather than reconstructed here.
+            let bypassed = match selected_computational.as_ref() {
+                None => Vec::new(),
+                Some((frame_origin, case_index, recursive_positions)) => {
+                    let mut bypassed = Vec::new();
+                    for position in recursive_positions.iter().copied() {
+                        if let Some(identity) =
+                            self.static_transition_plan.continuation_call_binding_for(
+                                static_origin,
+                                *frame_origin,
+                                u32::try_from(*case_index).map_err(|_| {
+                                    unsupported(
+                                        "ComputationalMatch",
+                                        "continuation alternative exhausted",
+                                    )
+                                })?,
+                                u32::try_from(position).map_err(|_| {
+                                    unsupported(
+                                        "ComputationalMatch",
+                                        "continuation recursive position exhausted",
+                                    )
+                                })?,
+                            )?
+                        {
+                            bypassed.push(identity);
+                        }
+                    }
+                    bypassed
+                }
+            };
+            // `D3` — the ordered causal observation at bridge ENTRY,
+            // recorded on EVERY run so the unmutated and armed arms are
+            // comparable at the same seat for the same identity.
+            #[cfg(test)]
+            for identity in &bypassed {
+                super::units::d3_record(super::units::D3Event::BridgeEntry {
+                    identity: identity.clone(),
+                    settled: self.d3_raw_settled(identity),
+                    pending_composed: self.d3_raw_pending_composed(identity),
+                });
+            }
+            // `D3` mutation 2 — settle on ENTRY, before the scope is
+            // known to have completed. Nothing else moves.
+            if super::units::d3_mutation()
+                == super::units::D3Mutation::MarkInlineBeforeBridgeCompletion
+            {
+                for identity in &bypassed {
+                    if !self.continuation_candidate_is_consumed(identity) {
+                        #[cfg(test)]
+                        super::units::d3_record(super::units::D3Event::Settle {
+                            identity: identity.clone(),
+                            disposition: super::units::CandidateDisposition::InlineNoCall,
+                            seat: super::units::D3Seat::BridgeEntry,
+                        });
+                        self.settle_continuation_candidate(
+                            identity,
+                            super::units::CandidateDisposition::InlineNoCall,
+                        )?;
+                    }
+                }
+            }
+            let outcome =
+                self.lower_computational_producer_expr(builder, selected, producer_env, &composed);
+            // **Settled only on `Ok`, and only while still unconsumed.**
+            // A bridge that is ENTERED and then fails is not an inline
+            // completion -- `D0` measured 25 such candidates and folding
+            // them in would manufacture members. And a candidate the
+            // bridge's own body went on to discharge is already settled,
+            // so the consumed test is what makes "unconsumed" a read of
+            // the ledger rather than an assumption about order.
+            let completed = match super::units::d3_mutation() {
+                // `D3` mutation 2 -- settle as though the scope had
+                // completed, whatever it actually did. Only this one
+                // bit moves; the settlement itself is the production
+                // one below.
+                super::units::D3Mutation::MarkInlineBeforeBridgeCompletion => true,
+                _ => outcome.is_ok(),
+            };
+            // `D3` — the ordered causal observation at bridge EXIT. The
+            // two feed reads are RAW, deliberately not routed through
+            // `continuation_candidate_is_consumed`: that is the
+            // function mutation 3 mutates, and an instrument reading
+            // through it would agree with the mutation instead of
+            // exposing it.
+            #[cfg(test)]
+            for identity in &bypassed {
+                super::units::d3_record(super::units::D3Event::BridgeExit {
+                    identity: identity.clone(),
+                    completed,
+                    settled: self.d3_raw_settled(identity),
+                    pending_composed: self.d3_raw_pending_composed(identity),
+                });
+            }
+            if completed {
+                for identity in &bypassed {
+                    if !self.continuation_candidate_is_consumed(identity) {
+                        #[cfg(test)]
+                        super::units::d3_record(super::units::D3Event::Settle {
+                            identity: identity.clone(),
+                            disposition: super::units::CandidateDisposition::InlineNoCall,
+                            seat: super::units::D3Seat::BridgeExit,
+                        });
+                        self.settle_continuation_candidate(
+                            identity,
+                            super::units::CandidateDisposition::InlineNoCall,
+                        )?;
+                    }
+                }
+            }
+            return outcome;
+        }
+
+        let lowered_args = args
+            .iter()
+            .enumerate()
+            .map(|(position, arg)| {
+                let arg = self.child_occurrence(static_origin, position, arg)?;
+                self.lower_expr(builder, arg, producer_env)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // `RT-CONTSPEC-ACTIVATE` `D3` — THE PRODUCER OCCURRENCE.
+        //
+        // Fields are lowered; nothing has been transferred into a
+        // carrier and the identity-erasing join has not run. This is
+        // the seat where the four-field selector's operands all exist
+        // and where the exact token is claimed at most once.
+        let mut continuation_result: Option<ClaimedContinuationResult> = None;
+        if let Some((frame_origin, case_index, recursive_positions)) =
+            selected_computational.as_ref()
+        {
+            // ---- `D3` — THE OUTER-REALIZATION DISPATCH, before any
+            // ---- ordinary continuation-call resolution or emission.
+            //
+            // `evt_2564nv6yqqs2q`. The field run above is complete and
+            // nothing has been emitted for this seat yet, which is the
+            // measured precondition the ruling turns on. An `R` identity
+            // is realized here, once, by calling the already-declared
+            // fused target; the fused function computes the whole
+            // composed region, so its result IS this seat's result and
+            // the eliminator below must not run over it a second time.
+            for position in recursive_positions.iter().copied() {
+                        if let Some(realized) = self
+                            .dispatch_fusion_owned_outer_realization(
+                                builder,
+                                static_origin,
+                                *frame_origin,
+                                *case_index,
+                                position,
+                                &lowered_args,
+                                producer_env,
+                            )?
+                        {
+                    return Ok(realized);
+                }
+            }
+            for position in recursive_positions.iter().copied() {
+                // `D9` — the WHOLE lowered field run is handed down; the
+                // ordinary run is assembled from the planner's envelope
+                // at the one seat that resolves the unit.
+                //
+                // ⛔ This site used to build the run itself, filtering
+                // out the recursive field, under a comment claiming
+                // *"worker captures follow in capture-ordinal order"*.
+                // They did not: nothing here or downstream appended
+                // them, so a continuation whose selected worker had
+                // captures was called with its declared parameter tail
+                // unfilled.
+                if let Some(returned) = self.claim_and_call_continuation(
+                    builder,
+                    static_origin,
+                    *frame_origin,
+                    *case_index,
+                    position,
+                    &lowered_args,
+                    producer_env,
+                    eliminators,
+                )? {
+                    // The call's own value is the result after the
+                    // consumed computational frame, and it is never
+                    // discarded: it is handed to the frame consumption
+                    // in place of the constructor that would have been
+                    // produced. Returning it directly here would skip
+                    // the frame's planned-join disposition, which the
+                    // emitter accounts for separately.
+                    continuation_result = Some(returned);
+                }
+            }
+        }
+        // A claimed continuation result replaces this producer
+        // constructor. Building the raw constructor first is both
+        // semantically dead and unsound for a functional recursive
+        // field: it offers the raw closure to boundary transfer before
+        // the call result can substitute it. A checked-IH transport
+        // adds the exact two-endpoint closure below; ordinary claimed
+        // continuations take the same no-eager-construction rule.
+        if let Some(claimed) = continuation_result.take() {
+            let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+                unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "a claimed continuation result reached a constructor with no emission owner",
+                )
+            })?;
+            if let Some(transport) = self
+                .static_transition_plan
+                .checked_ih_environment_transport(
+                    destination_owner,
+                    static_origin,
+                    claimed.recursive_position,
+                    claimed.identity.target(),
+                )?
+            {
+                let child_origin = self
+                    .static_transition_plan
+                    .child_static_origin(static_origin, transport.recursive_position() as usize)?;
+                if child_origin != transport.seat()
+                    || transport.destination_owner() != destination_owner
+                    || transport.destination_construct_origin() != static_origin
+                {
+                    return Err(unsupported(
+                        "CheckedIhEnvironmentTransport",
+                        "the authorized transport's stable closure seat or destination endpoint disagrees with the crossing being lowered",
+                    ));
+                }
+                if !matches!(&claimed.answer.value, LoweringOperand::Carried(_)) {
+                    return Err(unsupported(
+                        "CheckedIhEnvironmentTransport",
+                        "the force-materialized checked-IH environment did not return a carrier word to its authorized crossing",
+                    ));
+                }
+            }
+            return self.continue_composed_value(
+                builder,
+                claimed.answer,
+                eliminators,
+                producer_tail,
+            );
+        }
+
+        let produced = if lowered_args
+            .iter()
+            .any(|argument| matches!(argument, LoweringOperand::Carried(_)))
+        {
+            LoweringOperand::Carried(self.transfer_constructor_operands(
+                builder,
+                static_origin,
+                constructor,
+                &lowered_args,
+            )?)
+        } else {
+            LoweringOperand::Specialized(Lowered::Constructor {
+                constructor: constructor.clone(),
+                // Carry the plan's already-resolved source identity with
+                // the template.  A later unit boundary may receive this
+                // result after nested producer traversal, where the
+                // caller occurrence is not the constructor occurrence
+                // and therefore cannot lawfully re-query its atom.
+                synthesized_identity: Some(
+                    self.static_transition_plan
+                        .constructor_symbol_identity(static_origin)?,
+                ),
+                // `D7` -- the allocation lane is the second fact resolved
+                // at the producer and carried with the template.
+                occurrence: Some(self.static_transition_plan.source_aggregate_occurrence(
+                    static_origin,
+                    PlannedAggregateShape::Constructor,
+                )?),
+                args: specialized_constructor_fields_at(&lowered_args, "a constructor argument")?,
+            })
+        };
+        // `D6a` upstream half -- ordinary evaluation STARTS direct and
+        // the exact producer RAISES it. ⛔ Not a default written at the
+        // consumer: a site that hard-codes `DirectScrutinee` on a path an
+        // exact call result reaches would erase the fact being transported.
+        self.continue_composed_value(
+            builder,
+            RoutedAnswer::direct(produced),
+            eliminators,
+            producer_tail,
+        )
     }
 
     fn lower_bounded_nat_computational(
@@ -6758,6 +7365,7 @@ impl<'a> Lowering<'a> {
             producer_env,
             defining,
             defining_owner,
+            ContinuationOperandEnvironment::DirectEmission,
         )?;
         let worker_body = operands.body.worker_body_origin;
         let retargeted_worker_body = match (
@@ -6843,7 +7451,7 @@ impl<'a> Lowering<'a> {
         // `D3` — the ACTUAL eliminator stack at this seat, so the composition
         // closes against the real head rather than a remembered origin.
         eliminators: &[EliminatorFrame<'_>],
-    ) -> Result<Option<RoutedAnswer>, CraneliftBackendError> {
+    ) -> Result<Option<ClaimedContinuationResult>, CraneliftBackendError> {
         let alternative = u32::try_from(producer_alternative).map_err(|_| {
             unsupported("ComputationalMatch", "case index exceeds addressable range")
         })?;
@@ -6882,6 +7490,36 @@ impl<'a> Lowering<'a> {
         };
         #[cfg(test)]
         d5a_trace(format!("  CLAIM bound identity={identity:?}"));
+
+        let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "CheckedIhEnvironmentTransport",
+                "a continuation result crossing has no destination emission owner",
+            )
+        })?;
+        if let Some(transport) = self
+            .static_transition_plan
+            .checked_ih_environment_transport(
+                destination_owner,
+                producer_construct_origin,
+                position,
+                identity.target(),
+            )?
+            .cloned()
+        {
+            if transport.source_call_identity() != &identity
+                || transport.source_owner()
+                    != ContinuationEmissionOwner::Specialization(identity.target())
+            {
+                return Err(unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "the authorized transport's source endpoint is not the causal continuation target selected at this crossing",
+                ));
+            }
+            return self
+                .call_checked_ih_environment_transport(builder, &transport, fields, producer_env)
+                .map(Some);
+        }
         // `D1`/`D2` — settlement is NOT here. It sits inside
         // `claim_and_call_resolved_continuation`, which both direct consumption
         // seats funnel through. See the note there.
@@ -6893,7 +7531,326 @@ impl<'a> Lowering<'a> {
             producer_env,
             eliminators,
         )?;
-        Ok(Some(claimed))
+        Ok(Some(ClaimedContinuationResult {
+            identity,
+            recursive_position: position,
+            answer: claimed,
+        }))
+    }
+
+    fn call_checked_ih_environment_transport(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        transport: &CheckedIhEnvironmentTransport,
+        fields: &[LoweringOperand],
+        producer_env: &[LoweringEnvironmentBinding],
+    ) -> Result<ClaimedContinuationResult, CraneliftBackendError> {
+        let identity = transport.source_call_identity().clone();
+        if transport.source_owner() != ContinuationEmissionOwner::Specialization(identity.target())
+            || transport.source_specialization() != identity.target()
+        {
+            return Err(unsupported(
+                "CheckedIhEnvironmentTransport",
+                "the transport's source owner, source specialization and causal target are not one stable code identity",
+            ));
+        }
+        let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "CheckedIhEnvironmentTransport",
+                "an authorized transport was reached with no destination emission owner",
+            )
+        })?;
+        if destination_owner != transport.destination_owner() {
+            return Err(unsupported(
+                "CheckedIhEnvironmentTransport",
+                "the transport was consumed outside its exact destination owner",
+            ));
+        }
+        let defining = self.defining_unit.ok_or_else(|| {
+            unsupported(
+                "CheckedIhEnvironmentTransport",
+                "an authorized transport was reached outside a unit definition",
+            )
+        })?;
+        // The FuncRef is minted into this destination Function from the edge;
+        // it is never copied from the source Function. One source occurrence
+        // may be emitted in multiple mutually-exclusive runtime branches, so
+        // declaration lookup is reusable while the planner edge itself remains
+        // one exact two-endpoint authority.
+        let target = self
+            .function_local
+            .continuation_calls
+            .get(&identity)
+            .cloned()
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "the force-materialization target was not declared into the authorized transport destination",
+                )
+            })?;
+        let operands = self.assemble_continuation_call_operands(
+            &identity,
+            fields,
+            transport.recursive_position() as usize,
+            producer_env,
+            defining,
+            destination_owner,
+            ContinuationOperandEnvironment::CheckedIhTransport(transport.clone()),
+        )?;
+        let mut inputs = operands.ordinary;
+        inputs.extend(operands.continuation_inputs);
+        let (returned, call) = self.call_declared_unit_target(
+            builder,
+            target,
+            &inputs,
+            #[cfg(test)]
+            None,
+        )?;
+        self.function_local
+            .checked_ih_transport_emissions
+            .push((transport.clone(), call));
+        if !self.continuation_candidate_is_consumed(&identity) {
+            self.settle_continuation_candidate(
+                &identity,
+                super::units::CandidateDisposition::InlineNoCall,
+            )?;
+        }
+        Ok(ClaimedContinuationResult {
+            identity,
+            recursive_position: transport.recursive_position(),
+            answer: RoutedAnswer::checked(returned),
+        })
+    }
+
+    pub(super) fn call_checked_ih_transport_from_case_environment(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        transport: &CheckedIhEnvironmentTransport,
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let identity = transport.source_call_identity().clone();
+        let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "CheckedIhEnvironmentTransport",
+                "a checked-IH force transport has no destination emission owner",
+            )
+        })?;
+        if destination_owner != transport.destination_owner()
+            || transport.source_specialization() != identity.target()
+        {
+            return Err(unsupported(
+                "CheckedIhEnvironmentTransport",
+                "the checked-IH force transport disagrees with its source or destination endpoint",
+            ));
+        }
+        let unit = self
+            .static_transition_plan
+            .continuation_units()?
+            .into_iter()
+            .find(|unit| unit.id() == transport.source_specialization())
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "the transport source has no continuation unit",
+                )
+            })?;
+        let recursive_count = unit.recursive_positions().len();
+        let field_count = unit
+            .ordinary_envelope()?
+            .iter()
+            .filter(|role| {
+                matches!(
+                    role,
+                    ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField { .. }
+                )
+            })
+            .count()
+            .checked_add(recursive_count)
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "the transport source constructor field count overflowed",
+                )
+            })?;
+        let field_start = recursive_count;
+        let fields_end = field_start.checked_add(field_count).ok_or_else(|| {
+            unsupported(
+                "CheckedIhEnvironmentTransport",
+                "the transport source case environment range overflowed",
+            )
+        })?;
+        if env.len() < fields_end {
+            return Err(unsupported(
+                "CheckedIhEnvironmentTransport",
+                "the selected case environment is shorter than its IH prefix plus constructor field run",
+            ));
+        }
+        let selected_index = field_start
+            .checked_add(unit.recursive_position() as usize)
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "the selected recursive field index overflowed",
+                )
+            })?;
+        let selected_worker = match env.get(selected_index) {
+            Some(LoweringEnvironmentBinding::StaticWorker(worker)) => worker,
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))) => {
+                // The carried computational case projected this exact recursive
+                // field from the transported producer. Its carrier word is
+                // already the sole force-materialized environment; forcing the
+                // checked IH returns it directly and emits no second call or
+                // record.
+                if !self.continuation_candidate_is_consumed(&identity) {
+                    self.settle_continuation_candidate(
+                        &identity,
+                        super::units::CandidateDisposition::InlineNoCall,
+                    )?;
+                }
+                return Ok(LoweringOperand::Carried(*word));
+            }
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_))) | None => {
+                return Err(unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "the transport source case environment holds neither its selected static worker nor the already-transported environment word at the ruled recursive field",
+                ));
+            }
+        };
+        if selected_worker.closure_origin != transport.seat()
+            || selected_worker.body_origin != unit.worker_body_origin()
+            || selected_worker.declared_arity != unit.worker_declared_arity()
+            || selected_worker.captures.len() != unit.worker_capture_count()
+        {
+            return Err(unsupported(
+                "CheckedIhEnvironmentTransport",
+                "the selected worker binding disagrees with the transport's stable closure code identity",
+            ));
+        }
+
+        let envelope = unit.ordinary_envelope()?;
+        let mut ordinary = Vec::with_capacity(envelope.len());
+        let mut suffix = Vec::new();
+        for role in &envelope {
+            match role {
+                ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
+                    source_position,
+                } => {
+                    let binding = env
+                        .get(field_start + *source_position as usize)
+                        .ok_or_else(|| {
+                            unsupported(
+                                "CheckedIhEnvironmentTransport",
+                                "a nonrecursive transport field is outside the selected case environment",
+                            )
+                        })?;
+                    ordinary.push(
+                        binding
+                            .value_at("a checked-IH transport nonrecursive field")?
+                            .clone(),
+                    );
+                }
+                ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+                    ordinal, source, ..
+                } => {
+                    let ContinuationWorkerCaptureSource::Lexical(origin) = source else {
+                        return Err(unsupported(
+                            "CheckedIhEnvironmentTransport",
+                            "a checked-IH transport capture has no lexical source occurrence",
+                        ));
+                    };
+                    let capture = selected_worker
+                        .captures
+                        .get(*ordinal as usize)
+                        .cloned()
+                        .ok_or_else(|| {
+                            unsupported(
+                                "CheckedIhEnvironmentTransport",
+                                "a transport capture ordinal is outside the selected worker's capture run",
+                            )
+                        })?;
+                    suffix.push((*ordinal, *origin));
+                    ordinary.push(capture);
+                }
+            }
+        }
+        self.static_transition_plan
+            .validate_checked_ih_capture_suffix(
+                transport.source_owner(),
+                transport.seat(),
+                &suffix,
+            )?;
+
+        let inputs_view = unit.continuation_inputs()?;
+        if inputs_view.len() != transport.continuation_input_count() {
+            return Err(unsupported(
+                "CheckedIhEnvironmentTransport",
+                "the transport continuation-input morphism has the wrong arity",
+            ));
+        }
+        let mut continuation_inputs = Vec::with_capacity(inputs_view.len());
+        for input in inputs_view {
+            let destination = transport
+                .continuation_input_index(input.ordinal, input.coordinate)
+                .ok_or_else(|| {
+                    unsupported(
+                        "CheckedIhEnvironmentTransport",
+                        "the transport has no destination for one declared continuation input",
+                    )
+                })?;
+            let operand = match destination {
+                CheckedIhTransportInputDestination::LexicalEnvironment(index) => env
+                    .get(index as usize)
+                    .ok_or_else(|| {
+                        unsupported(
+                            "CheckedIhEnvironmentTransport",
+                            "a transport lexical destination is outside the selected case environment",
+                        )
+                    })?
+                    .value_at("a checked-IH transport continuation input")?
+                    .clone(),
+                CheckedIhTransportInputDestination::EntryFrame(slot) => self
+                    .function_local
+                    .defining_abi_operands
+                    .get(slot as usize)
+                    .cloned()
+                    .ok_or_else(|| {
+                        unsupported(
+                            "CheckedIhEnvironmentTransport",
+                            "a transport entry-frame destination is outside the current ABI frame",
+                        )
+                    })?,
+            };
+            continuation_inputs.push(operand);
+        }
+        ordinary.extend(continuation_inputs);
+        let target = self
+            .function_local
+            .continuation_calls
+            .get(&identity)
+            .cloned()
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "the checked-IH force target was not declared into the transport destination",
+                )
+            })?;
+        let (returned, call) = self.call_declared_unit_target(
+            builder,
+            target,
+            &ordinary,
+            #[cfg(test)]
+            None,
+        )?;
+        self.function_local
+            .checked_ih_transport_emissions
+            .push((transport.clone(), call));
+        if !self.continuation_candidate_is_consumed(&identity) {
+            self.settle_continuation_candidate(
+                &identity,
+                super::units::CandidateDisposition::InlineNoCall,
+            )?;
+        }
+        Ok(returned)
     }
 
     /// **`RT-DECL-CLOSURE-PORT` `D5a` — the claim/call machinery, factored to
@@ -7568,6 +8525,7 @@ impl<'a> Lowering<'a> {
         producer_env: &[LoweringEnvironmentBinding],
         defining: PredeclaredFunctionId,
         defining_owner: ContinuationEmissionOwner,
+        operand_environment: ContinuationOperandEnvironment,
     ) -> Result<ContinuationCallOperands, CraneliftBackendError> {
         // Capture slots come from the EXACT producer environment, addressed by
         // the projected `source_owner` + `source_abi_position`. ⛔
@@ -7688,6 +8646,7 @@ impl<'a> Lowering<'a> {
             ));
         }
         let mut ordinary = Vec::with_capacity(envelope.len());
+        let mut checked_capture_suffix = Some(Vec::new());
         // ⛔ Capture roles are consumed in ascending contiguous ordinal order
         // from zero. The envelope is a SEQUENCE, so two roles carrying swapped
         // ordinals is a different run, and taking each ordinal as it comes
@@ -7741,6 +8700,7 @@ impl<'a> Lowering<'a> {
                 ContinuationOrdinaryEnvelopeRole::WorkerCapture {
                     ordinal,
                     closure_origin,
+                    source,
                     ..
                 } => {
                     seen_capture = true;
@@ -7767,6 +8727,16 @@ impl<'a> Lowering<'a> {
                                  assemble a different call"
                             ),
                         ));
+                    }
+                    match source {
+                        ContinuationWorkerCaptureSource::Lexical(origin) => {
+                            if let Some(suffix) = checked_capture_suffix.as_mut() {
+                                suffix.push((*ordinal, *origin));
+                            }
+                        }
+                        ContinuationWorkerCaptureSource::Seed => {
+                            checked_capture_suffix = None;
+                        }
                     }
                     let capture = selected_captures.get(*ordinal as usize).ok_or_else(|| {
                         unsupported(
@@ -7797,6 +8767,14 @@ impl<'a> Lowering<'a> {
                     selected_captures.len()
                 ),
             ));
+        }
+        if let Some(suffix) = checked_capture_suffix {
+            self.static_transition_plan
+                .validate_checked_ih_capture_suffix(
+                    ContinuationEmissionOwner::Specialization(unit.id()),
+                    unit.worker_closure_origin(),
+                    &suffix,
+                )?;
         }
         // The final cardinality, against the continuation's own declared
         // ordinary-parameter count. ⛔ Checked against the DECLARATION rather
@@ -8035,8 +9013,21 @@ impl<'a> Lowering<'a> {
                 });
             }
         }
-        let mut resolved_slots: Vec<(ContinuationSourceCoordinate, u32)> = Vec::new();
-        for input in unit.continuation_inputs()? {
+        let mut resolved_slots: Vec<(
+            ContinuationSourceCoordinate,
+            CheckedIhTransportInputDestination,
+        )> = Vec::new();
+        let continuation_inputs_view = unit.continuation_inputs()?;
+        if let ContinuationOperandEnvironment::CheckedIhTransport(transport) = &operand_environment
+        {
+            if transport.continuation_input_count() != continuation_inputs_view.len() {
+                return Err(unsupported(
+                    "CheckedIhEnvironmentTransport",
+                    "the transport's source-to-destination input morphism and the target continuation's declared input run have different arities",
+                ));
+            }
+        }
+        for input in continuation_inputs_view {
             // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — present a producer-local
             // coordinate to this seam, so its refusal is measured rather than
             // merely written. ⛔ Applied BEFORE the domain match, because the
@@ -8148,15 +9139,32 @@ impl<'a> Lowering<'a> {
             // the value IS. Matching the halves separately lets a crossed pair
             // through whenever both halves are individually well-formed, which
             // is exactly the shape that reads as safe.
-            let immediate_slot = self.resolve_direct_emission_claim(
-                &input.requested_source_slot(),
-                input.availability,
-                defining_owner,
-                ContinuationDirectEmissionSeat {
-                    producer_result_origin: unit.producer_result_origin(),
-                    emission_origin: unit.producer_construct_origin(),
-                },
-            )?;
+            let destination = match &operand_environment {
+                ContinuationOperandEnvironment::DirectEmission => {
+                    CheckedIhTransportInputDestination::LexicalEnvironment(
+                        self.resolve_direct_emission_claim(
+                            &input.requested_source_slot(),
+                            input.availability,
+                            defining_owner,
+                            ContinuationDirectEmissionSeat {
+                                producer_result_origin: unit.producer_result_origin(),
+                                emission_origin: unit.producer_construct_origin(),
+                            },
+                        )?,
+                    )
+                }
+                ContinuationOperandEnvironment::CheckedIhTransport(transport) => transport
+                    .continuation_input_index(input.ordinal, input.coordinate)
+                    .ok_or_else(|| {
+                        unsupported(
+                            "CheckedIhEnvironmentTransport",
+                            format!(
+                                "the transport morphism has no destination environment coordinate for source input ordinal {} at {:?}",
+                                input.ordinal, input.coordinate,
+                            ),
+                        )
+                    })?,
+            };
             // `D3b` (re-cut) — INJECTIVITY, over the whole emission.
             //
             // ⭐ **The re-cut widens this law, and that is a consequence of the
@@ -8172,45 +9180,92 @@ impl<'a> Lowering<'a> {
             // place, and at least one of them would be emitted carrying the
             // other's operand. It is the consumption-side dual of the planner's
             // refusal of a coordinate present at two positions of the seat.
-            if let Some((seen, _)) = resolved_slots
-                .iter()
-                .find(|(_, slot)| *slot == immediate_slot)
-            {
+            if let Some((seen, _)) = resolved_slots.iter().find(|(_, held)| *held == destination) {
                 if *seen != input.coordinate {
                     return Err(unsupported(
                         "ContinuationSpecialization",
                         format!(
                             "two distinct continuation inputs of one emission resolve to the \
-                             same immediate slot {immediate_slot}: {seen:?} and {:?}. One \
-                             position cannot hold both values, so at least one would be emitted \
-                             carrying the other's operand",
+                             same destination {destination:?}: {seen:?} and {:?}. One position \
+                             cannot hold both values, so at least one would be emitted carrying \
+                             the other's operand",
                             input.coordinate
                         ),
                     ));
                 }
             }
-            resolved_slots.push((input.coordinate, immediate_slot));
-            let binding = producer_env.get(immediate_slot as usize).ok_or_else(|| {
-                unsupported(
-                    "ContinuationSpecialization",
-                    format!(
-                        "a continuation input names immediate slot {} outside the emitting \
-                             context's environment of {} bindings; note this is the IMMEDIATE \
-                             slot, whose meaning is fixed by the availability domain {:?} and \
-                             not by any root position beside it",
-                        immediate_slot,
-                        producer_env.len(),
-                        input.availability,
-                    ),
-                )
-            })?;
-            continuation_inputs.push(binding.value_at({
-                #[cfg(test)]
-                crate::cranelift_backend::lowering::record_d2k_owner_event(
-                    crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller { site: "core.rs continuation capture" },
-                );
-                "a continuation capture input"
-            })?.clone());
+            resolved_slots.push((input.coordinate, destination));
+            let operand = match (&operand_environment, destination) {
+                (
+                    ContinuationOperandEnvironment::DirectEmission,
+                    CheckedIhTransportInputDestination::LexicalEnvironment(immediate_slot),
+                ) => {
+                    let binding = producer_env.get(immediate_slot as usize).ok_or_else(|| {
+                        unsupported(
+                            "ContinuationSpecialization",
+                            format!(
+                                "a continuation input names immediate slot {} outside the emitting \
+                                 context's environment of {} bindings; note this is the IMMEDIATE \
+                                 slot, whose meaning is fixed by the availability domain {:?} and \
+                                 not by any root position beside it",
+                                immediate_slot,
+                                producer_env.len(),
+                                input.availability,
+                            ),
+                        )
+                    })?;
+                    binding.value_at({
+                        #[cfg(test)]
+                        crate::cranelift_backend::lowering::record_d2k_owner_event(
+                            crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller { site: "core.rs continuation capture" },
+                        );
+                        "a continuation capture input"
+                    })?.clone()
+                }
+                (
+                    ContinuationOperandEnvironment::DirectEmission,
+                    CheckedIhTransportInputDestination::EntryFrame(_),
+                ) => {
+                    return Err(unsupported(
+                        "ContinuationSpecialization",
+                        "the ordinary direct-emission resolver returned an entry-frame coordinate instead of an index into its lexical environment",
+                    ));
+                }
+                (
+                    ContinuationOperandEnvironment::CheckedIhTransport(_),
+                    CheckedIhTransportInputDestination::LexicalEnvironment(index),
+                ) => producer_env
+                    .get(index as usize)
+                    .ok_or_else(|| {
+                        unsupported(
+                            "CheckedIhEnvironmentTransport",
+                            format!(
+                                "the transport morphism names lexical environment index {index} outside the composed producer environment's {} bindings",
+                                producer_env.len(),
+                            ),
+                        )
+                    })?
+                    .value_at("a checked-IH transport continuation input")?
+                    .clone(),
+                (
+                    ContinuationOperandEnvironment::CheckedIhTransport(_),
+                    CheckedIhTransportInputDestination::EntryFrame(slot),
+                ) => self
+                    .function_local
+                    .defining_abi_operands
+                    .get(slot as usize)
+                    .cloned()
+                    .ok_or_else(|| {
+                        unsupported(
+                            "CheckedIhEnvironmentTransport",
+                            format!(
+                                "the transport morphism names entry-frame slot {slot} outside the destination's {} ABI operands",
+                                self.function_local.defining_abi_operands.len(),
+                            ),
+                        )
+                    })?,
+            };
+            continuation_inputs.push(operand);
         }
         // **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- CONSTRUCT THE GENERATED
         // CONTEXT'S FRAME, HERE, WHERE ITS FREE VARIABLES ARE LIVE.**
@@ -8416,6 +9471,7 @@ impl<'a> Lowering<'a> {
             producer_env,
             defining,
             defining_owner,
+            ContinuationOperandEnvironment::DirectEmission,
         )?;
         // `D5a` — whether THIS function retargeted the target's worker body to a
         // generated execution context, read from this function's own two tables.
@@ -8519,6 +9575,7 @@ impl<'a> Lowering<'a> {
             producer_env,
             defining,
             defining_owner,
+            ContinuationOperandEnvironment::DirectEmission,
         )?;
         let Some(EliminatorFrame::Computational(head)) = eliminators.first() else {
             return Err(unsupported(
@@ -8822,6 +9879,7 @@ impl<'a> Lowering<'a> {
             producer_env,
             defining,
             defining_owner,
+            ContinuationOperandEnvironment::DirectEmission,
         )?;
         // The direct call's operand run: the ordinary envelope followed by the
         // continuation inputs in ordinal order. The order is asserted by the
@@ -9079,6 +10137,17 @@ impl<'a> Lowering<'a> {
             edge.recursive_position,
             edge.identity.target()
         ));
+        if self
+            .static_transition_plan
+            .checked_ih_environment_transport_source(&edge.identity)
+            .is_some()
+            && matches!(&lowered, LoweringOperand::Carried(_))
+        {
+            // The source specialization's result is the sole materialized
+            // environment. It is the payload the transport call returns, not a
+            // producer constructor to eliminate again at this detached seat.
+            return Ok(lowered);
+        }
         // Contract 4, first clause: validate the specialized result's PLANNED
         // constructor identity and field run.
         //
@@ -10351,7 +11420,7 @@ impl<'a> Lowering<'a> {
     /// the static plan.  A carried child is stored unchanged; a specialized
     /// sibling crosses through the sole producer before both are joined in the
     /// same runtime node.
-    fn transfer_constructor_operands(
+    pub(super) fn transfer_constructor_operands(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         origin: StaticOriginId,
@@ -11673,6 +12742,8 @@ impl<'a> Lowering<'a> {
             }
             RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id,
+                kind,
+                binder_morphism,
                 body,
                 ..
             } => {
@@ -11680,6 +12751,8 @@ impl<'a> Lowering<'a> {
                 let body = self.child_occurrence(static_origin, 0, body)?;
                 self.enter_checked_computational_ih_invocation(
                     *call_template_id,
+                    *kind,
+                    *binder_morphism,
                     body.expr,
                     body.static_origin,
                 )?;
@@ -11974,6 +13047,7 @@ impl<'a> Lowering<'a> {
                         default,
                         static_origin,
                         env,
+                        None,
                     );
                 }
                 if let LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }) = lowered_scrutinee {
@@ -12516,11 +13590,24 @@ impl<'a> Lowering<'a> {
                         // consumed only by the application the plan issued it
                         // for. An ordinary selected-argument call reaching this
                         // seat with a marker pending leaves it pending.
-                        self.consume_checked_ih_marker_at_static_worker_call(
+                        let pending = self.pending_computational_ih_call;
+                        let disposition = self.consume_checked_ih_marker_at_static_worker_call(
                             u64::from(*index),
                             args.len(),
                             static_origin,
                         )?;
+                        if let Some(pending) = pending {
+                            if let Some(environment) = self
+                                .materialize_checked_ih_static_worker_application(
+                                    builder,
+                                    pending,
+                                    disposition,
+                                    &worker,
+                                )?
+                            {
+                                return Ok(environment);
+                            }
+                        }
                         return self.call_static_worker(
                             builder,
                             &worker,

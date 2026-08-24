@@ -860,6 +860,9 @@ fn every_variant_occurrence() -> Vec<(&'static str, RuntimeExpr)> {
             RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id: 5,
                 checked_occurrence_path: vec![1],
+                kind: crate::CheckedComputationalIHInvocationKind::OrdinaryApplication,
+                binder_morphism:
+                    crate::CheckedComputationalIHBinderMorphism::identity_for_test(0),
                 body: Box::new(leaf()),
             },
         ),
@@ -2110,6 +2113,8 @@ fn occurrence_exact_marker_fixture(
     let call_marker = RuntimeExpr::CheckedComputationalIHInvocation {
         call_template_id: 100,
         checked_occurrence_path: vec![30],
+        kind: crate::CheckedComputationalIHInvocationKind::OrdinaryApplication,
+        binder_morphism: crate::CheckedComputationalIHBinderMorphism::identity_for_test(0),
         body: Box::new(RuntimeExpr::Value(RuntimeValue::Int((2).into()))),
     };
     let slot_value = if duplicate_slot {
@@ -2358,11 +2363,7 @@ pub(super) fn expression_children(expr: &RuntimeExpr) -> Vec<&RuntimeExpr> {
             checked_occurrence_paths: _,
             body,
         } => vec![body],
-        RuntimeExpr::CheckedComputationalIHInvocation {
-            call_template_id: _,
-            checked_occurrence_path: _,
-            body,
-        } => vec![body],
+        RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => vec![body],
         RuntimeExpr::Value(_) => Vec::new(),
         RuntimeExpr::Var(_) => Vec::new(),
         RuntimeExpr::Let { value, body } => vec![value, body],

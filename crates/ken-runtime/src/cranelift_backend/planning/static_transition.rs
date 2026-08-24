@@ -112,10 +112,10 @@ use continuations::ContinuationProductionMutation;
 // this module, unchanged from before the move.
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use aggregates::{
-    AggregateOccurrenceId, AggregateOccurrenceProducer, PlannedAggregateAllocation,
-    PlannedAggregateOwnership, PlannedAggregateShape, SynthesizedAggregateNode,
-    SynthesizedAggregatePath, SynthesizedAggregateRole, SynthesizedAggregateRoot,
-    SynthesizedDynamicSet,
+    AggregateOccurrenceId, AggregateOccurrenceProducer, CheckedIhEnvironmentTransport,
+    CheckedIhTransportInputDestination, PlannedAggregateAllocation, PlannedAggregateOwnership,
+    PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
+    SynthesizedAggregateRole, SynthesizedAggregateRoot, SynthesizedDynamicSet,
 };
 use aggregates::lifetime_referent_affinity;
 #[cfg(test)]
@@ -539,6 +539,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// HAS a lowering accessor — the allocation lane is unreadable at the
     /// producer without it.
     aggregate_ownership: Vec<PlannedAggregateOwnership>,
+    /// The exact two-endpoint transports that carry a force-materialized
+    /// checked-IH environment to an escaping closure crossing. These reference
+    /// `aggregate_ownership`; they never issue a second record.
+    checked_ih_environment_transports: Vec<CheckedIhEnvironmentTransport>,
     /// `RT-DECL-CLOSURE-PORT` `D7`. One record per capability/argument seat of
     /// every admitted host effect occurrence. Read by lowering, which claims
     /// exactly one of these per seat it consumes.
@@ -576,17 +580,20 @@ fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetim
 }
 
 
-/// Every emission owner under which one effect seat's body may be lowered.
+/// Every emission owner under which an inline synthesized aggregate is built.
 ///
-/// A seat is always emitted by its own predeclared unit. It is ALSO emitted
-/// inside every generated specialization context whose selected worker body
-/// contains it — that is the `D5a` case, and those two emissions are different
-/// occurrences of the same static seat.
+/// A seat is emitted by its own predeclared unit. It is also emitted under each
+/// continuation specialization whose exact selected case body contains it.
+/// Those specialization bodies are the population lowering actually enters
+/// under `defining_emission_owner = Specialization(unit.id())`; generated
+/// continuation contexts are a narrower, post-hoc population and therefore
+/// cannot authorize these records.
 ///
-/// Both halves are enumerated so neither needs a default. A seat reached under
-/// an owner this misses has no record and refuses loudly at its allocation,
-/// which is the fail-closed direction.
-fn synthesized_seat_emission_owners(
+/// This authority applies to synthesized aggregates constructed inline at
+/// `seat`: host-result constructors and unit-boundary environments. A checked-IH
+/// environment is force-emitted at a different seat and uses its explicit force
+/// relation instead.
+fn inline_synthesized_seat_emission_owners(
     plan: &StaticTransitionPlan<'_>,
     seat: StaticOriginId,
 ) -> Result<Vec<ContinuationEmissionOwner>, CraneliftBackendError> {
@@ -594,11 +601,27 @@ fn synthesized_seat_emission_owners(
     if let Some(predeclared) = plan.semantic.function_owner(seat)? {
         owners.push(ContinuationEmissionOwner::Predeclared(predeclared));
     }
-    for context in &plan.continuation_contexts {
-        if occurrence_subtree_contains(plan, context.worker_body_origin, seat)? {
-            owners.push(ContinuationEmissionOwner::Specialization(
-                context.enclosing_specialization,
+    for unit in plan.continuation_units()? {
+        let frame = plan.planned_occurrence_expr(unit.continuation_origin())?;
+        let RuntimeExpr::ComputationalMatch { cases, .. } = frame else {
+            return Err(planner_error(
+                "a continuation specialization's continuation origin is not a computational \
+                 frame, so its emitted body cannot be identified",
             ));
+        };
+        let alternative = unit.producer_alternative() as usize;
+        if cases.get(alternative).is_none() {
+            return Err(planner_error(
+                "a continuation specialization's selected alternative is outside its \
+                 computational frame",
+            ));
+        }
+        let body_position = alternative
+            .checked_add(1)
+            .ok_or_else(|| planner_capacity_error("continuation case position overflows"))?;
+        let body = plan.semantic.child_origin(unit.continuation_origin(), body_position)?;
+        if occurrence_subtree_contains(plan, body, seat)? {
+            owners.push(ContinuationEmissionOwner::Specialization(unit.id()));
         }
     }
     owners.sort();
@@ -964,6 +987,9 @@ mod tests {
                 RuntimeExpr::CheckedComputationalIHInvocation {
                     call_template_id: call,
                     checked_occurrence_path: path,
+                    kind: crate::CheckedComputationalIHInvocationKind::OrdinaryApplication,
+                    binder_morphism:
+                        crate::CheckedComputationalIHBinderMorphism::identity_for_test(0),
                     body: Box::new(body),
                 }
             } else {
@@ -1448,6 +1474,8 @@ mod tests {
             RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id,
                 checked_occurrence_path,
+                kind,
+                binder_morphism,
                 body,
             } => RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id: if cause == D2jCause::Invocation {
@@ -1456,6 +1484,8 @@ mod tests {
                     call_template_id
                 },
                 checked_occurrence_path,
+                kind,
+                binder_morphism,
                 body: Box::new(d2j_rewrite_body(*body, cause, in_case_body)),
             },
             RuntimeExpr::ComputationalMatch {
