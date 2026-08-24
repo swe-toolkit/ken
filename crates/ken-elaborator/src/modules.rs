@@ -1644,21 +1644,20 @@ fn prebind_scope_declarations(
     prelude_names: &HashSet<String>,
 ) -> Result<(), ElabError> {
     // Collect locals before imports so collisions are source-order independent.
-    // Keep these strict-only constructor/class temporaries out of
-    // `expand_scope`'s long-lived frame: elaborating large application spines
-    // is intentionally recursive and must retain the legacy stack budget.
+    // This persistent module scope is separate from `expand_scope`'s recursive
+    // application-spine frames, so local constructor/class binding is identical
+    // in legacy and strict resolution without spending the legacy stack budget.
     for decl in decls {
         let inner = decl.unwrap_pub();
-        let strict_unqualified_local =
-            scope.mode == ResolutionMode::Strict && matches!(inner, Decl::ClassDecl { .. });
-        if !is_qualifiable(inner) && !strict_unqualified_local {
+        let unqualified_local = matches!(inner, Decl::ClassDecl { .. });
+        if !is_qualifiable(inner) && !unqualified_local {
             continue;
         }
         if matches!(inner, Decl::AttachedProofDecl { .. }) {
             continue;
         }
         let bare = inner.name().to_string();
-        let qualified = if strict_unqualified_local {
+        let qualified = if unqualified_local {
             bare.clone()
         } else {
             qualify(prefix, &bare)
@@ -1671,9 +1670,6 @@ fn prebind_scope_declarations(
             });
         }
         scope.bind_local(&bare, &qualified, inner.span())?;
-        if scope.mode != ResolutionMode::Strict {
-            continue;
-        }
         match inner {
             Decl::DataDecl { ctors, .. } => {
                 for ctor in ctors {

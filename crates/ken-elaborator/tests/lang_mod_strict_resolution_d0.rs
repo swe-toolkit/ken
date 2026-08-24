@@ -373,9 +373,25 @@ fn catalog_ambient_passthrough_migration_census() {
 
     let expected = vec![
         (
+            "Algorithm.Numeric.Gcd".to_string(),
+            ["Equal", "Nat", "Proved", "Suc", "Zero"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        ),
+        (
             "Capability.Console.Text".to_string(),
             [
                 "IO", "IOError", "Result", "Stderr", "Stdout", "Unit", "write",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
+            "Capability.Diagnostics.Core".to_string(),
+            [
+                "Bottom", "Equal", "Nat", "None", "Option", "Prop", "Some", "Suc", "Top", "Zero",
             ]
             .into_iter()
             .map(str::to_string)
@@ -489,6 +505,48 @@ fn catalog_ambient_passthrough_migration_census() {
                 .map(str::to_string)
                 .collect(),
         ),
+        (
+            "Core.Logic.EmptyDec".to_string(),
+            ["Dec", "Empty", "Equal", "IsTrue", "No", "Proved", "Yes"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        ),
+        (
+            "Data.Numeric.Nat.Arithmetic".to_string(),
+            ["Equal", "Nat", "Proved", "Suc", "Zero"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        ),
+        (
+            "Data.Sums.Combinators".to_string(),
+            [
+                "Equal", "Err", "None", "Ok", "Option", "Proved", "Result", "Some",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
+            "Tooling.Testing.Property".to_string(),
+            [
+                "Err", "MkUnit", "Nat", "None", "Ok", "Option", "Result", "Some", "Suc", "Unit",
+                "Zero",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
+            "Tooling.Verification.FoKripke".to_string(),
+            [
+                "Bottom", "Equal", "Nat", "None", "Option", "Proved", "Some", "Suc", "Zero",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
     ];
     assert_eq!(
         census, expected,
@@ -505,6 +563,7 @@ fn catalog_ambient_passthrough_migration_census() {
         .map(|(entry, _)| entry.clone())
         .collect::<BTreeSet<_>>();
     let expected_clean = [
+        "Core.Logic.Or",
         "Core.Logic.Transport",
         "Tooling.Verification.ProofErasureBoundaryChecker",
     ]
@@ -512,12 +571,10 @@ fn catalog_ambient_passthrough_migration_census() {
     .map(str::to_string)
     .collect::<BTreeSet<_>>();
     let expected_residuals = [
-        "Algorithm.Numeric.Gcd",
         "Algorithm.Sorting.InsertionSort",
         "Application.CommandLine.ArgParse",
         "Application.Configuration.Decoder",
         "Application.Input.Schema",
-        "Capability.Diagnostics.Core",
         "Capability.Diagnostics.Render",
         "Capability.Filesystem.Path.Posix",
         "Capability.Formatting.Doc",
@@ -530,22 +587,16 @@ fn catalog_ambient_passthrough_migration_census() {
         "Core.Classes.EffectfulClasses",
         "Core.Classes.LawfulClasses",
         "Core.Classes.LawfulFunctors",
-        "Core.Logic.EmptyDec",
-        "Core.Logic.Or",
         "Data.Binary.BytesKeys",
         "Data.Collections.Derived",
         "Data.Collections.Map",
         "Data.Collections.NonEmpty",
-        "Data.Numeric.Nat.Arithmetic",
         "Data.Numeric.Nat.Order",
         "Data.Serialization.Json",
-        "Data.Sums.Combinators",
         "Data.Sums.Validation",
         "Data.Text.Codec",
         "Data.Text.StringBijection",
         "Data.Text.StringKeys",
-        "Tooling.Testing.Property",
-        "Tooling.Verification.FoKripke",
     ]
     .into_iter()
     .map(str::to_string)
