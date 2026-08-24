@@ -35,6 +35,39 @@ functional-IH representation at the lowering/construction layer; M4 wires that
 representation into the boundary-transfer seam for the rows that still refuse
 there after M6.
 
+## Architect disposition (evt_2dnst700ynbeh) — crossing discharged
+
+The M4 crossing mechanism was BUILT and VALIDATED at WIP `422310a32`: the two
+direct-result `px8l_recursive_decl_native` rows cross honestly (the `boundary.rs`
+Closure refusal is gone, native construction succeeds, both production closure
+arms byte-untouched, captures project faithfully). Both then red only at
+EXECUTION on a newly-exposed trap (`malformed borrowed process input`,
+`object_linker_packaging.rs:2221` value -1). The Architect ruled that trap a
+DISTINCT execution-parity successor, NOT unfinished M4 — M4's closure-crossing
+contract is discharged. The successor is
+[[RT-BORROWED-INPUT-CARRIER-DURABILITY]] (Steward-framed).
+
+This SUPERSEDES deliverable 3 / AC-GREEN below with the permitted continuation:
+
+- **M4 must NOT retain the borrowed-input mechanism in scope.** M4's contract is
+  the crossing DECISION; `emit_carrier_tag` / borrowed-input durability is the
+  successor's, on the shared carried-value path.
+- **Widen to the full censused checked-continuation population** (deliverable 2
+  applies to all four census rows, not only the two started), and for each
+  measure whether it crosses AND greens end-to-end — a row's capture shape may
+  or may not hit the borrowed-input seam.
+- **Re-point, do not un-ignore, the carry-forward rows.** Any censused row that
+  crosses but reds ONLY at the borrowed-input execution seam re-points its
+  `#[ignore]` string to [[RT-BORROWED-INPUT-CARRIER-DURABILITY]] as owner —
+  exactly as M6 re-pointed `rt_write_writable_stage` to M3. An honest advancing
+  refusal, not a regression; do not un-ignore it.
+- **Un-ignore ONLY rows that cross AND green end-to-end.** Those land green.
+- **M4 is landable as accepted work per COORDINATION section 8a** even if some
+  rows carry forward to the successor: the crossing mechanism plus the honest
+  re-points is a complete M4 deliverable. Any row that stays red at a NEW seam
+  beyond the borrowed-input trap is still a stop-and-report to Architect +
+  Steward.
+
 ## Why the population must be CENSUSED, not inherited (measured @ `011bf2a95`)
 
 The node's 2026-08-22 population citations are STALE and must not be frozen into
