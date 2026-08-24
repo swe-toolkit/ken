@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-24 18:56:44Z — from 438 issue file(s) in `docs/program/issues/`.
+2026-08-24 20:32:12Z — from 439 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -240,6 +240,7 @@ the committed file matches the generator's output.
 | `RT-BACKEND-SPLIT-CENSUS` | Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves | merged | runtime | M | none | — |
 | `RT-BACKEND-SPLIT-CLOSURE` | Close the backend module split -- delete the transitional adapters, narrow the facades, run the test-root closure over control.rs, and prove all four bound files are under 10k | merged | runtime | M | none | — |
 | `RT-BODY-OCCURRENCE-PROVENANCE` | Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree | merged | runtime | M | none | — |
+| `RT-BORROWED-INPUT-CARRIER-DURABILITY` | Execution-parity successor — give a borrowed process input (BorrowedOpaque) a durable carrier representation on the generic carried-value path, so a capture that crosses the closure boundary does not trap at run with `malformed borrowed process input` (object_linker_packaging.rs:2221, native stub value -1) | draft | runtime | M | none | — |
 | `RT-BOUNDARY-IGNORED-CORPUS-MEASURE` | Read unit_boundary_environment_fields on the six ignored closure-at-boundary tests, the population the merged measurement's own selection rule excluded | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2381 |
 | `RT-BRANCH-LOCAL-DECLARED-CALLABLE` | recursive_position_unit_body returns one Option<StaticOriginId> for the whole source, so whole-source agreement is too coarse for a Match whose arms differ -- the cut is constructor-and-recursive-position-specific callable authority installed inside the already-selected constructor case, which eliminates the closure crossing rather than opening a durable closure lane | merged | runtime | L | none | — |
 | `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` | Port the recursive-unit-body resolution through a branched scrutinee -- recursive_position_unit_body returns None whenever the scrutinee is a plain Match rather than a literal Construct, so a carried child whose owning form branches has no declared body unit and every consumer falls back to refusal | merged | runtime | M | none | — |
@@ -542,6 +543,7 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
+- `RT-BORROWED-INPUT-CARRIER-DURABILITY` blocked by `RT-CLOSURE-BOUNDARY-RESIDUAL` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
