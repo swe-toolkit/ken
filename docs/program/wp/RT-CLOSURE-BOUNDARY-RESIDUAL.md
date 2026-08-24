@@ -107,6 +107,36 @@ Permitted continuation (M4's surface — no successor, no widening):
   retired-flat path. M4 lands per COORDINATION section 8a; the Architect reviews
   the candidate at soundness.
 
+## Fourth-stop disposition (Architect hold evt_7vxzx3b82k7kk; Steward partial-land)
+
+After the third-stop split, `px8ta` HALF B
+(`px8ds_real_same_depth_path_runs_exact_edges`) runs independently and STILL
+reaches the generic Closure refusal — the ordinary plan's own remaining
+crossing, not control contamination. It fails M4's crossing by the PREDICATE'S
+DESIGN, grounded by the Architect: HALF B's checked continuation is over a
+self-recursive producer (`countdown` calls itself), instantiated as TWO
+same-depth sibling IH instances, and applied as a bind continuation — so it is
+not structurally contained in the emitted owner's result value, and M4's
+capture-only single-static-descriptor model has no single descriptor for a
+multi-instance same-depth recursive continuation. Not a mechanism bug.
+
+The Architect HOLDS the same-contract-vs-successor ruling under its §1a trigger
+(fourth hard-stop, a representation-scope fork), pending a research prior-art
+advisory (Research picked it up, evt_64rxg73jq6651); its leaning is
+distinct-successor. HALF B stays ignored + re-pointed to this node (M4) as
+holding owner; no M4 extension may be attempted while the advisory is out.
+
+Steward framing call: LAND THE PROVEN PARTIAL NOW (COORDINATION section 8a). The
+proven mechanism — the px8f/px8l crossing + honest re-points (px8f→M3,
+2×px8l→borrowed-input) + the px8ta split (HALF A independent rejection control) +
+any genuinely cross-and-green un-ignores — assembles into an accepted-partial
+candidate and lands, with the recursive-continuation population (HALF B + any
+sibling rows sharing its shape) carried forward. On landing, M4's node goes
+`active` (authorized partial, holding owner), NOT `merged`. When the Architect's
+post-research ruling lands: distinct-successor ⇒ HALF B re-points to the new node
+and M4 closes `merged`; same-contract ⇒ M4 takes a follow-up increment. HALF B
+does not gate the proven mechanism.
+
 ## Why the population must be CENSUSED, not inherited (measured @ `011bf2a95`)
 
 The node's 2026-08-22 population citations are STALE and must not be frozen into
