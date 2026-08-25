@@ -72,6 +72,27 @@ representation. The predicate was already named; this is its measured
 confirmation, and it strengthens the unification (one checked program manifests
 it at multiple seams) rather than fracturing it.
 
+Entry 2 (measured 2026-08-25, Architect umbrella arm(b) object read at merged
+`d9bc68db0`, evt_7jpt4hm2nm6hh): px8ta CLOSES (its driving row reaches successful
+terminal observation) but the FOUR full-program witnesses do NOT — three semantic
+blockers remain, NOT an un-ignore-only residual (the px8ds 256 MiB policy is
+unrelated). The remaining lane-1 critical path, in Architect-recommended order:
+- SemanticErrorV1 (both positioned parity rows red `RuntimeTrap(4)` / `explicit
+  entry trap` instead of `InvalidOffset`): a generated-unit failure identity is
+  collapsed to a global scalar at the root trap-exit authority
+  (`calls.rs:2075-2090`, `identity_preserved: false`, `return -4`; plus the earlier
+  `-3` alias) -> [[RT-UNIT-FAILURE-STATUS-PROVENANCE]] recut as the structural
+  closure. FRAME FIRST (restores the identity needed to name the next object).
+- ReadSome/Wrote (both px8f rows stop at object emission): retained body
+  `StaticOriginId(1236)` has no graph-derived call target
+  (`calls.rs:1631-1640`, `call_declared_unit`) ->
+  [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]], now M3-unblocked. SECOND; MUST NOT
+  co-run with the first (both touch `calls.rs`).
+- ReadEof: no executing native closure witness today (the `rt_cap41` stages are
+  unselected by any Rust test) -> a final closure/un-ignore/CI-rearm fold, framed
+  after the two objects land plus a fresh four-value object read.
+The lane-1 headline is NOT done; PX8 stays blocked.
+
 ## Closure condition (when PX8 re-verifies + closes)
 
 On the NATIVE backend, a checked positioned/partial-IO program reifies each of
