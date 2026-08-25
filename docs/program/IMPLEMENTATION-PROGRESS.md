@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-25 02:17:47Z — from 441 issue file(s) in `docs/program/issues/`.
+2026-08-25 02:48:50Z — from 441 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -170,7 +170,7 @@ the committed file matches the generator's output.
 | `LANG-MOD-OR-CANONICAL-HOME` | Or arm (b), NODE B — author Core.Logic.Or (data Or (a:Omega)(b:Omega):Type with Inl/Inr, field-for-field the prelude shape), migrate every checked-source consumer to import it, and retire the Rust prelude Or/Inl/Inr registration so exactly one catalog Or identity exists | merged | language | L | none | — |
 | `LANG-MOD-OR-OMEGA-PARAM-ELAB` | Or arm (b), NODE A (prerequisite) — teach explicit-data parameter/index elaboration to honor an Omega-sorted binder, so a catalog package can declare Or : Omega -> Omega -> Type; the result-sort admission is unchanged, preserving the ban on proof-relevant multi-constructor Omega-valued families | merged | language | S | none | — |
 | `LANG-MOD-PUB-ELIGIBILITY` | WP-3 — semantic gate rejecting pub on ineligible placements with a surface diagnostic; pub proof retains the subject-must-be-public rule | merged | language | M | none | — |
-| `LANG-MOD-STRICT-RESOLUTION` | WP-2 — strict root-loaded resolution: a bare name in a loader-built scope resolves only through locals, explicit imports, kernel vocabulary, and the closed prelude floor; no fall-through to arbitrary program globals (the soundness core) | ready | language | L | none | — |
+| `LANG-MOD-STRICT-RESOLUTION` | WP-2 — strict root-loaded resolution: a bare name in a loader-built scope resolves only through locals, explicit imports, kernel vocabulary, and the closed prelude floor; no fall-through to arbitrary program globals (the soundness core) | merged | language | L | none | — |
 | `LANG-MODULE-IMPORT-SYSTEM` | Module/import capability campaign — declaration visibility (public export), a selective-import surface, and cross-package plus prelude symbol resolution, sufficient for catalog packages to reuse canonical modules instead of reimplementing them | draft | language | XL | none | — |
 | `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` | `ken-cli` native production runs `px4b_native_production` at effectively zero stack margin -- base passes with a few hundred bytes to spare, so any candidate adding a few hundred bytes aborts it, and `98e6ac51` is the trigger that exposed this rather than its cause | merged | language | M | none | — |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
@@ -493,7 +493,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
-- `LANG-MOD-STRICT-RESOLUTION` — WP-2 — strict root-loaded resolution: a bare name in a loader-built scope resolves only through locals, explicit imports, kernel vocabulary, and the closed prelude floor; no fall-through to arbitrary program globals (the soundness core)
 - `LANG-SYMBOLIC-OPERATOR-NAMES` — `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all

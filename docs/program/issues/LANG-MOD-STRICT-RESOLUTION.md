@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-STRICT-RESOLUTION
 title: "WP-2 — strict root-loaded resolution: a bare name in a loader-built scope resolves only through locals, explicit imports, kernel vocabulary, and the closed prelude floor; no fall-through to arbitrary program globals (the soundness core)"
-status: ready
+status: merged
 owner: language
 size: L
 gate: none
@@ -11,16 +11,22 @@ github: null
 origin: "Architect component framing evt_hpnhqy1ex286 (WP-2), keying REVISED to strict-all-root-loaded in evt_xtscdw8r3q3k, under [[LANG-MODULE-IMPORT-SYSTEM]]. Steward-filed per COORDINATION section 2, 2026-08-23. RELEASED 2026-08-23 (WP-3 merged c39024f50; language ring clear; ring order WP-1->WP-3->WP-2)."
 ---
 
-> # RELEASED 2026-08-23 — module/import WP-2 (soundness core; D0 probe FIRST)
+> # MERGED — delivered inside the module/import realization; node reconcile 2026-08-25
 >
-> Full frame: `docs/program/wp/LANG-MOD-STRICT-RESOLUTION.md`, fixed inputs at
-> `origin/main c39024f50` (WP-3 merged; language ring clear). Rides on
-> [[LANG-MOD-LOADER-ENTRY]] (landed). Strict resolution is keyed
-> strict-all-root-loaded (Architect `evt_xtscdw8r3q3k`). This is the WP the
-> Architect reviews hardest; D0 is a buildability/census probe that flips no
-> enforcement and is releasable/mergeable independently. The D1 strict flip
-> co-gates with WP-4's catalog census migration (AC-CO-GATE), and WP-4 is
-> additionally gated on the Or/Inl/Inr fork the operator owes.
+> WP-2's substance (D0 census + D1 strict enforcement) shipped as ancestors of
+> `origin/main` and the node was never flipped from `ready` — a stale-node
+> reconcile, not missing work. Verified by the Steward at `d7c6283ff`
+> (independently confirmed by language-implementer evt_4fxnfxxy2583t +
+> language-leader evt_3hk6gbmrhkqv2): D0 `c64c62190` and D1 `5a74301f4` are both
+> ancestors; `crates/ken-elaborator/tests/lang_mod_strict_resolution_d0.rs` and
+> `..._d1.rs` are present; `modules.rs` carries `ResolutionMode::{Legacy,Strict}`,
+> `PRELUDE_FLOOR_NAMES = [Bool,Char,List]`, strict `resolve_ref` fail-close,
+> roots-mode cache separation, and `elaborate_module_from_roots_strict`, with
+> `lib.rs` exposing the strict entry. The D1 strict flip and WP-4's catalog census
+> (Component A/B `574eb90c0`, `76426e9f9`) both landed, so the AC-CO-GATE is
+> satisfied on main. A 2026-08-25 Steward re-release off the stale `ready` node was
+> withdrawn on the implementer's hard stop (no non-duplicative delta;
+> subsume-don't-proliferate). The frame below is the historical release record.
 
 # Objective
 

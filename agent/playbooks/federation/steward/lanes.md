@@ -45,7 +45,7 @@ each node (`git fetch`; read status) before acting; a node id decays.
 | lane | ring | objective |
 |---|---|---|
 | 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (M-series defunctionalization). M6/M4 merged; M3 at its gate; two M3 successors filed. |
-| 2 | language | Module/import campaign `LANG-MODULE-IMPORT-SYSTEM` — unblocks lane 3. Next releasable member WP: `LANG-MOD-STRICT-RESOLUTION` (WP-2, `ready`, dep merged). |
+| 2 | language | Module/import campaign `LANG-MODULE-IMPORT-SYSTEM` — essentially COMPLETE (WP-1/2/3/4A merged incl. strict resolution). Remaining member work (Component B remainder, Nat provider, `CAT-GCD-REFACTOR`) is gated on the Nat Decision `dec_1kqwn6hdvn7d2`; lane-2 interim direction is an operator call (surfaced 2026-08-25). |
 | 3 | foundation | Expressibility trial — CAT WPs. `CAT-DEQUE`/`CAT-BSEARCH`/`CAT-VEC` `ready` now; `CAT-GCD-REFACTOR` waits on module/import. The Architect-burden probe. |
 
 **Lane 1 — runtime (priority).** The native carried-value program
@@ -66,11 +66,18 @@ COMPLETE (Architect 4-WP decomposition `evt_hpnhqy1ex286`; spec-surface merged
 `LANG-MOD-LOADER-ENTRY` merged; WP-3 `LANG-MOD-PUB-ELIGIBILITY` merged; WP-4A
 `LANG-MOD-CATALOG-REALIZATION` merged; `LANG-MOD-CATALOG-COMPLETENESS`
 (Component B) `active` (authorized partial; remainder held on the Nat Decision
-`dec_1kqwn6hdvn7d2`). **WP-2 `LANG-MOD-STRICT-RESOLUTION` (the strict root-loaded
-resolution soundness core) is `ready`, dep `LANG-MOD-LOADER-ENTRY` merged — the
-next releasable module/import WP, NOT blocked on the Nat Decision.** The
-Nat/Order provider drafts (`LANG-MOD-NAT-PROVIDER-INTERFACE`) + `CAT-GCD-REFACTOR`
-are what the Nat Decision gates, not WP-2.
+`dec_1kqwn6hdvn7d2`). WP-2 `LANG-MOD-STRICT-RESOLUTION` (the strict root-loaded
+resolution soundness core) is **`merged`** — its D0 census (`c64c62190`) + D1
+enforcement (`5a74301f4`) shipped inside the Component A/B realization; a
+2026-08-25 Steward re-release off its stale `ready` node was withdrawn on the
+implementer's hard stop (no non-duplicative delta). **So module/import is
+essentially complete, and the only remaining member work — Component B's
+remainder + the Nat/Order provider (`LANG-MOD-NAT-PROVIDER-INTERFACE`) +
+`CAT-GCD-REFACTOR` — is all gated on the Nat Decision `dec_1kqwn6hdvn7d2`
+(operator-pending).** Lane 2 has NO unblocked module/import work until that
+resolves; its interim direction (idle vs FO frontier vs surface-syntax) is an
+operator sequencing call, surfaced 2026-08-25. Do NOT re-release WP-2 off the
+node — re-measure the tree.
 
 The earlier lane-2 objectives are DONE and are history, not current work:
 `V3-FO-CHECKER-SOUNDNESS` is `closed` (FO checker-soundness theorem complete,
