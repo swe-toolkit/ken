@@ -256,7 +256,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
     AggregateOccurrenceId, PlannedAggregateAllocation, PlannedAggregateShape,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
-    dead_arm_effect_trap,
+    dead_arm_effect_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
     verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
@@ -8076,6 +8076,27 @@ fn site_operand_witness(value: &Lowered) -> Option<SiteOperandWitness> {
 
 
 const MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS: i64 = -3;
+
+/// Encode one planner-issued nonzero trap identity for the linked process ABI.
+///
+/// The token layout is shared with the JIT decoder. The linked ABI adds only
+/// the sign needed to remain a trapping process result; the payload stays the
+/// exact planner identity.
+fn signed_root_trap_token(
+    builder: &mut FunctionBuilder<'_>,
+    trap_identity: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let shifted = builder.ins().ishl_imm(
+        trap_identity,
+        crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT,
+    );
+    let root_token = builder.ins().bor_imm(
+        shifted,
+        crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG,
+    );
+    builder.ins().ineg(root_token)
+}
+
 fn validate_dynamic_constructor_alternatives<'a>(
     alternatives: impl IntoIterator<Item = (i64, &'a str)>,
 ) -> Result<(), CraneliftBackendError> {

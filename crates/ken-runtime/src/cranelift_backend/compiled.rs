@@ -44,8 +44,21 @@ pub(super) enum ResultDecoder {
 /// Root/native trap reporting is outside the source-value carrier vocabulary.
 /// The invalid low-byte tag keeps this token disjoint from every BoundaryWord;
 /// the payload is the planner-bound, nonzero trap identity.
-pub(super) const ROOT_TRAP_TOKEN_TAG: i64 = 0xff;
-pub(super) const ROOT_TRAP_TOKEN_SHIFT: i64 = 8;
+pub(crate) const ROOT_TRAP_TOKEN_TAG: i64 = 0xff;
+pub(crate) const ROOT_TRAP_TOKEN_SHIFT: i64 = 8;
+
+/// Decode the magnitude shared by JIT root tokens and linked signed root
+/// tokens into the zero-based planner-catalog index it names.
+///
+/// The sign belongs to the surrounding ABI and is removed before this call.
+/// Identity zero, a malformed tag, and an index wider than the host address
+/// space all refuse rather than becoming a generic trap.
+pub(crate) fn root_trap_catalog_index(magnitude: u64) -> Option<usize> {
+    (magnitude & ROOT_TRAP_TOKEN_TAG as u64 == ROOT_TRAP_TOKEN_TAG as u64)
+        .then_some(magnitude >> ROOT_TRAP_TOKEN_SHIFT)
+        .filter(|identity| *identity != 0)
+        .and_then(|identity| usize::try_from(identity - 1).ok())
+}
 
 impl<M> CompiledModule<M> {
     /// Transparent one-to-one packing seam (RT-SPLIT §10.4a). Exists so the
@@ -79,6 +92,10 @@ impl<M> CompiledModule<M> {
             assumptions,
             unsupported,
         }
+    }
+
+    pub(super) fn trap_catalog(&self) -> &[RuntimeTrap] {
+        &self.trap_catalog
     }
 }
 
@@ -134,12 +151,9 @@ impl CompiledModule<JITModule> {
             .decoder
             .ok_or_else(|| backend(BackendFailure::NativeResultDecode { token }))?;
         let trap_identity = || {
-            let word = token as u64;
-            ((token > 0)
-                && (word & ROOT_TRAP_TOKEN_TAG as u64) == ROOT_TRAP_TOKEN_TAG as u64)
-                .then_some(word >> ROOT_TRAP_TOKEN_SHIFT)
-                .filter(|identity| *identity != 0)
-                .and_then(|identity| usize::try_from(identity - 1).ok())
+            (token > 0)
+                .then(|| root_trap_catalog_index(token as u64))
+                .flatten()
         };
         let decode_trap = |identity: usize| {
             self.trap_catalog

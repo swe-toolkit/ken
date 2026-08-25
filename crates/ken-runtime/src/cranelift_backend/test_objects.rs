@@ -72,6 +72,7 @@ pub(crate) fn emit_process_entrypoint_object_with_cranelift(
     let verifier_passed = compiled.verifier_passed;
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();
+    let trap_catalog = compiled.trap_catalog().to_vec();
     let object_bytes = compiled
         .module
         .finish()
@@ -86,6 +87,7 @@ pub(crate) fn emit_process_entrypoint_object_with_cranelift(
         platform_target: native_platform_target_name(),
         backend_name: "Cranelift process object".to_string(),
         verifier_passed,
+        trap_catalog,
         assumptions,
         unsupported,
     })
@@ -498,6 +500,7 @@ pub(crate) fn emit_px8tr_nested_post_effect_object_with_plan(
     let verifier_passed = compiled.verifier_passed;
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();
+    let trap_catalog = compiled.trap_catalog().to_vec();
     let object_bytes = compiled
         .module
         .finish()
@@ -514,6 +517,7 @@ pub(crate) fn emit_px8tr_nested_post_effect_object_with_plan(
             platform_target: native_platform_target_name(),
             backend_name: "Cranelift PX8-TR process object".to_string(),
             verifier_passed,
+            trap_catalog,
             assumptions,
             unsupported,
         },

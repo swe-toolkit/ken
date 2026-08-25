@@ -1353,6 +1353,134 @@ fn native_nullary_resource_error_set_rejects_payloads_and_unknown_identities() {
     );
 }
 
+fn px8_dynamic_read_residual_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
+    let trap = || RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "dynamic read residual fixture default".to_string(),
+    };
+    let allocate = || RuntimeExpr::Effect {
+        family: "FS".to_string(),
+        operation: ken_host::HostOpV1::BufferAllocate,
+        capability: None,
+        args: vec![RuntimeExpr::Value(RuntimeValue::Int((8).into()))],
+    };
+    let read = RuntimeExpr::Effect {
+        family: "FS".to_string(),
+        operation: ken_host::HostOpV1::FsReadAt,
+        capability: None,
+        args: vec![
+            RuntimeExpr::Var(1),
+            RuntimeExpr::Value(RuntimeValue::Int((0).into())),
+            RuntimeExpr::Var(0),
+            RuntimeExpr::Value(RuntimeValue::Int((7).into())),
+            RuntimeExpr::Value(RuntimeValue::Int((4).into())),
+        ],
+    };
+    let crossed_read = host_result_closure_match(read);
+    let second = RuntimeExpr::Match {
+        scrutinee: Box::new(allocate()),
+        cases: vec![
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: px8n_failure(
+                    symbols,
+                    RuntimeExpr::Value(RuntimeValue::Int((81).into())),
+                ),
+            },
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: crossed_read,
+            },
+        ],
+        default: trap(),
+    };
+    let body = RuntimeExpr::Match {
+        scrutinee: Box::new(allocate()),
+        cases: vec![
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: px8n_failure(
+                    symbols,
+                    RuntimeExpr::Value(RuntimeValue::Int((80).into())),
+                ),
+            },
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: second,
+            },
+        ],
+        default: trap(),
+    };
+    RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: Vec::new(),
+            body: Box::new(body),
+        }),
+        args: Vec::new(),
+    }
+}
+
+/// Durable invariant. MEASURED: a valid `FsReadAt` host reply reaches the real
+/// read-progress producer, whose test mutation changes only its discriminator
+/// from the valid 0/1 domain to 2 before the HostResult crosses its generated
+/// call; the production dynamic-constructor emitter returns the signed token for
+/// the same plan's catalog identity. CLAIMED: `emit_carrier_dynamic_constructor`
+/// no longer exposes its residual as bare `-3`, and `call_declared_unit_target`
+/// forwards the token unchanged. THE GAP: the mutation changes the production
+/// producer rather than injecting a post-validation `DynamicConstructorV1`;
+/// linked-boundary tests separately pin catalog resolution and refusal.
+#[test]
+fn dynamic_host_result_residual_carries_the_planner_trap_identity() {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
+        }
+    }
+
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let expression = px8_dynamic_read_residual_fixture(&symbols);
+    let plan = plan_static_transition_graph_with_symbols(
+        &expression,
+        &BTreeMap::new(),
+        &symbols,
+        AbiRootIngress::Process,
+        true,
+    )
+    .expect("the production host-effect fixture plans");
+    let identity = plan
+        .trap_identity(&malformed_dynamic_constructor_trap())
+        .expect("the dynamic residual belongs to the plan's existing catalog")
+        .abi_word();
+    let expected = -((identity
+        << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
+        | crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG);
+
+    let (baseline, baseline_fixture) =
+        run_px8n_arm_fixture(PX8N_SHORT_READ, px8_dynamic_read_residual_fixture);
+    assert_eq!(baseline_fixture.malformed_request, 0, "baseline request shape");
+    assert_eq!(baseline_fixture.call_index, 3, "baseline host dispatches");
+    assert_eq!(baseline, 0, "the valid 0/1 producer domain reaches success");
+
+    set_effect_seat_dispatch_mutation(
+        EffectSeatDispatchMutation::ForceReadProgressOutsideAlternatives,
+    );
+    let _reset = Reset;
+    let (actual, fixture) = run_px8n_arm_fixture(
+        PX8N_SHORT_READ,
+        px8_dynamic_read_residual_fixture,
+    );
+    assert_eq!(fixture.malformed_request, 0, "production request shape");
+    assert_eq!(fixture.call_index, 3, "three real host dispatches");
+    assert_eq!(actual, expected);
+    assert_ne!(actual, MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS);
+}
+
 #[test]
 fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
     assert_eq!(
@@ -3987,16 +4115,18 @@ const AC1_SIBLING_SELECTED: &str = "ctor:fixture::AC1Sibling::One";
 #[cfg(test)]
 const AC1_SIBLING_UNSELECTED: &str = "ctor:fixture::AC1Sibling::Other";
 
-/// The payload the selected arm binds and returns. Arbitrary, but it must not
-/// collide with [`AC1_SIBLING_DEFAULT_STATUS`] or the pair below could not tell
-/// "selected and delivered" from "fell to the default".
+/// The payload the selected arm binds and returns. Arbitrary, but positive so
+/// it cannot collide with the signed planner-trap token for the closed default.
 #[cfg(test)]
 const AC1_SIBLING_PAYLOAD: i64 = 21;
 
-/// The status the match's closed default returns, spelled by
-/// `Lowering::seal_source_trap_branch`.
 #[cfg(test)]
-const AC1_SIBLING_DEFAULT_STATUS: i64 = -4;
+fn ac1_sibling_default() -> RuntimeTrap {
+    RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "ac1 specialized sibling default".to_string(),
+    }
+}
 
 #[cfg(test)]
 const AC1_SIBLING_CALLEE: &str = "fixture::ac1_sibling::sel";
@@ -4020,10 +4150,7 @@ fn ac1_sibling_declaration() -> RuntimeDeclaration {
                         // wrong.
                         body: RuntimeExpr::Var(0),
                     }],
-                    default: RuntimeTrap {
-                        code: RuntimeTrapCode::PatternMatchFailure,
-                        message: "ac1 specialized sibling default".to_string(),
-                    },
+                    default: ac1_sibling_default(),
                 }),
             },
         },
@@ -4037,7 +4164,7 @@ fn ac1_sibling_declaration() -> RuntimeDeclaration {
 /// `ExitFailure(Call(DeclarationRef(sel), [<producer>(21)]))`, run as a whole
 /// process, returning its exit code.
 #[cfg(test)]
-fn run_ac1_specialized_sibling(producer: &str) -> i64 {
+fn run_ac1_specialized_sibling(producer: &str) -> (i64, i64) {
     let declaration = ac1_sibling_declaration();
     let mut declarations = BTreeMap::new();
     declarations.insert(AC1_SIBLING_CALLEE, &declaration);
@@ -4069,6 +4196,15 @@ fn run_ac1_specialized_sibling(producer: &str) -> i64 {
         None,
     )
     .expect("the specialized sibling fixture lowers");
+    let default_identity = compiled
+        .trap_catalog()
+        .iter()
+        .position(|trap| trap == &ac1_sibling_default())
+        .and_then(|index| i64::try_from(index + 1).ok())
+        .expect("the closed default belongs to this compiled plan's catalog");
+    let default_status = -((default_identity
+        << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
+        | crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG);
     let input = BorrowedFixtureValue {
         kind: 1,
         tag: 0,
@@ -4081,11 +4217,12 @@ fn run_ac1_specialized_sibling(producer: &str) -> i64 {
         host_context: (&mut host_context as *mut ()).cast(),
         capability: 0,
     };
-    compiled
+    let status = compiled
         .run(Some((&invocation as *const RootIngressFixture).cast()))
         .expect("the specialized sibling fixture runs")
         .1
-        .expect("the specialized sibling fixture returns an exit code")
+        .expect("the specialized sibling fixture returns an exit code");
+    (status, default_status)
 }
 
 /// `AC-1` control family 4 -- a SPECIALIZED constructor scrutinee still selects
@@ -4094,7 +4231,7 @@ fn run_ac1_specialized_sibling(producer: &str) -> i64 {
 /// MEASURED: a whole-process fixture compiles and RUNS. With the selecting
 /// producer the process exits `21` -- the payload the case body bound and
 /// returned. With the producer swapped for a same-arity constructor the case
-/// list does not name, it exits `-4`, the match's closed default.
+/// list does not name, it returns the match default's signed planner-trap token.
 ///
 /// CLAIMED: the carried arm added to the source-machine `Match` operand
 /// dispatch did not disturb specialized selection, projection, or delivery of
@@ -4122,14 +4259,20 @@ fn run_ac1_specialized_sibling(producer: &str) -> i64 {
 /// selection reddens one.
 #[test]
 fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
-    let selected = run_ac1_specialized_sibling(AC1_SIBLING_SELECTED);
+    let (selected, selected_default) =
+        run_ac1_specialized_sibling(AC1_SIBLING_SELECTED);
     assert_eq!(
         selected, AC1_SIBLING_PAYLOAD,
         "the selecting producer must reach the case body and deliver the child \
          it bound"
     );
 
-    let unselected = run_ac1_specialized_sibling(AC1_SIBLING_UNSELECTED);
+    let (unselected, unselected_default) =
+        run_ac1_specialized_sibling(AC1_SIBLING_UNSELECTED);
+    assert_eq!(
+        selected_default, unselected_default,
+        "changing only the producer must not change the planned default identity"
+    );
     assert_ne!(
         unselected, AC1_SIBLING_PAYLOAD,
         "DISCRIMINATOR: a producer the case list does not name must not reach \
@@ -4137,7 +4280,7 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
          constructor identity at all"
     );
     assert_eq!(
-        unselected, AC1_SIBLING_DEFAULT_STATUS,
+        unselected, unselected_default,
         "the unselected producer must take the match's CLOSED DEFAULT, not a \
          trap, a neighbouring case, or a representation refusal"
     );

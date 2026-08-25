@@ -665,6 +665,57 @@ fn buffer_allocate_malformed_capacity_narrows_to_invalid_bounds() {
 
 // -- FsReadAt ------------------------------------------------------------
 
+/// Durable invariant. MEASURED: the exact checked-source InvalidOffset witness
+/// reaches the linked process boundary as a nonzero planner identity whose
+/// artifact-bound catalog element is the ITree default, and stderr reports that
+/// same origin and kind. CLAIMED: the witness-path generated-unit failure keeps
+/// exact trap provenance through linked reporting. THE GAP: this deliberately
+/// does not claim the ITree default is the right source producer; the adjacent
+/// SemanticError parity row stays ignored until
+/// RT-ITREE-DEFAULT-SELECTION-PROVENANCE.
+#[test]
+fn fs_read_at_malformed_offset_reports_exact_itree_default_trap_provenance() {
+    in_large_stack_thread("rt-parity-read-offset-provenance", || {
+        let Differential { native, .. } =
+            differential("fs-read-at-offset-provenance", "rt_read_offset_stage");
+        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+            native.terminal_error.as_ref()
+        else {
+            panic!("native witness must report typed planner trap provenance: {native:?}");
+        };
+        assert!(
+            provenance.planned_identity > 0,
+            "identity zero is reserved for no trap"
+        );
+        assert_eq!(
+            provenance.trap.code,
+            ken_runtime::RuntimeTrapCode::PatternMatchFailure
+        );
+        assert_eq!(
+            provenance.trap.message,
+            "no runtime match case selected for \
+             decl:rt_parity_fs_read_at_offset_provenance::ITree"
+        );
+        let stderr = String::from_utf8_lossy(&native.stderr);
+        assert!(stderr.contains("PatternMatchFailure"));
+        assert!(stderr.contains(&provenance.trap.message));
+        assert!(!stderr.contains("unknown terminal sentinel"));
+        assert_eq!(
+            native
+                .effect_trace
+                .iter()
+                .map(|event| event.operation)
+                .collect::<Vec<_>>(),
+            vec![
+                ken_runtime::HostOpV1::FsOpen,
+                ken_runtime::HostOpV1::BufferAllocate,
+                ken_runtime::HostOpV1::ResourceRelease,
+                ken_runtime::HostOpV1::ResourceRelease,
+            ]
+        );
+    });
+}
+
 #[test]
 #[ignore = "post-M6 runtime parity debt: native construction completes, but execution traps on a malformed ExitCode::Failure payload instead of observing InvalidOffset"]
 fn fs_read_at_malformed_offset_narrows_to_invalid_offset() {

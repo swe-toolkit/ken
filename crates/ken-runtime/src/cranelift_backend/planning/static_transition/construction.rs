@@ -1227,6 +1227,12 @@ impl<'src> Planner<'src> {
         // representation, which does not exist until that line.
         self.plan.host_effect_seats = build_host_effect_seat_plan(&self.plan)?;
         validate_host_effect_seat_plan(&self.plan, &self.plan.host_effect_seats)?;
+        // This compiler-generated residual is authorized by the same catalog as
+        // source traps. Append it only after every source-derived entry so
+        // existing planned identities remain stable; lowering can then replace
+        // the residual scalar with the catalog identity rather than minting a
+        // second sentinel namespace.
+        self.intern_trap(&super::joins_traps::malformed_dynamic_constructor_trap())?;
         #[cfg(test)]
         apply_static_worker_member_mutation(&mut self.plan);
         self.plan.validate()?;

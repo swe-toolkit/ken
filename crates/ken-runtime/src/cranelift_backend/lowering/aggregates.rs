@@ -3120,9 +3120,12 @@ impl<'a> Lowering<'a> {
                 builder.switch_to_block(next);
             }
 
-            let malformed = builder
-                .ins()
-                .iconst(types::I64, MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS);
+            let malformed_trap = malformed_dynamic_constructor_trap();
+            let identity = self
+                .static_transition_plan
+                .trap_identity(&malformed_trap)?;
+            let identity = builder.ins().iconst(types::I64, identity.abi_word());
+            let malformed = signed_root_trap_token(builder, identity);
             builder.ins().return_(&[malformed]);
             builder.switch_to_block(merge);
             Ok(CarriedBoundaryWord {

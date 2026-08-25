@@ -2084,9 +2084,9 @@ impl<'a> Lowering<'a> {
                     #[cfg(test)]
                     px8tr_record_trap_provenance(Px8trTrapProvenanceEvent::UnitTrapWordPropagated {
                         seat: PlannedTrapSeat::RootProcessSentinel,
-                        identity_preserved: false,
+                        identity_preserved: true,
                     });
-                    let process_trap = builder.ins().iconst(types::I64, -4);
+                    let process_trap = signed_root_trap_token(builder, trap_word);
                     builder.ins().return_(&[process_trap]);
                 }
                 Some(TrapExitAuthority::Root {

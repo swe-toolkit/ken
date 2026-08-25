@@ -8,6 +8,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub use ken_host::{RuntimeTrap, RuntimeTrapCode};
+
 /// Stable checked-core symbol rendered at the package boundary.
 pub type RuntimeSymbol = String;
 
@@ -1138,21 +1140,6 @@ pub enum RuntimeGroundValue {
     Record {
         fields: Vec<(String, RuntimeGroundValue)>,
     },
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RuntimeTrap {
-    pub code: RuntimeTrapCode,
-    pub message: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum RuntimeTrapCode {
-    UnsupportedErasure,
-    UnsupportedPrimitivePartiality,
-    MissingRuntimeMetadata,
-    PatternMatchFailure,
-    ExplicitTrap,
 }
 
 /// ⚠ **`PartialEq`/`Eq` are not derived** — this type transitively contains
