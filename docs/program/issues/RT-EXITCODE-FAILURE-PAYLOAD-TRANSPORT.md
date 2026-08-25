@@ -1,56 +1,66 @@
 ---
 id: RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT
-title: "Execution-parity successor — give the ExitCode::Failure result payload a durable native transport so a checked program that crosses M3's effect seat does not trap `malformed ExitCode::Failure payload` at process exit (object_linker_packaging.rs:2223, native stub value -3)"
-status: draft
+title: "M-series successor (M3+1) — close the process-exit consumers over the existing exact-Int carrier forms: a persistent/dynamic ExitCode::Failure payload is admitted only as ImmediateInt, so both the carried-phase (core.rs:11523) and specialized-phase (calls.rs:2301) exit-status producers force it to native sentinel -3 instead of mapping it to an exit code"
+status: ready
 owner: runtime
 size: M
 gate: none
 depends_on: [RT-CARRIED-IH-DISPATCH-SITEOP]
 blocks: []
 github: null
-origin: "Steward, 2026-08-25, from the Architect object-distinctness ruling (evt_317adj9ebfw86) on M3 WIP 3e9821c5d. M3's ConstructorTag/CarriedWord effect-seat crossing succeeds; px8ta HALF B then executes and traps at process exit on a malformed ExitCode::Failure payload — a DISTINCT execution-parity object in the process-exit/ExitCode native-trap family (value -3, beside RT-BORROWED-INPUT-CARRIER-DURABILITY value -1 and the closed RT-ENTRY-TRAP-254 value 254/-2). New sibling node, not a fold: RT-ENTRY-TRAP-254 is closed and specific to a different value, so it cannot own this live successor. Steward framing call per COORDINATION section 2; the dispatcher-bypass diagnostic (identical trap/trace with the entire M3 dispatcher removed) confirms M3's guard is off the causal path."
+origin: "Steward, 2026-08-25, from the Architect object-distinctness ruling (evt_317adj9ebfw86) and the landed-SHA re-measure + mechanism correction (evt_4kkspzs62gtn6, thr_7m88b1hsemj9c). Sequenced FIRST of M3's two successors (Architect: ExitCode before RT-RETAINED-UNIT-CALL-TARGET-DERIVATION, no fold — the ExitCode cut is smaller because the exact-Int representation and observer already exist). Re-anchored to landed origin/main 5fff430db (Architect re-ran the witness at that exact commit; object unchanged). Steward framing call per COORDINATION section 2."
 ---
 
-> # Execution-parity successor — gated behind M3's crossing (DRAFT stub)
+> # M3 successor, ready to frame — re-anchored to landed 5fff430db
 >
-> Node minted on the M3 accept-COMPLETE-for-object disposition
-> (Steward evt_3v7t4qcp9m8gt). Full WP frame + release queue behind M3's landing;
-> this stub records the grounded object so M3's re-pointed row has a real owner.
+> Sequenced first of M3's two distinct successors (Architect evt_4kkspzs62gtn6).
+> The pre-landing stub's mechanism statement ("no durable native transport") was
+> too broad; corrected below to the consumer-not-closed-over-existing-forms
+> defect the Architect measured at landed 5fff430db. Full frame:
+> `docs/program/wp/RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT.md`.
 
-## Objective
+## Objective (Architect-corrected mechanism, measured at 5fff430db)
 
-A checked program that crosses M3's effect-seat boundary runs to process exit and
-then TRAPS at the native C stub with `ken native trap: malformed ExitCode::Failure
-payload` (object_linker_packaging.rs:2223, value -3). The `ExitCode::Failure`
-result payload has no durable native transport across the process-exit boundary.
-Give it one so the program's exit result is carried faithfully and the row runs
-end-to-end.
+A checked program that crosses M3's effect seat runs to process exit and its
+`ExitCode::Failure` payload is forced to the native sentinel `-3`
+(`ken native trap: malformed ExitCode::Failure payload`). The defect is NOT a
+missing representation: exact `Int` already has both immediate and persistent
+carrier forms, and `effects.rs:1589-1700` already provides the
+representation-blind observer `narrow_carried_int_u64`. The defect is that the
+process-exit CONSUMERS are not closed over those existing forms — a persistent /
+dynamic exact `Int` is admitted only as `BoundaryTag::ImmediateInt` and every
+other form falls straight through to `-3`.
 
-This is the same execution-parity native-trap family as
-[[RT-BORROWED-INPUT-CARRIER-DURABILITY]] (value -1) and the closed
-[[RT-ENTRY-TRAP-254]] (value 254/-2), but a DISTINCT object: the ExitCode::Failure
-payload transport, not borrowed-input durability and not the entry ExitCode trap.
-The M4->M3 pattern again — the crossing succeeds and exposes a deeper, distinct
-seam, not a defect of our own making.
+Two producer surfaces force `-3`, in two phases (both must be reconciled — the
+Architect's probe replacing only the carried immediate-only arm did NOT green
+the witness, so a one-site patch is insufficient):
 
-## Fixed inputs (Architect evt_317adj9ebfw86, object DB `f0292222`)
+- `core.rs:11523-11577` `transfer_carried_failure_exit_status` (carried phase):
+  admits only `ImmediateInt`; every persistent exact `Int` goes directly to `-3`.
+- `calls.rs:2301-2370` `emit_process_exit_status` (specialized phase): the
+  sibling; also produces `-3` on an un-narrowable dynamic `Int`.
+- `object_linker_packaging.rs:2223` only REPORTS the sentinel; it is NOT the
+  defect site (the pre-landing stub misnamed it as the site).
 
-- The trap is EXECUTION-layer, native C stub at
-  `crates/ken-runtime/src/object_linker_packaging.rs:2223`:
-  `value == -3 -> "ken native trap: malformed ExitCode::Failure payload"`, sitting
-  beside `value == -1` (borrowed input) and `value == -2` (malformed entry
-  ExitCode).
-- Trigger row: `crates/ken-cli/tests/px8ta_oriented_subcontinuation.rs:372`
-  (`px8ds_real_same_depth_path_runs_exact_edges`, HALF B). Trace: BufferAllocate +
-  ResourceRelease, ZERO ConsoleIsTerminal — the program runs, then malforms its
-  ExitCode::Failure payload at exit. Re-pointed to this node by M3's finalization.
-- Dispatcher-bypass diagnostic (decisive): removing the entire M3
-  carried-constructor dispatcher yields the IDENTICAL trap/trace, so M3's guard is
-  not on the causal path — this is a distinct object, not unfinished M3.
+Close both consumers over the landed exact-`Int` observers, then apply one
+canonical exit mapping (`0 -> 1`, `1..=255 -> value`, out-of-range/malformed ->
+`-3`). Do not add a third `Int` representation or duplicate the persistent
+decoder.
+
+## Scope boundary — this WP does NOT promise px8ta goes green
+
+The fresh trigger trace (`px8ds_real_same_depth_path_runs_exact_edges`, HALF B)
+is still exactly `BufferAllocate`, `ResourceRelease`, with ZERO
+`ConsoleIsTerminal`. So faithful transport may expose `Failure 91/92` rather than
+`Success`. Object-level completion is: the process-exit boundary FAITHFULLY
+TRANSPORTS or HONESTLY REJECTS the payload — not that px8ta ends green. If px8ta
+becomes genuinely end-to-end green, un-ignore it; if it advances to a distinct
+nonzero outcome with the missing effect still causal, STOP and re-point that
+successor rather than widening this cut (Architect ruling).
 
 ## Sequencing
 
-Draft, execution-parity family. Gated behind M3's crossing (depends_on). Whether it
-later joins an execution-parity umbrella with
-[[RT-BORROWED-INPUT-CARRIER-DURABILITY]] is a post-framing call. Full WP frame +
-release queue behind M3's landing; the Architect reviews the WP at release.
+First of M3's two successors. [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] stays
+second and separate (it crosses planner ownership + function-local call-target
+derivation — a larger cut). No technical dependency between them; this is
+simplest-first sequencing.

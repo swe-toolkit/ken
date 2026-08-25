@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIED-IH-DISPATCH-SITEOP
 title: "Track-1 consumer (M3) — a boundary-carried CarriedWord value cannot present the ConstructorTag an effect seat demands (effects.rs:548), so object emission refuses; give the carried value a finite compile-time constructor discriminant it can present, reusing M4's defunctionalization"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,16 @@ blocks: []
 github: null
 origin: "Steward, 2026-08-22, filing Track-1 seat M3 of [[RT-NATIVE-CARRIED-VALUE]] from the Architect's frame (evt_9kat78d438cb). The SiteOperand PORT already landed ([[RT-SITEOP-CARRIED-WITNESS]] merged); the seam advanced to core.rs:2962, where a carried recursive hypothesis is currently rejected as 'an eliminated value, not a callable'. Steward-filed per COORDINATION section 2."
 ---
+
+> # MERGED — squash `5fff430db` (2026-08-25), tree `8e72fd8f`
+>
+> Landed via the CI-red respin (parity fixture flipped: `rt_write_writable_stage`
+> from the M3-retired `CARRIED_SITEOP_CONSTRUCTOR_TAG` refusal to `Completes`).
+> Steward tree-audit: landed tree byte-identical to the approved candidate
+> `2dd8fe7c`; all 10 cold-lowering path blobs match; zero `trusted_base()` delta.
+> Route A proven (finite compile-time constructor discriminant, runtime carries
+> the tag only; guarded finite dispatcher; one-sided — traps before host commit).
+> The ken-CI auto-close did not flip this node; reconciled here.
 
 > # RELEASED 2026-08-25 on the landed M4 close (`f02922221`). Frame:
 > `docs/program/wp/RT-CARRIED-IH-DISPATCH-SITEOP.md`.

@@ -11,11 +11,25 @@ github: null
 origin: "Steward, 2026-08-25, from the Architect object-distinctness ruling (evt_317adj9ebfw86) on M3 WIP 3e9821c5d. M3's effect-seat crossing succeeds; px8f then stops at object emission because a retained body's call target is not derived in the unit call graph. DISTINCT call-graph-derivation object — NOT M3's effect-seat object, NOT the worker_calls finite-static-apply facet (calls.rs:1605), NOT reject_carried_residual_arguments (core.rs:2935). New node, Steward framing call per COORDINATION section 2."
 ---
 
-> # Call-target-resolution successor — gated behind M3's crossing (DRAFT stub)
+> # Call-target-resolution successor — SECOND of M3's two successors (DRAFT stub)
 >
 > Node minted on the M3 accept-COMPLETE-for-object disposition
-> (Steward evt_3v7t4qcp9m8gt). Full WP frame + release queue behind M3's landing;
-> this stub records the grounded object so M3's re-pointed row has a real owner.
+> (Steward evt_3v7t4qcp9m8gt). Sequenced SECOND, after
+> [[RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT]] (Architect evt_4kkspzs62gtn6: no fold,
+> no technical dependency; this cut is larger — it crosses planner ownership and
+> function-local call-target derivation). Frame it when ExitCode lands.
+>
+> RE-ANCHORED to landed origin/main 5fff430db (Architect re-ran the witness at
+> that exact commit; object unchanged). Updated grounding: the production refusal
+> is `calls.rs:1631-1640`; the active owner at the lookup is
+> `Specialization(ContinuationSpecializationId(2))`, whose `unit_calls` keys are
+> `800, 1008, 1321, 1374` — not the retained `StaticOriginId(1236)`, hence the
+> miss. The eventual frame must DERIVE the missing specialization-owned target
+> from existing graph/claim authority BEFORE emission — never synthesize a target
+> from the lookup miss, numeric-origin coincidence, or retained-body shape;
+> preserve the fail-closed lookup as the backstop and pin wrong/ambiguous-target
+> rejection (Architect ruling). Also clean this witness's stale "Ignored pending
+> M3" narrative comment when framed.
 
 ## Objective
 
