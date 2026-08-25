@@ -3790,6 +3790,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 captures,
                 params,
                 body,
+                boundary_environment,
             } => {
                 if params.len() != args.len() {
                     return Err(unsupported(
@@ -3800,6 +3801,17 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             args.len()
                         ),
                     ));
+                }
+                if let Some(environment) = boundary_environment {
+                    let mut inputs = args;
+                    inputs.extend(captures);
+                    let called = self.call_boundary_closure_environment(
+                        builder,
+                        environment,
+                        body,
+                        &inputs,
+                    )?;
+                    return Ok(SourceCallOutcome::Complete(called));
                 }
                 // Continued source evaluation: unwrap only, no crossing.
                 let mut call_env = bound_values(args);
@@ -4066,6 +4078,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         captures,
                         params,
                         body,
+                        ..
                     } = base
                     else {
                         return Err(unsupported(

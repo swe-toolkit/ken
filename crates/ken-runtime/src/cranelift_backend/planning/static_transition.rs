@@ -112,7 +112,8 @@ use continuations::ContinuationProductionMutation;
 // this module, unchanged from before the move.
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use aggregates::{
-    AggregateOccurrenceId, AggregateOccurrenceProducer, CheckedIhEnvironmentTransport,
+    AggregateOccurrenceId, AggregateOccurrenceProducer, BoundaryClosureEnvironment,
+    CheckedIhEnvironmentTransport,
     CheckedIhTransportInputDestination, PlannedAggregateAllocation, PlannedAggregateOwnership,
     PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
     SynthesizedAggregateRole, SynthesizedAggregateRoot, SynthesizedDynamicSet,

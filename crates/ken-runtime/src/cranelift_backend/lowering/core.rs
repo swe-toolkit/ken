@@ -3007,6 +3007,7 @@ impl<'a> Lowering<'a> {
             captures,
             params,
             body,
+            ..
         } = residual
         else {
             return Err(unsupported(
@@ -5184,6 +5185,7 @@ impl<'a> Lowering<'a> {
                 captures,
                 params,
                 body,
+                ..
             }) => {
                 if params.len() != args.len() {
                     return Err(unsupported(
@@ -5353,6 +5355,7 @@ impl<'a> Lowering<'a> {
                     captures,
                     params,
                     body,
+                    ..
                 } = base
                 else {
                     return Err(unsupported(
@@ -8602,6 +8605,7 @@ impl<'a> Lowering<'a> {
                 captures,
                 params,
                 body,
+                ..
             }) => (captures, *body, params.len()),
             _ => {
                 return Err(unsupported(
@@ -10887,6 +10891,8 @@ impl<'a> Lowering<'a> {
         #[cfg(not(test))]
         let narrowing_restored = false;
         if carried == 0 || narrowing_restored {
+            let boundary_environment =
+                self.boundary_closure_environment_record(static_origin)?;
             // All-specialized: preserve the existing compile-time closure.
             //
             // ⭐ **The narrowing STAYS on this branch, and deleting it would
@@ -10905,6 +10911,7 @@ impl<'a> Lowering<'a> {
                         .collect(),
                     params: params.clone(),
                     body: body.static_origin,
+                    boundary_environment,
                 }),
             ));
         }
@@ -11469,7 +11476,11 @@ impl<'a> Lowering<'a> {
         // moves is *when*, and nothing else.
         for argument in args {
             if let LoweringOperand::Specialized(value) = argument {
-                value.boundary_transfer_admissibility()?;
+                if value.contains_boundary_closure_environment()? {
+                    self.represented_boundary_admissibility(value)?;
+                } else {
+                    value.boundary_transfer_admissibility()?;
+                }
                 self.source_aggregate_preflight(value)?;
             }
         }
@@ -11489,7 +11500,11 @@ impl<'a> Lowering<'a> {
             let child = match argument {
                 LoweringOperand::Carried(child) => *child,
                 LoweringOperand::Specialized(value) => {
-                    self.transfer_into_carrier(builder, child_origin, value)?
+                    if value.contains_boundary_closure_environment()? {
+                        self.transfer_represented_boundary_value(builder, child_origin, value)?
+                    } else {
+                        self.transfer_into_carrier(builder, child_origin, value)?
+                    }
                 }
             };
             self.emit_carrier_store_field(builder, word, position, child)?;
@@ -13474,6 +13489,7 @@ impl<'a> Lowering<'a> {
                     captures: lowered_captures,
                     params: params.clone(),
                     body: body.static_origin,
+                    boundary_environment: None,
                 }))
             }
             // D7, site 2 of 3.
@@ -13533,10 +13549,13 @@ impl<'a> Lowering<'a> {
                         &captures,
                     )?;
                 }
+                let boundary_environment =
+                    self.boundary_closure_environment_record(static_origin)?;
                 Ok(LoweringOperand::Specialized(Lowered::Closure {
                     captures,
                     params: params.clone(),
                     body: body.static_origin,
+                    boundary_environment,
                 }))
             }
             RuntimeExpr::DeclarationRef { symbol } => {
@@ -13845,6 +13864,7 @@ impl<'a> Lowering<'a> {
                         captures,
                         params,
                         body,
+                        boundary_environment,
                     }) => {
                         let mut call_inputs = args
                             .iter()
@@ -13880,6 +13900,14 @@ impl<'a> Lowering<'a> {
                         // environment role is the bare installation with no
                         // enclosing spine behind it.
                         call_inputs.extend(captures);
+                        if let Some(environment) = boundary_environment {
+                            return self.call_boundary_closure_environment(
+                                builder,
+                                environment,
+                                body,
+                                &call_inputs,
+                            );
+                        }
                         self.call_declared_unit(
                             builder,
                             body,
@@ -13990,6 +14018,7 @@ impl<'a> Lowering<'a> {
                             captures,
                             params,
                             body,
+                            ..
                         } = base
                         else {
                             return Err(unsupported(

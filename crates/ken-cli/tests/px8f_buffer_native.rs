@@ -185,22 +185,19 @@ ssize_t pwrite64(int fd, const void *buf, size_t count, off64_t offset) {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CARRIED-RESOURCE-SCALAR.
+// Ignored pending RT-CARRIED-IH-DISPATCH-SITEOP.
 //
 // Observed signature, exactly:
-//   Effect: seat Argument(0) of FsWriteAt needs ResourceScalar, which it cannot observe in CarriedWord
+//   Effect: seat Argument(1) of FsOpen needs ConstructorTag, which it cannot
+//     observe in CarriedWord
 //
-// Owner node: RT-CARRIED-RESOURCE-SCALAR.
-// Pre-existing base debt, NOT a bind-order regression: measured failing at
-// the frozen base 21fd46dc by the D10 differential, before any
-// RT-SRCBODY-BIND-ORDER commit.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// A ResourceScalar need, not a byte-span one, despite the shared refusal
-// shape. Its ken-verify twin px8f_write_partition fails identically.
+// Owner node: RT-CARRIED-IH-DISPATCH-SITEOP.
+// M4's positional captured-environment representation retires the prior
+// closure-boundary refusal. The row now reaches this distinct object-emission
+// successor, so it remains ignored rather than being silenced as green.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-CLOSURE-BOUNDARY-RESIDUAL: lowering refuses with \"Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane\" (boundary.rs:1044). MEASURED 2026-08-22 on this row. The origin seam RT-CLOSURE-BOUNDARY-LANE is RESOLVED, and so is the RT-CARRIED-RESOURCE-SCALAR blocker this row used to name -- closing them moved the row to this residual population rather than greening it."]
+#[ignore = "RT-CARRIED-IH-DISPATCH-SITEOP: closure crossing succeeds; object emission refuses because seat Argument(1) of FsOpen needs ConstructorTag, which it cannot observe in CarriedWord"]
 fn linked_checked_write_all_observes_short_progress_and_matches_interpreter() {
     std::thread::Builder::new()
         .name("px8f-write-all".to_string())

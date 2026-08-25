@@ -727,6 +727,72 @@ impl SynthesizedArgument {
 }
 
 
+impl Lowered {
+        /// Whether this value graph contains a closure carrying the exact
+        /// planner-issued boundary-environment identity. This selects the
+        /// represented route; ordinary closures remain on the unchanged
+        /// `boundary_transfer_admissibility` refusal path.
+        pub(super) fn contains_boundary_closure_environment(
+            &self,
+        ) -> Result<bool, CraneliftBackendError> {
+            match self {
+                Lowered::Closure {
+                    boundary_environment,
+                    ..
+                } => Ok(boundary_environment.is_some()),
+                Lowered::Constructor { args, .. } => {
+                    for field in specialized_field_refs_at(
+                        args,
+                        "a constructor field inspected for a boundary environment",
+                    )? {
+                        if field.contains_boundary_closure_environment()? {
+                            return Ok(true);
+                        }
+                    }
+                    Ok(false)
+                }
+                Lowered::Record { fields, .. } => {
+                    for field in fields {
+                        if field.value.contains_boundary_closure_environment()? {
+                            return Ok(true);
+                        }
+                    }
+                    Ok(false)
+                }
+                Lowered::HostResult { error, ok, .. } => Ok(
+                    error.contains_boundary_closure_environment()?
+                        || ok.contains_boundary_closure_environment()?,
+                ),
+                Lowered::DynamicConstructor(dynamic) => {
+                    for alternative in &dynamic.alternatives {
+                        for field in &alternative.fields {
+                            if field.contains_boundary_closure_environment()? {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                    Ok(false)
+                }
+                Lowered::DeclarationClosure { .. }
+                | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::Int { .. }
+                | Lowered::Bool { .. }
+                | Lowered::ProcessExitStatus { .. }
+                | Lowered::CapabilityToken { .. }
+                | Lowered::ResourceToken { .. }
+                | Lowered::BoundedNat(_)
+                | Lowered::StructuralNat(_)
+                | Lowered::ResponseBytes { .. }
+                | Lowered::Bytes(_)
+                | Lowered::BorrowedNativeValue { .. }
+                | Lowered::BorrowedOption { .. }
+                | Lowered::String(_)
+                | Lowered::RecursiveBackedge
+                | Lowered::Trap(_) => Ok(false),
+            }
+        }
+}
+
 impl<'a> Lowering<'a> {
         /// **`RT-DECL-CLOSURE-PORT` `D7` — reconcile every aggregate in a template
         /// against its OWN producer's planned ownership record, before anything is
@@ -843,6 +909,212 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+        /// Admissibility for a planner-issued positional-environment schema.
+        ///
+        /// The ordinary boundary walk remains unchanged and refuses every
+        /// `Lowered::Closure`. The result-edge route calls this directly; the
+        /// bind-continuation route calls it only after separately proving its
+        /// singleton target and instance pairing. Both validate the identity
+        /// before any parent allocation and recursively screen the captures.
+        pub(super) fn represented_boundary_admissibility(
+            &self,
+            value: &Lowered,
+        ) -> Result<(), CraneliftBackendError> {
+            match value {
+                Lowered::Closure {
+                    captures,
+                    params,
+                    body,
+                    boundary_environment: Some(record),
+                } => {
+                    let environment = self
+                        .static_transition_plan
+                        .boundary_closure_environment_by_record(*record)?;
+                    let owner = self.defining_emission_owner.ok_or_else(|| {
+                        unsupported(
+                            "BoundaryClosureEnvironment",
+                            "a represented boundary closure is being transferred outside a declared owner",
+                        )
+                    })?;
+                    if environment.owner() != owner
+                        || environment.body_origin() != *body
+                        || environment.params() != params
+                        || environment.capture_origins().len() != captures.len()
+                    {
+                        return Err(unsupported(
+                            "BoundaryClosureEnvironment",
+                            "a represented boundary closure disagrees with its exact owner, code identity, or captured-environment schema",
+                        ));
+                    }
+                    for capture in captures {
+                        if let LoweringOperand::Specialized(value) = capture {
+                            self.represented_boundary_admissibility(value)?;
+                            self.source_aggregate_preflight(value)?;
+                        }
+                    }
+                    Ok(())
+                }
+                Lowered::Constructor { args, .. } => {
+                    for field in specialized_field_refs_at(
+                        args,
+                        "a constructor field in a represented unit result",
+                    )? {
+                        self.represented_boundary_admissibility(field)?;
+                    }
+                    Ok(())
+                }
+                Lowered::Record { fields, .. } => {
+                    for field in fields {
+                        self.represented_boundary_admissibility(&field.value)?;
+                    }
+                    Ok(())
+                }
+                Lowered::HostResult { error, ok, .. } => {
+                    self.represented_boundary_admissibility(error)?;
+                    self.represented_boundary_admissibility(ok)
+                }
+                Lowered::DynamicConstructor(dynamic) => {
+                    for alternative in &dynamic.alternatives {
+                        for field in &alternative.fields {
+                            self.represented_boundary_admissibility(field)?;
+                        }
+                    }
+                    Ok(())
+                }
+                Lowered::Closure {
+                    boundary_environment: None,
+                    ..
+                }
+                | Lowered::DeclarationClosure { .. }
+                | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::Int { .. }
+                | Lowered::Bool { .. }
+                | Lowered::ProcessExitStatus { .. }
+                | Lowered::CapabilityToken { .. }
+                | Lowered::ResourceToken { .. }
+                | Lowered::BoundedNat(_)
+                | Lowered::StructuralNat(_)
+                | Lowered::ResponseBytes { .. }
+                | Lowered::Bytes(_)
+                | Lowered::BorrowedNativeValue { .. }
+                | Lowered::BorrowedOption { .. }
+                | Lowered::String(_)
+                | Lowered::RecursiveBackedge
+                | Lowered::Trap(_) => value.boundary_transfer_admissibility(),
+            }
+        }
+
+        /// Admissibility for the exact bind-continuation crossing arm.
+        ///
+        /// A closure record that is valid as a schema is not by itself bind
+        /// authority. This walk re-proves the planner's singleton target and
+        /// per-instance field pairing for every represented closure in the
+        /// value graph. A miss deliberately falls through the unchanged generic
+        /// closure refusal rather than becoming a record-only fallback.
+        pub(super) fn bind_continuation_boundary_admissibility(
+            &self,
+            value: &Lowered,
+        ) -> Result<(), CraneliftBackendError> {
+            match value {
+                Lowered::Closure {
+                    captures,
+                    boundary_environment: Some(record),
+                    ..
+                } => {
+                    if self
+                        .static_transition_plan
+                        .boundary_bind_continuation_environment_by_record(*record)?
+                        .is_none()
+                    {
+                        return value.boundary_transfer_admissibility();
+                    }
+                    self.represented_boundary_admissibility(value)?;
+                    for capture in captures {
+                        if let LoweringOperand::Specialized(value) = capture {
+                            self.bind_continuation_boundary_admissibility(value)?;
+                        }
+                    }
+                    Ok(())
+                }
+                Lowered::Constructor { args, .. } => {
+                    for field in specialized_field_refs_at(
+                        args,
+                        "a constructor field in a bind-continuation response",
+                    )? {
+                        self.bind_continuation_boundary_admissibility(field)?;
+                    }
+                    Ok(())
+                }
+                Lowered::Record { fields, .. } => {
+                    for field in fields {
+                        self.bind_continuation_boundary_admissibility(&field.value)?;
+                    }
+                    Ok(())
+                }
+                Lowered::HostResult { error, ok, .. } => {
+                    self.bind_continuation_boundary_admissibility(error)?;
+                    self.bind_continuation_boundary_admissibility(ok)
+                }
+                Lowered::DynamicConstructor(dynamic) => {
+                    for alternative in &dynamic.alternatives {
+                        for field in &alternative.fields {
+                            self.bind_continuation_boundary_admissibility(field)?;
+                        }
+                    }
+                    Ok(())
+                }
+                Lowered::Closure {
+                    boundary_environment: None,
+                    ..
+                }
+                | Lowered::DeclarationClosure { .. }
+                | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::Int { .. }
+                | Lowered::Bool { .. }
+                | Lowered::ProcessExitStatus { .. }
+                | Lowered::CapabilityToken { .. }
+                | Lowered::ResourceToken { .. }
+                | Lowered::BoundedNat(_)
+                | Lowered::StructuralNat(_)
+                | Lowered::ResponseBytes { .. }
+                | Lowered::Bytes(_)
+                | Lowered::BorrowedNativeValue { .. }
+                | Lowered::BorrowedOption { .. }
+                | Lowered::String(_)
+                | Lowered::RecursiveBackedge
+                | Lowered::Trap(_) => value.boundary_transfer_admissibility(),
+            }
+        }
+
+        /// Emit one value through the ordinary producer only after the exact
+        /// bind-continuation proof has replaced every authorized closure by its
+        /// positional environment.
+        pub(super) fn transfer_bind_continuation_boundary_value(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            origin: StaticOriginId,
+            value: &Lowered,
+        ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+            self.bind_continuation_boundary_admissibility(value)?;
+            self.source_aggregate_preflight(value)?;
+            self.emit_carrier_transfer(builder, origin, value)
+        }
+
+        /// Emit a boundary value after replacing only planner-authorized closure
+        /// capsules by their positional environments. The ordinary producer is
+        /// deliberately not called: its unchanged admissibility walk must keep
+        /// refusing raw closures on every other route.
+        pub(super) fn transfer_represented_boundary_value(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            origin: StaticOriginId,
+            value: &Lowered,
+        ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+            self.represented_boundary_admissibility(value)?;
+            self.source_aggregate_preflight(value)?;
+            self.emit_carrier_transfer(builder, origin, value)
+        }
+
         /// Reconcile ONE source aggregate node against the ownership record its own
         /// producer occurrence names.
         ///
@@ -1119,6 +1391,30 @@ impl<'a> Lowering<'a> {
             &self,
             child: &Lowered,
         ) -> Result<Vec<BoundaryReferentOwner>, CraneliftBackendError> {
+            // A planner-authorized boundary closure is emitted as its positional
+            // environment aggregate, not as the forbidden ordinary-closure
+            // shape. Read that exact record's allocation lane so the enclosing
+            // source aggregate reconciles the value it will actually store.
+            if let Lowered::Closure {
+                boundary_environment: Some(record),
+                ..
+            } = child
+            {
+                self.static_transition_plan
+                    .boundary_closure_environment_by_record(*record)?;
+                let allocation = self
+                    .static_transition_plan
+                    .aggregate_record_view(*record)?
+                    .allocation();
+                return Ok(vec![match allocation {
+                    PlannedAggregateAllocation::PersistentGround => {
+                        BoundaryReferentOwner::PersistentStore
+                    }
+                    PlannedAggregateAllocation::InvocationAggregate => {
+                        BoundaryReferentOwner::InvocationArena
+                    }
+                }]);
+            }
             match child.boundary_disposition() {
                 // An immediate with no spill class has no boundary node at any
                 // magnitude, so there is nothing for an arena or a store to own.
@@ -1693,7 +1989,30 @@ impl<'a> Lowering<'a> {
                 // anyway because exhaustiveness is the mechanism that makes a 22nd
                 // variant a compile error — ⛔ collapsing them into a `_` arm would
                 // buy three lines and spend the whole closure property.
-                Lowered::Closure { .. }
+                Lowered::Closure {
+                    captures,
+                    params,
+                    body,
+                    boundary_environment: Some(record),
+                } => {
+                    let environment = self
+                        .static_transition_plan
+                        .boundary_closure_environment_by_record(*record)?;
+                    if environment.body_origin() != *body
+                        || environment.params() != params
+                        || environment.capture_origins().len() != captures.len()
+                    {
+                        return Err(unsupported(
+                            "BoundaryClosureEnvironment",
+                            "a represented boundary closure changed after unit-result preflight",
+                        ));
+                    }
+                    self.emit_boundary_closure_environment(builder, &environment, captures)
+                }
+                Lowered::Closure {
+                    boundary_environment: None,
+                    ..
+                }
                 | Lowered::DeclarationClosure { .. }
                 | Lowered::ComputationalRecursorClosure { .. } => Err(unsupported(
                     lowered_value_kind(value),
@@ -3387,9 +3706,34 @@ impl<'a> Lowering<'a> {
                         if *bound != seat || ordinal != declared_ordinal {
                             false
                         } else {
-                            let planned = self
-                                .static_transition_plan
-                                .checked_ih_capture_origin(owner, seat, *declared_ordinal)?;
+                            let planned = match path.root_kind() {
+                                SynthesizedAggregateRoot::CheckedIhCapturedEnvironment => self
+                                    .static_transition_plan
+                                    .checked_ih_capture_origin(owner, seat, *declared_ordinal)?,
+                                SynthesizedAggregateRoot::BoundaryClosureEnvironment => self
+                                    .static_transition_plan
+                                    .boundary_closure_environment(owner, seat)?
+                                    .and_then(|environment| {
+                                        environment
+                                            .capture_origins()
+                                            .get(*declared_ordinal as usize)
+                                            .copied()
+                                    })
+                                    .ok_or_else(|| {
+                                        unsupported(
+                                            "BoundaryClosureEnvironment",
+                                            "a boundary closure capture has no exact planned source occurrence",
+                                        )
+                                    })?,
+                                SynthesizedAggregateRoot::HostResultError
+                                | SynthesizedAggregateRoot::HostResultOk
+                                | SynthesizedAggregateRoot::UnitBoundaryEnvironment => {
+                                    return Err(unsupported(
+                                        "BoundaryClosureEnvironment",
+                                        "a positional closure capture was reconciled under a non-capture aggregate root",
+                                    ));
+                                }
+                            };
                             *origin == planned
                         }
                     }
@@ -3546,6 +3890,134 @@ impl<'a> Lowering<'a> {
                 self.emit_carrier_store_field(builder, word, position, child)?;
             }
             Ok(LoweringOperand::Carried(word))
+        }
+
+        /// Materialize only the positional environment of one statically
+        /// described lexical closure crossing a generated-unit boundary.
+        ///
+        /// The descriptor is compile-time code identity. The emitted aggregate
+        /// contains captures only and deliberately has no tag id, body word, or
+        /// callable identity. A consumer can reconstruct the compiler-private
+        /// closure capsule only from the same descriptor.
+        pub(super) fn emit_boundary_closure_environment(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            environment: &BoundaryClosureEnvironment,
+            captures: &[LoweringOperand],
+        ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+            let owner = self.defining_emission_owner.ok_or_else(|| {
+                unsupported(
+                    "BoundaryClosureEnvironment",
+                    "a boundary closure environment is being emitted outside a declared owner",
+                )
+            })?;
+            if owner != environment.owner() {
+                return Err(unsupported(
+                    "BoundaryClosureEnvironment",
+                    "a boundary closure environment descriptor names another emission owner",
+                ));
+            }
+            let seat = environment.seat();
+            let record = self
+                .static_transition_plan
+                .aggregate_record_view(environment.record())?;
+            if record.shape() != PlannedAggregateShape::Constructor {
+                return Err(unsupported(
+                    "BoundaryClosureEnvironment",
+                    "a boundary closure environment is not planned as a positional aggregate",
+                ));
+            }
+            let declared = record.declared_children().ok_or_else(|| {
+                unsupported(
+                    "BoundaryClosureEnvironment",
+                    "a boundary closure environment has no declared positional child model",
+                )
+            })?;
+            if declared.len() != captures.len()
+                || environment.capture_origins().len() != captures.len()
+            {
+                return Err(unsupported(
+                    "BoundaryClosureEnvironment",
+                    "the boundary closure descriptor, planned record, and captured operand run disagree on arity",
+                ));
+            }
+
+            let mut arguments = Vec::with_capacity(captures.len());
+            for (position, (origin, value)) in environment
+                .capture_origins()
+                .iter()
+                .copied()
+                .zip(captures.iter().cloned())
+                .enumerate()
+            {
+                let ordinal = u32::try_from(position).map_err(|_| {
+                    unsupported(
+                        "BoundaryClosureEnvironment",
+                        "a boundary closure capture ordinal exceeds the positional identity space",
+                    )
+                })?;
+                arguments.push(SynthesizedArgument::WorkerCaptureOperand {
+                    seat,
+                    ordinal,
+                    origin,
+                    value,
+                });
+            }
+            let path = SynthesizedAggregatePath::root(
+                SynthesizedAggregateRoot::BoundaryClosureEnvironment,
+            );
+            self.reconcile_declared_children(
+                owner,
+                seat,
+                &path,
+                declared,
+                &arguments,
+                &ClaimedEffectSeats::none(),
+            )?;
+
+            // The complete environment is screened before its parent exists.
+            for argument in &arguments {
+                let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
+                    unreachable!("this emitter constructs only positional capture arguments")
+                };
+                if let LoweringOperand::Specialized(value) = value {
+                    value.boundary_transfer_admissibility()?;
+                    self.source_aggregate_preflight(value)?;
+                }
+            }
+
+            let template = Lowered::Constructor {
+                constructor: RuntimeSymbol::from("compiler:boundary-closure-environment"),
+                synthesized_identity: None,
+                occurrence: Some(environment.record()),
+                args: Vec::new(),
+            };
+            let (occurrence, class) = self.aggregate_carrier_authority(
+                seat,
+                &template,
+                PlannedAggregateShape::Constructor,
+            )?;
+            let word = self.emit_checked_aggregate_alloc(
+                builder,
+                GovernedAllocationSite::SourceConstructor,
+                occurrence,
+                PlannedAggregateShape::Constructor,
+                class,
+                arguments.len(),
+            )?;
+            for (position, argument) in arguments.into_iter().enumerate() {
+                let SynthesizedArgument::WorkerCaptureOperand { origin, value, .. } = argument else {
+                    unreachable!("this emitter constructs only positional capture arguments")
+                };
+                let child = match value {
+                    LoweringOperand::Carried(word) => word,
+                    LoweringOperand::Specialized(value) => {
+                        self.transfer_into_carrier(builder, origin, &value)?
+                    }
+                };
+                self.emit_carrier_store_field(builder, word, position, child)?;
+            }
+            Ok(word)
         }
 
         /// Build one alternative of a compiler-synthesized dynamic constructor.

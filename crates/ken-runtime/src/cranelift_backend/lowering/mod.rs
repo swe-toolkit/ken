@@ -238,7 +238,8 @@ pub(in crate::cranelift_backend) use super::planning::{
     // eliminator checks its assembled run against it. ⛔ Ungated here and in
     // `planning.rs`, because a `cfg(test)` re-export of an item production reads
     // is an unresolved import the test profile cannot see.
-    CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhEnvironmentTransport,
+    BoundaryClosureEnvironment, CheckedCaseBinderLayout, CheckedCaseBinderRole,
+    CheckedIhEnvironmentTransport,
     CheckedIhTransportInputDestination, CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
     DeclarationCallTargetClass,
     ContinuationContextId, ContinuationEmissionOwner,
@@ -3308,6 +3309,11 @@ enum Lowered {
         captures: Vec<LoweringOperand>,
         params: Vec<String>,
         body: StaticOriginId,
+        /// Planner-issued identity of the positional boundary environment this
+        /// capsule was reconstructed from. `None` for every ordinary local
+        /// closure. This is environment authority, not body identity; `body`
+        /// remains the sole code identity and the word carries no runtime tag.
+        boundary_environment: Option<AggregateOccurrenceId>,
     },
     DeclarationClosure {
         /// **`RT-DECL-CLOSURE-PORT` `D4` — the planner-issued
@@ -6515,6 +6521,14 @@ impl<'a> Lowering<'a> {
             invoking_site: D2K_BOUNDARY_TRANSFER_INVOKING_SITE
                 .with(std::cell::Cell::get),
         });
+        // The test-only retired flat-order control intentionally receives no
+        // M4 representation: it is a rejection witness, not another bind edge.
+        // The switch is absent from ordinary artifacts by cfg construction.
+        if value.contains_boundary_closure_environment()?
+            && !px8ds_retired_flat_order_enabled()
+        {
+            return self.transfer_bind_continuation_boundary_value(builder, origin, value);
+        }
         value.boundary_transfer_admissibility()?;
         self.source_aggregate_preflight(value)?;
         self.emit_carrier_transfer(builder, origin, value)

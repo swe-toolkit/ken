@@ -1556,6 +1556,7 @@ mod tests {
             captures: Vec::new(),
             params: Vec::new(),
             body: origin,
+            boundary_environment: None,
         }
     }
 
