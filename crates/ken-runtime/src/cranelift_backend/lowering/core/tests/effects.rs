@@ -12,6 +12,10 @@ use cranelift_module::default_libcall_names;
 
 use crate::cranelift_backend::artifact::native_isa_for_lowering_tests as native_isa;
 
+use super::constructors::{
+    ac_c7_bind_arena, c2_compile_edge_with_arg, c2_run_edge_with_arg,
+};
+
 /// Exercise the checked-reply mint without involving any resource operation.
 /// The fixture deliberately enters through `mint_validated_progress_nat`, so
 /// tests cannot manufacture the compact carrier through a second constructor.
@@ -2696,6 +2700,231 @@ fn seats_of_equal_structural_kind_stay_distinct_on_operation_ordinal_and_need() 
         open_capability.1,
         contract(ken_host::HostOpV1::ResourceRelease, EffectSeatSlot::Argument(0)).1,
         "a capability token and a resource handle share one need"
+    );
+}
+
+fn compile_resource_token_seat_probe() -> (JITModule, *const u8) {
+    static SOURCE: RuntimeExpr = RuntimeExpr::Var(0);
+    let (plan, origin) = planned_root_occurrence(&SOURCE);
+    let seed_env = NativeSeedEnvironment::empty();
+    c2_compile_edge_with_arg(
+        "resource_token_transport_tag_probe",
+        &seed_env,
+        plan,
+        move |compiler, builder, scalar| {
+            let word = compiler.transfer_into_carrier(
+                builder,
+                origin,
+                &Lowered::ResourceToken { value: scalar },
+            )?;
+            let semantic_tag = compiler.emit_carrier_tag(builder, word)?;
+            Lowering::require_i64(builder, semantic_tag, 0);
+            compiler.lower_resource_token_seat(
+                builder,
+                &LoweringOperand::Carried(word),
+                "resource tag-domain control",
+                "argument 0",
+            )
+        },
+    )
+}
+
+/// Durable invariant: the resource-token seat reads the transport tag byte,
+/// not the borrowed node's unrelated semantic constructor identity.
+///
+/// MEASURED: the production transfer mints an `InvocationBorrowed` /
+/// `BorrowedOpaque` node whose semantic tag is exactly zero, and the production
+/// resource seat returns its full scalar unchanged.
+/// CLAIMED: a tag-7 resource handle is admitted by its transport tag even when
+/// its semantic node identity is not 7.
+/// THE GAP: this control isolates the tag vocabulary; the hostile row below
+/// independently proves the tag guard still refuses before later projections.
+#[test]
+fn resource_token_seat_reads_the_transport_tag_not_semantic_node_identity() {
+    let (_module, code) = compile_resource_token_seat_probe();
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    for scalar in [0x0123_4567_89ab_cdef, i64::MAX] {
+        assert_eq!(
+            c2_run_edge_with_arg(code, base, scalar),
+            scalar,
+            "the tag-7 BorrowedOpaque resource scalar must survive exactly"
+        );
+    }
+}
+
+extern "C" fn resource_class_projection_probe(
+    counters: *mut u64,
+    _word: u64,
+    out: *mut u64,
+) -> i64 {
+    // SAFETY: the focused JIT rig passes a live two-word counter and an
+    // eight-byte Cranelift stack slot.
+    unsafe {
+        *counters = (*counters).saturating_add(1);
+        *out = BoundaryClass::BorrowedOpaque as u64;
+    }
+    0
+}
+
+extern "C" fn resource_scalar_projection_probe(
+    counters: *mut u64,
+    _word: u64,
+    out: *mut u64,
+) -> i64 {
+    // SAFETY: the focused JIT rig passes a live two-word counter and an
+    // eight-byte Cranelift stack slot.
+    unsafe {
+        *counters.add(1) = (*counters.add(1)).saturating_add(1);
+        *out = 91;
+    }
+    0
+}
+
+fn compile_wrong_resource_tag_order_probe() -> (JITModule, *const u8) {
+    static SOURCE: RuntimeExpr = RuntimeExpr::Var(0);
+    let (plan, _) = planned_root_occurrence(&SOURCE);
+    let isa = native_isa().expect("native ISA");
+    let mut jit = JITBuilder::with_isa(isa, default_libcall_names());
+    jit.symbol(
+        "resource_class_projection_probe",
+        resource_class_projection_probe as *const u8,
+    );
+    jit.symbol(
+        "resource_scalar_projection_probe",
+        resource_scalar_projection_probe as *const u8,
+    );
+    let mut module = JITModule::new(jit);
+    let native = crate::native_int_clif::emit_native_int_local_graph(&mut module, false)
+        .expect("native-int graph emits");
+    let boundary_plan = crate::boundary_value::BoundaryEmissionPlan::derive();
+    let helpers = crate::boundary_value_clif::emit_boundary_value_local_graph(
+        &mut module,
+        &native,
+        &boundary_plan,
+    )
+    .expect("boundary carrier graph emits");
+    let pointer = module.target_config().pointer_type();
+    let mut observer_signature = module.make_signature();
+    observer_signature.params.extend([
+        AbiParam::new(pointer),
+        AbiParam::new(pointer),
+        AbiParam::new(pointer),
+    ]);
+    observer_signature.returns.push(AbiParam::new(types::I64));
+    let class_probe = module
+        .declare_function(
+            "resource_class_projection_probe",
+            Linkage::Import,
+            &observer_signature,
+        )
+        .expect("class projection probe declares");
+    let scalar_probe = module
+        .declare_function(
+            "resource_scalar_projection_probe",
+            Linkage::Import,
+            &observer_signature,
+        )
+        .expect("scalar projection probe declares");
+
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer));
+    signature.params.push(AbiParam::new(types::I64));
+    signature.returns.push(AbiParam::new(types::I64));
+    let func_id = module
+        .declare_function("wrong_resource_tag_order_probe", Linkage::Local, &signature)
+        .expect("resource tag-order probe declares");
+    let mut context = module.make_context();
+    context.func =
+        Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
+    let class = module.declare_func_in_func(class_probe, &mut context.func);
+    let scalar = module.declare_func_in_func(scalar_probe, &mut context.func);
+    let seed_env = NativeSeedEnvironment::empty();
+    let mut compiler = super::constructors::bare_carrier_test_lowering(&seed_env, plan);
+    compiler.function_local.boundary_carrier = Some(BoundaryCarrierRefs {
+        class,
+        tag: module.declare_func_in_func(helpers.tag, &mut context.func),
+        field_count: module.declare_func_in_func(helpers.field_count, &mut context.func),
+        field: module.declare_func_in_func(helpers.field, &mut context.func),
+        record_field: module.declare_func_in_func(helpers.record_field, &mut context.func),
+        scalar,
+        host_success: module.declare_func_in_func(helpers.host_success, &mut context.func),
+        host_payload: module.declare_func_in_func(helpers.host_payload, &mut context.func),
+        alloc: module.declare_func_in_func(helpers.alloc, &mut context.func),
+        store_tag_id: module.declare_func_in_func(helpers.store_tag_id, &mut context.func),
+        store_scalar: module.declare_func_in_func(helpers.store_scalar, &mut context.func),
+        store_field: module.declare_func_in_func(helpers.store_field, &mut context.func),
+        store_name: module.declare_func_in_func(helpers.store_name, &mut context.func),
+        make_immediate: module.declare_func_in_func(helpers.make_immediate, &mut context.func),
+        store_int_tag: module.declare_func_in_func(helpers.store_int_tag, &mut context.func),
+        store_bytes_len: module.declare_func_in_func(helpers.store_bytes_len, &mut context.func),
+        store_byte: module.declare_func_in_func(helpers.store_byte, &mut context.func),
+        store_int_limbs: module.declare_func_in_func(helpers.store_int_limbs, &mut context.func),
+        store_int_limb: module.declare_func_in_func(helpers.store_int_limb, &mut context.func),
+        seal_int: module.declare_func_in_func(helpers.seal_int, &mut context.func),
+        int_view: module.declare_func_in_func(helpers.int_view, &mut context.func),
+        bytes_view: module.declare_func_in_func(helpers.bytes_view, &mut context.func),
+    });
+    let mut function_context = FunctionBuilderContext::new();
+    {
+        let mut builder = FunctionBuilder::new(&mut context.func, &mut function_context);
+        let entry = builder.create_block();
+        builder.append_block_params_for_function_params(entry);
+        builder.switch_to_block(entry);
+        let parameters = builder.block_params(entry).to_vec();
+        compiler.function_local.boundary_arena = Some(parameters[0]);
+        super::constructors::bind_bare_test_trap_lane(&mut compiler, &mut builder);
+        let result = compiler
+            .lower_resource_token_seat(
+                &mut builder,
+                &LoweringOperand::Carried(CarriedBoundaryWord {
+                    word: parameters[1],
+                }),
+                "resource tag-domain hostile control",
+                "argument 0",
+            )
+            .expect("the resource-seat hostile rig emits");
+        builder.ins().return_(&[result]);
+        builder.seal_all_blocks();
+        builder.finalize();
+    }
+    module
+        .define_function(func_id, &mut context)
+        .expect("resource tag-order probe defines");
+    module.finalize_definitions().expect("JIT finalizes");
+    let code = module.get_finalized_function(func_id);
+    (module, code)
+}
+
+/// Durable invariant: a wrong transport tag refuses before the resource seat
+/// asks either the class or scalar projection for an answer.
+///
+/// MEASURED: a tag-1 word returns the carried refusal and both projection hit
+/// counters remain zero, even though the focused stubs would answer the later
+/// class and scalar guards successfully if reached.
+/// CLAIMED: the exact `InvocationBorrowed` transport guard is first and remains
+/// fail-closed independently of the later `BorrowedOpaque` and scalar guards.
+/// THE GAP: the stubs isolate ordering rather than representation legality; the
+/// real-helper positive above proves the lawful tag-7/class-8 representation.
+#[test]
+fn resource_token_seat_refuses_a_wrong_low_tag_before_class_and_scalar() {
+    let (_module, code) = compile_wrong_resource_tag_order_probe();
+    let function: extern "C" fn(*mut u64, i64) -> i64 = unsafe { std::mem::transmute(code) };
+    let mut projection_hits = [0_u64; 2];
+    let wrong_tag = crate::boundary_value::BoundaryWord::immediate(
+        crate::boundary_value::BoundaryTag::ImmediateInt,
+        17,
+    )
+    .0 as i64;
+    assert_eq!(
+        function(projection_hits.as_mut_ptr(), wrong_tag),
+        -1,
+        "the wrong low tag must refuse"
+    );
+    assert_eq!(
+        projection_hits,
+        [0, 0],
+        "class/scalar projection ran before the low-tag refusal"
     );
 }
 
