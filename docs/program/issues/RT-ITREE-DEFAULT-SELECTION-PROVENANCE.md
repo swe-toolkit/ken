@@ -1,7 +1,7 @@
 ---
 id: RT-ITREE-DEFAULT-SELECTION-PROVENANCE
 title: "AC-5 successor exposed by identity-preserving trap provenance — an admitted checked program's runtime lowering SELECTS the generated ITree-elimination fail-closed default (planned identity 40, PatternMatchFailure 'no runtime match case selected for ...::ITree') where the synthesized Err InvalidOffset should continue through the checked ITree/result path. The erasure default VALUE (erasure.rs:2740-2744) is CORRECT and fail-closed; the first causally wrong authority is the lowering branch that selected it, and identity 40 cannot locate the occurrence (Planner::intern_trap value-dedups). First deliverable is occurrence localization by graph-derived StaticOriginId, not repair."
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,25 @@ github: null
 origin: "Steward, 2026-08-25, from the Architect AC-5 ruling (evt_3rq4xafrf7cqf, thr_6gmh4p1m0gch4) on runtime WIP 7094c29cd. Preserving the root generated-unit failure's planned trap identity (RT-UNIT-FAILURE-STATUS-PROVENANCE) exposed a DISTINCT downstream producer: the checked ITree-elimination default is selected for an admitted program. The Architect ruled AC-5 valid and directed this be framed as its own object (explicitly NOT the prohibited -3-vs-4 'third node'; it is a different producer requiring its own object read). Steward framing call per COORDINATION section 2."
 ---
 
+> # RELEASED 2026-08-25 — dependency landed; base re-grounded to current main
+>
+> [[RT-UNIT-FAILURE-STATUS-PROVENANCE]] merged at `2a5b3cd0e` (honest witness-path
+> provenance: the exact row now reports planned identity `40` /
+> `PatternMatchFailure`, not `unknown terminal sentinel`). This node's `depends_on`
+> is satisfied; flipped to
+> `ready`. Runtime resumes here NEXT in the lane-1 sequence;
+> [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] (ReadSome/Wrote) and the final
+> ReadEof/un-ignore/CI-rearm fold follow after this lands — none co-run, all touch
+> `calls.rs`.
+>
+> BASE re-grounded to current `origin/main` `2a5b3cd0e`: build D0's occurrence
+> localization against the LANDED honest-red witness there, not the superseded WIP.
+> WIP `7094c29cd` in Fixed inputs remains only the exposing evidence; the trigger
+> rows (the read-offset + write-offset positioned full programs) now reproduce the
+> identity-`40` / `PatternMatchFailure` state directly on `2a5b3cd0e`. Reviewers
+> Architect + runtime-qa unchanged; D0 may HARD-STOP to an Architect object read if
+> it exposes a further distinct authority (do NOT repair from current evidence).
+>
 > # FRAMED 2026-08-25 — distinct AC-5 successor (Architect ruling evt_3rq4xafrf7cqf)
 >
 > Exposed by the AC-5 hard stop on WIP `7094c29cd`: once the root generated-unit
