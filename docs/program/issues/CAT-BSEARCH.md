@@ -1,7 +1,7 @@
 ---
 id: CAT-BSEARCH
 title: "Decidable ordered search — Algorithm/Searching: membership over a sorted List returning a Dec proof, target 3 of the Foundation expressibility trial"
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none
@@ -10,6 +10,9 @@ blocks: []
 github: null
 origin: "Foundation expressibility trial (docs/program/wp/foundation-expressibility-trial.md), operator-directed 2026-08-21. Steward-filed, functional-build phase-1 scope. Target 3 of 5, non-sequential. Independent of CAT-SORT — sortedness enters as a hypothesis, not a build dependency."
 ---
+
+> # MERGED 2026-08-25 — CAT-BSEARCH catalog entry landed at `e1e59c7a7`.
+> Foundation expressibility trial target 3/5 complete.
 
 ## Objective
 

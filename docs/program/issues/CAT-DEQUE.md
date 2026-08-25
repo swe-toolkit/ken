@@ -1,7 +1,7 @@
 ---
 id: CAT-DEQUE
 title: "Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial"
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none
@@ -10,6 +10,9 @@ blocks: []
 github: null
 origin: "Foundation expressibility trial (docs/program/wp/foundation-expressibility-trial.md), operator-directed 2026-08-21. Steward-filed, functional-build phase-1 scope. Target 2 of 5, non-sequential."
 ---
+
+> # MERGED 2026-08-25 — CAT-DEQUE catalog entry landed at `5e6150765`.
+> Foundation expressibility trial target 2/5 complete.
 
 ## Objective
 

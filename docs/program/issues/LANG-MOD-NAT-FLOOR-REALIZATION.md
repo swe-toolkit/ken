@@ -1,6 +1,6 @@
 ---
 id: LANG-MOD-NAT-FLOOR-REALIZATION
-title: "Realize the landed nine-name prelude floor in the elaborator: extend the strict resolution floor from the implemented {Bool, Char, List} to the landed closed set {Auth, Bool, Char, List, Nat, Option, ResourceKind, Result, Utf8Error}, binding each name to its EXISTING GlobalId (kernel {Nat, Zero, Suc}; the five signature-arm names the implemented floor under-counted), no new family/Decl/GlobalId, fail-closed on non-canonical origin, zero trusted_base() delta. The build half of the Nat prerequisite."
+title: "Realize the landed nine-name prelude floor in the elaborator, BOTH halves: (a) admission — extend the strict resolution floor from the implemented {Bool, Char, List} to the landed closed set {Auth, Bool, Char, List, Nat, Option, ResourceKind, Result, Utf8Error}, binding each name to its EXISTING GlobalId (no new family/Decl/GlobalId, zero trusted_base() delta); and (b) immutability — fail closed on every same-spelling floor parent OR constructor collision with AmbiguousReference BEFORE any allocation, in every top-level module scope regardless of prefix, qualified/renamed access the lawful escape. The build half of the Nat prerequisite."
 status: ready
 owner: language
 size: M
@@ -11,70 +11,101 @@ github: null
 origin: "Steward-filed 2026-08-25 as the build half of the operator-ruled Nat prelude-floor approach (Decision dec_1kqwn6hdvn7d2), split from the reframed spec WP [[LANG-MOD-NAT-PROVIDER-INTERFACE]]. Under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
-> # RELEASED 2026-08-25 — spec WP landed (nine-floor); operator CLEARED the 3->9
+> # FRAME CORRECTED 2026-08-25 — floor-immutability half added (Architect reject)
 >
-> The spec WP [[LANG-MOD-NAT-PROVIDER-INTERFACE]] MERGED (b7f73f1d): the amended
-> `30-taxonomy §4` membership rule + coupled sections + conformance pins are on
-> `main`, and the landed closed floor is the NINE-name set, not the four this
-> node first drafted. This node executes those landed pins in the elaborator; it
-> does not decide the rule.
+> The Architect REJECTED the first respin `b6a576c63` (evt_wnjne3e48qbz): the
+> nine-member admission and identity reuse are SOUND, but the candidate left the
+> landed floor-IMMUTABILITY contract unimplemented and added a test that
+> positively required the forbidden allocation. That was a frame/spec
+> contradiction, not ring discretion — the prior AC-IDENTITY permitted a
+> source-level `data Nat` to allocate a distinct `Entry.Nat`, which the landed
+> spec forbids. The Steward owns the frame; this correction implements the
+> landed contract before the ring respins. Any respin voids the prior verdict.
 >
-> RELEASED (kickoff evt_5wdckv9xbp11r). The floor expansion — strict scope
-> resolves all nine floor names ambiently, six more than the implemented
-> `[Bool, Char, List]` — is a real behavior change; the Steward flagged it to the
-> operator (Pat) and the operator CLEARED it this session. The merge gate is
-> LIFTED: this proceeds as a normal build WP (candidate -> CV + Architect review
-> -> merge), no operator hold. (The Steward ruled the expansion mechanical closure
-> of dec_1kqwn6hdvn7d2, zero-TCB; the operator concurred.)
+> What changed: AC-IDENTITY (allocate-distinct) is REPLACED by AC-FLOOR-IMMUTABILITY
+> (reject same-spelling before allocation, the landed one-axis matrix); D2 (the
+> fail-closed collision half) is added; the objective/seam now name the
+> whole-binding-set contract, not admission alone. The admission half (AC-NINE,
+> AC-2 flip, zero-trust) the Architect approved is UNCHANGED.
+>
+> RELEASED for respin (kickoff evt_5wdckv9xbp11r stands; merge gate LIFTED per
+> operator clearance of the 3->9). Normal build WP: candidate -> CV + Architect
+> review -> merge.
 
 ## Objective
 
-Extend the strict resolution floor from the implemented `{Bool, Char, List}` to
-the LANDED closed nine-name set `{Auth, Bool, Char, List, Nat, Option,
-ResourceKind, Result, Utf8Error}` (landed `30-taxonomy §4`: "floor installation
-reuses all nine existing `GlobalId`s and allocates nothing"). Each name binds to
-its EXISTING identity — the kernel-checked `{Nat, Zero, Suc}` (created before
-source by `register_prelude`) for the bootstrap-arm member, and the existing
+Realize the landed nine-name prelude floor as a whole-binding-set contract with
+two halves.
+
+Half (a) ADMISSION. Extend the strict resolution floor from the implemented
+`{Bool, Char, List}` to the LANDED closed nine-name set `{Auth, Bool, Char,
+List, Nat, Option, ResourceKind, Result, Utf8Error}` (landed `30-taxonomy §4` /
+`spec/30-surface/33-declarations.md:250-266`). Each name binds its EXISTING
+identity — the kernel-checked `{Nat, Zero, Suc}` (created before source by
+`register_prelude`) for the bootstrap-arm member, and the existing
 surface/stdlib identities for the eight signature-arm names — allocating no
-second family, no new `Decl`/`GlobalId`, and adding zero `trusted_base()`
-entries. Non-canonical origins (a source-level redeclaration of a floor name, e.g.
-a fresh `data Nat`) fail closed: they do not satisfy the identity. `Nat` (with
-`Zero`/`Suc`) is the headline new admission; the five signature-arm names the
-implemented floor under-counted (`Auth`, `Option`, `ResourceKind`, `Result`,
-`Utf8Error`) are the rest of the gap.
+second family, no new `Decl`/`GlobalId`, adding zero `trusted_base()` entries.
 
-## The seam (grounded by WP-2, re-measure at release)
+Half (b) IMMUTABILITY. The floor is not merely admitted, it is unshadowable.
+Per landed `33-declarations.md:250-266`, prelude bindings are the immutable
+primitive floor: a top-level local that clashes with the floor by spelling —
+whether a floor PARENT (`Nat`, `Option`, …) or a floor CONSTRUCTOR (`Zero`,
+`Some`, `Err`, … whose kernel-recorded parent is a floor parent) — must fail
+closed with `AmbiguousReference` naming the retained floor spelling, BEFORE any
+declaration or `GlobalId` is allocated, in EVERY top-level module scope
+regardless of module prefix. Qualified or renamed access remains the lawful
+escape; an all-renamed same-shape family is accepted with distinct local ids.
+A source-level `data Nat = …` does NOT allocate a distinct `Entry.Nat`; it is
+rejected. This is the half the first respin omitted.
 
-WP-2 landed the strict floor as a fixed name set + admission filter in
-`crates/ken-elaborator/src/modules.rs`: `PRELUDE_FLOOR_NAMES = [Bool, Char,
-List]`, installed by `install_prelude_floor`, with `capture_strict_builtin_names`
-admitting trusted native names + closed-floor constructors, and strict
-`resolve_ref` fail-close. Today `resolve_ref` REJECTS `Nat` (and the other five
-under-counted signature-arm names) under Strict, and
-`lang_mod_catalog_realization.rs:81-117` pins the `Nat` rejection. The realization
-extends `PRELUDE_FLOOR_NAMES` + the admission filter to the landed nine, binding
-each name (and each inductive floor member's constructors, e.g. `Zero`/`Suc`) to
-its existing GlobalId — not a re-declared family. D0 censuses exactly which of the
-nine are already admitted vs missing at this seam before the flip.
+## The seam (grounded by WP-2 + the landed spec; re-measure at release)
+
+Admission seam (built): `crates/ken-elaborator/src/modules.rs`
+`PRELUDE_FLOOR_NAMES = [Bool, Char, List]`, installed by `install_prelude_floor`,
+`capture_strict_builtin_names` deriving admitted constructors by exact kernel
+parent, strict `resolve_ref` fail-close. `lang_mod_catalog_realization.rs:81-117`
+pins the strict-`Nat` REJECT (flipped to ACCEPT by AC-2).
+
+Immutability seam (the omitted defect, from the Architect reject): the collision
+guard at `modules.rs:1676-1683` rejects a floor-name local ONLY when
+`prefix.is_empty()`. Strict roots elaborate a unit under a non-empty module
+prefix such as `Entry`, so `data Nat = …` bypasses the guard and binds
+`Entry.Nat` locally. The constructor loops at `modules.rs:1687-1698` call
+`bind_local` without consulting the floor binding set at all, so a renamed
+parent carrying a constructor spelled `Zero`/`Some`/`Err`/… shadows the
+canonical floor constructor. Conformance
+`conformance/surface/modules/seed-modules.md:564-592`
+(`prelude-floor-clash-and-lookalike-matrix`) records this exactly: "current root
+loading still admits and shadows a same-spelling floor declaration" is the
+implementation defect this realization must redden on.
 
 ## Deliverables
 
-- D0 (buildability probe / census FIRST). At the WP-2 seam, census which of the
-  landed nine floor names are ALREADY admitted by `PRELUDE_FLOOR_NAMES` +
-  `capture_strict_builtin_names` and which are missing (expected missing: `Nat`
-  and the five under-counted signature-arm names `Auth`, `Option`,
-  `ResourceKind`, `Result`, `Utf8Error` — re-measure, do not assume). Confirm each
-  missing name (and each inductive member's constructors) binds its EXISTING
-  GlobalId (reuse, not mint) under the landed rule. Output: the exact admission
-  gap the D1 flip must close.
-- D1. Extend `PRELUDE_FLOOR_NAMES` + the admission filter to the landed nine,
-  binding each name and its constructors to existing GlobalIds; flip the
-  strict-Nat control (see AC-2); satisfy the landed conformance pins. Add no new
+- D0 (census FIRST). At the admission seam, census which of the landed nine are
+  already admitted vs missing (expected missing: `Nat` + `Auth`, `Option`,
+  `ResourceKind`, `Result`, `Utf8Error` — re-measure). Confirm each missing name
+  (and each inductive member's constructors) binds its EXISTING GlobalId (reuse,
+  not mint). Output: the exact admission gap D1 closes.
+- D1 (admission). Extend `PRELUDE_FLOOR_NAMES` + the admission filter to the
+  landed nine, binding each name and its constructors to existing GlobalIds; flip
+  the strict-`Nat` control (AC-2); satisfy the landed admission pins. Add no new
   family/`Decl`/`GlobalId`; zero `trusted_base()` delta.
+- D2 (immutability — the fail-closed collision half). Per the Architect
+  correction (evt_wnjne3e48qbz):
+  1. Keep `PRELUDE_FLOOR_NAMES` exactly the nine TYPE names — do not list
+     constructors there, do not widen to arbitrary globals.
+  2. Derive a SEPARATE unshadowable floor-binding set from those exact parent
+     `GlobalId`s plus only the constructor names whose kernel-recorded parent is
+     one of them. Do NOT reuse all `strict_builtin_names` — that would conflate
+     the closed floor with trusted/native vocabulary.
+  3. Before allocation, make `prebind_scope_declarations` reject every top-level
+     local binding in that set regardless of module prefix, including
+     constructor bindings inside a renamed family. Apply the same binding set to
+     selective-import collisions; qualified or renamed access remains lawful.
 
 ## Acceptance criteria
 
-Inherits the spec WP's landed acceptance pins (AC-1 identity, AC-2 strict-accept,
+Inherits the spec WP's landed admission pins (AC-1 identity, AC-2 strict-accept,
 AC-3 closed-floor-not-catch-all, AC-4 zero-trust/zero-allocation) as its
 executable target, plus:
 
@@ -89,21 +120,40 @@ executable target, plus:
   closed-floor guard). The accept/reject discriminating controls extend to ALL
   added families (`Nat` and the five under-counted signature-arm names), not
   `Nat` alone — a per-name control, so silently dropping one family is caught.
-- AC-IDENTITY. A second, source-level `data Nat = Zero | Suc Nat` in a unit
-  resolves to a DISTINCT family and does not collide with / shadow the floor Nat.
+- AC-FLOOR-IMMUTABILITY (REPLACES the prior AC-IDENTITY; the landed one-axis
+  matrix from `seed-modules.md:564-592`). Using a fresh strict-roots environment
+  per row, for each of the eight inductive floor parents:
+  1. keep only the PARENT spelling canonical while renaming all its constructors
+     — rejects with `AmbiguousReference` naming the retained floor spelling;
+  2. in separate entries, keep only ONE CONSTRUCTOR spelling canonical while
+     renaming the parent and all sibling constructors — rejects with
+     `AmbiguousReference`;
+  3. as the reaching positive, rename the parent and every constructor while
+     preserving the same declaration shape — ACCEPTS with ids distinct from
+     every floor id and each constructor's parent its renamed local former.
+  For constructor-free `Char`: `def Char = Int` rejects; the same-production
+  positive `def LocalChar = Int` accepts as a distinct checked transparent id.
+  Every same-spelling reject fires BEFORE any declaration or `GlobalId` is
+  allocated (assert unchanged declaration count / `next_global_id` / allocator at
+  the reject); every row preserves `trusted_base()`. The reject must fire under a
+  NON-EMPTY module prefix (e.g. `Entry`), pinning the `prefix.is_empty()` bypass
+  closed. A generic `expect_err` or a single all-names-collide fixture does not
+  satisfy this — the one-axis rows plus same-production positives are required.
 - AC-NO-REGRESSION. Whole-suite green in CI; the WP-2 strict-resolution controls
   (`n2_in_repo_loader.rs`, `n3_import_exclusion.rs`, `l_resolver_globals.rs`
   legacy) stay green; flat-Σ pin green; local targeted `-p` only.
 
 ## Reviewers
 
-conformance-validator (identity + accept/reject discriminators with the new
-closed floor) + Architect (the identity reuse must not grow the TCB and the
-legacy passthrough must be untouched).
+conformance-validator (admission identity + the floor-immutability collision
+matrix against the landed seed) + Architect (identity reuse must not grow the
+TCB; the fail-closed collision must cover the whole binding set — nine parents
+plus exact-parent-derived constructors — in every top-level scope, not just the
+empty-prefix type-name case).
 
 ## Capability tier
 
-T1 (a soundness-bearing floor extension threading kernel-identity reuse through
-the strict admission seam; the fail-closed-on-redeclaration invariant is
-load-bearing). Size M — smaller than the spec WP; it executes a specified pin
-set against a seam WP-2 already built.
+T1 (a soundness-bearing floor realization: kernel-identity reuse through the
+strict admission seam AND a fail-closed immutability invariant over the whole
+binding set; both are load-bearing). Size M — it executes a specified pin set
+against a seam WP-2 already partly built; the collision half is the added work.
