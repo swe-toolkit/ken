@@ -1,7 +1,7 @@
 ---
 id: RT-GENERATED-CONTINUATION-OPERAND-PAIRING
 title: "Lane-1 successor after the merged HostResult repair — bind px8ta's next causal object: funcid51's Bool eliminator receives a tag-7 InvocationBorrowed carrier where the selected Console Bool(false) (ImmediateBool, tag 0) belongs. D0 produces one exact source-to-slot lineage table for the funcid51 Bool binder; repair at the first authority that pairs the wrong source with that frame slot"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,20 @@ blocks: []
 github: null
 origin: "Steward, 2026-08-25, from the Architect object-distinctness ruling evt_49v063sd0gv68 (thr_1nmda4kcea9wg) on px8ta's post-D1 obstruction. After RT-DYNAMIC D1 (branch-before-transfer) merged at c7541df21, px8ta HALF B advanced past the eager inactive-error residual and now traps at the Bool eliminator in generated funcid51. The Architect grounded the landed blobs at 596428b48 and proved via scratch-only byte-restored probes that the public RuntimeTrap(4) is the -4 root sentinel alias, not causal identity; the object beneath it is an arity-correct but semantically mispaired generated-continuation frame operand. Distinct object, distinct causal class from the merged HostResult-materialization repair. Steward owns the final ID/frame; no Decision fork open (the evidence fixes the layer, the remaining D0 fixes the exact seam). Steward framing call per COORDINATION section 2."
 ---
+
+> # MERGED 2026-08-25 — D1 landed at squash `e10dabf8`
+>
+> D1 (raw-owner ABI `1+4` partition at
+> `units.rs::define_continuation_context_bodies`) merged: candidate `88cb976609`
+> (5 paths, +351/-52) landed as squash `e10dabf8`;
+> Steward blob-audit confirms all 5 paths byte-identical to the candidate and the
+> full candidate/main tree-diff is empty. Both domain gates approved the exact SHA
+> (Architect `evt_30xkxssz3byd6`, runtime-qa `evt_2mgt0d2w55zb2`); Decision
+> `dec_1a99a0fzwq14c` resolved. px8ta HALF B advanced from root sentinel `-4` to
+> `-1` (same `BufferAllocate -> ConsoleIsTerminal(false) -> ResourceRelease`
+> trace) — the correctly-paired `ImmediateBool(false)` now reaches the carried
+> Match consumer, which is the next object. The gated successor
+> [[RT-CARRIED-BOOL-ELIMINATOR-DISPATCH]] is now dependency-unblocked and RELEASED.
 
 > # AMENDED 2026-08-25 — Architect hard-stop #1 (evt_3nm3jvapsf7cp)
 >
