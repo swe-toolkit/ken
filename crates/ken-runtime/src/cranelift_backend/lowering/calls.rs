@@ -2084,9 +2084,17 @@ impl<'a> Lowering<'a> {
                     #[cfg(test)]
                     px8tr_record_trap_provenance(Px8trTrapProvenanceEvent::UnitTrapWordPropagated {
                         seat: PlannedTrapSeat::RootProcessSentinel,
-                        identity_preserved: false,
+                        identity_preserved: true,
                     });
-                    let process_trap = builder.ins().iconst(types::I64, -4);
+                    let shifted = builder.ins().ishl_imm(
+                        trap_word,
+                        crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT,
+                    );
+                    let root_token = builder.ins().bor_imm(
+                        shifted,
+                        crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG,
+                    );
+                    let process_trap = builder.ins().ineg(root_token);
                     builder.ins().return_(&[process_trap]);
                 }
                 Some(TrapExitAuthority::Root {
