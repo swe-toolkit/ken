@@ -11,6 +11,23 @@ github: null
 origin: "Steward, 2026-08-25, from the Architect object-distinctness ruling evt_49v063sd0gv68 (thr_1nmda4kcea9wg) on px8ta's post-D1 obstruction. After RT-DYNAMIC D1 (branch-before-transfer) merged at c7541df21, px8ta HALF B advanced past the eager inactive-error residual and now traps at the Bool eliminator in generated funcid51. The Architect grounded the landed blobs at 596428b48 and proved via scratch-only byte-restored probes that the public RuntimeTrap(4) is the -4 root sentinel alias, not causal identity; the object beneath it is an arity-correct but semantically mispaired generated-continuation frame operand. Distinct object, distinct causal class from the merged HostResult-materialization repair. Steward owns the final ID/frame; no Decision fork open (the evidence fixes the layer, the remaining D0 fixes the exact seam). Steward framing call per COORDINATION section 2."
 ---
 
+> # AMENDED 2026-08-25 — Architect hard-stop #1 (evt_3nm3jvapsf7cp)
+>
+> D0 done and sound: the first mispairing authority is callee environment
+> reconstruction (`units.rs::define_continuation_context_bodies` reversing the
+> coalesced five-slot context `Parameter` run wholesale). The provisional
+> authority-derived repair (split `1 + 4` via the raw owner ABI header, reverse
+> only the source-parameter prefix) advances px8ta from root sentinel `-4` to `-1`.
+> The `-1` is a DISTINCT object — a representation-specific eliminator gap: the
+> correctly-paired `ImmediateBool(false)` hits the node-only carried Match, which
+> refuses immediate scalars. Per the Architect, this WP lands COMPLETE for its own
+> pairing object (honest crossing); AC-3/AC-4 are replaced with pairing-local
+> controls, the WIP pairing test is split, and the Bool consumer is cut as the
+> successor [[RT-CARRIED-BOOL-ELIMINATOR-DISPATCH]]. No Decision (two independently
+> correctable mechanisms). Clean WIP (probes retained, not a candidate):
+> `15abc5eb9255d61bb9033b4e0e236f2c07997d67`. Runtime resumes D1 under the amended
+> gates once this routing lands.
+
 > # First lane-1 object after the merged HostResult repair
 >
 > This is the successor to [[RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE]] (D1

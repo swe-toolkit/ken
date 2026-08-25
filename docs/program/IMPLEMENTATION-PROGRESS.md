@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-25 12:56:55Z — from 445 issue file(s) in `docs/program/issues/`.
+2026-08-25 13:47:30Z — from 446 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -254,6 +254,7 @@ the committed file matches the generator's output.
 | `RT-CAPTURE-CONTEXT-FRAME-EMIT` | physically emit the producer-local worker's continuation through the generated context's OWN emitted frame (define_continuation_context_bodies), so its capture-gather reads the context's own (parameters+captures) ABI operand run instead of the enclosing function's 2-operand run -- the sufficient closure for the 10 populated recursive-position witnesses that all six RT-CAPTURE-PROJECTION-GROW findings pointed at. Measured decisive (runtime-leader evt_77tdvcap4067t): seam (i) alone PERSISTS and the context-body defining_abi_operands push executes ZERO times compiling px7f -- the context body is not emitted for this population at all, so the closure is CAUSING that emission plus constructing the context frame at the producer point, substantial new wiring, not existing-path completion. | merged | runtime | L | none | — |
 | `RT-CAPTURE-PROJECTION-GROW` | green the ten populated recursive-position witnesses by growing the planner's capture projection to cover the closure's declared, body-referenced captures (D1) and seating the resulting producer-local claims in the generated context's entry-source enumeration (D2, the revived RT-CONTSRC-ENTRY-FRAME-WIDEN widening). The cardinality-gap D0 measured all-H1: every unclaimed capture is a genuine value the projection drops because continuations.rs:6075 clones the context's capture set from the enclosing specialization's continuation_inputs, a different population than the closure's declared set. This is the closing deliverable for the population -- the two steps compose, D2 is non-inert only because D1 supplies the claims. | merged | runtime | L | none | — |
 | `RT-CAPTURE-SUPPLY-DECLARED-INPUTS` | the branch-local callable-authority cut is necessary but not sufficient -- every witness's residual blocker is capture supply; a capture-bearing LexicalClosure at a recursive position can present its captures as planner-owned declared inputs ONLY if every capture's value is recoverable as a planner-assigned ABI operand with zero read of the carried word -- D0 measures that per witness before any implementation | merged | runtime | L | none | — |
+| `RT-CARRIED-BOOL-ELIMINATOR-DISPATCH` | Lane-1 successor to the pairing WP — route the canonical carried Bool (BoundaryTag::ImmediateBool, payload 0/1) through a finite scalar dispatcher in joins.rs::lower_carried_constructor_match, which today calls node-only emit_carrier_tag and require_i64-refuses every immediate scalar before any Bool case. D0 binds the case-family identity authority and censuses which immediate inductive representations reach the same consumer; D1 adds the scalar Bool path using existing tag/scalar authority, leaving node-backed constructors unchanged and giving structural Nat an explicit measured disposition | draft | runtime | M | none | — |
 | `RT-CARRIED-CONTINUATION-RESUME` | A carried scrutinee reaching a continuation frame has no resume path — the carried elimination does not implement the Carried x {PendingLet, Active} arm | merged | runtime | M | none | — |
 | `RT-CARRIED-IH-DISPATCH-SITEOP` | Track-1 consumer (M3) — a boundary-carried CarriedWord value cannot present the ConstructorTag an effect seat demands (effects.rs:548), so object emission refuses; give the carried value a finite compile-time constructor discriminant it can present, reusing M4's defunctionalization | merged | runtime | M | none | — |
 | `RT-CARRIED-ORDINARY-COMPOSITION` | Carried ordinary elimination consumes exactly one frame — a composed suffix behind an ordinary carried eliminator is refused rather than continued | merged | runtime | M | none | — |
@@ -546,6 +547,7 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
+- `RT-CARRIED-BOOL-ELIMINATOR-DISPATCH` blocked by `RT-GENERATED-CONTINUATION-OPERAND-PAIRING` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 

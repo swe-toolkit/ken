@@ -12,6 +12,40 @@
 > soundness-bearing pairing boundary; the D0 deliverable is a lineage table
 > that determines the seam, not a diff). Fresh object — hard-stop count zero.
 
+> # AMENDED 2026-08-25 (Architect hard-stop #1, evt_3nm3jvapsf7cp, thr_3nmd0xy7dgh6g)
+>
+> D0 is DONE and sound. The lineage table bound every hop: funcid49 places the
+> transferred Console Bool at funcid51 `Parameter(0)` offset 0; funcid51 loads it
+> as `v10`; the raw `ClosureBody` descriptor independently declares one parameter
+> plus four captures. The FIRST wrong authority is callee environment
+> reconstruction: `define_continuation_context_bodies` reverses the context's
+> coalesced five-slot `Parameter` run as though all five entries were source
+> parameters, so body `Var(0)` consumes `v14` (`0x0207` = `InvocationBorrowed`,
+> payload 2) instead of `v10` (`ImmediateBool(false)`). The provisional repair
+> uses the raw owner's own ABI header to split `1 + 4`, reverses only the declared
+> source-parameter prefix per `source_body_binding_order`, and appends raw +
+> context captures unchanged — mirroring `define_unit_body`. It is
+> authority-derived, count-validated, general over the descriptor, and hard-codes
+> no px8ta slots. Under it, px8ta advances from root sentinel `-4` to `-1` with the
+> same `BufferAllocate -> ConsoleIsTerminal(false) -> ResourceRelease` trace.
+>
+> The new `-1` is a DISTINCT mechanism, not residual pairing: the correctly-paired
+> `ImmediateBool(false)` now reaches `joins.rs::lower_carried_constructor_match`,
+> which calls the node-word helper `emit_carrier_tag`/`ken_boundary_tag_local` and
+> `require_i64`-refuses before any Bool case because a canonical `ImmediateBool` is
+> intentionally not an arena node. That is a representation-specific eliminator gap
+> and the frame's ban forbids fixing it here. The Architect ruled: this WP lands
+> COMPLETE FOR ITS OWN OBJECT once the pairing repair + pairing-local controls are
+> clean (honest crossing, AC-6); the Bool consumer moves to the successor
+> [[RT-CARRIED-BOOL-ELIMINATOR-DISPATCH]]. D0/D1/AC-0/1/2/5/6 and the banned-repair
+> list are RETAINED; AC-3/AC-4 are REPLACED with the pairing-local controls below;
+> the WIP pairing test is split. No Decision — the two mechanisms are independently
+> correctable, no product/design tradeoff. New-chain hard-stop count is 1. Clean
+> WIP (probes retained, NOT a candidate): `15abc5eb9255d61bb9033b4e0e236f2c07997d67`
+> on the WP branch, one commit over seven runtime paths, base `2efa5ee07`. Durable
+> symptom inventory entry 1: `architect/rt-cont-pairing-inventory @ d33344271`.
+> Runtime is HELD until this amendment + the successor cut land.
+
 ## Objective
 
 Bind px8ta's next causal residual to ONE exact source-to-slot lineage for the
@@ -95,11 +129,15 @@ not a base or candidate. No prior WIP branch is load-bearing for this object.
 - **D0 stop.** Return the lineage table and the identified first-mispairing hop.
   Do NOT infer the repair from a count and do NOT green px8ta by any of the banned
   moves below.
-- **D1 (conditional on D0) — repair at the first mispairing authority.** The
-  repair belongs at the first authority that pairs the wrong source with that
-  slot. Preserve the declared frame order and the existing fail-closed
-  membership/arity guards. Do NOT compensate in `joins.rs` and do NOT compensate
-  in carrier decoding. Repair only the proven layer; zero `trusted_base()` delta.
+- **D1 (conditional on D0) — repair at the first mispairing authority.** D0
+  selected callee environment reconstruction: the repair is at
+  `units.rs::define_continuation_context_bodies` (source formal/capture partition
+  and semantic environment order), splitting the coalesced context run `1 + 4` via
+  the raw owner's own ABI header and reversing only the declared source-parameter
+  prefix (see the amendment banner). Preserve the declared frame order and the
+  existing fail-closed membership/arity guards. Do NOT compensate in `joins.rs`
+  and do NOT compensate in carrier decoding. Repair only the proven layer; zero
+  `trusted_base()` delta.
 
 ## Acceptance criteria
 
@@ -116,12 +154,30 @@ not a base or candidate. No prior WIP branch is load-bearing for this object.
   preserves all frame sizes and types must RED the source-to-slot pairing oracle.
   A control that a permutation can pass is not discriminating and does not satisfy
   this AC.
-- AC-3 (eliminator-branch control). Paired false/true `ConsoleIsTerminal` results
-  prove the selected Bool constructor changes the actual eliminator branch (the
-  fix carries the identity through, both ways).
-- AC-4 (hostile-tag refusal preserved). A hostile tag-7-in-Bool-slot control
-  proves the closed Bool default still REFUSES — the repair must not make
-  `InvocationBorrowed` acceptable in a Bool slot.
+- AC-3 (pairing-local controls — REPLACES the old eliminator-branch/hostile-tag
+  ACs, Architect hard-stop #1 evt_3nm3jvapsf7cp). The old AC-3/AC-4 required the
+  Bool consumer to go green; that consumer is a distinct object moved to
+  [[RT-CARRIED-BOOL-ELIMINATOR-DISPATCH]]. This WP's controls are pairing-local:
+  1. a same-cardinality structural control consumes the reconstructed
+     environment's POSITION 0 and proves it is the selected caller operand,
+     followed by the four raw captures and then the context-capture suffix. The
+     whole-five-word reversal mutation must change that observation and RED the
+     unchanged control;
+  2. paired with the actual px8ta advance: the exact tag-7-at-`Var(0)` Bool
+     default disappears under the repaired production path; restoring whole-run
+     reversal restores that old causal observation;
+  3. a hostile word supplied as the declared source parameter must remain that
+     exact hostile word at environment position 0 — pins pairing neutrality;
+     whether Bool Match accepts or refuses it belongs to the successor.
+- AC-4 (preservation + probe removal + test split). Preserve raw-owner header
+  mismatch refusal, the existing arity/membership guards, and the D1 HostResult
+  controls; remove every D0 probe before candidate handoff. The WIP test
+  `generated_context_pairing_selects_both_bool_arms_and_refuses_tag_seven` must
+  NOT become this WP's pairing oracle as written — it passes `selected` directly
+  as the scrutinee and its constant case bodies never consume `env[0]`, so
+  reversing the reconstructed environment can leave it green. SPLIT it: this WP
+  keeps a control that observes `env[0]`; the successor gets the direct Bool
+  eliminator false/true/hostile test without pairing scaffolding.
 - AC-5 (D1 regressions held). The landed D1 one-active-`HostResult`-payload
   behavior and its hostile inactive/selected controls remain unchanged and green.
 - AC-6 (px8ta advance, honest). Re-run px8ta HALF B: the claim is ONLY that this
