@@ -1,15 +1,40 @@
 ---
 id: RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT
 title: "M-series successor (M3+1) — close the process-exit consumers over the existing exact-Int carrier forms: a persistent/dynamic ExitCode::Failure payload is admitted only as ImmediateInt, so both the carried-phase (core.rs:11523) and specialized-phase (calls.rs:2301) exit-status producers force it to native sentinel -3 instead of mapping it to an exit code"
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: none
 depends_on: [RT-CARRIED-IH-DISPATCH-SITEOP]
 blocks: []
 github: null
-origin: "Steward, 2026-08-25, from the Architect object-distinctness ruling (evt_317adj9ebfw86) and the landed-SHA re-measure + mechanism correction (evt_4kkspzs62gtn6, thr_7m88b1hsemj9c). Sequenced FIRST of M3's two successors (Architect: ExitCode before RT-RETAINED-UNIT-CALL-TARGET-DERIVATION, no fold — the ExitCode cut is smaller because the exact-Int representation and observer already exist). Re-anchored to landed origin/main 5fff430db (Architect re-ran the witness at that exact commit; object unchanged). Steward framing call per COORDINATION section 2."
+origin: "Steward, 2026-08-25, from the Architect object-distinctness ruling (evt_317adj9ebfw86) and the landed-SHA re-measure + mechanism correction (evt_4kkspzs62gtn6, thr_7m88b1hsemj9c). Sequenced FIRST of M3's two successors (Architect: ExitCode before RT-RETAINED-UNIT-CALL-TARGET-DERIVATION, no fold — the ExitCode cut is smaller because the exact-Int representation and observer already exist). Re-anchored to landed origin/main 5fff430db (Architect re-ran the witness at that exact commit; object unchanged). Steward framing call per COORDINATION section 2. CLOSED 2026-08-25 — FALSIFIED as a product object by the Architect hard-stop #3 ruling (evt_1vhmndq7fscd1); recut as RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE."
 ---
+
+> # CLOSED / FALSIFIED 2026-08-25 — READ THIS BEFORE ANYTHING BELOW
+>
+> The Architect FALSIFIED this WP as a product object after the hard-stop #3
+> research advisory (ruling evt_1vhmndq7fscd1, thr_305pn5gzx37h). The durable
+> finding: the exact-Int carrier already admits every valid exit code under the
+> old policy, and the two named process-exit consumers are NOT missing transport;
+> every final/named exit-representation marker was bypassed. The causal defect is
+> a dynamic-constructor dispatch residual — `emit_carrier_dynamic_constructor`'s
+> direct `return_(-3)` at `StaticOriginId(34)` — not an ExitCode payload gap. The
+> three consecutive hard stops shared one predicate (a downstream semantic
+> classification used as upstream producer/provenance authority), which this
+> frame embeds in its objective, sites, controls, and diagnostic — so it is
+> REPLACED, not amended.
+>
+> - Do NOT resume D1. Do NOT ship the production refactor in `34ab178ac` (kept
+>   READ-ONLY as the load-bearing probe checkpoint only).
+> - Replacement: [[RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE]] (ready, fresh WP
+>   thread; hard-stop count reset to zero — different design question).
+> - The `-3` reporter alias (an independently proven honesty defect) is tracked
+>   SEPARATELY as [[RT-UNIT-FAILURE-STATUS-PROVENANCE]]; it was NOT folded in.
+> - [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] remains distinct — no dependency
+>   or sequencing change.
+>
+> Everything below is retained for provenance and is superseded.
 
 > # M3 successor, ready to frame — re-anchored to landed 5fff430db
 >

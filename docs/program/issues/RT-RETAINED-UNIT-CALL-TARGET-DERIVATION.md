@@ -14,10 +14,13 @@ origin: "Steward, 2026-08-25, from the Architect object-distinctness ruling (evt
 > # Call-target-resolution successor — SECOND of M3's two successors (DRAFT stub)
 >
 > Node minted on the M3 accept-COMPLETE-for-object disposition
-> (Steward evt_3v7t4qcp9m8gt). Sequenced SECOND, after
-> [[RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT]] (Architect evt_4kkspzs62gtn6: no fold,
-> no technical dependency; this cut is larger — it crosses planner ownership and
-> function-local call-target derivation). Frame it when ExitCode lands.
+> (Steward evt_3v7t4qcp9m8gt). Sequenced SECOND and distinct; this cut is larger —
+> it crosses planner ownership and function-local call-target derivation. The
+> first sibling was recut 2026-08-25: [[RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT]] is
+> `closed`/falsified (Architect hard-stop #3, evt_1vhmndq7fscd1) and replaced by
+> [[RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE]]. That ruling creates NO
+> dependency or sequencing change for this node (Architect: it remains distinct);
+> Steward owns lane order.
 >
 > RE-ANCHORED to landed origin/main 5fff430db (Architect re-ran the witness at
 > that exact commit; object unchanged). Updated grounding: the production refusal

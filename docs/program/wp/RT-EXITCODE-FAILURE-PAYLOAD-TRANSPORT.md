@@ -1,4 +1,19 @@
-# WP frame — RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT (M3 successor, first)
+# WP frame — RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT (WITHDRAWN — falsified)
+
+> # WITHDRAWN / FALSIFIED 2026-08-25 — do not implement this frame
+>
+> The Architect falsified this WP as a product object after the hard-stop #3
+> research advisory (ruling evt_1vhmndq7fscd1, thr_305pn5gzx37h). The exact-Int
+> carrier already admits every valid exit code and the two named process-exit
+> consumers are not missing transport; the causal defect is a dynamic-constructor
+> dispatch residual (`emit_carrier_dynamic_constructor`'s direct `return_(-3)` at
+> `StaticOriginId(34)`), not an ExitCode payload gap. Do NOT resume D1 and do NOT
+> ship the production refactor in `34ab178ac` (kept read-only as the probe
+> checkpoint only). Replacement:
+> `docs/program/wp/RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE.md`. The `-3`
+> reporter alias is tracked separately as [[RT-UNIT-FAILURE-STATUS-PROVENANCE]].
+> Node: [[RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT]] is `closed`. Everything below is
+> retained for provenance and is superseded.
 
 > M-series successor of [[RT-NATIVE-CARRIED-VALUE]], sequenced FIRST of M3's two
 > exposed objects (Architect evt_4kkspzs62gtn6; the retained-call successor
