@@ -79,16 +79,17 @@ fn assert_body_uses_constructor(env: &ElabEnv, value: &str, provider: &str) {
 }
 
 /// Promise class: durable invariant. Component A's dependency-closed slice
-/// loads standalone-strict without adding trust, while an external convenience
-/// remains unavailable in strict mode.
+/// loads standalone-strict without adding trust, while floor Nat resolves to
+/// the compiler-installed family and constructors rather than a replacement.
 ///
-/// **MEASURED:** strict roots elaborates each real selected module, preserves
-/// the trusted-base set, and rejects a fixture whose first external name is
-/// `Nat`. **CLAIMED:** local-scope repair does not widen strict ambient
-/// authority. **THE GAP:** this is the self-contained Component A slice, not a
-/// claim that the whole catalog is strict-green.
+/// **MEASURED:** strict roots elaborates each real selected module and a Nat
+/// fixture, preserves the trusted-base set, and the fixture bodies use the
+/// pre-existing `Nat` constructor ids. **CLAIMED:** the specified Nat-floor
+/// inversion admits canonical identity without minting or widening beyond the
+/// closed floor. **THE GAP:** whole-floor closure and the non-member reject live
+/// in `lang_mod_nat_floor_realization`.
 #[test]
-fn strict_slice_stays_closed_and_external_nat_stays_rejected() {
+fn strict_slice_stays_closed_and_floor_nat_reuses_existing_identity() {
     for module in [
         "Core.Logic.Or",
         "Core.Logic.Transport",
@@ -105,16 +106,31 @@ fn strict_slice_stays_closed_and_external_nat_stays_rejected() {
         );
     }
 
-    let root = FixtureRoot::new("strict-external-nat");
-    root.write("StrictNat.ken", "const n : Nat = Zero");
-    let error = ElabEnv::new()
-        .expect("base environment")
-        .elaborate_module_from_roots_strict(&root.roots(), "StrictNat")
-        .expect_err("strict roots must not regain ambient Nat");
-    assert!(
-        matches!(error, ElabError::UnboundName { ref name, .. } if name == "Nat"),
-        "strict external Nat must fail at the strict resolver choke, got {error:?}"
+    let root = FixtureRoot::new("strict-floor-nat");
+    root.write(
+        "StrictNat.ken",
+        "const zero : Nat = Zero\nconst one : Nat = Suc Zero",
     );
+    let mut env = ElabEnv::new().expect("base environment");
+    let nat = env.globals["Nat"];
+    let zero = env.globals["Zero"];
+    let suc = env.globals["Suc"];
+    let declaration_count = env.env.declarations().len();
+    let next_id = env.env.next_global_id();
+    let trusted_before = env.env.trusted_base();
+
+    env.elaborate_module_from_roots_strict(&root.roots(), "StrictNat")
+        .expect("strict roots must admit the canonical Nat floor identity");
+
+    assert_eq!(env.globals["Nat"], nat);
+    assert_eq!(env.globals["Zero"], zero);
+    assert_eq!(env.globals["Suc"], suc);
+    assert!(!env.globals.contains_key("StrictNat.Nat"));
+    assert_body_uses_constructor(&env, "StrictNat.zero", "Zero");
+    assert_body_uses_constructor(&env, "StrictNat.one", "Suc");
+    assert_eq!(env.env.declarations().len(), declaration_count + 2);
+    assert_eq!(env.env.next_global_id().0, next_id.0 + 2);
+    assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
 /// Promise class: durable invariant. A real explicit-data provider publishes

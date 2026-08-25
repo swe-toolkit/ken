@@ -22,23 +22,6 @@ fn assert_int(term: &Term, expected: &str) {
     }
 }
 
-fn find_elim_family(term: &Term) -> Option<GlobalId> {
-    match term {
-        Term::Elim { fam, .. } => Some(*fam),
-        Term::App(function, argument)
-        | Term::Pi(function, argument)
-        | Term::Lam(function, argument)
-        | Term::Sigma(function, argument)
-        | Term::Ascript(function, argument) => {
-            find_elim_family(function).or_else(|| find_elim_family(argument))
-        }
-        Term::Let { ty, val, body } => find_elim_family(ty)
-            .or_else(|| find_elim_family(val))
-            .or_else(|| find_elim_family(body)),
-        _ => None,
-    }
-}
-
 /// Promise class: semantic positive.
 /// MEASURED: both preregistered Bool constructors select their corresponding
 /// branch and reduce to distinct closed integer values.
@@ -58,40 +41,35 @@ fn true_and_false_select_their_respective_branches() {
     assert_int(&reduced_body(&env, false_id), "22");
 }
 
-/// Promise class: identity/negative-control.
-/// MEASURED: source constructors named `True` and `False` replace the surface
-/// name map, while the conditional still targets the original Bool family and
-/// computes with the captured constructor identities.
-/// CLAIMED: conditionals cannot be retargeted by source-level shadowing.
-/// THE GAP: a fixture without the name-map inequality would not prove that
-/// shadowing actually occurred.
+/// Promise class: durable invariant.
+/// MEASURED: a source constructor named `True` rejects at the immutable floor
+/// collision before allocation and leaves both canonical Bool constructor ids
+/// unchanged.
+/// CLAIMED: conditionals cannot be retargeted by source-level constructor
+/// shadowing because that competing top-level binding is unrepresentable.
+/// THE GAP: the complete per-binding collision population is pinned by
+/// `lang_mod_nat_floor_realization`.
 #[test]
-fn shadowed_constructor_names_cannot_retarget_if() {
+fn floor_constructor_names_cannot_retarget_if() {
     let mut env = ElabEnv::new().expect("base environment");
-    let bool_id = env.numeric_env.bool_id;
     let true_id = env.numeric_env.bool_true_id;
     let false_id = env.numeric_env.bool_false_id;
-    env.elaborate_decl("const canonical_true : Bool = True")
-        .expect("capture a Bool value before source shadowing");
-    let ids = env
-        .elaborate_file(
-            "data Shadow = True | False\n\
-             const shadow_safe : Int = if canonical_true then 31 else 47",
-        )
-        .expect("shadowing fixture must elaborate");
+    let declarations_before = env.env.declarations().len();
+    let next_id_before = env.env.next_global_id();
+    let trusted_before = env.env.trusted_base();
 
-    assert_ne!(
-        env.globals["True"], true_id,
-        "captured True id: {true_id:?}"
+    let error = env
+        .elaborate_file("data Shadow = True | False")
+        .expect_err("a floor constructor spelling must be unshadowable");
+    assert!(
+        matches!(error, ElabError::AmbiguousReference { ref name, .. } if name == "True"),
+        "the first retained floor constructor must be the collision, got {error:?}"
     );
-    assert_ne!(
-        env.globals["False"], false_id,
-        "captured False id: {false_id:?}"
-    );
-    let result_id = *ids.last().expect("result declaration");
-    let (_, body) = env.env.transparent_body(result_id).expect("result body");
-    assert_eq!(find_elim_family(&body), Some(bool_id));
-    assert_int(&whnf(&env.env, &Context::new(), &body), "31");
+    assert_eq!(env.globals["True"], true_id);
+    assert_eq!(env.globals["False"], false_id);
+    assert_eq!(env.env.declarations().len(), declarations_before);
+    assert_eq!(env.env.next_global_id(), next_id_before);
+    assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
 /// Promise class: diagnostic negative.

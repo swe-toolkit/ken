@@ -363,14 +363,14 @@ fn duplicate_flat_arm_is_subsumed_by_exactly_one_earlier_arm() {
 //
 // Regression for GAP-nested-patterns: `infer_match` used to track coverage
 // by top-level constructor only, so two arms sharing a head constructor
-// (`Succ Zero` / `Succ (Succ m)`) tripped a false ReachabilityError even
+// (`LSucc LZero` / `LSucc (LSucc m)`) tripped a false ReachabilityError even
 // though the nested patterns are disjoint. The fix compiles the standard
 // column-by-column pattern matrix, splitting further on a field whose own
 // sub-pattern is itself a constructor.
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn setup_natl(env: &mut ElabEnv) {
-    elab_ok(env, "data NatL = Zero | Succ NatL");
+    elab_ok(env, "data NatL = LZero | LSucc NatL");
 }
 
 #[test]
@@ -380,8 +380,8 @@ fn nested_ctor_pattern_accepted_and_reduces() {
 
     let id = elab_ok(
         &mut env,
-        "let result : Int = match Succ (Succ Zero) { \
-         Zero |-> 0 ; Succ Zero |-> 1 ; Succ (Succ m) |-> 2 }",
+        "let result : Int = match LSucc (LSucc LZero) { \
+         LZero |-> 0 ; LSucc LZero |-> 1 ; LSucc (LSucc m) |-> 2 }",
     );
     let body = body_of(&env, id);
     assert!(matches!(body, Term::Elim { .. }), "nested match should produce Elim");
@@ -391,7 +391,7 @@ fn nested_ctor_pattern_accepted_and_reduces() {
     assert_eq!(
         reduced,
         Term::IntLit(num_bigint::BigInt::from(2)),
-        "Succ (Succ Zero) should select the Succ (Succ m) arm and ι-reduce to IntLit(2), \
+        "LSucc (LSucc LZero) should select the LSucc (LSucc m) arm and ι-reduce to IntLit(2), \
          got {:?}",
         reduced
     );
@@ -403,12 +403,12 @@ fn nested_ctor_pattern_selects_the_right_arm_at_succ_zero() {
     setup_natl(&mut env);
 
     // Discriminating: swap which literal each arm returns, and scrutinize
-    // `Succ Zero` — only reduces to the FIRST Const if the `Succ Zero`
-    // (not `Succ (Succ m)`) arm actually fired.
+    // `LSucc LZero` — only reduces to the FIRST Const if the `LSucc LZero`
+    // (not `LSucc (LSucc m)`) arm actually fired.
     let id = elab_ok(
         &mut env,
-        "let result : Int = match Succ Zero { \
-         Zero |-> 0 ; Succ Zero |-> 7 ; Succ (Succ m) |-> 9 }",
+        "let result : Int = match LSucc LZero { \
+         LZero |-> 0 ; LSucc LZero |-> 7 ; LSucc (LSucc m) |-> 9 }",
     );
     let body = body_of(&env, id);
     let ctx = Context::new();
@@ -418,7 +418,7 @@ fn nested_ctor_pattern_selects_the_right_arm_at_succ_zero() {
     assert_eq!(
         reduced,
         Term::IntLit(num_bigint::BigInt::from(7)),
-        "expected the Succ Zero arm (7) to ι-reduce to IntLit(7), got {:?}",
+        "expected the LSucc LZero arm (7) to ι-reduce to IntLit(7), got {:?}",
         reduced
     );
 }
@@ -428,11 +428,11 @@ fn nested_ctor_pattern_missing_case_is_exhaustiveness_error() {
     let mut env = mk_env();
     setup_natl(&mut env);
 
-    // `Succ Zero` is uncovered: the outer `Succ` bucket only handles the
-    // nested-`Succ` sub-case, leaving the nested-`Zero` sub-case missing.
+    // `LSucc LZero` is uncovered: the outer `LSucc` bucket only handles the
+    // nested-`LSucc` sub-case, leaving the nested-`LZero` sub-case missing.
     let result = elab(
         &mut env,
-        "let bad : Int = match Zero { Zero |-> 0 ; Succ (Succ m) |-> 2 }",
+        "let bad : Int = match LZero { LZero |-> 0 ; LSucc (LSucc m) |-> 2 }",
     );
 
     match result {
@@ -448,9 +448,9 @@ fn nested_ctor_pattern_missing_case_is_exhaustiveness_error() {
 // `constructor(id) -> Option<(&InductiveDecl, usize)>`) instead of taking a
 // caller-supplied `arity: usize` that could disagree with the name. This is
 // the single control the node calls for: an arity >= 1 constructor's witness
-// must render exactly its own declared arity's worth of wildcards. `Succ`
+// must render exactly its own declared arity's worth of wildcards. `LSucc`
 // (arity 1) also reaches `infer_match`'s general non-dependent path -- the
-// same emission site previously witnessed only at arity 0 (`Zero`).
+// same emission site previously witnessed only at arity 0 (`LZero`).
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
@@ -458,28 +458,28 @@ fn non_dependent_arity_one_constructor_witness_derives_its_own_arity() {
     let mut env = mk_env();
     setup_natl(&mut env);
 
-    let result = elab(&mut env, "let bad : Int = match Zero { Zero |-> 0 }");
+    let result = elab(&mut env, "let bad : Int = match LZero { LZero |-> 0 }");
 
     match result {
         Err(ElabError::ExhaustivenessError { missing, .. }) => {
             assert_eq!(
-                missing.constructor, "Succ",
-                "derived witness should name 'Succ', got '{}'",
+                missing.constructor, "LSucc",
+                "derived witness should name 'LSucc', got '{}'",
                 missing.constructor
             );
             assert_eq!(
                 missing.arity, 1,
-                "'Succ' is declared with exactly one argument (NatL); the \
+                "'LSucc' is declared with exactly one argument (NatL); the \
                  derived arity must equal that declaration"
             );
             assert_eq!(
                 missing.to_string(),
-                "Succ _",
+                "LSucc _",
                 "an arity-1 witness renders exactly one trailing wildcard"
             );
         }
         Ok(_) => panic!("non-exhaustive match accepted (should have been rejected)"),
-        Err(other) => panic!("expected ExhaustivenessError naming 'Succ', got: {}", other),
+        Err(other) => panic!("expected ExhaustivenessError naming 'LSucc', got: {}", other),
     }
 }
 
@@ -703,13 +703,13 @@ fn nested_ctor_pattern_shadowed_by_earlier_flat_arm_is_reachability_error() {
     let mut env = mk_env();
     setup_natl(&mut env);
 
-    // `Succ n` (flat) already covers every Succ-headed value, so the later
-    // `Succ (Succ m)` arm is dead code — must still be caught even though it
-    // shares no top-level ambiguity with `Succ n` at the FIRST split.
+    // `LSucc n` (flat) already covers every LSucc-headed value, so the later
+    // `LSucc (LSucc m)` arm is dead code — must still be caught even though it
+    // shares no top-level ambiguity with `LSucc n` at the FIRST split.
     let result = elab(
         &mut env,
-        "let bad : Int = match Zero { \
-         Zero |-> 0 ; Succ n |-> 1 ; Succ (Succ m) |-> 2 }",
+        "let bad : Int = match LZero { \
+         LZero |-> 0 ; LSucc n |-> 1 ; LSucc (LSucc m) |-> 2 }",
     );
 
     match result {
@@ -1075,26 +1075,26 @@ fn ac8_direct_lookup_member_reflection_helper_elaborates() {
 #[test]
 fn data_recursive_type_accepts() {
     let mut env = mk_env();
-    elab_ok(&mut env, "data NatL = Zero | Succ NatL");
+    elab_ok(&mut env, "data NatL = LZero | LSucc NatL");
 
-    assert!(env.globals.contains_key("Zero"));
-    assert!(env.globals.contains_key("Succ"));
+    assert!(env.globals.contains_key("LZero"));
+    assert!(env.globals.contains_key("LSucc"));
 
-    // Simple match on Zero inline.
+    // Simple match on LZero inline.
     let id = elab_ok(
         &mut env,
-        "let is_zero : Int = match Zero { Zero |-> 1 ; Succ n |-> 0 }",
+        "let is_zero : Int = match LZero { LZero |-> 1 ; LSucc n |-> 0 }",
     );
     let body = body_of(&env, id);
     assert!(matches!(body, Term::Elim { .. }));
 
-    // ι-reduces on Zero.
+    // ι-reduces on LZero.
     let ctx = Context::new();
     let reduced = whnf(&env.env, &ctx, &body);
     assert_eq!(
         reduced,
         Term::IntLit(num_bigint::BigInt::from(1)),
-        "recursive type match on Zero should ι-reduce to IntLit(1), got {:?}",
+        "recursive type match on LZero should ι-reduce to IntLit(1), got {:?}",
         reduced
     );
 }

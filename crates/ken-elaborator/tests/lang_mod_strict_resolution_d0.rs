@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use ken_elaborator::modules::{
-    catalog_module_from_path, is_prelude_floor_name, PRELUDE_FLOOR_NAMES,
+    PRELUDE_FLOOR_NAMES, catalog_module_from_path, is_prelude_floor_name,
 };
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Level, Term};
@@ -265,11 +265,25 @@ fn every_ambient_name_representation_reaches_its_current_route() {
 /// unit without any user-declared ambient convenience.
 #[test]
 fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
-    assert_eq!(PRELUDE_FLOOR_NAMES, ["Bool", "Char", "List"]);
+    assert_eq!(
+        PRELUDE_FLOOR_NAMES.as_slice(),
+        [
+            "Auth",
+            "Bool",
+            "Char",
+            "List",
+            "Nat",
+            "Option",
+            "ResourceKind",
+            "Result",
+            "Utf8Error",
+        ]
+        .as_slice()
+    );
     for name in PRELUDE_FLOOR_NAMES {
         assert!(is_prelude_floor_name(name));
     }
-    for name in ["True", "Nat", "Int", "Ordering", "Equal"] {
+    for name in ["True", "Int", "Ordering", "Equal", "Prod"] {
         assert!(!is_prelude_floor_name(name));
     }
 
@@ -342,9 +356,10 @@ fn ambient_dependencies(root: &Path, entry: &str) -> Result<Vec<String>, String>
     Err("ambient dependency census exceeded the initial global inventory".to_string())
 }
 
-/// Transition sentinel for WP-4: this is a behavioral migration census, not a
-/// source-text census. Retire the exact rows when WP-4 adds explicit imports;
-/// D1 must use the same strict floor and make every dependency vector empty.
+/// Transition sentinel for catalog migration: this is a behavioral census,
+/// not a source-text census. The nine-name floor intentionally removes its
+/// families and constructors from these residual dependency vectors; every
+/// remaining name still requires an explicit provider migration.
 #[test]
 fn catalog_ambient_passthrough_migration_census() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -374,38 +389,31 @@ fn catalog_ambient_passthrough_migration_census() {
     let expected = vec![
         (
             "Algorithm.Numeric.Gcd".to_string(),
-            ["Equal", "Nat", "Proved", "Suc", "Zero"]
+            ["Equal", "Proved"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
         ),
         (
             "Capability.Console.Text".to_string(),
-            [
-                "IO", "IOError", "Result", "Stderr", "Stdout", "Unit", "write",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["IO", "IOError", "Stderr", "Stdout", "Unit", "write"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             "Capability.Diagnostics.Core".to_string(),
-            [
-                "Bottom", "Equal", "Nat", "None", "Option", "Prop", "Some", "Suc", "Top", "Zero",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Bottom", "Equal", "Prop", "Top"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             "Capability.Filesystem.Authority".to_string(),
             [
-                "AFull",
-                "Auth",
                 "CreatePolicy",
                 "FS",
                 "FileError",
-                "Result",
                 "Unit",
                 "read_bytes",
                 "write_file",
@@ -446,7 +454,7 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Capability.Process.Exit".to_string(),
-            ["Err", "ExitCode", "Failure", "Ok", "Result", "Success"]
+            ["ExitCode", "Failure", "Success"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -465,7 +473,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 "BufferWindow",
                 "Equal",
                 "MkBufferWindow",
-                "Nat",
                 "TransferCount",
                 "buffer_nat_add",
                 "buffer_span_budget",
@@ -549,45 +556,35 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Data.Numeric.Nat.Arithmetic".to_string(),
-            ["Equal", "Nat", "Proved", "Suc", "Zero"]
+            ["Equal", "Proved"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
         ),
         (
             "Data.Sums.Combinators".to_string(),
-            [
-                "Equal", "Err", "None", "Ok", "Option", "Proved", "Result", "Some",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Equal", "Proved"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             "Data.Vector.Vector".to_string(),
-            ["Equal", "Nat", "Proved", "Suc", "Zero"]
+            ["Equal", "Proved"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
         ),
         (
             "Tooling.Testing.Property".to_string(),
-            [
-                "Err", "MkUnit", "Nat", "None", "Ok", "Option", "Result", "Some", "Suc", "Unit",
-                "Zero",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["MkUnit", "Unit"].into_iter().map(str::to_string).collect(),
         ),
         (
             "Tooling.Verification.FoKripke".to_string(),
-            [
-                "Bottom", "Equal", "Nat", "None", "Option", "Proved", "Some", "Suc", "Zero",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Bottom", "Equal", "Proved"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
     ];
     assert_eq!(

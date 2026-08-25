@@ -8,10 +8,10 @@
 //!    under the prelude's role spellings must not redirect any stored Runtime
 //!    role onto them. The record must still carry the roles the *canonical
 //!    prelude* `GlobalId`s denote.
-//! 2. **Roster inventory.** Every role the canonical roster carries is covered
-//!    by property 1's fixture, in both directions. This keeps the substitution
-//!    control exhaustive over the roster as the roster changes; it is a claim
-//!    about the fixture's coverage, not about the producers.
+//! 2. **Roster inventory.** Every role the canonical roster carries is either
+//!    covered by property 1's fixture or is a constructor of an exact closed-
+//!    floor parent and therefore unshadowable before allocation. This keeps the
+//!    substitution control exhaustive over the shadowable roster as it changes.
 //!
 //! **The producer property is closed by the SIGNATURE, not by this file.** Both
 //! `checked_host_spine_v1` and `checked_runtime_symbols_v1` take `&PreludeEnv`
@@ -39,10 +39,11 @@
 //! Every assertion below names a **fully qualified** symbol — the parent chain
 //! is the identity, and the parent is what a substitution changes.
 //!
-//! **MEASURED.** With all sixty shadowable role spellings and all five family
-//! spellings declared by a package, no shadow's framed symbol occurs anywhere in
-//! the emitted record, the canonical prelude parents are still carried, and the
-//! roster's spelling table and the fixture's inventory agree in both directions.
+//! **MEASURED.** With every non-floor shadowable role spelling and every family
+//! spelling declared by a package, no shadow's framed symbol occurs anywhere in
+//! the emitted record, the canonical prelude parents are still carried, and
+//! every roster spelling is covered by either that fixture or exact floor
+//! constructor parentage.
 //! Seven mutations discriminate it: one per producer path class (record
 //! constructor, spine constructor, family, operation), each restored to
 //! `env.globals.get(name)` and each reddening while naming exactly the redirected
@@ -66,21 +67,28 @@
 //! Roles whose ids were already canonical before this repair (`Zero`/`Suc`, the
 //! private operations, the resource ids) are outside the fixture by
 //! construction — they never passed through name lookup, so there is nothing to
-//! substitute.
+//! substitute. Closed-floor bindings (`Nil`/`Cons`, `Some`, `Ok`/`Err`,
+//! `True`/`False`, `Buffer`) are also outside it: module prebinding now rejects
+//! those spellings before package allocation, so source redirection is
+//! unrepresentable rather than merely ignored by these producers.
+
+use std::collections::BTreeSet;
 
 use ken_elaborator::checked_core::{CheckedCorePackage, StableSymbol, SymbolNamespace};
-use ken_elaborator::prelude::CanonicalRuntimeRoles;
 use ken_elaborator::compiler_driver::{
     checked_runtime_symbols_v1_key, compile_ken_package_sources, CompilerManifest, CompilerSource,
     CompilerTargetKind, TargetSelector,
 };
+use ken_elaborator::modules::PRELUDE_FLOOR_NAMES;
+use ken_elaborator::prelude::CanonicalRuntimeRoles;
+use ken_elaborator::ElabEnv;
 
 const PACKAGE: &str = "d1b_role_a_shadow_pkg";
 
 /// A package that declares colliding names across every class of role the two
 /// producers resolve: the six former entry-plan roles, the ITree/coproduct
-/// spine, `Result`/`Option`, `Bool`/`Unit`, IO errors, resource errors and
-/// kinds, progress constructors, file-error and file-operation discriminants,
+/// spine, `Unit`, IO errors, non-floor resource errors, progress constructors,
+/// file-error and file-operation discriminants,
 /// and the public host operations.
 ///
 /// Every one of these spellings was, before this repair, a live
@@ -91,12 +99,11 @@ data ConsoleOp = ShadowConsoleOp
 data ClockOp = ShadowClockOp
 data EntropyOp = ShadowEntropyOp
 data Cap = ShadowCap
-data ShadowPlan = Nil | Cons | MkProd | MkProcessInput | Success | Failure
+data ShadowPlan = MkProd | MkProcessInput | Success | Failure
 data ShadowSpine = Ret | Vis | InL | InR
-data ShadowSums = Some | Ok | Err
-data ShadowUnitBool = MkUnit | True | False
+data ShadowUnit = MkUnit
 data ShadowIoErrors = NotFound | PermissionDenied | CapabilityDenied | BrokenPipe | Interrupted | AlreadyExists | InvalidInput | IsDirectory | NotDirectory | NotEmpty | Unsupported | Other
-data ShadowResource = ResourceKindMismatch | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress | Buffer
+data ShadowResource = ResourceKindMismatch | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress
 data ShadowProgress = ReadSome | ReadEof | Wrote
 data ShadowFileOps = MkFileError | OpReadFile | OpWriteFile | OpChangeMode
 data ShadowOps = Read | Write | Flush | IsTerminal | WallNow | MonotonicNow | SleepUntil | RandomBytes | ReadFile | WriteFile | AppendFile | Metadata | ReadDirectory | CreateDirectory | RemoveFile | RemoveDirectory | Rename | ChangeMode
@@ -111,8 +118,6 @@ const two : Nat = Suc (Suc Zero)
 /// a producer without adding it here cannot quietly escape the control — the
 /// role's spelling is shadowed and its redirection would be observed.
 const SHADOWED_ROLES: &[(&str, &str)] = &[
-    ("ShadowPlan", "Nil"),
-    ("ShadowPlan", "Cons"),
     ("ShadowPlan", "MkProd"),
     ("ShadowPlan", "MkProcessInput"),
     ("ShadowPlan", "Success"),
@@ -121,12 +126,7 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowSpine", "Vis"),
     ("ShadowSpine", "InL"),
     ("ShadowSpine", "InR"),
-    ("ShadowSums", "Some"),
-    ("ShadowSums", "Ok"),
-    ("ShadowSums", "Err"),
-    ("ShadowUnitBool", "MkUnit"),
-    ("ShadowUnitBool", "True"),
-    ("ShadowUnitBool", "False"),
+    ("ShadowUnit", "MkUnit"),
     ("ShadowIoErrors", "NotFound"),
     ("ShadowIoErrors", "PermissionDenied"),
     ("ShadowIoErrors", "CapabilityDenied"),
@@ -145,7 +145,6 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowResource", "InvalidOffset"),
     ("ShadowResource", "InvalidBounds"),
     ("ShadowResource", "NoProgress"),
-    ("ShadowResource", "Buffer"),
     ("ShadowProgress", "ReadSome"),
     ("ShadowProgress", "ReadEof"),
     ("ShadowProgress", "Wrote"),
@@ -335,7 +334,8 @@ fn d1b_role_a_package_shadowing_cannot_redirect_any_stored_runtime_role() {
 /// it is a snapshot that a newly added role would silently escape.
 ///
 /// This keeps the two in step: the roster's spelling table is compared against
-/// the fixture's shadow inventory in both directions. Add a role to
+/// the union of the fixture's shadow inventory and constructors whose recorded
+/// parent is one of the exact nine floor parents. Add a shadowable role to
 /// `canonical_runtime_roles!` without shadowing it and this reds, naming it,
 /// before the substitution control can go quietly partial.
 ///
@@ -351,7 +351,7 @@ fn d1b_role_a_package_shadowing_cannot_redirect_any_stored_runtime_role() {
 /// shadowed, and removing one keeps it green once the row goes; only a
 /// divergence between the two reds it. There is no frozen number to maintain.
 #[test]
-fn d1b_role_a_every_canonical_role_is_covered_by_the_shadowing_fixture() {
+fn d1b_role_a_every_canonical_role_is_covered_by_shadowing_or_floor_immutability() {
     let mut shadowed: Vec<&str> = SHADOWED_ROLES
         .iter()
         .map(|(_, constructor)| *constructor)
@@ -371,17 +371,37 @@ fn d1b_role_a_every_canonical_role_is_covered_by_the_shadowing_fixture() {
         .iter()
         .map(|(_, spelling)| *spelling)
         .collect();
-
-    let unshadowed: Vec<&(&str, &str)> = CanonicalRuntimeRoles::spellings()
+    let env = ElabEnv::new().expect("base environment");
+    let floor_parents = PRELUDE_FLOOR_NAMES
         .iter()
-        .filter(|(_, spelling)| !shadowed.contains(spelling))
+        .map(|name| env.globals[*name])
+        .collect::<BTreeSet<_>>();
+    let floor_protected = roster
+        .iter()
+        .copied()
+        .filter(|spelling| {
+            env.globals.get(*spelling).is_some_and(|id| {
+                env.env
+                    .constructor(*id)
+                    .is_some_and(|(parent, _)| floor_parents.contains(&parent.id))
+            })
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        !floor_protected.is_empty(),
+        "the roster must exercise the exact-parent floor-protection arm"
+    );
+
+    let uncovered: Vec<&(&str, &str)> = CanonicalRuntimeRoles::spellings()
+        .iter()
+        .filter(|(_, spelling)| !shadowed.contains(spelling) && !floor_protected.contains(spelling))
         .collect();
     assert!(
-        unshadowed.is_empty(),
-        "these canonical roles are NOT shadowed by the fixture, so the substitution control says \
-         nothing about them: {unshadowed:?}\n\
-         Add each spelling to the fixture's declarations and to SHADOWED_ROLES (or \
-         SHADOWED_FAMILIES for a type), or the completeness claim is partial."
+        uncovered.is_empty(),
+        "these canonical roles are neither shadowed by the fixture nor protected by exact floor \
+         constructor parentage: {uncovered:?}\n\
+         Add a shadowable spelling to SHADOWED_ROLES/SHADOWED_FAMILIES, or make the intended \
+         structural protection explicit."
     );
 
     let stale: Vec<&&str> = shadowed
