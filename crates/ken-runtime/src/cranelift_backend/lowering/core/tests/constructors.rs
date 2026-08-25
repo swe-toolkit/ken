@@ -2906,6 +2906,16 @@ fn c2_ac6_host_result_covers_resource_token_and_response_bytes_payloads() {
         },
     );
 
+    let count_plan = plan.clone();
+    let (_count_module, read_count) = c2_compile_edge_with_arg(
+        "c2_host_result_field_count_consumer",
+        &seed_env,
+        count_plan,
+        |compiler, builder, word| {
+            compiler.emit_carrier_field_count(builder, CarriedBoundaryWord { word })
+        },
+    );
+
     let resource_plan = plan.clone();
     let (_resource_module, read_resource) = c2_compile_edge_with_arg(
         "c2_resource_token_consumer",
@@ -2942,12 +2952,22 @@ fn c2_ac6_host_result_covers_resource_token_and_response_bytes_payloads() {
     let (_arena, base) = ac_c7_bind_arena(&mut store);
     let ok_word = c2_run_edge_with_arg(producer, base, 1);
     assert_eq!(
+        c2_run_edge_with_arg(read_count, base, ok_word),
+        1,
+        "the production HostResult has exactly one physical payload field"
+    );
+    assert_eq!(
         c2_run_edge_with_arg(read_resource, base, ok_word),
         resource,
         "the success arm must preserve and expose the full ResourceToken scalar"
     );
 
     let err_word = c2_run_edge_with_arg(producer, base, 0);
+    assert_eq!(
+        c2_run_edge_with_arg(read_count, base, err_word),
+        1,
+        "the error form has the same canonical one-payload physical shape"
+    );
     let response_word = crate::boundary_value::BoundaryWord(
         c2_run_edge_with_arg(read_response, base, err_word) as u64,
     );
@@ -2975,6 +2995,143 @@ fn c2_ac6_host_result_covers_resource_token_and_response_bytes_payloads() {
         response_backing,
         "`D2`: ⛔ the error arm must preserve the ResponseBytes CONTENT — the \
          copied bytes, in order, not a pointer it no longer publishes"
+    );
+}
+
+/// The production HostResult transfer branches before recursively transferring
+/// either payload.
+///
+/// MEASURED: each generated producer holds one valid Bool arm and one structurally
+/// admissible dynamic constructor whose runtime discriminator is outside its
+/// finite alternative table. The inactive-hostile direction returns the valid
+/// payload; selecting the same hostile arm returns the dynamic dispatcher's exact
+/// malformed status.
+/// CLAIMED: only the arm selected by the runtime success word is transferred,
+/// while malformed selected values retain the existing fail-closed dispatcher.
+/// THE GAP: this pins the production transfer seam and its runtime result, not the
+/// higher-level host operation that supplied the templates. Promise class:
+/// durable invariant.
+#[test]
+fn host_result_transfer_materializes_only_the_runtime_selected_payload() {
+    let constructor = "ctor:fixture::D1::Only".to_string();
+    let source = RuntimeExpr::Construct {
+        constructor: constructor.clone(),
+        args: Vec::new(),
+    };
+    let (plan, origin) = planned_root_occurrence(&source);
+    let occurrence = plan
+        .source_aggregate_occurrence(origin, PlannedAggregateShape::Constructor)
+        .expect("the hostile alternative has a planner-issued allocation record");
+    let identity = plan
+        .constructor_symbol_identity(origin)
+        .expect("the hostile alternative has a planner-issued identity");
+    let seed_env = NativeSeedEnvironment::empty();
+
+    let success_plan = plan.clone();
+    let success_constructor = constructor.clone();
+    let (_success_module, success_producer) = c2_compile_edge_with_arg(
+        "host_result_success_skips_hostile_error",
+        &seed_env,
+        success_plan,
+        move |compiler, builder, success| {
+            let one = builder.ins().iconst(types::I64, 1);
+            let hostile = Lowered::DynamicConstructor(DynamicConstructorV1 {
+                discriminator: one,
+                alternatives: vec![DynamicConstructorAlternativeV1 {
+                    tag: 0,
+                    constructor: success_constructor.clone(),
+                    identity,
+                    occurrence: Some(occurrence),
+                    fields: Vec::new(),
+                }],
+            });
+            let result = Lowered::HostResult {
+                success,
+                error: Box::new(hostile),
+                ok: Box::new(Lowered::Bool {
+                    value: one,
+                    known: Some(true),
+                }),
+                err_constructor: "ctor:fixture::D1::Err".to_string(),
+                ok_constructor: "ctor:fixture::D1::Ok".to_string(),
+            };
+            Ok(compiler
+                .transfer_into_carrier(builder, origin, &result)?
+                .word)
+        },
+    );
+
+    let error_plan = plan.clone();
+    let error_constructor = constructor;
+    let (_error_module, error_producer) = c2_compile_edge_with_arg(
+        "host_result_error_skips_hostile_ok",
+        &seed_env,
+        error_plan,
+        move |compiler, builder, success| {
+            let zero = builder.ins().iconst(types::I64, 0);
+            let one = builder.ins().iconst(types::I64, 1);
+            let hostile = Lowered::DynamicConstructor(DynamicConstructorV1 {
+                discriminator: one,
+                alternatives: vec![DynamicConstructorAlternativeV1 {
+                    tag: 0,
+                    constructor: error_constructor.clone(),
+                    identity,
+                    occurrence: Some(occurrence),
+                    fields: Vec::new(),
+                }],
+            });
+            let result = Lowered::HostResult {
+                success,
+                error: Box::new(Lowered::Bool {
+                    value: zero,
+                    known: Some(false),
+                }),
+                ok: Box::new(hostile),
+                err_constructor: "ctor:fixture::D1::Err".to_string(),
+                ok_constructor: "ctor:fixture::D1::Ok".to_string(),
+            };
+            Ok(compiler
+                .transfer_into_carrier(builder, origin, &result)?
+                .word)
+        },
+    );
+
+    let (_reader_module, read_payload) = c2_compile_edge_with_arg(
+        "host_result_selected_payload_reader",
+        &seed_env,
+        plan,
+        |compiler, builder, word| {
+            let payload =
+                compiler.emit_carrier_host_payload(builder, CarriedBoundaryWord { word })?;
+            compiler.emit_carrier_scalar(builder, payload)
+        },
+    );
+
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+
+    let success_word = c2_run_edge_with_arg(success_producer, base, 1);
+    assert_eq!(
+        c2_run_edge_with_arg(read_payload, base, success_word),
+        1,
+        "a valid success payload must survive a hostile inactive error template"
+    );
+    assert_eq!(
+        c2_run_edge_with_arg(success_producer, base, 0),
+        MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS,
+        "the same hostile error must fail when the runtime selects it"
+    );
+
+    let error_word = c2_run_edge_with_arg(error_producer, base, 0);
+    assert_eq!(
+        c2_run_edge_with_arg(read_payload, base, error_word),
+        0,
+        "a valid error payload must survive a hostile inactive success template"
+    );
+    assert_eq!(
+        c2_run_edge_with_arg(error_producer, base, 1),
+        MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS,
+        "the same hostile success must fail when the runtime selects it"
     );
 }
 

@@ -1895,22 +1895,44 @@ impl<'a> Lowering<'a> {
                     success, error, ok, ..
                 } => {
                     let (tag, class) = Self::carrier_handle_disposition(value)?;
-                    let ok = self.emit_carrier_transfer(builder, origin, ok)?;
-                    let error = self.emit_carrier_transfer(builder, origin, error)?;
-                    let word = self.emit_carrier_alloc(
-                        builder,
-                        CarrierAllocationRequest::NonAggregate { tag },
-                        class,
-                        2,
-                    )?;
-                    let success = if builder.func.dfg.value_type(*success) == types::I64 {
+                    let success_i64 = if builder.func.dfg.value_type(*success) == types::I64 {
                         *success
                     } else {
                         builder.ins().uextend(types::I64, *success)
                     };
-                    self.emit_carrier_store_scalar(builder, word, success)?;
-                    self.emit_carrier_store_field(builder, word, 0, ok)?;
-                    self.emit_carrier_store_field(builder, word, 1, error)?;
+                    let took_ok = builder.ins().icmp_imm(
+                        cranelift_codegen::ir::condcodes::IntCC::NotEqual,
+                        success_i64,
+                        0,
+                    );
+                    let ok_block = builder.create_block();
+                    let error_block = builder.create_block();
+                    let merge = builder.create_block();
+                    builder.append_block_param(merge, types::I64);
+                    builder
+                        .ins()
+                        .brif(took_ok, ok_block, &[], error_block, &[]);
+
+                    builder.switch_to_block(ok_block);
+                    let selected = self.emit_carrier_transfer(builder, origin, ok)?;
+                    builder.ins().jump(merge, &[selected.word.into()]);
+
+                    builder.switch_to_block(error_block);
+                    let selected = self.emit_carrier_transfer(builder, origin, error)?;
+                    builder.ins().jump(merge, &[selected.word.into()]);
+
+                    builder.switch_to_block(merge);
+                    let selected = CarriedBoundaryWord {
+                        word: builder.block_params(merge)[0],
+                    };
+                    let word = self.emit_carrier_alloc(
+                        builder,
+                        CarrierAllocationRequest::NonAggregate { tag },
+                        class,
+                        1,
+                    )?;
+                    self.emit_carrier_store_scalar(builder, word, success_i64)?;
+                    self.emit_carrier_store_field(builder, word, 0, selected)?;
                     Ok(word)
                 }
                 Lowered::DynamicConstructor(dynamic) => {

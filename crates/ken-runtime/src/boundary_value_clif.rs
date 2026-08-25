@@ -1128,11 +1128,11 @@ fn define_host_success<M: Module>(
     finish(module, graph.host_success, func)
 }
 
-/// `(arena, word, out) -> status` — the payload the discriminant selects.
+/// `(arena, word, out) -> status` — the selected payload.
 ///
-/// ⭐ The selection is a **runtime** branch on a runtime discriminant. Nothing
-/// here consults a compile-time record of which arm a reply took; that is the
-/// distinction `#10` measured, and it is the one this helper exists to hold.
+/// The runtime producer branches on the discriminant before transfer and stores
+/// exactly one active payload. This helper therefore projects field zero after
+/// the shared exact-class and exact-arity guard.
 fn define_host_payload<M: Module>(
     module: &mut M,
     graph: Graph,
@@ -1151,33 +1151,11 @@ fn define_host_payload<M: Module>(
         let Resolved { node, region } = resolve_prologue(&mut b, ptr, resolve, arena, word);
         let node = host_result_guard(&mut b, node);
 
-        let success = b
-            .ins()
-            .load(types::I64, MemFlags::trusted(), node, NODE_PAYLOAD);
-        let ok_index = b.ins().iconst(types::I64, 0);
-        let err_index = b.ins().iconst(types::I64, 1);
-        let took_ok = b.ins().icmp_imm(IntCC::NotEqual, success, 0);
-        let index = b.ins().select(took_ok, ok_index, err_index);
-
-        let count = b
-            .ins()
-            .load(types::I64, MemFlags::trusted(), node, NODE_FIELD_COUNT);
-        let within = b.ins().icmp(IntCC::UnsignedLessThan, index, count);
-        let ok = b.create_block();
-        let oob = b.create_block();
-        b.ins().brif(within, ok, &[], oob, &[]);
-
-        b.switch_to_block(oob);
-        let err = b.ins().iconst(types::I64, BOUNDARY_ERR_BOUNDS);
-        b.ins().return_(&[err]);
-
-        b.switch_to_block(ok);
         let at = b
             .ins()
             .load(types::I64, MemFlags::trusted(), node, NODE_FIELDS_AT);
         let words = b.ins().load(ptr, MemFlags::trusted(), region, ARENA_WORDS);
-        let absolute = b.ins().iadd(at, index);
-        let offset = b.ins().imul_imm(absolute, 8);
+        let offset = b.ins().imul_imm(at, 8);
         let address = b.ins().iadd(words, offset);
         let child = b.ins().load(types::I64, MemFlags::trusted(), address, 0);
         b.ins().store(MemFlags::trusted(), child, out, 0);
@@ -1190,7 +1168,7 @@ fn define_host_payload<M: Module>(
     finish(module, graph.host_payload, func)
 }
 
-/// Return early with `ERR_CLASS` unless the node is a `HostResult`.
+/// Return early unless the node is a canonical arity-one `HostResult`.
 fn host_result_guard(
     b: &mut FunctionBuilder<'_>,
     node: cranelift_codegen::ir::Value,
@@ -1201,15 +1179,28 @@ fn host_result_guard(
     let is_host = b
         .ins()
         .icmp_imm(IntCC::Equal, class, BoundaryClass::HostResult as i64);
-    let ok = b.create_block();
-    let bad = b.create_block();
-    b.ins().brif(is_host, ok, &[], bad, &[]);
+    let class_ok = b.create_block();
+    let bad_class = b.create_block();
+    b.ins().brif(is_host, class_ok, &[], bad_class, &[]);
 
-    b.switch_to_block(bad);
+    b.switch_to_block(bad_class);
     let err = b.ins().iconst(types::I64, BOUNDARY_ERR_CLASS);
     b.ins().return_(&[err]);
 
-    b.switch_to_block(ok);
+    b.switch_to_block(class_ok);
+    let count = b
+        .ins()
+        .load(types::I64, MemFlags::trusted(), node, NODE_FIELD_COUNT);
+    let is_canonical = b.ins().icmp_imm(IntCC::Equal, count, 1);
+    let shape_ok = b.create_block();
+    let bad_shape = b.create_block();
+    b.ins().brif(is_canonical, shape_ok, &[], bad_shape, &[]);
+
+    b.switch_to_block(bad_shape);
+    let err = b.ins().iconst(types::I64, BOUNDARY_ERR_SHAPE);
+    b.ins().return_(&[err]);
+
+    b.switch_to_block(shape_ok);
     node
 }
 
@@ -3470,9 +3461,8 @@ pub(crate) mod tests {
     /// **`D5` control 2 — a `HostResult` across a boundary, with the callee
     /// selecting the correct arm.**
     ///
-    /// ⛔ The success flag is a RUNTIME value. Both arms are materialized for
-    /// every case, so a callee that returned a fixed arm would pass one case
-    /// and fail the other.
+    /// The success flag is a runtime value and the node stores exactly the one
+    /// payload selected by that value.
     #[test]
     fn b2v_emitted_code_selects_the_host_result_arm_at_runtime() {
         let (_m, payload_code) = compile_probe(Probe::Unary(|h| h.host_payload));
@@ -3492,7 +3482,8 @@ pub(crate) mod tests {
                 &RuntimeGroundValue::Int(RuntimeIntV1::Small(22)),
             )
             .expect("err payload");
-            let word = materialize_host_result(&mut builder, success, ok, err);
+            let selected = if success != 0 { ok } else { err };
+            let word = materialize_host_result(&mut builder, success, selected);
             let f = bind(&mut store, builder);
             let base = f.base;
 
@@ -3614,7 +3605,7 @@ pub(crate) mod tests {
         let mut builder = BoundaryArenaBuilder::new();
         let persistent = materialize_ground(&mut store, &cons(1)).expect("materializes");
         let borrowed = materialize_borrowed(&mut builder, 1);
-        let host = materialize_host_result(&mut builder, 1, persistent, persistent);
+        let host = materialize_host_result(&mut builder, 1, persistent);
         let immediate = BoundaryWord::immediate(BoundaryTag::ImmediateBool, 1);
         let f = bind(&mut store, builder);
         let base = f.base;
@@ -4297,28 +4288,26 @@ pub(crate) mod tests {
         b.ins().return_(&[word]);
     }
 
-    /// `(base, success, ok_word, err_word) -> word` — build a `HostResult`.
+    /// `(base, success, selected_word) -> word` — build a `HostResult`.
     fn emit_host_result_producer(
         b: &mut FunctionBuilder<'_>,
         refs: &Refs,
         p: &[cranelift_codegen::ir::Value],
         ptr: cranelift_codegen::ir::Type,
     ) {
-        let (base, success, ok_word, err_word) = (p[0], p[1], p[2], p[3]);
+        let (base, success, selected_word) = (p[0], p[1], p[2]);
         let out = cell(b, ptr);
         let tag = b
             .ins()
             .iconst(types::I64, BoundaryTag::InvocationHostResult as i64);
         let class = b.ins().iconst(types::I64, BoundaryClass::HostResult as i64);
-        let two = b.ins().iconst(types::I64, 2);
-        guard(b, refs.alloc, &[base, tag, class, two, out]);
+        let one = b.ins().iconst(types::I64, 1);
+        guard(b, refs.alloc, &[base, tag, class, one, out]);
         let word = b.ins().load(types::I64, MemFlags::trusted(), out, 0);
 
         guard(b, refs.store_scalar, &[base, word, success]);
         let zero = b.ins().iconst(types::I64, 0);
-        let one = b.ins().iconst(types::I64, 1);
-        guard(b, refs.store_field, &[base, word, zero, ok_word]);
-        guard(b, refs.store_field, &[base, word, one, err_word]);
+        guard(b, refs.store_field, &[base, word, zero, selected_word]);
         b.ins().return_(&[word]);
     }
 
@@ -4605,13 +4594,14 @@ pub(crate) mod tests {
         }
     }
 
-    /// **`AC-4` — a producer mints BOTH `HostResult` arms.**
+    /// **`AC-4` — a producer mints one selected `HostResult` payload.**
     #[test]
-    fn b2v_emitted_code_constructs_both_host_result_arms() {
-        let (_pm, produce) = compile_producer(4, emit_host_result_producer);
+    fn b2v_emitted_code_constructs_one_selected_host_result_payload() {
+        let (_pm, produce) = compile_producer(3, emit_host_result_producer);
         let (_c1, success_code) = compile_probe(Probe::Unary(|h| h.host_success));
         let (_c2, payload_code) = compile_probe(Probe::Unary(|h| h.host_payload));
         let (_c3, scalar_code) = compile_probe(Probe::Unary(|h| h.scalar));
+        let (_c4, count_code) = compile_probe(Probe::Unary(|h| h.field_count));
 
         for (success, expected) in [(1u64, 11i64), (0, 22)] {
             let mut store = c1_d2_store();
@@ -4621,10 +4611,10 @@ pub(crate) mod tests {
                 (0, 0, 0),
                 (4, 8, 0),
             );
-            let ok = BoundaryWord::immediate(BoundaryTag::ImmediateInt, 11);
-            let err = BoundaryWord::immediate(BoundaryTag::ImmediateInt, 22);
+            let selected = BoundaryWord::immediate(BoundaryTag::ImmediateInt, expected as u64);
 
-            let word = BoundaryWord(run4(produce, f.base, success, ok.0, err.0) as u64);
+            let word =
+                BoundaryWord(run3(produce, f.base, BoundaryWord(success), selected.0) as u64);
             assert_eq!(
                 word.tag(),
                 Some(BoundaryTag::InvocationHostResult),
@@ -4636,11 +4626,57 @@ pub(crate) mod tests {
                 success as i64,
                 "AC-4: the discriminant the producer stored is the one read back"
             );
+            assert_eq!(
+                run2(count_code, f.base, word),
+                1,
+                "AC-4: the physical HostResult shape has one active payload"
+            );
             let selected = BoundaryWord(run2(payload_code, f.base, word) as u64);
             assert_eq!(
                 run2(scalar_code, f.base, selected),
                 expected,
-                "AC-4: the consumer selected the arm at run time"
+                "AC-4: the consumer projects the one selected payload"
+            );
+        }
+    }
+
+    /// HostResult readers refuse both neighbours of the canonical arity-one
+    /// physical shape.
+    #[test]
+    fn host_result_readers_refuse_arity_zero_and_two() {
+        let (_am, allocate) = compile_producer(4, emit_alloc_probe);
+        let (_sm, success_code) = compile_probe(Probe::Unary(|h| h.host_success));
+        let (_pm, payload_code) = compile_probe(Probe::Unary(|h| h.host_payload));
+
+        for arity in [0u64, 2] {
+            let mut store = c1_d2_store();
+            let f = bind_with(
+                &mut store,
+                BoundaryArenaBuilder::new(),
+                (0, 0, 0),
+                (4, 8, 0),
+            );
+            let word = BoundaryWord(run4(
+                allocate,
+                f.base,
+                BoundaryTag::InvocationHostResult as u64,
+                BoundaryClass::HostResult as u64,
+                arity,
+            ) as u64);
+            assert_eq!(
+                word.tag(),
+                Some(BoundaryTag::InvocationHostResult),
+                "the malformed-shape control must reach a real HostResult node"
+            );
+            assert_eq!(
+                run2(success_code, f.base, word),
+                BOUNDARY_ERR_SHAPE,
+                "host_success must refuse HostResult arity {arity}"
+            );
+            assert_eq!(
+                run2(payload_code, f.base, word),
+                BOUNDARY_ERR_SHAPE,
+                "host_payload must refuse HostResult arity {arity}"
             );
         }
     }
@@ -7743,7 +7779,7 @@ pub(crate) mod tests {
         store.bind_artifact(fixture_artifact("invocation", 8));
         let mut builder = BoundaryArenaBuilder::new();
         let borrowed = materialize_borrowed(&mut builder, 1);
-        let host = materialize_host_result(&mut builder, 1, borrowed, borrowed);
+        let host = materialize_host_result(&mut builder, 1, borrowed);
         store.seal_persistent();
         for word in [borrowed, host] {
             assert_eq!(
