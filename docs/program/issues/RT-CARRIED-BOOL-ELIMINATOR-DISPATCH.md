@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIED-BOOL-ELIMINATOR-DISPATCH
 title: "Lane-1 successor to the pairing WP — route the canonical carried Bool (BoundaryTag::ImmediateBool, payload 0/1) through a finite scalar dispatcher in joins.rs::lower_carried_constructor_match, which today calls node-only emit_carrier_tag and require_i64-refuses every immediate scalar before any Bool case. D0 binds the case-family identity authority and censuses which immediate inductive representations reach the same consumer; D1 adds the scalar Bool path using existing tag/scalar authority, leaving node-backed constructors unchanged and giving structural Nat an explicit measured disposition"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,12 +11,20 @@ github: null
 origin: "Steward, 2026-08-25, from the Architect hard-stop #1 ruling evt_3nm3jvapsf7cp (thr_3nmd0xy7dgh6g) on RT-GENERATED-CONTINUATION-OPERAND-PAIRING. The pairing repair correctly delivers the selected ImmediateBool(false) to the next consumer, exposing a DISTINCT representation-specific eliminator gap: joins.rs::lower_carried_constructor_match treats every non-HostResult value as a node-backed constructor (emit_carrier_tag -> ken_boundary_tag_local -> require_i64), while canonical Bool is an immediate scalar sum, so it refuses before any Bool case comparison. Ruled a separate object with no Decision (two independently correctable mechanisms). Steward owns the final ID/frame."
 ---
 
+> # RELEASED 2026-08-25 — the pairing WP merged; now the active lane-1 object
+>
+> [[RT-GENERATED-CONTINUATION-OPERAND-PAIRING]] merged at squash `e10dabf8`
+> (blob-audit clean), so the correctly-paired `ImmediateBool(false)` now reaches
+> this consumer. Dependency discharged; `status: ready`. Base the successor branch
+> on the `main` that carries the pairing merge (`e10dabf8` or later). This is the
+> next lane-1 object.
+
 > # Successor to the generated-continuation pairing repair
 >
 > Held behind [[RT-GENERATED-CONTINUATION-OPERAND-PAIRING]]: the correctly-paired
 > `ImmediateBool(false)` only reaches this consumer after the pairing repair
-> lands, so `depends_on` that WP. `status: draft` — release to the runtime ring
-> once the pairing WP merges (Steward owns lane order). Full frame:
+> lands, so `depends_on` that WP. The pairing WP has now merged (`e10dabf8`), so
+> this is `status: ready` and released (Steward owns lane order). Full frame:
 > `docs/program/wp/RT-CARRIED-BOOL-ELIMINATOR-DISPATCH.md`.
 >
 > This is NOT a pairing residual — the source binder now receives exactly the
