@@ -490,6 +490,38 @@ fn assert_floor_collision_rejects_before_allocation(label: &str, source: &str, n
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
+fn assert_public_floor_collision_rejects_before_allocation(label: &str, source: &str, name: &str) {
+    let mut env = ElabEnv::new().expect("base environment");
+    let canonical_bindings = FLOOR_CASES
+        .iter()
+        .flat_map(|case| {
+            std::iter::once(case.name)
+                .chain(case.constructors.iter().copied())
+                .map(|name| (name, env.globals[name]))
+        })
+        .collect::<Vec<_>>();
+    let declarations_before = env.env.declarations().len();
+    let next_id_before = env.env.next_global_id();
+    let trusted_before = env.env.trusted_base();
+
+    let error = env
+        .elaborate_file(source)
+        .expect_err("a public same-spelling floor binding must reject before allocation");
+    assert!(
+        matches!(error, ElabError::AmbiguousReference { name: ref rejected, .. } if rejected == name),
+        "{label} must reject at {name}, got {error:?}"
+    );
+    for (floor_name, canonical_id) in canonical_bindings {
+        assert_eq!(
+            env.globals[floor_name], canonical_id,
+            "{label} changed canonical floor binding {floor_name}"
+        );
+    }
+    assert_eq!(env.env.declarations().len(), declarations_before);
+    assert_eq!(env.env.next_global_id(), next_id_before);
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
 fn assert_root_floor_collision_rejects_before_allocation(source: &str, name: &str) {
     let mut env = ElabEnv::new().expect("base environment");
     let canonical_id = env.globals[name];
@@ -622,6 +654,69 @@ fn floor_parent_and_constructor_clash_matrix_is_fail_closed() {
     ));
     assert_eq!(env.env.declarations().len(), declarations_before + 1);
     assert_eq!(env.env.next_global_id().0, next_id_before.0 + 1);
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+/// Promise class: durable invariant. The public wrapper preserves declaration
+/// namespace effects in the production parser/elaborator path.
+///
+/// **MEASURED:** separate public parent and constructor declarations reject at
+/// their retained floor spelling with every canonical floor binding,
+/// declaration count, allocator position, and trust unchanged. An all-renamed
+/// public data declaration allocates exactly one local family and constructor
+/// with kernel-recorded local parentage. **CLAIMED:** the classifier-boundary
+/// wrapper law is realized before allocation for both safety-relevant binding
+/// effect shapes. **THE GAP:** the boundary law's one-level constructible-leaf
+/// population is a manually maintained unit-test table and must grow with a new
+/// non-`Pub` `Decl` leaf.
+#[test]
+fn public_wrapper_rejects_floor_parent_before_allocation() {
+    assert_public_floor_collision_rejects_before_allocation(
+        "public-parent",
+        "pub def Nat = Bool",
+        "Nat",
+    );
+}
+
+/// A public data declaration reaches constructor-name collision enumeration
+/// independently of the family-name route above.
+#[test]
+fn public_wrapper_rejects_floor_constructor_before_allocation() {
+    assert_public_floor_collision_rejects_before_allocation(
+        "public-constructor",
+        "pub data LocalNat = Zero",
+        "Zero",
+    );
+}
+
+/// An all-renamed public data declaration is the reaching positive: the same
+/// production form remains lawful and records exact local parentage.
+#[test]
+fn public_wrapper_all_renamed_data_preserves_local_parentage() {
+    let mut env = ElabEnv::new().expect("base environment");
+    let canonical_ids = floor_ids(&env);
+    let declarations_before = env.env.declarations().len();
+    let next_id_before = env.env.next_global_id();
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_file("pub data LocalNat = LocalZero")
+        .expect("an all-renamed public family must elaborate");
+
+    let parent = env.globals["LocalNat"];
+    let constructor = env
+        .env
+        .inductive(parent)
+        .expect("public renamed family must be kernel-recorded")
+        .constructors[0]
+        .id;
+    assert!(!canonical_ids.contains(&parent));
+    assert!(!canonical_ids.contains(&constructor));
+    let (recorded_parent, _) = env
+        .env
+        .constructor(constructor)
+        .expect("public renamed constructor must be kernel-recorded");
+    assert_eq!(recorded_parent.id, parent);
+    assert_eq!(env.env.declarations().len(), declarations_before + 1);
+    assert_eq!(env.env.next_global_id().0, next_id_before.0 + 2);
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 

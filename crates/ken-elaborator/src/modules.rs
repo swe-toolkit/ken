@@ -2488,3 +2488,145 @@ pub fn expand_and_elaborate(
     elab.module_state.root_scope = scope;
     Ok(results)
 }
+
+#[cfg(test)]
+mod namespace_effect_tests {
+    use super::{decl_namespace_effect, ConstructorNameSource, DeclNamespaceEffect};
+    use crate::ast::{Decl, ExplicitDataCtor};
+    use crate::error::Span;
+    use crate::parser::parse_decls;
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum OwnedNamespaceEffect {
+        TopLevelName {
+            name: String,
+            span: Span,
+        },
+        ConstructorNames {
+            parent: String,
+            parent_span: Span,
+            constructors: Vec<(String, Span)>,
+        },
+        QualifiedIdentity {
+            subject: String,
+            proof_name: String,
+            span: Span,
+        },
+        ReferenceOnly,
+        NoBinding,
+    }
+
+    fn owned_namespace_effect(decl: &Decl) -> OwnedNamespaceEffect {
+        match decl_namespace_effect(decl) {
+            DeclNamespaceEffect::TopLevelName { name, span } => {
+                OwnedNamespaceEffect::TopLevelName {
+                    name: name.to_string(),
+                    span: span.clone(),
+                }
+            }
+            DeclNamespaceEffect::ConstructorNames {
+                parent,
+                parent_span,
+                constructors,
+            } => {
+                let constructors = match constructors {
+                    ConstructorNameSource::Simple(constructors) => constructors
+                        .iter()
+                        .map(|constructor| (constructor.name.clone(), constructor.span.clone()))
+                        .collect(),
+                    ConstructorNameSource::Explicit(constructors) => constructors
+                        .iter()
+                        .map(|constructor| match constructor {
+                            ExplicitDataCtor::Simple(constructor) => {
+                                (constructor.name.clone(), constructor.span.clone())
+                            }
+                            ExplicitDataCtor::Signature { name, span, .. } => {
+                                (name.clone(), span.clone())
+                            }
+                        })
+                        .collect(),
+                };
+                OwnedNamespaceEffect::ConstructorNames {
+                    parent: parent.to_string(),
+                    parent_span: parent_span.clone(),
+                    constructors,
+                }
+            }
+            DeclNamespaceEffect::QualifiedIdentity {
+                subject,
+                proof_name,
+                span,
+            } => OwnedNamespaceEffect::QualifiedIdentity {
+                subject: subject.to_string(),
+                proof_name: proof_name.to_string(),
+                span: span.clone(),
+            },
+            DeclNamespaceEffect::ReferenceOnly => OwnedNamespaceEffect::ReferenceOnly,
+            DeclNamespaceEffect::NoBinding => OwnedNamespaceEffect::NoBinding,
+        }
+    }
+
+    /// `Pub` is a transparent namespace-effect wrapper for the complete
+    /// one-level constructible-leaf population. This table intentionally
+    /// includes parser-ineligible public forms because the law is about the
+    /// constructible AST, not only today's `pub_eligibility` subset.
+    ///
+    /// The table is manually maintained: the production classifier is
+    /// compile-time exhaustive, but adding a non-`Pub` `Decl` leaf also
+    /// requires adding its representative here.
+    #[test]
+    fn pub_wrapper_preserves_complete_owned_leaf_effects() {
+        let leaf_sources = [
+            ("boundary", "program"),
+            ("view", "const local_view : Bool = True"),
+            ("space", "space LocalSpace { mut cell : Int = 0 }"),
+            ("let", "let local_let : Bool = True"),
+            ("prove", "prove local_prove : Bool"),
+            ("prop", "prop LocalProp : Omega where { intro : LocalProp }"),
+            ("theorem", "theorem local_theorem : Bool = True"),
+            ("axiom", "axiom local_axiom : Bool"),
+            (
+                "attached-proof",
+                "proof local_proof for local_subject : Bool = True",
+            ),
+            ("law", "law LocalLaw (x) { field : Bool }"),
+            ("data", "data LocalData = LocalCtor"),
+            (
+                "explicit-data",
+                "data ExplicitData : Type where { ExplicitCtor : ExplicitData }",
+            ),
+            ("type-alias", "def LocalAlias = Bool"),
+            (
+                "foreign",
+                "foreign local_foreign : Int = \"probe\" \"libc.so\" pure",
+            ),
+            ("temporal", "temporal local_temporal { always True }"),
+            ("record", "record LocalRecord { field : Bool }"),
+            ("class", "class LocalClass { field : Bool }"),
+            ("instance", "instance LocalClass Bool { field = True }"),
+            ("derive", "derive LocalClass for LocalData"),
+            ("module", "module LocalModule {}"),
+            ("import", "import LocalModule"),
+            ("export", "export local_view"),
+        ];
+
+        for (label, source) in leaf_sources {
+            let mut declarations = parse_decls(source)
+                .unwrap_or_else(|error| panic!("{label} leaf must parse: {error}"));
+            assert_eq!(
+                declarations.len(),
+                1,
+                "{label} fixture must construct exactly one leaf"
+            );
+            let leaf = declarations.pop().expect("one checked declaration");
+            assert!(
+                !matches!(leaf, Decl::Pub(_)),
+                "{label} fixture must be a non-Pub leaf"
+            );
+            let expected = owned_namespace_effect(&leaf);
+            let wrapped = Decl::Pub(Box::new(leaf));
+            let actual = owned_namespace_effect(&wrapped);
+            assert_eq!(actual, expected, "Pub changed the complete {label} effect");
+        }
+    }
+}
