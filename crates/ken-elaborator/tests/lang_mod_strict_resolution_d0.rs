@@ -564,6 +564,13 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            "Data.Vector.Vector".to_string(),
+            ["Equal", "Nat", "Proved", "Suc", "Zero"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        ),
+        (
             "Tooling.Testing.Property".to_string(),
             [
                 "Err", "MkUnit", "Nat", "None", "Ok", "Option", "Result", "Some", "Suc", "Unit",
