@@ -478,34 +478,174 @@ unrelated `ElabEnv` does not satisfy them.
 
 ### surface/modules/closed-floor-accepts-arbitrary-global-does-not
 
-- spec: `30-taxonomy §4` (closed prelude floor), `33 §3.3` (exact
-  `{Bool, Char, List}` Ken-defined floor and no convenience-global fallback),
-  `39 §2.0` step 4
+- promise class: **normative compatibility vector** — the exact floor is closed
+  in both directions
+- spec: `30-taxonomy §4` (closed prelude floor), `33 §3.3` (exact nine-type
+  floor and no convenience-global fallback), `39 §2.0` step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
   path to register the transparent Ken definition `def Ambient = Bool` under
-  the bare implementation-global spelling `Ambient`. Then invoke the roots
-  loader. The controlled arms are:
+  the bare implementation-global spelling `Ambient`. Then invoke the strict
+  roots loader. The controlled arms are:
 
-  1. entry `Floor` contains only `pub def B = Bool`, `pub def C = Char`, and
-     `pub def L = List Bool`;
+  1. entry `Floor` contains checked aliases reaching all nine floor types,
+     values and exhaustive matches reaching every floor constructor,
+     `bytes_at`/`bytes_slice` uses whose results are matched as `Option`, and a
+     `bytes_decode` use matched as
+     `Result Utf8Error String`, and functions typed by `Cap a` and
+     `Resource k`;
   2. entry `Leaky` contains only `pub def X = Ambient`;
   3. entry `Explicit` contains `import Provider (Ambient)` followed by
      `pub def X = Ambient`, while `Provider.ken.md` contains
-     `pub def Ambient = Bool`.
+     `pub def Ambient = Bool`;
+  4. entry `Convenience` contains only `pub def P = Prod Bool Bool`.
 
   Arms 2 and 3 both retain the pre-registered bare `Ambient` in the same kind
-  of `ElabEnv`; no test-only export map is installed.
-- expect: arm 1 accepts, proving all three Ken-defined floor names are present.
-  Arm 2 rejects `Ambient` as unbound at surface resolution even though the
-  implementation global exists. **RED UNTIL the module/import repair campaign**
-  at this strict-resolution gate. Arm 3 accepts and resolves `X` through the
-  imported provider declaration, not through the pre-registered bare global.
-  None changes `trusted_base()`.
-- why: `Bool` and `Ambient` are definitionally the same type in this fixture,
-  so kernel typing cannot distinguish the reject. Only the source-scope
-  boundary can. A resolver whose `resolve_ref` leaves an unbound bare name for
-  a later global-table lookup accepts arm 2; a resolver that removes the whole
-  prelude fails arm 1; a resolver that forbids all non-floor names fails arm 3.
+  of `ElabEnv`; arm 4 retains the compiler-installed checked `Prod`. No
+  test-only export map is installed.
+- expect: arm 1 accepts and every resolved type/constructor reference carries
+  the recorded pre-source `GlobalId`. Arm 2 rejects `Ambient` as unbound even
+  though the implementation global exists. Arm 3 accepts and resolves `X`
+  through the imported provider declaration, not the bare global. Arm 4 rejects
+  `Prod` as unbound. None changes `trusted_base()`.
+- why: the positive reaches each floor member through ordinary source and the
+  public primitive signatures that require the added types. `Bool` and
+  `Ambient` are definitionally the same in this fixture, so kernel typing cannot
+  distinguish arm 2; only source scope can. `Prod` separates a pre-installed
+  checked convenience from a later arbitrary global. Widening all globals,
+  removing the floor, or forbidding explicit imports each fails a different arm.
+
+The expanded floor arm and the four cases below are **RED UNTIL
+LANG-MOD-NAT-FLOOR-REALIZATION**. The existing strict-Nat rejection is a
+transition sentinel that this build must invert; it is not retained beside the
+new contract.
+
+### surface/modules/prelude-floor-reuses-exact-types-and-constructors
+
+- promise class: **durable invariant** — availability changes, canonical
+  identity and trust do not
+- spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`
+- given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
+  of `Auth`, `Bool`, `Char`, `List`, `Nat`, `Option`, `ResourceKind`, `Result`,
+  and `Utf8Error`; record every constructor id and kernel parent; and snapshot
+  `declarations().len()`, `next_global_id()`, and `trusted_base()`. Through
+  strict roots elaborate an entry with checked declarations that reach every
+  recorded id, including actual `bytes_at`/`bytes_slice`/`bytes_decode`, `Cap`,
+  and `Resource` signatures.
+- expect: every emitted type/body contains the corresponding recorded id. The
+  inductive members and their exact constructors are:
+
+  | parent | constructors |
+  |---|---|
+  | `Auth` | `ANone`, `APartial`, `AFull` |
+  | `Bool` | `True`, `False` |
+  | `List` | `Nil`, `Cons` |
+  | `Nat` | `Zero`, `Suc` |
+  | `Option` | `None`, `Some` |
+  | `ResourceKind` | `FsHandle`, `Buffer` |
+  | `Result` | `Err`, `Ok` |
+  | `Utf8Error` | `InvalidUtf8` |
+
+  `Char` is the checked transparent member and has no constructors. Every
+  constructor still reports the recorded parent. Declaration count and allocator
+  advance by exactly the number of source declarations, with no extra family or
+  constructor allocation. No recorded floor id enters `trusted_base()`.
+- why: ids and parentage are the property. Comparing names or data shapes cannot
+  distinguish a replacement family, and a source-only positive that never uses
+  the byte/capability/resource primitives would not prove their public result
+  and parameter types are nameable.
+- **MEASURED:** with only the nine-name floor inventory mutated at base
+  `06c62313af62`, all recorded ids are reused, every public signature use
+  elaborates, only source declarations allocate, and `trusted_base()` is
+  unchanged. **CLAIMED:** floor installation exposes the existing checked
+  identities without creating or trusting anything. **THE GAP:** the build must
+  derive every constructor from the recorded parent and must not substitute an
+  equal-shaped or same-spelling declaration.
+
+### surface/modules/prelude-floor-clash-and-lookalike-matrix
+
+- promise class: **durable invariant** — the immutable floor fails closed on
+  every non-canonical same-spelling origin
+- spec: `33 §3.3` (top-level local × prelude clash), `39 §2.0`
+- given: use a fresh strict-roots environment per row. For each of the eight
+  inductive parents in the table above:
+
+  1. keep only the parent spelling canonical while renaming all constructors;
+  2. in separate entries, keep only one constructor spelling canonical while
+     renaming the parent and all sibling constructors;
+  3. as the reaching positive, rename the parent and every constructor while
+     preserving the same declaration shape.
+
+  For constructor-free `Char`, pair `def Char = Int` with the same-production
+  positive `def LocalChar = Int`.
+- expect: every same-spelling row raises `AmbiguousReference` naming the one
+  retained floor spelling before any declaration or `GlobalId` is allocated.
+  Every all-renamed positive accepts. Each renamed inductive former and
+  constructor has an id distinct from every floor id, and each constructor's
+  parent is its renamed local former; `LocalChar` is likewise a distinct checked
+  transparent id. Every row preserves `trusted_base()`.
+- why: a generic `expect_err`, or one all-names-collide fixture, can pass at the
+  parser, positivity checker, or the wrong collision. One-axis rows plus
+  same-production positives establish reachability and exact error phase for
+  every binding. The renamed lookalikes prove structural equality is not
+  canonical identity.
+- **MEASURED:** all-renamed same-shape families elaborate under distinct ids;
+  current root loading still admits and shadows a same-spelling floor
+  declaration. **CLAIMED:** every floor name is immutable and rejects before
+  allocation. **THE GAP:** add the fail-closed collision at the fresh root-unit
+  scope; accepting a lookalike is the present implementation defect this case
+  must redden on.
+
+### surface/modules/ord-nat-class-owner-and-reexport-use-one-dictionary
+
+- promise class: **durable invariant** — one canonical dictionary and one
+  defining provenance
+- spec: `33 §4.3`, `§5.3`, `§5.5.1`; `39 §6.1`;
+  `50-stdlib/51 §7`
+- given: strict-load the realized `Core.Classes.LawfulClasses` and
+  `Data.Numeric.Nat.Order` units. Record the bootstrap `Nat` id and the
+  `Ord_instance_Nat` dictionary declared by `LawfulClasses`. Exercise implicit
+  `where Ord Nat` once through the class package's public surface and once
+  through `Order`'s reader-facing re-export/admission surface.
+- expect: the instance record's head is the exact bootstrap `Nat`; both use
+  sites select the same dictionary `GlobalId`; successful-resolution provenance
+  names `Core.Classes.LawfulClasses`; and the environment contains one
+  `(Ord, Nat)` structure entry. Loading/re-exporting `Order` adds no second
+  dictionary. The one instance is transparent and kernel-rechecked, adding zero
+  `trusted_base()` entries.
+- why: selection and provenance are asserted structurally, not inferred from a
+  generated name or export text. A build that redeclares the instance in
+  `Order`, keys it on a same-shaped family, or rewrites provenance fails at
+  least one independent assertion.
+- **MEASURED:** both public routes select one id whose registered head and
+  defining package are fixed. **CLAIMED:** re-export carries rather than owns or
+  duplicates `Ord Nat`. **THE GAP:** §5.5.1 carry must be the route that grants
+  the second use; the fixture supplies no direct admission of a second provider.
+
+### surface/modules/prelude-head-does-not-transfer-orphan-ownership
+
+- promise class: **durable invariant** — compiler-installed floor availability
+  creates no orphan exception
+- spec: `33 §4.3`/`§5.3`, `39 §6.1`
+- given: use a minimal structure class `FloorOrder a` with one identity
+  operation so the ordinary class/instance production is reached without the
+  full `Ord` proof payload. Controlled roots place
+  `instance FloorOrder Nat` (a) in the module that defines `FloorOrder`, and
+  (b) in an unrelated module that only imports/re-exports `FloorOrder` and sees
+  ambient `Nat`. A third control changes only the head to a `LocalNat` data
+  family defined beside the instance.
+- expect: (a) accepts by the class-owner arm; (b) rejects specifically with
+  `OrphanInstance { class = FloorOrder, head_type = Nat }` before registration;
+  and (c) accepts by the head-owner arm under a distinct `(FloorOrder,
+  LocalNat)` key. Re-exporting either name in (b) does not change its verdict.
+- why: the three loci exercise both lawful orphan arms and the forbidden middle
+  from the same production. The actual `Ord Nat` positive is separately pinned
+  above, so this smaller fixture isolates the general owner predicate rather
+  than hand-feeding the desired dictionary.
+- **MEASURED:** declaration locus alone selects class-owner accept, unrelated
+  reject, and local-head accept. **CLAIMED:** the prelude floor and re-export do
+  not transfer head ownership. **THE GAP:** `FloorOrder` stands for the generic
+  orphan rule, while the preceding actual-package case binds that rule to
+  `Ord Nat`.
 
 ## D3. Root, source-path, and lazy-discovery boundaries
 
@@ -612,7 +752,7 @@ already built.
 | `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
 | caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
-| floor/global | three floor names accept; bare ambient rejects; explicit import accepts | floor is closed and arbitrary globals do not resolve | definitionally equal type, real pre-registration, imported control |
+| floor/global | nine exact type identities plus parent-derived constructors accept; bare ambient and `Prod` reject; explicit import accepts | floor is closed and arbitrary/pre-installed non-members do not resolve | actual primitive uses, exact ids/parentage, definitionally equal ambient type, imported control |
 | root/path | valid anchor accepts; each one-axis mutation rejects at its guard | root and source identities fail closed | one valid loader input plus independent matrix rows |
 | laziness | inert poison accepts; adding its sole edge rejects at the poison | discovery follows only entry-rooted edges | identical poisoned tree in both arms |
 | front end | root-addressed entry resolves its otherwise unavailable dependency | catalog entry reaches the roots loader | only root and entry supplied; direct-loader producer control separate |
@@ -1099,6 +1239,12 @@ monotone-downward and revocation management actions remain runner/host-internal
   `root-and-source-leaf-refusal-matrix`,
   `unimported-poison-is-lazy-imported-poison-rejects`, and
   `catalog-root-entry-check-drives-real-loader`.
+- **Exact prelude floor and `Ord Nat` provenance** (`30 §4`, `33 §3.3`/
+  `§4.3`/`§5.3`, `39 §2.0`/`§6.1`, `51 §7`):
+  `prelude-floor-reuses-exact-types-and-constructors`,
+  `prelude-floor-clash-and-lookalike-matrix`,
+  `ord-nat-class-owner-and-reexport-use-one-dictionary`, and
+  `prelude-head-does-not-transfer-orphan-ownership`.
 - **N3** (module clash error + explicit resolution, lexical boundary, prelude
   floor, and grammar): `top-level-local-import-clash-rejected`,
   `import-de-selection-leaves-local-sole-binding`,
@@ -1171,6 +1317,15 @@ monotone-downward and revocation management actions remain runner/host-internal
   The floor/global case independently separates allowed ambient vocabulary from
   an arbitrary pre-registered Ken global. None can be implemented by clearing
   all imports or disabling the prelude.
+- **Floor availability, identity, and instance ownership are separate axes.**
+  Strict uses of all nine floor types and every exact constructor accept on the
+  recorded ids, including the public primitive signatures that require the
+  signature arm. Every same-spelling type/constructor declaration rejects while
+  each all-renamed lookalike gets distinct ids and local parentage. Ambient
+  availability still does not make an unrelated module a head owner. The actual
+  `Ord Nat` case then requires class-owned provenance and one carried
+  dictionary. Widening globals, comparing only shapes, or treating re-export as
+  ownership satisfies at most one axis.
 - **Root refusal does not decide multi-root precedence.** The root/path matrix
   accepts the one-root anchor and rejects zero or two populated roots in this
   source-world round. It says nothing about how a later package-manager round
@@ -1227,10 +1382,12 @@ monotone-downward and revocation management actions remain runner/host-internal
   the general `Cap E` rule; it pins the new program-header clause as the source
   of that existing binding. Its controlled pair changes only the header line
   and must reach the same landed `MissingCapability { effect = FS }` gate.
-- **`§5` constraints / typeclasses-as-subobjects** are **Lc's**
-  (`../classes/seed-classes.md`, `33 §5`, landed) — ES3 touches `§3`/`§4`
-  only; the orphan check's **per-module** predicate (`§5.3`) references
-  modules but is Lc's home, not re-pinned here.
+- **Generic `§5` constraints / typeclasses-as-subobjects** remain **Lc's**
+  (`../classes/seed-classes.md`, `33 §5`, landed). The two Nat cases here do not
+  re-pin class elaboration or the general orphan suite; they pin the new
+  bootstrap-head interaction: no source head owner exists, so the existing
+  class-owner arm is the only canonical `Ord Nat` placement and re-export does
+  not change it.
 - **The opaque constant + the flat `Σ` + `trusted_base()`** are the
   **kernel's** (`11 §4`; `../taxonomy/minimality.md` for the delta). ES3
   observes abstract export **as** the opaque constant and modules **as**
@@ -1241,9 +1398,10 @@ monotone-downward and revocation management actions remain runner/host-internal
   Section F records one explicit RED-UNTIL forward oracle for cross-manifest
   collision provenance; it does not claim a live manifest input. Compiled-
   manifest source-equivalence remains normative forward compatibility.
-- **Re-export-carried instance surfaces** remain post-MRES-9/N5. No N4 fixture
-  uses `pub use` or treats a transitive provider as direct through re-export;
-  adding that case before the syntax exists would be a vacuous red.
+- **Generic re-export-carried instance surfaces** are specified in `33 §5.5.1`
+  and realized by the landed carry computation. The Nat case composes that
+  mechanism with a bootstrap head and asserts only identity/provenance; it does
+  not duplicate the broader carry suite.
 - **Runtime entry selection** is separate from admission (MRES-4a). No fixture
   invents an entry declaration or treats a `program` header as one. I-4's
   §B-dependent cases consume the Program-I entry contract only after its real
@@ -1282,6 +1440,24 @@ identity/cycle/flat-`Σ` homes in §D5 remain unchanged. A direct call to the
 loader does not discharge the front-end row, and an eager scan does not
 discharge the lazy-poison pair.
 
+## Build-forward (closed signature + bootstrap floor)
+
+`LANG-MOD-NAT-FLOOR-REALIZATION` replaces the former three-name configuration
+with the explicit, mechanically checked nine-type inventory: `{Auth, Bool,
+Char, List, Nat, Option, ResourceKind, Result, Utf8Error}`. An executable
+closure check traverses every primitive declaration type, derives the
+eight-member signature arm, and requires exact equality with the configured
+inventory after adding bootstrap `Nat`; it never widens resolution implicitly.
+Constructor capture admits only ids with an exact recorded floor parent.
+It flips the current strict-Nat sentinel, exercises the public byte/capability/
+resource signatures under strict roots, keeps non-members such as `Prod`
+unavailable, and closes every root-unit floor clash before allocation. The one
+canonical `instance Ord Nat` moves to the class-owning
+`Core.Classes.LawfulClasses` unit; `Data.Numeric.Nat.Order` carries that same
+dictionary without redeclaring it. Floor installation adds zero declarations,
+ids, or trusted entries; the instance adds one transparent checked dictionary
+and zero trusted entries.
+
 ## Build-forward (N3 Lane B)
 
 This N3 addition is conformance-only. Lane B adds the per-name rename parser
@@ -1302,8 +1478,8 @@ promise an unreachable both-package collision diagnostic. All §E rejects are
 surface/elaboration diagnostics and add nothing to the flat `Σ` or
 `trusted_base()`. Section F's both-package diagnostic remains RED UNTIL compiled
 manifests meet at the package-manager admission boundary. Registries, lockfiles,
-content addressing, re-export instance surfaces, and test-scoped admission stay
-unbuilt.
+content addressing, and test-scoped admission stay unbuilt; the landed
+re-export carry computation is reused rather than deferred here.
 
 ## Build-forward (I-4 §B + parser dependency)
 

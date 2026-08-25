@@ -357,6 +357,21 @@ delta for a primitive carrier, `§6`). This spec chapter is the **contract**; th
 Team-Language build follow-on lands the `.ken` source (classes + canonical
 law-carrying instances) + wires `where Ord a` to supply the comparator.
 
+**Canonical `Ord Nat` placement.** `Nat` is a compiler-bootstrap prelude head
+(`30 §4`), not a head defined by a source package. Under the unchanged orphan
+rule (`33 §5.3`), its canonical `Ord` dictionary therefore uses the class-owner
+arm: `instance Ord Nat` is declared in `Core.Classes.LawfulClasses`, the module
+that defines `Ord`, and is keyed by the exact bootstrap `Nat` identity. This is
+the existing class-side pattern for canonical carrier instances (`Bool`,
+`Pair`, and `List`), not a new ownership mechanism. The reader-facing
+`Data.Numeric.Nat.Order` module imports and re-exports the relevant
+class surface and carries that same dictionary under `33 §5.5.1`; it never
+redeclares the instance and never becomes the head owner. The dictionary and
+its supporting proof terms are ordinary transparent, kernel-rechecked Ken, so
+the instance contributes zero `trusted_base()` entries. A local same-shaped
+family has a different key and cannot stand in for this instance. No
+provider-path owner map or prelude-specific orphan exception exists.
+
 **Un-defer (AC5).** ES2-remainder deferred the lawful `Ord` and CV task #27
 descoped two conformance cases to `(deferred, gated-on-WP)` because the landed
 `Ord` was an empty stub. **This WP is that gate.** On its build, the two cases —
@@ -394,9 +409,16 @@ conformance edit names the target; the actual un-defer rides the build.)
   stated — the pattern for every later ES4 tranche.
 - **AC5 (un-defer).** The two CV #27 `(deferred, gated-on-WP)` cases named as
   un-deferring on this WP's build, re-pointed to the real `Ord` (`§7`).
+- **AC6 (bootstrap `Nat` placement).** `Core.Classes.LawfulClasses` declares the
+  one canonical `instance Ord Nat` against the exact prelude family;
+  `Data.Numeric.Nat.Order` carries the same dictionary and does not redeclare
+  it. The instance is one transparent definition with zero
+  `trusted_base()` delta; an unrelated module remains an orphan.
 
 **Conformance:** `../../conformance/surface/collections/` (the un-deferred
 `user-ord-*` cases) + the discriminating **law-proof-present flips against a
-law-less dictionary** net. **QA (build):** producer-grep the instance law fields
-for `declare_postulate`/holes — their **absence** is the check
+law-less dictionary** net + `../../conformance/surface/modules/seed-modules.md`
+(the exact-identity, class-owner, carry, and orphan controls for `Ord Nat`).
+**QA (build):** producer-grep the instance law fields for
+`declare_postulate`/holes — their **absence** is the check
 ([[kernel-backed-claim-grep-the-emission-not-the-name]]).

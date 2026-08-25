@@ -91,10 +91,17 @@ The loader proceeds as follows:
    it at most once in the run; later edges reuse that result.
 4. Construct a fresh scope for each unit from exactly its local declarations,
    explicit imports, kernel and built-in vocabulary, and the closed prelude
-   floor. Imports are non-transitive in both directions, as required by `33
-   §3.3`: a unit neither borrows its caller's imports nor exports its own imports
-   merely because it was loaded. An unresolved bare name does not fall through
-   to arbitrary implementation globals outside that scope.
+   floor. Its exact type-name set is `{Auth, Bool, Char, List, Nat, Option,
+   ResourceKind, Result, Utf8Error}`. Constructors are admitted only when the
+   kernel records the exact corresponding floor parent: `ANone`/`APartial`/
+   `AFull → Auth`, `True`/`False → Bool`, `Nil`/`Cons → List`, `Zero`/`Suc →
+   Nat`, `None`/`Some → Option`, `FsHandle`/`Buffer → ResourceKind`, `Err`/`Ok →
+   Result`, and `InvalidUtf8 → Utf8Error`. `Char` has no constructors. Imports
+   are non-transitive in both directions, as required by `33 §3.3`: a unit
+   neither borrows its caller's
+   imports nor exports its own imports merely because it was loaded. An
+   unresolved bare name does not fall through to arbitrary implementation
+   globals outside that scope.
 5. Resolve every imported or re-exported name through the provider's public
    interface to the provider declaration's existing canonical identity. Enforce
    privacy, ambiguity, and re-export clashes before emitting the caller. An
@@ -103,6 +110,18 @@ The loader proceeds as follows:
    and elaborate the declarations through the ordinary checked path. The kernel
    receives the same flat append-only `Σ` as the fully qualified one-file
    program, with an identical `trusted_base()` delta.
+
+Installing either kind of floor member is a resolution operation over
+declarations that already exist. The loader reuses all nine compiler-installed,
+kernel-checked type `GlobalId`s and the exact constructor ids derived from their
+recorded parentage; it allocates no declaration and adds no
+`trusted_base()` entry. A same-spelling top-level declaration for any floor type
+or constructor collides with the immutable floor and is rejected before
+admission. A separately named same-shaped family has distinct identities and
+cannot satisfy a reference to its floor counterpart. Failure to find a canonical
+type, any constructor-parent mismatch, or any name outside the closed inventory
+is a surface error; none falls back to a lookalike or arbitrary implementation
+global.
 
 A front end checking a source entry uses this loader whenever that entry is
 addressed through a catalog root. Reading the entry as an isolated file is not a
@@ -990,6 +1009,13 @@ one entry:
   `(C, h)` key for a **structure** class is the overlap error (§6.7), caught at
   declaration. Property (Ω) classes are never keyed for canonicity — they need
   no registry beyond "an instance exists."
+- A compiler-installed floor head has no source head-owner module. The orphan
+  check therefore accepts its canonical instance only on the class-owner arm.
+  For the key `(Ord, Nat)`, `Nat` is the exact floor family; the defining
+  module is `Core.Classes.LawfulClasses`, because that module defines `Ord`.
+  Re-export or ambient floor membership can carry and select that dictionary
+  but never changes its declaration provenance. `Data.Numeric.Nat.Order` does
+  not register a second entry.
 
 ### 6.2 The search procedure
 

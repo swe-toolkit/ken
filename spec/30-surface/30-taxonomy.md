@@ -46,13 +46,15 @@ invariant in **both** directions — no built-in has a derivation path
 | Tier | What it is | Trust level | In `trusted_base()`? |
 |---|---|---|---|
 | **Built-in** | irreducible — cannot be defined in Ken from other built-ins | the **surface TCB**: audited primitives / assumed at the boundary | **yes** (primitive/postulate) |
-| **Prelude** | Ken-defined, but **always present** because a built-in's *signature* names it | re-checked `definition` | **no** |
+| **Prelude** | Ken-defined and **always present**: a primitive signature names it, or bootstrap must expose one canonical checked identity | re-checked `definition` | **no** |
 | **Standard package** | Ken-defined, **optional**, explicit `import` | re-checked `definition` | **no** |
 
 The two lower tiers are both **re-checked Ken** (out of the trusted base); they
-differ only in **availability**: prelude is always in scope (the primitive layer
-depends on it), a package is imported. "Always there" ≠ "irreducible" — a
-prelude entry is a definition the kernel re-checks, not a trust-root assumption.
+differ only in **availability**. A prelude entry is always in scope because the
+primitive-signature closure needs it or because source must reach one canonical
+compiler-bootstrap identity. A package is imported. "Always there" ≠
+"irreducible" — a prelude entry is a definition the kernel re-checks, not a
+trust-root assumption.
 
 ## 3. The built-in set — the surface TCB (irreducible)
 
@@ -60,11 +62,14 @@ Exactly these are primitively provided; each is irreducible (there is no more
 primitive Ken to define it from):
 
 - **Primitive types + the literal affordance** — the types
-  `Int`/`Float`/`Char`/`String`/`Bytes` (`35`, `37`) are admitted via
+  `Int`/`Float`/`String`/`Bytes` (`35`, `37`) are admitted via
   `declare_primitive` (item-2, in the base once); the parser's reading of a
-  literal token is base syntax. Each literal *value* is a **primitive-constant
-  term** of its type — computed, so **out** of `trusted_base()` (§6: the current
-  per-literal `declare_postulate` is the highest-volume hygiene item). The type
+  literal token is base syntax. `Char` is instead the checked transparent
+  refinement over `Int` (`18a §5.9`, and therefore the signature-arm prelude
+  member in §4), not a surviving primitive type. Each literal *value* is a
+  **primitive-constant term** of its type — computed, so **out** of
+  `trusted_base()` (§6; the current per-literal `declare_postulate` is the
+  highest-volume hygiene item). The type
   is irreducible; nothing is more primitive than the machine representation the
   primitive ops compute on.
 - **Audited primitive operations** (`../10-kernel/14 §5`) — machine
@@ -88,32 +93,65 @@ below.
 
 ## 4. The prelude tier — Ken-defined, always-present, closed
 
-Some Ken-definable types must be present **before** the primitive layer, because
-a built-in primitive's **type signature references them**. `Bool` is the
-clearest case: the comparison primitives have type `Int → Int → Bool`, so `Bool`
-must exist at the primitive layer — yet `Bool` is `data Bool = True | False`,
-ordinary Ken (§6, F1). This is the surface analog of the kernel's
-`Top`/`Bottom`/`tt` prelude (`64 §1`: Ken-vocabulary excluded from
-`trusted_base()` yet always present, the closed `is_prelude` set).
+Some Ken-definable types must be present before ordinary source-unit
+resolution. There are two reasons. A built-in primitive may name the type in
+its signature: comparison primitives have type `Int → Int → Bool`, so `Bool`
+must already exist even though it is ordinary `data Bool = True | False` Ken
+(§6, F1). Or the compiler bootstrap may already have installed one canonical,
+kernel-checked identity that the surface contract requires source to name and
+that a source declaration cannot recreate. This is the surface analog of the
+kernel's `Top`/`Bottom`/`tt` prelude (`64 §1`): fixed Ken vocabulary excluded
+from `trusted_base()` yet always present in a closed set.
 
-> **Prelude membership rule (normative, checkable).** A type is in the prelude
-> **iff it is named in a built-in primitive's type signature, and is not already
-> provided by the kernel** — nothing else. The prelude is therefore a **closed,
-> minimal** set, mechanically derivable by collecting the type names the
-> primitive signatures (`reg_*`) mention. A "prelude" type **no** primitive
-> signature names is a **bloat vector** (it is really a package); a primitive
-> whose signature names a type **absent** from the prelude is a **gap**.
+> **Prelude membership rule (normative, checkable).** A Ken-defined,
+> source-resolved type is in the prelude **iff** at least one of these arms has a
+> witness:
+>
+> 1. **Signature arm.** A built-in primitive's type signature names the type.
+> 2. **Bootstrap-identity arm.** Before source-unit elaboration the compiler has
+>    installed one canonical identity through ordinary kernel checking; the
+>    surface contract requires programs to name that exact identity; and a
+>    source declaration with the same structure would allocate a distinct
+>    `GlobalId` rather than reproduce it.
+>
+> The prelude is the **closed union** of the two witnessed inventories, never a
+> fallback to arbitrary compiler globals. A signature-arm type that no primitive
+> signature names is bloat. A bootstrap-arm type with no independent
+> source-reachability requirement, or whose identity source can reproduce, is
+> likewise bloat. A missing witnessed member is a gap. Kernel syntax and native
+> formers remain built-ins and are referenced directly rather than duplicated as
+> prelude bindings.
 
 The prelude is a **second minimality target** — the same TB-Sound discipline
 (`is_prelude` is exactly `{Top, Bottom, tt}`, no catch-all) applied at the
-surface.
-By the rule, today's prelude is the closed set **`{Bool, Char, List}`** (CV's
-signature-grep): `Bool` (the comparison primitives `Int → Int → Bool`), and
-`Char` **and** `List` (the `String ↔ List Char` conversion primitive names
-both). Each is a re-checked `definition`, **out** of `trusted_base()`.
+surface. The signature inventory is obtained by traversing the type of every
+built-in primitive declaration and collecting its Ken-defined type identities;
+it is not a census of selected registration helpers. That inventory is exactly
+**`{Auth, Bool, Char, List, Option, ResourceKind, Result, Utf8Error}`**:
+
+- comparisons name `Bool`, and the `String ↔ List Char` operations name `List`
+  and `Char`;
+- `bytes_at`/`bytes_slice` name `Option`, while `bytes_decode` names `Result`
+  and `Utf8Error`;
+- the opaque primitive former `Cap : Auth → Type` names `Auth`, and
+  `Resource : ResourceKind → Type` names `ResourceKind`.
+
+The bootstrap-identity arm adds exactly `Nat`. Thus today's Ken-defined surface
+floor is the closed set **`{Auth, Bool, Char, List, Nat, Option, ResourceKind,
+Result, Utf8Error}`**. Before source-unit elaboration, the compiler has already
+installed each identity through ordinary kernel checking: eight are witnessed
+by primitive signatures, and `Nat` is the ordinary checked inductive
+`data Nat = Zero | Suc Nat` that source must use as the canonical natural/index
+carrier. Floor installation reuses all nine existing `GlobalId`s and allocates
+nothing. For an inductive floor member, a constructor enters only when its
+kernel-recorded parent is that exact member; `Char` is the transparent,
+constructor-free case. A same-shaped source family has different identities
+and is not the floor member. Every floor type and constructor is re-checked and
+**out** of `trusted_base()`.
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
-return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2)
-— so it is a standard-package type; adding a `compare : A → A → Ordering`
+return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2),
+and it has no independent bootstrap-identity witness. It is therefore a
+standard-package type; adding a `compare : A → A → Ordering`
 primitive *would* make it prelude, but that enlarges the built-in set for no
 minimality gain and is **not** taken. The derivation-path table
 (`../../conformance/surface/taxonomy/`) pins the exact closed set and flags any
@@ -121,9 +159,14 @@ over-inclusion as bloat (§6, `OrdResult`).
 
 ## 5. The standard-package tier — the dissolved stdlib
 
-Everything Ken-definable that **no** primitive signature forces into the prelude
-is a **standard package**: optional, explicitly imported, ordinary Ken with its
-**derivation path from the built-ins stated in-spec**. The reframed catalog is
+Everything Ken-definable that **neither** prelude arm admits is a **standard
+package**: optional, explicitly imported, ordinary Ken with its **derivation
+path from the built-ins stated in-spec**. `Nat` is therefore no longer a
+package carrier: it is the bootstrap-identity member of the prelude. `Option`
+and `Result` are likewise not packages: public primitive signatures name their
+canonical compiler-installed identities. `Unit`, `Empty`, `Either`, and `Pair`
+remain packages; no primitive signature names them and they have no independent
+bootstrap-identity witness. The reframed catalog is
 `../50-stdlib/README.md` — the lawful classes (`Num`/`Ord`/`Eq`/`Monoid`/
 `Functor`/`Monad`/`Foldable`), the collection combinators
 (`map`/`filter`/`fold`/ `range`), and formatting (`show`/`split`/`join`/`pad`).
@@ -159,8 +202,9 @@ coincide.
   is redundant; reference the derived connective (or
   `data And (A B : Ω) : Ω = conj A B`, which lands in Ω by the
   both-components-keyed `sort_sigma`, `13 §4`).
-- **`is_sorted` / `Perm` → definitions (see `37 §6`).** These are **not** prelude
-  (no primitive signature names them) — they are the verified-`sort` showcase's
+- **`is_sorted` / `Perm` → definitions (see `37 §6`).** These are **not**
+  prelude: no primitive signature names them, and neither has an independent
+  bootstrap-identity witness. They are the verified-`sort` showcase's
   predicates, and they **must be definitions**, specified in `37 §6` (§below).
   As postulates the flagship proof proves nothing.
 - **opaque `Bool` → `data Bool = True | False`** (F1). The current opaque
@@ -193,8 +237,9 @@ coincide.
 
 - **`OrdResult` → remove (bloat).** `data OrdResult = Lt | Eq | Gt`
   (`prelude.rs`) sits in the prelude but **no primitive signature names it**
-  (the comparisons return `Bool`), so by the membership rule (§4) it is a
-  **bloat vector**. It exists only as a workaround for the opaque `Bool` (not
+  (the comparisons return `Bool`) and it has no independent bootstrap-identity
+  witness, so by the membership rule (§4) it is a **bloat vector**. It exists
+  only as a workaround for the opaque `Bool` (not
   matchable); F1's `data Bool` obviates it. Remove it; where a 3-way result is
   wanted, the `Ord` package's `Ordering` (§4/§5) is it.
 - **`reg_novf` — split the predicate from the per-operation obligations (only

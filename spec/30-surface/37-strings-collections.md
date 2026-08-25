@@ -311,6 +311,13 @@ longer required for new folds.
 | `Option a` | transparent inductive `data` (L2) | `data Option a = None \| Some a` (`34 §1`) | structural |
 | `Result e a` | transparent inductive `data` (L2) | `data Result e a = Err e \| Ok a` (`34 §1`) | structural |
 
+`List`, `Option`, and `Result` are closed prelude identities (`30 §4`), not
+optional packages: public primitive signatures name each of them. The same
+`bytes_decode` signature also places its `Utf8Error` family in the prelude.
+Their ordinary `data` derivations explain why they add no trust; they do not make
+those canonical compiler-installed identities recreatable under a second source
+`GlobalId`.
+
 All core collections are **immutable and persistent**: an "update" returns a
 new value and leaves the input unchanged. Copying, structural sharing, and
 allocation are private runtime choices (`41 §2`). Mutation, where genuinely
@@ -662,7 +669,8 @@ defining shapes:
   Declaring the bare inductive `: Ω` is the relevance leak `16 §1.3`/`13 §4`
   forbid (CV's table surfaced this fork; CV-Spec blocked on it).
 
-Neither is prelude — no primitive signature names them (`30 §4`); they are the
+Neither is prelude: no primitive signature names either one, and neither has
+an independent bootstrap-identity witness (`30 §4`). They are the
 verified-`sort` showcase's own definitions.
 
 **L-classes staging boundary (flag, do not resolve).** The collection **types**

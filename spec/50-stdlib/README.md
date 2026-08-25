@@ -28,20 +28,26 @@ The everyday minimum that is **always in scope** is not a package — it is the
 two lower tiers of the surface taxonomy (`../30-surface/30`):
 
 - **Built-in (the surface TCB, `30 §3`)** — primitive types + literals
-  (`Int`/`Float`/`Char`/`String`/`Bytes`, `../30-surface/35`, `37`), the audited
+  (`Int`/`Float`/`String`/`Bytes`, `../30-surface/35`, `37`), the audited
   primitive ops (`../10-kernel/14 §5`), the effect/FFI boundary
   (`../30-surface/38`), and the base elaborator syntax.
-- **Prelude (Ken-defined, always-present, `30 §4`)** — the **closed** set a
-  built-in primitive's signature names: `Bool`, `Char`, `List` (`Ordering` is
-  **not** prelude — no primitive returns it; it is a package, `30 §4`) — plus
-  the kernel's own logic vocabulary (`Ω`, `⊤`/`⊥`, the derived connectives,
-  `Eq`, `Decidable`/`DecEq`, `../10-kernel/15`/`16`), referenced, **not**
+- **Prelude (Ken-defined, always-present, `30 §4`)** — the **closed** union of
+  the primitive-signature arm (`Auth`, `Bool`, `Char`, `List`, `Option`,
+  `ResourceKind`, `Result`, `Utf8Error`) and the bootstrap-identity arm (`Nat`).
+  Constructors enter only through exact recorded parentage to those identities.
+  `Ordering` is **not** prelude — no primitive returns it and it has no
+  bootstrap-identity witness, so it is a package (`30 §4`). The kernel's own
+  logic vocabulary (`Ω`, `⊤`/`⊥`, the derived connectives, `Eq`,
+  `Decidable`/`DecEq`, `../10-kernel/15`/`16`) is referenced, **not**
   re-declared (`30 §6`: `Equal` is deleted for the kernel's `Eq`).
 
 Everything below is a **package**: imported, derivable, re-checked. Core data
-(`Unit`/`Empty`/`Nat`/`Option`/`Result`/`Either`/`Pair`, `../30-surface/34`) and
-the core combinators (`id`, `∘`, `const`, `flip`) are packages — Ken `data`/defs
-over the built-ins, not prelude (no primitive signature names them).
+`Unit`/`Empty`/`Either`/`Pair` (`../30-surface/34`) and the core combinators
+(`id`, `∘`, `const`, `flip`) are packages — Ken `data`/defs over the built-ins,
+not prelude. `Nat`, `Option`, and `Result` are deliberate exceptions among the
+core data carriers: source must reach their canonical compiler-installed
+identities because the bootstrap contract or public primitive signatures name
+them; a fresh `data` declaration cannot recreate those identities.
 
 ## 2. Lawful classes (the verification-aware core) — packages
 
@@ -78,8 +84,10 @@ tranche** —
 
 ## 3. Collections — packages over built-in/prelude carriers
 
-`List` is a **prelude** type (named by the `String ↔ List Char` conversion,
-`30 §4`); its combinators (`map`/`filter`/`fold`/`range`/…) are packages.
+`List`, `Option`, and `Result` are **prelude** types (named by primitive
+signatures, `30 §4`); their combinators are packages. In particular,
+`List`'s `map`/`filter`/`fold`/`range` operations remain imported package
+content even though its canonical family and constructors are always present.
 `Array` is a **built-in audited runtime type** (`../30-surface/37 §3.2`,
 `30 §6`: `declare_primitive` OpaqueType, item-2 audited); its internal
 persistent-tree, copying, and sharing strategy is private (`41 §2`).
