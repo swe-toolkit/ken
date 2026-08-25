@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-25 04:39:40Z — from 442 issue file(s) in `docs/program/issues/`.
+2026-08-25 05:01:28Z — from 442 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -317,7 +317,7 @@ the committed file matches the generator's output.
 | `RT-ENTRY-TRAP-PX7O` | px7o heterogeneous eliminator frames: native traps at the explicit entry (RuntimeTrap(4), exit 1) where the interpreter returns exit 7 -- the entry-trap family the de Bruijn repair did NOT clear | closed | runtime | TBD | none | — |
 | `RT-ESCAPE` | escaping a second Resource through a bracket fails native lowering | merged | runtime | M | none | PR #911 @ 238a5c5d (origin/main 4ac9141e, CI green) |
 | `RT-EXACTINT-CARRIED-OBSERVE` | A genuinely-live effect seat needing ExactIntU64 (FsReadAt Argument(1)) cannot observe its need in the CarriedWord phase, so the withResource path still fails object emission behind the now-closed ResourceScalar family -- the ExactIntU64-need carried-observation closure on the existing carried_exact_int EITHER_PHASE precedent | closed | runtime | S | none | — |
-| `RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT` | Execution-parity successor — give the ExitCode::Failure result payload a durable native transport so a checked program that crosses M3's effect seat does not trap `malformed ExitCode::Failure payload` at process exit (object_linker_packaging.rs:2223, native stub value -3) | draft | runtime | M | none | — |
+| `RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT` | M-series successor (M3+1) — close the process-exit consumers over the existing exact-Int carrier forms: a persistent/dynamic ExitCode::Failure payload is admitted only as ImmediateInt, so both the carried-phase (core.rs:11523) and specialized-phase (calls.rs:2301) exit-status producers force it to native sentinel -3 instead of mapping it to an exit code | ready | runtime | M | none | — |
 | `RT-FNSPLIT-B1R` | RT-NATIVE-FNSPLIT Boundary B1R — encode the occurrence-local semantic material B1 counted but never stored (repair of landed B1) | merged | runtime | L | none | 937 |
 | `RT-FNSPLIT-B2A-C` | plan↔lowering occurrence correspondence — transport the preallocated StaticOriginId to the site where it is out of scope | merged | runtime | L | none | 940 |
 | `RT-FNSPLIT-B2A-S` | defunctionalize retained body selection — static-origin tag plus one closed consumer, replacing cloned-RuntimeExpr identity | merged | runtime | M | none | 944 |
@@ -504,6 +504,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` — the consuming-occurrence validator refusal has four defects that must land together: the production string sits in a cfg arm no test compiles; under cfg(test) the production arm is ABSENT rather than dead so a dropped return makes the validator silently ACCEPT a mismatched occurrence; and the classifier has two messages for FIVE causes, with the body arm a catch-all over an eliminator-kind defect, an identity-match failure and an ambiguity; and the sibling function 55 lines up has the same defect over four more causes, one of which the D2k probe only just measured
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
+- `RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT` — M-series successor (M3+1) — close the process-exit consumers over the existing exact-Int carrier forms: a persistent/dynamic ExitCode::Failure payload is admitted only as ImmediateInt, so both the carried-phase (core.rs:11523) and specialized-phase (calls.rs:2301) exit-status producers force it to native sentinel -3 instead of mapping it to an exit code
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-RETIRED-CENSUS-ROT` — Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
