@@ -2159,7 +2159,10 @@ impl<'a> Lowering<'a> {
                 format!("{owner} {seat} is not a resource"),
             )),
             LoweringOperand::Carried(word) => {
-                let tag = self.emit_carrier_tag(builder, *word)?;
+                let tag = builder.ins().band_imm(
+                    word.word,
+                    crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+                );
                 Self::require_i64(
                     builder,
                     tag,

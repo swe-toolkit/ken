@@ -2275,7 +2275,7 @@ fn c1_d3_a_carried_operand_survives_case_env_and_nested_lowering() {
 /// alive across the call: the base pointer names *their* tables, and the
 /// reservation happens before `publish` because growing a table afterwards
 /// would move it under the pointer emitted code already holds.
-fn ac_c7_bind_arena(
+pub(super) fn ac_c7_bind_arena(
     store: &mut crate::boundary_value::BoundaryValueStore,
 ) -> (crate::boundary_value::BoundaryArenaV1, *mut u64) {
     store.reserve_persistent(64, 256, 512, 0);
@@ -2473,7 +2473,7 @@ fn ac_c7_run(code: *const u8, arena: *const u64) -> i64 {
     }
 }
 
-fn c2_compile_edge_with_arg<'src>(
+pub(super) fn c2_compile_edge_with_arg<'src>(
     name: &str,
     seed_env: &'src NativeSeedEnvironment,
     plan: StaticTransitionPlan<'src>,
@@ -2555,7 +2555,11 @@ fn c2_compile_edge_with_arg<'src>(
     (module, code)
 }
 
-fn c2_run_edge_with_arg(code: *const u8, arena: *const u64, argument: i64) -> i64 {
+pub(super) fn c2_run_edge_with_arg(
+    code: *const u8,
+    arena: *const u64,
+    argument: i64,
+) -> i64 {
     let function: extern "C" fn(*const u64, i64) -> i64 =
         unsafe { std::mem::transmute(code) };
     function(arena, argument)
