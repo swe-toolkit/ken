@@ -3050,7 +3050,29 @@ fn d1_compile_nat_spill_producer(
         move |compiler, builder, value| {
             let lowered = match representation {
                 D1NatRepresentation::Bounded => {
-                    Lowered::BoundedNat(BoundedNatV1::derived_from_validated(value))
+                    // Drive the production reply-validation mint with the exact
+                    // valid tuple count == effective_request == request_length,
+                    // request_start == reply_start == 0. The caller-controlled
+                    // count therefore reaches transfer only after every progress
+                    // condition has been checked at its natural producer.
+                    let zero = builder.ins().iconst(types::I64, 0);
+                    let one = builder.ins().iconst(types::I64, 1);
+                    let success = builder.ins().icmp_imm(
+                        cranelift_codegen::ir::condcodes::IntCC::Equal,
+                        one,
+                        1,
+                    );
+                    let (minted, _predecessor, _remaining) =
+                        Lowering::mint_validated_progress_nat(
+                            builder,
+                            success,
+                            value,
+                            zero,
+                            value,
+                            value,
+                            Some(zero),
+                        );
+                    Lowered::BoundedNat(minted)
                 }
                 D1NatRepresentation::Structural => {
                     Lowered::StructuralNat(StructuralNatV1 { value })
@@ -3068,8 +3090,10 @@ fn d1_compile_nat_spill_producer(
 /// chain. Admitting Int at only the new class gate changes both outcomes to the
 /// source default, proving that gate is causal rather than decorative.
 ///
-/// MEASURED: both production spill emitters mint PersistentGround words; exact
-/// lowering returns -1, while one Int-class admission mutation reaches default.
+/// MEASURED: the BoundedNat row enters through the production progress mint on
+/// an exact valid tuple above the immediate domain, and both production spill
+/// emitters mint PersistentGround words. Exact lowering returns -1, while one
+/// Int-class admission mutation reaches default.
 /// CLAIMED: the non-Bool class gate explicitly owns both Nat spill refusals.
 /// THE GAP: the mutation is test-only, and its default is this rig's raw zero
 /// rather than the whole-process trap projection.
@@ -3095,16 +3119,35 @@ fn carried_non_bool_match_refuses_structural_and_bounded_nat_spills() {
         d1_compile_nat_spill_producer(D1NatRepresentation::Structural);
     let mut store = crate::boundary_value::BoundaryValueStore::new();
     let (_arena, base) = ac_c7_bind_arena(&mut store);
+    assert_eq!(
+        c2_run_edge_with_arg(bounded_producer, base, 0),
+        -1,
+        "the natural BoundedNat producer must reject a non-positive count before transfer"
+    );
+    assert_eq!(
+        store.image().0.node_count(),
+        0,
+        "the invalid producer tuple must mint no persistent spill"
+    );
     let spilling_payload = 1i64 << 56;
     for (label, producer) in [
         ("BoundedNat", bounded_producer),
         ("StructuralNat", structural_producer),
     ] {
         let spilled = c2_run_edge_with_arg(producer, base, spilling_payload);
+        let spilled_word = BoundaryWord(spilled as u64);
         assert_eq!(
-            BoundaryWord(spilled as u64).tag(),
+            spilled_word.tag(),
             Some(BoundaryTag::PersistentGround),
             "{label} control must actually take the spill route"
+        );
+        assert_eq!(
+            store.image().0.node_field(
+                spilled_word.payload(),
+                crate::boundary_value::NODE_CLASS,
+            ),
+            Some(BoundaryClass::Int as u64),
+            "{label} spill must carry the exact Int class before consumption"
         );
         assert_eq!(
             d1_run_carried_word(exact_consumer, base, spilled),
