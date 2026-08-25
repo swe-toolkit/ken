@@ -1191,11 +1191,13 @@ impl LoweredVariant {
             // the native invocation. `AC-7`'s escape check keys on exactly this
             // owner, so a word naming one cannot silently outlive its buffer.
             //
-            // `HostResult` is the second REQUIRED live arm. It carries a
-            // RUNTIME success discriminant plus the two payloads it selects
-            // between; the landed lowering holds those payloads as compile-time
-            // templates, which is why a compiled-once callee cannot consume one
-            // today.
+            // `HostResult` is the second REQUIRED live arm. At compile time,
+            // `Lowered::HostResult` retains a runtime success word plus two
+            // candidate payload templates, but emitted transfer branches on the
+            // normalized success word before recursive transfer and materializes
+            // exactly one selected payload in canonical field zero. Carried
+            // consumers read that representation through `host_success` and
+            // field-zero `host_payload`.
             LoweredVariant::HostResult => RepresentedHandle {
                 tag: BoundaryTag::InvocationHostResult,
                 class: BoundaryClass::HostResult,

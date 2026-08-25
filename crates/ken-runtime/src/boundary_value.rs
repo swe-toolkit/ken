@@ -4,11 +4,11 @@
 //! slot order, width and declared ownership of an activation frame. **Neither
 //! said what the bits of an `AbiCarrier::ValueWord` or `ResultWord` MEAN**, nor
 //! how compiled code inspects a dynamic aggregate. Hard-stop `#10` measured the
-//! consequence: a compiled-once callee cannot consume the `Constructor` and
-//! `HostResult` values that actually cross a boundary, because `Lowered` is a
-//! **compile-time specialization lattice** and the one aggregate path that works
-//! today works only because *the consumer is Rust* (`ResultDecoder` +
-//! `result_table` in `CompiledModule`).
+//! then-current consequence: a compiled-once callee could not consume the
+//! `Constructor` and `HostResult` values that crossed a boundary: `Lowered` is
+//! a **compile-time specialization lattice**, and the one aggregate path then
+//! available worked only because *the consumer was Rust*
+//! (`ResultDecoder` + `result_table` in `CompiledModule`).
 //!
 //! This module supplies the missing half: **one closed 64-bit tagged word** for
 //! every source-valued boundary transfer, together with the flat tables emitted
