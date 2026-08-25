@@ -472,6 +472,7 @@ fn assert_floor_collision_rejects_before_allocation(label: &str, source: &str, n
     let root = FixtureRoot::new(label);
     root.write(source);
     let mut env = ElabEnv::new().expect("base environment");
+    let canonical_id = env.globals[name];
     let declarations_before = env.env.declarations().len();
     let next_id_before = env.env.next_global_id();
     let trusted_before = env.env.trusted_base();
@@ -483,6 +484,26 @@ fn assert_floor_collision_rejects_before_allocation(label: &str, source: &str, n
         matches!(error, ElabError::AmbiguousReference { name: ref rejected, .. } if rejected == name),
         "{label} must reject at the retained floor spelling {name}, got {error:?}"
     );
+    assert_eq!(env.globals[name], canonical_id);
+    assert_eq!(env.env.declarations().len(), declarations_before);
+    assert_eq!(env.env.next_global_id(), next_id_before);
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+fn assert_root_floor_collision_rejects_before_allocation(source: &str, name: &str) {
+    let mut env = ElabEnv::new().expect("base environment");
+    let canonical_id = env.globals[name];
+    let declarations_before = env.env.declarations().len();
+    let next_id_before = env.env.next_global_id();
+    let trusted_before = env.env.trusted_base();
+    let error = env
+        .elaborate_file(source)
+        .expect_err("a root-only same-spelling floor binding must reject before allocation");
+    assert!(
+        matches!(error, ElabError::AmbiguousReference { name: ref rejected, .. } if rejected == name),
+        "root-only route must reject at {name}, got {error:?}"
+    );
+    assert_eq!(env.globals[name], canonical_id);
     assert_eq!(env.env.declarations().len(), declarations_before);
     assert_eq!(env.env.next_global_id(), next_id_before);
     assert_eq!(env.env.trusted_base(), trusted_before);
@@ -604,18 +625,190 @@ fn floor_parent_and_constructor_clash_matrix_is_fail_closed() {
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
+struct BindingRouteCase {
+    label: &'static str,
+    collision_template: &'static str,
+    renamed_source: &'static str,
+    renamed_identity: &'static str,
+}
+
+const BINDING_ROUTE_CASES: &[BindingRouteCase] = &[
+    BindingRouteCase {
+        label: "view",
+        collision_template: "const {name} : Bool = True",
+        renamed_source: "const LocalView : Bool = True",
+        renamed_identity: "Entry.LocalView",
+    },
+    BindingRouteCase {
+        label: "let",
+        collision_template: "let {name} : Bool = True",
+        renamed_source: "let LocalLet : Bool = True",
+        renamed_identity: "Entry.LocalLet",
+    },
+    BindingRouteCase {
+        label: "prove",
+        collision_template: "prove {name} : Bool",
+        renamed_source: "prove LocalProve : Bool",
+        renamed_identity: "LocalProve",
+    },
+    BindingRouteCase {
+        label: "prop",
+        collision_template: "prop {name} : Omega where { intro : {name} }",
+        renamed_source: "prop LocalProp : Omega where { intro : LocalProp }",
+        renamed_identity: "Entry.LocalProp",
+    },
+    BindingRouteCase {
+        label: "theorem",
+        collision_template: "prop RouteGoal : Omega where { route_intro : RouteGoal }\ntheorem {name} : RouteGoal = RouteGoal.route_intro",
+        renamed_source: "prop RouteGoal : Omega where { route_intro : RouteGoal }\ntheorem LocalTheorem : RouteGoal = RouteGoal.route_intro",
+        renamed_identity: "Entry.LocalTheorem",
+    },
+    BindingRouteCase {
+        label: "axiom",
+        collision_template: "prop AxiomGoal : Omega where { axiom_intro : AxiomGoal }\naxiom {name} : AxiomGoal",
+        renamed_source: "prop AxiomGoal : Omega where { axiom_intro : AxiomGoal }\naxiom LocalAxiom : AxiomGoal",
+        renamed_identity: "Entry.LocalAxiom",
+    },
+    BindingRouteCase {
+        label: "law",
+        collision_template: "law {name} (x) { field : Bool }",
+        renamed_source: "law LocalLaw (x) { field : Bool }",
+        renamed_identity: "LocalLaw",
+    },
+    BindingRouteCase {
+        label: "type-alias",
+        collision_template: "def {name} = Bool",
+        renamed_source: "def LocalAlias = Bool",
+        renamed_identity: "Entry.LocalAlias",
+    },
+    BindingRouteCase {
+        label: "record",
+        collision_template: "record {name} { field : Bool }",
+        renamed_source: "record LocalRecord { field : Bool }",
+        renamed_identity: "LocalRecord",
+    },
+    BindingRouteCase {
+        label: "class",
+        collision_template: "class {name} { field : Bool }",
+        renamed_source: "class LocalClass { field : Bool }",
+        renamed_identity: "LocalClass",
+    },
+    BindingRouteCase {
+        label: "foreign",
+        collision_template: "foreign {name} : Int = \"floor_probe\" \"libc.so\" pure",
+        renamed_source: "foreign LocalForeign : Int = \"floor_probe\" \"libc.so\" pure",
+        renamed_identity: "LocalForeign",
+    },
+    BindingRouteCase {
+        label: "temporal",
+        collision_template: "temporal {name} { always True }",
+        renamed_source: "temporal LocalTemporal { always True }",
+        renamed_identity: "LocalTemporal",
+    },
+];
+
+/// Promise class: durable invariant. The exhaustive declaration namespace-
+/// effect classifier guards every executable top-level binding producer,
+/// independently of the separate module-qualification taxonomy.
+///
+/// **MEASURED:** every route rejects both a floor parent and a floor constructor
+/// at the exact spelling without changing canonical identity, declarations,
+/// allocator, or trust, while the same declaration form under a renamed binding
+/// accepts and produces a distinct identity. **CLAIMED:** collision population
+/// is closed over declaration binding producers, not a hand-picked syntax list.
+/// **THE GAP:** data and explicit-data constructor sub-bindings are exercised by
+/// the complete per-binding matrix above; the root-only space route is exercised
+/// separately because strict roots intentionally reject its nested placement.
+#[test]
+fn every_executable_top_level_binding_route_is_floor_immutable() {
+    for route in BINDING_ROUTE_CASES {
+        for name in ["Nat", "Zero"] {
+            assert_floor_collision_rejects_before_allocation(
+                &format!("{}-{name}", route.label),
+                &route.collision_template.replace("{name}", name),
+                name,
+            );
+        }
+
+        let root = FixtureRoot::new(&format!("{}-renamed", route.label));
+        root.write(route.renamed_source);
+        let mut env = ElabEnv::new().expect("base environment");
+        let canonical_ids = floor_ids(&env);
+        env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+            .unwrap_or_else(|error| {
+                panic!(
+                    "renamed {} binding route must elaborate: {error}",
+                    route.label
+                )
+            });
+        let local = env.globals[route.renamed_identity];
+        assert!(
+            !canonical_ids.contains(&local),
+            "renamed {} route reused a floor identity",
+            route.label
+        );
+    }
+
+    for name in ["Nat", "Zero"] {
+        assert_root_floor_collision_rejects_before_allocation(
+            &format!("space {name} {{ mut cell : Int = 0 }}"),
+            name,
+        );
+    }
+    let mut space_env = ElabEnv::new().expect("base environment");
+    let canonical_ids = floor_ids(&space_env);
+    space_env
+        .elaborate_file("space LocalSpace { mut cell : Int = 0 }")
+        .expect("renamed root-only space must elaborate");
+    let local_space = space_env.globals["LocalSpace"];
+    assert!(!canonical_ids.contains(&local_space));
+}
+
 /// Promise class: durable invariant. Selective imports consult the complete
 /// floor binding set, while per-item renaming and qualification remain lawful.
 ///
 /// **MEASURED:** importing an all-renamed local constructor under `Zero`
-/// rejects without allocation after its provider is loaded, while importing it
-/// as `UserZero` and using the qualified provider path both elaborate.
+/// rejects without allocation after its provider is loaded; re-importing the
+/// canonical `Nil` under the same spelling is idempotent and preserves its exact
+/// identity; per-item renaming and qualified provider access both elaborate.
 /// **CLAIMED:** import collision checking shares the exact-derived floor
-/// binding authority with local prebinding. **THE GAP:** one representative
-/// constructor reaches the shared set; the matrix above proves every specified
-/// parent and constructor belongs to that set.
+/// binding authority with local prebinding and distinguishes identity from
+/// spelling. **THE GAP:** representative constructors reach both identity
+/// orientations; the matrix above proves every specified parent and constructor
+/// belongs to the shared set.
 #[test]
 fn selective_import_floor_collision_rejects_but_renamed_and_qualified_access_accept() {
+    let same = FixtureRoot::new("same-identity-import");
+    same.write_named("Provider", "export Nil");
+    same.write("import Provider (Nil)\nconst witness : List Bool = Nil Bool");
+    let mut same_env = ElabEnv::new().expect("base environment");
+    let canonical_nil = same_env.globals["Nil"];
+    same_env
+        .elaborate_module_from_roots_strict(&[same.0.clone()], "Provider")
+        .expect("provider must re-export the canonical Nil identity");
+    let declarations_before_same_import = same_env.env.declarations().len();
+    let next_id_before_same_import = same_env.env.next_global_id();
+    let trusted_before_same_import = same_env.env.trusted_base();
+    let same_ids = same_env
+        .elaborate_module_from_roots_strict(&[same.0.clone()], "Entry")
+        .expect("a second path to the same canonical Nil identity must be idempotent");
+    assert_eq!(same_env.globals["Nil"], canonical_nil);
+    let same_witness = *same_ids.last().expect("same-identity witness");
+    let (_, same_body) = same_env
+        .env
+        .transparent_body(same_witness)
+        .expect("same-identity witness body");
+    assert!(mentions_global(&same_body, canonical_nil));
+    assert_eq!(
+        same_env.env.declarations().len(),
+        declarations_before_same_import + 1
+    );
+    assert_eq!(
+        same_env.env.next_global_id().0,
+        next_id_before_same_import.0 + 1
+    );
+    assert_eq!(same_env.env.trusted_base(), trusted_before_same_import);
+
     let root = FixtureRoot::new("selective-import");
     root.write_named(
         "Provider",

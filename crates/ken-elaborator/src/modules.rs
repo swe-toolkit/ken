@@ -355,6 +355,7 @@ fn resolve_attached_ref(
 fn apply_import(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
     module: &str,
     kind: &ImportKind,
@@ -383,11 +384,17 @@ fn apply_import(
                     })?;
                 let bare = item.rename.as_deref().unwrap_or(&item.name);
                 if prelude_binding_names.contains(bare) {
-                    return Err(ElabError::AmbiguousReference {
-                        name: bare.to_string(),
-                        sources: vec![format!("<prelude>.{bare}"), q.clone()],
-                        span: span.clone(),
-                    });
+                    let same_canonical_identity = globals
+                        .get(bare)
+                        .zip(globals.get(q))
+                        .is_some_and(|(installed, incoming)| installed == incoming);
+                    if !same_canonical_identity {
+                        return Err(ElabError::AmbiguousReference {
+                            name: bare.to_string(),
+                            sources: vec![format!("<prelude>.{bare}"), q.clone()],
+                            span: span.clone(),
+                        });
+                    }
                 }
                 scope.bind_import(bare, q, span)?;
             }
@@ -1671,12 +1678,149 @@ fn reject_prelude_binding(
     Ok(())
 }
 
+/// Namespace effects of a parsed declaration, independent of whether its
+/// spelling is module-qualifiable. This match is intentionally exhaustive and
+/// has no wildcard: adding a declaration form forces an explicit collision-
+/// population decision.
+enum DeclNamespaceEffect<'a> {
+    TopLevelName {
+        name: &'a str,
+        span: &'a Span,
+    },
+    ConstructorNames {
+        parent: &'a str,
+        parent_span: &'a Span,
+        constructors: ConstructorNameSource<'a>,
+    },
+    QualifiedIdentity {
+        subject: &'a str,
+        proof_name: &'a str,
+        span: &'a Span,
+    },
+    ReferenceOnly,
+    NoBinding,
+}
+
+enum ConstructorNameSource<'a> {
+    Simple(&'a [CtorDecl]),
+    Explicit(&'a [ExplicitDataCtor]),
+}
+
+fn decl_namespace_effect(decl: &Decl) -> DeclNamespaceEffect<'_> {
+    match decl {
+        Decl::Pub(inner) => decl_namespace_effect(inner),
+        Decl::ViewDecl { name, span, .. }
+        | Decl::SpaceDecl { name, span, .. }
+        | Decl::LetDecl { name, span, .. }
+        | Decl::ProveDecl { name, span, .. }
+        | Decl::PropDecl { name, span, .. }
+        | Decl::TheoremDecl { name, span, .. }
+        | Decl::AxiomDecl { name, span, .. }
+        | Decl::LawDecl { name, span, .. }
+        | Decl::TypeAlias { name, span, .. }
+        | Decl::ForeignDecl { name, span, .. }
+        | Decl::TemporalDecl { name, span, .. }
+        | Decl::RecordDecl { name, span, .. }
+        | Decl::ClassDecl { name, span, .. } => DeclNamespaceEffect::TopLevelName { name, span },
+        Decl::DataDecl {
+            name, ctors, span, ..
+        } => DeclNamespaceEffect::ConstructorNames {
+            parent: name,
+            parent_span: span,
+            constructors: ConstructorNameSource::Simple(ctors),
+        },
+        Decl::ExplicitDataDecl {
+            name, ctors, span, ..
+        } => DeclNamespaceEffect::ConstructorNames {
+            parent: name,
+            parent_span: span,
+            constructors: ConstructorNameSource::Explicit(ctors),
+        },
+        Decl::AttachedProofDecl {
+            proof_name,
+            subject,
+            span,
+            ..
+        } => DeclNamespaceEffect::QualifiedIdentity {
+            subject,
+            proof_name,
+            span,
+        },
+        Decl::InstanceDecl { .. }
+        | Decl::DeriveDecl { .. }
+        | Decl::ImportDecl { .. }
+        | Decl::ExportDecl { .. } => DeclNamespaceEffect::ReferenceOnly,
+        Decl::BoundaryDecl { .. } | Decl::ModuleDecl { .. } => DeclNamespaceEffect::NoBinding,
+    }
+}
+
+fn reject_decl_prelude_bindings(
+    decl: &Decl,
+    prefix: &str,
+    prelude_binding_names: &HashSet<String>,
+) -> Result<(), ElabError> {
+    let reject = |bare: &str, span: &Span| {
+        reject_prelude_binding(bare, &qualify(prefix, bare), span, prelude_binding_names)
+    };
+    match decl_namespace_effect(decl) {
+        DeclNamespaceEffect::TopLevelName { name, span } => reject(name, span),
+        DeclNamespaceEffect::ConstructorNames {
+            parent,
+            parent_span,
+            constructors,
+        } => {
+            reject(parent, parent_span)?;
+            match constructors {
+                ConstructorNameSource::Simple(constructors) => {
+                    for constructor in constructors {
+                        reject(&constructor.name, &constructor.span)?;
+                    }
+                }
+                ConstructorNameSource::Explicit(constructors) => {
+                    for constructor in constructors {
+                        let (name, span) = match constructor {
+                            ExplicitDataCtor::Simple(constructor) => {
+                                (&constructor.name, &constructor.span)
+                            }
+                            ExplicitDataCtor::Signature { name, span, .. } => (name, span),
+                        };
+                        reject(name, span)?;
+                    }
+                }
+            }
+            Ok(())
+        }
+        DeclNamespaceEffect::QualifiedIdentity {
+            subject,
+            proof_name,
+            span,
+        } => {
+            let identity = format!("{subject}::{proof_name}");
+            reject_prelude_binding(
+                &identity,
+                &qualify(prefix, &identity),
+                span,
+                prelude_binding_names,
+            )
+        }
+        DeclNamespaceEffect::ReferenceOnly | DeclNamespaceEffect::NoBinding => Ok(()),
+    }
+}
+
 fn prebind_scope_declarations(
     scope: &mut Scope,
     decls: &[Decl],
     prefix: &str,
     prelude_binding_names: &HashSet<String>,
 ) -> Result<(), ElabError> {
+    // Collision population follows declaration namespace effects, not the
+    // separate qualification taxonomy. Reject the whole scope before binding
+    // or elaborating any declaration so refusal cannot allocate or replace a
+    // canonical global.
+    for decl in decls {
+        reject_decl_prelude_bindings(decl, prefix, prelude_binding_names)?;
+    }
+
     // Collect locals before imports so collisions are source-order independent.
     // This persistent module scope is separate from `expand_scope`'s recursive
     // application-spine frames, so local constructor/class binding is identical
@@ -1696,18 +1840,11 @@ fn prebind_scope_declarations(
         } else {
             qualify(prefix, &bare)
         };
-        reject_prelude_binding(&bare, &qualified, inner.span(), prelude_binding_names)?;
         scope.bind_local(&bare, &qualified, inner.span())?;
         match inner {
             Decl::DataDecl { ctors, .. } => {
                 for ctor in ctors {
                     let qualified = qualify(prefix, &ctor.name);
-                    reject_prelude_binding(
-                        &ctor.name,
-                        &qualified,
-                        &ctor.span,
-                        prelude_binding_names,
-                    )?;
                     scope.bind_local(&ctor.name, &qualified, &ctor.span)?;
                 }
             }
@@ -1718,7 +1855,6 @@ fn prebind_scope_declarations(
                         ExplicitDataCtor::Signature { name, span, .. } => (name, span),
                     };
                     let qualified = qualify(prefix, name);
-                    reject_prelude_binding(name, &qualified, span, prelude_binding_names)?;
                     scope.bind_local(name, &qualified, span)?;
                 }
             }
@@ -1795,6 +1931,7 @@ fn expand_scope(
                 apply_import(
                     scope,
                     &elab.module_state.exports,
+                    &elab.globals,
                     &elab.module_state.prelude_binding_names,
                     module,
                     kind,
