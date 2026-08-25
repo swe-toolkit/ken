@@ -301,13 +301,13 @@ fn loader_executes_import_identity_clash_and_rename_discriminators() {
     match load_entry(
         "prelude-reject",
         &[
-            ("M.ken", "pub def Bool = Nat\n"),
-            ("Entry.ken", "import M (Bool)\n"),
+            ("M.ken", "pub def LocalBool = Nat\n"),
+            ("Entry.ken", "import M (LocalBool as Bool)\n"),
         ],
     ) {
         Err(ElabError::AmbiguousReference { name, sources, .. }) => {
             assert_eq!(name, "Bool");
-            assert!(sources.contains(&"M.Bool".to_string()));
+            assert!(sources.contains(&"M.LocalBool".to_string()));
             assert!(sources.contains(&"<prelude>.Bool".to_string()));
         }
         Err(other) => panic!("prelude clash rejected with the wrong error: {other}"),
@@ -317,10 +317,10 @@ fn loader_executes_import_identity_clash_and_rename_discriminators() {
     let prelude_rename = load_entry(
         "prelude-rename",
         &[
-            ("M.ken", "pub def Bool = Nat\n"),
+            ("M.ken", "pub def LocalBool = Nat\n"),
             (
                 "Entry.ken",
-                "import M (Bool as MBool)\n\
+                "import M (LocalBool as MBool)\n\
                  const from_m : Type = MBool\n\
                  const from_prelude : Type = Bool\n",
             ),
@@ -329,7 +329,7 @@ fn loader_executes_import_identity_clash_and_rename_discriminators() {
     .expect("renaming preserves both the user and prelude identities");
     assert_eq!(
         body_const(&prelude_rename, "Entry.from_m"),
-        prelude_rename.globals["M.Bool"]
+        prelude_rename.globals["M.LocalBool"]
     );
     let (_, prelude_body) = prelude_rename
         .env
@@ -343,7 +343,7 @@ fn loader_executes_import_identity_clash_and_rename_discriminators() {
         "bare Bool must remain the registered prelude type, got {prelude_body:?}"
     );
     assert_ne!(
-        prelude_rename.globals["M.Bool"],
+        prelude_rename.globals["M.LocalBool"],
         prelude_rename.globals["Bool"]
     );
 }
@@ -410,10 +410,10 @@ fn loader_executes_facade_and_in_scope_body_scope_discriminator() {
     let preexisting = load_entry(
         "facade-preserves-preexisting",
         &[
-            ("M.ken", "pub def Bool = Nat\n"),
+            ("M.ken", "pub def LocalBool = Nat\n"),
             (
                 "P.ken",
-                "export M (Bool as MBool)\n\
+                "export M (LocalBool as MBool)\n\
                  const body_uses_prelude : Type = Bool\n",
             ),
             (
@@ -436,7 +436,7 @@ fn loader_executes_facade_and_in_scope_body_scope_discriminator() {
     );
     assert_eq!(
         body_const(&preexisting, "Entry.via_facade"),
-        preexisting.globals["M.Bool"]
+        preexisting.globals["M.LocalBool"]
     );
 
     match load_entry(

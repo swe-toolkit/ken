@@ -67,8 +67,11 @@ pub struct ModuleState {
     loaded_unit_scopes: HashMap<String, Scope>,
     /// Units currently being discovered/elaborated, in entry-rooted edge order.
     active_imports: Vec<String>,
-    /// The unshadowable prelude floor (`30-taxonomy §4`, `33 §3.3`).
+    /// Parent names in the closed prelude floor (`30-taxonomy §4`).
     prelude_names: HashSet<String>,
+    /// Unshadowable bindings derived from the exact floor parents: those
+    /// parent names plus only their kernel-recorded constructor names.
+    prelude_binding_names: HashSet<String>,
     /// Compiler vocabulary captured before package source can add aliases.
     /// Includes native trusted names and constructors of the closed floor.
     strict_builtin_names: HashSet<String>,
@@ -127,12 +130,16 @@ impl ModuleState {
             .iter()
             .filter_map(|name| globals.get(*name).copied())
             .collect();
+        self.prelude_binding_names = self.prelude_names.clone();
         self.strict_builtin_names = globals
             .iter()
             .filter_map(|(name, id)| {
                 let floor_constructor = env
                     .constructor(*id)
                     .is_some_and(|(parent, _)| floor_formers.contains(&parent.id));
+                if floor_constructor {
+                    self.prelude_binding_names.insert(name.clone());
+                }
                 (native_trusted_base.contains(id) || floor_constructor).then_some(name.clone())
             })
             .collect();
@@ -348,7 +355,7 @@ fn resolve_attached_ref(
 fn apply_import(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
-    prelude_names: &HashSet<String>,
+    prelude_binding_names: &HashSet<String>,
     module: &str,
     kind: &ImportKind,
     span: &Span,
@@ -375,7 +382,7 @@ fn apply_import(
                         span: span.clone(),
                     })?;
                 let bare = item.rename.as_deref().unwrap_or(&item.name);
-                if prelude_names.contains(bare) {
+                if prelude_binding_names.contains(bare) {
                     return Err(ElabError::AmbiguousReference {
                         name: bare.to_string(),
                         sources: vec![format!("<prelude>.{bare}"), q.clone()],
@@ -1648,11 +1655,27 @@ fn resolve_scoped_decl(
     rewrite_rdecl(scope, exports, rdecl)
 }
 
+fn reject_prelude_binding(
+    bare: &str,
+    qualified: &str,
+    span: &Span,
+    prelude_binding_names: &HashSet<String>,
+) -> Result<(), ElabError> {
+    if prelude_binding_names.contains(bare) {
+        return Err(ElabError::AmbiguousReference {
+            name: bare.to_string(),
+            sources: vec![format!("<prelude>.{bare}"), qualified.to_string()],
+            span: span.clone(),
+        });
+    }
+    Ok(())
+}
+
 fn prebind_scope_declarations(
     scope: &mut Scope,
     decls: &[Decl],
     prefix: &str,
-    prelude_names: &HashSet<String>,
+    prelude_binding_names: &HashSet<String>,
 ) -> Result<(), ElabError> {
     // Collect locals before imports so collisions are source-order independent.
     // This persistent module scope is separate from `expand_scope`'s recursive
@@ -1673,18 +1696,19 @@ fn prebind_scope_declarations(
         } else {
             qualify(prefix, &bare)
         };
-        if prefix.is_empty() && prelude_names.contains(&bare) && !scope.locals.contains(&bare) {
-            return Err(ElabError::AmbiguousReference {
-                name: bare.clone(),
-                sources: vec![format!("<prelude>.{bare}"), qualified],
-                span: inner.span().clone(),
-            });
-        }
+        reject_prelude_binding(&bare, &qualified, inner.span(), prelude_binding_names)?;
         scope.bind_local(&bare, &qualified, inner.span())?;
         match inner {
             Decl::DataDecl { ctors, .. } => {
                 for ctor in ctors {
-                    scope.bind_local(&ctor.name, &qualify(prefix, &ctor.name), &ctor.span)?;
+                    let qualified = qualify(prefix, &ctor.name);
+                    reject_prelude_binding(
+                        &ctor.name,
+                        &qualified,
+                        &ctor.span,
+                        prelude_binding_names,
+                    )?;
+                    scope.bind_local(&ctor.name, &qualified, &ctor.span)?;
                 }
             }
             Decl::ExplicitDataDecl { ctors, .. } => {
@@ -1693,7 +1717,9 @@ fn prebind_scope_declarations(
                         ExplicitDataCtor::Simple(ctor) => (&ctor.name, &ctor.span),
                         ExplicitDataCtor::Signature { name, span, .. } => (name, span),
                     };
-                    scope.bind_local(name, &qualify(prefix, name), span)?;
+                    let qualified = qualify(prefix, name);
+                    reject_prelude_binding(name, &qualified, span, prelude_binding_names)?;
+                    scope.bind_local(name, &qualified, span)?;
                 }
             }
             _ => {}
@@ -1737,7 +1763,12 @@ fn expand_scope(
         }
     }
 
-    prebind_scope_declarations(scope, decls, prefix, &elab.module_state.prelude_names)?;
+    prebind_scope_declarations(
+        scope,
+        decls,
+        prefix,
+        &elab.module_state.prelude_binding_names,
+    )?;
 
     let mut ids = Vec::new();
     let mut exports_here: HashMap<String, String> = HashMap::new();
@@ -1764,7 +1795,7 @@ fn expand_scope(
                 apply_import(
                     scope,
                     &elab.module_state.exports,
-                    &elab.module_state.prelude_names,
+                    &elab.module_state.prelude_binding_names,
                     module,
                     kind,
                     span,

@@ -77,6 +77,116 @@ const FLOOR_CASES: [FloorCase; 9] = [
     },
 ];
 
+struct CollisionCase {
+    parent: &'static str,
+    parent_collision_source: &'static str,
+    constructor_collisions: &'static [(&'static str, &'static str)],
+    renamed_source: &'static str,
+    renamed_parent: &'static str,
+    renamed_constructors: &'static [&'static str],
+}
+
+const COLLISION_CASES: [CollisionCase; 8] = [
+    CollisionCase {
+        parent: "Auth",
+        parent_collision_source: "data Auth = LocalANone | LocalAPartial | LocalAFull",
+        constructor_collisions: &[
+            (
+                "ANone",
+                "data LocalAuth = ANone | LocalAPartial | LocalAFull",
+            ),
+            (
+                "APartial",
+                "data LocalAuth = LocalANone | APartial | LocalAFull",
+            ),
+            (
+                "AFull",
+                "data LocalAuth = LocalANone | LocalAPartial | AFull",
+            ),
+        ],
+        renamed_source: "data LocalAuth = LocalANone | LocalAPartial | LocalAFull",
+        renamed_parent: "LocalAuth",
+        renamed_constructors: &["LocalANone", "LocalAPartial", "LocalAFull"],
+    },
+    CollisionCase {
+        parent: "Bool",
+        parent_collision_source: "data Bool = LocalTrue | LocalFalse",
+        constructor_collisions: &[
+            ("True", "data LocalBool = True | LocalFalse"),
+            ("False", "data LocalBool = LocalTrue | False"),
+        ],
+        renamed_source: "data LocalBool = LocalTrue | LocalFalse",
+        renamed_parent: "LocalBool",
+        renamed_constructors: &["LocalTrue", "LocalFalse"],
+    },
+    CollisionCase {
+        parent: "List",
+        parent_collision_source: "data List a = LocalNil | LocalCons a (List a)",
+        constructor_collisions: &[
+            ("Nil", "data LocalList a = Nil | LocalCons a (LocalList a)"),
+            ("Cons", "data LocalList a = LocalNil | Cons a (LocalList a)"),
+        ],
+        renamed_source: "data LocalList a = LocalNil | LocalCons a (LocalList a)",
+        renamed_parent: "LocalList",
+        renamed_constructors: &["LocalNil", "LocalCons"],
+    },
+    CollisionCase {
+        parent: "Nat",
+        parent_collision_source: "data Nat = LocalZero | LocalSuc Nat",
+        constructor_collisions: &[
+            ("Zero", "data LocalNat = Zero | LocalSuc LocalNat"),
+            ("Suc", "data LocalNat = LocalZero | Suc LocalNat"),
+        ],
+        renamed_source: "data LocalNat = LocalZero | LocalSuc LocalNat",
+        renamed_parent: "LocalNat",
+        renamed_constructors: &["LocalZero", "LocalSuc"],
+    },
+    CollisionCase {
+        parent: "Option",
+        parent_collision_source: "data Option a = LocalNone | LocalSome a",
+        constructor_collisions: &[
+            ("None", "data LocalOption a = None | LocalSome a"),
+            ("Some", "data LocalOption a = LocalNone | Some a"),
+        ],
+        renamed_source: "data LocalOption a = LocalNone | LocalSome a",
+        renamed_parent: "LocalOption",
+        renamed_constructors: &["LocalNone", "LocalSome"],
+    },
+    CollisionCase {
+        parent: "ResourceKind",
+        parent_collision_source: "data ResourceKind = LocalFsHandle | LocalBuffer",
+        constructor_collisions: &[
+            (
+                "FsHandle",
+                "data LocalResourceKind = FsHandle | LocalBuffer",
+            ),
+            ("Buffer", "data LocalResourceKind = LocalFsHandle | Buffer"),
+        ],
+        renamed_source: "data LocalResourceKind = LocalFsHandle | LocalBuffer",
+        renamed_parent: "LocalResourceKind",
+        renamed_constructors: &["LocalFsHandle", "LocalBuffer"],
+    },
+    CollisionCase {
+        parent: "Result",
+        parent_collision_source: "data Result e a = LocalErr e | LocalOk a",
+        constructor_collisions: &[
+            ("Err", "data LocalResult e a = Err e | LocalOk a"),
+            ("Ok", "data LocalResult e a = LocalErr e | Ok a"),
+        ],
+        renamed_source: "data LocalResult e a = LocalErr e | LocalOk a",
+        renamed_parent: "LocalResult",
+        renamed_constructors: &["LocalErr", "LocalOk"],
+    },
+    CollisionCase {
+        parent: "Utf8Error",
+        parent_collision_source: "data Utf8Error = LocalInvalidUtf8",
+        constructor_collisions: &[("InvalidUtf8", "data LocalUtf8Error = InvalidUtf8")],
+        renamed_source: "data LocalUtf8Error = LocalInvalidUtf8",
+        renamed_parent: "LocalUtf8Error",
+        renamed_constructors: &["LocalInvalidUtf8"],
+    },
+];
+
 struct FixtureRoot(PathBuf);
 
 impl FixtureRoot {
@@ -91,7 +201,11 @@ impl FixtureRoot {
     }
 
     fn write(&self, source: &str) {
-        fs::write(self.0.join("Entry.ken"), source).expect("write Nat-floor fixture");
+        self.write_named("Entry", source);
+    }
+
+    fn write_named(&self, module: &str, source: &str) {
+        fs::write(self.0.join(format!("{module}.ken")), source).expect("write Nat-floor fixture");
     }
 }
 
@@ -344,36 +458,183 @@ fn strict_floor_export_allocates_nothing_and_nonmember_prod_rejects() {
     );
 }
 
-/// Promise class: durable invariant. A source family spelled `Nat` is a fresh
-/// identity and cannot be imported over the canonical floor binding.
-#[test]
-fn source_redeclared_nat_is_distinct_and_cannot_shadow_the_floor() {
-    let root = FixtureRoot::new("source-nat");
-    root.write("data Nat = FreshZero\nexport Nat, FreshZero");
-    fs::write(
-        root.0.join("Consumer.ken"),
-        "import Entry (Nat)\nfn witness (x : Nat) : Nat = x",
-    )
-    .expect("write source-Nat consumer");
+fn floor_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
+    FLOOR_CASES
+        .iter()
+        .flat_map(|case| {
+            std::iter::once(env.globals[case.name])
+                .chain(case.constructors.iter().map(|name| env.globals[*name]))
+        })
+        .collect()
+}
 
+fn assert_floor_collision_rejects_before_allocation(label: &str, source: &str, name: &str) {
+    let root = FixtureRoot::new(label);
+    root.write(source);
     let mut env = ElabEnv::new().expect("base environment");
-    let canonical_nat = env.globals["Nat"];
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
-        .expect("source-local Nat may exist only under its qualified identity");
-    let source_nat = env.globals["Entry.Nat"];
-    assert_ne!(source_nat, canonical_nat);
-    let (parent, _) = env
-        .env
-        .constructor(env.globals["Entry.FreshZero"])
-        .expect("source constructor must be kernel-recorded");
-    assert_eq!(parent.id, source_nat);
-    assert_eq!(env.globals["Nat"], canonical_nat);
+    let declarations_before = env.env.declarations().len();
+    let next_id_before = env.env.next_global_id();
+    let trusted_before = env.env.trusted_base();
 
     let error = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Consumer")
-        .expect_err("a distinct source Nat must not replace the prelude floor identity");
+        .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .expect_err("a same-spelling floor binding must reject under the non-empty Entry prefix");
     assert!(
-        matches!(error, ElabError::AmbiguousReference { ref name, .. } if name == "Nat"),
-        "source Nat import must fail closed at the floor collision, got {error:?}"
+        matches!(error, ElabError::AmbiguousReference { name: ref rejected, .. } if rejected == name),
+        "{label} must reject at the retained floor spelling {name}, got {error:?}"
     );
+    assert_eq!(env.env.declarations().len(), declarations_before);
+    assert_eq!(env.env.next_global_id(), next_id_before);
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+fn assert_renamed_family_accepts(case: &CollisionCase) {
+    let root = FixtureRoot::new(case.renamed_parent);
+    root.write(case.renamed_source);
+    let mut env = ElabEnv::new().expect("base environment");
+    let canonical_ids = floor_ids(&env);
+    let trusted_before = env.env.trusted_base();
+
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .unwrap_or_else(|error| panic!("all-renamed {} must elaborate: {error}", case.parent));
+
+    let local_parent = env.globals[&format!("Entry.{}", case.renamed_parent)];
+    assert!(!canonical_ids.contains(&local_parent));
+    let local_inductive = env
+        .env
+        .inductive(local_parent)
+        .expect("renamed floor lookalike must be an ordinary local inductive");
+    let local_constructors = case
+        .renamed_constructors
+        .iter()
+        .map(|name| env.globals[&format!("Entry.{name}")])
+        .collect::<Vec<_>>();
+    assert_eq!(
+        local_inductive
+            .constructors
+            .iter()
+            .map(|constructor| constructor.id)
+            .collect::<Vec<_>>(),
+        local_constructors
+    );
+    for constructor in local_constructors {
+        assert!(!canonical_ids.contains(&constructor));
+        let (parent, _) = env
+            .env
+            .constructor(constructor)
+            .expect("renamed constructor must be kernel-recorded");
+        assert_eq!(parent.id, local_parent);
+    }
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+/// Promise class: durable invariant. Every parent and exact-parent constructor
+/// in the closed floor is unshadowable before allocation under a non-empty
+/// module prefix, while equal-shaped all-renamed declarations remain ordinary
+/// checked local identities.
+///
+/// **MEASURED:** one-axis parent and constructor rows reject at the retained
+/// spelling with unchanged declarations, allocator, and trust; one all-renamed
+/// positive per family allocates only its distinct local family and constructors
+/// with kernel-recorded local parentage. **CLAIMED:** prelude immutability covers
+/// the complete exact-parent-derived floor binding set, not shape or an
+/// arbitrary compiler-name inventory. **THE GAP:** selective-import collisions
+/// use the same set through a separate production entry, pinned below.
+#[test]
+fn floor_parent_and_constructor_clash_matrix_is_fail_closed() {
+    for case in &COLLISION_CASES {
+        assert_floor_collision_rejects_before_allocation(
+            &format!("{}-parent", case.parent),
+            case.parent_collision_source,
+            case.parent,
+        );
+        for (constructor, source) in case.constructor_collisions {
+            assert_floor_collision_rejects_before_allocation(
+                &format!("{}-{constructor}", case.parent),
+                source,
+                constructor,
+            );
+        }
+        assert_renamed_family_accepts(case);
+    }
+
+    assert_floor_collision_rejects_before_allocation("char-parent", "def Char = Int", "Char");
+    let root = FixtureRoot::new("local-char");
+    root.write("def LocalChar = Int");
+    let mut env = ElabEnv::new().expect("base environment");
+    let floor = floor_ids(&env);
+    let declarations_before = env.env.declarations().len();
+    let next_id_before = env.env.next_global_id();
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .expect("renamed constructor-free Char lookalike must elaborate");
+    let local_char = env.globals["Entry.LocalChar"];
+    assert!(!floor.contains(&local_char));
+    assert!(matches!(
+        env.env.lookup(local_char),
+        Some(Decl::Transparent { .. })
+    ));
+    assert_eq!(env.env.declarations().len(), declarations_before + 1);
+    assert_eq!(env.env.next_global_id().0, next_id_before.0 + 1);
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+/// Promise class: durable invariant. Selective imports consult the complete
+/// floor binding set, while per-item renaming and qualification remain lawful.
+///
+/// **MEASURED:** importing an all-renamed local constructor under `Zero`
+/// rejects without allocation after its provider is loaded, while importing it
+/// as `UserZero` and using the qualified provider path both elaborate.
+/// **CLAIMED:** import collision checking shares the exact-derived floor
+/// binding authority with local prebinding. **THE GAP:** one representative
+/// constructor reaches the shared set; the matrix above proves every specified
+/// parent and constructor belongs to that set.
+#[test]
+fn selective_import_floor_collision_rejects_but_renamed_and_qualified_access_accept() {
+    let root = FixtureRoot::new("selective-import");
+    root.write_named(
+        "Provider",
+        "data LocalNat = LocalZero | LocalSuc LocalNat\nexport LocalNat, LocalZero, LocalSuc",
+    );
+    root.write("import Provider (LocalZero as Zero)");
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Provider")
+        .expect("all-renamed provider must elaborate");
+    let declarations_before = env.env.declarations().len();
+    let next_id_before = env.env.next_global_id();
+    let trusted_before = env.env.trusted_base();
+    let error = env
+        .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .expect_err("a selective import may not bind a floor constructor spelling");
+    assert!(
+        matches!(error, ElabError::AmbiguousReference { ref name, .. } if name == "Zero"),
+        "selective collision must name Zero, got {error:?}"
+    );
+    assert_eq!(env.env.declarations().len(), declarations_before);
+    assert_eq!(env.env.next_global_id(), next_id_before);
+    assert_eq!(env.env.trusted_base(), trusted_before);
+
+    let renamed = FixtureRoot::new("renamed-import");
+    renamed.write_named(
+        "Provider",
+        "data LocalNat = LocalZero | LocalSuc LocalNat\nexport LocalNat, LocalZero, LocalSuc",
+    );
+    renamed.write(
+        "import Provider (LocalNat as UserNat, LocalZero as UserZero)\nconst witness : UserNat = UserZero",
+    );
+    ElabEnv::new()
+        .expect("base environment")
+        .elaborate_module_from_roots_strict(&[renamed.0.clone()], "Entry")
+        .expect("per-item renaming must preserve lawful access");
+
+    let qualified = FixtureRoot::new("qualified-import");
+    qualified.write_named(
+        "Provider",
+        "data LocalNat = LocalZero | LocalSuc LocalNat\nexport LocalNat, LocalZero, LocalSuc",
+    );
+    qualified.write("import Provider\nconst witness : Provider.LocalNat = Provider.LocalZero");
+    ElabEnv::new()
+        .expect("base environment")
+        .elaborate_module_from_roots_strict(&[qualified.0.clone()], "Entry")
+        .expect("qualified access must preserve the provider identity without a bare collision");
 }
