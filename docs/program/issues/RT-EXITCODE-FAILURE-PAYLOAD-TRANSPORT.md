@@ -18,6 +18,16 @@ origin: "Steward, 2026-08-25, from the Architect object-distinctness ruling (evt
 > too broad; corrected below to the consumer-not-closed-over-existing-forms
 > defect the Architect measured at landed 5fff430db. Full frame:
 > `docs/program/wp/RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT.md`.
+>
+> AMENDED 2026-08-25 (Architect hard-stop #1, evt_3kprh7knmxa3w): the
+> single-observer reading below ("close both consumers over the landed exact-`Int`
+> observers" read as one helper) is refined — surface B (specialized) stays on
+> `narrow_native_int_u64`; do NOT convert it to a carrier. The carried decoder
+> outcome is factored below its effect-seat policy wrapper, and one shared exit
+> mapper serves both surfaces; the carried process wrapper yields `-3` (not `-1`)
+> on malformed input. Authoritative component shape + controls are in the frame's
+> Deliverables/ACs. Only "`narrow_carried_int_u64` sufficient at each phase" is
+> withdrawn; the two-surface census stands.
 
 ## Objective (Architect-corrected mechanism, measured at 5fff430db)
 
