@@ -120,11 +120,28 @@ origin: "Operator directive 2026-08-22: module/import is its own campaign and, b
 > criterion + foundation [[CAT-GCD-REFACTOR]] now unblock only after a canonical
 > `Pair` package lands. Updated ordering:
 >
-> 1. [[LANG-MOD-CATALOG-COMPLETENESS]] (Component B, RECUT) — the Pair-INDEPENDENT
->    closed loader-derived unit-disposition pass: every unit is `StrictGreen` now
->    or `deferred-on-canonical-Pair-package`. Pair-independent work (Nat home,
->    Arithmetic strict, OrdResult home) lands; it does NOT claim whole-catalog
->    closure. Front of the tail; release now.
+> RECUT #3 2026-08-25 (Component B hard stop #3 — Architect ruling evt_9mg707psmsjz
+> after Research evt_7dew4x9gbcm2a). Even the census cannot scope the migration
+> program. At `96971d80` only 26 of 50 units have a successful legacy core (an
+> exact-`GlobalId` ledger); the other 24 (22 resolution-frontier, 2 typed
+> semantic) have NO pre-name-resolution authority for their intended provider
+> identity. Consequences below supersede items 1-2:
+> - Item 1's Component B is now an EVIDENCE-FRONTIER artifact — closed population +
+>   per-unit (Strict outcome, `ExactLedger | Unavailable` evidence). It scopes AT
+>   MOST the 26 identity-grounded rows and PROVES 24 remain unclassified; it closes
+>   nothing and scopes no migration program.
+> - Item 2's canonical `Pair` package closes only the Pair-dependent SUBSET, NOT
+>   the whole-catalog criterion. The whole criterion now needs a separately-framed
+>   identity/interface migration program (or a real resolver/header phase),
+>   advancing the frontier monotonically. Its SHAPE (full program vs
+>   foundation-unblock subset) and the FLOOR question (Unit/Empty/IO/FS) are
+>   ESCALATED to the operator; do not cut those nodes until the operator rules.
+>
+> 1. [[LANG-MOD-CATALOG-COMPLETENESS]] (Component B, RECUT #3 — see above) — the
+>    EVIDENCE-FRONTIER artifact: closed population + per-unit Strict outcome and
+>    `ExactLedger | Unavailable` identity evidence. Closes nothing, scopes no
+>    migration program (at most the 26 identity-grounded rows). Front of the tail;
+>    release now.
 >    In parallel (Pair-independent, startable now): [[LANG-MOD-PAIR-STRICT-BOUNDARY]]
 >    (spec) — the durable boundary artifact (compiler possession is not provider
 >    availability + conformance pins).

@@ -11,6 +11,48 @@ github: null
 origin: "Architect ruling evt_214z6r6qnwme0 (2026-08-24), unbundling the WP-4 strict whole-catalog co-gate off Component A. The co-gate gates a deliverable outside WP-4's authorized surface (a canonical home for the type Nat), so it is re-homed here. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
+> # RECUT #3 2026-08-25 — EVIDENCE-FRONTIER artifact (hard stop #3; Architect ruling)
+>
+> Hard stop #3 (language-implementer evt_rhpwds4rxyhz) established that AC-C2's
+> `StrictGreenAtBase | BlockedOn {named prerequisites}` total is FALSE for the
+> 24-row complement. At `96971d80`, 26 of 50 discovered units have a successful
+> per-unit Legacy core (an exact-`GlobalId` ledger is derivable); the other 24 do
+> NOT — 22 fail at the resolution frontier (`UnresolvedCon`), 1 is an elaborator
+> `TypeMismatch` (`Data.Collections.NonEmpty`), 1 is a kernel `TypeMismatch`
+> (`Data.Numeric.Nat.Order`). Research advisory evt_7dew4x9gbcm2a + prior art (GHC
+> `RdrName`/`Name`, Rust `Res::Def`/`Res::Err`, Agda `NameId`, Lean
+> unknown-constant) confirm the shared predicate: no pre-name-resolution authority
+> can turn an unavailable occurrence into the `GlobalId` its author intended.
+> Spelling, first error, global uniqueness, and source search are not substitutes;
+> there is no unchanged whole-catalog Legacy batch loader, and preloading all units
+> into one shared environment is a prohibited order-dependent ambient fixture.
+>
+> Architect ruling evt_9mg707psmsjz (a Steward-delegated scope choice: arm A recut
+> to the evidence-frontier artifact, arm B cancel/defer behind identity-producing
+> migrations). Steward takes arm A — the frontier is the input BOTH futures need
+> and forecloses nothing. Component B REDUCES to a truthful transition report: the
+> closed canonical-unit population plus, per unit, two ORTHOGONAL observations —
+> the Strict outcome and whether identity evidence is available. It is NOT a closed
+> named-prerequisite graph, NOT catalog completeness, and unblocks NOTHING. The
+> revised AC-CENSUS below (AC-C1 kept; AC-C2 replaced by the `UnitCensusRow`
+> two-observation record; AC-C3 narrowed to `ExactLedger` rows; AC-C4 preserved;
+> AC-C5 kept; AC-C6 program-scope claim WITHDRAWN) SUPERSEDES the RECUT-#2
+> AC-CENSUS.
+>
+> Operator-owned downstream (ESCALATED, not decided here): the campaign's
+> whole-catalog criterion cannot close from Component B and needs a separately
+> framed identity/interface migration program (or a real resolver/header phase);
+> its shape (full program vs foundation-unblock subset) and the floor question
+> (Unit/Empty/IO/FS as canonical-package vs floor member) are the operator's. The
+> evidence-frontier census quantifies that fork; after each authorized migration
+> lands, rerun the unchanged real loaders and replace `Unavailable` only with
+> newly-successful exact evidence — a monotone frontier, not an upfront graph.
+>
+> ------------------------------------------------------------------------------
+> RECUT #2 (below) is HISTORICAL — its `StrictGreenAtBase | BlockedOn` two-class
+> total is superseded by the RECUT-#3 evidence-frontier AC-CENSUS. Retained for
+> the hard-stop-#2 population/floor rulings it records.
+
 > # RECUT #2 2026-08-25 — CENSUS-ONLY artifact (hard stop #2; enclave ruling)
 >
 > Hard stop #2 (language-implementer evt_58h0y21cqgvx4) FALSIFIED the RECUT-#1
@@ -260,39 +302,56 @@ ranges over the real population, not the stale count.
 
 # Acceptance criteria
 
-AC-CENSUS (RECUT #2, OPERATIVE — supersedes the AC-B* series below, which is
-retained only as historical context for the Pair boundary). Component B delivers
-ONE artifact: a truthful census/prerequisite graph. No source edits, no
-newly-green unit, no whole-catalog / Pair-cluster / Order-Gcd / campaign closure.
+AC-CENSUS (RECUT #3, OPERATIVE — supersedes RECUT #2's AC-C2/C3/C6 and the AC-B*
+series below, retained only as historical context). Component B delivers ONE
+artifact: a truthful EVIDENCE-FRONTIER census. No source edits, no newly-green
+unit, no whole-catalog / Pair-cluster / Order-Gcd / campaign / migration-program
+closure. It is explicitly NOT a closed named-prerequisite graph.
 
-- AC-C1 (population from real discovery). The population is derived from the real
-  loader's root discovery (`catalog_module_from_path` over the populated catalog
-  root); the observed count (50 at dcfa19210) is an observation, never a frozen
-  contract. Every discovered canonical unit appears in the ledger EXACTLY ONCE.
-- AC-C2 (two truthful classes). Each unit is classified as exactly one of:
-  `StrictGreenAtBase` — the UNCHANGED real Strict loader succeeds for the whole
-  unit now; or `BlockedOn {p1..pn}` — a nonempty finite set of NAMED
-  canonical-home / missing-import prerequisites (a unit may require several).
-- AC-C3 (`BlockedOn` grounded by identity, not error text). For each blocked
-  unit, derive its COMPLETE dependency set from the successfully elaborated legacy
-  core by exact `GlobalId`, reconcile it against parsed imports and known provider
-  interfaces, and record for each excess identity either its canonical
-  provider/import edge or its missing canonical-home prerequisite. Error strings,
-  first-error order, source grep, and reported counts are NOT authorities.
-- AC-C4 (hard-stop discipline). A legacy elaboration failure, an identity with no
-  classification, or a strict failure not explained by that complete identity
-  ledger is a HARD STOP — never a catch-all defer. Semantic identity evidence
-  identifies a future migration need; it is NEVER a parsed import edge, a Strict
-  resolver authority, or a third disposition arm.
-- AC-C5 (byte-stable, no closure). Zero source/catalog/test production edits;
-  every unit's source stays byte-stable; zero `trusted_base()` delta. The census
-  is never resolver input. It claims no strict-green unit and closes no downstream
-  node.
-- AC-C6 (scoping deliverable). The committed ledger is the closed
-  population/prerequisite graph that scopes the follow-on canonical-home /
-  import-migration program. Nat-home and Arithmetic strict-green delivery are NOT
-  in this node — they move to a separately framed WP with their own strict-green
-  acceptance.
+- AC-C1 (population from real discovery — UNCHANGED). The population is derived
+  from the real loader's root discovery (`catalog_module_from_path` over the
+  populated catalog root); the observed count (50 at `96971d80`) is an
+  observation, never a frozen contract. Every discovered canonical unit appears
+  in the ledger EXACTLY ONCE.
+- AC-C2 (two ORTHOGONAL observations per row — REPLACES the RECUT-#2 two-class
+  total, which is false for the 24-row complement). Each unit is one
+  `UnitCensusRow { canonical_module, parsed_direct_imports, strict_observation:
+  Succeeded | Refused, legacy_identity_evidence: ExactLedger { resolved
+  GlobalIds, identity-grounded known prerequisites } | Unavailable { typed
+  failing pipeline stage } }`. The Strict outcome and the identity-evidence state
+  are INDEPENDENT axes. `Unavailable` is an evidence-STATUS value — NOT a resolver
+  mode, admission path, deferral, or guessed `BlockedOn P`; it records exactly
+  that the artifact has no authority to name the prerequisite. Do not add a third
+  resolver disposition.
+- AC-C3 (`ExactLedger` grounded by identity — NARROWED to the 26 successful
+  cores). For each `ExactLedger` row ONLY, derive the COMPLETE dependency set from
+  the successfully elaborated legacy core by exact `GlobalId`, reconcile it
+  against parsed imports and known provider interfaces, and record each excess
+  identity's canonical provider/import edge or its missing canonical-home
+  prerequisite. For an `Unavailable` row, record NO provider name. Diagnostic text
+  may be retained as a reproduction observation, NEVER promoted into the ledger
+  key. Error strings, first-error order, source grep, and reported counts are not
+  authorities.
+- AC-C4 (hard-stop discipline — PRESERVED). An `Unavailable` row hard-stops every
+  claim that the census is a complete prerequisite graph, every named migration
+  assignment for that row, and every closure claim — it authorizes nothing
+  downstream. It does NOT prevent the population/evidence-frontier report from
+  honestly recording that the stop exists. A legacy failure whose typed stage is
+  unrecorded, an identity with no classification on an `ExactLedger` row, or a
+  strict failure not explained by that row's complete identity ledger is a HARD
+  STOP, never a catch-all defer.
+- AC-C5 (byte-stable, no closure — UNCHANGED). Zero source/catalog/test
+  production edits; every unit's source stays byte-stable; zero `trusted_base()`
+  delta. The census is never resolver input. It claims no strict-green unit and
+  closes no downstream node.
+- AC-C6 (scoping deliverable — program-scope claim WITHDRAWN). The committed
+  ledger scopes AT MOST the 26 identity-grounded rows and PROVES the 24 rows
+  remain unclassified; it does NOT scope the complete canonical-home /
+  import-migration program (it cannot). Separately authorized package/interface
+  migrations advance the frontier monotonically; after each lands, rerun the
+  unchanged real loaders and replace `Unavailable` only with newly-successful
+  exact evidence. Nat-home and Arithmetic strict-green delivery are NOT in this
+  node — they move to a separately framed WP with its own strict-green acceptance.
 - AC-C-NO-REGRESSION — whole-suite green in CI; local targeted `-p`/`--test` only,
   never `--workspace`.
 
