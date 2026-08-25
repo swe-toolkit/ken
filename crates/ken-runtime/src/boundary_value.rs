@@ -123,8 +123,8 @@ pub enum BoundaryTag {
     /// Handle to borrowed ingress — a host-owned buffer or option that is valid
     /// only for this native invocation. Payload indexes the invocation arena.
     InvocationBorrowed = 7,
-    /// Handle to a `HostResult`: a runtime success discriminant plus the two
-    /// payload words it selects between.
+    /// Handle to a `HostResult`: a runtime success discriminant plus its one
+    /// selected payload word.
     InvocationHostResult = 8,
     /// Handle to a `Constructor`/`Record` aggregate **at least one of whose
     /// children is invocation-owned**, so the aggregate itself cannot outlive
@@ -3234,22 +3234,22 @@ pub fn materialize_borrowed(builder: &mut BoundaryArenaBuilder, payload: u64) ->
     )
 }
 
-/// Materialize a `HostResult` — a runtime success discriminant selecting
-/// between two already-materialized payload words.
+/// Materialize a `HostResult` — a runtime success discriminant and its one
+/// selected payload word.
 ///
-/// ⛔ Borrowed ingress: the node is invocation-owned. `success` is a **runtime**
-/// value; nothing here inspects which arm a particular reply took.
+/// Borrowed ingress: the node is invocation-owned. The selected payload is the
+/// only sum arm represented at runtime; the other arm remains a compile-time
+/// template and is never materialized.
 pub fn materialize_host_result(
     builder: &mut BoundaryArenaBuilder,
     success: u64,
-    ok: BoundaryWord,
-    err: BoundaryWord,
+    selected: BoundaryWord,
 ) -> BoundaryWord {
     builder.push_node(
         BoundaryTag::InvocationHostResult,
         BoundaryClass::HostResult,
         success,
-        &[ok, err],
+        &[selected],
     )
 }
 

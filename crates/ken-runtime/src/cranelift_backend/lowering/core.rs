@@ -1491,10 +1491,10 @@ fn coc_d2_suppress_continuation() -> bool {
 /// [`Lowered::ResponseBytes`] means *a byte span that will be dereferenced and
 /// copied*, so **every instance must independently be a valid span** — being
 /// the arm a runtime discriminant does not select cannot legalize a pointer
-/// nobody established. The carrier materializes both `HostResult` children
-/// eagerly and B2V controls pin that, so the obligation cannot be discharged by
-/// making transfer lazy. It is discharged where `success`, the operation and the
-/// byte source are all already in scope: right here.
+/// nobody established. The carrier now materializes only the selected
+/// `HostResult` child, but this typed producer still normalizes the template at
+/// the point where `success`, the operation and the byte source are all already
+/// in scope. No consumer relies on an inactive template being materialized.
 ///
 /// ⛔ **Not a placeholder lane and not a new representation.** The unselected
 /// arm is the canonical EMPTY span `{null, 0}` — an ordinary, lawful

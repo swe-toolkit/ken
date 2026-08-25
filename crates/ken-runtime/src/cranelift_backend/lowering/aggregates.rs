@@ -36,76 +36,6 @@
 //! `D0`.
 
 use super::*;
-use std::sync::{Mutex, OnceLock};
-
-// D0-P0/P1 probe scaffolding for RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE.
-// Removed after the owner-bound observation selects the causal layer.
-#[derive(Default)]
-struct DynamicProvenanceProbeRegistry {
-    next_family: usize,
-    functions: BTreeMap<String, Vec<(i64, String)>>,
-}
-
-static DYNAMIC_PROVENANCE_PROBES: OnceLock<Mutex<DynamicProvenanceProbeRegistry>> =
-    OnceLock::new();
-
-fn dynamic_provenance_probe_registry() -> &'static Mutex<DynamicProvenanceProbeRegistry> {
-    DYNAMIC_PROVENANCE_PROBES
-        .get_or_init(|| Mutex::new(DynamicProvenanceProbeRegistry::default()))
-}
-
-fn register_dynamic_provenance_probe(
-    function: String,
-    metadata: String,
-) -> Result<i64, CraneliftBackendError> {
-    let mut registry = dynamic_provenance_probe_registry().lock().map_err(|_| {
-        backend_module("the dynamic-provenance probe registry was poisoned".to_string())
-    })?;
-    let family = match registry.next_family {
-        0 => 80,
-        1 => 90,
-        extra => {
-            return Err(backend_module(format!(
-                "the owner-bound dynamic-provenance probe found candidate {}, but its ruled population has exactly two ResourceError emissions at StaticOriginId(34)",
-                extra + 1
-            )))
-        }
-    };
-    registry.next_family += 1;
-    registry
-        .functions
-        .entry(function)
-        .or_default()
-        .push((family, metadata));
-    Ok(family)
-}
-
-pub(super) fn dump_dynamic_provenance_probe_function(
-    function: &Function,
-) -> Result<(), CraneliftBackendError> {
-    let name = format!("{:?}", function.name);
-    let records = dynamic_provenance_probe_registry()
-        .lock()
-        .map_err(|_| {
-            backend_module("the dynamic-provenance probe registry was poisoned".to_string())
-        })?
-        .functions
-        .get(&name)
-        .cloned()
-        .unwrap_or_default();
-    for (family, metadata) in records {
-        let dump = format!("{metadata}\n\n{}", function.display());
-        let path = format!("/tmp/rt-dynamic-provenance-family-{family}.clif");
-        std::fs::write(&path, dump).map_err(|error| {
-            backend_module(format!(
-                "failed to write owner-bound dynamic-provenance CLIF dump {path}: {error}"
-            ))
-        })?;
-        eprintln!("DYNPROV-P0 finalized family={family} function={name:?} dump={path}");
-    }
-    Ok(())
-}
-
 // The site-operand-substitution `#[cfg(test)]` mutation check reaches these
 // directly; moved to `effects.rs` at `RT-EMITTER-EFFECTS-SPLIT` `D1`.
 // (`EffectSeatLedger::commit_body`, this file's other reach into `effects`,
@@ -1965,22 +1895,44 @@ impl<'a> Lowering<'a> {
                     success, error, ok, ..
                 } => {
                     let (tag, class) = Self::carrier_handle_disposition(value)?;
-                    let ok = self.emit_carrier_transfer(builder, origin, ok)?;
-                    let error = self.emit_carrier_transfer(builder, origin, error)?;
-                    let word = self.emit_carrier_alloc(
-                        builder,
-                        CarrierAllocationRequest::NonAggregate { tag },
-                        class,
-                        2,
-                    )?;
-                    let success = if builder.func.dfg.value_type(*success) == types::I64 {
+                    let success_i64 = if builder.func.dfg.value_type(*success) == types::I64 {
                         *success
                     } else {
                         builder.ins().uextend(types::I64, *success)
                     };
-                    self.emit_carrier_store_scalar(builder, word, success)?;
-                    self.emit_carrier_store_field(builder, word, 0, ok)?;
-                    self.emit_carrier_store_field(builder, word, 1, error)?;
+                    let took_ok = builder.ins().icmp_imm(
+                        cranelift_codegen::ir::condcodes::IntCC::NotEqual,
+                        success_i64,
+                        0,
+                    );
+                    let ok_block = builder.create_block();
+                    let error_block = builder.create_block();
+                    let merge = builder.create_block();
+                    builder.append_block_param(merge, types::I64);
+                    builder
+                        .ins()
+                        .brif(took_ok, ok_block, &[], error_block, &[]);
+
+                    builder.switch_to_block(ok_block);
+                    let selected = self.emit_carrier_transfer(builder, origin, ok)?;
+                    builder.ins().jump(merge, &[selected.word.into()]);
+
+                    builder.switch_to_block(error_block);
+                    let selected = self.emit_carrier_transfer(builder, origin, error)?;
+                    builder.ins().jump(merge, &[selected.word.into()]);
+
+                    builder.switch_to_block(merge);
+                    let selected = CarriedBoundaryWord {
+                        word: builder.block_params(merge)[0],
+                    };
+                    let word = self.emit_carrier_alloc(
+                        builder,
+                        CarrierAllocationRequest::NonAggregate { tag },
+                        class,
+                        1,
+                    )?;
+                    self.emit_carrier_store_scalar(builder, word, success_i64)?;
+                    self.emit_carrier_store_field(builder, word, 0, selected)?;
                     Ok(word)
                 }
                 Lowered::DynamicConstructor(dynamic) => {
@@ -3102,15 +3054,6 @@ impl<'a> Lowering<'a> {
             )?;
             let merge = builder.create_block();
             builder.append_block_param(merge, types::I64);
-            let is_probe_candidate = format!("{origin:?}") == "StaticOriginId(34)"
-                && dynamic.alternatives.iter().any(|alternative| {
-                    alternative.tag == 1
-                        && alternative
-                            .constructor
-                            .as_str()
-                            .ends_with("::ResourceError::Closed")
-                });
-            let mut probe_status = None;
 
             for alternative in &dynamic.alternatives {
                 let selected = builder.create_block();
@@ -3120,76 +3063,6 @@ impl<'a> Lowering<'a> {
                     dynamic.discriminator,
                     alternative.tag,
                 );
-                if is_probe_candidate && alternative.tag == 1 {
-                    let function = format!("{:?}", builder.func.name);
-                    let discriminator_def =
-                        format!("{:?}", builder.func.dfg.value_def(dynamic.discriminator));
-                    let discriminator_type = builder.func.dfg.value_type(dynamic.discriminator);
-                    let compare_def = format!("{:?}", builder.func.dfg.value_def(matches));
-                    let metadata = format!(
-                        "DYNPROV-P0 function={function} function_id={:?} owner={:?} origin={origin:?} occurrence={:?} constructor={} identity={:?} discriminator={:?} discriminator_def={discriminator_def} discriminator_type={discriminator_type} compare_value={matches:?} compare_def={compare_def} selected={selected:?} next={next:?} merge={merge:?}",
-                        self.defining_function_id,
-                        self.defining_emission_owner,
-                        alternative.occurrence,
-                        alternative.constructor,
-                        alternative.identity,
-                        dynamic.discriminator,
-                    );
-                    let family =
-                        register_dynamic_provenance_probe(function, metadata.clone())?;
-                    eprintln!("{metadata} family={family}");
-
-                    let rhs = builder.ins().iconst(types::I64, alternative.tag);
-                    let lhs_is_one = builder.ins().icmp_imm(
-                        cranelift_codegen::ir::condcodes::IntCC::Equal,
-                        dynamic.discriminator,
-                        1,
-                    );
-                    let rhs_is_one = builder.ins().icmp_imm(
-                        cranelift_codegen::ir::condcodes::IntCC::Equal,
-                        rhs,
-                        1,
-                    );
-                    let both_true = builder.ins().iconst(types::I64, family + 1);
-                    let compare_false = builder.ins().iconst(types::I64, family + 2);
-                    let lhs_not_one = builder.ins().iconst(types::I64, family + 3);
-                    let rhs_not_one = builder.ins().iconst(types::I64, family + 4);
-                    let both_status =
-                        builder.ins().select(matches, both_true, compare_false);
-                    let lhs_status =
-                        builder.ins().select(rhs_is_one, both_status, rhs_not_one);
-                    let p1_status =
-                        builder.ins().select(lhs_is_one, lhs_status, lhs_not_one);
-                    probe_status = Some(if family == 80 {
-                        // P1 selected lhs-not-one. Run only its ruled one-sided
-                        // substitution: fresh lhs vs unchanged RHS, then unchanged
-                        // lhs vs fresh RHS.
-                        let fresh_one = builder.ins().iconst(types::I64, 1);
-                        let lhs_substitution = builder.ins().icmp(
-                            cranelift_codegen::ir::condcodes::IntCC::Equal,
-                            fresh_one,
-                            rhs,
-                        );
-                        let rhs_substitution = builder.ins().icmp(
-                            cranelift_codegen::ir::condcodes::IntCC::Equal,
-                            dynamic.discriminator,
-                            fresh_one,
-                        );
-                        let expected = builder.ins().iconst(types::I64, 85);
-                        let rhs_wrong = builder.ins().iconst(types::I64, 86);
-                        let both_true = builder.ins().iconst(types::I64, 87);
-                        let rhs_only = builder.ins().iconst(types::I64, 88);
-                        let lhs_true =
-                            builder.ins().select(rhs_substitution, both_true, expected);
-                        let lhs_false =
-                            builder.ins().select(rhs_substitution, rhs_only, rhs_wrong);
-                        builder
-                            .ins()
-                            .select(lhs_substitution, lhs_true, lhs_false)
-                    } else {
-                        p1_status
-                    });
-                }
                 builder.ins().brif(matches, selected, &[], next, &[]);
 
                 builder.switch_to_block(selected);
@@ -3238,11 +3111,7 @@ impl<'a> Lowering<'a> {
                     class,
                     alternative.fields.len(),
                 )?;
-                self.emit_carrier_store_tag_id(
-                    builder,
-                    word,
-                    alternative.identity.tag_abi_word()?,
-                )?;
+                self.emit_carrier_store_tag_id(builder, word, alternative.identity.tag_abi_word()?)?;
                 for (position, field) in alternative.fields.iter().enumerate() {
                     let field = self.emit_carrier_transfer(builder, origin, field)?;
                     self.emit_carrier_store_field(builder, word, position, field)?;
@@ -3251,19 +3120,9 @@ impl<'a> Lowering<'a> {
                 builder.switch_to_block(next);
             }
 
-            let malformed = probe_status.unwrap_or_else(|| {
-                builder
-                    .ins()
-                    .iconst(types::I64, MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS)
-            });
-            eprintln!(
-                "DYNPROV-P0 residual function={:?} function_id={:?} owner={:?} origin={origin:?} block={:?} probe={:?}",
-                builder.func.name,
-                self.defining_function_id,
-                self.defining_emission_owner,
-                builder.current_block(),
-                probe_status,
-            );
+            let malformed = builder
+                .ins()
+                .iconst(types::I64, MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS);
             builder.ins().return_(&[malformed]);
             builder.switch_to_block(merge);
             Ok(CarriedBoundaryWord {

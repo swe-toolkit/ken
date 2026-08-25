@@ -710,9 +710,7 @@ fn verify_cranelift_function(
     func: &Function,
     isa: &dyn cranelift_codegen::isa::TargetIsa,
 ) -> Result<(), CraneliftBackendError> {
-    verify_function(func, isa)
-        .map_err(|err| backend(BackendFailure::Verifier(err.to_string())))?;
-    aggregates::dump_dynamic_provenance_probe_function(func)
+    verify_function(func, isa).map_err(|err| backend(BackendFailure::Verifier(err.to_string())))
 }
 
 // RT-SPLIT slice 5 (Architect `evt_3tgaw9ws44fqg`): test-only adapter letting
