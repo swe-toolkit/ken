@@ -623,6 +623,7 @@ fn catalog_ambient_passthrough_migration_census() {
         "Core.Classes.EffectfulClasses",
         "Core.Classes.LawfulFunctors",
         "Data.Binary.BytesKeys",
+        "Data.Collections.Deque",
         "Data.Collections.Derived",
         "Data.Collections.Map",
         "Data.Collections.NonEmpty",
