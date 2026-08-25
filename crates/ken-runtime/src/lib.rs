@@ -73,7 +73,8 @@ pub use ken_host::{
     ConsoleStreamV1, EffectEvent, EffectObservation, EffectiveUidSnapshotV1, FsDeltaV1,
     FsNodeKindV1, FsNodeObservationV1, HomeRootResolutionFailureV1, HostOpV1, IoErrorIdentityV1,
     LinkedEffectTrace, ReadProgressV1, ResourceBindingRole, ResourceErrorV1,
-    RootExecutionDeniedV1, SemanticErrorV1, TerminalErrorV1, TerminalExitClass, TransferCountV1,
+    RootExecutionDeniedV1, RuntimeTrapProvenanceV1, SemanticErrorV1, TerminalErrorV1,
+    TerminalExitClass, TransferCountV1,
     WriteProgressV1,
 };
 pub use native_execution_differential::*;

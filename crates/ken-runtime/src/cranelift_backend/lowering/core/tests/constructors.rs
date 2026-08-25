@@ -1876,6 +1876,7 @@ fn emit_process_entrypoint_object_with_symbols(
     let verifier_passed = compiled.verifier_passed;
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();
+    let trap_catalog = compiled.trap_catalog().to_vec();
     let object_bytes = compiled
         .module
         .finish()
@@ -1890,6 +1891,7 @@ fn emit_process_entrypoint_object_with_symbols(
         platform_target: native_platform_target_name(),
         backend_name: "Cranelift process object".to_string(),
         verifier_passed,
+        trap_catalog,
         assumptions,
         unsupported,
     })
@@ -3633,9 +3635,9 @@ fn c2_ac6_host_result_covers_resource_token_and_response_bytes_payloads() {
 /// admissible dynamic constructor whose runtime discriminator is outside its
 /// finite alternative table. The inactive-hostile direction returns the valid
 /// payload; selecting the same hostile arm returns the dynamic dispatcher's exact
-/// malformed status.
+/// signed planner-trap token.
 /// CLAIMED: only the arm selected by the runtime success word is transferred,
-/// while malformed selected values retain the existing fail-closed dispatcher.
+/// while malformed selected values preserve their planner trap identity.
 /// THE GAP: this pins the production transfer seam and its runtime result, not the
 /// higher-level host operation that supplied the templates. Promise class:
 /// durable invariant.
@@ -3653,6 +3655,13 @@ fn host_result_transfer_materializes_only_the_runtime_selected_payload() {
     let identity = plan
         .constructor_symbol_identity(origin)
         .expect("the hostile alternative has a planner-issued identity");
+    let malformed_identity = plan
+        .trap_identity(&malformed_dynamic_constructor_trap())
+        .expect("the dynamic residual is in the same planner catalog")
+        .abi_word();
+    let malformed_status = -((malformed_identity
+        << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
+        | crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG);
     let seed_env = NativeSeedEnvironment::empty();
 
     let success_plan = plan.clone();
@@ -3746,7 +3755,7 @@ fn host_result_transfer_materializes_only_the_runtime_selected_payload() {
     );
     assert_eq!(
         c2_run_edge_with_arg(success_producer, base, 0),
-        MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS,
+        malformed_status,
         "the same hostile error must fail when the runtime selects it"
     );
 
@@ -3758,7 +3767,7 @@ fn host_result_transfer_materializes_only_the_runtime_selected_payload() {
     );
     assert_eq!(
         c2_run_edge_with_arg(error_producer, base, 1),
-        MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS,
+        malformed_status,
         "the same hostile success must fail when the runtime selects it"
     );
 }

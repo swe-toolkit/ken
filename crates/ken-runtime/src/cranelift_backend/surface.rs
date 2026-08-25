@@ -32,6 +32,10 @@ pub struct CraneliftObjectArtifact {
     pub platform_target: String,
     pub backend_name: String,
     pub verifier_passed: bool,
+    /// The exact planner catalog used while emitting these object bytes.
+    /// Linked packaging carries this value forward; it never reconstructs a
+    /// catalog from source, status codes, or reporter strings.
+    pub trap_catalog: Vec<crate::RuntimeTrap>,
     pub assumptions: BTreeSet<String>,
     pub unsupported: Vec<String>,
 }

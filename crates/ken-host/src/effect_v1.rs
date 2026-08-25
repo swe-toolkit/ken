@@ -2483,6 +2483,38 @@ pub enum FsDeltaV1 {
     },
 }
 
+/// The planner-owned meaning of one runtime trap.
+///
+/// This value is the catalog element itself, not a process status or a second
+/// runtime code namespace. Linked native reporting carries it only after the
+/// signed root token has been resolved against the catalog bound to the exact
+/// artifact.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RuntimeTrap {
+    pub code: RuntimeTrapCode,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RuntimeTrapCode {
+    UnsupportedErasure,
+    UnsupportedPrimitivePartiality,
+    MissingRuntimeMetadata,
+    PatternMatchFailure,
+    ExplicitTrap,
+}
+
+/// A decoded planner trap identity and the exact catalog value it names.
+///
+/// Identity zero is never representable here. Construction belongs to the
+/// linked artifact boundary after catalog lookup; generated code transports
+/// only the signed root token.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RuntimeTrapProvenanceV1 {
+    pub planned_identity: u32,
+    pub trap: RuntimeTrap,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TerminalErrorV1 {
     UnknownFamily {
@@ -2498,7 +2530,7 @@ pub enum TerminalErrorV1 {
     TargetAbiMismatch,
     HostEffectAbiMismatch,
     OperationUnavailable(HostOpV1),
-    RuntimeTrap(u16),
+    RuntimeTrap(RuntimeTrapProvenanceV1),
     DriverFailure,
     RootExecutionDenied,
     HomeRootResolutionFailed(crate::HomeRootResolutionFailureV1),

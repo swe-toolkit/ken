@@ -26,6 +26,16 @@ use super::{
 use super::construction::Planner;
 use crate::{RuntimeExpr, RuntimePartiality, RuntimeTrap, RuntimeTrapCode};
 
+/// The exact catalog value for a generated dynamic-constructor table whose
+/// runtime discriminator selects none of its planner-authorized alternatives.
+pub(in crate::cranelift_backend) fn malformed_dynamic_constructor_trap() -> RuntimeTrap {
+    RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "compiler-generated dynamic constructor selected no planned alternative"
+            .to_string(),
+    }
+}
+
 /// The complete, pre-emission result representation of one source join.
 ///
 /// This is deliberately a two-way type rather than a phase bit threaded through

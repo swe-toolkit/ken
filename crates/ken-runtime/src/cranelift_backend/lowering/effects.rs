@@ -149,6 +149,11 @@ pub(super) enum EffectSeatDispatchMutation {
     /// been captured. The reconciliation must reject the substitution rather
     /// than lending the original operand's owner proof to the replacement.
     SubstituteSiteOperandValue,
+    /// Give the production `ReadEof`/`ReadSome` constructor producer a
+    /// discriminator outside its closed 0/1 alternatives. This mutates the
+    /// producer, before transfer, rather than injecting a post-validation
+    /// `DynamicConstructorV1` in a test.
+    ForceReadProgressOutsideAlternatives,
     /// Withdraw only M3's carried-constructor route. `Avail` remains
     /// specialized-only, so the original exact seat refusal must return.
     RemoveCarriedConstructorDispatch,
@@ -3526,8 +3531,19 @@ impl<'a> Lowering<'a> {
                     ],
                     &seats,
                 )?;
+                #[cfg(test)]
+                let read_progress_discriminator = if effect_seat_dispatch_mutation()
+                    == EffectSeatDispatchMutation::ForceReadProgressOutsideAlternatives
+                {
+                    builder.ins().iconst(types::I64, 2)
+                } else {
+                    builder.ins().uextend(types::I64, nonzero)
+                };
+                #[cfg(not(test))]
+                let read_progress_discriminator =
+                    builder.ins().uextend(types::I64, nonzero);
                 Lowered::DynamicConstructor(DynamicConstructorV1 {
-                    discriminator: builder.ins().uextend(types::I64, nonzero),
+                    discriminator: read_progress_discriminator,
                     alternatives: vec![
                         self.synthesized_dynamic_alternative(
                             static_origin,

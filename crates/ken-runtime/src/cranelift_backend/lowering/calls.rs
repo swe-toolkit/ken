@@ -2086,15 +2086,7 @@ impl<'a> Lowering<'a> {
                         seat: PlannedTrapSeat::RootProcessSentinel,
                         identity_preserved: true,
                     });
-                    let shifted = builder.ins().ishl_imm(
-                        trap_word,
-                        crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT,
-                    );
-                    let root_token = builder.ins().bor_imm(
-                        shifted,
-                        crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG,
-                    );
-                    let process_trap = builder.ins().ineg(root_token);
+                    let process_trap = signed_root_trap_token(builder, trap_word);
                     builder.ins().return_(&[process_trap]);
                 }
                 Some(TrapExitAuthority::Root {

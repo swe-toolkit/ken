@@ -74,6 +74,18 @@ pub struct BoundProcessExecutableArtifact {
     pub target_symbol: RuntimeSymbol,
     pub executable_path: PathBuf,
     pub executable_hash: u64,
+    trap_catalog: BoundPlannerTrapCatalog,
+}
+
+/// The planner catalog carried with, and bound to, one linked runtime artifact.
+///
+/// Fields stay private so a caller cannot substitute a catalog independently
+/// of the artifact identity. This is the same catalog emitted by Cranelift,
+/// not a reporter-owned reconstruction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct BoundPlannerTrapCatalog {
+    runtime_artifact: RuntimeArtifactIdentity,
+    traps: Vec<crate::RuntimeTrap>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -90,6 +102,7 @@ pub enum NativeEffectRunErrorV1 {
     MalformedTrace,
     BindingMismatch,
     ObservationBoundaryUnavailable,
+    UnclassifiedRuntimeTrap { terminal_value: i64 },
 }
 
 impl fmt::Display for NativeEffectRunErrorV1 {
@@ -102,6 +115,10 @@ impl fmt::Display for NativeEffectRunErrorV1 {
             }
             Self::ObservationBoundaryUnavailable => formatter.write_str(
                 "native effect observation sink cannot be placed outside the capability root",
+            ),
+            Self::UnclassifiedRuntimeTrap { terminal_value } => write!(
+                formatter,
+                "linked runtime trap token {terminal_value} is malformed or names no trap in the artifact-bound planner catalog"
             ),
         }
     }
@@ -236,6 +253,31 @@ fn filesystem_delta_v1(
         .collect()
 }
 
+fn decode_signed_root_trap(
+    terminal_value: i64,
+    catalog: &[crate::RuntimeTrap],
+) -> Result<ken_host::RuntimeTrapProvenanceV1, NativeEffectRunErrorV1> {
+    let refuse = || NativeEffectRunErrorV1::UnclassifiedRuntimeTrap { terminal_value };
+    if terminal_value >= 0 {
+        return Err(refuse());
+    }
+    // Unsigned two's-complement negation is defined even for i64::MIN. The
+    // token parser then rejects any magnitude that is malformed or absent from
+    // this exact artifact's finite catalog.
+    let magnitude = (terminal_value as u64).wrapping_neg();
+    let index = crate::cranelift_backend::compiled::root_trap_catalog_index(magnitude)
+        .ok_or_else(|| refuse())?;
+    let trap = catalog.get(index).cloned().ok_or_else(|| refuse())?;
+    let planned_identity = index
+        .checked_add(1)
+        .and_then(|identity| u32::try_from(identity).ok())
+        .ok_or_else(|| refuse())?;
+    Ok(ken_host::RuntimeTrapProvenanceV1 {
+        planned_identity,
+        trap,
+    })
+}
+
 /// Runs the linked checked-source artifact and returns its complete canonical
 /// observation. The trace sink is launcher-owned and outside the capability
 /// root; stdout/stderr and filesystem deltas are observed by this same call.
@@ -243,6 +285,9 @@ pub fn run_bound_process_effect_observation(
     artifact: &BoundProcessExecutableArtifact,
     options: &NativeEffectRunOptionsV1,
 ) -> Result<ken_host::EffectObservation, NativeEffectRunErrorV1> {
+    if artifact.trap_catalog.runtime_artifact != artifact.runtime_artifact {
+        return Err(NativeEffectRunErrorV1::BindingMismatch);
+    }
     let cwd = fs::canonicalize(&options.cwd)?;
     let observation_root = cwd
         .parent()
@@ -256,7 +301,7 @@ pub fn run_bound_process_effect_observation(
             .map_err(|_| NativeEffectRunErrorV1::MalformedTrace)?
             .as_nanos()
     ));
-    let output = Command::new(&artifact.executable_path)
+    let mut output = Command::new(&artifact.executable_path)
         .args(&options.arguments)
         .env_clear()
         .envs(options.environment.iter().cloned())
@@ -280,9 +325,16 @@ pub fn run_bound_process_effect_observation(
     } else if output.status.code().is_none() {
         Some(ken_host::TerminalErrorV1::DriverFailure)
     } else if trace.terminal_value < 0 {
-        Some(ken_host::TerminalErrorV1::RuntimeTrap(
-            u16::try_from(-trace.terminal_value).unwrap_or(u16::MAX),
-        ))
+        let provenance =
+            decode_signed_root_trap(trace.terminal_value, &artifact.trap_catalog.traps)?;
+        output.stderr.extend_from_slice(
+            format!(
+                "ken native trap: {:?}: {}\n",
+                provenance.trap.code, provenance.trap.message
+            )
+            .as_bytes(),
+        );
+        Some(ken_host::TerminalErrorV1::RuntimeTrap(provenance))
     } else if trace.terminal_value != i64::from(exit_status) {
         Some(ken_host::TerminalErrorV1::MalformedHostAbiField)
     } else {
@@ -947,6 +999,11 @@ pub fn build_bound_process_starter_executable_artifact(
             err.to_string(),
         )
     })?;
+    let runtime_artifact = RuntimeArtifactIdentity::from_program(program);
+    let trap_catalog = BoundPlannerTrapCatalog {
+        runtime_artifact: runtime_artifact.clone(),
+        traps: object.trap_catalog.clone(),
+    };
     let object_path = output_dir.join(&options.object_relative_path);
     fs::write(&object_path, object.object_bytes).map_err(|err| {
         packaging_error(
@@ -997,10 +1054,11 @@ pub fn build_bound_process_starter_executable_artifact(
         )
     })?;
     Ok(BoundProcessExecutableArtifact {
-        runtime_artifact: RuntimeArtifactIdentity::from_program(program),
+        runtime_artifact,
         target_symbol: entrypoint.target_symbol.clone(),
         executable_path,
         executable_hash: fnv1a_64(&executable_bytes),
+        trap_catalog,
     })
 }
 
@@ -2222,7 +2280,9 @@ int main(int argc, char **argv, char **envp) {
     else if (value == -2) fputs("ken native trap: entrypoint returned a malformed ExitCode\n", stderr);
     else if (value == -3) fputs("ken native trap: malformed ExitCode::Failure payload\n", stderr);
     else if (value == -4) fputs("ken native trap: explicit entry trap\n", stderr);
-    else if (value < 0) fputs("ken native trap: unknown terminal sentinel\n", stderr);
+    else if (value < 0 && ((0 - (uint64_t)value) & 0xffu) == 0xffu)
+        fputs("ken native trap: planned runtime trap token\n", stderr);
+    else if (value < 0) fputs("ken native trap: unclassified negative process status\n", stderr);
     if (value < 0) return 1;
     return (int)value;
 }
@@ -2327,6 +2387,77 @@ mod tests {
         RuntimeMetadata, RuntimePartiality, RuntimePrimitive, RuntimeSymbolMetadata, RuntimeTrap,
         RuntimeTrapCode, RuntimeValue,
     };
+
+    fn signed_root_token(identity: u64) -> i64 {
+        let magnitude = (identity
+            << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
+            | crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG as u64;
+        -i64::try_from(magnitude).expect("test trap token fits the process ABI")
+    }
+
+    /// Durable invariant. MEASURED: the linked-boundary decoder accepts each
+    /// nonzero in-range identity and returns the exact catalog element together
+    /// with that identity. CLAIMED: linked reporting preserves planner trap
+    /// provenance rather than returning a scalar status. THE GAP: this pins the
+    /// decoder and artifact catalog relation; the producer controls separately
+    /// establish which signed token reached it.
+    #[test]
+    fn signed_root_trap_decoder_returns_exact_catalog_provenance() {
+        let first = RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "first planned origin".to_string(),
+        };
+        let second = RuntimeTrap {
+            code: RuntimeTrapCode::ExplicitTrap,
+            message: "second planned origin".to_string(),
+        };
+        let catalog = vec![first.clone(), second.clone()];
+
+        assert_eq!(
+            decode_signed_root_trap(signed_root_token(1), &catalog).unwrap(),
+            ken_host::RuntimeTrapProvenanceV1 {
+                planned_identity: 1,
+                trap: first,
+            }
+        );
+        assert_eq!(
+            decode_signed_root_trap(signed_root_token(2), &catalog).unwrap(),
+            ken_host::RuntimeTrapProvenanceV1 {
+                planned_identity: 2,
+                trap: second,
+            }
+        );
+    }
+
+    /// Durable invariant. MEASURED: zero identity, unknown identity, an
+    /// identity outside the planner's u32 domain, bare governed legacy values,
+    /// and i64::MIN all return the exact refusal variant. CLAIMED: no malformed
+    /// or out-of-range terminal value is admitted as a runtime trap. THE GAP:
+    /// the process runner must call this decoder for every negative value, which
+    /// is pinned by its typed-terminal integration tests.
+    #[test]
+    fn signed_root_trap_decoder_refuses_every_unbound_identity_class() {
+        let catalog = vec![RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "only planned origin".to_string(),
+        }];
+        let values = [
+            -crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG,
+            signed_root_token(2),
+            signed_root_token(u64::from(u32::MAX) + 1),
+            -3, // the pre-fold dynamic-constructor residual
+            -4, // the pre-fold root generated-unit collapse
+            i64::MIN,
+        ];
+        for terminal_value in values {
+            assert!(matches!(
+                decode_signed_root_trap(terminal_value, &catalog),
+                Err(NativeEffectRunErrorV1::UnclassifiedRuntimeTrap {
+                    terminal_value: refused,
+                }) if refused == terminal_value
+            ));
+        }
+    }
 
     fn starter_program(body: RuntimeExpr, observation: RuntimeObservation) -> RuntimeProgram {
         let symbol = "decl:fixture::Executable::main".to_string();

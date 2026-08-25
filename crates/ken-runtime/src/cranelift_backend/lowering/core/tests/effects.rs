@@ -1353,6 +1353,134 @@ fn native_nullary_resource_error_set_rejects_payloads_and_unknown_identities() {
     );
 }
 
+fn px8_dynamic_read_residual_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
+    let trap = || RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "dynamic read residual fixture default".to_string(),
+    };
+    let allocate = || RuntimeExpr::Effect {
+        family: "FS".to_string(),
+        operation: ken_host::HostOpV1::BufferAllocate,
+        capability: None,
+        args: vec![RuntimeExpr::Value(RuntimeValue::Int((8).into()))],
+    };
+    let read = RuntimeExpr::Effect {
+        family: "FS".to_string(),
+        operation: ken_host::HostOpV1::FsReadAt,
+        capability: None,
+        args: vec![
+            RuntimeExpr::Var(1),
+            RuntimeExpr::Value(RuntimeValue::Int((0).into())),
+            RuntimeExpr::Var(0),
+            RuntimeExpr::Value(RuntimeValue::Int((7).into())),
+            RuntimeExpr::Value(RuntimeValue::Int((4).into())),
+        ],
+    };
+    let crossed_read = host_result_closure_match(read);
+    let second = RuntimeExpr::Match {
+        scrutinee: Box::new(allocate()),
+        cases: vec![
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: px8n_failure(
+                    symbols,
+                    RuntimeExpr::Value(RuntimeValue::Int((81).into())),
+                ),
+            },
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: crossed_read,
+            },
+        ],
+        default: trap(),
+    };
+    let body = RuntimeExpr::Match {
+        scrutinee: Box::new(allocate()),
+        cases: vec![
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: px8n_failure(
+                    symbols,
+                    RuntimeExpr::Value(RuntimeValue::Int((80).into())),
+                ),
+            },
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: second,
+            },
+        ],
+        default: trap(),
+    };
+    RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: Vec::new(),
+            body: Box::new(body),
+        }),
+        args: Vec::new(),
+    }
+}
+
+/// Durable invariant. MEASURED: a valid `FsReadAt` host reply reaches the real
+/// read-progress producer, whose test mutation changes only its discriminator
+/// from the valid 0/1 domain to 2 before the HostResult crosses its generated
+/// call; the production dynamic-constructor emitter returns the signed token for
+/// the same plan's catalog identity. CLAIMED: `emit_carrier_dynamic_constructor`
+/// no longer exposes its residual as bare `-3`, and `call_declared_unit_target`
+/// forwards the token unchanged. THE GAP: the mutation changes the production
+/// producer rather than injecting a post-validation `DynamicConstructorV1`;
+/// linked-boundary tests separately pin catalog resolution and refusal.
+#[test]
+fn dynamic_host_result_residual_carries_the_planner_trap_identity() {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
+        }
+    }
+
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let expression = px8_dynamic_read_residual_fixture(&symbols);
+    let plan = plan_static_transition_graph_with_symbols(
+        &expression,
+        &BTreeMap::new(),
+        &symbols,
+        AbiRootIngress::Process,
+        true,
+    )
+    .expect("the production host-effect fixture plans");
+    let identity = plan
+        .trap_identity(&malformed_dynamic_constructor_trap())
+        .expect("the dynamic residual belongs to the plan's existing catalog")
+        .abi_word();
+    let expected = -((identity
+        << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
+        | crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG);
+
+    let (baseline, baseline_fixture) =
+        run_px8n_arm_fixture(PX8N_SHORT_READ, px8_dynamic_read_residual_fixture);
+    assert_eq!(baseline_fixture.malformed_request, 0, "baseline request shape");
+    assert_eq!(baseline_fixture.call_index, 3, "baseline host dispatches");
+    assert_eq!(baseline, 0, "the valid 0/1 producer domain reaches success");
+
+    set_effect_seat_dispatch_mutation(
+        EffectSeatDispatchMutation::ForceReadProgressOutsideAlternatives,
+    );
+    let _reset = Reset;
+    let (actual, fixture) = run_px8n_arm_fixture(
+        PX8N_SHORT_READ,
+        px8_dynamic_read_residual_fixture,
+    );
+    assert_eq!(fixture.malformed_request, 0, "production request shape");
+    assert_eq!(fixture.call_index, 3, "three real host dispatches");
+    assert_eq!(actual, expected);
+    assert_ne!(actual, MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS);
+}
+
 #[test]
 fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
     assert_eq!(

@@ -368,6 +368,7 @@ pub(crate) fn emit_runtime_ir_object_with_authority(
     // it depends on.
     let assumptions = with_admitted_trust(compiled.assumptions.clone(), admitted);
     let unsupported = compiled.unsupported.clone();
+    let trap_catalog = compiled.trap_catalog().to_vec();
     let object_bytes = compiled
         .module
         .finish()
@@ -383,6 +384,7 @@ pub(crate) fn emit_runtime_ir_object_with_authority(
         platform_target: native_platform_target_name(),
         backend_name: "Cranelift object".to_string(),
         verifier_passed,
+        trap_catalog,
         assumptions,
         unsupported,
     })
@@ -415,6 +417,7 @@ pub(crate) fn emit_bound_process_program_object_with_cranelift(
     let verifier_passed = compiled.verifier_passed;
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();
+    let trap_catalog = compiled.trap_catalog().to_vec();
     let object_bytes = compiled
         .module
         .finish()
@@ -429,6 +432,7 @@ pub(crate) fn emit_bound_process_program_object_with_cranelift(
         platform_target: native_platform_target_name(),
         backend_name: "Cranelift checked process object".to_string(),
         verifier_passed,
+        trap_catalog,
         assumptions,
         unsupported,
     })
