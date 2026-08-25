@@ -25,7 +25,8 @@ order); `21 §3` (`law`/`verify` proof obligations); `25` (T1 diagnostics).
 (`sct.rs:414`) run on a group by `declare_recursive_group` (`check.rs:983`,
 `sct_check` at `:1033`) and on a single def by `declare_def` (`check.rs:944`,
 `sct_check` at `:962`, guard-tested by `declare_def_sct_rejects_self_loop`); the
-record encoding `Term::Sigma`/`Pair`/`Proj` (`13 §2`); Ω-PI (`16 §1`). **Net-new
+record encoding `Term::Sigma`/`Term::Pair`/`Term::Proj1`/`Term::Proj2` (`13
+§2`); Ω-PI (`16 §1`). **Net-new
 (the Lc build creates it):** the class/instance desugaring, the orphan + overlap
 checks, the constraint insertion, and the search.
 
@@ -328,8 +329,9 @@ Lc adds **no** kernel rule, judgment, or "class" former (`33 §5.7`/`39 §6.8`);
 the build creates the **net-new** class/instance desugaring, the orphan +
 overlap checks, the constraint insertion, and the search, and **reuses** the
 landed kernel producers the soundness-critical ACs bottom out in (`sort_sigma`,
-`sct_check` via `declare_recursive_group`, `declare_def`, `Term::Sigma`/`Pair`/
-`Proj`, Ω-PI). The producer-grep QA gate greps the **real** elaborator/kernel
+`sct_check` via `declare_recursive_group`, `declare_def`, `Term::Sigma`/
+`Term::Pair`/`Term::Proj1`/`Term::Proj2`, Ω-PI). The producer-grep QA gate greps
+the **real** elaborator/kernel
 path — the class desugar feeding the real `sort_sigma` (AC4), the reified group
 admitted through the real `declare_recursive_group`/`sct_check` (AC6), the
 derive candidate through the real `declare_def` (AC7) — never a synthetic

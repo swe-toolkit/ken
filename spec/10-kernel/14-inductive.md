@@ -1,7 +1,6 @@
 # Inductive families
 
-> Status: **K1 elaborated; K1.5 extends it; nested-positive specified and
-> implementation-gated**.
+> Status: **K1 elaborated; K1.5 extends it; nested-positive partially landed**.
 > Normative. Declaration of inductive types, the strict-positivity requirement,
 > the dependent eliminator and its ι-computation, and how primitive types
 > attach. Identity is **not** a plain inductive in Ken — it is observational
@@ -16,9 +15,13 @@
 > (§2.1, §3.1, §7.7, §9.4). It removes the K1-era blanket rejection of Π-bound
 > recursion. Strict positivity (§8) remains the sole structural admission gate;
 > §8.5 extends that gate through checked positive-parameter paths and requires
-> the lifted eliminator machinery of §3.2/§7.8. That extension remains gated on
-> `KERNEL-NESTED-IND`. The motivating K1.5 client is L5's interaction tree
-> `ITree` (`../30-surface/36-effects.md`).
+> the lifted eliminator machinery of §3.2/§7.8. Current production admits fresh
+> and composed recorded-positive paths, including `Bag Rose` and
+> `Bag (Wrap Deep)`, and exposes Type- and Ω-classified nested results to the
+> surface selectors. `KERNEL-NESTED-IND` retains only the independently marked
+> generated-family, method, topology, sort, and dependent-motive residuals; it is
+> not a blanket admission gate. The motivating K1.5 client is L5's interaction
+> tree `ITree` (`../30-surface/36-effects.md`).
 
 ## 1. Declarations
 
@@ -152,8 +155,9 @@ eliminator to this WP). **K1.5 removes that blanket gate.** Admission of a
 any arrow (`(D → Bool) → D`, §8.3) — and nested occurrences through an unknown
 or non-positive parameter position (§8.5). Mutual families remain a separate
 later extension. Nested occurrences through declared strictly-positive
-parameter positions are specified in §8.5; the on-`main` kernel remains
-fail-closed on that new class until `KERNEL-NESTED-IND` lands.
+parameter positions are specified in §8.5 and currently admit through the
+landed fresh, composed, and transparent-head paths. The separately marked
+§3.2/§7.8 completeness residuals do not restore a blanket rejection.
 
 **Level (predicativity) — no new rule, one instance of `14 §1`.** A W-style
 argument type `(b:B) → D Δ_p t̄` lives at `max(level B, ℓ_D)`; `14 §1`'s rule
@@ -925,14 +929,23 @@ Note: even though the outermost polarisation is `+`, the domain of the arrow
 flips to `-`, so `Nat` appears negatively and is caught.
 
 **Rejected (nested negative in application argument):**
-`data Bad3 = mk : Pair (Bad3 → Empty) Unit → Bad3`. Argument telescope
-`(f : Pair (Bad3 → Empty) Unit)`, argument type `Pair (Bad3 → Empty) Unit`.
-Both parameters of the already-admitted `Pair` are recorded strictly positive.
-Under `+`, `check-pos-application` therefore traverses both arguments at the
-same positive polarisation:
+`data Bad3 = mk : Pair (Bad3 → Empty) Unit → Bad3`. The displayed surface
+spelling assumes explicit imports of the standard-package names; the kernel
+judgment operates on their already-resolved declarations. The canonical
+`Pair` is a checked transparent definition of the non-dependent Σ, not a host
+name with specially recorded positive parameters (`../30-surface/34
+§"Canonical non-dependent pair package"`). Ordinary transparent reduction
+first exposes
+
+```
+Pair (Bad3 → Empty) Unit  ≡  (x : Bad3 → Empty) × Unit
+```
+
+and the primitive Σ rule then checks both components at positive polarisation:
 
 ```
 check-pos-arg(Bad3, +, Pair (Bad3 → Empty) Unit)
+  = check-pos-arg(Bad3, +, (x : Bad3 → Empty) × Unit)
   = check-pos-arg(Bad3, +, Bad3 → Empty)
     and check-pos-arg(Bad3, +, Unit)
   = (check-pos-arg(Bad3, -, Bad3)
@@ -941,12 +954,13 @@ check-pos-arg(Bad3, +, Pair (Bad3 → Empty) Unit)
   = false → FAILS
 ```
 
-The positive `Pair` boundary does not make its entire argument positive. The
+The positive Σ boundary does not make its entire component positive. The
 recursive descent opens `(Bad3 → Empty)`, flips polarity for the Π-domain, and
-rejects the direct `Bad3` occurrence at `-`; `Unit` is `D`-free. The residual
-`not occurs` guard of §8.5 clause 6 remains load-bearing for an unknown,
-unclassified, or discarded parameter position, but it does not decide this
-known-positive case.
+rejects the direct `Bad3` occurrence at `-`; `Unit` is `D`-free. Renaming the
+transparent definition while preserving the same Σ body leaves the verdict
+unchanged. The residual `not occurs` guard of §8.5 clause 6 remains
+load-bearing for an unknown, unclassified, or discarded parameter position,
+but it does not decide this structurally exposed case.
 
 **Rejected (D in its own indices):**
 `data Vec (A : Type) : Nat → Type where …` is fine (the index `Nat` is not
@@ -1030,22 +1044,33 @@ data Json = ... | JsonArray (List Json)
                     | JsonObject (List (Pair String Json)) | ...
 ```
 
-These examples are admitted because every path to the recursive family follows
-checked strictly-positive parameters. They are examples of the rule, not
-special cases in it.
+The surface unit containing `JsonObject` explicitly imports the canonical
+`Pair` package interface. `List` supplies a checked positive parameter path;
+transparent reduction then exposes `Pair String Json` as primitive
+`(x : String) × Json`, whose second component is positive by the structural Σ
+rule. Renaming the Pair definition without changing that transparent body does
+not change admission. These are examples of the rule, not special cases in it.
 
 **Fail-closed boundaries.** A recursive occurrence under a parameter with no
 checked polarity is rejected as **unknown**. A recursive occurrence under a
 declared negative or mixed parameter is rejected as **non-positive**. A nested
-negative such as `Pair (Bad → Empty) Unit` remains rejected by §8.3 even when
-the outer parameter is positive: the recursive descent reaches the Π-domain at
-negative polarisation and fails.
+negative such as `Pair (Bad → Empty) Unit` remains rejected by §8.3 after
+ordinary reduction exposes its Σ representation: recursive descent reaches the
+Π-domain at negative polarisation and fails. The checker never recognizes the
+surface spelling `Pair`.
 
-**Implementation stage.** `SPEC-NESTED-IND` states this rule;
-`KERNEL-NESTED-IND` implements its admission metadata, generated `All`
-families, lifted IHs, and ι. Until that kernel node lands, the on-`main` kernel
-continues to reject the newly specified nested-positive class. This is a safe
-completeness boundary, not an unsound kernel result.
+**Implementation stage.** `SPEC-NESTED-IND` states this rule. Current
+production derives and consumes admission metadata for fresh and composed
+recorded-positive carriers and checked-transparent Sigma heads; the executing
+corpus admits `Bag Rose` and `Bag (Wrap Deep)`, rejects unknown/non-positive and
+inner-arrow paths, and carries both Type- and Ω-classified nested results to
+the surface. `KERNEL-NESTED-IND` remains active for the individually marked
+generated-family, method, topology, sort, and dependent-motive residuals. In
+particular, a unary residual `All^Omega` method kernel-checks, while one method
+combining two residual host fields currently reaches both selectors and then
+fails its final kernel re-check. That is a fail-closed completeness boundary;
+it neither makes selector availability residual nor rejects the admitted class
+as a whole.
 
 ### 8.6 Mutually-defined inductives — still deferred
 

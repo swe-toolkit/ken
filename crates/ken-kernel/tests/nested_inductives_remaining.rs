@@ -2,25 +2,31 @@
 //!
 //! Binds exactly these cases from
 //! `conformance/kernel/inductive/seed-nested.md`:
-//! - `nested-ds9-shapes-admitted` and `nested-fresh-carrier-admitted`;
+//! - `nested-ds9-shapes-admitted`, `nested-fresh-carrier-admitted`, and
+//!   `nested-positive-chain-composes`;
 //! - `nested-negative-under-positive` and
-//!   `nested-negative-existing-pair-control` (AC-K5);
+//!   `nested-negative-transparent-sigma-control` (AC-K5);
 //! - `nested-unknown-head-rejected` and `nested-nonpositive-rejected`
 //!   (AC-K6–AC-K7);
 //! - `nested-direct-and-wstyle-controls-unchanged` (AC-K8).
 //!
-//! `nested-size-uses-lift` remains `[KERNEL-NESTED-IND]`-gated on
-//! `KERNEL-RECURSIVE-RESULT-SURFACE`; no finite topology control discharges it.
+//! `nested-size-uses-lift` and both structural-result selector sorts execute in
+//! the elaborator's full-pipeline bindings. The durable unary `ProofWrap`
+//! positive also passes its generated `All^Omega` method's kernel re-check. The
+//! remaining dependent-motive gap is narrower: the committed binary `ProofJoin`
+//! transition sentinel reaches both residual associations and selectors, then
+//! requires the exact final method-recheck type mismatch. This positivity file
+//! does not claim the eventual binary positive.
 //!
 //! Exact executing bindings:
 //! - `nested-ds9-shapes-admitted` ->
-//!   `declared_positive_paths_admit_list_pair_and_fresh_container_nesting`;
-//! - `nested-fresh-carrier-admitted` ->
+//!   `checked_transparent_sigma_aliases_admit_renamed_nested_paths`;
+//! - `nested-fresh-carrier-admitted` and `nested-positive-chain-composes` ->
 //!   `seed_fresh_bag_rose_and_deep_paths_admit_structurally`;
 //! - `nested-negative-under-positive` ->
 //!   `seed_negative_under_fresh_positive_bag_rejects_only_inner_arrow`;
-//! - `nested-negative-existing-pair-control` ->
-//!   `acceptance::ac5_nested_negative_in_application_rejected`;
+//! - `nested-negative-transparent-sigma-control` ->
+//!   `checked_transparent_sigma_alias_rejects_inner_arrow_negative`;
 //! - `nested-unknown-head-rejected` ->
 //!   `seed_bound_head_is_unknown_and_rejected`;
 //! - `nested-nonpositive-rejected` ->
@@ -32,8 +38,9 @@ use ken_kernel::env::PrimReduction;
 use ken_kernel::inductive::{derive_parameter_polarities, iota_reduct, method_type, peel_pi};
 use ken_kernel::subst::weaken;
 use ken_kernel::{
-    check, declare_inductive, declare_primitive, infer, whnf, ConstructorDecl, Context, CtorSpec,
-    GlobalEnv, GlobalId, InductiveDecl, InductiveSpec, KernelError, Level, ParameterPolarity, Term,
+    check, declare_def, declare_inductive, declare_primitive, infer, whnf, ConstructorDecl,
+    Context, CtorSpec, GlobalEnv, GlobalId, InductiveDecl, InductiveSpec, KernelError, Level,
+    ParameterPolarity, Term,
 };
 
 fn ty0() -> Term {
@@ -90,6 +97,19 @@ fn declare_list(env: &mut GlobalEnv) -> GlobalId {
         ],
     })
     .expect("List")
+}
+
+fn declare_product_alias(env: &mut GlobalEnv) -> GlobalId {
+    declare_def(
+        env,
+        vec![],
+        Term::pi(ty0(), Term::pi(ty0(), ty0())),
+        Term::lam(
+            ty0(),
+            Term::lam(ty0(), Term::sigma(Term::var(1), Term::var(1))),
+        ),
+    )
+    .expect("checked transparent non-dependent Sigma alias")
 }
 
 fn declare_pair(env: &mut GlobalEnv) -> GlobalId {
@@ -232,6 +252,59 @@ fn declared_positive_paths_admit_list_pair_and_fresh_container_nesting() {
 }
 
 #[test]
+fn checked_transparent_sigma_aliases_admit_renamed_nested_paths() {
+    // Durable invariant (AC-K1): checked transparent definitions expose the
+    // primitive Sigma positivity rule. Distinct names with the same body must
+    // produce the same verdict; an inductive-parameter path does not bind this.
+    let mut env = GlobalEnv::new();
+    let bool_id = declare_bool(&mut env);
+    let list = declare_list(&mut env);
+    let product = declare_product_alias(&mut env);
+    let renamed_product = declare_product_alias(&mut env);
+    assert_ne!(product, renamed_product);
+    assert!(env.transparent_body(product).is_some());
+    assert!(env.transparent_body(renamed_product).is_some());
+
+    let nested = declare_inductive(&mut env, |json| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![
+            CtorSpec {
+                args: vec![],
+                target_indices: vec![],
+            },
+            CtorSpec {
+                args: vec![Term::app(former(list), former(json))],
+                target_indices: vec![],
+            },
+            CtorSpec {
+                args: vec![Term::app(
+                    former(list),
+                    app2(Term::const_(product, vec![]), former(bool_id), former(json)),
+                )],
+                target_indices: vec![],
+            },
+            CtorSpec {
+                args: vec![Term::app(
+                    former(list),
+                    app2(
+                        Term::const_(renamed_product, vec![]),
+                        former(bool_id),
+                        former(json),
+                    ),
+                )],
+                target_indices: vec![],
+            },
+        ],
+    })
+    .expect("transparent Sigma aliases admit both renamed nested paths");
+
+    assert_eq!(env.inductive(nested).unwrap().constructors.len(), 4);
+}
+
+#[test]
 fn seed_fresh_bag_rose_and_deep_paths_admit_structurally() {
     // Durable invariant (AC-K2): fresh names work because their recorded
     // parameter polarity composes. Bag/Rose covers the named seed carrier;
@@ -334,6 +407,100 @@ fn seed_negative_under_fresh_positive_bag_rejects_only_inner_arrow() {
         level: Level::zero(),
         constructors: vec![CtorSpec {
             args: vec![Term::app(former(bag), Term::pi(former(bad), former(empty)))],
+            target_indices: vec![],
+        }],
+    });
+    assert!(positivity_error(bad).contains("non-strictly-positive"));
+}
+
+#[test]
+fn checked_transparent_sigma_alias_rejects_inner_arrow_negative() {
+    // Durable discriminating pairs (AC-K5): the same checked transparent Sigma
+    // alias accepts a direct recursive component and rejects the occurrence in
+    // an inner arrow domain, independently in each Sigma component. This reaches
+    // head WHNF and both component descents, not former polarity data.
+    let mut env = GlobalEnv::new();
+    let empty = declare_inductive(&mut env, |_| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![],
+    })
+    .expect("Empty");
+    let unit = declare_inductive(&mut env, |_| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![],
+            target_indices: vec![],
+        }],
+    })
+    .expect("Unit");
+    let product = declare_product_alias(&mut env);
+    assert!(env.transparent_body(product).is_some());
+
+    declare_inductive(&mut env, |good| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![app2(
+                Term::const_(product, vec![]),
+                former(good),
+                former(unit),
+            )],
+            target_indices: vec![],
+        }],
+    })
+    .expect("Product Good Unit positive control");
+
+    let bad = declare_inductive(&mut env, |bad| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![app2(
+                Term::const_(product, vec![]),
+                Term::pi(former(bad), former(empty)),
+                former(unit),
+            )],
+            target_indices: vec![],
+        }],
+    });
+    assert!(positivity_error(bad).contains("non-strictly-positive"));
+
+    declare_inductive(&mut env, |good| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![app2(
+                Term::const_(product, vec![]),
+                former(unit),
+                former(good),
+            )],
+            target_indices: vec![],
+        }],
+    })
+    .expect("Product Unit Good positive control");
+
+    let bad = declare_inductive(&mut env, |bad| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![app2(
+                Term::const_(product, vec![]),
+                former(unit),
+                Term::pi(former(bad), former(empty)),
+            )],
             target_indices: vec![],
         }],
     });

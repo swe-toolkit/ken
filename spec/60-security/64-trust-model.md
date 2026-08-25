@@ -28,8 +28,11 @@ interpreter semantics:
    nested-positive, SCT, quotient respect, `18 §4.3`). The gates are
    trusted-as-code but **re-run on every input** — nothing is admitted without
    passing — so they add **no per-program assumption**; they are part of item 1,
-   never item 3. The nested-positive gate is specified but remains
-   implementation-gated on `KERNEL-NESTED-IND`.
+   never item 3. Nested-positive admission is partially landed: fresh and
+   composed recorded-positive paths execute, unknown/non-positive paths reject,
+   and both selector sorts are available. `KERNEL-NESTED-IND` retains only the
+   individually marked generated-family, method, topology, sort, and dependent-
+   motive residuals.
 2. **The primitive declarations and operation registrations** — the irreducible
    primitive surface (`../10-kernel/14 §5`), each registered via
    `declare_primitive` as a `Decl::Primitive` and enumerated for audit. The

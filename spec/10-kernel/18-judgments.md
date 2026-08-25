@@ -23,11 +23,14 @@
 > admission + the `method_type` indexed-family eliminator fix,
 > `dec_2vc6ytrbcbfc5`) **and K2c-series-2-build** (non-Ω quotient respect)
 > merged. The later nested-positive semantic extension preserves the frozen API
-> signature but remains gated on `KERNEL-NESTED-IND`; until that node lands,
-> the on-`main` kernel rejects the new class fail-closed. This is the **inverse
-> of a stale-frame**: here the landed *spec* leads and the *code* trails an
-> in-flight merge — the contract follows the spec (the authority), never the
-> transient code state.
+> signature and is partially landed. Current `declare_inductive` admission
+> accepts fresh and composed recorded-positive paths, including `Bag Rose` and
+> `Bag (Wrap Deep)`, while unknown/non-positive paths reject. Both nested-result
+> selector sorts execute. `KERNEL-NESTED-IND` tracks only the independently
+> marked generated-family, method, topology, sort, and dependent-motive
+> residuals; it is not a blanket current-code rejection. This is the **inverse
+> of a stale-frame**: the contract and freeze record both follow the landed
+> producer rather than an all-or-nothing node label.
 
 ## 1. Judgment forms
 
@@ -278,7 +281,7 @@ entry may return.
 |---|---|---|---|
 | `declare_def` | `ty`, `body` raw-well-formed over `·` | `· ⊢ ty type`; `· ⊢ body ⇐ ty`; the def's group passes **SCT** (`17 §4`); `id` admitted **transparent** (δ-unfoldable). Pre-admitted opaque during checking so `body` may self-reference `id` | `TypeMismatch`, `UniverseInconsistency`, `NotTerminating` (SCT reject ⇒ `id` removed, Σ unchanged) |
 | `declare_recursive_group` | one `(level_params, ty)` per member; `bodies_fn` returns one body per member, in order | each `ty` checked; all members pre-admitted opaque; each body checked; **SCT on the whole group**; accept ⇒ all transparent; **reject ⇒ the whole group rolled back** | as `declare_def`; `NotTerminating` rolls back every member |
-| `declare_inductive` | `build(id)` yields a well-formed host `InductiveSpec` self-referencing `id`; callers cannot mark a spec as terminal support | the host signatures, universes, **strict positivity** (`14 §8`), **W-style boundary** (`14 §8.4`), and **nested-positive boundary** (`14 §8.5`) check. If the host has `p` checked positive carriers, exactly `2p` first-order `All^Type` / `All^Omega` families then pass ordinary indexed-inductive checks (`14 §1`/`§3.2`). Kernel provenance classifies them as terminal support: each stored `InductiveDecl` carries its constructor records, its generic `Term::Elim { fam, … }` form checks ordinarily, and it triggers neither support generation nor general enclosing-former registration. Success atomically appends the host and fixed support set as `Decl::Inductive` entries; no eliminator declaration or `GlobalId` is created. Nested method types and ι use those same family applications (`14 §7.8`). Any failure rolls the entire transaction back, so `Σ` is unchanged. The nested clause is implementation-gated on `KERNEL-NESTED-IND` | `PositivityViolation`, `IllFormedDecl`, `ConstructorUniverseViolation`, `LevelArityMismatch` |
+| `declare_inductive` | `build(id)` yields a well-formed host `InductiveSpec` self-referencing `id`; callers cannot mark a spec as terminal support | the host signatures, universes, **strict positivity** (`14 §8`), **W-style boundary** (`14 §8.4`), and **nested-positive boundary** (`14 §8.5`) check. If the host has `p` checked positive carriers, exactly `2p` first-order `All^Type` / `All^Omega` families then pass ordinary indexed-inductive checks (`14 §1`/`§3.2`). Kernel provenance classifies them as terminal support: each stored `InductiveDecl` carries its constructor records, its generic `Term::Elim { fam, … }` form checks ordinarily, and it triggers neither support generation nor general enclosing-former registration. Success atomically appends the host and fixed support set as `Decl::Inductive` entries; no eliminator declaration or `GlobalId` is created. Nested method types and ι use those same family applications (`14 §7.8`). Any failure rolls the entire transaction back, so `Σ` is unchanged. The admission subset is landed; only the independently marked nested completeness residuals remain gated on `KERNEL-NESTED-IND` | `PositivityViolation`, `IllFormedDecl`, `ConstructorUniverseViolation`, `LevelArityMismatch` |
 | `declare_postulate` | `name` is a non-positional audit label; `ty` raw-well-formed over `·` | `· ⊢ ty type`; `id` admitted **opaque** with `name`; **recorded in the trusted base** (appears as a named entry in `trusted_base()`). A postulate of an empty type is admitted but **visible** as an assumption | `TypeMismatch`, `UniverseInconsistency` |
 | `declare_primitive` | `ty` raw-well-formed; `reduction` the registered operation descriptor | `· ⊢ ty type`; `id` admitted opaque + descriptor **registered in the trusted-base ledger**. `Literal` records a value class; `Op` is opaque to landed conversion and names interpreter dispatch (§5) | `TypeMismatch`, `UniverseInconsistency` |
 | `infer` | `ctx` well-formed; `t` raw-well-formed | returns the **unique** `A` with `ctx ⊢ t ⇒ A` (§3.1) | `VarOutOfScope`, `NotAFunction`, `NotASigma`, `LevelArityMismatch`, `TypeMismatch`; a non-inferable head ⇒ error |
@@ -415,12 +418,15 @@ actually exposes the day K-api lands (cross-ref the banner's freeze-status
 note).
 
 That historical freeze did not claim the later `14 §8.5` nested-positive
-extension or its `14 §3.2` intrinsic families. `KERNEL-NESTED-IND` adds that
-semantic class and the atomic internal-family transaction behind the same
-frozen `declare_inductive` signature. The transaction is finitely closed by the
-kernel-originated terminal-support classification; it adds no public caller
-mode. Until it lands, the two corresponding rows in §4.3 are specified, fail-
-closed implementation gates rather than claims about current code.
+extension or its `14 §3.2` intrinsic families. The extension now partially
+executes behind the same frozen `declare_inductive` signature: fresh and
+composed recorded-positive paths admit, unknown/non-positive paths reject, and
+both selector sorts are available. The transaction remains finitely closed by
+kernel-originated terminal-support classification and adds no public caller
+mode. `KERNEL-NESTED-IND` now gates only the individually marked
+family/method/topology/sort completeness residuals. The unary residual Ω method
+kernel-checks; the binary method combining two residual host fields currently
+fails closed only at its final generated-method kernel re-check.
 
 ## 5. The trusted base (what soundness actually rests on)
 
@@ -533,6 +539,8 @@ switch (a term that checks only via a conversion step), one **invoking** test
 per admission gate flipping accept↔reject on the gate condition alone, a
 certificate-checking case (prover output re-checked) and its wrong-certificate
 rejection, an ill-typed term rejected with a minimal error, and a
-`trusted_base()` enumeration test. Per §4.6, nested-positive invocation remains
-gated on `KERNEL-NESTED-IND`; the W-style/positivity and non-Ω-quotient cases
-already ride their landed builds.
+`trusted_base()` enumeration test. Per §4.6, the admission-only nested-positive
+invocation is current, while the individually marked generated-family, method,
+topology, sort, and dependent-motive residuals remain gated on
+`KERNEL-NESTED-IND`. The W-style/positivity and non-Ω-quotient cases already
+ride their landed builds.

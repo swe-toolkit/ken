@@ -166,13 +166,24 @@ package carrier: it is the bootstrap-identity member of the prelude. `Option`
 and `Result` are likewise not packages: public primitive signatures name their
 canonical compiler-installed identities. `Unit`, `Empty`, `Either`, and `Pair`
 remain packages; no primitive signature names them and they have no independent
-bootstrap-identity witness. The reframed catalog is
+bootstrap-identity witness. In particular, compiler possession is not itself a
+bootstrap witness. A checked implementation-global `Pair` is outside the floor
+because the surface contract neither requires source to name that identity nor
+makes it reachable under Strict. It is an implementation convenience pending
+the canonical explicit-import package contract (`34 §"Canonical
+non-dependent pair package"`), not a provider or a third membership arm. A
+same-shaped source definition allocates a distinct identity and cannot convert
+compiler possession into package provenance.
+
+The reframed catalog is
 `../50-stdlib/README.md` — the lawful classes (`Num`/`Ord`/`Eq`/`Monoid`/
 `Functor`/`Monad`/`Foldable`), the collection combinators
 (`map`/`filter`/`fold`/ `range`), and formatting (`show`/`split`/`join`/`pad`).
 The monolithic **L8 stdlib dissolves** into this catalog
 (`docs/program/wp/L8-stdlib-core.md` superseded); its "laws are **proved, not
-postulated**" discipline carries to the package builds (ES4).
+postulated**" discipline carries to the package builds (ES4). A proposal to
+make `Pair` a tenth floor member reopens the exact-floor ruling and is outside
+this package contract; ordinary explicit import is the specified boundary.
 
 **The derivation-path discipline (normative).** Every catalog entry states a
 real Ken definition path from the built-ins. A catalog entry with **no** path is

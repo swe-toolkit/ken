@@ -101,7 +101,10 @@ The loader proceeds as follows:
    neither borrows its caller's
    imports nor exports its own imports merely because it was loaded. An
    unresolved bare name does not fall through to arbitrary implementation
-   globals outside that scope.
+   globals outside that scope. This includes checked, transparent conveniences:
+   compiler possession of `Pair`, `mk_pair`, `pair_fst`, or `pair_snd` is not
+   provider availability. Until a unit explicitly imports their canonical
+   public interface, each bare name is unresolved under Strict.
 5. Resolve every imported or re-exported name through the provider's public
    interface to the provider declaration's existing canonical identity. Enforce
    privacy, ambiguity, and re-export clashes before emitting the caller. An
@@ -122,6 +125,15 @@ cannot satisfy a reference to its floor counterpart. Failure to find a canonical
 type, any constructor-parent mismatch, or any name outside the closed inventory
 is a surface error; none falls back to a lookalike or arbitrary implementation
 global.
+
+A same-shaped local definition does not change this rule. Resolution binds its
+new identity, while any already-checked declaration that contains the
+implementation `Pair` identity continues to contain that exact `GlobalId`;
+conversion of transparent bodies does not rewrite provenance. After the
+canonical package is realized, direct import and re-export bind the one provider
+identity and allocate no replacement (`34 §"Canonical non-dependent pair
+package"`). The unimported arm remains rejected even when the provider was
+loaded for another unit.
 
 A front end checking a source entry uses this loader whenever that entry is
 addressed through a catalog root. Reading the entry as an isolated file is not a
@@ -277,10 +289,15 @@ The required elaboration contract is:
 - A negative recursive occurrence, a nested occurrence through an unknown or
   non-positive parameter, or a mutual-family shape is routed through the kernel
   admission verdict and surfaced at the constructor span; the elaborator does
-  not implement a second positivity checker. A nested occurrence through
-  declared strictly-positive parameters remains a staged rejection until
-  `KERNEL-NESTED-IND` lands, after which it must carry the lifted method context
-  of item 5.
+  not implement a second positivity checker. Declared strictly-positive paths
+  are current behavior: fresh `Bag Rose`, composed `Bag (Wrap Deep)`, and
+  checked-transparent Sigma heads admit, and nested methods expose their checked
+  Type- or Ω-classified results through the contextual selectors of §2.3.
+  Individually marked generated-family, topology, sort, and method residuals
+  remain staged. The live method residual is narrower: the unary residual
+  `ProofWrap` Ω method passes the final kernel re-check, while a binary
+  `ProofJoin` method combining two residual host fields reaches both
+  associations and selectors before that final re-check reports a type mismatch.
 - `{x : A} -> ...` in a constructor signature is an implicit telescope binder.
   Named-argument application and record-field labels inside explicit dependent
   constructor signatures are intentionally staged out; the old `C { f : A }`
@@ -1174,7 +1191,8 @@ ACs bottom out in **landed** producers: `AC7` (`derive`) and every instance
 ride the real **`declare_def`** re-check (`check.rs`); `AC6` (termination) is
 the real
 **`sct_check`** on the reified dictionary group (§6.4); the record/Σ
-encoding targets the landed **`Term::Sigma`/`Pair`/`Proj`** (`13 §2`); and
+encoding targets the landed kernel forms **`Term::Sigma`, `Term::Pair`,
+`Term::Proj1`, and `Term::Proj2`** (`13 §2`); and
 property-class coherence is the landed **Ω-PI** (`16 §1`). The net-new logic is
 the *desugaring, the orphan/overlap check, and the search*; the *trust root it
 rests on is landed and unchanged* — subsume-don't-proliferate.

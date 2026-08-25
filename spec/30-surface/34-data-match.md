@@ -16,19 +16,94 @@
 > type former. The elaborator and the exhaustiveness/reachability checker are
 > **untrusted** (`39 §1`): a bug yields a rejected valid program or a poor
 > diagnostic, **never** an unsound acceptance — the kernel re-checks the emitted
-> `elim_D` (`§4.4`). The nested-positive extension named below is separately
-> staged on `KERNEL-NESTED-IND`; it does not claim that kernel support has
-> landed.
+> `elim_D` (`§4.4`). The nested-positive work named below is **partially
+> landed**. The current kernel admits declaration-recorded strictly-positive
+> parameter paths and checked-transparent Sigma aliases, including fresh
+> `Bag Rose` and two-former `Bag (Wrap Deep)` paths. Both Type-classified
+> `recursive result for` and Ω-classified `induction hypothesis for` execute
+> through generated lifts and nested ι. Independently marked generator,
+> topology, sort, and dependent-motive residuals remain staged; this status does
+> not claim those cases.
 >
 > **Perishable — pin against the landed kernel, not this prose.** K1.5 has
 > landed: the K1-era blanket rejection of Π-bound recursion
 > (`check_no_pi_bound_recursive`) is **retired**, and `check_positivity` is the
 > sole structural admission gate (`../10-kernel/14 §8.4`;
 > `ken-kernel/src/inductive.rs`). W-style `(b:B) → D` recursive constructor
-> arguments are **admitted**. Nested recursion through declared
-> strictly-positive parameter positions is specified by `14 §8.5` and remains
-> gated on `KERNEL-NESTED-IND`; the current kernel rejects that class
-> fail-closed. Verify against the on-`main` `14`/kernel before building.
+> arguments are **admitted**. Nested-positive admission is no longer blanket-
+> gated: the current D6 corpus executes the fresh-carrier, composed-carrier,
+> transparent-head, and controlled-negative paths. `KERNEL-NESTED-IND` retains
+> only the cases independently marked as residual. Both structural-result
+> selectors are landed. The durable unary `ProofWrap` full-pipeline positive
+> reaches its Ω-classified residual result and kernel-checks. The narrower live
+> surface gap is a dependent generated-`All` method that combines **two residual
+> host fields**: the committed `ProofJoin` transition sentinel reaches both
+> associations and selectors, but the final method kernel re-check rejects a
+> type mismatch. The sentinel retires only when that exact fixture accepts and
+> its binary positive plus independent wrong-result/association negatives land
+> together. Verify against the on-`main` `14`/kernel before building.
+
+## Canonical non-dependent pair package
+
+The named surface family `Pair` is an ordinary standard-package definition over
+the kernel's dependent pair. It is not the kernel term constructor called
+`Pair` in core syntax, and it is not a member of the closed prelude floor. A
+source unit uses the named family only after importing it from its one defining
+public interface. Merely having an implementation-global definition with the
+same spelling does not provide that interface under Strict (`30 §4`/`§5`, `33
+§3.3`, `39 §2.0`).
+
+The public behavioral contract has four checked transparent declarations:
+
+```ken
+Pair     : Type -> Type -> Type
+mk_pair  : (A : Type) -> (B : Type) -> A -> B -> Pair A B
+pair_fst : (A : Type) -> (B : Type) -> Pair A B -> A
+pair_snd : (A : Type) -> (B : Type) -> Pair A B -> B
+```
+
+Their meanings are fixed by conversion. For `A B : Type`, `a : A`, `b : B`,
+and `p : Pair A B`:
+
+```text
+Pair A B                                      ≡  (x : A) × B
+mk_pair A B a b                               ≡  (a, b)
+pair_fst A B (mk_pair A B a b)                ≡  a
+pair_snd A B (mk_pair A B a b)                ≡  b
+mk_pair A B (pair_fst A B p) (pair_snd A B p) ≡  p
+```
+
+The right sides are semantic notation for the existing kernel
+`Sigma`/introduction/projection forms, not new surface syntax. The first four
+lines follow by transparent unfolding and Σ-β; the last is the existing
+judgmental Σ-η (`../10-kernel/13 §6`). Each displayed equation is
+**definitional** and requires no theorem, postulate, or runtime rule.
+
+When one of these judgments is restated as a surface equality, its proof
+terminal is determined by the normalized proposition rather than by one
+uniform “reflexivity” token. A concrete Bool fst or snd β instance reduces the
+whole equality to `Top`, so it closes with `Proved`; `Refl` rejects because the
+goal is no longer `Eq`-shaped. Reconstruction η at a neutral
+`p : Pair Bool Bool` remains `Eq`-shaped and closes with `Refl`; `Proved`
+rejects there. Both terminals rely only on conversion, but they are not
+interchangeable.
+
+Each public name has exactly one defining module and one canonical `GlobalId`.
+A direct import and any re-export preserve those identities and allocate no
+replacement declaration. A separately authored definition with the same name,
+type, and transparent body has a different identity; definitional equality does
+not turn it into the provider declaration or rewrite an existing identity-keyed
+reference. All four definitions are ordinary kernel-rechecked Ken and add
+nothing to `trusted_base()` or the flat `Σ` model beyond their checked package
+declarations.
+
+Until the canonical interface is realized, positive package vectors that name
+these declarations are **RED-UNTIL the canonical Pair package**. Strict bare use
+continues to reject. The eventual package does not add `Pair` to the floor and
+does not retain an ambient, Legacy, compatibility-alias, or mixed-resolution
+route to an implementation convenience. The concrete package path and the
+transition mechanism are separately designed; this section fixes only the
+observable one-interface, one-identity, transparent-Σ contract.
 
 ## 1. Sum types (real, not stubbed)
 
@@ -96,9 +171,18 @@ the kernel's admission gates. Non-recursive and **direct-recursive**
 (`A → List A → List A`) constructors are K1. **W-style** (Π-bound) recursive
 arguments — `(b:B) → D`, the branching shape of `W` and L5's `ITree` — are
 **K1.5** and now admitted (`14 §2.1`, landed). **Nested strictly-positive**
-recursion is specified in `14 §8.5` but remains implementation-gated on
-`KERNEL-NESTED-IND`; until that node lands, a declaration needing it is a
-fail-closed compile error, not a silent lowering. **Mutual** families remain a
+admission is partially landed: the current kernel accepts fresh
+recorded-positive carrier paths such as `Bag Rose` and the composed
+`Bag (Wrap Deep)` path, while unknown and non-positive paths still reject
+fail-closed. Type- and Ω-classified nested surface selectors execute through
+generated lifts and ι. Only the individually marked residual cases remain
+implementation-gated. In this chapter the live surface-lowering residual is
+the stronger dependent generated-`All` method with two residual fields:
+`omega_selector_accepts_unary_residual_all_through_full_pipeline` checks the
+one-residual Ω path, while
+`binary_omega_residual_method_recheck_is_a_transition_sentinel` confirms that a
+`Join xs ys` branch consuming both induction hypotheses reaches the generated
+method's final kernel re-check and fails there. **Mutual** families remain a
 separately deferred extension (`14 §8.6`).
 
 ## 2. Indexed families and dependent constructors (GADT-like)
@@ -342,9 +426,14 @@ the corresponding motive instance, and every pattern-bound enclosing child
 retains the residual lift for its contained occurrences. A recursive theorem or
 computation over the field consumes those generated hypotheses. Re-emitting an
 unrestricted self-call, discarding the lift, or admitting the declaration
-without this branch context is not a valid lowering. This surface path remains
-gated on `KERNEL-NESTED-IND` until the kernel can generate and check the lifted
-method type and its ι.
+without this branch context is not a valid lowering. Both Type- and
+Ω-classified selectors are landed and execute through generated lifts and
+nested ι. The durable unary `ProofWrap` full-pipeline test checks the Ω residual
+path. The narrower residual is method construction after selection: the
+committed binary `ProofJoin` transition sentinel reaches both residual
+associations and selections, then fails its final generated-method kernel
+re-check with a type mismatch. Kernel admission and selector availability are
+not blanket-gated on that residual.
 
 #### 3.1.1 Recursive results and induction hypotheses for nested fields
 

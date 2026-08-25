@@ -342,10 +342,13 @@ chapter ships every flavor **concrete** and states the polymorphic law form.
 
 The shipped projection flavor is a lens onto the first component of a concrete
 product `Pair Bool Bool` — `get := pair_fst Bool Bool` and `set s b := mk_pair
-Bool Bool b (pair_snd Bool Bool s)`, over the landed prelude Σ-pair
-(`Pair`/`mk_pair`/`pair_fst`/`pair_snd`, `prelude.rs`; the negative Σ, `13 §6`) —
-with the three classic coherence laws, `Ω`-valued and proved by the `§1 pt 3`
-grammar:
+Bool Bool b (pair_snd Bool Bool s)`. Its unit explicitly imports the canonical
+Pair package (`../30-surface/34 §"Canonical non-dependent pair package"`), whose
+checked transparent definitions expose the existing Σ and its negative rule
+(`13 §6`). The strict named-interface vector is RED-UNTIL that package is
+realized; compiler possession of equivalent definitions is not an import. With
+that boundary stated, the three classic coherence laws are `Ω`-valued and proved
+by the `§1 pt 3` grammar:
 
 ```
 -- get-set: reading back what you set

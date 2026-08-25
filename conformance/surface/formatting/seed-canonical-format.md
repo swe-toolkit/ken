@@ -487,6 +487,11 @@ reachability measurement below; B3's
 drives every currently parseable embedded orientation without a hand-built
 `FormattableSource`.
 
+The `record Pair` declarations in the formatting cases below are intentional
+local declarations, not uses of the canonical package. They require no import,
+receive their own identity if elaborated, and do not provide or alias the
+standard `Pair` interface. These cases assert formatting only.
+
 ### surface/formatting/blank-runs-normalize-in-both-orientations (property)
 
 - spec: `31 §1d` (physical text and spacing), B3 AC3

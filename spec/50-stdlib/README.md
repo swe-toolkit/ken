@@ -42,12 +42,32 @@ two lower tiers of the surface taxonomy (`../30-surface/30`):
   re-declared (`30 §6`: `Equal` is deleted for the kernel's `Eq`).
 
 Everything below is a **package**: imported, derivable, re-checked. Core data
-`Unit`/`Empty`/`Either`/`Pair` (`../30-surface/34`) and the core combinators
-(`id`, `∘`, `const`, `flip`) are packages — Ken `data`/defs over the built-ins,
-not prelude. `Nat`, `Option`, and `Result` are deliberate exceptions among the
-core data carriers: source must reach their canonical compiler-installed
-identities because the bootstrap contract or public primitive signatures name
-them; a fresh `data` declaration cannot recreate those identities.
+`Unit`/`Empty`/`Either` and the named non-dependent `Pair` interface
+(`../30-surface/34 §"Canonical non-dependent pair package"`) plus the core
+combinators (`id`, `∘`, `const`, `flip`) are packages — Ken `data`/defs over the
+built-ins, not prelude. `Nat`, `Option`, and `Result` are deliberate exceptions
+among the core data carriers: source must reach their canonical
+compiler-installed identities because the bootstrap contract or public
+primitive signatures name them; a fresh `data` declaration cannot recreate
+those identities.
+
+The `Pair` package derives transparently from the existing dependent Σ former:
+`Pair A B ≡ (x : A) × B`, with checked transparent introduction and projection
+helpers and definitional fst/snd β plus reconstruction η. It therefore needs no
+primitive, postulate, or trust entry. Its four names are available under Strict
+only through the one defining public interface; an implementation-global
+checked convenience is neither that interface nor an ambient fallback. Positive
+catalog contracts that use these names remain RED-UNTIL the canonical package
+is realized and then import it explicitly. The package path is selected by that
+realization, not by this index.
+
+Deferring those whole units changes neither declaration ownership nor proof
+ownership. The sole canonical `instance Ord Nat` remains defined by the
+class-owning `Core.Classes.LawfulClasses`; `Data.Numeric.Nat.Order` may later
+import/re-export only that dictionary. The settled conversions of foreign
+attached proofs to private ordinary theorems—`pair_compare_eq_sound`,
+`pair_compare_lt_asym`, and `bool_or_eq_true_of_or`—remain owed when their
+containing units re-enter. Deferral neither reverses nor discharges them.
 
 ## 2. Lawful classes (the verification-aware core) — packages
 

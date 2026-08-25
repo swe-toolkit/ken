@@ -27,6 +27,12 @@ non-canonical-carrier `Bottom` exploit),
 proof-relevant-`Ω` / verified-sort coupling that the deferred permutation law
 inherits).
 
+The `toList : … → List (Pair k v)` surface is a positive named-Pair vector. Its
+strict package form is RED-UNTIL the canonical Pair package and explicitly
+imports that transparent-Σ interface. The existing Map-law evidence remains
+valid for computation, but ambient implementation-global Pair availability is
+not provider closure.
+
 **Status — the full seven `Map` correctness laws are BUILT + realized on
 `main`** — the two Branch-A non-inductive proofs + all **five inductive laws**
 (preservation / found-after-insert / locality / agreement / `toList`-ordered),
