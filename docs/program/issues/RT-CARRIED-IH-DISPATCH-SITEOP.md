@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIED-IH-DISPATCH-SITEOP
-title: "Track-1 consumer (M3) — the live successor at core.rs:2962 reject_carried_residual_arguments becomes a defunctionalized dispatch once the checked-IH representation lands"
-status: draft
+title: "Track-1 consumer (M3) — a boundary-carried CarriedWord value cannot present the ConstructorTag an effect seat demands (effects.rs:548), so object emission refuses; give the carried value a finite compile-time constructor discriminant it can present, reusing M4's defunctionalization"
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,9 +11,23 @@ github: null
 origin: "Steward, 2026-08-22, filing Track-1 seat M3 of [[RT-NATIVE-CARRIED-VALUE]] from the Architect's frame (evt_9kat78d438cb). The SiteOperand PORT already landed ([[RT-SITEOP-CARRIED-WITNESS]] merged); the seam advanced to core.rs:2962, where a carried recursive hypothesis is currently rejected as 'an eliminated value, not a callable'. Steward-filed per COORDINATION section 2."
 ---
 
+> # RELEASED 2026-08-25 on the landed M4 close (`f02922221`). Frame:
+> `docs/program/wp/RT-CARRIED-IH-DISPATCH-SITEOP.md`.
+>
+> M6 (D0) and M4 are both merged, so this consumer is unblocked. The Architect's
+> post-landing shape ruling (`evt_3r7fhkcd3e`, resolving the deferred fork
+> `evt_4sp2xftkmc1mz`) ruled M3 a DISTINCT BUILD — same defunctionalization
+> family as M4, applied to DATA-constructor discrimination for host marshalling,
+> not closure-code identity — and CORRECTED the scope: frame M3 against the
+> effect-seat claim routine (`effects.rs:548`, the seam px8f:200 and px8ta HALF
+> B:372 actually hit post-M4), NOT `reject_carried_residual_arguments`
+> (core.rs:2935), which is [[RT-SITEOP-CARRIED-WITNESS]] D2's. The Objective
+> below is the STALE filing-origin characterization, superseded by the frame; see
+> the frame for the released deliverables and ACs.
+
 > # Track-1 consumer (M3) — gated by the Track-1 D0 representation
 
-## Objective
+## Objective (STALE — superseded by the frame; see the released banner)
 
 At `core.rs:2962` (`reject_carried_residual_arguments`) a carried recursive
 hypothesis is refused as "an eliminated value, not a callable." Once the
