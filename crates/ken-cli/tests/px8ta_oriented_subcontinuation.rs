@@ -359,6 +359,14 @@ fn run_px8ds_retired_flat_control() {
 }
 
 #[cfg(target_os = "linux")]
+// Baseline provisioning shared by both exact px8ds rows. The pairing-reversal
+// fixture passed with 2 MiB and stack-overflowed with 1 MiB on this candidate,
+// so 256 MiB supplies 254 MiB and at least 128x headroom over the measured
+// passing floor. The ordinary px8ds row already used this exact provision on
+// the base; naming and sharing it is not a stack-regression repair.
+const PX8DS_THREAD_STACK_BYTES: usize = 256 * 1024 * 1024;
+
+#[cfg(target_os = "linux")]
 // Ignored pending RT-CARRIED-BOOL-ELIMINATOR-DISPATCH.
 //
 // Observed signature after the generated-context pairing repair, exactly:
@@ -375,7 +383,7 @@ fn run_px8ds_retired_flat_control() {
 fn px8ds_real_same_depth_path_runs_exact_edges() {
     std::thread::Builder::new()
         .name("px8ds-real-siblings".to_string())
-        .stack_size(256 * 1024 * 1024)
+        .stack_size(PX8DS_THREAD_STACK_BYTES)
         .spawn(run_px8ds_real_same_depth_path)
         .expect("spawn large-stack PX8-DS ordinary-plan half")
         .join()
@@ -439,14 +447,17 @@ fn run_px8ds_real_same_depth_path() {
 // proves the mutation reached production reconstruction, while the unchanged
 // effect trace keeps the observation on the same Console-return path.
 //
-// Promise class: transition sentinel. Retire this mutation row only when the
-// pairing WP's test-only mutation hook is removed after its guarded lifetime.
+// Evidence class: manually invoked, non-gating mutation witness. Because it is
+// ignored, it supplies no CI coverage and is not a transition sentinel. At the
+// RT-CARRIED-BOOL-ELIMINATOR-DISPATCH kickoff review, before changing ordinary
+// HALF B, remove together the backend test-support export, the lowering hook
+// (including its units.rs activation), and this ignored CLI row.
 #[test]
 #[ignore = "RT-GENERATED-CONTINUATION-OPERAND-PAIRING targeted mutation proof; the ordinary HALF B remains held on the distinct Bool eliminator successor"]
 fn px8ds_whole_context_parameter_reversal_restores_pairing_residual() {
     std::thread::Builder::new()
         .name("px8ds-pairing-reversal".to_string())
-        .stack_size(256 * 1024 * 1024)
+        .stack_size(PX8DS_THREAD_STACK_BYTES)
         .spawn(|| {
             let (observation, applications) =
                 ken_runtime::with_generated_context_whole_parameter_reversal(
