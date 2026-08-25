@@ -209,8 +209,10 @@ provider.
 
 ### kernel/inductive/canonical-pair-positive-path-unfolds-to-sigma
 
-- promise class: **soundness/completeness pair** — transparent representation,
-  not a spelling allow-list, determines the verdict
+- promise class: **durable invariant** — transparent representation, not a
+  spelling allow-list, determines the verdict across intended extensions
+- shape: **soundness/completeness pair** — each positive orientation is paired
+  with the corresponding inner-arrow negative
 - spec: `14 §8.3`/`§8.5`; `34 §"Canonical non-dependent pair package"`
 - given: admit or import the checked transparent Pair definition, then submit
   the first-component pair
@@ -248,8 +250,8 @@ provider.
 
 ### surface/modules/pair-cluster-is-deferred-not-green
 
-- promise class: **transitional compatibility vector** — a prerequisite is not
-  an accepted failure
+- promise class: **transition sentinel** — a prerequisite is not an accepted
+  failure; `LANG-MOD-CANONICAL-PAIR-PACKAGE` retires this deferral
 - spec: `30 §5`; `33 §3.3`; `34 §"Canonical non-dependent pair package"`; `39
   §2.0`
 - given: before the canonical package lands, run the real strict roots loader on
@@ -277,8 +279,9 @@ provider.
 
 ### surface/modules/pair-cluster-flips-only-after-explicit-import-closure
 
-- promise class: **RED-UNTIL forward oracle** — the prerequisite removes the
-  deferral rather than normalizing it
+- promise class: **durable invariant** — explicit-import identity closure
+  remains enforced after the prerequisite removes the temporary deferral
+- stage: **RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE`**
 - spec: `33 §3.3`/`§4.3`; `34 §"Canonical non-dependent pair package"`; `39
   §2.0`
 - given: after the canonical package lands, rerun the authoritative population
@@ -301,7 +304,9 @@ provider.
 
 ### surface/modules/pair-deferral-does-not-transfer-ord-nat-ownership
 
-- promise class: **durable invariant by reference**
+- promise class: **durable invariant** — Pair availability does not change
+  instance ownership or declaration provenance
+- evidence: **by reference** to the owning module/orphan seed named below
 - spec: `33 §5.3`/`§5.5.1`; `51 §7`
 - given: rerun `seed-modules.md`'s
   `ord-nat-class-owner-and-reexport-use-one-dictionary` after the Pair-dependent
@@ -314,7 +319,9 @@ provider.
 
 ### surface/modules/pair-deferral-does-not-discharge-attached-proof-conversions
 
-- promise class: **durable invariant by reference**
+- promise class: **durable invariant** — Pair availability does not change
+  attached-proof ownership or mint a foreign proof identity
+- evidence: **by reference** to the ownership controls named below
 - spec: `33 §8.2`; `39 §2.0`; `LANG-MOD-ATTACHED-PROOF-OWNERSHIP`
 - given: when `LawfulClasses` and Order re-enter, rerun the provider-local accept,
   consumer-foreign reject, and local ordinary-theorem controls from the attached

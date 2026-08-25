@@ -16,19 +16,26 @@
 > type former. The elaborator and the exhaustiveness/reachability checker are
 > **untrusted** (`39 §1`): a bug yields a rejected valid program or a poor
 > diagnostic, **never** an unsound acceptance — the kernel re-checks the emitted
-> `elim_D` (`§4.4`). The nested-positive extension named below is separately
-> staged on `KERNEL-NESTED-IND`; it does not claim that kernel support has
-> landed.
+> `elim_D` (`§4.4`). The nested-positive work named below is **partially
+> landed**. The current kernel admits declaration-recorded strictly-positive
+> parameter paths and checked-transparent Sigma aliases, including fresh
+> `Bag Rose` and two-former `Bag (Wrap Deep)` paths. Type-classified surface
+> recursive results execute through generated lifts and nested ι. Independently
+> marked generator, topology, sort, and dependent-motive residuals remain
+> staged; this status does not claim those cases.
 >
 > **Perishable — pin against the landed kernel, not this prose.** K1.5 has
 > landed: the K1-era blanket rejection of Π-bound recursion
 > (`check_no_pi_bound_recursive`) is **retired**, and `check_positivity` is the
 > sole structural admission gate (`../10-kernel/14 §8.4`;
 > `ken-kernel/src/inductive.rs`). W-style `(b:B) → D` recursive constructor
-> arguments are **admitted**. Nested recursion through declared
-> strictly-positive parameter positions is specified by `14 §8.5` and remains
-> gated on `KERNEL-NESTED-IND`; the current kernel rejects that class
-> fail-closed. Verify against the on-`main` `14`/kernel before building.
+> arguments are **admitted**. Nested-positive admission is no longer blanket-
+> gated: the current D6 corpus executes the fresh-carrier, composed-carrier,
+> transparent-head, and controlled-negative paths. `KERNEL-NESTED-IND` retains
+> only the cases independently marked as residual. The narrower live surface
+> boundary is the Ω-classified dependent-motive selector, gated on
+> `KERNEL-RECURSIVE-RESULT-SURFACE`; the Type-classified selector is landed.
+> Verify against the on-`main` `14`/kernel before building.
 
 ## Canonical non-dependent pair package
 
@@ -158,10 +165,15 @@ the kernel's admission gates. Non-recursive and **direct-recursive**
 (`A → List A → List A`) constructors are K1. **W-style** (Π-bound) recursive
 arguments — `(b:B) → D`, the branching shape of `W` and L5's `ITree` — are
 **K1.5** and now admitted (`14 §2.1`, landed). **Nested strictly-positive**
-recursion is specified in `14 §8.5` but remains implementation-gated on
-`KERNEL-NESTED-IND`; until that node lands, a declaration needing it is a
-fail-closed compile error, not a silent lowering. **Mutual** families remain a
-separately deferred extension (`14 §8.6`).
+admission is partially landed: the current kernel accepts fresh
+recorded-positive carrier paths such as `Bag Rose` and the composed
+`Bag (Wrap Deep)` path, while unknown and non-positive paths still reject
+fail-closed. Type-classified nested surface recursion also executes through its
+generated lift and ι. Only the individually marked residual cases remain
+implementation-gated; in this chapter the live surface-lowering residual is
+the Ω-classified dependent-motive selector under
+`KERNEL-RECURSIVE-RESULT-SURFACE`. **Mutual** families remain a separately
+deferred extension (`14 §8.6`).
 
 ## 2. Indexed families and dependent constructors (GADT-like)
 
@@ -404,9 +416,12 @@ the corresponding motive instance, and every pattern-bound enclosing child
 retains the residual lift for its contained occurrences. A recursive theorem or
 computation over the field consumes those generated hypotheses. Re-emitting an
 unrestricted self-call, discarding the lift, or admitting the declaration
-without this branch context is not a valid lowering. This surface path remains
-gated on `KERNEL-NESTED-IND` until the kernel can generate and check the lifted
-method type and its ι.
+without this branch context is not a valid lowering. The Type-classified
+surface path is landed and executes through the generated lift and nested ι.
+The narrower Ω-classified dependent-motive selector remains gated on
+`KERNEL-RECURSIVE-RESULT-SURFACE` until the surface can expose its exact
+associated proof result; kernel admission is not blanket-gated on that
+residual.
 
 #### 3.1.1 Recursive results and induction hypotheses for nested fields
 
