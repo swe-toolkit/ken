@@ -60,6 +60,12 @@ Spec: `14 §8.5` clauses 1–3.
 
 ### kernel/inductive/nested-ds9-shapes-admitted
 
+Status: executing binding established in
+`crates/ken-kernel/tests/nested_inductives_remaining.rs` as
+`checked_transparent_sigma_aliases_admit_renamed_nested_paths`. The test admits
+two distinct ordinary `declare_def` aliases with the same Sigma body and sends
+both through the production positivity path.
+
 - spec: `14 §8.5`; `18 §4.3`
 - given: previously admitted positive `List` plus a fresh checked transparent
   `Product A B = (x : A) × B`, followed by an ordinary `Json` declaration
@@ -497,6 +503,11 @@ Spec: `14 §8.3`, `§8.5` clause 5.
   not the outer application.
 
 ### kernel/inductive/nested-negative-transparent-sigma-control
+
+Status: executing binding established in
+`crates/ken-kernel/tests/nested_inductives_remaining.rs` as
+`checked_transparent_sigma_alias_rejects_inner_arrow_negative`. The direct
+recursive payload is its positive control.
 
 - spec: `14 §8.3`; `§8.5` clause 5
 - given: the existing `kernel/seed-k1.md` case

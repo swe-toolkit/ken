@@ -179,6 +179,9 @@ Spec: `spec/10-kernel/14-inductive.md §2, §8`; frame §2 item 5.
 
 ### kernel/inductive/nested-negative-in-application-rejected
 - spec: `spec/10-kernel/14-inductive.md §8.1–8.3`, `§8.5`
+- executing binding:
+  `checked_transparent_sigma_alias_rejects_inner_arrow_negative` in
+  `crates/ken-kernel/tests/nested_inductives_remaining.rs`
 - given: admit a fresh checked transparent
   `Product A B = (x : A) × B`, then declare
   `data Bad3 : Type 0 where { mk : Product (Bad3 → Empty) Unit → Bad3 }`

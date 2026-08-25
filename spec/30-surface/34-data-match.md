@@ -63,9 +63,17 @@ mk_pair A B (pair_fst A B p) (pair_snd A B p) ≡  p
 The right sides are semantic notation for the existing kernel
 `Sigma`/introduction/projection forms, not new surface syntax. The first four
 lines follow by transparent unfolding and Σ-β; the last is the existing
-judgmental Σ-η (`../10-kernel/13 §6`). Each equation is **definitional**: a
-proof stated as equality closes with reflexivity and requires no theorem,
-postulate, or runtime rule.
+judgmental Σ-η (`../10-kernel/13 §6`). Each displayed equation is
+**definitional** and requires no theorem, postulate, or runtime rule.
+
+When one of these judgments is restated as a surface equality, its proof
+terminal is determined by the normalized proposition rather than by one
+uniform “reflexivity” token. A concrete Bool fst or snd β instance reduces the
+whole equality to `Top`, so it closes with `Proved`; `Refl` rejects because the
+goal is no longer `Eq`-shaped. Reconstruction η at a neutral
+`p : Pair Bool Bool` remains `Eq`-shaped and closes with `Refl`; `Proved`
+rejects there. Both terminals rely only on conversion, but they are not
+interchangeable.
 
 Each public name has exactly one defining module and one canonical `GlobalId`.
 A direct import and any re-export preserve those identities and allocate no

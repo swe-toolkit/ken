@@ -12,8 +12,10 @@ happens to use `Pair` as its local name. Those three uses do not create a
 package provider.
 
 The rejection and exact-floor cases describe the current Strict boundary. The
-positive explicit-import, conversion, positivity, and cluster-closure cases are
-**RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE`**. RED-UNTIL is not an accepted
+named explicit-import, conversion, positivity, and cluster-closure cases are
+**RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE`**. The representation-only
+transparent-Sigma controls execute now through the kernel bindings named in
+AC5; they do not provide the named Pair interface. RED-UNTIL is not an accepted
 failure and not a green numerator: it identifies the prerequisite that must
 flip the same seam.
 
@@ -153,22 +155,29 @@ choose it.
 
 ### surface/modules/canonical-pair-beta-eta-are-definitional
 
-- promise class: **normative compatibility vector** — downstream proofs may use
-  reflexivity, not a package theorem
+- promise class: **normative compatibility vector** — downstream proofs use
+  conversion, not a package theorem
 - spec: `34 §"Canonical non-dependent pair package"`; `13 §2`/`§6`
-- given: after explicit import of all four provider names, check reflexivity at
-  these three neutral or concrete equations:
-  `pair_fst Bool Bool (mk_pair Bool Bool True False) = True`,
-  `pair_snd Bool Bool (mk_pair Bool Bool True False) = False`, and, for neutral
-  `p : Pair Bool Bool`,
-  `mk_pair Bool Bool (pair_fst Bool Bool p) (pair_snd Bool Bool p) = p`.
-- expect: all three close by conversion and reflexivity alone. No imported law,
-  rewrite, eliminator, postulate, or runtime evaluation participates.
-- controls: change only the first expected endpoint to `False`, the second to
-  `True`, and the neutral reconstruction to the component-swapped pair in
-  independent arms. Each reflexivity proof rejects.
-- why: concrete beta arms distinguish the projections, while the neutral eta
-  arm cannot pass by reducing a freshly constructed pair on both sides.
+- given: after explicit import of all four provider names, check these exact
+  surface equality terminals:
+  `pair_fst Bool Bool (mk_pair Bool Bool True False) = True` with `Proved`,
+  `pair_snd Bool Bool (mk_pair Bool Bool True False) = False` with `Proved`,
+  and, for neutral `p : Pair Bool Bool`,
+  `mk_pair Bool Bool (pair_fst Bool Bool p) (pair_snd Bool Bool p) = p`
+  with `Refl`.
+- expect: the concrete fst and snd goals normalize to `Top` and accept
+  `Proved`; `Refl` rejects because those goals are no longer `Eq`-shaped. The
+  neutral reconstruction remains `Eq`-shaped and accepts `Refl`; `Proved`
+  rejects. No imported law, rewrite, eliminator, postulate, or runtime
+  evaluation participates.
+- controls: in independent arms, change only the first expected endpoint to
+  `False`, the second to `True`, and the neutral reconstruction to the
+  component-swapped pair; each prescribed terminal rejects. Independently swap
+  `Proved` and `Refl` at the three correct equations; each wrong terminal
+  rejects at the normalized goal shape.
+- why: concrete beta arms distinguish the projections and pin the `Top`
+  terminal, while neutral eta pins the distinct `Eq`-shaped terminal. The word
+  “reflexivity” alone would not distinguish those surface proof forms.
 
 ### surface/modules/pair-import-and-reexport-preserve-one-identity
 
@@ -192,8 +201,11 @@ choose it.
 
 ## AC5 — nested positivity is representation-derived
 
-These cases are RED-UNTIL the canonical Pair package and compose with
-`../../kernel/inductive/seed-nested.md`.
+The named Pair instantiation is RED-UNTIL the canonical package. Its
+representation rule already has executing controls in
+`../../kernel/inductive/seed-nested.md`; those controls use ordinary
+`declare_def` checked-transparent Sigma aliases and do not count as a Pair
+provider.
 
 ### kernel/inductive/canonical-pair-positive-path-unfolds-to-sigma
 
@@ -204,19 +216,24 @@ These cases are RED-UNTIL the canonical Pair package and compose with
   `data Good = MkGood (Pair Good Unit)` and
   `data Bad = MkBad (Pair (Bad -> Empty) Unit)` through the ordinary inductive
   admission path. The kernel fixture supplies already-resolved `Unit`/`Empty`;
-  this case does not classify their surface availability. Repeat both
-  declarations with a freshly named transparent
-  `Product A B = (x : A) × B` substituted for Pair.
-- expect: both `Good` variants accept by reducing the transparent head to Sigma
-  and following a positive component. Both `Bad` variants reject when the same
-  reduction reaches `Bad` in the arrow domain at negative polarity. Renaming
-  the transparent head leaves both verdicts unchanged.
-- controls: replace `Product` with an opaque or unknown type former of the same
-  kind; a recursive payload fails closed as unknown. Replace only
-  `(Bad -> Empty)` with `Bad`; that positive control accepts.
-- why: a Pair spelling allow-list fails the renamed positives; blanket traversal
-  fails the opaque control; treating an outer positive component as recursively
-  all-positive fails the negative pair.
+  this case does not classify their surface availability.
+- expect: `Good` accepts by reducing the transparent head to Sigma and following
+  a positive component. `Bad` rejects when the same reduction reaches `Bad` in
+  the arrow domain at negative polarity.
+- controls: rerun `nested-ds9-shapes-admitted` and
+  `nested-negative-transparent-sigma-control`. Their exact executing bindings
+  are
+  `checked_transparent_sigma_aliases_admit_renamed_nested_paths` and
+  `checked_transparent_sigma_alias_rejects_inner_arrow_negative` in
+  `crates/ken-kernel/tests/nested_inductives_remaining.rs`. They admit two
+  distinct checked-transparent definitions with the same Sigma body, require
+  both renamed positive paths to accept, require the inner-arrow negative to
+  reject, and require the direct recursive payload to accept. The opaque and
+  unknown-head controls in that suite remain fail-closed.
+- why: the current controls establish representation- and name-independence at
+  the same kernel seam without pretending to supply the future public Pair
+  identity. The RED-UNTIL arm must instantiate that rule through the canonical
+  imported declaration rather than a spelling allow-list or a second mechanism.
 
 ## AC6 — deferred cluster and later closure use one flipping seam
 
