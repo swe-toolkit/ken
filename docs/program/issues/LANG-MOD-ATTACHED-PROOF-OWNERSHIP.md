@@ -5,11 +5,24 @@ status: draft
 owner: spec
 size: S
 gate: none
-depends_on: []
+depends_on: [LANG-MOD-CATALOG-COMPLETENESS]
 blocks: []
 github: null
 origin: "Component B third structural wall (language-implementer evt_4757hgk2t2mj6): LawfulClasses attaching lt_asym/eq_sound to imported Derived.pair_compare. Ruled convert-to-local, no loader extension, by spec-author evt_6wbz5eeh5v1y6, Architect evt_7d90kztv4n7hv part I, spec-leader evt_2fgr39s4ghebn / evt_2grrxacejq6f5. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
+
+> # FRAMED + SCHEDULED 2026-08-25 — LANG-MOD campaign tail (operator direction)
+>
+> WP frame authored: `docs/program/wp/LANG-MOD-ATTACHED-PROOF-OWNERSHIP.md`.
+> Operator (2026-08-21) directed the two new LANG-MOD nodes be scheduled at the
+> END of the module/import work — after Component B
+> ([[LANG-MOD-CATALOG-COMPLETENESS]]) — and BEFORE the interrupted verify/z3
+> FO-checker lane resumes ([[V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY]] /
+> [[V3-FO-EMBEDDING-ADEQUACY]]). `depends_on: [LANG-MOD-CATALOG-COMPLETENESS]`
+> now encodes that schedule. The design is fully ruled (convert-to-local, closed
+> namespace); this WP transcribes it into normative spec text + conformance,
+> owner spec. Stays `draft` until Steward releases it as the campaign tail. Not
+> released yet.
 
 > # DRAFT — codifies EXISTING behavior; does NOT gate Component B's build
 >
