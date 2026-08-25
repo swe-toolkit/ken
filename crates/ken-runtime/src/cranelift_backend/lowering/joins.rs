@@ -53,6 +53,62 @@ pub(super) fn set_trap_identity_mutation(mutation: TrapIdentityMutation) {
     TRAP_IDENTITY_MUTATION.with(|cell| cell.set(mutation));
 }
 
+/// Compile-preserving mutations for the carried Bool dispatcher and its
+/// non-Bool class gate. Each mutation changes one production decision and
+/// records whether the real lowering site applied it.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend::lowering) enum CarriedMatchDispatchMutation {
+    Exact,
+    ReverseBoolMapping,
+    BypassBoolTagGuard,
+    AdmitIntClass,
+}
+
+#[cfg(test)]
+thread_local! {
+    static CARRIED_MATCH_DISPATCH_MUTATION:
+        std::cell::Cell<CarriedMatchDispatchMutation> =
+        const { std::cell::Cell::new(CarriedMatchDispatchMutation::Exact) };
+    static CARRIED_MATCH_DISPATCH_MUTATION_HITS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend::lowering) fn with_carried_match_dispatch_mutation<T>(
+    mutation: CarriedMatchDispatchMutation,
+    body: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Reset {
+        mutation: CarriedMatchDispatchMutation,
+        hits: usize,
+    }
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            CARRIED_MATCH_DISPATCH_MUTATION.with(|cell| cell.set(self.mutation));
+            CARRIED_MATCH_DISPATCH_MUTATION_HITS.with(|cell| cell.set(self.hits));
+        }
+    }
+
+    let reset = Reset {
+        mutation: CARRIED_MATCH_DISPATCH_MUTATION
+            .with(|cell| cell.replace(mutation)),
+        hits: CARRIED_MATCH_DISPATCH_MUTATION_HITS.with(|cell| cell.replace(0)),
+    };
+    let result = body();
+    let hits = CARRIED_MATCH_DISPATCH_MUTATION_HITS.with(std::cell::Cell::get);
+    drop(reset);
+    (result, hits)
+}
+
+#[cfg(test)]
+fn carried_match_dispatch_mutation_applies(mutation: CarriedMatchDispatchMutation) -> bool {
+    let applies = CARRIED_MATCH_DISPATCH_MUTATION.with(|cell| cell.get() == mutation);
+    if applies {
+        CARRIED_MATCH_DISPATCH_MUTATION_HITS.with(|cell| cell.set(cell.get().saturating_add(1)));
+    }
+    applies
+}
 
 /// One general scalar-merge decision observed by the governed
 /// `RT-DYNAMIC-ARM-SCALAR-MERGE` control.
@@ -696,6 +752,118 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+    fn lower_carried_bool_match(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        scrutinee: CarriedBoundaryWord,
+        cases: &[crate::RuntimeMatchCase],
+        default: &RuntimeTrap,
+        static_origin: StaticOriginId,
+        env: &[LoweringEnvironmentBinding],
+        join_plan: &JoinPlanToken,
+        bool_cases: BoolMatchCaseOrdinals,
+        composed_suffix: Option<&[EliminatorFrame<'_>]>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let (false_ordinal, true_ordinal) = (bool_cases.false_ordinal(), bool_cases.true_ordinal());
+        #[cfg(test)]
+        let (false_ordinal, true_ordinal) = if carried_match_dispatch_mutation_applies(
+            CarriedMatchDispatchMutation::ReverseBoolMapping,
+        ) {
+            (true_ordinal, false_ordinal)
+        } else {
+            (false_ordinal, true_ordinal)
+        };
+
+        #[cfg(test)]
+        let payload = if carried_match_dispatch_mutation_applies(
+            CarriedMatchDispatchMutation::BypassBoolTagGuard,
+        ) {
+            self.emit_carrier_scalar(builder, scrutinee)?
+        } else {
+            self.merge_scalar_operand(
+                builder,
+                LoweringOperand::Carried(scrutinee),
+                Some(ScalarMergeKind::Bool),
+                "a carried Bool Match",
+            )?
+            .0
+            .payload
+        };
+        #[cfg(not(test))]
+        let payload = self
+            .merge_scalar_operand(
+                builder,
+                LoweringOperand::Carried(scrutinee),
+                Some(ScalarMergeKind::Bool),
+                "a carried Bool Match",
+            )?
+            .0
+            .payload;
+        Self::require_one_of_i64(builder, payload, &[0, 1]);
+
+        let false_body = builder.create_block();
+        let true_body = builder.create_block();
+        let is_false =
+            builder
+                .ins()
+                .icmp_imm(cranelift_codegen::ir::condcodes::IntCC::Equal, payload, 0);
+        builder
+            .ins()
+            .brif(is_false, false_body, &[], true_body, &[]);
+
+        let merge = join_plan
+            .has_continuing_predecessor
+            .then(|| builder.create_block());
+        if let Some(merge) = merge {
+            self.append_planned_join_params(builder, merge, join_plan);
+        }
+        let mut merge_kind = None;
+        for (block, ordinal) in [(false_body, false_ordinal), (true_body, true_ordinal)] {
+            builder.switch_to_block(block);
+            let case = &cases[ordinal];
+            let body = self.case_body_occurrence(static_origin, ordinal, &case.body)?;
+            let body_origin = body.static_origin;
+            let lowered = match composed_suffix {
+                Some(suffix) if !suffix.is_empty() => {
+                    self.lower_computational_producer_expr(builder, body, env, suffix)?
+                }
+                Some(_) | None => self.lower_expr(builder, body, env)?,
+            };
+            if self.seal_source_trap_branch(builder, &lowered)? {
+                continue;
+            }
+            let merge = merge.ok_or_else(|| {
+                backend_module(
+                    "join plan omitted a merge despite a continuing predecessor".to_string(),
+                )
+            })?;
+            self.jump_planned_join_arm(
+                builder,
+                merge,
+                join_plan,
+                body_origin,
+                lowered,
+                &mut merge_kind,
+                "a carried Bool Match arm",
+            )?;
+        }
+
+        let Some(merge) = merge else {
+            let unreachable_continuation = builder.create_block();
+            builder.switch_to_block(unreachable_continuation);
+            return Ok(LoweringOperand::Specialized(Lowered::Trap(default.clone())));
+        };
+        self.finish_planned_join(
+            builder,
+            merge,
+            join_plan,
+            merge_kind,
+            "a carried Bool Match join",
+        )
+    }
+}
+
+impl<'a> Lowering<'a> {
         fn lower_carried_constructor_match(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
@@ -707,6 +875,46 @@ impl<'a> Lowering<'a> {
             join_plan: &JoinPlanToken,
         composed_suffix: Option<&[EliminatorFrame<'_>]>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
+            // The planner classifies the exact Bool family in the typed identity
+            // namespace before lowering emits a case block. Lowering receives only
+            // the order-independent case ordinals, never a role spelling.
+            if let Some(bool_cases) = self
+                .static_transition_plan
+                .bool_match_case_ordinals(static_origin)?
+            {
+                return self.lower_carried_bool_match(
+                    builder,
+                    scrutinee,
+                    cases,
+                    default,
+                    static_origin,
+                    env,
+                    join_plan,
+                    bool_cases,
+                    composed_suffix,
+                );
+            }
+
+            // Every non-Bool ordinary constructor family admits only the
+            // Constructor class before the unchanged node tag/arity/field chain.
+            // This makes all immediate scalar classes and scalar spill handles
+            // fail closed before a node-only observation.
+            let class = self.emit_carrier_class(builder, scrutinee)?;
+            #[cfg(test)]
+            if carried_match_dispatch_mutation_applies(
+                CarriedMatchDispatchMutation::AdmitIntClass,
+            ) {
+                Self::require_one_of_i64(
+                    builder,
+                    class,
+                    &[BoundaryClass::Constructor as i64, BoundaryClass::Int as i64],
+                );
+            } else {
+                Self::require_i64(builder, class, BoundaryClass::Constructor as i64);
+            }
+            #[cfg(not(test))]
+            Self::require_i64(builder, class, BoundaryClass::Constructor as i64);
+
             // Read identity and arity ONCE, ahead of the chain: both are properties
             // of the scrutinee, not of any case, and re-reading per case would be a
             // second answer to a question that has one.

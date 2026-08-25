@@ -59,8 +59,8 @@ pub(super) use static_transition::{
     RequiredConsumerProjectionDisposition, ScaleBPlanCensus,
 };
 pub(super) use static_transition::{
-    planned_partiality_trap, CaseEmissionStatus, ConstructorIdentity, DeclarationCallTargetClass,
-    JoinPlanToken,
+    planned_partiality_trap, BoolMatchCaseOrdinals, CaseEmissionStatus, ConstructorIdentity,
+    DeclarationCallTargetClass, JoinPlanToken,
     dead_arm_effect_trap,
     JoinResultRepresentation, StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
     SynthesizedFixedConstructorRole,

@@ -359,27 +359,21 @@ fn run_px8ds_retired_flat_control() {
 }
 
 #[cfg(target_os = "linux")]
-// Baseline provisioning shared by both exact px8ds rows. The pairing-reversal
-// fixture passed with 2 MiB and stack-overflowed with 1 MiB on this candidate,
-// so 256 MiB supplies 254 MiB and at least 128x headroom over the measured
-// passing floor. The ordinary px8ds row already used this exact provision on
-// the base; naming and sharing it is not a stack-regression repair.
+// Existing baseline provisioning for the ordinary px8ds row. This WP neither
+// raises nor otherwise changes its stack budget.
 const PX8DS_THREAD_STACK_BYTES: usize = 256 * 1024 * 1024;
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CARRIED-BOOL-ELIMINATOR-DISPATCH.
+// Ignored on the post-D1 operand-provenance residual.
 //
-// Observed signature after the generated-context pairing repair, exactly:
-//   BufferAllocate -> ConsoleIsTerminal(false) -> ResourceRelease
-//   ControlledTrap RuntimeTrap(1), stderr "ken native trap: malformed borrowed
-//   process input"
-//
-// The selected ImmediateBool(false) now reaches the node-only carried Match
-// consumer. That representation-specific eliminator is the distinct successor;
-// this row remains ignored until that successor makes the program genuinely
-// green.
+// The exact Bool dispatcher now calls the tag-checked scalar helper at
+// `ken_continuation_context_0`; the node-only Bool refusal is gone. The host
+// observation remains `ConsoleIsTerminal(false)`, but the generated context
+// receives canonical `ImmediateBool` payload 1 and therefore selects True. Its
+// continuation returns -1 before a second Console effect. This is upstream of
+// case mapping and distinct from the eliminated node/immediate mismatch.
 #[test]
-#[ignore = "RT-CARRIED-BOOL-ELIMINATOR-DISPATCH: paired ImmediateBool(false) reaches the node-only carried Match and refuses before either Bool arm"]
+#[ignore = "post-D1 px8ds residual: generated context receives Bool payload 1 after host false"]
 fn px8ds_real_same_depth_path_runs_exact_edges() {
     std::thread::Builder::new()
         .name("px8ds-real-siblings".to_string())
@@ -438,62 +432,6 @@ fn run_px8ds_real_same_depth_path() {
             ken_runtime::HostOpV1::ResourceRelease,
         ]
     );
-}
-
-#[cfg(target_os = "linux")]
-// Mutation proof for RT-GENERATED-CONTINUATION-OPERAND-PAIRING. This row stays
-// ignored with HALF B: it deliberately restores the retired whole-Parameter-run
-// reversal and asserts the old root pairing residual. The application counter
-// proves the mutation reached production reconstruction, while the unchanged
-// effect trace keeps the observation on the same Console-return path.
-//
-// Evidence class: manually invoked, non-gating mutation witness. Because it is
-// ignored, it supplies no CI coverage and is not a transition sentinel. At the
-// RT-CARRIED-BOOL-ELIMINATOR-DISPATCH kickoff review, before changing ordinary
-// HALF B, remove together the backend test-support export, the lowering hook
-// (including its units.rs activation), and this ignored CLI row.
-#[test]
-#[ignore = "RT-GENERATED-CONTINUATION-OPERAND-PAIRING targeted mutation proof; the ordinary HALF B remains held on the distinct Bool eliminator successor"]
-fn px8ds_whole_context_parameter_reversal_restores_pairing_residual() {
-    std::thread::Builder::new()
-        .name("px8ds-pairing-reversal".to_string())
-        .stack_size(PX8DS_THREAD_STACK_BYTES)
-        .spawn(|| {
-            let (observation, applications) =
-                ken_runtime::with_generated_context_whole_parameter_reversal(
-                    observe_px8ds_real_same_depth_path,
-                );
-            assert!(
-                applications > 0,
-                "the reversal mutation must reach generated-context reconstruction"
-            );
-            assert_eq!(observation.exit_status, 1, "{observation:?}");
-            assert_eq!(
-                observation.terminal_error,
-                Some(ken_runtime::TerminalErrorV1::RuntimeTrap(4)),
-                "whole-run reversal must restore the old root -4 pairing sentinel"
-            );
-            assert_eq!(
-                observation.stderr, b"ken native trap: explicit entry trap\n",
-                "the mutation must restore the exact pre-repair terminal observation"
-            );
-            assert_eq!(
-                observation
-                    .effect_trace
-                    .iter()
-                    .map(|event| event.operation)
-                    .collect::<Vec<_>>(),
-                vec![
-                    ken_runtime::HostOpV1::BufferAllocate,
-                    ken_runtime::HostOpV1::ConsoleIsTerminal,
-                    ken_runtime::HostOpV1::ResourceRelease,
-                ],
-                "the mutation must restore the old pairing residual on the same effect path"
-            );
-        })
-        .expect("spawn large-stack PX8-DS pairing mutation control")
-        .join()
-        .expect("PX8-DS pairing mutation control thread");
 }
 
 #[cfg(target_os = "linux")]

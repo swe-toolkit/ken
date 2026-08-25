@@ -44,7 +44,9 @@ use abi::AbiPlane;
 use abi::install_continuation_specialization_abi;
 use semantic_ir::{SemanticMaterialArena, SemanticPlane, SemanticSourceKind, SemanticSourceSeed};
 #[cfg_attr(not(test), allow(unused_imports))]
-use semantic_ir::build_synthesized_constructor_inventory;
+use semantic_ir::{
+    build_bool_constructor_inventory, build_synthesized_constructor_inventory,
+};
 #[cfg_attr(not(test), allow(unused_imports))]
 use semantic_ir::RuntimeExprShape;
 // `RT-CONTSRC-PRODUCER-LOCAL` `D2` — the shape vocabulary, so a producer-local
@@ -74,7 +76,8 @@ pub(in crate::cranelift_backend) use semantic_ir::{
     with_d2a_population_mutation, D2aPopulationMutation,
 };
 pub(in crate::cranelift_backend) use semantic_ir::{
-    ConstructorIdentity, FieldIdentity, SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
+    BoolMatchCaseOrdinals, ConstructorIdentity, FieldIdentity, SynthesizedConstructorRole,
+    SynthesizedFixedConstructorRole,
 };
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
 pub(in crate::cranelift_backend) use units::{

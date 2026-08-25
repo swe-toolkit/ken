@@ -238,8 +238,8 @@ pub(in crate::cranelift_backend) use super::planning::{
     // eliminator checks its assembled run against it. ⛔ Ungated here and in
     // `planning.rs`, because a `cfg(test)` re-export of an item production reads
     // is an unresolved import the test profile cannot see.
-    BoundaryClosureEnvironment, CheckedCaseBinderLayout, CheckedCaseBinderRole,
-    CheckedIhEnvironmentTransport,
+    BoolMatchCaseOrdinals, BoundaryClosureEnvironment, CheckedCaseBinderLayout,
+    CheckedCaseBinderRole, CheckedIhEnvironmentTransport,
     CheckedIhTransportInputDestination, CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
     DeclarationCallTargetClass,
     ContinuationContextId, ContinuationEmissionOwner,
@@ -3559,65 +3559,6 @@ enum LoweringOperand {
     Specialized(Lowered),
     /// A runtime boundary word, eliminated only by emitted helpers.
     Carried(CarriedBoundaryWord),
-}
-
-#[cfg(any(test, feature = "px8-ds-test-support"))]
-thread_local! {
-    static GENERATED_CONTEXT_WHOLE_PARAMETER_REVERSAL: std::cell::Cell<bool> =
-        const { std::cell::Cell::new(false) };
-    static GENERATED_CONTEXT_WHOLE_PARAMETER_REVERSAL_APPLICATIONS: std::cell::Cell<u32> =
-        const { std::cell::Cell::new(0) };
-}
-
-#[cfg(any(test, feature = "px8-ds-test-support"))]
-#[doc(hidden)]
-pub fn with_generated_context_whole_parameter_reversal<R>(
-    run: impl FnOnce() -> R,
-) -> (R, u32) {
-    struct Restore {
-        enabled: bool,
-        applications: u32,
-    }
-
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            GENERATED_CONTEXT_WHOLE_PARAMETER_REVERSAL
-                .with(|cell| cell.set(self.enabled));
-            GENERATED_CONTEXT_WHOLE_PARAMETER_REVERSAL_APPLICATIONS
-                .with(|cell| cell.set(self.applications));
-        }
-    }
-
-    let restore = Restore {
-        enabled: GENERATED_CONTEXT_WHOLE_PARAMETER_REVERSAL
-            .with(|cell| cell.replace(true)),
-        applications: GENERATED_CONTEXT_WHOLE_PARAMETER_REVERSAL_APPLICATIONS
-            .with(|cell| cell.replace(0)),
-    };
-    let result = run();
-    let applications = GENERATED_CONTEXT_WHOLE_PARAMETER_REVERSAL_APPLICATIONS
-        .with(std::cell::Cell::get);
-    drop(restore);
-    (result, applications)
-}
-
-fn generated_context_whole_parameter_reversal_enabled() -> bool {
-    #[cfg(any(test, feature = "px8-ds-test-support"))]
-    {
-        return GENERATED_CONTEXT_WHOLE_PARAMETER_REVERSAL
-            .with(std::cell::Cell::get);
-    }
-    #[cfg(not(any(test, feature = "px8-ds-test-support")))]
-    {
-        false
-    }
-}
-
-fn record_generated_context_whole_parameter_reversal() {
-    #[cfg(any(test, feature = "px8-ds-test-support"))]
-    GENERATED_CONTEXT_WHOLE_PARAMETER_REVERSAL_APPLICATIONS.with(|cell| {
-        cell.set(cell.get().saturating_add(1));
-    });
 }
 
 /// **THE ONE BINDING AUTHORITY** for a lexical environment (`RT-WORKER-BIND`

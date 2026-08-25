@@ -79,9 +79,7 @@ pub(crate) use artifact::api::{
 // into the private `lowering` module severs that path, and neither
 // `-p ken-runtime` build config can observe the break — only the consumer can.
 #[cfg(feature = "px8-ds-test-support")]
-pub use lowering::{
-    with_generated_context_whole_parameter_reversal, with_px8ds_retired_flat_order,
-};
+pub use lowering::with_px8ds_retired_flat_order;
 
 // `RT-MATCH-RECURSOR-CONSUMERS` 4a: the cross-crate census surface, reached as
 // `ken_runtime::{with_match_recursor_census, MatchRecursorCensusRow}` through

@@ -4376,6 +4376,13 @@ fn the_owner_classification_has_a_closed_production_naming_inventory() {
             // only its definition file moved (same shape as the
             // `PredeclaredFunctionId` note below).
             "pub(in crate::cranelift_backend) struct ConstructorIdentity(pub(super) DenseRange);",
+            // `RT-CARRIED-BOOL-ELIMINATOR-DISPATCH` adds one opaque result
+            // and two read-only projections. The canonical Bool role enum and
+            // its identity map remain planner-private; lowering can only read
+            // the two ordinals the planner already classified.
+            "pub(in crate::cranelift_backend) struct BoolMatchCaseOrdinals {",
+            "pub(in crate::cranelift_backend) fn false_ordinal(self) -> usize {",
+            "pub(in crate::cranelift_backend) fn true_ordinal(self) -> usize {",
             "pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {",
             "pub(in crate::cranelift_backend) struct SynthesizedIoErrorRole(pub(super) u32);",
             "pub(in crate::cranelift_backend) enum SynthesizedConstructorRole {",
@@ -4435,12 +4442,16 @@ fn the_owner_classification_has_a_closed_production_naming_inventory() {
          that seam without claiming production reachability. The IO token's \
          field remains parent-private and lowering can only receive one from \
          the plan.\n\
+         `RT-CARRIED-BOOL-ELIMINATOR-DISPATCH` adds the opaque Bool-case ordinal \
+         pair and its two read-only projections. The canonical role enum and \
+         identity inventory remain `pub(super)`; lowering receives no spelling \
+         or identity resolver and cannot construct the ordinal pair.\n\
          ⛔ What is NOT widened, and is the thing this pin most needs to keep \
          catching: `SemanticPlane` and its `names` arena stay `pub(super)`. The \
          Architect's ruling forbids resolving a consumer's need by widening the \
          plane, and `D1` is deliberately a capability export instead. A future \
          `SemanticPlane` or `names` line appearing in this list is the \
-         violation, not a fifth capability.\n\
+         violation, not an additional plane capability.\n\
          ⚠ This is a DECLARATION inventory, not a proof of inertness: a \
          widening of the OWNER surface is a DELIBERATE REVIEW EVENT that must \
          be argued here, not absorbed. It entails nothing by itself about what \
