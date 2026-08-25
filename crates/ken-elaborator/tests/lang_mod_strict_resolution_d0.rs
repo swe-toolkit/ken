@@ -607,6 +607,7 @@ fn catalog_ambient_passthrough_migration_census() {
     .map(str::to_string)
     .collect::<BTreeSet<_>>();
     let expected_residuals = [
+        "Algorithm.Searching.OrderedSearch",
         "Algorithm.Sorting.InsertionSort",
         "Application.CommandLine.ArgParse",
         "Application.Configuration.Decoder",
