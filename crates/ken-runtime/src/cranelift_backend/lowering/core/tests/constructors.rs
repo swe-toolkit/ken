@@ -16,6 +16,9 @@ use crate::cranelift_backend::lowering::aggregates::tests::{
     d7_constructor_arguments, d7_ownership_run,
 };
 use crate::boundary_value::BoundaryWord;
+use crate::cranelift_backend::lowering::joins::{
+    with_carried_match_dispatch_mutation, CarriedMatchDispatchMutation,
+};
 use crate::cranelift_backend::lowering::units::generated_context_source_environment;
 
 // RT-SPLIT slice 7, rule 8: dependencies carried in with the moved
@@ -2604,33 +2607,560 @@ fn generated_context_pairing_keeps_selected_parameter_before_both_capture_runs()
     );
 }
 
-/// Mutation proof for the unchanged structural oracle above: restoring the old
-/// whole-five-word reversal keeps the same eight words and types, but moves the
-/// final raw capture to position zero and makes the equality assertion red.
+// `RT-CARRIED-BOOL-ELIMINATOR-DISPATCH` — exact carried Bool elimination.
+
+fn d1_carried_match_default() -> RuntimeTrap {
+    RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "D1 carried Match closed default".to_string(),
+    }
+}
+
+fn d1_match_case(constructor: String, binders: usize, selected: i64) -> RuntimeMatchCase {
+    RuntimeMatchCase {
+        constructor,
+        binders,
+        body: RuntimeExpr::Value(RuntimeValue::Int(selected.into())),
+    }
+}
+
+fn d1_match_expr(cases: Vec<RuntimeMatchCase>) -> RuntimeExpr {
+    RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Var(0)),
+        cases,
+        default: d1_carried_match_default(),
+    }
+}
+
+fn d1_compile_carried_match_consumer<'src>(
+    source: &'src RuntimeExpr,
+    symbols: &crate::NativeProcessSymbols,
+) -> Result<(cranelift_jit::JITModule, *const u8, Vec<i64>), CraneliftBackendError> {
+    let plan = plan_static_transition_graph_with_symbols(
+        source,
+        &BTreeMap::new(),
+        symbols,
+        AbiRootIngress::Value,
+        true,
+    )?;
+    let match_origin = plan
+        .root_static_origin()
+        .expect("the carried Match fixture has a root occurrence");
+    let (cases, default) = match source {
+        RuntimeExpr::Match { cases, default, .. } => (cases, default),
+        _ => unreachable!("the fixture is a Match"),
+    };
+    let selected_values = cases
+        .iter()
+        .map(|case| match &case.body {
+            RuntimeExpr::Value(RuntimeValue::Int(crate::RuntimeIntV1::Small(value))) => *value,
+            _ => panic!("the focused carried-Match fixture uses small Int case results"),
+        })
+        .collect::<Vec<_>>();
+    let seed_env = NativeSeedEnvironment::empty();
+    let (module, code) = ac_c7_try_compile_edge_with_operands(
+        &seed_env,
+        plan,
+        1,
+        |compiler, builder, operands| {
+            compiler.enter_source_occurrence_plan(match_origin)?;
+            let lowered = compiler.lower_carried_match(
+                builder,
+                CarriedBoundaryWord { word: operands[0] },
+                cases,
+                default,
+                match_origin,
+                &[],
+                None,
+            )?;
+            Ok(compiler
+                .merge_scalar_operand(
+                    builder,
+                    lowered,
+                    Some(ScalarMergeKind::Int),
+                    "a focused carried Match result",
+                )?
+                .0
+                .payload)
+        },
+    )?;
+    Ok((module, code, selected_values))
+}
+
+fn d1_bool_match_expr() -> RuntimeExpr {
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    // True intentionally precedes False. The result therefore proves the
+    // planner passed role ordinals rather than lowering assuming source order.
+    d1_match_expr(vec![
+        d1_match_case(symbols.bool_true, 0, 73),
+        d1_match_case(symbols.bool_false, 0, 41),
+    ])
+}
+
+fn d1_raw_immediate(tag: BoundaryTag, payload: u64) -> i64 {
+    ((payload << crate::boundary_value::BOUNDARY_TAG_BITS) | tag as u64) as i64
+}
+
+fn d1_run_carried_word(code: *const u8, arena: *const u64, word: i64) -> i64 {
+    c2_run_edge_with_arg(code, arena, word)
+}
+
+/// Durable invariant: one compiled dispatcher maps canonical payload 0 to the
+/// planner-owned False ordinal and payload 1 to the planner-owned True ordinal,
+/// even though the source cases are declared in the opposite order.
+///
+/// MEASURED: one JIT body returns distinct literal results for payloads 0 and 1.
+/// CLAIMED: typed role identities, not case position, select False and True.
+/// THE GAP: this focused fixture has no composed suffix; px8ds measures that
+/// production shape separately and currently advances to a later residual.
 #[test]
-fn generated_context_pairing_oracle_reddens_on_whole_run_reversal() {
-    let selected_false = BoundaryWord::immediate(BoundaryTag::ImmediateBool, 0).0;
-    let ((observed, expected), applications) =
-        crate::cranelift_backend::lowering::with_generated_context_whole_parameter_reversal(|| {
-            generated_context_pairing_words(selected_false)
-        });
+fn carried_bool_dispatch_selects_exact_false_and_true_ordinals() {
+    let source = d1_bool_match_expr();
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let (_module, code, selected) =
+        d1_compile_carried_match_consumer(&source, &symbols).expect("exact Bool family lowers");
+    assert_ne!(
+        selected[0], selected[1],
+        "the two case bodies must have distinct observed Int results"
+    );
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
     assert_eq!(
-        applications, 1,
-        "the mutation must reach the production helper"
+        d1_run_carried_word(
+            code,
+            base,
+            d1_raw_immediate(BoundaryTag::ImmediateBool, 0),
+        ),
+        selected[1],
+        "payload 0 must select False, which is source ordinal 1"
+    );
+    assert_eq!(
+        d1_run_carried_word(
+            code,
+            base,
+            d1_raw_immediate(BoundaryTag::ImmediateBool, 1),
+        ),
+        selected[0],
+        "payload 1 must select True, which is source ordinal 0"
+    );
+}
+
+/// Durable invariant: Bool is a finite two-point scalar, never a nonzero truth
+/// convention. A well-tagged payload 2 refuses before selecting either arm.
+///
+/// MEASURED: a tag-correct raw payload 2 returns the carrier refusal status.
+/// CLAIMED: only payloads 0 and 1 inhabit canonical carried Bool.
+/// THE GAP: this row does not test the tag guard; the real tag-7 node row does.
+#[test]
+fn carried_bool_dispatch_refuses_payload_two() {
+    let source = d1_bool_match_expr();
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let (_module, code, _) =
+        d1_compile_carried_match_consumer(&source, &symbols).expect("exact Bool family lowers");
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    assert_eq!(
+        d1_run_carried_word(
+            code,
+            base,
+            d1_raw_immediate(BoundaryTag::ImmediateBool, 2),
+        ),
+        -1,
+        "payload 2 must refuse at the finite Bool discriminator"
+    );
+}
+
+fn d1_compile_borrowed_word_producer() -> (cranelift_jit::JITModule, *const u8) {
+    static SOURCE: RuntimeExpr = RuntimeExpr::Var(0);
+    let (plan, origin) = planned_root_occurrence(&SOURCE);
+    let seed_env = NativeSeedEnvironment::empty();
+    c2_compile_edge_with_arg(
+        "d1_borrowed_bool_hostile",
+        &seed_env,
+        plan,
+        move |compiler, builder, pointer| {
+            Ok(compiler
+                .transfer_into_carrier(builder, origin, &Lowered::BorrowedNativeValue { pointer })?
+                .word)
+        },
+    )
+}
+
+/// Durable invariant: a real tag-7 BorrowedOpaque node whose scalar happens to
+/// be 0 or 1 remains the wrong family and cannot enter a Bool arm.
+///
+/// MEASURED: production transfer mints tag-7 nodes with scalars 0 and 1, and
+/// the Bool consumer refuses both.
+/// CLAIMED: scalar shape cannot substitute for exact `ImmediateBool` identity.
+/// THE GAP: this exercises one hostile handle class, not every non-Bool class.
+#[test]
+fn carried_bool_dispatch_refuses_real_tag_seven_nodes_with_bool_shaped_scalars() {
+    let source = d1_bool_match_expr();
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let (_consumer_module, consumer, _) =
+        d1_compile_carried_match_consumer(&source, &symbols).expect("exact Bool family lowers");
+    let (_producer_module, producer) = d1_compile_borrowed_word_producer();
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    for scalar in [0, 1] {
+        let hostile = c2_run_edge_with_arg(producer, base, scalar);
+        assert_eq!(
+            BoundaryWord(hostile as u64).tag(),
+            Some(BoundaryTag::InvocationBorrowed),
+            "the hostile producer must mint the real tag-7 lane"
+        );
+        assert_eq!(
+            d1_run_carried_word(consumer, base, hostile),
+            -1,
+            "tag 7 with Bool-shaped scalar {scalar} must refuse"
+        );
+    }
+}
+
+/// Mutation proof: swapping only the planner-selected target ordinals reverses
+/// both paired observations while preserving the source, payloads, and cases.
+///
+/// MEASURED: the production-site mutation applies once and reverses both results.
+/// CLAIMED: the paired positive row is causally sensitive to the role mapping.
+/// THE GAP: the mutation is test-only and says nothing about planner inventory
+/// construction, which the exact-family controls reach independently.
+#[test]
+fn carried_bool_mapping_oracle_reddens_on_reversed_role_mapping() {
+    let source = d1_bool_match_expr();
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let (compiled, hits) = with_carried_match_dispatch_mutation(
+        CarriedMatchDispatchMutation::ReverseBoolMapping,
+        || d1_compile_carried_match_consumer(&source, &symbols),
+    );
+    let (_module, code, selected) = compiled.expect("the reversed mapping still compiles");
+    assert_eq!(
+        hits, 1,
+        "the mutation must reach the exact Bool dispatcher once"
+    );
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    let false_observed =
+        d1_run_carried_word(code, base, d1_raw_immediate(BoundaryTag::ImmediateBool, 0));
+    let true_observed =
+        d1_run_carried_word(code, base, d1_raw_immediate(BoundaryTag::ImmediateBool, 1));
+    assert_eq!(false_observed, selected[0]);
+    assert_eq!(true_observed, selected[1]);
+    assert_ne!(false_observed, selected[1], "the unchanged False row reds");
+    assert_ne!(true_observed, selected[0], "the unchanged True row reds");
+}
+
+/// Mutation proof: bypassing only the existing exact Bool tag guard makes the
+/// real tag-7 nodes above select by their accidental scalar 0/1.
+///
+/// MEASURED: the bypass applies once and turns both hostile words into arm results.
+/// CLAIMED: the existing tag guard, not later payload logic, owns the refusal.
+/// THE GAP: this proves the Bool guard and not the separate non-Bool class gate.
+#[test]
+fn carried_bool_hostile_oracle_reddens_when_exact_tag_guard_is_bypassed() {
+    let source = d1_bool_match_expr();
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let (compiled, hits) = with_carried_match_dispatch_mutation(
+        CarriedMatchDispatchMutation::BypassBoolTagGuard,
+        || d1_compile_carried_match_consumer(&source, &symbols),
+    );
+    let (_consumer_module, consumer, selected) =
+        compiled.expect("the tag-guard bypass still compiles");
+    assert_eq!(
+        hits, 1,
+        "the bypass must reach the exact Bool dispatcher once"
+    );
+    let (_producer_module, producer) = d1_compile_borrowed_word_producer();
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    let hostile_false = c2_run_edge_with_arg(producer, base, 0);
+    let hostile_true = c2_run_edge_with_arg(producer, base, 1);
+    assert_eq!(
+        d1_run_carried_word(consumer, base, hostile_false),
+        selected[1]
+    );
+    assert_eq!(
+        d1_run_carried_word(consumer, base, hostile_true),
+        selected[0]
     );
     assert_ne!(
-        observed, expected,
-        "the mutation must change the observation"
+        d1_run_carried_word(consumer, base, hostile_false),
+        -1,
+        "the unchanged hostile refusal reds under the guard bypass"
     );
-    assert_ne!(
-        observed[0], selected_false,
-        "whole-run reversal must move the selected caller word out of position zero"
-    );
-    let unchanged_oracle = std::panic::catch_unwind(|| assert_eq!(observed, expected));
+}
+
+fn d1_bool_family_error(cases: Vec<RuntimeMatchCase>) -> CraneliftBackendError {
+    let source = d1_match_expr(cases);
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    match d1_compile_carried_match_consumer(&source, &symbols) {
+        Ok(_) => panic!("an attempted malformed Bool family must refuse before emission"),
+        Err(error) => error,
+    }
+}
+
+fn d1_assert_bool_family_error(error: CraneliftBackendError, fragment: &str) {
+    let CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason)) = error else {
+        panic!("the Bool family must refuse in the planner identity gate: {error:?}");
+    };
     assert!(
-        unchanged_oracle.is_err(),
-        "the unchanged structural oracle must red under whole-run reversal"
+        reason.contains(fragment),
+        "the exact Bool family detector must own the refusal: {reason}"
     );
+}
+
+/// MEASURED: a False-only family returns the planner's exact partial-family error.
+/// CLAIMED: an attempted Bool family must contain both roles before arm emission.
+/// THE GAP: duplicate, mixed, and binder corruption have separate rows below.
+#[test]
+fn carried_bool_family_refuses_a_partial_case_set_pre_arm() {
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    d1_assert_bool_family_error(
+        d1_bool_family_error(vec![d1_match_case(symbols.bool_false, 0, 41)]),
+        "partial canonical Bool family",
+    );
+}
+
+/// MEASURED: two False identities return the exact duplicate-role error.
+/// CLAIMED: each canonical Bool role appears exactly once.
+/// THE GAP: this row does not cover a foreign extra case; the mixed row does.
+#[test]
+fn carried_bool_family_refuses_a_duplicate_role_pre_arm() {
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    d1_assert_bool_family_error(
+        d1_bool_family_error(vec![
+            d1_match_case(symbols.bool_false.clone(), 0, 41),
+            d1_match_case(symbols.bool_false, 0, 43),
+        ]),
+        "duplicates a canonical Bool constructor role",
+    );
+}
+
+/// MEASURED: exact False/True plus one foreign identity returns the mixed error.
+/// CLAIMED: no extra or wrong-family case may enter the Bool dispatcher.
+/// THE GAP: a family containing no Bool role is intentionally the node path and
+/// is measured by the existing two-case carried-constructor control.
+#[test]
+fn carried_bool_family_refuses_a_mixed_extra_case_pre_arm() {
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    d1_assert_bool_family_error(
+        d1_bool_family_error(vec![
+            d1_match_case(symbols.bool_false, 0, 41),
+            d1_match_case(symbols.bool_true, 0, 73),
+            d1_match_case("ctor:fixture::CarriedBool::Other".to_string(), 0, 89),
+        ]),
+        "mixes canonical Bool roles with another constructor case",
+    );
+}
+
+/// MEASURED: an otherwise exact family with one binder returns the binder error.
+/// CLAIMED: canonical False and True are both arity zero before arm emission.
+/// THE GAP: runtime node arity remains the unchanged node-path control's subject.
+#[test]
+fn carried_bool_family_refuses_a_wrong_binder_count_pre_arm() {
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    d1_assert_bool_family_error(
+        d1_bool_family_error(vec![
+            d1_match_case(symbols.bool_false, 1, 41),
+            d1_match_case(symbols.bool_true, 0, 73),
+        ]),
+        "must each bind zero fields",
+    );
+}
+
+fn d1_nat_match_expr() -> RuntimeExpr {
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    d1_match_expr(vec![
+        d1_match_case(symbols.nat_zero, 0, 101),
+        d1_match_case(symbols.nat_suc, 1, 103),
+    ])
+}
+
+/// Durable invariant: both immediate Nat representations explicitly refuse at
+/// the non-Bool class gate for both Zero-shaped and Suc-shaped payloads.
+///
+/// MEASURED: four real words span both Nat tags and payloads 0/1; all return -1.
+/// CLAIMED: neither immediate Nat representation falls through the Bool repair.
+/// THE GAP: the final status alone cannot locate the gate; the spill mutation
+/// below makes class admission observably reach the later default.
+#[test]
+fn carried_non_bool_match_refuses_both_immediate_nat_representations() {
+    let source = d1_nat_match_expr();
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let (_module, consumer, _) =
+        d1_compile_carried_match_consumer(&source, &symbols).expect("Nat family lowers");
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    for tag in [
+        BoundaryTag::ImmediateBoundedNat,
+        BoundaryTag::ImmediateStructuralNat,
+    ] {
+        for payload in [0, 1] {
+            assert_eq!(
+                d1_run_carried_word(consumer, base, d1_raw_immediate(tag, payload)),
+                -1,
+                "{tag:?} payload {payload} must refuse before the node chain"
+            );
+        }
+    }
+}
+
+/// Durable invariant: the two immediate scalar representations that are not
+/// inductive families also refuse at the same non-Bool class gate.
+///
+/// MEASURED: ImmediateInt and ImmediateExitStatus words both return -1.
+/// CLAIMED: opaque scalar carriers are not ordinary constructor families.
+/// THE GAP: this does not exercise their spill routes; the D0 census records
+/// their producer closure while Nat supplies the class-gate spill discriminator.
+#[test]
+fn carried_non_bool_match_refuses_int_and_exit_status_immediates() {
+    let source = d1_nat_match_expr();
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let (_module, consumer, _) =
+        d1_compile_carried_match_consumer(&source, &symbols).expect("Nat family lowers");
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    for (tag, payload) in [
+        (BoundaryTag::ImmediateInt, 37),
+        (BoundaryTag::ImmediateExitStatus, 91),
+    ] {
+        assert_eq!(
+            d1_run_carried_word(consumer, base, d1_raw_immediate(tag, payload)),
+            -1,
+            "{tag:?} is not a constructor family and must refuse before the node chain"
+        );
+    }
+}
+
+#[derive(Clone, Copy)]
+enum D1NatRepresentation {
+    Bounded,
+    Structural,
+}
+
+fn d1_compile_nat_spill_producer(
+    representation: D1NatRepresentation,
+) -> (cranelift_jit::JITModule, *const u8) {
+    static SOURCE: RuntimeExpr = RuntimeExpr::Var(0);
+    let (plan, origin) = planned_root_occurrence(&SOURCE);
+    let seed_env = NativeSeedEnvironment::empty();
+    c2_compile_edge_with_arg(
+        "d1_nat_spill_producer",
+        &seed_env,
+        plan,
+        move |compiler, builder, value| {
+            let lowered = match representation {
+                D1NatRepresentation::Bounded => {
+                    // Drive the production reply-validation mint with the exact
+                    // valid tuple count == effective_request == request_length,
+                    // request_start == reply_start == 0. The caller-controlled
+                    // count therefore reaches transfer only after every progress
+                    // condition has been checked at its natural producer.
+                    let zero = builder.ins().iconst(types::I64, 0);
+                    let one = builder.ins().iconst(types::I64, 1);
+                    let success = builder.ins().icmp_imm(
+                        cranelift_codegen::ir::condcodes::IntCC::Equal,
+                        one,
+                        1,
+                    );
+                    let (minted, _predecessor, _remaining) =
+                        Lowering::mint_validated_progress_nat(
+                            builder,
+                            success,
+                            value,
+                            zero,
+                            value,
+                            value,
+                            Some(zero),
+                        );
+                    Lowered::BoundedNat(minted)
+                }
+                D1NatRepresentation::Structural => {
+                    Lowered::StructuralNat(StructuralNatV1 { value })
+                }
+            };
+            Ok(compiler
+                .transfer_into_carrier(builder, origin, &lowered)?
+                .word)
+        },
+    )
+}
+
+/// Durable invariant plus mutation proof: both Nat spill routes become
+/// PersistentGround Int-class handles and are still refused before the node
+/// chain. Admitting Int at only the new class gate changes both outcomes to the
+/// source default, proving that gate is causal rather than decorative.
+///
+/// MEASURED: the BoundedNat row enters through the production progress mint on
+/// an exact valid tuple above the immediate domain, and both production spill
+/// emitters mint PersistentGround words. Exact lowering returns -1, while one
+/// Int-class admission mutation reaches default.
+/// CLAIMED: the non-Bool class gate explicitly owns both Nat spill refusals.
+/// THE GAP: the mutation is test-only, and its default is this rig's raw zero
+/// rather than the whole-process trap projection.
+#[test]
+fn carried_non_bool_match_refuses_structural_and_bounded_nat_spills() {
+    let source = d1_nat_match_expr();
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let (_exact_module, exact_consumer, _) =
+        d1_compile_carried_match_consumer(&source, &symbols).expect("Nat family lowers");
+    let (mutated, hits) =
+        with_carried_match_dispatch_mutation(CarriedMatchDispatchMutation::AdmitIntClass, || {
+            d1_compile_carried_match_consumer(&source, &symbols)
+        });
+    let (_mutated_module, mutated_consumer, _) =
+        mutated.expect("the Int-class admission mutation compiles");
+    assert_eq!(
+        hits, 1,
+        "the mutation must reach the non-Bool class gate once"
+    );
+    let (_bounded_module, bounded_producer) =
+        d1_compile_nat_spill_producer(D1NatRepresentation::Bounded);
+    let (_structural_module, structural_producer) =
+        d1_compile_nat_spill_producer(D1NatRepresentation::Structural);
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    assert_eq!(
+        c2_run_edge_with_arg(bounded_producer, base, 0),
+        -1,
+        "the natural BoundedNat producer must reject a non-positive count before transfer"
+    );
+    assert_eq!(
+        store.image().0.node_count(),
+        0,
+        "the invalid producer tuple must mint no persistent spill"
+    );
+    let spilling_payload = 1i64 << 56;
+    for (label, producer) in [
+        ("BoundedNat", bounded_producer),
+        ("StructuralNat", structural_producer),
+    ] {
+        let spilled = c2_run_edge_with_arg(producer, base, spilling_payload);
+        let spilled_word = BoundaryWord(spilled as u64);
+        assert_eq!(
+            spilled_word.tag(),
+            Some(BoundaryTag::PersistentGround),
+            "{label} control must actually take the spill route"
+        );
+        assert_eq!(
+            store.image().0.node_field(
+                spilled_word.payload(),
+                crate::boundary_value::NODE_CLASS,
+            ),
+            Some(BoundaryClass::Int as u64),
+            "{label} spill must carry the exact Int class before consumption"
+        );
+        assert_eq!(
+            d1_run_carried_word(exact_consumer, base, spilled),
+            -1,
+            "{label} spill must refuse at the exact Constructor-class gate"
+        );
+        assert_eq!(
+            d1_run_carried_word(mutated_consumer, base, spilled),
+            0,
+            "admitting Int must move {label} past the class gate to this rig's \
+             closed-default return"
+        );
+    }
 }
 
 /// Durable invariant: the raw owner's header is the partition authority. A

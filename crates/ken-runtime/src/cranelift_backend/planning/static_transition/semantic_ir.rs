@@ -42,6 +42,49 @@ thread_local! {
 #[repr(transparent)]
 pub(in crate::cranelift_backend) struct ConstructorIdentity(pub(super) DenseRange);
 
+/// The canonical Bool constructor roles known only to the planner.
+///
+/// Lowering never receives this enum and cannot ask the identity arena to
+/// resolve a spelling. It receives only [`BoolMatchCaseOrdinals`], after the
+/// planner has compared typed [`ConstructorIdentity`] values.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(super) enum BoolConstructorRole {
+    False,
+    True,
+}
+
+impl BoolConstructorRole {
+    const ALL: [Self; 2] = [Self::False, Self::True];
+
+    fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
+        match self {
+            Self::False => &symbols.bool_false,
+            Self::True => &symbols.bool_true,
+        }
+    }
+}
+
+/// The order-independent result of classifying one source `Match` as the exact
+/// canonical Bool family.
+///
+/// The fields are private even to lowering. Its only capability is to select
+/// the already-planned False and True case bodies by ordinal.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct BoolMatchCaseOrdinals {
+    false_ordinal: usize,
+    true_ordinal: usize,
+}
+
+impl BoolMatchCaseOrdinals {
+    pub(in crate::cranelift_backend) fn false_ordinal(self) -> usize {
+        self.false_ordinal
+    }
+
+    pub(in crate::cranelift_backend) fn true_ordinal(self) -> usize {
+        self.true_ordinal
+    }
+}
+
 /// A fixed constructor role synthesized by effect lowering.
 ///
 /// This is a closed capability vocabulary, not a name lookup.  Lowering may
@@ -655,6 +698,17 @@ impl SemanticMaterialArena {
     }
 }
 
+pub(super) fn build_bool_constructor_inventory(
+    arena: &mut SemanticMaterialArena,
+    symbols: &crate::NativeProcessSymbols,
+) -> Result<BTreeMap<BoolConstructorRole, DenseRange>, CraneliftBackendError> {
+    let mut identities = BTreeMap::new();
+    for role in BoolConstructorRole::ALL {
+        identities.insert(role, arena.intern(role.spelling(symbols).as_bytes())?);
+    }
+    Ok(identities)
+}
+
 pub(super) fn build_synthesized_constructor_inventory(
     arena: &mut SemanticMaterialArena,
     symbols: &crate::NativeProcessSymbols,
@@ -838,6 +892,10 @@ pub(super) struct SemanticPlane {
     /// private interner as source constructor atoms.
     synthesized_constructor_roles: BTreeMap<SynthesizedConstructorRole, DenseRange>,
     synthesized_io_error_roles: Vec<SynthesizedIoErrorRole>,
+    /// Canonical Bool identities interned from the already-validated process
+    /// symbols. The role key remains planner-private; lowering receives only a
+    /// classified pair of case ordinals.
+    bool_constructor_roles: BTreeMap<BoolConstructorRole, DenseRange>,
 }
 
 /// The unique pair of shared exit templates, located and checked as a pair.
@@ -1559,6 +1617,9 @@ impl SemanticPlane {
         for span in self.synthesized_constructor_roles.values().copied() {
             record(span)?;
         }
+        for span in self.bool_constructor_roles.values().copied() {
+            record(span)?;
+        }
         Ok(catalog
             .into_iter()
             .map(|(identity, spelling)| (spelling, identity))
@@ -1572,6 +1633,48 @@ impl SemanticPlane {
     ) {
         self.synthesized_constructor_roles = identities;
         self.synthesized_io_error_roles = io_roles;
+    }
+
+    pub(super) fn install_bool_constructor_inventory(
+        &mut self,
+        identities: BTreeMap<BoolConstructorRole, DenseRange>,
+    ) {
+        self.bool_constructor_roles = identities;
+    }
+
+    fn bool_constructor_identity(
+        &self,
+        role: BoolConstructorRole,
+    ) -> Result<ConstructorIdentity, CraneliftBackendError> {
+        let span = self.bool_constructor_roles.get(&role).copied().ok_or_else(|| {
+            planner_error(format!(
+                "canonical Bool constructor role {role:?} is absent from its closed inventory"
+            ))
+        })?;
+        validate_range(
+            span,
+            self.names.len(),
+            "canonical Bool constructor identity is outside the closed name arena",
+        )?;
+        Ok(ConstructorIdentity(span))
+    }
+
+    pub(super) fn validate_bool_constructor_inventory(
+        &self,
+    ) -> Result<(), CraneliftBackendError> {
+        if self.bool_constructor_roles.len() != BoolConstructorRole::ALL.len() {
+            return Err(planner_error(
+                "canonical Bool constructor inventory is not exact for False and True",
+            ));
+        }
+        let false_identity = self.bool_constructor_identity(BoolConstructorRole::False)?;
+        let true_identity = self.bool_constructor_identity(BoolConstructorRole::True)?;
+        if false_identity == true_identity {
+            return Err(planner_error(
+                "canonical Bool False and True roles share one constructor identity",
+            ));
+        }
+        Ok(())
     }
 
     pub(super) fn synthesized_constructor_identity(
@@ -1730,6 +1833,79 @@ impl SemanticPlane {
             SemanticAtomKind::CaseConstructor,
             case_index,
         )?))
+    }
+
+    fn case_binder_count(
+        &self,
+        origin: StaticOriginId,
+        case_index: usize,
+    ) -> Result<usize, CraneliftBackendError> {
+        usize::try_from(
+            self.named_atom(origin, SemanticAtomKind::CaseBinders, case_index)?
+                .payload,
+        )
+        .map_err(|_| planner_capacity_error("source Match case binder count exhausted"))
+    }
+
+    /// Classify the exact canonical Bool family before lowering emits any case
+    /// block. The comparison stays in the typed constructor-identity namespace;
+    /// no ABI word or source spelling crosses this decision.
+    pub(super) fn bool_match_case_ordinals(
+        &self,
+        origin: StaticOriginId,
+    ) -> Result<Option<BoolMatchCaseOrdinals>, CraneliftBackendError> {
+        let case_count = self
+            .operands_of(origin)?
+            .iter()
+            .filter(|atom| atom.kind == SemanticAtomKind::CaseConstructor)
+            .count();
+        let false_identity = self.bool_constructor_identity(BoolConstructorRole::False)?;
+        let true_identity = self.bool_constructor_identity(BoolConstructorRole::True)?;
+        let mut false_ordinals = Vec::new();
+        let mut true_ordinals = Vec::new();
+        let mut other_count = 0usize;
+        for ordinal in 0..case_count {
+            let identity = self.case_constructor_identity(origin, ordinal)?;
+            if identity == false_identity {
+                false_ordinals.push(ordinal);
+            } else if identity == true_identity {
+                true_ordinals.push(ordinal);
+            } else {
+                other_count += 1;
+            }
+        }
+
+        if false_ordinals.is_empty() && true_ordinals.is_empty() {
+            return Ok(None);
+        }
+        if other_count != 0 {
+            return Err(planner_error(
+                "source Match mixes canonical Bool roles with another constructor case",
+            ));
+        }
+        if false_ordinals.len() > 1 || true_ordinals.len() > 1 {
+            return Err(planner_error(
+                "source Match duplicates a canonical Bool constructor role",
+            ));
+        }
+        let ([false_ordinal], [true_ordinal]) =
+            (false_ordinals.as_slice(), true_ordinals.as_slice())
+        else {
+            return Err(planner_error(
+                "source Match has a partial canonical Bool family",
+            ));
+        };
+        if self.case_binder_count(origin, *false_ordinal)? != 0
+            || self.case_binder_count(origin, *true_ordinal)? != 0
+        {
+            return Err(planner_error(
+                "canonical Bool Match cases must each bind zero fields",
+            ));
+        }
+        Ok(Some(BoolMatchCaseOrdinals {
+            false_ordinal: *false_ordinal,
+            true_ordinal: *true_ordinal,
+        }))
     }
 
     /// The artifact-static constructor identity of the `Construct` occurrence at

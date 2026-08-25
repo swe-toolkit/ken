@@ -2739,13 +2739,6 @@ pub(super) fn generated_context_source_environment<T>(
         )));
     }
 
-    if super::generated_context_whole_parameter_reversal_enabled() {
-        super::record_generated_context_whole_parameter_reversal();
-        combined_parameters.reverse();
-        combined_parameters.extend(context_captures);
-        return Ok(combined_parameters);
-    }
-
     let mut captures = combined_parameters.split_off(raw_parameters);
     if converts_source_parameters {
         combined_parameters.reverse();

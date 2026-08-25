@@ -98,8 +98,9 @@ use super::occurrences::{
     build_occurrence_authority_plan, origin_of, validate_occurrence_authority_plan, StaticOriginId,
 };
 use super::semantic_ir::{
-    build_semantic_plane, build_synthesized_constructor_inventory, SemanticMaterialArena,
-    SemanticPlane, SemanticSourceSeed,
+    build_bool_constructor_inventory, build_semantic_plane,
+    build_synthesized_constructor_inventory, SemanticMaterialArena, SemanticPlane,
+    SemanticSourceSeed,
 };
 use super::{
     planner_capacity_error, planner_error, CraneliftBackendError, DeclarationCallTargetClass,
@@ -1090,6 +1091,8 @@ impl<'src> Planner<'src> {
     ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
         let (synthesized_identities, synthesized_io_roles) =
             build_synthesized_constructor_inventory(&mut self.plan.semantic_material, symbols)?;
+        let bool_identities =
+            build_bool_constructor_inventory(&mut self.plan.semantic_material, symbols)?;
         let planned_entry_bodies = self.plan.planned_entry_bodies.clone();
         let entry_bodies = |entry: StaticNodeId| {
             planned_entry_bodies
@@ -1115,6 +1118,10 @@ impl<'src> Planner<'src> {
         self.plan
             .semantic
             .validate_synthesized_constructor_inventory()?;
+        self.plan
+            .semantic
+            .install_bool_constructor_inventory(bool_identities);
+        self.plan.semantic.validate_bool_constructor_inventory()?;
         // Slice 0's substrate closes before ABI descriptors or any emitted
         // allocation can exist. The two populations are independently
         // re-derived and checked; their cross-population closure is a third,

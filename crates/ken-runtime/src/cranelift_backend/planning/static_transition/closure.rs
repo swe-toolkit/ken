@@ -88,8 +88,8 @@ use super::occurrences::{
     validate_occurrence_authority_plan, PlannedOccurrenceAuthority, StaticOriginId,
 };
 use super::semantic_ir::{
-    self, ConstructorIdentity, FieldIdentity, SemanticSourceKind, SynthesizedConstructorRole,
-    SynthesizedIoErrorRole,
+    self, BoolMatchCaseOrdinals, ConstructorIdentity, FieldIdentity, SemanticSourceKind,
+    SynthesizedConstructorRole, SynthesizedIoErrorRole,
 };
 use super::units::{EmittableCallKind, PredeclaredFunctionId};
 #[cfg_attr(not(test), allow(unused_imports))]
@@ -1182,6 +1182,16 @@ impl<'src> StaticTransitionPlan<'src> {
         case_index: usize,
     ) -> Result<ConstructorIdentity, CraneliftBackendError> {
         self.semantic.case_constructor_identity(origin, case_index)
+    }
+
+    /// Classify one `Match` occurrence as the exact canonical Bool family.
+    /// Lowering receives only the False/True ordinals, never the private role
+    /// vocabulary or its symbol spellings.
+    pub(in crate::cranelift_backend) fn bool_match_case_ordinals(
+        &self,
+        origin: StaticOriginId,
+    ) -> Result<Option<BoolMatchCaseOrdinals>, CraneliftBackendError> {
+        self.semantic.bool_match_case_ordinals(origin)
     }
 
     /// The artifact-static constructor identity of a `Construct` occurrence —
@@ -3189,6 +3199,12 @@ mod tests {
         )
         .unwrap();
         reordered.install_synthesized_constructor_inventory(reordered_roles, reordered_io_roles);
+        let reordered_bool_roles = build_bool_constructor_inventory(
+            &mut reordered_material,
+            &crate::NativeProcessSymbols::legacy_prelude(),
+        )
+        .unwrap();
+        reordered.install_bool_constructor_inventory(reordered_bool_roles);
         assert_eq!(reordered, plan.semantic);
 
         let mut changed_frames = plan.nodes.clone();
@@ -3217,6 +3233,12 @@ mod tests {
         )
         .unwrap();
         changed.install_synthesized_constructor_inventory(changed_roles, changed_io_roles);
+        let changed_bool_roles = build_bool_constructor_inventory(
+            &mut changed_material,
+            &crate::NativeProcessSymbols::legacy_prelude(),
+        )
+        .unwrap();
+        changed.install_bool_constructor_inventory(changed_bool_roles);
         assert_eq!(
             changed, plan.semantic,
             "dynamic activation state changed semantic programs or bodies"
