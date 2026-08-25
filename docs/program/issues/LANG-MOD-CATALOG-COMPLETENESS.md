@@ -11,6 +11,29 @@ github: null
 origin: "Architect ruling evt_214z6r6qnwme0 (2026-08-24), unbundling the WP-4 strict whole-catalog co-gate off Component A. The co-gate gates a deliverable outside WP-4's authorized surface (a canonical home for the type Nat), so it is re-homed here. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
+> # HARD STOP #1 2026-08-25 — remainder SUSPENDED pending Spec/Architect boundary ruling
+>
+> The released remainder hit a genuine frame/mechanism hard stop
+> (language-implementer evt_2991hpp8xf9s5; Architect concurred evt_dkk2rp7qez0p,
+> holding the mechanism ruling). A real strict census (3 green / 45 red) shows the
+> ruled Compare/LawfulClasses/Derived cluster canonically depends on native `Pair`
+> (`Pair`, `mk_pair`, `pair_fst`, `pair_snd`), but the landed exact-nine floor
+> excludes `Pair` and Strict has no identity-preserving provider vehicle for it —
+> Compare fails first at `UnboundName Pair`, so Order can't strict-load
+> LawfulClasses and Gcd can't strict-load Order (blocks AC-B1/B2/B2a/B4/B7 + the
+> end-state invariant). Every workaround crosses a released boundary (widen the
+> floor, mint a second `Pair` identity, Legacy preload, split the cluster).
+>
+> SUSPENDED. Branch clean/freed; no implementer workaround authorized. Steward
+> routed the frame/spec boundary to the Spec enclave + Architect
+> (evt_n6sg9df8m36s, thr_7mdnraw5rrmc2), two arms: (A) authorize an
+> identity-preserving strict `Pair` source (provider vehicle and/or amend the
+> exact floor — arm (A) touches operator-ruled Decision `dec_1kqwn6hdvn7d2`, so it
+> escalates to the operator); or (B) amend Component B's closure contract
+> (AC-B9/B1/B2 + whole-catalog strict-green) so the Pair-dependent cluster is not
+> required strict on this WP. Steward executes the recut once the boundary is
+> ruled. Resume blocked until then.
+
 > # REMAINDER RELEASED 2026-08-25 — both held conditions met; operator-authorized
 >
 > The held conditions named in the banner below are now BOTH satisfied:
