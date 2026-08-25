@@ -12,6 +12,29 @@
 > probe-selected class, not a diff). The new dynamic-provenance chain starts at
 > hard-stop count zero — it is a different design question.
 
+> # AMENDED 2026-08-25 (Architect hard-stop #1, evt_6h546ckyzsgtf, thr_1b16f1grspdq8)
+>
+> D0 completed and selected a class the frame's five-class closure did not name —
+> a SIXTH class: an inactive `HostResult` template is eagerly materialized before
+> the runtime sum choice. Proven at exact WIP `59dd27f18e...` (base 665059cfd,
+> two probe-only files, +170/-5) and CLIF `/tmp/rt-dynamic-provenance-family-80.clif`
+> (sha256 779005d6...): exact function `u2:48`/`funcid48`, owner `Predeclared(8)`,
+> origin 34, occ 485, `ResourceError::Closed`, discriminator `v197 =
+> Result(inst339,0) = select(v34 == reply-error-tag 3, 0, v35+1)`; tag-1 compare
+> `v562 = icmp_imm eq v197, 1` with conventional blocks; the fresh-1/unchanged-RHS
+> substitution reads true and unchanged-v197/fresh-1 reads false (final status 85)
+> — a lawful current-function operand OUTSIDE the `ResourceError` tag set. Cause:
+> `aggregates.rs::emit_carrier_transfer` calls `emit_carrier_transfer(ok)` then
+> `emit_carrier_transfer(error)` BEFORE allocating/storing the `HostResult`
+> discriminant, so a successful `BufferAllocate` runs the unselected error
+> dispatcher over success-detail resource-token bits and reaches its lawful
+> malformed residual. It is NOT alien SSA / wrong constant / wrong successor /
+> owner mispairing / backend defect. The Architect AUTHORIZED D1 in place
+> (branch-before-transfer, one active payload). Runtime is HELD until this
+> amendment releases. New-chain hard-stop count is 1. Durable inventory:
+> `architect/rt-dynamic-inventory @ c142aaa74`. The concrete D1 mechanism +
+> controls REPLACE the "Conditional D1 design boundary" section below.
+
 ## Objective
 
 Bind px8ta's causal residual to ONE actual generated function, owner, SSA
@@ -114,23 +137,54 @@ Base the successor branch on current `main`.
   adjacent producer/consumer identities. Do NOT infer D1 from a marker count and
   do NOT green px8ta by changing the residual status.
 
-## Conditional D1 design boundary (do not pre-authorize)
+## D1 — authorized mechanism (Architect ruling evt_6h546ckyzsgtf)
 
-- If the discriminator is an alien function-local handle: the repair is
-  structural. A cloneable `Lowered::DynamicConstructor` may not carry a bare
-  `cranelift_codegen::ir::Value` across emitted-function ownership. Either
-  re-materialize the discriminator from an owner-independent semantic/source
-  recipe in the current `FunctionBuilder`, or emit/consume the dynamic value
-  entirely within the defining function. Merely attaching an owner label while
-  still consuming the alien `Value` is a detector, not a solution. The required
-  negative control constructs two functions whose same numeric `Value(u32)` index
-  denotes different scalars; the path must refuse before CLIF emission or
-  re-materialize correctly — never verify and silently consume the coincidental
-  current-DFG value.
-- If P0–P2 instead prove a wrong constant or CFG wiring: fix the single
-  authority/edge actually shown by the dumped CLIF. No alternate
-  dynamic-constructor representation, no ExitCode conversion, and no new magic
-  status are allowed.
+Choose runtime branch-before-transfer with ONE active payload. `Lowered::HostResult`
+remains a compile-time choice node holding both templates plus one runtime
+`success` value; its boundary representation is a runtime sum: **one discriminant
+and exactly one active payload.** Structural preflight still examines both
+templates (the compiled function must be admissible for either runtime outcome) —
+preflight is not materialization. Runtime transfer must execute exactly ONE
+recursive producer. Do NOT invent an inert unselected payload.
+
+In the `Lowered::HostResult` arm of `aggregates.rs::emit_carrier_transfer`:
+
+1. Normalize `success` once to the existing I64 truth word and derive
+   `took_ok = success_i64 != 0` from that same SSA value. The branch predicate
+   and the stored discriminant may not have separate authorities.
+2. Emit `ok_block`, `error_block`, and a merge with one I64 block parameter.
+3. `brif(took_ok, ok_block, error_block)` BEFORE either recursive
+   `emit_carrier_transfer` call.
+4. The ok block transfers only `ok`; the error block transfers only `error`; each
+   jumps to the merge with its one `BoundaryWord`.
+5. At the merge, allocate the existing `(InvocationHostResult, HostResult)` node
+   with field count ONE, store `success_i64`, and store the selected word at
+   field 0.
+
+Do NOT use an SSA `select` over two already-materialized payload words (under CBV
+that preserves the defect). Do NOT allocate an inert `ResourceError`, duplicate
+the selected word into two semantically named fields, or add a new tag/version. A
+sum has no semantic inactive payload; per-effect dummy construction invents values
+from fields outside their domain and leaves a wrong-but-projectable child in the
+generic field interface.
+
+Reconcile the canonical one-child shape in the SAME D1:
+
+- `boundary_value_clif.rs::define_host_payload` reads field 0 after exact
+  `HostResult` class + arity-one validation; it no longer derives index 0/1 from
+  `success`.
+- The shared HostResult guard used by `host_success`/`host_payload` must REFUSE a
+  HostResult node whose field count is not exactly one, rather than exposing a
+  discriminant from a malformed physical shape.
+- Rust-side `materialize_host_result`, the emitted HostResult producer fixture,
+  comments, and tests must describe/store one selected payload. REMOVE the old
+  "both arms are materialized" contract, do not retain a compatibility form.
+- Keep carried consumers unchanged at their semantic interface: read
+  `host_success`, read `host_payload`, then branch to `Ok`/`Err` — they already
+  require only the active word.
+
+Repair only the proven layer: no alternate dynamic-constructor representation, no
+ExitCode conversion, no new magic status, zero `trusted_base()` delta.
 
 ## Acceptance criteria
 
@@ -142,17 +196,34 @@ Base the successor branch on current `main`.
   one owner family (`81..84` xor `91..94`), reproduced in one build. The claimed
   same-site `1`/tag-1 relationship is either confirmed at that pinned function or
   refuted (operand/constant/owner mismatch identified).
-- AC-2 (class selected before any repair). The WP returns exactly one selected
-  class from {alien SSA handle, wrong constant/site pairing, wrong successor/body
-  exit, owner/provenance mispairing, backend defect}. No production mechanism is
-  committed until this holds; a repair diff without the selecting probe result is
-  out of scope.
-- AC-3 (conditional repair matches the proven layer). If a D1 repair is included,
-  it repairs ONLY the proven layer, adds no alternate dynamic-constructor
-  representation / no ExitCode conversion / no new sentinel, and — for the alien
-  handle case — carries the two-function same-index negative control that fails
-  closed (refuse before emission or re-materialize), never silently consuming the
-  coincidental value. Zero `trusted_base()` delta.
+- AC-2 (class selected — DONE). D0 selected the SIXTH class: an inactive
+  `HostResult` template eagerly materialized before the runtime sum choice
+  (Architect evt_6h546ckyzsgtf), refuting the five-class closure. Recorded in the
+  top amendment banner; this is the proven layer D1 repairs.
+- AC-3 (D1 controls — the branch-before-transfer proof). The candidate carries all
+  of:
+  1. a runtime success/error pair with distinct valid payloads: the same consumer
+     interface selects the correct active payload in both directions and the
+     physical field count is exactly one;
+  2. a hostile-inactive pair reaching the production `emit_carrier_transfer` arm —
+     success with valid ok + out-of-family dynamic error succeeds; failure with
+     valid error + out-of-family dynamic ok succeeds — such that either eager
+     transfer or a reversed branch reddens;
+  3. the paired selected-hostile cases still reach
+     `MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS` (D1 did not suppress the exact
+     dispatcher or turn malformed selected values into success);
+  4. HostResult nodes of arity zero and two are REFUSED as malformed shape (the
+     canonical helper cannot silently accept the retired two-child layout);
+  5. re-run px8ta HALF B: the acceptance claim is ONLY that this exact eager
+     inactive-error residual disappears — report `ConsoleIsTerminal` if reached,
+     else name the first new causal obstruction; do NOT promise end-to-end green
+     and do NOT change `-3` reporting;
+  6. every D0 registry, dump, marker, `eprintln!`, and substitution is removed
+     from the final candidate (the CLIF/WIP remains evidence, not production).
+  Mutation-prove at least the branch-before-transfer site in BOTH directions:
+  restoring eager ok+error transfer must red the success hostile-inactive witness;
+  reversing `took_ok` must red the success/error pair. No text pin substitutes for
+  either runtime property. Zero `trusted_base()` delta.
 - AC-4 (residual honesty untouched here). This WP does NOT re-classify or renumber
   the `-3` reporter alias; that is [[RT-UNIT-FAILURE-STATUS-PROVENANCE]] and must
   not be folded in. Changing the residual status to green px8ta is explicitly
@@ -173,10 +244,12 @@ non-gating.
 
 ## Contention check
 
-Touches `crates/ken-runtime` (`cranelift_backend/lowering/aggregates.rs`, and
-`calls.rs`/`effects.rs` only if a proven D1 requires it) and `crates/ken-cli/tests`.
-No overlap with lane 2 (language/elaborator) or lane 3 (foundation catalog
-packages). Runtime ring exclusive.
+Touches `crates/ken-runtime`: `cranelift_backend/lowering/aggregates.rs`
+(`emit_carrier_transfer`), `boundary_value.rs` and `boundary_value_clif.rs`
+(`define_host_payload` + the shared `host_success`/`host_payload` guard,
+`materialize_host_result`), and focused tests (`crates/ken-cli/tests` + runtime
+boundary tests). No overlap with lane 2 (language/elaborator) or lane 3
+(foundation catalog packages). Runtime ring exclusive.
 
 ## Capability tier
 
