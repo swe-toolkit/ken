@@ -23,7 +23,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use crate::ElabEnv;
 use crate::ast::{
     BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, ImportItem, ImportKind,
 };
@@ -32,6 +31,7 @@ use crate::resolve::{
     self, RCtorDecl, RDecl, RDeclKind, RExplicitCtorDecl, RExpr, RMatchArm, RPatKind, RPattern,
     RPropIntro, RTelescopeEntry, RType,
 };
+use crate::ElabEnv;
 
 /// Persistent cross-call module bookkeeping (lives on `ElabEnv`).
 #[derive(Default, Clone)]

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use ken_elaborator::modules::PRELUDE_FLOOR_NAMES;
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{Decl, GlobalId, PrimReduction, Term, declare_primitive};
+use ken_kernel::{declare_primitive, Decl, GlobalId, PrimReduction, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
@@ -535,8 +535,9 @@ fn assert_renamed_family_accepts(case: &CollisionCase) {
 ///
 /// **MEASURED:** one-axis parent and constructor rows reject at the retained
 /// spelling with unchanged declarations, allocator, and trust; one all-renamed
-/// positive per family allocates only its distinct local family and constructors
-/// with kernel-recorded local parentage. **CLAIMED:** prelude immutability covers
+/// positive per family plus an explicit-data spelling control allocates only
+/// distinct local families and constructors with kernel-recorded local parentage.
+/// **CLAIMED:** prelude immutability covers
 /// the complete exact-parent-derived floor binding set, not shape or an
 /// arbitrary compiler-name inventory. **THE GAP:** selective-import collisions
 /// use the same set through a separate production entry, pinned below.
@@ -557,6 +558,30 @@ fn floor_parent_and_constructor_clash_matrix_is_fail_closed() {
         }
         assert_renamed_family_accepts(case);
     }
+
+    assert_floor_collision_rejects_before_allocation(
+        "explicit-zero",
+        "data ExplicitLocalNat : Type where { Zero : ExplicitLocalNat }",
+        "Zero",
+    );
+    let explicit = FixtureRoot::new("explicit-renamed");
+    explicit.write("data ExplicitLocalNat : Type where { ExplicitLocalZero : ExplicitLocalNat }");
+    let mut explicit_env = ElabEnv::new().expect("base environment");
+    let explicit_floor = floor_ids(&explicit_env);
+    let explicit_trusted = explicit_env.env.trusted_base();
+    explicit_env
+        .elaborate_module_from_roots_strict(&[explicit.0.clone()], "Entry")
+        .expect("all-renamed explicit family must elaborate");
+    let explicit_parent = explicit_env.globals["Entry.ExplicitLocalNat"];
+    let explicit_constructor = explicit_env.globals["Entry.ExplicitLocalZero"];
+    assert!(!explicit_floor.contains(&explicit_parent));
+    assert!(!explicit_floor.contains(&explicit_constructor));
+    let (recorded_parent, _) = explicit_env
+        .env
+        .constructor(explicit_constructor)
+        .expect("renamed explicit constructor must be kernel-recorded");
+    assert_eq!(recorded_parent.id, explicit_parent);
+    assert_eq!(explicit_env.env.trusted_base(), explicit_trusted);
 
     assert_floor_collision_rejects_before_allocation("char-parent", "def Char = Int", "Char");
     let root = FixtureRoot::new("local-char");

@@ -75,13 +75,13 @@
 use std::collections::BTreeSet;
 
 use ken_elaborator::checked_core::{CheckedCorePackage, StableSymbol, SymbolNamespace};
-use ken_elaborator::modules::PRELUDE_FLOOR_NAMES;
-use ken_elaborator::prelude::CanonicalRuntimeRoles;
-use ken_elaborator::ElabEnv;
 use ken_elaborator::compiler_driver::{
     checked_runtime_symbols_v1_key, compile_ken_package_sources, CompilerManifest, CompilerSource,
     CompilerTargetKind, TargetSelector,
 };
+use ken_elaborator::modules::PRELUDE_FLOOR_NAMES;
+use ken_elaborator::prelude::CanonicalRuntimeRoles;
+use ken_elaborator::ElabEnv;
 
 const PACKAGE: &str = "d1b_role_a_shadow_pkg";
 
@@ -394,9 +394,7 @@ fn d1b_role_a_every_canonical_role_is_covered_by_shadowing_or_floor_immutability
 
     let uncovered: Vec<&(&str, &str)> = CanonicalRuntimeRoles::spellings()
         .iter()
-        .filter(|(_, spelling)| {
-            !shadowed.contains(spelling) && !floor_protected.contains(spelling)
-        })
+        .filter(|(_, spelling)| !shadowed.contains(spelling) && !floor_protected.contains(spelling))
         .collect();
     assert!(
         uncovered.is_empty(),
