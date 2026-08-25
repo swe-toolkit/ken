@@ -289,10 +289,15 @@ The required elaboration contract is:
 - A negative recursive occurrence, a nested occurrence through an unknown or
   non-positive parameter, or a mutual-family shape is routed through the kernel
   admission verdict and surfaced at the constructor span; the elaborator does
-  not implement a second positivity checker. A nested occurrence through
-  declared strictly-positive parameters remains a staged rejection until
-  `KERNEL-NESTED-IND` lands, after which it must carry the lifted method context
-  of item 5.
+  not implement a second positivity checker. Declared strictly-positive paths
+  are current behavior: fresh `Bag Rose`, composed `Bag (Wrap Deep)`, and
+  checked-transparent Sigma heads admit, and nested methods expose their checked
+  Type- or Ω-classified results through the contextual selectors of §2.3.
+  Individually marked generated-family, topology, sort, and method residuals
+  remain staged. The live method residual is narrower: the unary residual
+  `ProofWrap` Ω method passes the final kernel re-check, while a binary
+  `ProofJoin` method combining two residual host fields reaches both
+  associations and selectors before that final re-check reports a type mismatch.
 - `{x : A} -> ...` in a constructor signature is an implicit telescope binder.
   Named-argument application and record-field labels inside explicit dependent
   constructor signatures are intentionally staged out; the old `C { f : A }`

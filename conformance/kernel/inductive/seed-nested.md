@@ -22,12 +22,13 @@ behavior. The former bare-Pair vectors use a fresh checked transparent Sigma
 alias here; the canonical named-Pair instantiation is RED-UNTIL in
 `../../surface/modules/seed-pair-strict-boundary.md`. `nested-size-uses-lift`
 also executes un-gated through the named full-pipeline witnesses below. Both
-structural-result selector sorts are landed. `nested-dependent-motive-uses-lift`
-remains gated only at its stronger binary-residual generated-`All` method
-re-check, specified precisely below. Independently gated non-D6 residual cases
-remain marked. The existing direct and W-style controls remain live throughout,
-so staging the residual completeness class does not suspend the positivity
-posture.
+structural-result selector sorts are landed. The unary Ω residual positive and
+the binary final-recheck transition sentinel execute in
+`lang_structural_result_elab.rs`. `nested-dependent-motive-uses-lift` remains
+gated only at that stronger binary-residual generated-`All` method re-check.
+Independently gated non-D6 residual cases remain marked. The existing direct
+and W-style controls remain live throughout, so staging the residual
+completeness class does not suspend the positivity posture.
 
 The custom positive carrier used below is deliberately not a standard-library
 name:
@@ -224,10 +225,16 @@ dropped-fold control reaches `1`.
 
 ### kernel/inductive/nested-dependent-motive-uses-lift [KERNEL-NESTED-IND]
 
+Promise class: **transition sentinel**. The paired unary positive is a durable
+invariant and remains after the binary sentinel retires.
+
 Status: the selector is **not** the blocker. Both `recursive result for` and
-`induction hypothesis for` are landed, and a full-pipeline unary residual
-`ProofWrap xs` theorem accepts the Ω selector. The stronger binary-residual case
-remains unavailable at a later production seam.
+`induction hypothesis for` are landed. The durable full-pipeline positive
+`omega_selector_accepts_unary_residual_all_through_full_pipeline` proves that a
+unary `ProofWrap xs` theorem accepts the Ω selector and passes the completed
+method's kernel re-check. The stronger binary-residual case remains unavailable
+at a later production seam, durably located by
+`binary_omega_residual_method_recheck_is_a_transition_sentinel`.
 
 The exact failing shape uses
 `ProofJoin : ProofBag a -> ProofBag a -> ProofBag a`. Its proposition fold
@@ -250,14 +257,16 @@ a residual result. Neither proves that one dependent generated-`All` method can
 combine **both** residual Ω results and still kernel-check.
 
 ⇒ **The residual is method construction after successful association and
-selection.** It needs a kernel-checkable dependent branch-goal specialization
-for multiple residual host fields at `check_match_with_lift`, plus a persistent
-full-pipeline binary positive and controlled wrong-result/association
-negatives. Erasure is downstream of the current refusal and supplies no evidence
-for this row.
+selection.** The committed transition sentinel requires the exact final
+`generated All method failed kernel re-check: type mismatch` refusal; an earlier
+or different failure reds it. It needs a kernel-checkable dependent branch-goal
+specialization for multiple residual host fields at `check_match_with_lift`,
+plus a persistent full-pipeline binary positive and controlled wrong-result/
+association negatives. Erasure is downstream of the current refusal and
+supplies no evidence for this row.
 
 - spec: `14 §3.2`, `§9.5`; `34 §3.1.1`; `39 §2.3`, `§4`
-- given (residual binding, currently failing): a dependent motive
+- given (executing transition sentinel): a dependent motive
   `AllGood : Rose -> Omega_0` whose `node` proof matches the `Bag Rose` field
   and its `All^Omega_{Bag,0} (λr. AllGood r) b` inhabitant in lockstep. In a
   `Bag.join xs ys` branch, `induction hypothesis for xs` and
@@ -275,9 +284,9 @@ for this row.
   binders or changing ordinary direct and W-style match behavior
 - fail-closed boundary (required post-repair binding): missing, duplicate,
   swapped, and foreign associations reject with the corresponding D0
-  diagnostic. A
-  same-spelled, copied, projected, or shadowed binding has no authority unless
-  it independently carries exactly one validated same-occurrence association;
+  diagnostic. A same-spelled, copied, projected, or shadowed binding has no
+  authority unless it independently carries exactly one validated
+  same-occurrence association;
   neither its type nor an owner self-call may be used to guess one
 - sort boundary (landed independently; required unchanged here): classify the
   selected hidden proof result, not its `All^Omega` support evidence. Its type
@@ -295,8 +304,10 @@ for this row.
 Stage audit: the composed-carrier marker is retired because its production
 binding accepts `Bag (Wrap Deep)`. The `nested-dependent-motive-uses-lift`
 marker remains solely for the binary-residual method-recheck gap above, not for
-selector availability. Retiring that marker requires the exact binary positive
-to pass the final kernel re-check and its independent controls to bite; heading
+selector availability. Its transition sentinel retires exactly when the same
+binary `ProofJoin` fixture returns `Ok`; that retirement candidate must replace
+it with the durable binary positive and add independent wrong-result and wrong-
+association negatives. An earlier/different error does not retire it. Heading
 counts are not acceptance authority.
 
 ---
@@ -605,11 +616,10 @@ Spec: `14 §8.6`; `§3`, `§3.1`, `§7.3`, `§7.7`, `§8.4`.
   controls admit while each exact negative/unknown mutation flips the verdict.
 - `nested-size-uses-lift` executes un-gated through the named kernel and
   full-pipeline witnesses, including the deeper residual-`Bag.join` fold and its
-  `3`-versus-`1` discriminator. Both selector sorts are landed, and a unary
-  residual dependent-motive path reaches the Ω selector. The stronger binary
-  dependent-motive row remains gated because its generated `All^Omega` method
-  fails the final `check_match_with_lift` kernel re-check after both associations
-  and selections succeed. Its post-repair positive and fail-closed contract
-  remain stated without misclassifying the selector as missing. Independently
-  gated non-D6 residual rows remain marked; blanket nested rejection is no
-  longer the live boundary.
+  `3`-versus-`1` discriminator. Both selector sorts are landed. The durable
+  unary dependent-motive positive reaches the Ω selector and kernel-checks. The
+  binary transition sentinel reaches both residual associations and selections,
+  then requires the exact final `check_match_with_lift` type-mismatch refusal.
+  Its post-repair positive and fail-closed contract remain stated without
+  misclassifying the selector as missing. Independently gated non-D6 residual
+  rows remain marked; blanket nested rejection is no longer the live boundary.

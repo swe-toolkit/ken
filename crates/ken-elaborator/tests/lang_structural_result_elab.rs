@@ -87,6 +87,67 @@ const MIXED_REACHING_SOURCE: &str = "data Bag (a : Type) : Type where { \
     const wstyle_result : Nat = wsize (WNode True (\\b. WLeaf))\n\
     const mixed_result : Nat = add direct_result (add wstyle_result nested_result)";
 
+const UNARY_OMEGA_RESIDUAL_SOURCE: &str = r#"
+data ProofBag (a : Type) : Type where {
+  ProofEmpty : ProofBag a;
+  ProofOne : a -> ProofBag a;
+  ProofWrap : ProofBag a -> ProofBag a
+}
+data ProofRose = ProofLeaf | ProofNode (ProofBag ProofRose)
+fn allGoodType (r : ProofRose) : Omega = match r {
+  ProofLeaf |-> Top;
+  ProofNode b |-> match b {
+    ProofEmpty |-> Top;
+    ProofOne x |-> allGoodType x;
+    ProofWrap xs |-> recursive result for xs
+  }
+}
+theorem allGood (r : ProofRose) : allGoodType r = match r {
+  ProofLeaf |-> Proved;
+  ProofNode b |-> match b {
+    ProofEmpty |-> Proved;
+    ProofOne x |-> allGood x;
+    ProofWrap xs |-> induction hypothesis for xs
+  }
+}
+"#;
+
+const BINARY_OMEGA_RESIDUAL_SOURCE: &str = r#"
+data ProofBag (a : Type) : Type where {
+  ProofEmpty : ProofBag a;
+  ProofOne : a -> ProofBag a;
+  ProofJoin : ProofBag a -> ProofBag a -> ProofBag a
+}
+data ProofRose = ProofLeaf | ProofNode (ProofBag ProofRose)
+fn allGoodType (r : ProofRose) : Omega = match r {
+  ProofLeaf |-> Top;
+  ProofNode b |-> match b {
+    ProofEmpty |-> Top;
+    ProofOne x |-> allGoodType x;
+    ProofJoin xs ys |-> And
+      (recursive result for xs)
+      (recursive result for ys)
+  }
+}
+fn bagGoodType (b : ProofBag ProofRose) : Omega = match b {
+  ProofEmpty |-> Top;
+  ProofOne x |-> allGoodType x;
+  ProofJoin xs ys |-> And (bagGoodType xs) (bagGoodType ys)
+}
+theorem allGood (r : ProofRose) : allGoodType r = match r {
+  ProofLeaf |-> Proved;
+  ProofNode b |-> match b {
+    ProofEmpty |-> Proved;
+    ProofOne x |-> allGood x;
+    ProofJoin xs ys |-> and_intro
+      (bagGoodType xs)
+      (bagGoodType ys)
+      (induction hypothesis for xs)
+      (induction hypothesis for ys)
+  }
+}
+"#;
+
 fn elimination_family(env: &ElabEnv, name: &str) -> ken_kernel::GlobalId {
     let (_, mut body) = env
         .env
@@ -139,8 +200,7 @@ fn selector_is_contextual_and_resolves_the_surface_binding_identity() {
         } if name == "x"
     ));
 
-    let induction =
-        parse_expr("let x : Nat = Zero in induction hypothesis for x").unwrap();
+    let induction = parse_expr("let x : Nat = Zero in induction hypothesis for x").unwrap();
     let resolved = resolve_expr_standalone(&induction).unwrap();
     assert!(matches!(
         resolved,
@@ -168,7 +228,10 @@ fn retired_selector_spelling_is_a_parse_error() {
     // Construct the retired phrase so the crate sweep can prove that no source
     // or fixture still contains it while behavior still rejects it.
     let retired = ["structural", "result", "of", "x"].join(" ");
-    assert!(matches!(parse_expr(&retired), Err(ElabError::ParseError { .. })));
+    assert!(matches!(
+        parse_expr(&retired),
+        Err(ElabError::ParseError { .. })
+    ));
 }
 
 #[test]
@@ -238,10 +301,8 @@ fn ordinary_let_binding_inside_lifted_arm_is_exactly_out_of_scope() {
     let selector_start = source
         .find(selector_text)
         .expect("mutated source contains the ordinary-binding selector");
-    let selector_span = ken_elaborator::error::Span::new(
-        selector_start,
-        selector_start + selector_text.len(),
-    );
+    let selector_span =
+        ken_elaborator::error::Span::new(selector_start, selector_start + selector_text.len());
     let binding_start = source
         .find("let _ :")
         .expect("mutated source contains the ordinary wildcard binding")
@@ -339,10 +400,16 @@ fn d2_mixed_direct_wstyle_and_nested_structural_paths_reach_and_retain_behavior(
     // eliminations over their own original families, while `size` emits the
     // nested structural elimination. The concrete `mixed_result` retains calls
     // to all three checked functions rather than replacing either ordinary path.
-    assert_eq!(elimination_family(&env, "direct_size"), env.globals["Direct"]);
+    assert_eq!(
+        elimination_family(&env, "direct_size"),
+        env.globals["Direct"]
+    );
     assert_eq!(elimination_family(&env, "wsize"), env.globals["WTree"]);
     assert_eq!(elimination_family(&env, "size"), env.globals["Rose"]);
-    assert!(env.env.transparent_body(env.globals["mixed_result"]).is_some());
+    assert!(env
+        .env
+        .transparent_body(env.globals["mixed_result"])
+        .is_some());
 }
 
 #[test]
@@ -375,6 +442,45 @@ fn d2_deep_nested_associations_elaborate_and_kernel_check() {
     let mut env = ElabEnv::new().unwrap();
     env.elaborate_file(DEEP_STRUCTURAL_SIZE_SOURCE).unwrap();
     assert!(env.globals.contains_key("deep_result"));
+}
+
+#[test]
+fn omega_selector_accepts_unary_residual_all_through_full_pipeline() {
+    // Promise class: durable invariant.
+    // MEASURED: the literal ProofWrap program returns Ok from elaborate_file
+    // and publishes its checked allGood theorem.
+    // CLAIMED: the full pipeline accepts an Omega-classified selector for one
+    // residual generated-All child and kernel-checks the completed method.
+    // THE GAP: this unary shape says nothing about combining two residual
+    // children; the paired transition sentinel owns that exact boundary.
+    let mut env = ElabEnv::new().unwrap();
+    env.elaborate_file(UNARY_OMEGA_RESIDUAL_SOURCE)
+        .expect("unary residual Omega method must elaborate and kernel-check");
+    assert!(env.globals.contains_key("allGood"));
+}
+
+#[test]
+fn binary_omega_residual_method_recheck_is_a_transition_sentinel() {
+    // Promise class: transition sentinel.
+    // MEASURED: the literal ProofJoin program returns the exact final-method
+    // kernel-recheck type-mismatch prefix from elaborate_file.
+    // CLAIMED: both residual associations and selectors succeed before the
+    // current first refusal; selector availability is not the boundary.
+    // THE GAP: this refusal does not establish eventual binary acceptance or
+    // its negative controls. Retire exactly when this fixture returns Ok, and
+    // in the same candidate replace it with the durable binary positive plus
+    // independent wrong-result and wrong-association negatives. An earlier or
+    // different error is not retirement. Retirement must sweep 14, 18, 34, 39,
+    // both nested seeds, SPEC-PROGRESS, and the kernel-test staging header.
+    let mut env = ElabEnv::new().unwrap();
+    match env.elaborate_file(BINARY_OMEGA_RESIDUAL_SOURCE) {
+        Err(ElabError::Internal(message)) => assert!(
+            message.starts_with("generated All method failed kernel re-check: type mismatch"),
+            "binary residual reached a different internal refusal: {message}"
+        ),
+        Ok(_) => panic!("binary residual now kernel-checks; retire the transition sentinel"),
+        Err(other) => panic!("binary residual failed before the final method re-check: {other}"),
+    }
 }
 
 #[test]

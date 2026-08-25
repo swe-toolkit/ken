@@ -68,7 +68,7 @@ to that same declaration, including its qualifications.
 | `10-kernel/11-syntax.md` | `K1 elaborated` | Normative for kernel grammar and scoping; typing is assigned to `13`–`16` and `18`. |
 | `10-kernel/12-universes.md` | `K1 elaborated` | Normative for the universe hierarchy, checking, and level polymorphism; K1 scope is §§1–4 and §6. |
 | `10-kernel/13-pi-sigma.md` | `K1 elaborated` | Normative for Π and Σ rules and K1-scoped conversion. |
-| `10-kernel/14-inductive.md` | `K1 elaborated; K1.5 extends it; nested-positive specified and implementation-gated` | Normative for inductives, positivity, and elimination; nested-positive implementation remains gated on `KERNEL-NESTED-IND`. |
+| `10-kernel/14-inductive.md` | `K1 elaborated; K1.5 extends it; nested-positive partially landed` | Normative for inductives, positivity, and elimination; fresh/composed admission and both selector sorts execute, while individually marked generated-family/method/topology/sort residuals remain under `KERNEL-NESTED-IND`. |
 | `10-kernel/15-identity.md` | `K2 elaborated` | Normative for the observational-equality interface. |
 | `10-kernel/16-observational.md` | `K2 elaborated; K2c series-2 completes the three obs-reduction seams (§3.2 inductive index rewrite, §4.1 non-constant-motive J, §5.1 full quotient respect); K5 completes the observational fragment` | Normative for the observational interface, computation rules, and reduction behavior; `(oracle)` rules retain that qualification. |
 | `10-kernel/17-conversion.md` | `K2c elaborated (series 1 — conversion-hardening)` | Normative for kernel conversion and the SCT gate. |
@@ -85,7 +85,7 @@ to that same declaration, including its qualifications.
 | `30-surface/31-lexical.md` | `DRAFT v0` | Settled for `OQ-syntax` principles; the concrete token table is a revisable starter. |
 | `30-surface/32-grammar.md` | `DRAFT v0` | Normative intent for which productions exist; exact spelling remains proposal-level. |
 | `30-surface/33-declarations.md` | not declared | Normative for features and the named module, visibility, and class contracts; concrete spelling remains proposal-level. |
-| `30-surface/34-data-match.md` | `impl-ready (L2)` | Normative for the feature; nested-positive support remains separately staged as declared. |
+| `30-surface/34-data-match.md` | `impl-ready (L2)` | Normative for the feature; nested-positive admission and selectors are partially landed, with the binary residual dependent-method re-check separately staged. |
 | `30-surface/35-numbers.md` | `impl-ready (L1)` | Normative for the numeric model and L1 scope; user-defined numeric instancing remains gated on L-classes. |
 | `30-surface/36-effects.md` | `L5 elaborated; implementation-ready for Team Language` | Normative for the model and elaboration; concrete spelling remains proposal-level. |
 | `30-surface/37-strings-collections.md` | `impl-ready (L3)` | Binding for concepts, laws, lowering, and staging; exact API spelling and internal representations remain `(oracle)`-tagged. |

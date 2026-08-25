@@ -34,11 +34,14 @@
 > gated: the current D6 corpus executes the fresh-carrier, composed-carrier,
 > transparent-head, and controlled-negative paths. `KERNEL-NESTED-IND` retains
 > only the cases independently marked as residual. Both structural-result
-> selectors are landed. The narrower live surface gap is a dependent generated-
-> `All` method that combines **two residual host fields**: production reaches
-> both associations and selectors, but the final method kernel re-check rejects
-> a type mismatch. No executing positive currently binds that stronger case.
-> Verify against the on-`main` `14`/kernel before building.
+> selectors are landed. The durable unary `ProofWrap` full-pipeline positive
+> reaches its Ω-classified residual result and kernel-checks. The narrower live
+> surface gap is a dependent generated-`All` method that combines **two residual
+> host fields**: the committed `ProofJoin` transition sentinel reaches both
+> associations and selectors, but the final method kernel re-check rejects a
+> type mismatch. The sentinel retires only when that exact fixture accepts and
+> its binary positive plus independent wrong-result/association negatives land
+> together. Verify against the on-`main` `14`/kernel before building.
 
 ## Canonical non-dependent pair package
 
@@ -174,10 +177,13 @@ recorded-positive carrier paths such as `Bag Rose` and the composed
 fail-closed. Type- and Ω-classified nested surface selectors execute through
 generated lifts and ι. Only the individually marked residual cases remain
 implementation-gated. In this chapter the live surface-lowering residual is
-the stronger dependent generated-`All` method with two residual fields: the
-one-residual Ω path checks, while a `Join xs ys` branch consuming both induction
-hypotheses fails the generated method's final kernel re-check. **Mutual**
-families remain a separately deferred extension (`14 §8.6`).
+the stronger dependent generated-`All` method with two residual fields:
+`omega_selector_accepts_unary_residual_all_through_full_pipeline` checks the
+one-residual Ω path, while
+`binary_omega_residual_method_recheck_is_a_transition_sentinel` confirms that a
+`Join xs ys` branch consuming both induction hypotheses reaches the generated
+method's final kernel re-check and fails there. **Mutual** families remain a
+separately deferred extension (`14 §8.6`).
 
 ## 2. Indexed families and dependent constructors (GADT-like)
 
@@ -422,11 +428,12 @@ computation over the field consumes those generated hypotheses. Re-emitting an
 unrestricted self-call, discarding the lift, or admitting the declaration
 without this branch context is not a valid lowering. Both Type- and
 Ω-classified selectors are landed and execute through generated lifts and
-nested ι. The narrower residual is method construction after selection: a
-dependent generated-`All` branch combining two residual host fields currently
-fails its final kernel re-check with a type mismatch, although the corresponding
-one-residual Ω branch checks. Kernel admission and selector availability are not
-blanket-gated on that residual.
+nested ι. The durable unary `ProofWrap` full-pipeline test checks the Ω residual
+path. The narrower residual is method construction after selection: the
+committed binary `ProofJoin` transition sentinel reaches both residual
+associations and selections, then fails its final generated-method kernel
+re-check with a type mismatch. Kernel admission and selector availability are
+not blanket-gated on that residual.
 
 #### 3.1.1 Recursive results and induction hypotheses for nested fields
 

@@ -187,11 +187,11 @@ Spec: `spec/10-kernel/14-inductive.md §2, §8`; frame §2 item 5.
   `data Bad3 : Type 0 where { mk : Product (Bad3 → Empty) Unit → Bad3 }`
 - expect: **rejected** at admission (non-strictly-positive occurrence in the
   exposed Sigma component)
-- why: before `KERNEL-NESTED-IND`, the conservative `occurs` guard rejects this
-  entire nested class. After that gate lands, ordinary reduction unfolds
-  Product to primitive Sigma and structural descent finds `Bad3` negatively in
-  the domain of `Bad3 → Empty`, rejecting by `§8.3`. Renaming the transparent
-  Sigma alias must preserve the verdict. A spelling rule or a bug that treats a
+- why: the earlier conservative `occurs` guard rejected this entire nested
+  class. Current production instead performs ordinary reduction, unfolds
+  Product to primitive Sigma, and structurally finds `Bad3` negatively in the
+  domain of `Bad3 → Empty`, rejecting by `§8.3`. Renaming the transparent Sigma
+  alias preserves the verdict. A spelling rule or a bug that treats a
   positive outer component as making the whole payload positive fails the
   controls. Frame AC-5; retained soundness control, reconciled by
   `inductive/seed-nested.md` AC4. The future canonical named Pair instantiation

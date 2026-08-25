@@ -223,21 +223,28 @@ it**.
 
 ### A3b — Nested-positive gate at `declare_inductive`
 
-### kernel/judgments/declare-inductive-nested-admits [KERNEL-NESTED-IND]
+### kernel/judgments/declare-inductive-nested-admits
 
-- spec: `18 §4.3`/`§4.6`; `14 §3.2`/`§7.8`/`§8.5`
+- spec: `18 §4.3`/`§4.6`; `14 §8.5`
 - given: first call `declare_inductive` for a fresh positive carrier
   `Bag A` with constructors `empty`, `one : A -> Bag A`, and
   `join : Bag A -> Bag A -> Bag A`; then call it for
-  `Rose` with `leaf : Rose` and `node : Bag Rose -> Rose`
-- expect: **Ok(id)** for both declarations. `elim_Rose` is generated with the
-  structured lifted IH for `node`, and its nested ι is checked
-- why: this drives the nested-positive admission gate through its stable host
-  API rather than assuming a separate declarator. `Bag` is freshly declared, so
-  a standard-former name allow-list rejects where the required structural rule
-  accepts. Until `KERNEL-NESTED-IND` lands the invoking case remains gated, as
-  `18 §4.6` requires. The exhaustive admission/lift/fail-closed boundary is
-  `inductive/seed-nested.md`.
+  `Rose` with `leaf : Rose` and `node : Bag Rose -> Rose`; finally compose a
+  second fresh positive `Wrap A` in `Bag (Wrap Deep)`
+- expect: **Ok(id)** for all declarations. The host entry records and consumes
+  both fresh positive positions, and each admitted host stores its expected
+  constructor records
+- executing binding:
+  `seed_fresh_bag_rose_and_deep_paths_admit_structurally` in
+  `crates/ken-kernel/tests/nested_inductives_remaining.rs`
+- why: this drives the landed admission subset through its stable host API
+  rather than assuming a separate declarator. A standard-former name allow-list
+  rejects the fresh `Bag Rose`, and a one-former traversal cap rejects
+  `Bag (Wrap Deep)`, while the structural rule accepts both. This API case pins
+  admission only: the individually marked generated-method, nested-ι topology,
+  neutral-source, sort/level, terminal-support, and dependent-method residuals
+  remain in `inductive/seed-nested.md`. It does not mark the whole
+  `KERNEL-NESTED-IND` node complete.
 
 ### A4 — Quotient-respect gate at `infer`/`check` on `QuotElim` (cite `16 §5.1`)
 

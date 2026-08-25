@@ -11,10 +11,12 @@
 //! - `nested-direct-and-wstyle-controls-unchanged` (AC-K8).
 //!
 //! `nested-size-uses-lift` and both structural-result selector sorts execute in
-//! the elaborator's full-pipeline bindings. The remaining dependent-motive gap
-//! is narrower: one generated `All^Omega` method combining two residual host
-//! fields fails its final kernel re-check after selection. This positivity file
-//! does not claim an executing binding for that row.
+//! the elaborator's full-pipeline bindings. The durable unary `ProofWrap`
+//! positive also passes its generated `All^Omega` method's kernel re-check. The
+//! remaining dependent-motive gap is narrower: the committed binary `ProofJoin`
+//! transition sentinel reaches both residual associations and selectors, then
+//! requires the exact final method-recheck type mismatch. This positivity file
+//! does not claim the eventual binary positive.
 //!
 //! Exact executing bindings:
 //! - `nested-ds9-shapes-admitted` ->

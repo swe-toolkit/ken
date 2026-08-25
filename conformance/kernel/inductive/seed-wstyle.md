@@ -261,8 +261,9 @@ Spec: `14 §2`, `§6`, `§8.4`–`§8.6`.
   strictly-positive Π-bound class and nothing adjacent
 - why: `§8.4` — no change to `§8.1`/`§8.2` is needed; only the separate blanket
   Π-bound gate is removed. Negative occurrences and mutual families stay
-  **rejected**; nested-positive is a separately gated extension with its own
-  structural lift (`§8.5`, `seed-nested.md`). The structural eliminator and its
+  **rejected**; nested-positive is a partially landed extension whose
+  independently marked residuals keep their own gates and structural-lift
+  contracts (`§8.5`, `seed-nested.md`). The structural eliminator and its
   ι are unchanged for direct and W-style recursion. The regression gate for the
   trust-root extension.
 
