@@ -2702,6 +2702,59 @@ pub(super) fn define_continuation_bodies<M: Module>(
     Ok(defined)
 }
 
+/// Reconstruct a raw source body's semantic environment from a generated
+/// context's two ABI runs.
+///
+/// The context descriptor deliberately coalesces the raw body's declared
+/// arguments and raw captures into one `Parameter` run so its caller can append
+/// the enclosing specialization's continuation inputs as `Capture`s. That ABI
+/// layout is not the source binding order: de Bruijn conversion applies only to
+/// the declared-argument prefix. The raw captures already carry their lexical
+/// order, and the context captures are a separate planner-ordered suffix.
+///
+/// The split is validated against the raw owner's own descriptor. A count from
+/// the context alone cannot distinguish declared arguments from raw captures,
+/// which is the same-cardinality permutation this boundary must reject.
+pub(super) fn generated_context_source_environment<T>(
+    mut combined_parameters: Vec<T>,
+    context_captures: Vec<T>,
+    raw_parameters: u32,
+    raw_captures: u32,
+    converts_source_parameters: bool,
+) -> Result<Vec<T>, CraneliftBackendError> {
+    let raw_parameters = usize::try_from(raw_parameters).map_err(|_| {
+        backend_module("generated-context raw parameter count exceeds this platform".to_string())
+    })?;
+    let raw_captures = usize::try_from(raw_captures).map_err(|_| {
+        backend_module("generated-context raw capture count exceeds this platform".to_string())
+    })?;
+    let expected = raw_parameters.checked_add(raw_captures).ok_or_else(|| {
+        backend_module("generated-context raw input count overflowed".to_string())
+    })?;
+    if combined_parameters.len() != expected {
+        return Err(backend_module(format!(
+            "a generated context's Parameter run holds {} operands, but its raw owner declares \
+             {raw_parameters} parameters plus {raw_captures} captures",
+            combined_parameters.len()
+        )));
+    }
+
+    if super::generated_context_whole_parameter_reversal_enabled() {
+        super::record_generated_context_whole_parameter_reversal();
+        combined_parameters.reverse();
+        combined_parameters.extend(context_captures);
+        return Ok(combined_parameters);
+    }
+
+    let mut captures = combined_parameters.split_off(raw_parameters);
+    if converts_source_parameters {
+        combined_parameters.reverse();
+    }
+    combined_parameters.append(&mut captures);
+    combined_parameters.extend(context_captures);
+    Ok(combined_parameters)
+}
+
 /// **`RT-DECL-CLOSURE-PORT` `D5a` — define each generated producer execution
 /// context.**
 ///
@@ -2762,6 +2815,13 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
         /// construction; deciding it independently here would make it two
         /// judgments that happen to agree.
         raw_owner_definition: AbiUnitDefinition,
+        /// The raw source body's declared parameter run. The generated context
+        /// places this run and the raw capture run together in its `Parameter`
+        /// slots, but only this prefix is a source binder run.
+        raw_parameters: u32,
+        /// The raw source body's capture run, following `raw_parameters` inside
+        /// the generated context's `Parameter` slots.
+        raw_captures: u32,
         slots: Vec<AbiSlot>,
         offsets: Vec<u32>,
         header_parameters: u32,
@@ -2769,11 +2829,11 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
     }
     // Own every projected fact before the loop: the projection borrows the plan
     // and definition below needs the compiler mutably.
-    let unit_definitions = compiler
+    let unit_authorities = compiler
         .static_transition_plan
         .emittable_units()?
         .into_iter()
-        .map(|unit| (unit.function(), unit.definition()))
+        .map(|unit| (unit.function(), unit.definition(), unit.header()))
         .collect::<Vec<_>>();
     let contexts = compiler
         .static_transition_plan
@@ -2785,10 +2845,10 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
             // `D2` — a context whose raw owner has no descriptor is a context
             // whose body has no declared ABI, which is not a binding-order
             // question to answer conservatively.
-            let raw_owner_definition = unit_definitions
+            let (raw_owner_definition, raw_header) = unit_authorities
                 .iter()
-                .find(|(function, _)| *function == raw_owner)
-                .map(|(_, definition)| *definition)
+                .find(|(function, _, _)| *function == raw_owner)
+                .map(|(_, definition, header)| (*definition, *header))
                 .ok_or_else(|| {
                     backend_module(
                         "a generated context's raw owner has no ABI descriptor".to_string(),
@@ -2800,6 +2860,8 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 worker_body_origin: context.worker_body_origin(),
                 raw_owner,
                 raw_owner_definition,
+                raw_parameters: raw_header.parameters,
+                raw_captures: raw_header.captures,
                 slots: context.slots().to_vec(),
                 offsets,
                 header_parameters: context.header().parameters,
@@ -2969,26 +3031,22 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 crate::cranelift_backend::lowering::D8oBodyKey::GeneratedContext(context.id),
             );
 
-            // The environment: the Parameter run then the Capture run. This is
-            // the SAME conversion `define_unit_body` applies, which is why the
-            // raw body's binder positions resolve identically here -- the
-            // parameter prefix is byte-for-byte the run its own unit binds, and
-            // the continuation inputs sit strictly after it.
+            // The environment is the raw body's declared-argument prefix, then
+            // its raw captures, then the generated context's continuation-input
+            // captures. The context ABI coalesces the first two into one
+            // `Parameter` run, so descriptor kind alone does not identify the
+            // source binder boundary.
             //
-            // `RT-SRCBODY-BIND-ORDER` `D2`: "the same walk" is no longer enough
-            // to say that, because the walk and the environment are now two
-            // orders. The equivalence is preserved by taking the conversion
-            // from the RAW OWNER's definition arm -- so if that body's own unit
-            // reverses its parameter run, this context reverses the identical
-            // prefix, and if it does not, neither does this. The capture run is
-            // the enclosing specialization's ordered input projection and is
-            // positional by construction, so it is never reversed.
+            // `RT-SRCBODY-BIND-ORDER` `D2`: the raw owner's descriptor supplies
+            // that boundary. Only its declared-argument prefix receives the
+            // source de Bruijn conversion; both capture runs retain their own
+            // planner order. Reversing the coalesced context `Parameter` run
+            // instead is a same-cardinality permutation that moves the last raw
+            // capture into the source parameter's semantic position.
             let mut context_parameters = Vec::new();
             let mut context_captures = Vec::new();
             #[cfg(test)]
             let mut context_parameter_ordinals = Vec::new();
-            #[cfg(test)]
-            let mut context_capture_ordinals = Vec::new();
             for (slot, offset) in slots.iter().zip(offsets) {
                 if !matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture) {
                     continue;
@@ -3038,19 +3096,36 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                         context_parameter_ordinals.push(slot.ordinal);
                         context_parameters.push(binding)
                     }
-                    _ => {
-                        #[cfg(test)]
-                        context_capture_ordinals.push(slot.ordinal);
-                        context_captures.push(binding)
-                    }
+                    _ => context_captures.push(binding),
                 }
             }
             let context_converts = source_body_binding_order(context.raw_owner_definition)?;
+            let env = generated_context_source_environment(
+                context_parameters,
+                context_captures,
+                context.raw_parameters,
+                context.raw_captures,
+                context_converts,
+            )?;
+            #[cfg(test)]
+            let raw_parameter_count = usize::try_from(context.raw_parameters)
+                .expect("raw parameter count fits this platform after environment construction");
+            #[cfg(test)]
+            let raw_capture_count = usize::try_from(context.raw_captures)
+                .expect("raw capture count fits this platform after environment construction");
+            #[cfg(test)]
+            let mut source_parameter_ordinals =
+                context_parameter_ordinals[..raw_parameter_count].to_vec();
+            #[cfg(test)]
             if context_converts {
-                context_parameters.reverse();
-                #[cfg(test)]
-                context_parameter_ordinals.reverse();
+                source_parameter_ordinals.reverse();
             }
+            #[cfg(test)]
+            let source_capture_ordinals = context_parameter_ordinals
+                [raw_parameter_count..raw_parameter_count + raw_capture_count]
+                .iter()
+                .map(|ordinal| ordinal - context.raw_parameters)
+                .collect::<Vec<_>>();
             // `RT-SRCBODY-BIND-ORDER` `D3` control 4, amended (Architect,
             // producer-wide) -- the TRANSITION SENTINEL, sited at the producer
             // edge rather than inside one witness's test.
@@ -3091,13 +3166,13 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
             // the reaching positive control that keeps this non-vacuous.
             #[cfg(test)]
             assert!(
-                context_parameter_ordinals.len() <= 1,
-                "a generated-context worker declares {} parameters. D2's binding order is no \
-                 longer inert, so its cross-host equivalence is now OBSERVABLE and UNMEASURED. \
-                 The deliverable is the cross-host equivalence control -- that this body binds \
-                 the same order in its own unit and in the context that lowers it -- not a \
-                 wider bound at this gate. Recorded ordinals: {context_parameter_ordinals:?}",
-                context_parameter_ordinals.len()
+                raw_parameter_count <= 1,
+                "a generated-context worker declares {raw_parameter_count} source parameters. \
+                 D2's binding order is no longer inert, so its cross-host equivalence is now \
+                 OBSERVABLE and UNMEASURED. The deliverable is the cross-host equivalence \
+                 control -- that this body binds the same order in its own unit and in the \
+                 context that lowers it -- not a wider bound at this gate. Recorded source \
+                 ordinals: {source_parameter_ordinals:?}"
             );
             #[cfg(test)]
             srcbody_bind_order_record(SrcbodyBindOrderObservation {
@@ -3105,11 +3180,9 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 definition: context.raw_owner_definition,
                 converted: context_converts,
                 body_origin: context.worker_body_origin,
-                parameter_ordinals: context_parameter_ordinals,
-                capture_ordinals: context_capture_ordinals,
+                parameter_ordinals: source_parameter_ordinals,
+                capture_ordinals: source_capture_ordinals,
             });
-            let mut env = context_parameters;
-            env.extend(context_captures);
 
             let body = compiler.retained_body_occurrence(context.worker_body_origin)?;
             let lowered = compiler.lower_expr(&mut builder, body, &env)?;

@@ -15,6 +15,8 @@ use crate::nc5_seed_examples;
 use crate::cranelift_backend::lowering::aggregates::tests::{
     d7_constructor_arguments, d7_ownership_run,
 };
+use crate::boundary_value::BoundaryWord;
+use crate::cranelift_backend::lowering::units::generated_context_source_environment;
 
 // RT-SPLIT slice 7, rule 8: dependencies carried in with the moved
 // `emit_process_entrypoint_object_with_symbols` closure -- used ONLY by it, so
@@ -2554,6 +2556,98 @@ fn c2_run_edge_with_arg(code: *const u8, arena: *const u64, argument: i64) -> i6
     let function: extern "C" fn(*const u64, i64) -> i64 =
         unsafe { std::mem::transmute(code) };
     function(arena, argument)
+}
+
+/// The expected semantic environment for one declared source parameter, four
+/// raw captures, and three generated-context captures. Every entry is a valid,
+/// distinct boundary word, so equality observes identity and position rather
+/// than cardinality.
+fn generated_context_pairing_words(selected: u64) -> (Vec<u64>, Vec<u64>) {
+    let raw_captures = (3..=6)
+        .map(|payload| BoundaryWord::handle(BoundaryTag::InvocationBorrowed, payload).0)
+        .collect::<Vec<_>>();
+    let context_captures = (7..=9)
+        .map(|payload| BoundaryWord::handle(BoundaryTag::InvocationBorrowed, payload).0)
+        .collect::<Vec<_>>();
+    let mut combined_parameters = vec![selected];
+    combined_parameters.extend(raw_captures.iter().copied());
+    let mut expected = combined_parameters.clone();
+    expected.extend(context_captures.iter().copied());
+    let observed =
+        generated_context_source_environment(combined_parameters, context_captures, 1, 4, true)
+            .expect("the raw owner's 1+4 header matches the context Parameter run");
+    (observed, expected)
+}
+
+/// Durable invariant: the reconstructed environment consumes the selected
+/// caller Bool at position zero, followed by the raw captures and then the
+/// generated-context capture suffix. A hostile declared source parameter is
+/// transported neutrally at the same position; Bool elimination is deliberately
+/// outside this control.
+///
+/// Promise class: durable invariant. Generated-context storage may change, but
+/// the authority-derived source-parameter/raw-capture partition and positional
+/// pairing may not.
+#[test]
+fn generated_context_pairing_keeps_selected_parameter_before_both_capture_runs() {
+    let selected_false = BoundaryWord::immediate(BoundaryTag::ImmediateBool, 0).0;
+    let (observed_false, expected_false) = generated_context_pairing_words(selected_false);
+    assert_eq!(observed_false, expected_false);
+    assert_eq!(observed_false[0], selected_false);
+
+    let hostile = BoundaryWord::handle(BoundaryTag::InvocationBorrowed, 2).0;
+    let (observed_hostile, expected_hostile) = generated_context_pairing_words(hostile);
+    assert_eq!(observed_hostile, expected_hostile);
+    assert_eq!(
+        observed_hostile[0], hostile,
+        "pairing must preserve a hostile declared source word exactly at position zero"
+    );
+}
+
+/// Mutation proof for the unchanged structural oracle above: restoring the old
+/// whole-five-word reversal keeps the same eight words and types, but moves the
+/// final raw capture to position zero and makes the equality assertion red.
+#[test]
+fn generated_context_pairing_oracle_reddens_on_whole_run_reversal() {
+    let selected_false = BoundaryWord::immediate(BoundaryTag::ImmediateBool, 0).0;
+    let ((observed, expected), applications) =
+        crate::cranelift_backend::lowering::with_generated_context_whole_parameter_reversal(|| {
+            generated_context_pairing_words(selected_false)
+        });
+    assert_eq!(
+        applications, 1,
+        "the mutation must reach the production helper"
+    );
+    assert_ne!(
+        observed, expected,
+        "the mutation must change the observation"
+    );
+    assert_ne!(
+        observed[0], selected_false,
+        "whole-run reversal must move the selected caller word out of position zero"
+    );
+    let unchanged_oracle = std::panic::catch_unwind(|| assert_eq!(observed, expected));
+    assert!(
+        unchanged_oracle.is_err(),
+        "the unchanged structural oracle must red under whole-run reversal"
+    );
+}
+
+/// Durable invariant: the raw owner's header is the partition authority. A
+/// same-typed context run with a mismatching count is refused rather than
+/// guessed from the context descriptor.
+#[test]
+fn generated_context_pairing_refuses_raw_owner_header_mismatch() {
+    let error = generated_context_source_environment(vec![0u64; 5], vec![0u64; 3], 2, 4, true)
+        .expect_err("a 2+4 raw header cannot describe five context parameters");
+    assert_eq!(
+        error,
+        CraneliftBackendError::Backend(BackendFailure::Module(
+            "a generated context's Parameter run holds 5 operands, but its raw owner declares 2 \
+             parameters plus 4 captures"
+                .to_string(),
+        ))
+    );
 }
 
 // Ignored pending RT-CARRIER-PRODUCER-OCCURRENCE.
