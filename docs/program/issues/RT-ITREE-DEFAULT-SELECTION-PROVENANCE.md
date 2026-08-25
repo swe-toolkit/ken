@@ -1,16 +1,31 @@
 ---
 id: RT-ITREE-DEFAULT-SELECTION-PROVENANCE
 title: "AC-5 successor exposed by identity-preserving trap provenance — an admitted checked program's runtime lowering SELECTS the generated ITree-elimination fail-closed default (planned identity 40, PatternMatchFailure 'no runtime match case selected for ...::ITree') where the synthesized Err InvalidOffset should continue through the checked ITree/result path. The erasure default VALUE (erasure.rs:2740-2744) is CORRECT and fail-closed; the first causally wrong authority is the lowering branch that selected it, and identity 40 cannot locate the occurrence (Planner::intern_trap value-dedups). First deliverable is occurrence localization by graph-derived StaticOriginId, not repair."
-status: ready
+status: draft
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-UNIT-FAILURE-STATUS-PROVENANCE]
+depends_on: [RT-UNIT-FAILURE-STATUS-PROVENANCE, RT-LINKED-NEGATIVE-TERMINAL-CLASSIFICATION]
 blocks: []
 github: null
 origin: "Steward, 2026-08-25, from the Architect AC-5 ruling (evt_3rq4xafrf7cqf, thr_6gmh4p1m0gch4) on runtime WIP 7094c29cd. Preserving the root generated-unit failure's planned trap identity (RT-UNIT-FAILURE-STATUS-PROVENANCE) exposed a DISTINCT downstream producer: the checked ITree-elimination default is selected for an admitted program. The Architect ruled AC-5 valid and directed this be framed as its own object (explicitly NOT the prohibited -3-vs-4 'third node'; it is a different producer requiring its own object read). Steward framing call per COORDINATION section 2."
 ---
 
+> # HELD 2026-08-25 — PREEMPTED by RT-LINKED-NEGATIVE-TERMINAL-CLASSIFICATION
+>
+> A LIVE fail-closed regression on merged [[RT-UNIT-FAILURE-STATUS-PROVENANCE]]
+> (adversary evt_4am5ebv5p4xnn) took priority (Architect ruling evt_530y3skvjk8y6):
+> the linked consumer refuses the fixed process-boundary sentinels that
+> `emit_process_exit_status` legitimately emits, hard-erroring valid programs. The
+> runtime ring HOLDS this node at a clean D0 checkpoint — D0 occurrence-localization
+> instrumentation preserved/committed on `wp/RT-ITREE-DEFAULT-SELECTION-PROVENANCE`,
+> NO D1, no repair-site selection — and fixes
+> [[RT-LINKED-NEGATIVE-TERMINAL-CLASSIFICATION]] first. When that lands, RT-ITREE
+> re-anchors on then-current main and replays ONLY its D0 evidence into a fresh
+> candidate before continuing. Its full-program observations must be read through the
+> repaired reporting boundary, so this ordering holds even if the fix avoids
+> `calls.rs`. `depends_on` now carries the erratum.
+>
 > # RELEASED 2026-08-25 — dependency landed; base re-grounded to current main
 >
 > [[RT-UNIT-FAILURE-STATUS-PROVENANCE]] merged at `2a5b3cd0e` (honest witness-path
