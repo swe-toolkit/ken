@@ -362,12 +362,16 @@ fn run_px8ds_retired_flat_control() {
 // Existing baseline provisioning for the ordinary px8ds row. This WP neither
 // raises nor otherwise changes its stack budget.
 //
-// With ambient RUST_MIN_STACK absent, a temporary manual probe over this exact
-// ordinary fixture's build-and-observe path was bisected at 64 KiB resolution
-// and repeated at both boundary points:
+// With ambient RUST_MIN_STACK absent, one freshly compiled temporary probe
+// changed only this named ignored row: its Builder read the probed byte count
+// before spawning, and its thread body called
+// `observe_px8ds_real_same_depth_path` directly. The compiler reported the
+// constant and assertion-bearing helper as unused, confirming that the probe
+// body, rather than a cached ordinary body, was in the test binary. The same
+// binary was bisected at 64 KiB resolution and run twice at each boundary:
 //
-//   1792 KiB  stack overflow
-//   1856 KiB  completes the build-and-observe path
+//   1792 KiB  stack overflow twice
+//   1856 KiB  completes the build-and-observe path twice
 //
 // The committed 256 MiB provision is therefore 260,288 KiB (254.1875 MiB)
 // above the measured passing bound and 141.24 times that bound (140.24 times
