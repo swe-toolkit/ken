@@ -11,6 +11,24 @@ github: null
 origin: "Architect ruling evt_214z6r6qnwme0 (2026-08-24), unbundling the WP-4 strict whole-catalog co-gate off Component A. The co-gate gates a deliverable outside WP-4's authorized surface (a canonical home for the type Nat), so it is re-homed here. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
+> # REMAINDER RELEASED 2026-08-25 — both held conditions met; operator-authorized
+>
+> The held conditions named in the banner below are now BOTH satisfied:
+> (1) operator Decision `dec_1kqwn6hdvn7d2` (prelude-floor membership) resolved;
+> (2) the Nat prerequisite landed — [[LANG-MOD-NAT-FLOOR-REALIZATION]] MERGED
+> 2026-08-25 at squash `d5c41ec1` (blob-audited), plus
+> [[LANG-MOD-NAT-PROVIDER-INTERFACE]] merged. The operator authorized releasing
+> the remainder to the language ring (2026-08-25). The remainder is therefore
+> STARTABLE now: the whole-catalog strict-green criterion + AC-B5a Nat home,
+> Order's provider surface + identity, and the Arithmetic/Order/Gcd import
+> migration (Gcd imports add/mul + leq_nat/sub + Nat and drops its
+> reimplementations). Deliverables/ACs (AC-B1..B8) below are unchanged and
+> release-ready; reviewers Architect + conformance-validator. This is the front
+> of the LANG-MOD campaign tail; the two new nodes
+> ([[LANG-MOD-KENFMT-DECL-LAYOUT]], [[LANG-MOD-ATTACHED-PROOF-OWNERSHIP]]) are
+> sequenced AFTER it, and the verify/z3 FO-checker resume AFTER them. Closing B
+> closes the campaign's catalog criterion and unblocks [[CAT-GCD-REFACTOR]].
+
 > # ACTIVE — authorized PARTIAL landed; remainder HELD. Not terminally closed.
 >
 > ## AUTHORIZED PARTIAL LANDED 2026-08-24 at squash `76426e9f9`
