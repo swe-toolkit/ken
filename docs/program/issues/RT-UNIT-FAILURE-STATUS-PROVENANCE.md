@@ -30,7 +30,9 @@ origin: "Steward, 2026-08-25. Recut from the Architect umbrella arm(b) ruling (e
 >   The operative closure claim is NARROWED to the witness path; the rest are
 >   enumerated, not claimed closed.
 >
-> Runtime RESUMES this WP on the WIP `7094c29cd` base to complete D1 only. It MAY
+> Runtime resumes from current `origin/main` `a61a19a4`, replaying ONLY the
+> `7094c29cd` `calls.rs` delta as evidence into a fresh candidate SHA, to complete
+> D1 only. It MAY
 > land with SemanticErrorV1 still red — now honestly reported as the ITree
 > default, not `unknown terminal sentinel`. Greening InvalidOffset belongs to the
 > successor. `-3` and `-4` remain ONE status-provenance predicate — this is not a
@@ -177,10 +179,11 @@ narrowed closure claim. Size M.
 ## Sequencing
 
 Lane-1 (runtime, priority). RESUME to complete D1 only. Base construction: cut /
-rebase the branch from current `origin/main` `7242e5c1`, then replay the
+rebase the branch from current `origin/main` `a61a19a4`, then replay the
 `7094c29cd` `calls.rs` delta as evidence, producing a FRESH candidate SHA — do NOT
-remain based on pre-reconcile `14deff3c`. (The runtime ring already performed this
-replay at WIP `61ab731a`, parent `7242e5c1`.) The successor
+remain based on pre-reconcile `14deff3c` or `7242e5c1`. (The runtime ring already
+replayed this delta at WIP `61ab731a`; re-anchor it onto `a61a19a4`, a doc-only
+advance over `7242e5c1` that leaves the `calls.rs` replay unaffected.) The successor
 [[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]] (the exposed ITree-default producer that
 greens InvalidOffset) is sequenced AFTER and must not co-run.
 [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] (ReadSome/Wrote, `calls.rs:1631-1640`),
