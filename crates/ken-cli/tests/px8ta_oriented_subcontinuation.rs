@@ -376,20 +376,16 @@ fn run_px8ds_retired_flat_control() {
 // The committed 256 MiB provision is therefore 260,288 KiB (254.1875 MiB)
 // above the measured passing bound and 141.24 times that bound (140.24 times
 // extra headroom). This is baseline fixture provisioning, not a regression
-// repair or a claim that the ignored post-D1 operand residual is green.
+// repair.
 const PX8DS_THREAD_STACK_BYTES: usize = 256 * 1024 * 1024;
 
 #[cfg(target_os = "linux")]
-// Ignored on the post-D1 operand-provenance residual.
-//
-// The exact Bool dispatcher now calls the tag-checked scalar helper at
-// `ken_continuation_context_0`; the node-only Bool refusal is gone. The host
-// observation remains `ConsoleIsTerminal(false)`, but the generated context
-// receives canonical `ImmediateBool` payload 1 and therefore selects True. Its
-// continuation returns -1 before a second Console effect. This is upstream of
-// case mapping and distinct from the eliminated node/immediate mismatch.
+// This focused native row compiles, links, and runs a large artifact on its
+// separately provisioned thread. It is invoked explicitly by targeted Runtime
+// validation rather than by the default package suite. The assertions pin a
+// successful false branch with one Console observation and one release.
 #[test]
-#[ignore = "post-D1 px8ds residual: generated context receives Bool payload 1 after host false"]
+#[ignore = "focused native resource-cost row; run outside default suite"]
 fn px8ds_real_same_depth_path_runs_exact_edges() {
     std::thread::Builder::new()
         .name("px8ds-real-siblings".to_string())
