@@ -110,20 +110,38 @@ origin: "Operator directive 2026-08-22: module/import is its own campaign and, b
 > module/import blocks the foundation catalog trial. The operator's current
 > ordering for finishing the lane is:
 >
-> 1. [[LANG-MOD-CATALOG-COMPLETENESS]] (Component B) remainder — Nat criterion now
->    prerequisite-unblocked ([[LANG-MOD-NAT-FLOOR-REALIZATION]] MERGED 2026-08-25
->    at `d5c41ec1`, [[LANG-MOD-NAT-PROVIDER-INTERFACE]] merged). This is the front
->    of the tail. Closing B closes the campaign's catalog criterion and unblocks
->    [[CAT-GCD-REFACTOR]].
-> 2. THEN the two new LANG-MOD nodes, framed 2026-08-25 and scheduled here
+> RECUT 2026-08-25 (Component B hard stop #1 — native `Pair` vs the exact-nine
+> floor; enclave arm-B narrow-and-defer, Architect atomic-migration mechanism;
+> spec-author evt_6nk4xxkppz3k5, spec-leader evt_w7v4dvvzjr8k, Architect
+> evt_53295hb0v21mw). CONSEQUENCE: Component B can NO LONGER close the campaign's
+> whole-catalog strict-green criterion — its ruled Compare/LawfulClasses/Derived
+> cluster + transitive consumers (Order, Gcd) canonically depend on native `Pair`,
+> which the closed exact-nine floor excludes and Strict cannot source. The
+> criterion + foundation [[CAT-GCD-REFACTOR]] now unblock only after a canonical
+> `Pair` package lands. Updated ordering:
+>
+> 1. [[LANG-MOD-CATALOG-COMPLETENESS]] (Component B, RECUT) — the Pair-INDEPENDENT
+>    closed loader-derived unit-disposition pass: every unit is `StrictGreen` now
+>    or `deferred-on-canonical-Pair-package`. Pair-independent work (Nat home,
+>    Arithmetic strict, OrdResult home) lands; it does NOT claim whole-catalog
+>    closure. Front of the tail; release now.
+>    In parallel (Pair-independent, startable now): [[LANG-MOD-PAIR-STRICT-BOUNDARY]]
+>    (spec) — the durable boundary artifact (compiler possession is not provider
+>    availability + conformance pins).
+> 2. [[LANG-MOD-CANONICAL-PAIR-PACKAGE]] (language, DRAFT until the boundary
+>    artifact lands) — atomically migrate to ONE package-defined public `Pair`
+>    identity, retire the compiler-installed convenience, re-enter the deferred
+>    cluster into strict closure. THIS closes the campaign's whole-catalog
+>    criterion and unblocks [[CAT-GCD-REFACTOR]] (Gcd is in the deferred set).
+> 3. THEN the two earlier-framed LANG-MOD nodes
 >    (`depends_on: [LANG-MOD-CATALOG-COMPLETENESS]`):
->    [[LANG-MOD-KENFMT-DECL-LAYOUT]] (language) and
->    [[LANG-MOD-ATTACHED-PROOF-OWNERSHIP]] (spec). These are the END of the
->    LANG-MOD work.
-> 3. THEN RESUME the interrupted verify/z3 FO-checker integration:
+>    [[LANG-MOD-KENFMT-DECL-LAYOUT]] (language; its D2 recombination of Derived's
+>    stopgap waits on the deferred cluster re-entering) and
+>    [[LANG-MOD-ATTACHED-PROOF-OWNERSHIP]] (spec). END of the LANG-MOD work.
+> 4. THEN RESUME the interrupted verify/z3 FO-checker integration:
 >    [[V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY]] (active) and
 >    [[V3-FO-EMBEDDING-ADEQUACY]] (ready). Do NOT resume z3 before the LANG-MOD
->    tail (items 1-2) lands.
+>    tail (items 1-3) lands.
 >
 > ORIGINAL RELEASE GATE (2026-08-22, now historical): members were held until the
 > language ring FINISHES embedding-adequacy ([[V3-FO-EMBEDDING-ADEQUACY]]) per

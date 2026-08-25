@@ -11,46 +11,56 @@ github: null
 origin: "Architect ruling evt_214z6r6qnwme0 (2026-08-24), unbundling the WP-4 strict whole-catalog co-gate off Component A. The co-gate gates a deliverable outside WP-4's authorized surface (a canonical home for the type Nat), so it is re-homed here. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
-> # HARD STOP #1 2026-08-25 — remainder SUSPENDED pending Spec/Architect boundary ruling
+> # RECUT 2026-08-25 — narrow-and-defer (enclave boundary ruling; arm B)
 >
-> The released remainder hit a genuine frame/mechanism hard stop
-> (language-implementer evt_2991hpp8xf9s5; Architect concurred evt_dkk2rp7qez0p,
-> holding the mechanism ruling). A real strict census (3 green / 45 red) shows the
-> ruled Compare/LawfulClasses/Derived cluster canonically depends on native `Pair`
-> (`Pair`, `mk_pair`, `pair_fst`, `pair_snd`), but the landed exact-nine floor
-> excludes `Pair` and Strict has no identity-preserving provider vehicle for it —
-> Compare fails first at `UnboundName Pair`, so Order can't strict-load
-> LawfulClasses and Gcd can't strict-load Order (blocks AC-B1/B2/B2a/B4/B7 + the
-> end-state invariant). Every workaround crosses a released boundary (widen the
-> floor, mint a second `Pair` identity, Legacy preload, split the cluster).
+> Hard stop #1 (native `Pair` vs the exact-nine floor) is resolved by the Spec
+> enclave boundary ruling: spec-author evt_6nk4xxkppz3k5, spec-leader
+> evt_w7v4dvvzjr8k, thr_7mdnraw5rrmc2. The ruling is **arm B — narrow and
+> defer**, deductive from the settled floor/package/Strict contracts, so it needs
+> NO new Decision and NO floor change. Component B neither requires nor authorizes
+> a `Pair` floor member or provider mechanism. The exact-nine floor stays closed;
+> native compiler possession is not strict provider availability; a catalog `Pair`
+> would be a distinct identity; no mixed-resolution or fallback escape is lawful.
 >
-> SUSPENDED. Branch clean/freed; no implementer workaround authorized. Steward
-> routed the frame/spec boundary to the Spec enclave + Architect
-> (evt_n6sg9df8m36s, thr_7mdnraw5rrmc2), two arms: (A) authorize an
-> identity-preserving strict `Pair` source (provider vehicle and/or amend the
-> exact floor — arm (A) touches operator-ruled Decision `dec_1kqwn6hdvn7d2`, so it
-> escalates to the operator); or (B) amend Component B's closure contract
-> (AC-B9/B1/B2 + whole-catalog strict-green) so the Pair-dependent cluster is not
-> required strict on this WP. Steward executes the recut once the boundary is
-> ruled. Resume blocked until then.
-
-> # REMAINDER RELEASED 2026-08-25 — both held conditions met; operator-authorized
+> The recut of this WP's closure contract (operative below):
+> - **AC-B1's whole-catalog strict-green claim is WITHDRAWN for this WP.** The
+>   campaign catalog criterion no longer closes from Component B alone (see
+>   [[LANG-MODULE-IMPORT-SYSTEM]]).
+> - **Deferred population.** Exclude the full native-`Pair`-dependent
+>   Compare/LawfulClasses/Derived closure and every transitive strict consumer —
+>   at minimum `Core.Logic.Compare`, `Core.Classes.LawfulClasses`,
+>   `Data.Collections.Derived`, `Data.Numeric.Nat.Order`, `Algorithm.Numeric.Gcd`
+>   — from Component B's strict-green population. The real loader checks a unit AS
+>   A UNIT, so one Pair-dependent declaration defers the WHOLE unit; this ruling
+>   does NOT authorize an ad hoc module split to rescue part of a unit.
+> - **Closed disposition, not empty-vector.** Every catalog unit is classified as
+>   either strict-green-now (Pair-independent) OR explicitly
+>   `deferred-on-canonical-Pair-package`. Deferred is NOT green; an empty residual
+>   vector over a silently narrowed population is insufficient (AC-B3, recut).
+> - **Pair-independent work proceeds and lands.** The Nat home, Arithmetic strict
+>   closure, the already-landed OrdResult home, and every other Pair-independent
+>   unit are Component B's deliverable now. Preserve the exact-nine floor, ordinary
+>   explicit imports, flat Σ, and zero `trusted_base()` delta.
 >
-> The held conditions named in the banner below are now BOTH satisfied:
-> (1) operator Decision `dec_1kqwn6hdvn7d2` (prelude-floor membership) resolved;
-> (2) the Nat prerequisite landed — [[LANG-MOD-NAT-FLOOR-REALIZATION]] MERGED
-> 2026-08-25 at squash `d5c41ec1` (blob-audited), plus
-> [[LANG-MOD-NAT-PROVIDER-INTERFACE]] merged. The operator authorized releasing
-> the remainder to the language ring (2026-08-25). The remainder is therefore
-> STARTABLE now: the whole-catalog strict-green criterion + AC-B5a Nat home,
-> Order's provider surface + identity, and the Arithmetic/Order/Gcd import
-> migration (Gcd imports add/mul + leq_nat/sub + Nat and drops its
-> reimplementations). Deliverables/ACs (AC-B1..B8) below are unchanged and
-> release-ready; reviewers Architect + conformance-validator. This is the front
-> of the LANG-MOD campaign tail; the two new nodes
-> ([[LANG-MOD-KENFMT-DECL-LAYOUT]], [[LANG-MOD-ATTACHED-PROOF-OWNERSHIP]]) are
-> sequenced AFTER it, and the verify/z3 FO-checker resume AFTER them. Closing B
-> closes the campaign's catalog criterion and unblocks [[CAT-GCD-REFACTOR]].
+> Two new nodes carry the deferred cluster's re-entry, framed alongside this recut:
+> - [[LANG-MOD-CANONICAL-PAIR-PACKAGE]] — the Pair-package identity prerequisite
+>   (one public `Pair` identity via atomic migration to a package-defined type over
+>   the kernel Σ formers; Architect-ruled mechanism evt_53295hb0v21mw). The
+>   deferred cluster re-enters strict closure only after it lands.
+> - [[LANG-MOD-PAIR-STRICT-BOUNDARY]] — the durable Spec/Conformance boundary
+>   artifact (compiler possession is not provider availability + the conformance
+>   pins), spec-owned.
+>
+> Sequencing consequence: closing Component B's Pair-independent portion does NOT
+> close the campaign's whole-catalog criterion, and foundation
+> [[CAT-GCD-REFACTOR]] (Gcd is in the deferred set) unblocks only after the
+> canonical-Pair prerequisite + the deferred cluster land. Recorded in
+> [[LANG-MODULE-IMPORT-SYSTEM]].
+>
+> Held conditions that were satisfied at release (retained for the record):
+> operator Decision `dec_1kqwn6hdvn7d2` (prelude-floor membership) resolved;
+> [[LANG-MOD-NAT-FLOOR-REALIZATION]] MERGED at squash `d5c41ec1` (blob-audited);
+> [[LANG-MOD-NAT-PROVIDER-INTERFACE]] merged.
 
 > # ACTIVE — authorized PARTIAL landed; remainder HELD. Not terminally closed.
 >
@@ -208,10 +218,15 @@ ranges over the real population, not the stale count.
 
 # Acceptance criteria
 
-- AC-B1 (the re-homed co-gate). The whole catalog is strict-green in CI — the
-  co-gate with [[LANG-MOD-STRICT-RESOLUTION]], whose remaining whole-catalog
-  strict enforcement / CI closure co-closes here. Local targeted `-p` only;
-  whole-catalog strict-green is a CI gate, never a local `--workspace` run.
+- AC-B1 (recut — whole-catalog claim WITHDRAWN; Pair-independent strict-green +
+  closed disposition). The whole-catalog strict-green claim is withdrawn from this
+  WP per the enclave ruling (RECUT banner). Component B instead delivers: every
+  Pair-INDEPENDENT catalog unit is strict-green in CI, and the census is a closed
+  disposition (AC-B3) marking every remaining unit
+  `deferred-on-canonical-Pair-package`. The whole-catalog co-gate with
+  [[LANG-MOD-STRICT-RESOLUTION]] does NOT co-close here; it re-opens for the
+  deferred cluster behind [[LANG-MOD-CANONICAL-PAIR-PACKAGE]]. Local targeted `-p`
+  only; strict-green is a CI gate, never a local `--workspace` run.
 - AC-B2. Arithmetic, Order, and Gcd each check STANDALONE through the real loader
   under strict (the AC-1 re-homed from WP-4 — now satisfiable because `Nat` and
   `OrdResult` resolve through their canonical homes).
@@ -220,12 +235,57 @@ ranges over the real population, not the stale count.
   the real loader, observed by IDENTITY (not repo text, not a frozen id, no
   competing identity) — measurable in B once Order's closure (Transport +
   LawfulClasses + canonical OrdResult) resolves.
-- AC-B3 (residual triage). Completion ranges over the 34-residual population:
-  each residual is either migrated to strict-green OR explicitly excluded with a
-  stated reason. "Every census vector empty" is NOT sufficient — enumerate the
-  disposition of all 34.
+- AC-B3 (residual triage — recut to a closed loader-derived disposition;
+  Architect mechanism ruling evt_53295hb0v21mw). The census is a closed
+  unit-disposition pass over the EXISTING strict loader — no loader mechanism,
+  provider registry, floor member, fallback, or `Pair` declaration is added.
+  Method (binding):
+  1. Derive the complete catalog-unit population from the SAME roots discovery the
+     real loader consumes — not a frozen count (e.g. 48/50), not a filename grep,
+     not the current failure list.
+  2. Build the canonical module-import graph from PARSED module identities.
+     Classify each unit into a closed disposition sum with exactly two arms:
+     `StrictGreen` (the real strict roots-loader succeeds for the WHOLE unit) or
+     `DeferredOnCanonicalPairPackage` (the whole unit is in the Pair-dependent
+     closure).
+  3. Seed the deferred closure from behavioral AUTHORITY, not error text: direct
+     cluster roots `Core.Logic.Compare`, `Core.Classes.LawfulClasses`,
+     `Data.Collections.Derived`, plus the ruled mandatory consumers
+     `Data.Numeric.Nat.Order` and `Algorithm.Numeric.Gcd` (until their dependency
+     edges are materialized). Derive every further transitive consumer by REVERSE
+     reachability in the actual import graph. Record whether each seed is direct or
+     a ruled-mandatory edge.
+  4. NEVER classify from `UnboundName Pair`, spelling, a source grep,
+     qualification, or "first error" — those are observations, not membership
+     authority. A NON-seed unit that fails strict loading is a BLOCKER (hard stop),
+     NOT an invitation to add it to the deferred set.
+  5. Deferred means the complete loader unit: no declaration split, no green
+     prefix, no deferred row in a green numerator. Deferred-unit source is held
+     BYTE-STABLE by default; a Pair-independent edit lands only where the final
+     whole unit is `StrictGreen`.
+  6. The committed disposition ledger contains every canonical unit EXACTLY ONCE
+     with its direct imports, disposition, and — for a deferred unit — one
+     explicit dependency path to an authoritative seed. Exact set equality over
+     the derived population is the pin; multiple paths to one module identity
+     remain one row.
+  Deferred is NOT green; an empty residual over a silently narrowed population is
+  insufficient. Discriminating controls (AC-B7): removing a row fails population
+  equality; marking a deferred seed green reaches the real-loader refusal; adding a
+  green unit's import edge to a Pair seed changes the reverse closure and reds the
+  stale ledger; an unexpected non-Pair strict failure cannot be hidden by a
+  catch-all defer.
 - AC-B4. Gcd's four imports resolve to the exact provider IDs with no Gcd-owned
   competing identity — establish no-reimplementation by IDENTITY, not repo text.
+- DEFERRED ACs (recut 2026-08-25; Architect evt_53295hb0v21mw). AC-B2's Order/Gcd
+  standalone-strict clause, AC-B2a (Order provider identity), AC-B4 (Gcd imports),
+  the Pair-dependent portion of AC-B7/AC-B9, and the whole-catalog END-STATE
+  INVARIANT target units in the deferred `deferred-on-canonical-Pair-package` set
+  (`Data.Numeric.Nat.Order` → LawfulClasses → Compare → native `Pair`;
+  `Algorithm.Numeric.Gcd` → Order). They are NOT closure criteria for this recut
+  WP; they move to the deferred cluster's re-entry downstream of
+  [[LANG-MOD-CANONICAL-PAIR-PACKAGE]] and are re-run from scratch after it lands.
+  AC-B2 for THIS WP is Arithmetic (and any other Pair-independent unit)
+  standalone-strict only.
 - AC-B5 (canonical-home identity — Architect ruling evt_60na0wbpydg0y). Exactly
   one defining `data OrdResult` exists in the catalog (at `Core/Logic/OrdResult`),
   the two private copies at base deduped away; and `Nat` is served by a single
