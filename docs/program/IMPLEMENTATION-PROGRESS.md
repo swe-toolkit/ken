@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-25 01:09:33Z — from 439 issue file(s) in `docs/program/issues/`.
+2026-08-25 02:17:47Z — from 441 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -316,6 +316,7 @@ the committed file matches the generator's output.
 | `RT-ENTRY-TRAP-PX7O` | px7o heterogeneous eliminator frames: native traps at the explicit entry (RuntimeTrap(4), exit 1) where the interpreter returns exit 7 -- the entry-trap family the de Bruijn repair did NOT clear | closed | runtime | TBD | none | — |
 | `RT-ESCAPE` | escaping a second Resource through a bracket fails native lowering | merged | runtime | M | none | PR #911 @ 238a5c5d (origin/main 4ac9141e, CI green) |
 | `RT-EXACTINT-CARRIED-OBSERVE` | A genuinely-live effect seat needing ExactIntU64 (FsReadAt Argument(1)) cannot observe its need in the CarriedWord phase, so the withResource path still fails object emission behind the now-closed ResourceScalar family -- the ExactIntU64-need carried-observation closure on the existing carried_exact_int EITHER_PHASE precedent | closed | runtime | S | none | — |
+| `RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT` | Execution-parity successor — give the ExitCode::Failure result payload a durable native transport so a checked program that crosses M3's effect seat does not trap `malformed ExitCode::Failure payload` at process exit (object_linker_packaging.rs:2223, native stub value -3) | draft | runtime | M | none | — |
 | `RT-FNSPLIT-B1R` | RT-NATIVE-FNSPLIT Boundary B1R — encode the occurrence-local semantic material B1 counted but never stored (repair of landed B1) | merged | runtime | L | none | 937 |
 | `RT-FNSPLIT-B2A-C` | plan↔lowering occurrence correspondence — transport the preallocated StaticOriginId to the site where it is out of scope | merged | runtime | L | none | 940 |
 | `RT-FNSPLIT-B2A-S` | defunctionalize retained body selection — static-origin tag plus one closed consumer, replacing cloned-RuntimeExpr identity | merged | runtime | M | none | 944 |
@@ -388,6 +389,7 @@ the committed file matches the generator's output.
 | `RT-REQUIRED-CONSUMER-REACH-CENSUS` | The projection mints an entry only where required differs from source, so row 4 depth 1 is excluded from the new surface BY CONSTRUCTION -- census which rows the surface reaches, and attribute by SENTENCE the Closure refusal depths 2 and 3 now sit at | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2305 |
 | `RT-REQUIRED-OCCURRENCE-PROJECTION` | Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier | merged | runtime | M | none | — |
 | `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` | Genuinely-live effect seats needing ResourceScalar cannot observe their need in the CarriedWord phase, so the withResource path fails object emission -- the (A)-family carried-observation CLOSURE over the ResourceScalar need (ResourceRelease/FsHandleMetadata/FsReadAt Argument(0)): observe the need in the carried phase on the lower_buffer_freeze_resource_seat EITHER_PHASE precedent, keyed (need=ResourceScalar, phase=Carried), WITHOUT widening the seat's direct Need-subset-Avail partition | merged | runtime | M | none | — |
+| `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` | Call-target-resolution successor — a retained body (StaticOriginId) has no graph-derived call target in its unit, so object emission refuses at calls.rs:1638 (call_declared_unit / unit_calls map) after M3's effect-seat crossing succeeds | draft | runtime | M | none | — |
 | `RT-RETIRED-CENSUS-ROT` | Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement | ready | runtime | S | none | — |
 | `RT-ROOT-AUTHORITY-BLAME-DOMAIN` | The three root-authority guards report a compiler-owned invariant failure through the unsupported-construct channel, which reverses the fault domain -- and the correct arm, BackendFailure::PlannerInvariant, already exists with 40 producers in the same crate | merged | runtime | M | none | — |
 | `RT-ROOT-AUTHORITY-REACHABILITY-WITNESS` | ANSWERED, bounded negative on all three guards: three Ken-source programs attacking absence-at-consumption, wrong-outer-cursor and duplication all built and exited 0, so no language restriction is triggered -- three stress shapes are a search, not a proof of unreachability | closed | runtime | M | none | — |
@@ -543,7 +545,9 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
+- `RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT` blocked by `RT-CARRIED-IH-DISPATCH-SITEOP` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
+- `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` blocked by `RT-CARRIED-IH-DISPATCH-SITEOP` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
 ## Gate progress

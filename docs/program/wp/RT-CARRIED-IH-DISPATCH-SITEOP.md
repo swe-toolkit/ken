@@ -111,28 +111,76 @@ carrier upgrade lands.
    discriminant carried alongside the boundary-carried word, reusing M4's
    discriminant-only-at-runtime principle and the env-Record positional schema
    for any carried constructor's fields.
-2. The effect-seat dispatch: the effect-seat claim routine admits a discriminated
-   carried value at a `ConstructorTag` seat and dispatches on the presented
-   discriminant, so a genuinely discriminated `CarriedWord` satisfies
-   `avail.admits(ConstructorTag)` and marshals into the host call.
-3. The two rows execute correctly end-to-end and are un-ignored ONLY on genuine
-   green (px8f `FsOpen` Arg1; px8ta HALF B `ConsoleIsTerminal` Arg0).
+2. The effect-seat dispatch (ruled Route A, evt_77kh69f8tkx1t): keep
+   `EffectSeatAvail::SPECIALIZED_ONLY` and add a narrow `CarriedConstructorDispatch`
+   route for `(ConstructorTag, CarriedWord)`, consumed immediately by a guarded
+   finite dispatcher that compares the presented discriminant against the finite
+   artifact-static constructor identities and traps on any non-match. Admission is
+   permission (routing only); the guarded dispatcher is the accept/refuse
+   authority. A matching discriminated `CarriedWord` marshals into the host call;
+   a non-matching one traps (see AC-FAILCLOSED). No blanket `avail.admits` accept
+   and no new operand-provenance mechanism.
+3. The two rows MARSHAL correctly through the effect seat (px8f `FsOpen` Arg1;
+   px8ta HALF B `ConsoleIsTerminal` Arg0). They do NOT go end-to-end green under
+   M3: each then hits a DISTINCT downstream object (Architect evt_317adj9ebfw86)
+   and stays `#[ignore]`, re-pointed to its successor owner — px8ta HALF B ->
+   [[RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT]]; px8f ->
+   [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]]. No row is un-ignored under M3.
 
 ## Acceptance criteria
 
-- AC-EXEC (end-to-end, not cold-enum): acceptance is px8f
-  (`linked_checked_write_all_...`) and px8ta HALF B
-  (`px8ds_real_same_depth_path_runs_exact_edges`) EXECUTING correctly through the
-  effect seat and matching the interpreter, then un-ignored per COORDINATION §8a.
-  A lowering-enum `Completes` disposition is NOT acceptance: the cold row
+- AC-EXEC (object-scoped, corrected per Architect ruling evt_317adj9ebfw86): M3's
+  acceptance is its OBJECT proven — the `ConstructorTag`/`CarriedWord` effect-seat
+  marshalling refusal cleared and each named acceptance seat (px8f `FsOpen`
+  Argument(1); px8ta HALF B `ConsoleIsTerminal` Argument(0)) marshalling correctly
+  through the effect seat — PLUS honest re-points for the distinct downstream
+  objects the rows hit AFTER crossing M3's seam. End-to-end green is NOT a blanket
+  bar: a row that crosses M3's seam and then traps in a DISTINCT successor object
+  is not an M3 failure. px8f and px8ta HALF B stay `#[ignore]`, re-pointed to their
+  successor owners — px8ta HALF B -> [[RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT]] (the
+  ExitCode::Failure payload execution-parity trap, object_linker_packaging.rs:2223
+  value -3); px8f -> [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] (the unit-call-graph
+  call-target derivation, calls.rs:1638). The un-ignore rule (§8a) is honored by NOT
+  un-ignoring either row: no row goes end-to-end green under M3.
+  A lowering-enum `Completes` disposition is still NOT acceptance: the cold row
   `rt_cold_lowering_path_enumeration.rs:543` is a cold-enum disposition, and
   cold-enum `Completes` is not parity-correct (Architect z203 guard
   evt_1vcwzkd3g0s1r). Do not accept on the cold-enum row.
-- AC-FAILCLOSED (exactness, load-bearing): an effect seat admits a discriminated
-  carried value ONLY when the `ConstructorTag` is genuinely present/transported.
-  A still-opaque or wrong-tag carried value MUST still refuse at `effects.rs:548`.
-  Control: a test that reds if an undiscriminated `CarriedWord` is admitted at a
-  `ConstructorTag` seat (do not weaken `avail.admits` to a blanket accept).
+- AC-FAILCLOSED (soundness PROPERTY — corrected per Architect ruling
+  evt_77kh69f8tkx1t; the property is the gate, not a site). Load-bearing
+  requirement: a wrong-tag / opaque / wrong-family / wrong-arity `CarriedWord` is
+  REFUSED by a deterministic TRAP before any host effect or capability commits,
+  and is NEVER marshalled into the host call. It does NOT require the rejection to
+  happen at the claim-time `!admits` membership branch (`effects.rs:548`) — naming
+  that site was an AC-exact-wrong-location slip. The ruled mechanism is Route A:
+  keep `EffectSeatAvail::SPECIALIZED_ONLY` and add a narrow
+  `CarriedConstructorDispatch` route for `(ConstructorTag, CarriedWord)` consumed
+  immediately by a guarded finite dispatcher (the established
+  `CarriedResourceObservation` / RT-DEAD-ARM precedent in this file: "admission is
+  permission; the guarded observation is authority") — NOT a blanket accept, and
+  NOT a new operand-provenance mechanism (that was Route B, rejected: identical
+  soundness at a substantially larger TCB; PRINCIPLES subsume-don't-proliferate).
+  Route A is sound ONLY under these conditions (the Architect checks them at
+  release):
+  1. The guarded dispatcher's failure is STRICTLY ONE-SIDED — any word whose
+     `emit_carrier_tag` does not EXACTLY match a finite artifact-static
+     constructor identity (wrong tag / family / arity / positional child tags, or
+     Bool / Bytes / borrowed / opaque) takes a deterministic TRAP; the finite
+     table never coerces or marshals a non-matching word.
+  2. The trap fires BEFORE any observable host effect or capability is committed
+     for that seat — no partial host side-effect on the wrong-tag path.
+  3. Admission-as-permission is ROUTING ONLY; the accept/refuse AUTHORITY is the
+     guarded dispatcher. A wrong-tag admission must not leave a capability
+     recorded-as-granted-but-unexercised that misaccounts elsewhere (stay
+     consistent with the D5 grant/withdraw accounting).
+  EXACTNESS CONTROL (relocated to match the property, required for APPROVE): a
+  control that REDS if a wrong-tag / opaque / wrong-family `CarriedWord` is
+  MARSHALLED (produces a host call or any non-trap result) at a `ConstructorTag`
+  seat — i.e. it asserts the guarded dispatcher TRAPS on each non-matching
+  population, not merely that the claim-time branch refuses. If the dispatcher
+  CANNOT be made one-sided (some non-matching word is silently coerced/marshalled
+  — a fail-open dispatcher), Route A is unsound: stop-and-report to the Architect
+  (the genuine Route B case); do not ship a fail-open dispatcher.
 - AC-DEADARM (no-regression on the neighbour): the provably-dead-arm path
   (`effect_arm_is_provably_dead` `:362` → `UnreachableArm` `:543`) is undisturbed.
   M3 removes only the LIVE-arm refusal. Control: the dead-arm substitution still
