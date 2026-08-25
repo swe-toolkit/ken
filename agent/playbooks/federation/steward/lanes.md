@@ -44,20 +44,26 @@ each node (`git fetch`; read status) before acting; a node id decays.
 
 | lane | ring | objective |
 |---|---|---|
-| 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (M-series defunctionalization). M6/M4 merged; M3 at its gate; two M3 successors filed. |
+| 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (M-series defunctionalization). M6/M4/M3 merged. Active successor: `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` (`ready`, the ExitCode recut). `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` + `RT-UNIT-FAILURE-STATUS-PROVENANCE` `draft`. |
 | 2 | language | Module/import campaign `LANG-MODULE-IMPORT-SYSTEM` — essentially COMPLETE (WP-1/2/3/4A merged incl. strict resolution). Remaining member work (Component B remainder, Nat provider, `CAT-GCD-REFACTOR`) is gated on the Nat Decision `dec_1kqwn6hdvn7d2`; lane-2 interim direction is an operator call (surfaced 2026-08-25). |
 | 3 | foundation | Expressibility trial — CAT WPs. `CAT-DEQUE`/`CAT-BSEARCH`/`CAT-VEC` `ready` now; `CAT-GCD-REFACTOR` waits on module/import. The Architect-burden probe. |
 
 **Lane 1 — runtime (priority).** The native carried-value program
 `RT-NATIVE-CARRIED-VALUE` (Architect frame `evt_9kat78d438cb`): a finite
 compile-time-known defunctionalization carried at runtime as discriminant only.
-M-series seats. M6 (Track-1 D0 `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`) and M4
-(`RT-CLOSURE-BOUNDARY-RESIDUAL`) merged; M3 (`RT-CARRIED-IH-DISPATCH-SITEOP`) at
-its QA + Architect gate (Route A proven). M3's crossing exposed two distinct
-successors, now filed: `RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT` (ExitCode payload
-execution trap) and `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` (unit call-graph).
-The NHC chain + `RT-BACKEND-MODULE-SPLIT` (the 2026-08-22 objective) are drained/
-merged. Architect is required reviewer on the M-series — the Architect-heavy lane.
+M-series seats. M6 (Track-1 D0 `RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION`), M4
+(`RT-CLOSURE-BOUNDARY-RESIDUAL`), and M3 (`RT-CARRIED-IH-DISPATCH-SITEOP`) merged.
+M3's crossing exposed two successors; the first was recut 2026-08-25 after three
+consecutive Architect hard stops on a shared predicate (a downstream semantic
+classification used as upstream producer/provenance authority): the ExitCode WP
+`RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT` is `closed`/falsified (Architect
+evt_1vhmndq7fscd1) and REPLACED by `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE`
+(`ready`) — an owner-bound probe of the causal dynamic-constructor dispatch
+residual, no production mechanism authorized before D0 selects a class. The `-3`
+reporter alias is split out as `RT-UNIT-FAILURE-STATUS-PROVENANCE` (`draft`,
+sequenced after; not folded). `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` (`draft`)
+stays distinct. The NHC chain + `RT-BACKEND-MODULE-SPLIT` are drained/merged.
+Architect is required reviewer on the M-series — the Architect-heavy lane.
 
 **Lane 2 — language: module/import campaign `LANG-MODULE-IMPORT-SYSTEM`.** This
 is the lane's current objective and it UNBLOCKS lane-3 foundation. Framing is
