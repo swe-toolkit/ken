@@ -179,18 +179,20 @@ Spec: `spec/10-kernel/14-inductive.md §2, §8`; frame §2 item 5.
 
 ### kernel/inductive/nested-negative-in-application-rejected
 - spec: `spec/10-kernel/14-inductive.md §8.1–8.3`, `§8.5`
-- given: declaration `data Bad3 : Type 0 where { mk : Pair (Bad3 → Empty)
-  Unit → Bad3 }` — `Bad3` occurs in the argument of an application (`Pair
-  (Bad3 → Empty) Unit`), hidden from the structural polarisation check.
-- expect: **rejected** at admission (non-strictly-positive occurrence in
-  application argument)
+- given: admit a fresh checked transparent
+  `Product A B = (x : A) × B`, then declare
+  `data Bad3 : Type 0 where { mk : Product (Bad3 → Empty) Unit → Bad3 }`
+- expect: **rejected** at admission (non-strictly-positive occurrence in the
+  exposed Sigma component)
 - why: before `KERNEL-NESTED-IND`, the conservative `occurs` guard rejects this
-  entire nested class. After that gate lands, `14 §8.5` permits traversal only
-  through `Pair`'s checked positive parameter and then recursively checks its
-  argument; it finds `Bad3` negatively in the domain of `Bad3 → Empty` and
-  rejects by `§8.3`. A bug that treats a positive outer parameter as making the
-  whole payload positive admits the paradox. Frame AC-5; retained soundness
-  control, reconciled by `inductive/seed-nested.md` AC4.
+  entire nested class. After that gate lands, ordinary reduction unfolds
+  Product to primitive Sigma and structural descent finds `Bad3` negatively in
+  the domain of `Bad3 → Empty`, rejecting by `§8.3`. Renaming the transparent
+  Sigma alias must preserve the verdict. A spelling rule or a bug that treats a
+  positive outer component as making the whole payload positive fails the
+  controls. Frame AC-5; retained soundness control, reconciled by
+  `inductive/seed-nested.md` AC4. The future canonical named Pair instantiation
+  is homed in `surface/modules/seed-pair-strict-boundary.md`.
 
 ### kernel/inductive/d-in-own-indices-rejected
 - spec: `spec/10-kernel/14-inductive.md §8.1–8.3`

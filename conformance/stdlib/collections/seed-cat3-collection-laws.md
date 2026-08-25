@@ -43,8 +43,11 @@ The **Architect's three fork rulings** (`evt_4c3q1e611va69`), as transcribed in
 `catalog/packages/Data/Collections/Derived.ken.md`. The targeted
 `cat3_collections_package` run at this candidate base passes all eight tests,
 including the five formerly deferred surfaces and their negative controls.
-Historical row ids retain `red-until-built`; their dispositions below are now
-GREEN with the executing evidence that justifies the change.
+Historical row ids retain `red-until-built`; Pair-independent dispositions
+below are GREEN with the executing evidence that justifies the change. The lens
+rows that name `Pair` are RED-UNTIL the canonical Pair package and must
+explicitly import its four-name transparent-Σ interface; ambient native
+acceptance is measured implementation behavior, not strict package closure.
 
 ## Grounding (content-verified against the landed targets)
 
@@ -344,30 +347,33 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
   (endpoints)
 - given: the shipped concrete `lens` (`57 §4.4`) — a `Σ`-record of `get`/`set`
   + the three coherence proofs — onto the first component of `Pair Bool Bool`,
-  with `get := pairFst` and `set s b := mkPair b (pairSnd s)` over the landed
-  prelude Σ-pair, and the three coherence laws proved
+  after explicit import of canonical `Pair`/`mk_pair`/`pair_fst`/`pair_snd`,
+  with `get := pair_fst` and `set s b := mk_pair b (pair_snd s)`, and the three
+  coherence laws proved by the provider's transparent Σ contract
 - expect: **accepts** — the three coherence laws close **definitionally**, with
   the per-branch endpoint discipline (`55 §3.2`): **get-set**
   `Equal Bool (get (set s b)) b` computes by Σ-β to neutral `b` both sides →
   **`Refl`**; **set-set**
   `Equal (Pair Bool Bool) (set (set s b) c) (set s c)` computes by Σ-β so both
-  sides are the identical `mkPair c (pairSnd s)` → **`Refl`** (a **non-nullary**
-  head with a **neutral** component `pairSnd s`, so the `Eq Bool` on the second
+  sides are the identical `mk_pair c (pair_snd s)` → **`Refl`** (a
+  **non-nullary** head with a **neutral** component `pair_snd s`, so the `Eq
+  Bool` on the second
   components stays stuck and does NOT collapse to `Top` — `tt : Top` is
   ill-typed;
   Architect FOLD-IN 1); **set-get**
   `Equal (Pair Bool Bool) (set s (get s)) s` holds by **definitional Σ-η**
-  (`mkPair (pairFst s) (pairSnd s) ≡ s`, `13 §6`) → `Refl`. Assert: the record
-  elaborates, all three proofs close by `Refl`, zero `Axiom`, **no `match` on
-  the Σ-pair**
-  (Σ-η, not a case-split). **GREEN** —
-  `cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs`
+  (`mk_pair (pair_fst s) (pair_snd s) ≡ s`, `13 §6`) → `Refl`. Assert: the
+  record elaborates, all three proofs close by `Refl`, zero `Axiom`, **no
+  `match` on the Σ-pair** (Σ-η, not a case-split). The strict named-interface
+  vector is **RED-UNTIL the canonical Pair package**; the conversion body is
+  already measured by
+  `cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs`, which
   passes the concrete records and all three laws, while
   `cat3_d3_wrong_lens_endpoint_rejected` passes the negative endpoint control
 - why: (soundness) AC6 — the ACCEPT arm for the shipped concrete flavor. It is
   ordinary Ken (Fork B: plain `Σ`-record, kernel-untouched). **All three laws
   close by `Refl`** — none by `tt`: the `55 §3.2` "same head → `Top` → `tt`"
-  rule fires only for a **nullary** head that collapses fully; `Pair`'s `mkPair`
+  rule fires only for a **nullary** head that collapses fully; `Pair`'s `mk_pair`
   is non-nullary with a neutral component, so every endpoint is a stuck `Eq` on
   equal terms ([[tt-vs-refl-endpoint-rule-for-inductive-equal-law-bases]],
   Architect FOLD-IN 1 — the same non-nullary-head subtlety §3.2 pins). No
@@ -384,8 +390,8 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
   is then false
 - expect: **verdict flips on the coherence of `set`, at the get-set law.** (a)
   **accepts**; (b) **rejected — conversion failure at the `get_set` field**:
-  `get (set s b) = pairFst s` (the dropped `b`) while the law demands `≡ b`, a
-  false `Equal Bool (pairFst s) b` (two distinct neutrals — not `Refl`). Assert
+  `get (set s b) = pair_fst s` (the dropped `b`) while the law demands `≡ b`, a
+  false `Equal Bool (pair_fst s) b` (two distinct neutrals — not `Refl`). Assert
   the **specific observable**: (b) fails **at the `get_set` field** with a
   neutral/value clash — **not** `is_err()`, not a missing-field error, and
   **not** at `set_get` (which the broken `set s _ = s` still satisfies:
@@ -515,7 +521,7 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
   `Eq Nat Zero Zero` → `Top` → **`tt`** (nullary), inductive steps → `Refl`/
   `cong` (Architect §3.7 note). `take`/`drop` base + honest `isSorted` leaf are
   **nullary constructor-headed** → `Top` → `tt`. **All three lens laws →
-  `Refl`** — set-set's shared `mkPair c (pairSnd s)` is non-nullary with a
+  `Refl`** — set-set's shared `mk_pair c (pair_snd s)` is non-nullary with a
   neutral component, so `tt : Top` is ill-typed (Architect FOLD-IN 1). Exact
   sort/lens tokens reconciled at build.
 - **Carrier `List Bool` for proved *sort* arms; `Pair Bool Bool` for the lens.**

@@ -30,6 +30,60 @@
 > gated on `KERNEL-NESTED-IND`; the current kernel rejects that class
 > fail-closed. Verify against the on-`main` `14`/kernel before building.
 
+## Canonical non-dependent pair package
+
+The named surface family `Pair` is an ordinary standard-package definition over
+the kernel's dependent pair. It is not the kernel term constructor called
+`Pair` in core syntax, and it is not a member of the closed prelude floor. A
+source unit uses the named family only after importing it from its one defining
+public interface. Merely having an implementation-global definition with the
+same spelling does not provide that interface under Strict (`30 §4`/`§5`, `33
+§3.3`, `39 §2.0`).
+
+The public behavioral contract has four checked transparent declarations:
+
+```ken
+Pair     : Type -> Type -> Type
+mk_pair  : (A : Type) -> (B : Type) -> A -> B -> Pair A B
+pair_fst : (A : Type) -> (B : Type) -> Pair A B -> A
+pair_snd : (A : Type) -> (B : Type) -> Pair A B -> B
+```
+
+Their meanings are fixed by conversion. For `A B : Type`, `a : A`, `b : B`,
+and `p : Pair A B`:
+
+```text
+Pair A B                                      ≡  (x : A) × B
+mk_pair A B a b                               ≡  (a, b)
+pair_fst A B (mk_pair A B a b)                ≡  a
+pair_snd A B (mk_pair A B a b)                ≡  b
+mk_pair A B (pair_fst A B p) (pair_snd A B p) ≡  p
+```
+
+The right sides are semantic notation for the existing kernel
+`Sigma`/introduction/projection forms, not new surface syntax. The first four
+lines follow by transparent unfolding and Σ-β; the last is the existing
+judgmental Σ-η (`../10-kernel/13 §6`). Each equation is **definitional**: a
+proof stated as equality closes with reflexivity and requires no theorem,
+postulate, or runtime rule.
+
+Each public name has exactly one defining module and one canonical `GlobalId`.
+A direct import and any re-export preserve those identities and allocate no
+replacement declaration. A separately authored definition with the same name,
+type, and transparent body has a different identity; definitional equality does
+not turn it into the provider declaration or rewrite an existing identity-keyed
+reference. All four definitions are ordinary kernel-rechecked Ken and add
+nothing to `trusted_base()` or the flat `Σ` model beyond their checked package
+declarations.
+
+Until the canonical interface is realized, positive package vectors that name
+these declarations are **RED-UNTIL the canonical Pair package**. Strict bare use
+continues to reject. The eventual package does not add `Pair` to the floor and
+does not retain an ambient, Legacy, compatibility-alias, or mixed-resolution
+route to an implementation convenience. The concrete package path and the
+transition mechanism are separately designed; this section fixes only the
+observable one-interface, one-identity, transparent-Σ contract.
+
 ## 1. Sum types (real, not stubbed)
 
 ```

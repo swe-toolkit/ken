@@ -15,10 +15,13 @@ Ken-owned objects and first principles; no reference implementation or
 `local/refs/` source was consulted.
 
 Cases marked `[KERNEL-NESTED-IND]` remain design-locked and
-implementation-gated. Seven D6 cases now execute un-gated: DS-9 and fresh-carrier
-admission; negative-under-positive and Pair-negative rejection; unknown-head and
-nonpositive rejection; and unchanged direct/W-style behavior.
-`nested-size-uses-lift` now also executes un-gated through the named full-pipeline
+implementation-gated. Seven D6 cases execute un-gated: DS-9 and fresh-carrier
+admission; negative-under-positive and transparent-Sigma-negative rejection;
+unknown-head and nonpositive rejection; and unchanged direct/W-style behavior.
+The former bare-Pair vectors use a fresh checked transparent Sigma alias here;
+the canonical named-Pair instantiation is RED-UNTIL in
+`../../surface/modules/seed-pair-strict-boundary.md`. `nested-size-uses-lift`
+also executes un-gated through the named full-pipeline
 witnesses below. `nested-dependent-motive-uses-lift` remains gated on
 `KERNEL-RECURSIVE-RESULT-SURFACE`. Independently gated non-D6 residual cases remain
 marked below. The existing direct and W-style controls remain live throughout,
@@ -58,17 +61,20 @@ Spec: `14 §8.5` clauses 1–3.
 ### kernel/inductive/nested-ds9-shapes-admitted
 
 - spec: `14 §8.5`; `18 §4.3`
-- given: previously admitted positive `List` and `Pair`, followed by an ordinary
-  `Json` declaration containing both `JsonArray : List Json -> Json` and
-  `JsonObject : List (Pair String Json) -> Json`
+- given: previously admitted positive `List` plus a fresh checked transparent
+  `Product A B = (x : A) × B`, followed by an ordinary `Json` declaration
+  containing both `JsonArray : List Json -> Json` and
+  `JsonObject : List (Product String Json) -> Json`
 - expect: **accepted** by `declare_inductive`; `Json`, its constructors, and
   `elim_Json` are admitted
-- why: both paths to `Json` contain only checked strictly-positive parameter
-  positions: `List`'s sole parameter, and that parameter followed by `Pair`'s
-  second parameter. This is the concrete DS-9 consumer and proves that finite
-  positive paths compose. It is necessary but not sufficient: the
-  custom-carrier case below prevents a `List`/`Pair` allow-list from satisfying
-  the corpus.
+- why: the first path follows `List`'s checked strictly-positive parameter. The
+  second then transparently reduces Product to primitive Sigma and reaches Json
+  in its positive second component. Renaming Product while preserving its body
+  leaves the verdict unchanged. This is the concrete DS-9 consumer and proves
+  finite structural paths compose; the custom-carrier case below independently
+  prevents a `List` allow-list from satisfying the corpus. The future canonical
+  Pair provider must instantiate this same representation-derived arm; its
+  explicit-import vector is homed in the Pair-boundary seed.
 
 ### kernel/inductive/nested-fresh-carrier-admitted
 
@@ -490,18 +496,20 @@ Spec: `14 §8.3`, `§8.5` clause 5.
   and is accepted, so the rejection is specifically the inner arrow polarity,
   not the outer application.
 
-### kernel/inductive/nested-negative-existing-pair-control
+### kernel/inductive/nested-negative-transparent-sigma-control
 
 - spec: `14 §8.3`; `§8.5` clause 5
 - given: the existing `kernel/seed-k1.md` case
   `nested-negative-in-application-rejected`,
-  `Pair (Bad3 -> Empty) Unit`
+  `Product (Bad3 -> Empty) Unit`, where Product is a fresh checked transparent
+  non-dependent Sigma alias
 - expect: **unchanged rejection**
 - why: after nested-positive admission lands, the old case is no longer
-  explained by a blanket ban on application arguments. The checker traverses
-  `Pair`'s checked positive parameter and rejects when it reaches `Bad3` at
-  negative polarity. This retains the original soundness verdict while
-  reconciling its mechanism with `§8.5`.
+  explained by a blanket ban on application arguments. Ordinary reduction
+  unfolds the checked transparent Product to primitive Sigma; structural
+  descent then rejects when it reaches `Bad3` at negative polarity. Renaming
+  Product must retain the same verdict. This preserves the original soundness
+  result without a Pair spelling or parameter allow-list.
 
 ---
 
@@ -562,8 +570,10 @@ Spec: `14 §8.6`; `§3`, `§3.1`, `§7.3`, `§7.7`, `§8.4`.
   or `GlobalId`. Its two support families are terminal and no `All`-of-`All`
   exists; failure to generate either rolls the whole admission back.
 - The seven D6 bindings execute un-gated: DS-9 and fresh-carrier admission;
-  negative-under-positive and Pair-negative rejection; unknown-head and
-  nonpositive rejection; and unchanged direct/W-style behavior. Their paired
+  negative-under-positive and transparent-Sigma-negative rejection;
+  unknown-head and nonpositive rejection; and unchanged direct/W-style
+  behavior. The future canonical Pair instantiation remains RED-UNTIL in the
+  Pair-boundary seed without gating these representation controls. Their paired
   positive controls admit while each exact negative/unknown mutation flips the
   verdict.
 - `nested-size-uses-lift` executes un-gated through the named kernel and

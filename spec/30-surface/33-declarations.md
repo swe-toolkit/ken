@@ -271,6 +271,12 @@ is a **surface error** (`24`) — it never reaches the kernel:
   not ambient authority for name resolution. A package must import such a name
   from its defining public interface; otherwise the reference is unbound even
   if the implementation happens to hold a global entry with that spelling.
+  `Pair`, `mk_pair`, `pair_fst`, and `pair_snd` are the canonical boundary case:
+  they are absent from the exact-nine floor, so compiler-installed checked
+  versions do not enter a Strict scope. A local transparent `Pair` may be
+  definitionally equal to the same non-dependent Σ shape, but it has a distinct
+  `GlobalId`; it neither imports nor substitutes for the canonical package
+  declaration (`34 §"Canonical non-dependent pair package"`).
 - Every failure — unresolved name, **`AmbiguousReference`** from a top-level
   clash, or an out-of-scope private name (`§4`) — is a **surface diagnostic**;
   the flattened `Σ` the kernel receives contains only resolved, in-scope
@@ -560,6 +566,10 @@ deterministic name, and the singular `d` generalizes. A constraint **of the form
 prefix `d` immediately followed by that variable's identifier, projected by
 explicit `.field`:
 
+The following example assumes that its unit explicitly imports the canonical
+`Pair` interface; loading that provider elsewhere or possessing an
+implementation-global `Pair` is insufficient.
+
 ```
 instance DecEq (Pair a b) where DecEq a, DecEq b { … }
    ⟶  {a b : Type} → {da : DecEq a} → {db : DecEq b} → DecEq (Pair a b)
@@ -770,7 +780,8 @@ Classes/instances are **entirely net-new** surface + elaborator machinery; the
 Lc build creates the class/instance desugaring, the orphan check, and the
 search. What it **reuses unchanged** (the real producers the soundness-critical
 ACs bottom out in) is all **landed**: the kernel **Σ/record** primitives
-(`Term::Sigma`/`Pair`/`Proj`, `13 §2`/`§3`) the class-record/instance-value
+(`Term::Sigma`/`Term::Pair`/`Term::Proj1`/`Term::Proj2`, `13 §2`/`§3`) the
+class-record/instance-value
 target; **Ω** proof-irrelevance (`16 §1`) that makes property coherence free;
 the **`declare_def` re-check path** (`check.rs`) every instance — and every
 `derive`d candidate (`AC7`) — traverses; and the **landed SCT** (`17 §4`) that

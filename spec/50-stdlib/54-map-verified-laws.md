@@ -31,6 +31,13 @@
 > `declare_primitive`, no `declare_postulate`, **no `Axiom`** anywhere
 > (`catalog/packages/Data/Collections/Map.ken.md`).
 
+**Pair-package staging.** Every named use of `Pair`, `mk_pair`, `pair_fst`, or
+`pair_snd` below assumes an explicit import of the canonical interface specified
+by `../30-surface/34 §"Canonical non-dependent pair package"`. The equations
+used by these proofs are its definitional Σ-β/η contract. Current acceptance via
+an implementation-global convenience is not strict package closure; the named
+Pair-dependent vectors are RED-UNTIL that interface is realized and imported.
+
 ## 1. What this module is
 
 `52-map.md §5` proves the `Map` invariant and operation-correctness laws as
@@ -286,8 +293,8 @@ and needs the `Not` combinator; a first-class expression-level `->` / `Not` is a
 
 Already **landed** on the held base: `list_append`, `is_sorted` (`prelude.rs` —
 `is_sorted a leq (Cons x (Cons y r)) = And (Equal Bool (leq x y) True) (is_sorted
-a leq (Cons y r))`), `Pair`/`mk_pair`/`pair_fst`/`pair_snd`, `And`/`and_intro`/
-`and_fst`/`and_snd` (`prelude.rs`, `And A B := Sigma(_:A).B`), `absurd`/`Bottom`,
+a leq (Cons y r))`), `And`/`and_intro`/`and_fst`/`and_snd` (`prelude.rs`,
+`And A B := Sigma(_:A).B`), `absurd`/`Bottom`,
 `Equal`/`Refl`/`Proved`, `all_keys`, `all_in_list`, `to_list`, `pair_leq`, and
 — added by the capstone build — **`Not : Ω → Ω := λA. A → Bottom`**
 (`prelude.rs`, an
@@ -299,7 +306,8 @@ below are the remaining landed defs.
   kernel `declare_inductive` in `prelude.rs` (the surface `data` sugar hardcodes
   every parameter to `Type 0`, but `Or`'s two parameters are `Ω`-sorted
   propositions — the same "kernel API one level below the surface wrapper"
-  technique `Pair`/`And` already use). **It must be `Type`-valued (proof-
+  technique the transparent Σ definitions use). **It must be `Type`-valued
+  (proof-
   relevant), not `Ω`** — the whole point is to *case-split on which disjunct
   holds*, so `Inl`/`Inr` must be distinguishable; an `Ω`-valued `Or` would make
   them proof-irrelevantly equal and the split would carry no information

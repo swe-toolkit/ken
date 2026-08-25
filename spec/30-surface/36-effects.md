@@ -924,10 +924,14 @@ run_state s₀ m  :  a × s        when F = ∅   -- pure collapse: ITree 𝟘 (
 
 - The result pair `a × s` is `(result, final-state)` — the **Σ-pair** `R × S`
   that §4.2 returns (`(r, s)`, a right-nested Σ / record with η, `13 §3`),
-  realized at runtime by the interpreter's `EvalVal::Pair` (`ken-interp`). The
-  frame's illustrative `Pair a s` is this Σ-pair. (A named inductive
-  `data Prod a b = MkProd a b` is also landed in the prelude, but the denotation
-  uses the Σ-pair, not that inductive.)
+  realized at runtime by the interpreter's `EvalVal::Pair` (`ken-interp`). This
+  denotation uses raw dependent-pair syntax and the kernel term constructor; it
+  does not assume ambient availability of the named standard-package `Pair`.
+  Source that chooses the equivalent named `Pair a s` spelling imports its
+  canonical interface (`34 §"Canonical non-dependent pair package"`). A named
+  inductive `data Prod a b = MkProd a b` is a distinct checked convenience
+  outside the strict floor; the denotation uses neither that identity nor an
+  ambient fallback.
 - **`run_state` is an ordinary *total Ken definition*** — the §4.2 fold,
   structural on the sub-tree via `elim_ITree`, kernel-re-checked — **not** a
   trusted Rust primitive. This is what makes `[State s]`

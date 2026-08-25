@@ -164,10 +164,13 @@ than choose between them.
 
 ### surface/elaboration/let4-earlier-value-feeds-later-rhs-and-body
 
-- spec: S2/S4; `39 §5.3`–`§5.5`; LET-4 AC2
-- given: `const staged : Pair Nat Nat = let first = Zero; second = Suc first in
+- spec: S2/S4; `34 §"Canonical non-dependent pair package"`; `39
+  §5.3`–`§5.5`; LET-4 AC2
+- given: after explicit import of canonical `Pair` and `mk_pair`,
+  `const staged : Pair Nat Nat = let first = Zero; second = Suc first in
   mk_pair Nat Nat first second`
-- expect: **RED-UNTIL (LET-4 surface) — accepted**; the later RHS resolves
+- expect: **RED-UNTIL both the canonical Pair package and LET-4 surface —
+  accepted**; the later RHS resolves
   `first`, and the body resolves and consumes both `first` and `second`.
 - why: together with the two negative cases below, this is a controlled
   left-to-right scope experiment rather than an elaborate-only green case.

@@ -74,6 +74,10 @@ Option, ResourceKind, Result, Utf8Error}`**; the bootstrap arm adds exactly
 **`Nat`**. For every inductive member, the floor admits constructors only by
 matching their kernel-recorded parent `GlobalId`; `Char` has no constructor arm.
 Every listed family/definition and constructor is outside `trusted_base()`.
+Compiler-installed checked declarations outside this union are not admitted by
+mere possession. In particular, `Pair` is absent from every primitive signature
+and has no bootstrap-identity witness; its transient implementation-global
+identity is not a floor member or a Strict provider.
 
 ### surface/taxonomy/prelude-signature-inventory-is-executable-and-closed
 
@@ -88,8 +92,9 @@ Every listed family/definition and constructor is outside `trusted_base()`.
   declarations by helper name, source file, or a hand-picked primitive list.
 - expect: the checked dependency set is exactly `{Auth, Bool, Char, List,
   Option, ResourceKind, Result, Utf8Error}`. Adding bootstrap `Nat` equals the
-  exact floor type set. The constructor set is exactly the constructors recorded
-  under the seven inductive signature members plus `Nat`; no same-spelling
+  exact floor type set, and the pre-installed checked `Pair` identity is absent
+  from both sets. The constructor set is exactly the constructors recorded under
+  the seven inductive signature members plus `Nat`; no same-spelling
   constructor with another parent qualifies. None of the type or constructor ids
   appears in `trusted_base()`, and installing the floor changes neither
   declaration count nor allocator position.
@@ -97,9 +102,10 @@ Every listed family/definition and constructor is outside `trusted_base()`.
   For under-inclusion, install a checked `Extra` type and a real test-only
   primitive whose signature names `Extra`, leaving the configured floor
   unchanged; the derived signature set grows and the assertion must red. For
-  over-inclusion, add pre-installed checked `Prod` only to the configured floor,
-  without adding a primitive/bootstrap witness; the configured set grows and
-  the same assertion must red.
+  over-inclusion, first add the existing checked `Pair` identity only to the
+  configured floor and, independently, repeat with pre-installed checked
+  `Prod`, without adding a primitive/bootstrap witness; the configured set
+  grows and the same assertion must red in each arm.
 - why: producer traversal closes the population by construction. A selected
   `reg_*` grep omits primitives registered through another helper; a spelling
   list cannot distinguish a constructor attached to a lookalike family.
@@ -136,6 +142,7 @@ load-bearing observation).
 |---|---|---|
 | **operators** (`+ - * % == < >`) | `Ord`/`Eq` **class methods** (Lc, landed — `lawful_classes.ken`) back `== < >`; `+ - * %` bind directly to the audited prim ops (`int_add` etc. via `reg_binop`) + operator-infix syntax — **`class Num`/`instance Num Int` are specified-but-not-built** (named forward obligation, a future `class Num` WP), so `+`/`*` are not yet class-abstracted; user types get `== < >` by writing `Eq`/`Ord` instances | the audited prim op (`reg_binop`/`reg_cmpop`) + operator-infix syntax (base) + Lc |
 | **`show`/formatting** (`Int.show`, …) | `Int` `div`/`mod` prims → digit `Char`s (literals) → `List Char` → **`list_char_to_string`** (landed) → concat via **`append`** (landed) | `div`/`mod` prims, Char literals, `list_char_to_string`, `append` (**all landed** `bytes.rs`/`numbers.rs`) |
+| **named non-dependent pair** (`Pair`/`mk_pair`/`pair_fst`/`pair_snd`) | checked transparent definitions over kernel `Sigma`/pair introduction/projections; fst/snd β and reconstruction η are definitional (`34 §"Canonical non-dependent pair package"`) | dependent-pair syntax + kernel Σ conversion (`13 §2`/`§6`); explicit package import, never floor |
 | **collection combinators** (`map`/`filter`/`fold`/`range`) | total structural recursion over `List`/`elim_List` (L2/L3); `range` = fuel-bounded unfold (`37 §5`, no coinduction) | `data List` + `elim_List` (L2), recursion + SCT |
 | **lawful classes** (`Monoid`/`Functor`/`Monad`/`Foldable`) | `class`/`instance` records (Lc, landed) carrying law propositions | Lc (`33 §5`, landed) + Ω (laws) |
 | **string manipulation** (`split`/`join`/`pad`/`toUpper`) | over `String↔List Char` (landed conversions) + `append` + the combinators | `String↔List Char` + `append` + combinators |

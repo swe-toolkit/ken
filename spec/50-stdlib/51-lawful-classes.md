@@ -362,9 +362,12 @@ law-carrying instances) + wires `where Ord a` to supply the comparator.
 rule (`33 §5.3`), its canonical `Ord` dictionary therefore uses the class-owner
 arm: `instance Ord Nat` is declared in `Core.Classes.LawfulClasses`, the module
 that defines `Ord`, and is keyed by the exact bootstrap `Nat` identity. This is
-the existing class-side pattern for canonical carrier instances (`Bool`,
-`Pair`, and `List`), not a new ownership mechanism. The reader-facing
-`Data.Numeric.Nat.Order` module imports and re-exports the relevant
+the existing class-side pattern for canonical carrier instances (`Bool` and
+`List`, and later the explicitly imported canonical `Pair` package), not a new
+ownership mechanism. Deferring the Pair-dependent `LawfulClasses` unit does not
+transfer `Ord Nat` ownership: the dictionary remains owed at this class-owned
+locus. The reader-facing `Data.Numeric.Nat.Order` module imports and re-exports
+the relevant
 class surface and carries that same dictionary under `33 §5.5.1`; it never
 redeclares the instance and never becomes the head owner. The dictionary and
 its supporting proof terms are ordinary transparent, kernel-rechecked Ken, so

@@ -925,14 +925,23 @@ Note: even though the outermost polarisation is `+`, the domain of the arrow
 flips to `-`, so `Nat` appears negatively and is caught.
 
 **Rejected (nested negative in application argument):**
-`data Bad3 = mk : Pair (Bad3 → Empty) Unit → Bad3`. Argument telescope
-`(f : Pair (Bad3 → Empty) Unit)`, argument type `Pair (Bad3 → Empty) Unit`.
-Both parameters of the already-admitted `Pair` are recorded strictly positive.
-Under `+`, `check-pos-application` therefore traverses both arguments at the
-same positive polarisation:
+`data Bad3 = mk : Pair (Bad3 → Empty) Unit → Bad3`. The displayed surface
+spelling assumes explicit imports of the standard-package names; the kernel
+judgment operates on their already-resolved declarations. The canonical
+`Pair` is a checked transparent definition of the non-dependent Σ, not a host
+name with specially recorded positive parameters (`../30-surface/34
+§"Canonical non-dependent pair package"`). Ordinary transparent reduction
+first exposes
+
+```
+Pair (Bad3 → Empty) Unit  ≡  (x : Bad3 → Empty) × Unit
+```
+
+and the primitive Σ rule then checks both components at positive polarisation:
 
 ```
 check-pos-arg(Bad3, +, Pair (Bad3 → Empty) Unit)
+  = check-pos-arg(Bad3, +, (x : Bad3 → Empty) × Unit)
   = check-pos-arg(Bad3, +, Bad3 → Empty)
     and check-pos-arg(Bad3, +, Unit)
   = (check-pos-arg(Bad3, -, Bad3)
@@ -941,12 +950,13 @@ check-pos-arg(Bad3, +, Pair (Bad3 → Empty) Unit)
   = false → FAILS
 ```
 
-The positive `Pair` boundary does not make its entire argument positive. The
+The positive Σ boundary does not make its entire component positive. The
 recursive descent opens `(Bad3 → Empty)`, flips polarity for the Π-domain, and
-rejects the direct `Bad3` occurrence at `-`; `Unit` is `D`-free. The residual
-`not occurs` guard of §8.5 clause 6 remains load-bearing for an unknown,
-unclassified, or discarded parameter position, but it does not decide this
-known-positive case.
+rejects the direct `Bad3` occurrence at `-`; `Unit` is `D`-free. Renaming the
+transparent definition while preserving the same Σ body leaves the verdict
+unchanged. The residual `not occurs` guard of §8.5 clause 6 remains
+load-bearing for an unknown, unclassified, or discarded parameter position,
+but it does not decide this structurally exposed case.
 
 **Rejected (D in its own indices):**
 `data Vec (A : Type) : Nat → Type where …` is fine (the index `Nat` is not
@@ -1030,16 +1040,20 @@ data Json = ... | JsonArray (List Json)
                     | JsonObject (List (Pair String Json)) | ...
 ```
 
-These examples are admitted because every path to the recursive family follows
-checked strictly-positive parameters. They are examples of the rule, not
-special cases in it.
+The surface unit containing `JsonObject` explicitly imports the canonical
+`Pair` package interface. `List` supplies a checked positive parameter path;
+transparent reduction then exposes `Pair String Json` as primitive
+`(x : String) × Json`, whose second component is positive by the structural Σ
+rule. Renaming the Pair definition without changing that transparent body does
+not change admission. These are examples of the rule, not special cases in it.
 
 **Fail-closed boundaries.** A recursive occurrence under a parameter with no
 checked polarity is rejected as **unknown**. A recursive occurrence under a
 declared negative or mixed parameter is rejected as **non-positive**. A nested
-negative such as `Pair (Bad → Empty) Unit` remains rejected by §8.3 even when
-the outer parameter is positive: the recursive descent reaches the Π-domain at
-negative polarisation and fails.
+negative such as `Pair (Bad → Empty) Unit` remains rejected by §8.3 after
+ordinary reduction exposes its Σ representation: recursive descent reaches the
+Π-domain at negative polarisation and fails. The checker never recognizes the
+surface spelling `Pair`.
 
 **Implementation stage.** `SPEC-NESTED-IND` states this rule;
 `KERNEL-NESTED-IND` implements its admission metadata, generated `All`
