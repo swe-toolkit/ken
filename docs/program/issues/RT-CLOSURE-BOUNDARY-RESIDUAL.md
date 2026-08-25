@@ -1,7 +1,7 @@
 ---
 id: RT-CLOSURE-BOUNDARY-RESIDUAL
 title: "Track-1 consumer (M4) — the residual checked-closure population (rt_parity_native:825 + px8f_buffer_native:203 + px8f_write_partition:354), resolved by applying the merged CROSSING-ELIMINATE defunctionalization discipline"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
