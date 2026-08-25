@@ -369,7 +369,7 @@ fn run_px8ds_retired_flat_control() {
 // M4's exact bind-continuation arm retires the prior closure refusal. The row
 // now reaches this distinct object-emission successor and remains ignored.
 #[test]
-#[ignore = "RT-CARRIED-IH-DISPATCH-SITEOP: closure crossing succeeds; object emission refuses because seat Argument(0) of ConsoleIsTerminal needs ConstructorTag, which it cannot observe in CarriedWord"]
+#[ignore = "RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT: carried constructor dispatch succeeds; execution next traps on a malformed ExitCode::Failure payload"]
 fn px8ds_real_same_depth_path_runs_exact_edges() {
     std::thread::Builder::new()
         .name("px8ds-real-siblings".to_string())

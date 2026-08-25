@@ -535,14 +535,6 @@ const BOUNDARY_CARRIER: Disposition = Disposition::Refuses {
     retired_by: "the BoundaryCarrier need-directed-projection fold",
 };
 
-/// The M6 transport retires the escaping closure refusal on this row too. Its
-/// next exact layer is the carried site operand whose constructor tag the
-/// effect emitter cannot yet observe.
-const CARRIED_SITEOP_CONSTRUCTOR_TAG: Disposition = Disposition::Refuses {
-    key: "seat Argument(1) of FsOpen needs ConstructorTag, which it cannot observe in CarriedWord",
-    retired_by: "RT-CARRIED-IH-DISPATCH-SITEOP",
-};
-
 /// Refused by ELABORATION, before any lowering runs. It is in this population
 /// because the population is the admissible entries, not the entries that reach
 /// the backend, and dropping it would have made the census silently narrower
@@ -563,7 +555,7 @@ const EXPECTED: &[(&str, Disposition)] = &[
     ("rt_read_window_stage", Disposition::Completes),
     ("rt_write_pair_source", ELABORATION_MISMATCH),
     ("rt_write_readonly_stage", Disposition::Completes),
-    ("rt_write_writable_stage", CARRIED_SITEOP_CONSTRUCTOR_TAG),
+    ("rt_write_writable_stage", Disposition::Completes),
 ];
 
 /// The expectation table must range over exactly the population, so a new entry

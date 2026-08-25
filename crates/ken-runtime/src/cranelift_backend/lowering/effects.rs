@@ -149,6 +149,9 @@ pub(super) enum EffectSeatDispatchMutation {
     /// been captured. The reconciliation must reject the substitution rather
     /// than lending the original operand's owner proof to the replacement.
     SubstituteSiteOperandValue,
+    /// Withdraw only M3's carried-constructor route. `Avail` remains
+    /// specialized-only, so the original exact seat refusal must return.
+    RemoveCarriedConstructorDispatch,
 }
 #[cfg(test)]
 thread_local! {
@@ -493,12 +496,29 @@ impl<'a> Lowering<'a> {
         // conflate them.
         let carried_resource_token = observed == EffectSeatPhase::CarriedWord
             && record.need == EffectSeatNeed::ResourceScalar;
+        // `RT-CARRIED-IH-DISPATCH-SITEOP` M3 -- admission is permission to
+        // attempt one guarded observation, not a widening of `Avail`. The
+        // planner must issue at least one artifact-static constructor path for
+        // this exact operation/slot; an empty or non-constructor table retains
+        // the ordinary refusal below.
+        let carried_constructor_dispatch = observed == EffectSeatPhase::CarriedWord
+            && record.need == EffectSeatNeed::ConstructorTag
+            && self
+                .static_transition_plan
+                .host_effect_constructor_dispatch(record.operation, record.slot)?
+                .is_some_and(|paths| !paths.is_empty());
+        #[cfg(test)]
+        let carried_constructor_dispatch = carried_constructor_dispatch
+            && effect_seat_dispatch_mutation()
+                != EffectSeatDispatchMutation::RemoveCarriedConstructorDispatch;
         let route = if record.avail.admits(observed) {
             EffectSeatClaimRoute::Direct
         } else if carried_site_operand {
             EffectSeatClaimRoute::SiteOperandProjection
         } else if carried_resource_token {
             EffectSeatClaimRoute::CarriedResourceObservation
+        } else if carried_constructor_dispatch {
+            EffectSeatClaimRoute::CarriedConstructorDispatch
         } else {
             EffectSeatClaimRoute::Direct
         };
@@ -635,6 +655,14 @@ enum EffectSeatClaimRoute {
     /// AND the boundary class before it reads the scalar. Admission here is a
     /// permission; the guarded observation is the authority.
     CarriedResourceObservation,
+    /// A carried constructor value at an exact `ConstructorTag` seat with a
+    /// non-empty planner-issued finite dispatch table.
+    ///
+    /// Like the resource route, this is permission only. The accept/refuse
+    /// authority is the consumer: it checks the carrier tag, exact arity and
+    /// every positional child tag before producing a host-wire value. Every
+    /// mismatch returns the deterministic failure value before host dispatch.
+    CarriedConstructorDispatch,
 }
 /// One compiler-side lowering VISIT to one effect occurrence.
 ///
@@ -809,6 +837,10 @@ impl EffectSeatLedger {
             EffectSeatClaimRoute::CarriedResourceObservation => {
                 observed == EffectSeatPhase::CarriedWord
                     && record.need == EffectSeatNeed::ResourceScalar
+            }
+            EffectSeatClaimRoute::CarriedConstructorDispatch => {
+                observed == EffectSeatPhase::CarriedWord
+                    && record.need == EffectSeatNeed::ConstructorTag
             }
         };
         if !admissible {
@@ -1975,6 +2007,136 @@ impl<'a> Lowering<'a> {
         builder.switch_to_block(done);
     }
 
+    /// Emit the one-sided finite dispatcher for a carried constructor seat.
+    ///
+    /// Every success edge is named by a planner-issued constructor identity,
+    /// exact field count, and (where present) exact positional child identity
+    /// and arity. The unmatched edge returns the compiled function's
+    /// deterministic failure value. No host request is dispatched before this
+    /// method returns a wire tag, so a non-matching word cannot be marshalled.
+    fn emit_carried_constructor_dispatch(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        word: CarriedBoundaryWord,
+        paths: &[EffectSeatConstructorPath],
+    ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+        if paths.is_empty() {
+            return Err(unsupported(
+                "Effect",
+                "a carried constructor seat has no artifact-static dispatch path",
+            ));
+        }
+        let root_tag = self.emit_carrier_tag(builder, word)?;
+        let root_field_count = self.emit_carrier_field_count(builder, word)?;
+        let done = builder.create_block();
+        builder.append_block_param(done, types::I64);
+
+        for path in paths {
+            let selected = builder.create_block();
+            let next = builder.create_block();
+            let root_identity = match path {
+                EffectSeatConstructorPath::Root { identity, .. } => *identity,
+                EffectSeatConstructorPath::PositionalChild { root_identity, .. } => *root_identity,
+            };
+            let expected_root =
+                Self::carrier_identity_immediate(builder, root_identity.tag_abi_word()?);
+            let root_matches = builder.ins().icmp(
+                cranelift_codegen::ir::condcodes::IntCC::Equal,
+                root_tag,
+                expected_root,
+            );
+            builder.ins().brif(root_matches, selected, &[], next, &[]);
+            builder.switch_to_block(selected);
+
+            match path {
+                EffectSeatConstructorPath::Root {
+                    field_count,
+                    wire_tag,
+                    ..
+                } => {
+                    Self::require_i64(builder, root_field_count, i64::from(*field_count));
+                    let wire_tag = builder.ins().iconst(types::I64, *wire_tag);
+                    builder.ins().jump(done, &[wire_tag]);
+                }
+                EffectSeatConstructorPath::PositionalChild {
+                    root_field_count: expected_root_fields,
+                    child_position,
+                    child_identity,
+                    child_field_count,
+                    wire_tag,
+                    ..
+                } => {
+                    Self::require_i64(builder, root_field_count, i64::from(*expected_root_fields));
+                    let child_position = usize::try_from(*child_position).map_err(|_| {
+                        unsupported(
+                            "Effect",
+                            "a constructor child position exceeds the target index space",
+                        )
+                    })?;
+                    let child = self.emit_carrier_field(builder, word, child_position)?;
+                    let child_tag = self.emit_carrier_tag(builder, child)?;
+                    let child_fields = self.emit_carrier_field_count(builder, child)?;
+                    Self::require_i64(builder, child_fields, i64::from(*child_field_count));
+                    let expected_child =
+                        Self::carrier_identity_immediate(builder, child_identity.tag_abi_word()?);
+                    let child_matches = builder.ins().icmp(
+                        cranelift_codegen::ir::condcodes::IntCC::Equal,
+                        child_tag,
+                        expected_child,
+                    );
+                    let matched = builder.create_block();
+                    builder.ins().brif(child_matches, matched, &[], next, &[]);
+                    builder.switch_to_block(matched);
+                    let wire_tag = builder.ins().iconst(types::I64, *wire_tag);
+                    builder.ins().jump(done, &[wire_tag]);
+                }
+            }
+            builder.switch_to_block(next);
+        }
+
+        // The closed table had no exact member. This is the accept/refuse
+        // authority for Route A: return before any host dispatch rather than
+        // coerce the word to a convenient tag.
+        let failure = builder.ins().iconst(types::I64, -1);
+        builder.ins().return_(&[failure]);
+        builder.switch_to_block(done);
+        Ok(builder.block_params(done)[0])
+    }
+
+    /// Read one constructor-tag seat in either phase. Specialized templates
+    /// retain their established classifier. A carried word must pass the exact
+    /// planner-issued finite dispatcher above; no `Avail` widening is involved.
+    fn wire_constructor_tag_seat(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seats: &ClaimedEffectSeats<'_>,
+        slot: EffectSeatSlot,
+        classify_specialized: fn(&Lowered) -> Option<i64>,
+        malformed: &'static str,
+    ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+        let (record, operand) = seats.operand(slot)?;
+        match operand {
+            LoweringOperand::Specialized(lowered) => classify_specialized(lowered)
+                .map(|wire_tag| builder.ins().iconst(types::I64, wire_tag))
+                .ok_or_else(|| unsupported("Effect", malformed)),
+            LoweringOperand::Carried(word) => {
+                let paths = self
+                    .static_transition_plan
+                    .host_effect_constructor_dispatch(record.operation, record.slot)?
+                    .ok_or_else(|| {
+                        unsupported(
+                            "Effect",
+                            format!(
+                                "seat {:?} of {:?} has no constructor dispatcher",
+                                record.slot, record.operation
+                            ),
+                        )
+                    })?;
+                self.emit_carried_constructor_dispatch(builder, *word, &paths)
+            }
+        }
+    }
+
     ///
     /// **`RT-RESOURCE-RELEASE-CARRIED-OBSERVE` `D1` -- generalized to `owner` so
     /// there is ONE guarded resource-token observation, not two copies.** The
@@ -2287,10 +2449,13 @@ impl<'a> Lowering<'a> {
                         "ambient Console carried a capability",
                     ));
                 }
-                let stream = console_stream_tag(seats.specialized(SEAT_0)?).ok_or_else(|| {
-                    unsupported("Effect", "Console operation has a malformed Stream operand")
-                })?;
-                let stream = builder.ins().iconst(types::I64, stream);
+                let stream = self.wire_constructor_tag_seat(
+                    builder,
+                    &seats,
+                    SEAT_0,
+                    console_stream_tag,
+                    "Console operation has a malformed Stream operand",
+                )?;
                 builder
                     .ins()
                     .stack_store(stream, request, request_offset(0));
@@ -2352,16 +2517,18 @@ impl<'a> Lowering<'a> {
                     .ins()
                     .stack_store(path.len, request, request_offset(2));
                 if operation == ken_host::HostOpV1::FsWriteFile {
-                    let policy =
-                        create_policy_tag(seats.specialized(SEAT_1)?).ok_or_else(|| {
-                            unsupported("Effect", "FS.WriteFile has a malformed CreatePolicy")
-                        })?;
+                    let policy = self.wire_constructor_tag_seat(
+                        builder,
+                        &seats,
+                        SEAT_1,
+                        create_policy_tag,
+                        "FS.WriteFile has a malformed CreatePolicy",
+                    )?;
                     let contents = self.wire_bytes_seat(builder, &seats, SEAT_2)?;
                     if let Some((invalid, resource_code)) = contents.refusal {
                         let detail = io_error_other_detail(builder, resource_code);
                         record_narrow_failure(builder, invalid, error_reply_tag, detail);
                     }
-                    let policy = builder.ins().iconst(types::I64, policy);
                     builder
                         .ins()
                         .stack_store(policy, request, request_offset(3));
@@ -2385,11 +2552,13 @@ impl<'a> Lowering<'a> {
                     let mode = builder.ins().select(in_range, narrowed, invalid);
                     builder.ins().stack_store(mode, request, request_offset(3));
                 } else if operation == ken_host::HostOpV1::FsOpen {
-                    let mode =
-                        resource_open_mode_tag(seats.specialized(SEAT_1)?).ok_or_else(|| {
-                            unsupported("Effect", "FS.Open has a malformed ResourceOpenMode")
-                        })?;
-                    let mode = builder.ins().iconst(types::I64, mode);
+                    let mode = self.wire_constructor_tag_seat(
+                        builder,
+                        &seats,
+                        SEAT_1,
+                        resource_open_mode_tag,
+                        "FS.Open has a malformed ResourceOpenMode",
+                    )?;
                     builder.ins().stack_store(mode, request, request_offset(3));
                 }
             }

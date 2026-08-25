@@ -197,7 +197,7 @@ ssize_t pwrite64(int fd, const void *buf, size_t count, off64_t offset) {
 // successor, so it remains ignored rather than being silenced as green.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-CARRIED-IH-DISPATCH-SITEOP: closure crossing succeeds; object emission refuses because seat Argument(1) of FsOpen needs ConstructorTag, which it cannot observe in CarriedWord"]
+#[ignore = "RT-RETAINED-UNIT-CALL-TARGET-DERIVATION: the carried constructor dispatch succeeds; object emission next refuses because retained body StaticOriginId(1236) has no graph-derived call target in this unit"]
 fn linked_checked_write_all_observes_short_progress_and_matches_interpreter() {
     std::thread::Builder::new()
         .name("px8f-write-all".to_string())
