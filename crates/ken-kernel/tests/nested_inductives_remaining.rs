@@ -409,9 +409,10 @@ fn seed_negative_under_fresh_positive_bag_rejects_only_inner_arrow() {
 
 #[test]
 fn checked_transparent_sigma_alias_rejects_inner_arrow_negative() {
-    // Durable discriminating pair (AC-K5): the same checked transparent Sigma
+    // Durable discriminating pairs (AC-K5): the same checked transparent Sigma
     // alias accepts a direct recursive component and rejects the occurrence in
-    // an inner arrow domain. This reaches head WHNF, not former polarity data.
+    // an inner arrow domain, independently in each Sigma component. This reaches
+    // head WHNF and both component descents, not former polarity data.
     let mut env = GlobalEnv::new();
     let empty = declare_inductive(&mut env, |_| InductiveSpec {
         level_params: vec![],
@@ -461,6 +462,38 @@ fn checked_transparent_sigma_alias_rejects_inner_arrow_negative() {
                 Term::const_(product, vec![]),
                 Term::pi(former(bad), former(empty)),
                 former(unit),
+            )],
+            target_indices: vec![],
+        }],
+    });
+    assert!(positivity_error(bad).contains("non-strictly-positive"));
+
+    declare_inductive(&mut env, |good| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![app2(
+                Term::const_(product, vec![]),
+                former(unit),
+                former(good),
+            )],
+            target_indices: vec![],
+        }],
+    })
+    .expect("Product Unit Good positive control");
+
+    let bad = declare_inductive(&mut env, |bad| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![app2(
+                Term::const_(product, vec![]),
+                former(unit),
+                Term::pi(former(bad), former(empty)),
             )],
             target_indices: vec![],
         }],

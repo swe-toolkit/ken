@@ -213,13 +213,17 @@ provider.
   not a spelling allow-list, determines the verdict
 - spec: `14 §8.3`/`§8.5`; `34 §"Canonical non-dependent pair package"`
 - given: admit or import the checked transparent Pair definition, then submit
-  `data Good = MkGood (Pair Good Unit)` and
-  `data Bad = MkBad (Pair (Bad -> Empty) Unit)` through the ordinary inductive
-  admission path. The kernel fixture supplies already-resolved `Unit`/`Empty`;
-  this case does not classify their surface availability.
-- expect: `Good` accepts by reducing the transparent head to Sigma and following
-  a positive component. `Bad` rejects when the same reduction reaches `Bad` in
-  the arrow domain at negative polarity.
+  the first-component pair
+  `data Good1 = MkGood1 (Pair Good1 Unit)` and
+  `data Bad1 = MkBad1 (Pair (Bad1 -> Empty) Unit)`, plus the second-component
+  pair `data Good2 = MkGood2 (Pair Unit Good2)` and
+  `data Bad2 = MkBad2 (Pair Unit (Bad2 -> Empty))`, through the ordinary
+  inductive admission path. The kernel fixture supplies already-resolved
+  `Unit`/`Empty`; this case does not classify their surface availability.
+- expect: `Good1` and `Good2` accept by reducing the transparent head to Sigma
+  and following the corresponding positive component. `Bad1` and `Bad2` reject
+  when the same reduction reaches the recursive occurrence in an arrow domain
+  at negative polarity. Neither Sigma component may be discarded.
 - controls: rerun `nested-ds9-shapes-admitted` and
   `nested-negative-transparent-sigma-control`. Their exact executing bindings
   are
@@ -227,13 +231,18 @@ provider.
   `checked_transparent_sigma_alias_rejects_inner_arrow_negative` in
   `crates/ken-kernel/tests/nested_inductives_remaining.rs`. They admit two
   distinct checked-transparent definitions with the same Sigma body, require
-  both renamed positive paths to accept, require the inner-arrow negative to
-  reject, and require the direct recursive payload to accept. The opaque and
-  unknown-head controls in that suite remain fail-closed.
+  both renamed positive paths to accept, and require independently controlled
+  direct-recursive acceptance plus inner-arrow rejection in each Sigma
+  component. Independently suppressing transparent-head unfolding,
+  first-component descent, or second-component descent must redden its
+  corresponding executing control. The opaque and unknown-head controls in that
+  suite remain
+  fail-closed.
 - why: the current controls establish representation- and name-independence at
   the same kernel seam without pretending to supply the future public Pair
-  identity. The RED-UNTIL arm must instantiate that rule through the canonical
-  imported declaration rather than a spelling allow-list or a second mechanism.
+  identity. The RED-UNTIL arm must instantiate both component orientations
+  through the canonical imported declaration rather than a spelling allow-list
+  or a second mechanism.
 
 ## AC6 — deferred cluster and later closure use one flipping seam
 

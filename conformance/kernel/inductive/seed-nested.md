@@ -506,21 +506,27 @@ Spec: `14 §8.3`, `§8.5` clause 5.
 
 Status: executing binding established in
 `crates/ken-kernel/tests/nested_inductives_remaining.rs` as
-`checked_transparent_sigma_alias_rejects_inner_arrow_negative`. The direct
-recursive payload is its positive control.
+`checked_transparent_sigma_alias_rejects_inner_arrow_negative`. Its two direct
+recursive payloads are the positive controls.
 
 - spec: `14 §8.3`; `§8.5` clause 5
-- given: the existing `kernel/seed-k1.md` case
-  `nested-negative-in-application-rejected`,
-  `Product (Bad3 -> Empty) Unit`, where Product is a fresh checked transparent
-  non-dependent Sigma alias
-- expect: **unchanged rejection**
+- given: a fresh checked transparent non-dependent Sigma alias `Product`, then
+  the independently controlled pairs `Product Good1 Unit` versus
+  `Product (Bad1 -> Empty) Unit`, and `Product Unit Good2` versus
+  `Product Unit (Bad2 -> Empty)`
+- expect: both direct recursive payloads are **accepted**. Both corresponding
+  inner-arrow payloads are **rejected with `PositivityViolation`**
+- controls: independently suppress checked-transparent head unfolding,
+  primitive-Sigma first-component descent, and primitive-Sigma second-component
+  descent at their production seams. Each mutation must leave the fixture
+  buildable and redden the control for the exact dimension it removed
 - why: after nested-positive admission lands, the old case is no longer
   explained by a blanket ban on application arguments. Ordinary reduction
   unfolds the checked transparent Product to primitive Sigma; structural
-  descent then rejects when it reaches `Bad3` at negative polarity. Renaming
-  Product must retain the same verdict. This preserves the original soundness
-  result without a Pair spelling or parameter allow-list.
+  descent then checks both components and rejects when either reaches the
+  recursive occurrence at negative polarity. Renaming Product must retain the
+  same verdicts. This preserves the original soundness result without a Pair
+  spelling or parameter allow-list, and neither component can be discarded.
 
 ---
 
