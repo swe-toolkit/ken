@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIED-BOOL-ELIMINATOR-DISPATCH
 title: "Lane-1 successor to the pairing WP — route the canonical carried Bool (BoundaryTag::ImmediateBool, payload 0/1) through a finite scalar dispatcher in joins.rs::lower_carried_constructor_match, which today calls node-only emit_carrier_tag and require_i64-refuses every immediate scalar before any Bool case. D0 binds the case-family identity authority and censuses which immediate inductive representations reach the same consumer; D1 adds the scalar Bool path using existing tag/scalar authority, leaving node-backed constructors unchanged and giving structural Nat an explicit measured disposition"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,20 @@ blocks: []
 github: null
 origin: "Steward, 2026-08-25, from the Architect hard-stop #1 ruling evt_3nm3jvapsf7cp (thr_3nmd0xy7dgh6g) on RT-GENERATED-CONTINUATION-OPERAND-PAIRING. The pairing repair correctly delivers the selected ImmediateBool(false) to the next consumer, exposing a DISTINCT representation-specific eliminator gap: joins.rs::lower_carried_constructor_match treats every non-HostResult value as a node-backed constructor (emit_carrier_tag -> ken_boundary_tag_local -> require_i64), while canonical Bool is an immediate scalar sum, so it refuses before any Bool case comparison. Ruled a separate object with no Decision (two independently correctable mechanisms). Steward owns the final ID/frame."
 ---
+
+> # MERGED 2026-08-25 at squash `d82ea01e7` (PR #2921)
+>
+> D1 candidate `cd30deeae` merged onto main. Fresh exact-SHA gates bound
+> `cd30deeae`: QA + Architect approvals (runtime-leader evt_3mpbf593pxfba,
+> Decision `dec_ddb14ptb7zcv`). Steward self-verified diff scope (banned site
+> `boundary_value.rs` untouched) and routed the crate PR publisher; the lieutenant
+> published. BLOB-AUDIT clean: all 12 candidate path blobs are byte-identical
+> between reviewed `cd30deeae` and landed `d82ea01e7` (Steward + lieutenant
+> evt_47zhn2qdc2aw3 concur). The canonical carried Bool now routes through the
+> finite scalar dispatcher; structural Nat carries its explicit measured
+> disposition. The next lane-1 object is the honest re-point of px8ta to a DISTINCT
+> operand-provenance residual — NOT pre-framed here; it awaits an Architect object
+> read before it is cut.
 
 > # RELEASED 2026-08-25 — the pairing WP merged; now the active lane-1 object
 >
