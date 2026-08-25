@@ -131,8 +131,9 @@ use aggregates::{
 // reach these through this module, unchanged from before the move.
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use effects::{
-    host_effect_seat_contract_of, EffectSeatAvail, EffectSeatNeed, EffectSeatOperation,
-    EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat, CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
+    host_effect_seat_contract_of, EffectSeatAvail, EffectSeatConstructorPath, EffectSeatNeed,
+    EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
+    CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
 #[cfg(test)]
 pub(in crate::cranelift_backend) use effects::{set_effect_seat_plan_mutation, EffectSeatPlanMutation};

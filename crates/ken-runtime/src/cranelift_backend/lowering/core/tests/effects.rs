@@ -2955,6 +2955,126 @@ fn run_console_fixture(
     Ok((result.unwrap(), probe))
 }
 
+#[cfg(test)]
+#[derive(Debug, Default, PartialEq, Eq)]
+struct FsOpenWireProbe {
+    calls: usize,
+    mode: u64,
+}
+
+#[cfg(test)]
+extern "C" fn fs_open_probe_dispatch(
+    host_context: *const std::ffi::c_void,
+    operation: i64,
+    request: *const std::ffi::c_void,
+    request_size: i64,
+    _reply: *mut std::ffi::c_void,
+) -> i64 {
+    // SAFETY: the direct context points at the live probe only for this call.
+    let probe = unsafe { &mut *(host_context.cast_mut().cast::<FsOpenWireProbe>()) };
+    // Count first: a malformed or unexpected request was still externally
+    // dispatched and must make every fail-closed row red.
+    probe.calls += 1;
+    if operation != ken_host::HostOpV1::FsOpen as i64 {
+        return -1;
+    }
+    let wire = ken_host::host_effect_wire_layout_v1(ken_host::HostOpV1::FsOpen)
+        .expect("FsOpen has a generated wire layout");
+    if request_size != i64::from(wire.request_size) {
+        return -1;
+    }
+    // SAFETY: generated offset 3 is the aligned mode field of this exact
+    // target-C request record, whose size was checked above.
+    probe.mode = unsafe {
+        *(request
+            .cast::<u8>()
+            .add(wire.request_offsets[3] as usize)
+            .cast::<u64>())
+    };
+    // The probe intentionally refuses after observing the request. The test's
+    // positive signal is the call and exact mode word; no reply schema is
+    // needed to prove the pre-dispatch guard.
+    -1
+}
+
+#[cfg(test)]
+fn run_fs_open_fixture(
+    expr: &RuntimeExpr,
+) -> Result<(i64, FsOpenWireProbe), CraneliftBackendError> {
+    let isa = native_isa().unwrap();
+    let mut builder = JITBuilder::with_isa(isa, default_libcall_names());
+    builder.symbol("ken_host_dispatch_v1", fs_open_probe_dispatch as *const u8);
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let compiled = compile_expr_into_module(
+        JITModule::new(builder),
+        "m3_fs_open_constructor_dispatch",
+        Linkage::Local,
+        expr,
+        &NativeSeedEnvironment::empty(),
+        BTreeMap::new(),
+        None,
+        true,
+        Some(&symbols),
+        Some(test_only_distinguished_root_join_plan()),
+        None,
+    )?;
+    let input = BorrowedFixtureValue {
+        kind: 1,
+        tag: 0,
+        data: std::ptr::null(),
+        len: 0,
+    };
+    let mut probe = FsOpenWireProbe::default();
+    let invocation = RootIngressFixture {
+        process_input: &input,
+        host_context: (&mut probe as *mut FsOpenWireProbe).cast(),
+        capability: 1_u64 << 32,
+    };
+    let (_, result) = compiled
+        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .unwrap();
+    Ok((result.unwrap(), probe))
+}
+
+/// Deliver an open mode through a closure parameter. The closure captures the
+/// real process capability, while the inner `Let` contributes the expected
+/// `CreatePolicy` identity to the artifact-static table without a host call.
+fn fs_open_carried_mode_fixture(mode: RuntimeExpr) -> RuntimeExpr {
+    RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::LexicalClosure {
+            captures: vec![RuntimeExpr::Var(1)],
+            params: vec!["mode".to_string()],
+            body: Box::new(RuntimeExpr::Let {
+                value: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:prelude::CreatePolicy::CreateOrTruncate".to_string(),
+                    args: Vec::new(),
+                }),
+                body: Box::new(RuntimeExpr::Let {
+                    value: Box::new(RuntimeExpr::Effect {
+                        family: "FS".to_string(),
+                        operation: ken_host::HostOpV1::FsOpen,
+                        capability: Some(crate::RuntimeCapabilityUse {
+                            identity: "m3.fs-open.capability".to_string(),
+                            // The seed is index 0, the mode parameter index 1,
+                            // and the captured capability index 2.
+                            value: Box::new(RuntimeExpr::Var(2)),
+                        }),
+                        args: vec![
+                            RuntimeExpr::Value(RuntimeValue::Bytes(b"m3-open".to_vec())),
+                            RuntimeExpr::Var(1),
+                        ],
+                    }),
+                    body: Box::new(RuntimeExpr::Construct {
+                        constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
+                        args: Vec::new(),
+                    }),
+                }),
+            }),
+        }),
+        args: vec![mode],
+    }
+}
+
 /// `Err(InvalidBounds) -> 71`, `Ok(_) -> 41`, anything else traps.
 ///
 /// ⛔ Both outcomes are *values*, not one value and one trap. A fixture that
@@ -3311,86 +3431,247 @@ fn a_capacity_that_is_not_an_exact_int_fails_closed_and_is_never_invalid_bounds(
     }
 }
 
-/// **The framed disposition discriminator.** The carried phase is admitted at
-/// the seat whose `Need` an emitted helper can satisfy, and still refused at a
-/// seat that genuinely needs a compile-time template.
-///
-/// MEASURED: one program shape, one closure boundary, two seats. A carried
-/// capacity at `BufferAllocate.capacity` compiles and allocates; a carried
-/// `Stream` at `ConsoleWrite`'s constructor-tag seat refuses, and the refusal
-/// names that exact seat, operation and need.
-///
-/// **The refusing side was `ConsoleWrite`'s BYTE-SPAN seat until
-/// `RT-CARRIER-BYTESPAN-OBSERVE` `D5` activated it.** It is now the
-/// constructor-tag seat beside it, which is a strictly better discriminator for
-/// the claim: a tag selects a compile-time branch, so it genuinely cannot come
-/// from a boundary word, whereas a byte span only could not until an emitted
-/// helper existed. The pair no longer decays as byte-span seats activate.
-///
-/// CLAIMED: `Avail` is per seat rather than per phase — admitting `Carried`
-/// somewhere is not admitting it everywhere.
-///
-/// THE GAP: this shows the two seats disagree, not that the boundary sits at
-/// exactly the right place for every one of the thirteen operations. The
-/// population control is what covers the rest; this covers the pair the frame
-/// names, which is the pair a shared contract arm would have collapsed.
-#[test]
-fn the_carried_phase_is_admitted_at_the_capacity_seat_and_still_refused_at_a_template_seat() {
-    // The admitting side. Same closure boundary as the refusing side below, so
-    // the two differ in the SEAT and nothing else.
-    crate::cranelift_backend::lowering::units::reset_capacity_phase_dispatch();
-    let (allocated, probe) = run_capacity_fixture(&|symbols| {
-        carried_capacity_fixture(symbols, RuntimeExpr::Value(RuntimeValue::Int(8.into())))
-    })
-    .expect("a carried capacity is admitted at its seat");
-    assert_eq!(
-        crate::cranelift_backend::lowering::units::capacity_phase_dispatch(),
-        (0, 1),
-        "the admitting side must be the carried arm"
-    );
-    assert_eq!(allocated, 41);
-    assert_eq!(probe, CapacityWireProbe { calls: 1, capacity: 8 });
-
-    // The refusing side. `ConsoleWrite`'s STREAM seat selects a closed
-    // constructor tag, which is a compile-time branch selection; no emitted
-    // helper can satisfy that from a boundary word, in this release or a later
-    // one.
-    let error = run_capacity_fixture(&|_symbols| RuntimeExpr::Call {
+fn carried_console_stream_fixture(
+    symbols: &crate::NativeProcessSymbols,
+    stream: RuntimeExpr,
+) -> RuntimeExpr {
+    RuntimeExpr::Call {
         callee: Box::new(RuntimeExpr::LexicalClosure {
             captures: Vec::new(),
             params: vec!["stream".to_string()],
-            body: Box::new(RuntimeExpr::Effect {
-                family: "Console".to_string(),
-                operation: ken_host::HostOpV1::ConsoleWrite,
-                capability: None,
-                args: vec![
-                    RuntimeExpr::Var(0),
-                    RuntimeExpr::Value(RuntimeValue::Bytes(b"probe".to_vec())),
-                ],
-            }),
+            body: Box::new(console_outcome_fixture_for_stream(
+                symbols,
+                RuntimeExpr::Var(0),
+                RuntimeExpr::Value(RuntimeValue::Bytes(b"probe".to_vec())),
+            )),
         }),
-        args: vec![RuntimeExpr::Construct {
+        args: vec![stream],
+    }
+}
+
+/// Put the expected family identity in the artifact without executing a host
+/// operation. This lets wrong-family and opaque rows reach the emitted table's
+/// unmatched edge rather than a compile-time empty-table refusal.
+fn with_stream_dispatch_seed(body: RuntimeExpr) -> RuntimeExpr {
+    RuntimeExpr::Let {
+        value: Box::new(RuntimeExpr::Construct {
             constructor: "ctor:prelude::Stream::Stdout".to_string(),
             args: Vec::new(),
-        }],
-    })
-    .expect_err("a carried constructor tag is refused at its seat");
+        }),
+        body: Box::new(body),
+    }
+}
 
-    let reason = format!("{error:?}");
-    // ⛔ The discriminating pair, not a substring list. The refusal must be the
-    // SEAT's -- naming which seat of which operation needs what -- and must not
-    // be the generic specialized-only surface's, which is the diagnostic the
-    // removed bulk conversion produced for every seat alike.
+/// M3's route is an exception beside, not a widening of, the seat's phase
+/// relation.
+///
+/// MEASURED: `ConsoleWrite.Argument(0)` remains `SPECIALIZED_ONLY`; a `Stdout`
+/// delivered through a closure ABI slot nevertheless executes and dispatches
+/// once; withdrawing only `CarriedConstructorDispatch` restores the exact
+/// original `ConstructorTag`/`CarriedWord` refusal.
+///
+/// CLAIMED: admission is routing permission and the finite dispatcher is the
+/// authority. No blanket `Avail` change makes every carried word observable.
+///
+/// THE GAP: this proves the production route is load-bearing, not that its
+/// unmatched edge is one-sided. The separate non-matching-population control
+/// below proves that edge performs zero host calls.
+///
+/// Promise class: durable invariant. Any implementation preserving the narrow
+/// route and guarded consumer keeps both directions green.
+#[test]
+fn carried_constructor_dispatch_is_load_bearing_without_widening_avail() {
+    let (_, need, avail) = host_effect_seat_contract_of(
+        ken_host::HostOpV1::ConsoleWrite,
+        EffectSeatSlot::Argument(0),
+    )
+    .expect("ConsoleWrite stream seat contract");
+    assert_eq!(need, EffectSeatNeed::ConstructorTag);
     assert!(
-        reason.contains("Argument(0)")
-            && reason.contains("ConsoleWrite")
-            && reason.contains("ConstructorTag"),
-        "the refusal must name the exact seat, operation and need; got {reason}"
+        !avail.admits(EffectSeatPhase::CarriedWord),
+        "M3 must not turn the constructor-tag contract into a blanket carried availability"
     );
+
+    let carried_stdout = || {
+        run_console_fixture(&|symbols| {
+            carried_console_stream_fixture(
+                symbols,
+                RuntimeExpr::Construct {
+                    constructor: "ctor:prelude::Stream::Stdout".to_string(),
+                    args: Vec::new(),
+                },
+            )
+        })
+    };
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
+    let (status, probe) = carried_stdout().expect("a carried Stdout reaches M3's dispatcher");
+    assert_eq!((status, probe.calls), (41, 1));
+
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::RemoveCarriedConstructorDispatch);
+    let error =
+        carried_stdout().expect_err("withdrawing only M3's route restores the original refusal");
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
     assert!(
-        !reason.contains("is a specialized-only surface"),
-        "the refusal must not be the generic specialized-only surface's; got {reason}"
+        error.to_string().contains(
+            "seat Argument(0) of ConsoleWrite needs ConstructorTag, which it cannot observe in CarriedWord"
+        ),
+        "the route-withdrawal refusal must be the original production seat refusal: {error}"
     );
+}
+
+/// The guarded carried-constructor consumer is strictly one-sided.
+///
+/// MEASURED: wrong-tag, opaque, wrong-family, wrong-arity, and borrowed words
+/// all compile through the carried constructor route, return the deterministic
+/// carrier failure `-1`, and perform zero host calls. A valid carried `Stdout`
+/// on the same fixture dispatches once and returns `41`.
+///
+/// CLAIMED: no non-matching carried word is marshalled at a `ConstructorTag`
+/// seat, and refusal precedes every observable host effect.
+///
+/// THE GAP: the rows cover root identity and arity plus non-constructor carrier
+/// classes. Positional child identity and arity are covered independently by
+/// the `FsOpen` nested-dispatch control.
+///
+/// Promise class: durable invariant. Extensions may add new static identities;
+/// every word outside the resulting exact table must retain this outcome.
+#[test]
+fn carried_constructor_dispatch_traps_non_matching_roots_before_host_dispatch() {
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
+
+    let (accepted, accepted_probe) = run_console_fixture(&|symbols| {
+        carried_console_stream_fixture(
+            symbols,
+            RuntimeExpr::Construct {
+                constructor: "ctor:prelude::Stream::Stdout".to_string(),
+                args: Vec::new(),
+            },
+        )
+    })
+    .expect("the positive carried Stream fixture lowers");
+    assert_eq!((accepted, accepted_probe.calls), (41, 1));
+
+    for (name, value) in [
+        (
+            "wrong-tag Bool",
+            RuntimeExpr::Value(RuntimeValue::Bool(true)),
+        ),
+        (
+            "opaque Bytes",
+            RuntimeExpr::Value(RuntimeValue::Bytes(b"not a stream".to_vec())),
+        ),
+        (
+            "opaque String",
+            RuntimeExpr::Value(RuntimeValue::String("not a stream".to_string())),
+        ),
+        (
+            "wrong-family constructor",
+            RuntimeExpr::Construct {
+                constructor: "ctor:prelude::CreatePolicy::CreateNew".to_string(),
+                args: Vec::new(),
+            },
+        ),
+        (
+            "wrong-arity Stream",
+            RuntimeExpr::Construct {
+                constructor: "ctor:prelude::Stream::Stdout".to_string(),
+                args: vec![RuntimeExpr::Value(RuntimeValue::Int(1.into()))],
+            },
+        ),
+    ] {
+        let (status, probe) = run_console_fixture(&move |symbols| {
+            with_stream_dispatch_seed(carried_console_stream_fixture(symbols, value.clone()))
+        })
+        .unwrap_or_else(|error| panic!("{name}: the guarded route compiles: {error}"));
+        assert_eq!(status, -1, "{name}: must take the deterministic trap");
+        assert_eq!(probe.calls, 0, "{name}: must perform zero host calls");
+    }
+
+    // The root ingress is borrowed Bytes. The `Let` inserts the dispatch seed
+    // at de Bruijn index 0, so index 1 remains the borrowed process input that
+    // crosses the closure parameter into the constructor-tag seat.
+    let (status, probe) = run_console_fixture(&|symbols| {
+        with_stream_dispatch_seed(carried_console_stream_fixture(symbols, RuntimeExpr::Var(1)))
+    })
+    .expect("the borrowed carried-word row compiles through the guarded route");
+    assert_eq!(
+        status, -1,
+        "borrowed input must take the deterministic trap"
+    );
+    assert_eq!(
+        probe.calls, 0,
+        "borrowed input must perform zero host calls"
+    );
+}
+
+/// The nested `ResourceOpenMode` dispatcher checks its positional environment
+/// before any `FsOpen` call.
+///
+/// MEASURED: `ResourceWriteCreate(CreateOrTruncate)` reaches the probe once with
+/// wire tag 3. Holding the same root identity fixed while corrupting only the
+/// child identity, child arity, or root arity returns `-1` with zero calls.
+///
+/// CLAIMED: the carried environment is positional data only, and every dynamic
+/// instance must exactly match the planner's root/child identity and arity path
+/// before marshalling.
+///
+/// THE GAP: this is the positional-child half of the one-sided dispatcher. The
+/// root-family and opaque carrier classes are covered by the Console control.
+///
+/// Promise class: durable invariant. Adding another static policy path may add
+/// a positive row; it must not change these mismatches into host calls.
+#[test]
+fn carried_constructor_dispatch_traps_wrong_positional_child_before_fs_open() {
+    let valid = RuntimeExpr::Construct {
+        constructor: "ctor:prelude::ResourceOpenMode::ResourceWriteCreate".to_string(),
+        args: vec![RuntimeExpr::Construct {
+            constructor: "ctor:prelude::CreatePolicy::CreateOrTruncate".to_string(),
+            args: Vec::new(),
+        }],
+    };
+    let (status, probe) = run_fs_open_fixture(&fs_open_carried_mode_fixture(valid))
+        .expect("the valid nested carried mode lowers");
+    assert_eq!(status, -1, "the probe refuses after observing the request");
+    assert_eq!(
+        probe,
+        FsOpenWireProbe { calls: 1, mode: 3 },
+        "the exact nested path dispatches once with its own wire tag"
+    );
+
+    for (name, mode) in [
+        (
+            "wrong positional child identity",
+            RuntimeExpr::Construct {
+                constructor: "ctor:prelude::ResourceOpenMode::ResourceWriteCreate".to_string(),
+                args: vec![RuntimeExpr::Construct {
+                    constructor: "ctor:prelude::Stream::Stdout".to_string(),
+                    args: Vec::new(),
+                }],
+            },
+        ),
+        (
+            "wrong positional child arity",
+            RuntimeExpr::Construct {
+                constructor: "ctor:prelude::ResourceOpenMode::ResourceWriteCreate".to_string(),
+                args: vec![RuntimeExpr::Construct {
+                    constructor: "ctor:prelude::CreatePolicy::CreateOrTruncate".to_string(),
+                    args: vec![RuntimeExpr::Value(RuntimeValue::Int(1.into()))],
+                }],
+            },
+        ),
+        (
+            "wrong root arity",
+            RuntimeExpr::Construct {
+                constructor: "ctor:prelude::ResourceOpenMode::ResourceWriteCreate".to_string(),
+                args: Vec::new(),
+            },
+        ),
+    ] {
+        let (status, probe) = run_fs_open_fixture(&fs_open_carried_mode_fixture(mode))
+            .unwrap_or_else(|error| panic!("{name}: the guarded route compiles: {error}"));
+        assert_eq!(status, -1, "{name}: must take the deterministic trap");
+        assert_eq!(probe.calls, 0, "{name}: must perform zero host calls");
+    }
 }
 
 /// **The framed lowering closure.** Each of the two things this release did is
@@ -3782,18 +4063,27 @@ fn console_outcome_fixture(
     symbols: &crate::NativeProcessSymbols,
     payload: RuntimeExpr,
 ) -> RuntimeExpr {
+    console_outcome_fixture_for_stream(
+        symbols,
+        RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Stream::Stdout".to_string(),
+            args: Vec::new(),
+        },
+        payload,
+    )
+}
+
+fn console_outcome_fixture_for_stream(
+    symbols: &crate::NativeProcessSymbols,
+    stream: RuntimeExpr,
+    payload: RuntimeExpr,
+) -> RuntimeExpr {
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
             family: "Console".to_string(),
             operation: ken_host::HostOpV1::ConsoleWrite,
             capability: None,
-            args: vec![
-                RuntimeExpr::Construct {
-                    constructor: "ctor:prelude::Stream::Stdout".to_string(),
-                    args: Vec::new(),
-                },
-                payload,
-            ],
+            args: vec![stream, payload],
         }),
         cases: vec![
             crate::RuntimeMatchCase {

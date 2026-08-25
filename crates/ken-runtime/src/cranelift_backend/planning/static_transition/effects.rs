@@ -16,8 +16,8 @@
 use std::collections::BTreeSet;
 
 use super::{
-    occurrence_authority, planner_capacity_error, planner_error, CraneliftBackendError,
-    PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
+    occurrence_authority, planner_capacity_error, planner_error, ConstructorIdentity,
+    CraneliftBackendError, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
 };
 use super::aggregates::{collect_site_operand_ordinals, host_effect_recipe_tree};
 use crate::RuntimeExpr;
@@ -158,6 +158,67 @@ impl EffectSeatAvail {
 /// operation it belongs to *plus* its post-capability-offset semantic ordinal.
 /// Two seats agreeing on the first and differing on either of the others are
 /// two records, because the wire request wants different things of them.
+/// One artifact-static branch of the finite constructor dispatcher used by a
+/// carried `ConstructorTag` seat.
+///
+/// Identity words are planner-issued [`ConstructorIdentity`] values. The
+/// runtime carries only its ordinary constructor tag and positional fields;
+/// neither variant adds a family/body/code tag to the carrier.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum EffectSeatConstructorPath {
+    /// A nullary constructor maps directly to one host-wire tag.
+    Root {
+        identity: ConstructorIdentity,
+        field_count: u32,
+        wire_tag: i64,
+    },
+    /// A constructor whose one positional field contains the discriminant that
+    /// completes the host-wire tag. `ResourceWriteCreate(CreatePolicy)` is the
+    /// current instance.
+    PositionalChild {
+        root_identity: ConstructorIdentity,
+        root_field_count: u32,
+        child_position: u32,
+        child_identity: ConstructorIdentity,
+        child_field_count: u32,
+        wire_tag: i64,
+    },
+}
+
+/// The closed source-constructor roles a host seat may dispatch.
+///
+/// Kept planner-private so lowering cannot submit a spelling and mint a second
+/// identity authority. Lowering receives only [`EffectSeatConstructorPath`]
+/// values resolved from the semantic plane.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EffectSeatConstructorRole {
+    StreamStdin,
+    StreamStdout,
+    StreamStderr,
+    CreateNew,
+    CreateOrTruncate,
+    CreateOrKeep,
+    ResourceRead,
+    ResourceMetadata,
+    ResourceWriteCreate,
+}
+
+impl EffectSeatConstructorRole {
+    fn suffix(self) -> &'static str {
+        match self {
+            Self::StreamStdin => "::Stream::Stdin",
+            Self::StreamStdout => "::Stream::Stdout",
+            Self::StreamStderr => "::Stream::Stderr",
+            Self::CreateNew => "::CreatePolicy::CreateNew",
+            Self::CreateOrTruncate => "::CreatePolicy::CreateOrTruncate",
+            Self::CreateOrKeep => "::CreatePolicy::CreateOrKeep",
+            Self::ResourceRead => "::ResourceOpenMode::ResourceRead",
+            Self::ResourceMetadata => "::ResourceOpenMode::ResourceMetadata",
+            Self::ResourceWriteCreate => "::ResourceOpenMode::ResourceWriteCreate",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) struct PlannedEffectSeat {
     pub(in crate::cranelift_backend) effect_origin: StaticOriginId,
@@ -669,6 +730,81 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_host_e
 }
 
 impl<'src> StaticTransitionPlan<'src> {
+    /// The finite artifact-static dispatcher for an exact constructor-tag seat.
+    ///
+    /// `None` means the operation/slot is not a constructor-tag consumer. An
+    /// empty vector means it is such a consumer but this artifact interned no
+    /// matching constructor identity, so a carried value has no authority to
+    /// enter the route. Every lookup is unique-or-error; there is no first-match
+    /// or family fallback.
+    pub(in crate::cranelift_backend) fn host_effect_constructor_dispatch(
+        &self,
+        operation: ken_host::HostOpV1,
+        slot: EffectSeatSlot,
+    ) -> Result<Option<Vec<EffectSeatConstructorPath>>, CraneliftBackendError> {
+        use ken_host::HostOpV1 as Op;
+        use EffectSeatConstructorPath::{PositionalChild, Root};
+        use EffectSeatConstructorRole as Role;
+
+        let identity = |role: Role| {
+            self.semantic
+                .source_constructor_identity_with_suffix(role.suffix())
+        };
+        let roots = |roles: &[(Role, i64)]| -> Result<Vec<_>, CraneliftBackendError> {
+            let mut paths = Vec::new();
+            for (role, wire_tag) in roles {
+                if let Some(identity) = identity(*role)? {
+                    paths.push(Root {
+                        identity,
+                        field_count: 0,
+                        wire_tag: *wire_tag,
+                    });
+                }
+            }
+            Ok(paths)
+        };
+
+        let paths = match (operation, slot) {
+            (
+                Op::ConsoleWrite | Op::ConsoleFlush | Op::ConsoleIsTerminal,
+                EffectSeatSlot::Argument(0),
+            ) => roots(&[
+                (Role::StreamStdin, 0),
+                (Role::StreamStdout, 1),
+                (Role::StreamStderr, 2),
+            ])?,
+            (Op::FsWriteFile, EffectSeatSlot::Argument(1)) => roots(&[
+                (Role::CreateNew, 0),
+                (Role::CreateOrTruncate, 1),
+                (Role::CreateOrKeep, 2),
+            ])?,
+            (Op::FsOpen, EffectSeatSlot::Argument(1)) => {
+                let mut paths = roots(&[(Role::ResourceRead, 0), (Role::ResourceMetadata, 1)])?;
+                if let Some(root_identity) = identity(Role::ResourceWriteCreate)? {
+                    for (role, wire_tag) in [
+                        (Role::CreateNew, 2),
+                        (Role::CreateOrTruncate, 3),
+                        (Role::CreateOrKeep, 4),
+                    ] {
+                        if let Some(child_identity) = identity(role)? {
+                            paths.push(PositionalChild {
+                                root_identity,
+                                root_field_count: 1,
+                                child_position: 0,
+                                child_identity,
+                                child_field_count: 0,
+                                wire_tag,
+                            });
+                        }
+                    }
+                }
+                paths
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(paths))
+    }
+
     /// The closed planned seat population, for the whole-pass seat closeout.
     pub(in crate::cranelift_backend) fn host_effect_seat_records(&self) -> &[PlannedEffectSeat] {
         &self.host_effect_seats

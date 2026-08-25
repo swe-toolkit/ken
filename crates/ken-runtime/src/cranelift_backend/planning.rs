@@ -79,8 +79,9 @@ pub(super) use static_transition::{
 // `RT-DECL-CLOSURE-PORT` `D7` — the host-effect semantic-seat authority, read
 // by the effect emitter. Namespace re-export only.
 pub(super) use static_transition::{
-    host_effect_seat_contract_of, EffectSeatNeed, EffectSeatOperation, EffectSeatPhase,
-    EffectSeatSlot, PlannedEffectSeat, CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
+    host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
+    EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
+    CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
 #[cfg(test)]
 pub(super) use static_transition::{set_effect_seat_plan_mutation, EffectSeatPlanMutation};

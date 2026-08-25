@@ -1470,6 +1470,55 @@ impl SemanticPlane {
     /// Closed diagnostic/runtime view of the planner-owned carrier identity
     /// namespace. The returned words are the existing packed spans; this
     /// accessor neither interns nor derives an identity.
+    /// Resolve one source-constructor role from the closed semantic name arena.
+    ///
+    /// The caller supplies a family-qualified suffix from a sealed planner enum,
+    /// never an emitter-provided spelling. Exact identity remains the interned
+    /// [`ConstructorIdentity`]; the suffix only selects which already-interned
+    /// role the planner is asking for. Ambiguity refuses instead of selecting a
+    /// convenient first match.
+    pub(super) fn source_constructor_identity_with_suffix(
+        &self,
+        suffix: &str,
+    ) -> Result<Option<ConstructorIdentity>, CraneliftBackendError> {
+        let mut found = Vec::new();
+        for atom in &self.operands {
+            if !matches!(
+                atom.kind,
+                SemanticAtomKind::ConstructorSymbol
+                    | SemanticAtomKind::CaseConstructor
+                    | SemanticAtomKind::ValueConstructor
+            ) {
+                continue;
+            }
+            validate_range(
+                atom.content,
+                self.names.len(),
+                "constructor-role span is outside the closed name arena",
+            )?;
+            let spelling = std::str::from_utf8(plane_slice(
+                &self.names,
+                atom.content,
+                "constructor-role spelling",
+            )?)
+            .map_err(|_| planner_error("constructor-role spelling is not UTF-8"))?;
+            if !spelling.ends_with(suffix) {
+                continue;
+            }
+            let identity = ConstructorIdentity(atom.content);
+            if !found.contains(&identity) {
+                found.push(identity);
+            }
+        }
+        match found.as_slice() {
+            [] => Ok(None),
+            [identity] => Ok(Some(*identity)),
+            _ => Err(planner_error(format!(
+                "constructor role suffix {suffix:?} resolves to more than one artifact-static identity"
+            ))),
+        }
+    }
+
     pub(super) fn carrier_identity_catalog(
         &self,
     ) -> Result<Vec<(String, u64)>, CraneliftBackendError> {
