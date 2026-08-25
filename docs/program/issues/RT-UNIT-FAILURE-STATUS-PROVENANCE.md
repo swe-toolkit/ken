@@ -74,7 +74,9 @@ Enumerated (measured by the Architect):
 - `calls.rs:2075-2090` — root `TrapWord` collapses to `-4` under
   `TrapExitAuthority::Root { process_sentinel: true }`, `identity_preserved:false`.
   ON the witness path. IN scope.
-- the governed `MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS == -3` forwarding producer.
+- `emit_carrier_dynamic_constructor`'s residual `MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS
+  == -3`, forwarded UNCHANGED by `call_declared_unit_target` — the governed
+  in-scope `-3` member (the specific graph/code route, not the scalar spelling).
   ON the witness path. IN scope (folded under the same contract).
 - `joins.rs::emit_current_trap` — also obtains an exact planned identity and
   collapses it to `-4` under `Root { process_sentinel: true }`. OUT of this WP.
@@ -101,6 +103,12 @@ dropped. Do NOT assert "structural closure" in the candidate.
   `unknown terminal sentinel`, `FsOpen -> BufferAllocate -> ResourceRelease x2`,
   no `FsReadAt` (Architect rerun log `4dc5028a...`). `core.rs` byte-identical.
 - The linked-boundary decode chain named under "Production surface".
+- The governed in-scope `-3` producer (the ONLY `-3` member in this WP's claim):
+  `emit_carrier_dynamic_constructor`'s residual `MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS
+  == -3`, forwarded UNCHANGED by `call_declared_unit_target` to the process reporter
+  (classified "malformed ExitCode::Failure payload" — a sentinel alias; the path
+  never produced an ExitCode failure). The other enumerated `-3` producers
+  (`aggregates.rs`, two source-machine paths) are OUT of scope.
 
 ## Deliverable
 
@@ -108,8 +116,10 @@ dropped. Do NOT assert "structural closure" in the candidate.
   the root generated-unit failure (`calls.rs:2075-2090`) and decode its magnitude
   against the existing planner trap catalog at the linked reporting boundary (the
   subsuming typed envelope), so the reporter classifies by origin/kind. Fold the
-  governed `-3` producer under the same provenance contract. Use EXISTING typed
-  authority / catalog only — never a new sentinel or a second catalog. Fail-closed
+  governed in-scope `-3` producer — `emit_carrier_dynamic_constructor`'s residual
+  forwarded unchanged by `call_declared_unit_target` — under the same provenance
+  contract. Use EXISTING typed authority / catalog only — never a new sentinel or a
+  second catalog. Fail-closed
   residuals (unknown/zero/out-of-range) preserved.
 
 ## Success criterion (Architect — do NOT overpromise)
@@ -129,9 +139,11 @@ witness rows here.
 - AC-2 (the `-4` producer) — the root `TrapWord` at `calls.rs:2075-2090` no longer
   collapses to `identity_preserved:false` / `-4`; the planned identity survives to
   the reporting boundary.
-- AC-3 (the governed `-3` producer) — the governed
-  `MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS == -3` path carries origin/kind under the
-  same envelope, not a bare scalar (folded, no separate sentinel).
+- AC-3 (the governed `-3` producer) — `emit_carrier_dynamic_constructor`'s
+  residual `MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS == -3`, forwarded unchanged by
+  `call_declared_unit_target`, carries origin/kind under the same envelope, not a
+  bare scalar (folded, no separate sentinel). AC-3 binds THIS named route, not the
+  scalar spelling.
 - AC-4 — fail-closed backstop preserved: genuinely unclassifiable / zero /
   out-of-range identities still refuse; NO new sentinel, NO second catalog.
 - AC-5 (census honesty) — the candidate does NOT claim global structural closure;
@@ -164,10 +176,13 @@ narrowed closure claim. Size M.
 
 ## Sequencing
 
-Lane-1 (runtime, priority). RESUME on the WIP `7094c29cd` base to complete D1
-only. The successor [[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]] (the exposed
-ITree-default producer that greens InvalidOffset) is sequenced AFTER and must not
-co-run. [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] (ReadSome/Wrote,
-`calls.rs:1631-1640`), all ignores, and the final four-value closure fold stay
-held to this resulting sequence. PX8 remains blocked. Base the branch on
-`7094c29cd` (WIP) over `14deff3c` main.
+Lane-1 (runtime, priority). RESUME to complete D1 only. Base construction: cut /
+rebase the branch from current `origin/main` `7242e5c1`, then replay the
+`7094c29cd` `calls.rs` delta as evidence, producing a FRESH candidate SHA — do NOT
+remain based on pre-reconcile `14deff3c`. (The runtime ring already performed this
+replay at WIP `61ab731a`, parent `7242e5c1`.) The successor
+[[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]] (the exposed ITree-default producer that
+greens InvalidOffset) is sequenced AFTER and must not co-run.
+[[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] (ReadSome/Wrote, `calls.rs:1631-1640`),
+all ignores, and the final four-value closure fold stay held to this resulting
+sequence. PX8 remains blocked.
