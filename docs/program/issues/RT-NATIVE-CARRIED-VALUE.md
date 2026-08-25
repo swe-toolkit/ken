@@ -77,12 +77,17 @@ Entry 2 (measured 2026-08-25, Architect umbrella arm(b) object read at merged
 terminal observation) but the FOUR full-program witnesses do NOT — three semantic
 blockers remain, NOT an un-ignore-only residual (the px8ds 256 MiB policy is
 unrelated). The remaining lane-1 critical path, in Architect-recommended order:
-- SemanticErrorV1 (both positioned parity rows red `RuntimeTrap(4)` / `explicit
-  entry trap` instead of `InvalidOffset`): a generated-unit failure identity is
-  collapsed to a global scalar at the root trap-exit authority
-  (`calls.rs:2075-2090`, `identity_preserved: false`, `return -4`; plus the earlier
-  `-3` alias) -> [[RT-UNIT-FAILURE-STATUS-PROVENANCE]] recut as the structural
-  closure. FRAME FIRST (restores the identity needed to name the next object).
+- SemanticErrorV1 (both positioned parity rows): SPLIT by the AC-5 hard stop
+  (Architect evt_3rq4xafrf7cqf on WIP `7094c29cd`). (i)
+  [[RT-UNIT-FAILURE-STATUS-PROVENANCE]] (scope-reconciled) carries the root
+  generated-unit failure identity to the LINKED reporting boundary
+  (`calls.rs:2075-2090` `-4` + governed `-3`, one typed-catalog envelope) — HONEST
+  reporting; lands with the row still RED as the ITree default. (ii)
+  [[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]] localizes the exposed ITree-default
+  SELECTION occurrence and greens the exact `InvalidOffset`. (i) FIRST, (ii) after;
+  must not co-run. Wider identity-collapse census (`joins.rs::emit_current_trap`,
+  `aggregates.rs`, two source-machine `-3` paths) enumerated but out of (i)'s
+  operative claim.
 - ReadSome/Wrote (both px8f rows stop at object emission): retained body
   `StaticOriginId(1236)` has no graph-derived call target
   (`calls.rs:1631-1640`, `call_declared_unit`) ->
