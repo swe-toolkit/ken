@@ -120,16 +120,29 @@ carrier upgrade lands.
    authority. A matching discriminated `CarriedWord` marshals into the host call;
    a non-matching one traps (see AC-FAILCLOSED). No blanket `avail.admits` accept
    and no new operand-provenance mechanism.
-3. The two rows execute correctly end-to-end and are un-ignored ONLY on genuine
-   green (px8f `FsOpen` Arg1; px8ta HALF B `ConsoleIsTerminal` Arg0).
+3. The two rows MARSHAL correctly through the effect seat (px8f `FsOpen` Arg1;
+   px8ta HALF B `ConsoleIsTerminal` Arg0). They do NOT go end-to-end green under
+   M3: each then hits a DISTINCT downstream object (Architect evt_317adj9ebfw86)
+   and stays `#[ignore]`, re-pointed to its successor owner — px8ta HALF B ->
+   [[RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT]]; px8f ->
+   [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]]. No row is un-ignored under M3.
 
 ## Acceptance criteria
 
-- AC-EXEC (end-to-end, not cold-enum): acceptance is px8f
-  (`linked_checked_write_all_...`) and px8ta HALF B
-  (`px8ds_real_same_depth_path_runs_exact_edges`) EXECUTING correctly through the
-  effect seat and matching the interpreter, then un-ignored per COORDINATION §8a.
-  A lowering-enum `Completes` disposition is NOT acceptance: the cold row
+- AC-EXEC (object-scoped, corrected per Architect ruling evt_317adj9ebfw86): M3's
+  acceptance is its OBJECT proven — the `ConstructorTag`/`CarriedWord` effect-seat
+  marshalling refusal cleared and each named acceptance seat (px8f `FsOpen`
+  Argument(1); px8ta HALF B `ConsoleIsTerminal` Argument(0)) marshalling correctly
+  through the effect seat — PLUS honest re-points for the distinct downstream
+  objects the rows hit AFTER crossing M3's seam. End-to-end green is NOT a blanket
+  bar: a row that crosses M3's seam and then traps in a DISTINCT successor object
+  is not an M3 failure. px8f and px8ta HALF B stay `#[ignore]`, re-pointed to their
+  successor owners — px8ta HALF B -> [[RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT]] (the
+  ExitCode::Failure payload execution-parity trap, object_linker_packaging.rs:2223
+  value -3); px8f -> [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] (the unit-call-graph
+  call-target derivation, calls.rs:1638). The un-ignore rule (§8a) is honored by NOT
+  un-ignoring either row: no row goes end-to-end green under M3.
+  A lowering-enum `Completes` disposition is still NOT acceptance: the cold row
   `rt_cold_lowering_path_enumeration.rs:543` is a cold-enum disposition, and
   cold-enum `Completes` is not parity-correct (Architect z203 guard
   evt_1vcwzkd3g0s1r). Do not accept on the cold-enum row.
