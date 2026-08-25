@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-PAIR-STRICT-BOUNDARY
 title: "Durable Spec/Conformance boundary artifact — compiler possession of a non-floor convenience (native Pair) is NOT strict provider availability; pin the strict bare-Pair rejection, same-shape distinct-identity, exact-nine stability, and the deferred/later-closure conformance shape."
-status: ready
+status: merged
 owner: spec
 size: S
 gate: none
@@ -11,6 +11,17 @@ github: null
 origin: "Spec enclave boundary ruling on Component B hard stop #1 (spec-author evt_6nk4xxkppz3k5, spec-leader evt_w7v4dvvzjr8k, thr_7mdnraw5rrmc2). The ruling directs the Steward to release the durable boundary as its own node. Deductive from the settled floor/package/Strict contracts — no new Decision. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
+> # MERGED 2026-08-25 at squash `eb65d328b` — durable Pair strict boundary landed
+>
+> PR #2928 merged onto main (origin/main `d616db322` after the subsequent RT
+> doc-squash). Candidate `7f8da79cb` (tree `e983a45f`, base `dcfa19210`, 33 paths
+> +1231/-250). Exact-SHA APPROVES on `7f8da79cb`: Architect (evt_4mwx48teb96ta),
+> CV (evt_5wp11ysmn5t71; preserved-object tests 16/16 + 10/10 + 18/18), spec-leader
+> enclave sign-off (evt_7rjrj292azabf); Decision `dec_20b0v2bg9gf7s` resolved.
+> BLOB-AUDIT clean: all 33 reviewed paths byte-identical on the landed tree, and
+> the Pair squash touched exactly those 33 paths (the 2 `crates/` paths are both
+> `tests/`, no production src). Unblocks [[LANG-MOD-CANONICAL-PAIR-PACKAGE]].
+>
 > # FRAMED 2026-08-25 — enclave boundary ruling; startable now (spec-owned)
 >
 > The Spec enclave ruled Component B's native-`Pair` contradiction as arm B
