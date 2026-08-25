@@ -2,20 +2,24 @@
 //!
 //! Binds exactly these cases from
 //! `conformance/kernel/inductive/seed-nested.md`:
-//! - `nested-ds9-shapes-admitted` and `nested-fresh-carrier-admitted`;
+//! - `nested-ds9-shapes-admitted`, `nested-fresh-carrier-admitted`, and
+//!   `nested-positive-chain-composes`;
 //! - `nested-negative-under-positive` and
 //!   `nested-negative-transparent-sigma-control` (AC-K5);
 //! - `nested-unknown-head-rejected` and `nested-nonpositive-rejected`
 //!   (AC-K6–AC-K7);
 //! - `nested-direct-and-wstyle-controls-unchanged` (AC-K8).
 //!
-//! `nested-size-uses-lift` remains `[KERNEL-NESTED-IND]`-gated on
-//! `KERNEL-RECURSIVE-RESULT-SURFACE`; no finite topology control discharges it.
+//! `nested-size-uses-lift` and both structural-result selector sorts execute in
+//! the elaborator's full-pipeline bindings. The remaining dependent-motive gap
+//! is narrower: one generated `All^Omega` method combining two residual host
+//! fields fails its final kernel re-check after selection. This positivity file
+//! does not claim an executing binding for that row.
 //!
 //! Exact executing bindings:
 //! - `nested-ds9-shapes-admitted` ->
 //!   `checked_transparent_sigma_aliases_admit_renamed_nested_paths`;
-//! - `nested-fresh-carrier-admitted` ->
+//! - `nested-fresh-carrier-admitted` and `nested-positive-chain-composes` ->
 //!   `seed_fresh_bag_rose_and_deep_paths_admit_structurally`;
 //! - `nested-negative-under-positive` ->
 //!   `seed_negative_under_fresh_positive_bag_rejects_only_inner_arrow`;

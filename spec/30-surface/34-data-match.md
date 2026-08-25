@@ -19,10 +19,11 @@
 > `elim_D` (`§4.4`). The nested-positive work named below is **partially
 > landed**. The current kernel admits declaration-recorded strictly-positive
 > parameter paths and checked-transparent Sigma aliases, including fresh
-> `Bag Rose` and two-former `Bag (Wrap Deep)` paths. Type-classified surface
-> recursive results execute through generated lifts and nested ι. Independently
-> marked generator, topology, sort, and dependent-motive residuals remain
-> staged; this status does not claim those cases.
+> `Bag Rose` and two-former `Bag (Wrap Deep)` paths. Both Type-classified
+> `recursive result for` and Ω-classified `induction hypothesis for` execute
+> through generated lifts and nested ι. Independently marked generator,
+> topology, sort, and dependent-motive residuals remain staged; this status does
+> not claim those cases.
 >
 > **Perishable — pin against the landed kernel, not this prose.** K1.5 has
 > landed: the K1-era blanket rejection of Π-bound recursion
@@ -32,9 +33,11 @@
 > arguments are **admitted**. Nested-positive admission is no longer blanket-
 > gated: the current D6 corpus executes the fresh-carrier, composed-carrier,
 > transparent-head, and controlled-negative paths. `KERNEL-NESTED-IND` retains
-> only the cases independently marked as residual. The narrower live surface
-> boundary is the Ω-classified dependent-motive selector, gated on
-> `KERNEL-RECURSIVE-RESULT-SURFACE`; the Type-classified selector is landed.
+> only the cases independently marked as residual. Both structural-result
+> selectors are landed. The narrower live surface gap is a dependent generated-
+> `All` method that combines **two residual host fields**: production reaches
+> both associations and selectors, but the final method kernel re-check rejects
+> a type mismatch. No executing positive currently binds that stronger case.
 > Verify against the on-`main` `14`/kernel before building.
 
 ## Canonical non-dependent pair package
@@ -168,12 +171,13 @@ arguments — `(b:B) → D`, the branching shape of `W` and L5's `ITree` — are
 admission is partially landed: the current kernel accepts fresh
 recorded-positive carrier paths such as `Bag Rose` and the composed
 `Bag (Wrap Deep)` path, while unknown and non-positive paths still reject
-fail-closed. Type-classified nested surface recursion also executes through its
-generated lift and ι. Only the individually marked residual cases remain
-implementation-gated; in this chapter the live surface-lowering residual is
-the Ω-classified dependent-motive selector under
-`KERNEL-RECURSIVE-RESULT-SURFACE`. **Mutual** families remain a separately
-deferred extension (`14 §8.6`).
+fail-closed. Type- and Ω-classified nested surface selectors execute through
+generated lifts and ι. Only the individually marked residual cases remain
+implementation-gated. In this chapter the live surface-lowering residual is
+the stronger dependent generated-`All` method with two residual fields: the
+one-residual Ω path checks, while a `Join xs ys` branch consuming both induction
+hypotheses fails the generated method's final kernel re-check. **Mutual**
+families remain a separately deferred extension (`14 §8.6`).
 
 ## 2. Indexed families and dependent constructors (GADT-like)
 
@@ -416,12 +420,13 @@ the corresponding motive instance, and every pattern-bound enclosing child
 retains the residual lift for its contained occurrences. A recursive theorem or
 computation over the field consumes those generated hypotheses. Re-emitting an
 unrestricted self-call, discarding the lift, or admitting the declaration
-without this branch context is not a valid lowering. The Type-classified
-surface path is landed and executes through the generated lift and nested ι.
-The narrower Ω-classified dependent-motive selector remains gated on
-`KERNEL-RECURSIVE-RESULT-SURFACE` until the surface can expose its exact
-associated proof result; kernel admission is not blanket-gated on that
-residual.
+without this branch context is not a valid lowering. Both Type- and
+Ω-classified selectors are landed and execute through generated lifts and
+nested ι. The narrower residual is method construction after selection: a
+dependent generated-`All` branch combining two residual host fields currently
+fails its final kernel re-check with a type mismatch, although the corresponding
+one-residual Ω branch checks. Kernel admission and selector availability are not
+blanket-gated on that residual.
 
 #### 3.1.1 Recursive results and induction hypotheses for nested fields
 

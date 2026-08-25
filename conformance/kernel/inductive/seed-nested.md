@@ -15,16 +15,17 @@ Ken-owned objects and first principles; no reference implementation or
 `local/refs/` source was consulted.
 
 Cases marked `[KERNEL-NESTED-IND]` remain design-locked and
-implementation-gated. Seven D6 cases execute un-gated: DS-9 and fresh-carrier
-admission; negative-under-positive and transparent-Sigma-negative rejection;
-unknown-head and nonpositive rejection; and unchanged direct/W-style behavior.
-The former bare-Pair vectors use a fresh checked transparent Sigma alias here;
-the canonical named-Pair instantiation is RED-UNTIL in
+implementation-gated. DS-9, fresh-carrier, and composed-carrier admission
+execute un-gated, as do negative-under-positive and transparent-Sigma-negative
+rejection, unknown-head and nonpositive rejection, and unchanged direct/W-style
+behavior. The former bare-Pair vectors use a fresh checked transparent Sigma
+alias here; the canonical named-Pair instantiation is RED-UNTIL in
 `../../surface/modules/seed-pair-strict-boundary.md`. `nested-size-uses-lift`
-also executes un-gated through the named full-pipeline
-witnesses below. `nested-dependent-motive-uses-lift` remains gated on
-`KERNEL-RECURSIVE-RESULT-SURFACE`. Independently gated non-D6 residual cases remain
-marked below. The existing direct and W-style controls remain live throughout,
+also executes un-gated through the named full-pipeline witnesses below. Both
+structural-result selector sorts are landed. `nested-dependent-motive-uses-lift`
+remains gated only at its stronger binary-residual generated-`All` method
+re-check, specified precisely below. Independently gated non-D6 residual cases
+remain marked. The existing direct and W-style controls remain live throughout,
 so staging the residual completeness class does not suspend the positivity
 posture.
 
@@ -95,7 +96,11 @@ both through the production positivity path.
   accepting every application argument would fail AC4's controlled negative
   cases.
 
-### kernel/inductive/nested-positive-chain-composes [KERNEL-NESTED-IND]
+### kernel/inductive/nested-positive-chain-composes
+
+Status: executing binding established in
+`seed_fresh_bag_rose_and_deep_paths_admit_structurally`. The same production
+test that admits fresh `Bag Rose` also admits `Bag (Wrap Deep)`.
 
 - spec: `14 §8.5` clause 3
 - given: after admitting `Bag`, admit a second fresh positive carrier
@@ -219,37 +224,40 @@ dropped-fold control reaches `1`.
 
 ### kernel/inductive/nested-dependent-motive-uses-lift [KERNEL-NESTED-IND]
 
-Status: blocked on `KERNEL-RECURSIVE-RESULT-SURFACE` — the **same** blocker as
-`nested-size-uses-lift`, and for the same reason. This D1 entry records the
-future binding contract only; no executing dependent-motive result is claimed,
-and the marker remains gated.
+Status: the selector is **not** the blocker. Both `recursive result for` and
+`induction hypothesis for` are landed, and a full-pipeline unary residual
+`ProofWrap xs` theorem accepts the Ω selector. The stronger binary-residual case
+remains unavailable at a later production seam.
 
-The existing NC14 control `nested_dependent_motive_consumes_correlated_child_proofs`
-is a **direct-leaf association discriminator, not an executing binding for this
-row.** Its fixture is flat — `ProofJoin : a -> a -> ProofBag a` — so every child
-binding is `support: None` and an owner self-call consumes the exact motive
-instance. This row's carrier is `join : Bag A -> Bag A -> Bag A`, where `xs` and
-`ys` carry `support: Some(All^Omega_Bag)`; the kernel telescope supplies their
-recursive results, and `check_match_with_lift` hides every trailing binder. D0
-now specifies how `induction hypothesis for xs` and
-`induction hypothesis for ys` denote those associated results, but the landed
-surface pipeline does not yet elaborate that selector. Implicit lockstep
-preserves the correlation but does **not** synthesize the branch's recursive
-result — another source `match` only finite-unrolls the residual `Bag`, exactly
-as in the Nat-size case.
+The exact failing shape uses
+`ProofJoin : ProofBag a -> ProofBag a -> ProofBag a`. Its proposition fold
+accepts both `recursive result for xs` and
+`recursive result for ys`. The corresponding theorem reaches both recorded
+associations and both `induction hypothesis for` selections, then fails in
+`elab.rs::check_match_with_lift` when the generated `All^Omega` method receives
+its final `kernel_check`: the method conclusion and dependent branch goal report
+a type mismatch. A unary residual variant passes the same full parse → resolve
+→ elaboration → kernel-check pipeline, so this is not an Ω-selector or general
+dependent-motive gate.
 
-The obstruction is **sort-independent**: `All^Type` versus `All^Omega` changes
-the leaf motive, not the need to consume the support eliminator's recursive
-result at `Bag.join`. ⛔ The erasure boundary does not refute this — provenance-
-gated erasure admitting the generated support `Elim` while rejecting arbitrary
-dependent motives is a downstream artifact concern and says nothing about what
-source can name.
+The existing NC14 control
+`nested_dependent_motive_consumes_correlated_child_proofs` is a direct-leaf
+association discriminator, not an executing binding for this row. Its flat
+`ProofJoin : a -> a -> ProofBag a` gives every child `support: None`. The
+landed Type-valued `Bag.join` size case proves two residual associations and
+results can be consumed; the unary Ω case proves the proof selector can consume
+a residual result. Neither proves that one dependent generated-`All` method can
+combine **both** residual Ω results and still kernel-check.
 
-⇒ **One association mechanism serves both rows.** The two surface forms select
-by result sort; they do not introduce a second topology or association rule.
+⇒ **The residual is method construction after successful association and
+selection.** It needs a kernel-checkable dependent branch-goal specialization
+for multiple residual host fields at `check_match_with_lift`, plus a persistent
+full-pipeline binary positive and controlled wrong-result/association
+negatives. Erasure is downstream of the current refusal and supplies no evidence
+for this row.
 
 - spec: `14 §3.2`, `§9.5`; `34 §3.1.1`; `39 §2.3`, `§4`
-- given (future binding, gated): a dependent motive
+- given (residual binding, currently failing): a dependent motive
   `AllGood : Rose -> Omega_0` whose `node` proof matches the `Bag Rose` field
   and its `All^Omega_{Bag,0} (λr. AllGood r) b` inhabitant in lockstep. In a
   `Bag.join xs ys` branch, `induction hypothesis for xs` and
@@ -257,21 +265,23 @@ by result sort; they do not introduce a second topology or association rule.
   the checked method telescope with those surface bindings, field occurrences,
   and support evidence. Each association is one-to-one in both directions, in
   range, and from the same method and support provenance
-- expect (future binding, gated): **accepts** through elaboration and kernel
-  checking. Each exposed `Rose` child is accompanied by its exact
+- expect (required post-repair binding): **accepts** through elaboration and
+  kernel checking. Each exposed `Rose` child is accompanied by its exact
   `AllGood child` proof; each residual `Bag Rose` value is accompanied by the
   correspondingly indexed residual `All^Omega` inhabitant. The leaf proofs
   remain irrelevant at their `Omega_0` proposition types, while the
   topology-carrying `All^Omega` application itself is in `Type 0`. The
   selector emits the exact associated hidden result without exposing hidden
   binders or changing ordinary direct and W-style match behavior
-- fail-closed boundary (future binding, gated): missing, duplicate, swapped,
-  and foreign associations reject with the corresponding D0 diagnostic. A
+- fail-closed boundary (required post-repair binding): missing, duplicate,
+  swapped, and foreign associations reject with the corresponding D0
+  diagnostic. A
   same-spelled, copied, projected, or shadowed binding has no authority unless
   it independently carries exactly one validated same-occurrence association;
   neither its type nor an owner self-call may be used to guess one
-- sort boundary (future binding, gated): classify the selected hidden proof
-  result, not its `All^Omega` support evidence. Its type is `Omega`-classified
+- sort boundary (landed independently; required unchanged here): classify the
+  selected hidden proof result, not its `All^Omega` support evidence. Its type
+  is `Omega`-classified
   and therefore requires `induction hypothesis for`; the
   support application's residence in `Type 0` does not change that spelling.
   `recursive result for xs` rejects with `RecursiveResultSortMismatch` naming
@@ -282,11 +292,12 @@ by result sort; they do not introduce a second topology or association rule.
   the correlated lift cannot construct the branch proof. This pins that the
   feature is induction, not merely a constant-result fold.
 
-Current binding census: un-gating `nested-size-uses-lift` changes the seed-local
-population of headings marked `[KERNEL-NESTED-IND]` from **14 to 13**, and the
-corpus-wide population from **15 to 14**. The
-`nested-dependent-motive-uses-lift` heading and marker remain present; its
-eventual valid binding would change those populations to **12** and **13**.
+Stage audit: the composed-carrier marker is retired because its production
+binding accepts `Bag (Wrap Deep)`. The `nested-dependent-motive-uses-lift`
+marker remains solely for the binary-residual method-recheck gap above, not for
+selector availability. Retiring that marker requires the exact binary positive
+to pass the final kernel re-check and its independent controls to bite; heading
+counts are not acceptance authority.
 
 ---
 
@@ -586,18 +597,19 @@ Spec: `14 §8.6`; `§3`, `§3.1`, `§7.3`, `§7.7`, `§8.4`.
   `Inductive` declarations and six `GlobalId`s, with no eliminator declaration
   or `GlobalId`. Its two support families are terminal and no `All`-of-`All`
   exists; failure to generate either rolls the whole admission back.
-- The seven D6 bindings execute un-gated: DS-9 and fresh-carrier admission;
-  negative-under-positive and transparent-Sigma-negative rejection;
-  unknown-head and nonpositive rejection; and unchanged direct/W-style
-  behavior. The future canonical Pair instantiation remains RED-UNTIL in the
-  Pair-boundary seed without gating these representation controls. Their paired
-  positive controls admit while each exact negative/unknown mutation flips the
-  verdict.
+- DS-9, fresh-carrier, and composed-carrier admission execute un-gated;
+  negative-under-positive, transparent-Sigma-negative, unknown-head, and
+  nonpositive controls reject; direct/W-style behavior remains unchanged. The
+  future canonical Pair instantiation remains RED-UNTIL in the Pair-boundary
+  seed without gating these representation controls. Their paired positive
+  controls admit while each exact negative/unknown mutation flips the verdict.
 - `nested-size-uses-lift` executes un-gated through the named kernel and
   full-pipeline witnesses, including the deeper residual-`Bag.join` fold and its
-  `3`-versus-`1` discriminator. `nested-dependent-motive-uses-lift` remains
-  gated on `KERNEL-RECURSIVE-RESULT-SURFACE`; its future selector, association,
-  fail-closed, and executing-binding contract remains stated without claiming
-  current execution or removing its marker. Independently gated non-D6
-  residual rows remain marked; blanket nested rejection is no longer the live
-  boundary.
+  `3`-versus-`1` discriminator. Both selector sorts are landed, and a unary
+  residual dependent-motive path reaches the Ω selector. The stronger binary
+  dependent-motive row remains gated because its generated `All^Omega` method
+  fails the final `check_match_with_lift` kernel re-check after both associations
+  and selections succeed. Its post-repair positive and fail-closed contract
+  remain stated without misclassifying the selector as missing. Independently
+  gated non-D6 residual rows remain marked; blanket nested rejection is no
+  longer the live boundary.
