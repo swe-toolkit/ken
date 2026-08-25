@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-NAT-PROVIDER-INTERFACE
 title: "Nat's canonical home by prelude-floor membership: amend the GENERAL prelude membership rule (30-taxonomy §4) to a bootstrapping criterion that admits kernel-provided vocabulary the surface must reach and cannot re-derive with identity, with the coupled normative amendments (30 §5, 33 §3.3, 39, 50-stdlib) and identity/strict-accept/zero-allocation conformance pins. The Component B Nat prerequisite (spec WP)."
-status: ready
+status: merged
 owner: spec
 size: L
 gate: none
@@ -10,6 +10,24 @@ blocks: [LANG-MOD-NAT-FLOOR-REALIZATION, LANG-MOD-CATALOG-COMPLETENESS]
 github: null
 origin: "Component B hard stop (language-implementer evt_4757hgk2t2mj6 / language-leader evt_71apgcrce8fqf lineage), ruled a Spec+build prerequisite by the enclave (spec-author evt_33bwgcx226bxv, spec-leader evt_7nvtrx1fs6wf0, Architect deferred the mechanism to Spec evt_22r45y0x8nzbh). Material mechanism/scope escalated to the operator as Decision dec_1kqwn6hdvn7d2 and RESOLVED there 2026-08-25: the prelude membership rule itself is the defect; realize Nat by prelude-floor membership, NOT the provider-registry. Steward-reframed under [[LANG-MODULE-IMPORT-SYSTEM]] to the ruled approach."
 ---
+
+> # LANDED 2026-08-25 (b7f73f1d, "spec: add Nat nine-floor provider contract")
+>
+> The spec WP is MERGED. The strict floor closed set landed as NINE names, not
+> the four this node first drafted: the enclave closed the executable population
+> by walking every `Decl::Primitive` signature and found the signature arm names
+> `{Auth, Bool, Char, List, Option, ResourceKind, Result, Utf8Error}` (eight —
+> `bytes_at`/`bytes_slice` name `Option`, `bytes_decode` names `Result`/
+> `Utf8Error`, `Cap` names `Auth`, `Resource` names `ResourceKind`); the
+> bootstrap-identity arm adds exactly `Nat`. Landed `30-taxonomy §4`: "today's
+> Ken-defined surface floor is the closed set `{Auth, Bool, Char, List, Nat,
+> Option, ResourceKind, Result, Utf8Error}` ... floor installation reuses all
+> nine existing `GlobalId`s and allocates nothing." The Steward ruled the
+> four->nine as mechanical closure of the resolved operator ruling
+> dec_1kqwn6hdvn7d2 (zero-TCB, surface-preserving); flagged to the operator as an
+> FYI on return. Wherever the coupled-amendments section below still writes the
+> four-set `{Bool, Char, List, Nat}`, the LANDED set is the nine above. The build
+> half [[LANG-MOD-NAT-FLOOR-REALIZATION]] realizes the full nine-name floor.
 
 > # OPERATOR-RULED — provider-registry mechanism SUPERSEDED
 > by prelude-floor membership
@@ -66,15 +84,20 @@ The membership-rule amendment forces coupled edits. The enclave owns the precise
 normative wording; the Architect is the soundness reviewer. Reconcile at least:
 
 1. `30-taxonomy §4` — the membership rule itself: add the bootstrapping arm;
-   the closed derived set becomes `{Bool, Char, List, Nat}` (with `Nat`'s
-   constructors `Zero`/`Suc` reachable as its data constructors). State the
-   checkable criterion for the new arm.
+   the closed derived set is the nine-name floor `{Auth, Bool, Char, List, Nat,
+   Option, ResourceKind, Result, Utf8Error}` (the eight signature-arm names + the
+   bootstrap-arm `Nat` with constructors `Zero`/`Suc` reachable as its data
+   constructors). State the checkable criterion for the new arm. (LANDED as nine;
+   this item first drafted the four-set — see the top banner.)
 2. `30-taxonomy §5` (standard-package tier) and `50-stdlib/README §1` — these
    currently classify `Nat` as **package-tier, not prelude**. That classification
    was the stated reason floor-membership was "foreclosed"; it is now overturned.
    Nat moves from package-tier to prelude-tier; reconcile both statements.
-3. `33 §3.3` — the closed floor set the strict scope contains: `{Bool, Char,
-   List}` becomes `{Bool, Char, List, Nat}` (Nat + its constructors).
+3. `33 §3.3` — the closed floor set the strict scope contains: the implemented
+   `{Bool, Char, List}` becomes the landed nine `{Auth, Bool, Char, List, Nat,
+   Option, ResourceKind, Result, Utf8Error}` (Nat + its constructors, plus the
+   five signature-arm names the implemented floor under-counted). (LANDED as
+   nine; first drafted as the four-set.)
 4. `39` and `33 §4.3/§5.3` — the `Ord Nat` / instance-provenance coupled
    question. With Nat prelude-owned (kernel identity, no provider module), decide
    and state who head-owns `instance Ord Nat` for `§4.3` provenance / `§5.3`
