@@ -11,7 +11,7 @@ github: null
 origin: "Steward-filed 2026-08-25 as the build half of the operator-ruled Nat prelude-floor approach (Decision dec_1kqwn6hdvn7d2), split from the reframed spec WP [[LANG-MOD-NAT-PROVIDER-INTERFACE]]. Under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
-> # READY 2026-08-25 — spec WP landed (nine-floor); merge GATED on operator FYI
+> # RELEASED 2026-08-25 — spec WP landed (nine-floor); operator CLEARED the 3->9
 >
 > The spec WP [[LANG-MOD-NAT-PROVIDER-INTERFACE]] MERGED (b7f73f1d): the amended
 > `30-taxonomy §4` membership rule + coupled sections + conformance pins are on
@@ -19,14 +19,13 @@ origin: "Steward-filed 2026-08-25 as the build half of the operator-ruled Nat pr
 > node first drafted. This node executes those landed pins in the elaborator; it
 > does not decide the rule.
 >
-> RELEASED for AUTHORING. The production MERGE is GATED on the Steward's operator
-> FYI (11:30 UTC) about the four->nine floor expansion — this WP is where that
-> expansion becomes a real behavior change (strict scope resolves all nine floor
-> names ambiently, six more than the implemented `[Bool, Char, List]`). Authoring
-> and review may proceed; do not merge the production floor extension until the
-> Steward clears the operator visibility. (The Steward ruled the expansion
-> mechanical closure of dec_1kqwn6hdvn7d2, zero-TCB; veto is unlikely but the
-> gate is the operator's window.)
+> RELEASED (kickoff evt_5wdckv9xbp11r). The floor expansion — strict scope
+> resolves all nine floor names ambiently, six more than the implemented
+> `[Bool, Char, List]` — is a real behavior change; the Steward flagged it to the
+> operator (Pat) and the operator CLEARED it this session. The merge gate is
+> LIFTED: this proceeds as a normal build WP (candidate -> CV + Architect review
+> -> merge), no operator hold. (The Steward ruled the expansion mechanical closure
+> of dec_1kqwn6hdvn7d2, zero-TCB; the operator concurred.)
 
 ## Objective
 
