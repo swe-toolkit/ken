@@ -257,8 +257,15 @@ is a **surface error** (`24`) — it never reaches the kernel:
 - **Per-unit dependency closure.** Each source unit resolves its body in its own
   module scope: its local declarations, its explicit imports, the kernel and
   built-in vocabulary, and the closed prelude floor from `30-taxonomy §4`.
-  Among Ken-defined names that floor is exactly `{Bool, Char, List}`. Loading a
-  dependency is not an implicit import: the dependency cannot borrow imports
+  Among Ken-defined type names that floor is exactly `{Auth, Bool, Char, List,
+  Nat, Option, ResourceKind, Result, Utf8Error}`. Its constructor bindings are
+  derived, never listed by spelling alone: `ANone`/`APartial`/`AFull` must have
+  parent `Auth`; `True`/`False` parent `Bool`; `Nil`/`Cons` parent `List`;
+  `Zero`/`Suc` parent `Nat`; `None`/`Some` parent `Option`;
+  `FsHandle`/`Buffer` parent `ResourceKind`; `Err`/`Ok` parent `Result`; and
+  `InvalidUtf8` parent `Utf8Error`. Each parent comparison is against the exact
+  floor `GlobalId`. `Char` is the constructor-free transparent member. Loading
+  a dependency is not an implicit import: the dependency cannot borrow imports
   from its caller, and its own imports do not enter the caller's scope. An
   implementation-private convenience registered outside the closed floor is
   not ambient authority for name resolution. A package must import such a name
@@ -318,6 +325,15 @@ module. An `export` declaration records a **re-exported-at** public path to that
 identity; it republishes the existing `GlobalId` and never mints another one.
 This remains true through renaming and any number of re-export hops. The export
 statement keeps the provenance grep-recoverable at the republishing module.
+
+A compiler-installed floor identity has a compiler origin rather than a source
+**defined-at** module. Its ambient availability and any public re-export still
+preserve that identity; neither operation manufactures a source owner. This
+holds for signature-arm and bootstrap-arm members alike. In particular,
+re-exporting the canonical `Nat` family or its constructors does not make the
+republishing module the module that defined the `Nat` head. A same-shaped source
+`data` declaration is a different family, never another path to the floor
+identity.
 
 Two distinct identities may not occupy one surface name in a module interface:
 that is a hard surface error at the re-export site, reported with both the
@@ -481,16 +497,29 @@ through the real `declare_def` path (`../10-kernel/…`, `check.rs`), so the
 kernel re-checks the ops *and* the proofs.
 
 **The orphan check — at declaration, per-module (`AC2`).** An `instance C T`
-declaration is **accepted only if it mentions its class `C` or its head-type
-`T`'s constructor** in the module that declares it; an instance that names
-**neither** (an *orphan*) is a **hard error at the declaration site**
-(`39 §6.5`). This is a purely **syntactic, per-module** predicate on the
+declaration is **accepted only if its module defines class `C` or defines the
+head-type `T`'s constructor**; an instance whose module owns **neither** (an
+*orphan*) is a **hard error at the declaration site** (`39 §6.1`). Mentioning,
+importing, or re-exporting a class or head is not definition and does not
+transfer ownership. This is a purely **syntactic, per-module** predicate on the
 declaration — decidable without whole-program information — and it is what keeps
-canonicity (§5.5) *un-break-able by accident*: because every instance is
-co-located with either its class or its head-type, the canonical instance for a
-`(class, head-type)` pair is discoverable from those two modules alone. The
+canonicity (§5.5) *un-break-able by accident*: every ordinary instance is
+co-located with either its class or its head-type, so the canonical instance for
+a `(class, head-type)` pair is discoverable from those two modules alone. The
 check is an **elaborator** check (it constrains *where* a well-typed value may
 be declared), not a kernel rule.
+
+A compiler-installed floor head has no source module that can satisfy the
+head-owner arm. Its canonical structure instance must therefore be declared in
+the class's defining module; neither floor arm creates an orphan exception. The
+canonical `instance Ord Nat` is consequently declared in
+`Core.Classes.LawfulClasses`, which defines `Ord`, and is keyed by the exact
+bootstrap `Nat` `GlobalId`. `Data.Numeric.Nat.Order` may expose that existing
+instance through the re-export carry rule (§5.5.1), but it neither owns nor
+redeclares it. An `instance Ord Nat` declaration in `Order` remains an orphan.
+A separately declared same-shaped family may support its own head-owned
+instance under its distinct key, but that dictionary is not `Ord` for the
+bootstrap `Nat`.
 
 ### 5.4 Constraint `where C A` → an implicit instance argument
 

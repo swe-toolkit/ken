@@ -38,39 +38,92 @@ here would be bloat. None found (all four are genuine).
 
 | Built-in | Witness (why not Ken-definable) |
 |---|---|
-| **Primitive types + literals** — `Int`/`Int8..64`/`UInt8..64`/`Decimal`/`Float`/`Float32` (`numbers.rs reg_ty`), `Char`, `String`/`Bytes` (`bytes.rs`) + literal syntax | parser-produced opaque type constants (`declare_primitive` OpaqueType, `14 §5`); nothing is more primitive. |
+| **Primitive types + literals** — `Int`/`Int8..64`/`UInt8..64`/`Decimal`/`Float`/`Float32` (`numbers.rs reg_ty`), `String`/`Bytes` (`bytes.rs`) + literal syntax | parser-produced opaque type constants (`declare_primitive` OpaqueType, `14 §5`); nothing is more primitive. `Char` is the checked refinement in §B, not a primitive type. |
 | **Audited primitive ops** (`14 §5`) — `reg_binop` (`A→A→A` arith), `reg_cmpop` (`A→A→Bool`), the `String`/`Bytes` prims (`append`/`slice`/`byteLength`/`String↔List Char`) | bottom out in the kernel's audited `PrimReduction::Op` on literals; not expressible as pure Ken (they *are* the machine semantics). |
 | **The effect / FFI boundary** — `foreign` + the base `IO`/effect primitive (`[Console]`/`[FS]`; `print_line` foreign) | I/O is not pure Ken — the effect boundary is where the world enters. |
 | **Base elaborator syntax** — λ/app/`let`/`match`/annotation/`data`/`view`/`instance`, refinement types, the **operator-infix + fixity** affordance, `if`-sugar, minimal `module`/`import` | the language forms themselves; the parser/elaborator realizes them. (Note: `if` *desugars* to `match`, and operator *semantics* is package — but the **syntactic affordance** to write them is base. Syntax built-in; semantics derivable.) |
 
-## B. The prelude set (the signature-reference closure — AC2)
+## B. The prelude set (closed signature + bootstrap inventories — AC2)
 
-**Membership rule (normative, checkable):** a type is **prelude** iff it is
-named in a **built-in primitive's type signature** — nothing else. The surface
-analog of the kernel's closed `is_prelude = {Top, Bottom}` (`64 §1`); the
-prelude is a **second minimality target**, not a catch-all. Grounded by
-signature-grep of `reg_*` in `numbers.rs`/`bytes.rs`:
+**Membership rule (normative, checkable):** the prelude is the closed union of
+(1) Ken-defined types named by built-in primitive signatures and (2)
+compiler-bootstrap identities that the surface contract requires source to name
+and that source cannot recreate with the same `GlobalId` (`30-taxonomy §4`).
+The signature arm is derived from the executable population: traverse the type
+of every `Decl::Primitive`, then retain references whose declaration is an
+ordinary checked inductive or transparent definition. The bootstrap arm requires
+an exact-identity, constructor-parentage, and no-allocation witness. This is the
+surface analog of the kernel's closed `is_prelude = {Top, Bottom, tt}` (`64 §1`),
+not a catch-all.
 
-| Prelude type | Signature that names it | Derivation (Ken-defined) |
+| Prelude type | Membership witness | Derivation / identity witness |
 |---|---|---|
-| **`Bool`** | `reg_cmpop` result `A → A → Bool` (`numbers.rs:173`) | `data Bool = True \| False` — derivable, but signature-named ⇒ prelude (F1). |
-| **`Char`** | `string_to_list_char : String → List Char`, `char_length` (`bytes.rs`) | a scalar type (`35 §2.4`); signature-named ⇒ prelude. |
-| **`List`** | `string_to_list_char : String → **List** Char` / `list_char_to_string` | L2 inductive (`data List`); signature-named (via `List Char`) ⇒ prelude. |
-| **`Ω` (Omega)** | `reg_novf` no-overflow prop `A → A → Ω₀` (`numbers.rs:190`) | **kernel-provided** (the strict-prop universe, `16 §1`) — a *kernel* built-in, not a surface prelude datatype. |
+| **`Auth`** | signature: `Cap : Auth → Type` | ordinary checked `data Auth = ANone \| APartial \| AFull`; the opaque primitive former needs this exact parameter identity. |
+| **`Bool`** | signature: comparison result `A → A → Bool` | ordinary checked `data Bool = True \| False` — derivable, but signature-named ⇒ prelude (F1). |
+| **`Char`** | signature: `String ↔ List Char` | checked transparent scalar type (`35 §2.4`); the constructor-free signature member. |
+| **`List`** | signature: `String ↔ List Char` and `Bytes ↔ List UInt8` | ordinary checked `data List`; signature-named at two independent primitive surfaces. |
+| **`Option`** | signature: `bytes_at` and `bytes_slice` results | ordinary checked `data Option a = None \| Some a`; strict source must name and eliminate the exact result family. |
+| **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer`; the opaque primitive former needs this exact parameter identity. |
+| **`Result`** | signature: `bytes_decode : Bytes → Result Utf8Error String` | ordinary checked `data Result e a = Err e \| Ok a`; strict source must eliminate the exact result family. |
+| **`Utf8Error`** | signature: the error argument of `bytes_decode`'s result | ordinary checked `data Utf8Error = InvalidUtf8`; no replacement family can inhabit the primitive result. |
+| **`Nat`** | bootstrap identity: source must reach the compiler-installed family used as Ken's canonical natural/index carrier | ordinary checked `data Nat = Zero \| Suc Nat`; strict-floor installation reuses those exact ids and allocates none. |
+| **`Ω` (Omega)** | kernel syntax: no-overflow propositions land in `Ω₀` | **kernel-provided** (the strict-prop universe, `16 §1`) — a kernel built-in referenced directly, not a surface prelude binding. |
 
-**★ AC2 bloat finding — `OrdResult`.** `data OrdResult = Lt | Eq | Gt`
-(`prelude.rs:139`) sits in the elaborator prelude, but **no primitive
-signature names it** — the comparisons return `Bool` (`reg_cmpop`), not
-`OrdResult`. By the membership rule it is **not prelude** (a prelude type no
-signature names = the flagged bloat vector). Its origin is a **workaround**:
-"`Bool` is an opaque primitive… not pattern-matchable; `sort`/`insert` branch
-on `OrdResult` instead" (`prelude.rs:90`). **F1 (`data Bool`) removes the
-need** for the branch workaround. **Ruled (`30-taxonomy §6`, `7fa08cd`):
-remove `OrdResult` (bloat); the `Ord` package's `Ordering` is the 3-way
-`compare` result (standard-package, no primitive returns it). The prelude
-closes to exactly **{`Bool`, `Char`, `List`}**. My witness confirms the ruling:
-signature-grep finds no `reg_*` naming `OrdResult`. This is the AC2
-discriminator firing in the bloat direction.
+The signature arm therefore closes to exactly **`{Auth, Bool, Char, List,
+Option, ResourceKind, Result, Utf8Error}`**; the bootstrap arm adds exactly
+**`Nat`**. For every inductive member, the floor admits constructors only by
+matching their kernel-recorded parent `GlobalId`; `Char` has no constructor arm.
+Every listed family/definition and constructor is outside `trusted_base()`.
+
+### surface/taxonomy/prelude-signature-inventory-is-executable-and-closed
+
+- promise class: **normative compatibility vector** — these exact identities are
+  the current public primitive-signature and bootstrap contract
+- spec: `30-taxonomy §4`; `33 §3.3`; `39 §2.0`
+- given: in a fresh `ElabEnv`, walk the type term of **every**
+  `Decl::Primitive`, collecting each referenced `GlobalId` whose declaration is
+  `Decl::Inductive` or checked `Decl::Transparent`. Independently snapshot the
+  nine expected type ids, every constructor id and recorded parent,
+  `declarations().len()`, `next_global_id()`, and `trusted_base()`. Do not select
+  declarations by helper name, source file, or a hand-picked primitive list.
+- expect: the checked dependency set is exactly `{Auth, Bool, Char, List,
+  Option, ResourceKind, Result, Utf8Error}`. Adding bootstrap `Nat` equals the
+  exact floor type set. The constructor set is exactly the constructors recorded
+  under the seven inductive signature members plus `Nat`; no same-spelling
+  constructor with another parent qualifies. None of the type or constructor ids
+  appears in `trusted_base()`, and installing the floor changes neither
+  declaration count nor allocator position.
+- controls: prove both equality directions with compile-preserving mutations.
+  For under-inclusion, install a checked `Extra` type and a real test-only
+  primitive whose signature names `Extra`, leaving the configured floor
+  unchanged; the derived signature set grows and the assertion must red. For
+  over-inclusion, add pre-installed checked `Prod` only to the configured floor,
+  without adding a primitive/bootstrap witness; the configured set grows and
+  the same assertion must red.
+- why: producer traversal closes the population by construction. A selected
+  `reg_*` grep omits primitives registered through another helper; a spelling
+  list cannot distinguish a constructor attached to a lookalike family.
+- **MEASURED:** at base `06c62313af62`, the producer traversal returns the exact
+  eight-id set above; admitting their union with `Nat` preserves all ids,
+  declaration/allocator accounting, and `trusted_base()`. A pre-installed
+  non-member such as `Prod` remains unbound in strict roots. **CLAIMED:** the
+  executable inventory is the whole prelude floor. **THE GAP:** conformance must
+  derive the signature set from all primitive declarations, compare it with the
+  explicit configured floor, and fail on a difference in either direction.
+  Production resolution must not auto-admit an unreviewed newly observed name.
+
+This case and the strict source-reaching cases in
+`../modules/seed-modules.md` are **RED UNTIL
+`LANG-MOD-NAT-FLOOR-REALIZATION`**.
+
+**AC2 bloat finding — `OrdResult`.** `data OrdResult = Lt | Eq | Gt`
+(`prelude.rs`) sits in the elaborator prelude, but no primitive signature names
+it and it has no independent bootstrap-identity witness. By the membership rule
+it is **not prelude**. Its origin is a workaround for an opaque,
+non-matchable `Bool`; F1's ordinary `data Bool` removes that need. **Ruled
+(`30-taxonomy §6`, `7fa08cd`):** remove `OrdResult` as bloat; the `Ord` package's
+`Ordering` is the 3-way `compare` result. This is the AC2 discriminator firing
+in the bloat direction.
 
 ## C. The standard-package set (completeness — derivation paths)
 
@@ -162,9 +215,11 @@ ordinary data representation.
   (irreducibility, no bloat) + §C (completeness, no hidden built-in) — the
   table exercises **bloat** (§B `OrdResult`, §D `Equal`/`And`/…) **and**
   hidden-built-in (§C, none found; the floor named).
-- **AC2** (prelude closed by the signature rule): §B — the signature-grep
-  closure {`Bool`,`Char`,`List`}, the `OrdResult` bloat finding (ruled
-  remove; `Ordering`→package, §6).
+- **AC2** (prelude closed by the two-arm rule): §B — executable traversal of
+  every primitive type closes the eight-member signature set, the
+  exact-identity/no-allocation `Nat` bootstrap witness adds the ninth member,
+  and the `OrdResult` bloat finding proves the opposite direction (ruled remove;
+  `Ordering`→package, §6).
 - **AC3** (load-bearing predicates specified as definitions): §D — `And`/
   `isSorted`/`Perm` with defining equations + Ω-sort witnesses; the
   verified-`sort` refinement (`37 §6`) unfolds them (green-vs-green against a
