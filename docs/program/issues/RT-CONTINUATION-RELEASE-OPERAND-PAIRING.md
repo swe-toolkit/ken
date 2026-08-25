@@ -1,7 +1,7 @@
 ---
 id: RT-CONTINUATION-RELEASE-OPERAND-PAIRING
 title: "Lane-1 successor after the merged carried-Bool eliminator — bind px8ta's next causal object: the generated-continuation-to-specialization ResourceRelease operand pairing. A second logical release attempt in funcid50 selects an operand that is not the origin-171 resource token, failing the exact BoundaryTag::InvocationBorrowed guard in lower_resource_token_seat before host dispatch. D0 produces the exact source-to-slot lineage for funcid50's origin-171 release operand; repair at assemble_continuation_call_operands so the second release attempt disappears"
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,26 @@ blocks: []
 github: null
 origin: "Steward, 2026-08-25, from the Architect object read evt_5rec979da0gh6 (thr_5e7s6tnxzgeq0) on px8ta after the carried-Bool eliminator (RT-CARRIED-BOOL-ELIMINATOR-DISPATCH) merged at d82ea01e7. The Architect proved the Bool eliminator is CLEAN (sentinel-replacement probe: host ConsoleIsTerminal(false) reaches canonical carried Bool payload 0 and selects False — false-arm 40, true-arm 41) and DO NOT frame another Bool or case-mapping repair. px8ta advances to a new sentinel but remains in the broader operand-provenance class: a distinct ResourceRelease operand-pairing object. Steward owns the final ID/frame; no Decision fork (the object read fixes the layer + first authority, D0 fixes the exact seam). COORDINATION section 2 framing call."
 ---
+
+> # CLOSED / FALSIFIED 2026-08-25 — Architect ruling evt_7rhvct552ts2w (hard stop 1)
+>
+> The Architect UPHELD the implementer's D0 hard stop. The lineage table is
+> correct: `Parameter[0][0][1]` is the exact raw capture `v11` (runtime word
+> `0x0507`), and `assemble_continuation_call_operands`, the target-1 frame, and the
+> origin-171 `Var(1)` binding all preserve it. There is NO wrong operand and NO
+> second logical release attempt. This node's TITLE, OBJECTIVE, D0/D1, AC-2, and
+> AC-3's "`lower_resource_token_seat` unchanged" clause are FALSIFIED. `D1 as
+> framed is unauthorized` (no operand-pairing repair; `core.rs`/`units.rs` stay
+> byte-untouched).
+>
+> The truthful object is a resource-carrier TAG-DOMAIN correction at the consumer:
+> `lower_resource_token_seat`'s carried arm compares `emit_carrier_tag` (semantic
+> `NODE_TAG_ID` = `0` for a borrowed opaque node) against
+> `BoundaryTag::InvocationBorrowed == 7` (a transport tag byte) — two vocabularies
+> sharing an integer type. Replaced by the READY node
+> [[RT-RESOURCE-SEAT-TAG-DOMAIN]] (Steward, 2026-08-25). Nothing merged from this
+> node; closed unbuilt. Symptom inventory durable at
+> `architect/rt-release-pairing-inventory @ 1e16fd99`.
 
 > # READY 2026-08-25 — carried-Bool eliminator merged; this is the next lane-1 object
 >
