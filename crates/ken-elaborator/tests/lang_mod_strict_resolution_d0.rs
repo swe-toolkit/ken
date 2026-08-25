@@ -266,7 +266,7 @@ fn every_ambient_name_representation_reaches_its_current_route() {
 #[test]
 fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
     assert_eq!(
-        PRELUDE_FLOOR_NAMES,
+        PRELUDE_FLOOR_NAMES.as_slice(),
         [
             "Auth",
             "Bool",
@@ -278,6 +278,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "Result",
             "Utf8Error",
         ]
+        .as_slice()
     );
     for name in PRELUDE_FLOOR_NAMES {
         assert!(is_prelude_floor_name(name));

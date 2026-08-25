@@ -262,7 +262,10 @@ fn primitive_signature_inventory_is_executable_and_closed() {
 /// members belong.
 #[test]
 fn strict_roots_accept_all_nine_canonical_families_and_constructors() {
-    assert_eq!(PRELUDE_FLOOR_NAMES, LANDED_FLOOR_NAMES);
+    assert_eq!(
+        PRELUDE_FLOOR_NAMES.as_slice(),
+        LANDED_FLOOR_NAMES.as_slice()
+    );
 
     for case in &FLOOR_CASES {
         let root = FixtureRoot::new(case.name);
