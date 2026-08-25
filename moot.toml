@@ -128,25 +128,21 @@ startup_prompt = "You are Ken's Steward (operator proxy, workflow authority). Re
 [agents.architect]
 
 display_name = "architect"
-# Reseated from Opus 5 to `gpt-5.6-sol` (high) on 2026-08-17 per the operator,
-# reversing the 2026-08-13 swap for this seat. Codex harness, so `harness =
-# "codex"` is PRESENT and the effort key is `model_reasoning_effort` — NOT
-# `effort`.
-#
-# ⇒ THE STRANDING RISK RETURNS TO THIS PANE. On Codex this seat strands on convo
-# mentions (repair with a bare `Enter`), takes `moot compact` reliably, and needs
-# `send-keys -l` for literal text. It stranded on nearly every mention the last
-# time it ran Codex — five stacked pastes, then six — and it is the seat every
-# scope fork routes through. Put the per-tick composer check BACK on this pane.
-# 2026-08-19 reseat (operator): pi/OpenRouter glm-5.2 -> Anthropic Opus. OpenRouter
-# credits exhausted; spend down the Anthropic subscription before it renews (~10h).
-# Claude Code harness = NO harness key, uses `effort`, NO env; uses the steward's
-# cold-start subscription OAuth. Restores this seat's pre-bridge Anthropic seating
-# (Opus, T1). The Codex-stranding comment above is stale (this seat was pi, not
-# Codex, before this edit). Author-vs-reviewer independence preserved: Architect=Opus,
-# runtime-implementer=Sonnet 5 (different models).
-model = "claude-opus-4-8[1m]"
+# 2026-08-25 reseat (operator, Steward-executed): Anthropic Opus -> OpenAI
+# gpt-5.6-sol (high) via the pi harness ("openai-pi sol high"). T1 design/review
+# seat, so sol at high, mirroring spec-author / conformance-validator / research.
+# The pi harness has NO `harness = "codex"` key and uses `effort` (not
+# `model_reasoning_effort`), and it WAKES ON CONVO MENTION — unlike the codex
+# harness this seat ran on 2026-08-17, which stranded on nearly every mention. So
+# the old per-tick composer-check / bare-Enter repair for this pane is NOT needed
+# under this seating. Prior seatings (history): 2026-08-19 Anthropic Opus
+# (subscription spend-down); 2026-08-17 gpt-5.6-sol on the codex harness (stranded);
+# 2026-08-13 Opus. Author-vs-reviewer independence preserved: runtime-implementer
+# is Sonnet 5 (different model/harness from this reviewer).
+harness = "pi"
+model = "openai-codex/gpt-5.6-sol"
 effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Architect (component design + security review). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/architect.md, set status, and stand ready for design queries and merge reviews. Do not poll."
 
 [agents.spec-leader]
