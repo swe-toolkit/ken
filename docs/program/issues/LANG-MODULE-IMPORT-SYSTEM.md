@@ -51,13 +51,16 @@ origin: "Operator directive 2026-08-22: module/import is its own campaign and, b
 > structural mechanism/contract gaps the strict-migration surfaced plus one
 > formatter-surface gap the respin CI surfaced; §1b full-closure now governs the
 > remaining cluster, Steward evt_21bem2w7rzj2k):
-> - [[LANG-MOD-NAT-PROVIDER-INTERFACE]] — a compiler-realized package-provider
->   registry binding one module path to the existing kernel-checked
->   {Nat,Zero,Suc} identities under Strict, + coupled 30/33/39 normative
->   amendments + conformance. Enclave-ruled (spec-author evt_33bwgcx226bxv); a
->   NEW mechanism, so its material scope is escalated to the operator (Decision
->   dec_1kqwn6hdvn7d2, build vs descope-Nat). Blocks B's Nat criterion (AC-B5a)
->   and [[CAT-GCD-REFACTOR]]'s Nat import. Release HELD on that Decision.
+> - [[LANG-MOD-NAT-PROVIDER-INTERFACE]] (spec WP) +
+>   [[LANG-MOD-NAT-FLOOR-REALIZATION]]
+>   (build WP) — Nat's canonical home by PRELUDE-FLOOR MEMBERSHIP. Decision
+>   dec_1kqwn6hdvn7d2 RESOLVED (2026-08-25): the operator ruled the prelude
+>   membership rule (`30-taxonomy §4`) the defect and superseded the earlier
+>   provider-registry mechanism; realize by amending the general membership rule
+>   (bootstrapping arm) and admitting the existing kernel {Nat,Zero,Suc} into the
+>   strict floor, reusing identity. Blocks B's Nat criterion (AC-B5a) and
+>   [[CAT-GCD-REFACTOR]]'s Nat import. Spec WP `ready` (release first); build WP
+>   held on it.
 > - [[LANG-MOD-ATTACHED-PROOF-OWNERSHIP]] — normative clarification that a
 >   proof's attached namespace is closed under its subject's defining module (a
 >   nonlocal attached head rejects), + conformance. Codifies EXISTING behavior;

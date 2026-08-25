@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-25 02:48:50Z — from 441 issue file(s) in `docs/program/issues/`.
+2026-08-25 04:39:40Z — from 442 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -166,7 +166,8 @@ the committed file matches the generator's output.
 | `LANG-MOD-CATALOG-REALIZATION` | WP-4 (Component A) — module-graph/roots loader realization: the uniform local-scope prebind fix (decouple local-declaration binding from ResolutionMode) so canonical Or binds under legacy, the self-contained green set checks standalone-strict, and Arithmetic add/mul publish genuine legacy loader-resolved identity. Order + OrdResult + consumer migration + whole-catalog strict-green are Component B. | merged | language | M | none | — |
 | `LANG-MOD-KENFMT-DECL-LAYOUT` | kenfmt breakable layout for the module/import declaration surface: Doc-builders for ExportDecl and ImportDecl (and selective-import / re-export name lists) so an overflowing name list wraps under CANONICAL_WIDTH and round-trips as a formatter fixed point. The Component B formatter-gate gap. | draft | language | M | none | — |
 | `LANG-MOD-LOADER-ENTRY` | WP-1 — route ken check catalog files through elaborate_module_from_roots instead of the direct single-file call; behavior-preserving, non-strict | merged | language | M | none | — |
-| `LANG-MOD-NAT-PROVIDER-INTERFACE` | Compiler-realized package-provider interface for the canonical Nat home: a closed registry binding one designated module path to the existing kernel-checked {Nat, Zero, Suc} identities under Strict, with the coupled 30/33/39 normative amendments and identity/strict-rejection/zero-allocation conformance pins. The Component B Nat prerequisite. | draft | spec | L | none | — |
+| `LANG-MOD-NAT-FLOOR-REALIZATION` | Realize Nat prelude-floor membership in the elaborator: admit the existing kernel {Nat, Zero, Suc} into the strict resolution floor, reusing the kernel identity (no second family), fail-closed on non-canonical origin, zero trusted_base() delta. The build half of the Nat prerequisite. | draft | language | M | none | — |
+| `LANG-MOD-NAT-PROVIDER-INTERFACE` | Nat's canonical home by prelude-floor membership: amend the GENERAL prelude membership rule (30-taxonomy §4) to a bootstrapping criterion that admits kernel-provided vocabulary the surface must reach and cannot re-derive with identity, with the coupled normative amendments (30 §5, 33 §3.3, 39, 50-stdlib) and identity/strict-accept/zero-allocation conformance pins. The Component B Nat prerequisite (spec WP). | ready | spec | L | none | — |
 | `LANG-MOD-OR-CANONICAL-HOME` | Or arm (b), NODE B — author Core.Logic.Or (data Or (a:Omega)(b:Omega):Type with Inl/Inr, field-for-field the prelude shape), migrate every checked-source consumer to import it, and retire the Rust prelude Or/Inl/Inr registration so exactly one catalog Or identity exists | merged | language | L | none | — |
 | `LANG-MOD-OR-OMEGA-PARAM-ELAB` | Or arm (b), NODE A (prerequisite) — teach explicit-data parameter/index elaboration to honor an Omega-sorted binder, so a catalog package can declare Or : Omega -> Omega -> Type; the result-sort admission is unchanged, preserving the ban on proof-relevant multi-constructor Omega-valued families | merged | language | S | none | — |
 | `LANG-MOD-PUB-ELIGIBILITY` | WP-3 — semantic gate rejecting pub on ineligible placements with a surface diagnostic; pub proof retains the subject-must-be-public rule | merged | language | M | none | — |
@@ -254,7 +255,7 @@ the committed file matches the generator's output.
 | `RT-CAPTURE-PROJECTION-GROW` | green the ten populated recursive-position witnesses by growing the planner's capture projection to cover the closure's declared, body-referenced captures (D1) and seating the resulting producer-local claims in the generated context's entry-source enumeration (D2, the revived RT-CONTSRC-ENTRY-FRAME-WIDEN widening). The cardinality-gap D0 measured all-H1: every unclaimed capture is a genuine value the projection drops because continuations.rs:6075 clones the context's capture set from the enclosing specialization's continuation_inputs, a different population than the closure's declared set. This is the closing deliverable for the population -- the two steps compose, D2 is non-inert only because D1 supplies the claims. | merged | runtime | L | none | — |
 | `RT-CAPTURE-SUPPLY-DECLARED-INPUTS` | the branch-local callable-authority cut is necessary but not sufficient -- every witness's residual blocker is capture supply; a capture-bearing LexicalClosure at a recursive position can present its captures as planner-owned declared inputs ONLY if every capture's value is recoverable as a planner-assigned ABI operand with zero read of the carried word -- D0 measures that per witness before any implementation | merged | runtime | L | none | — |
 | `RT-CARRIED-CONTINUATION-RESUME` | A carried scrutinee reaching a continuation frame has no resume path — the carried elimination does not implement the Carried x {PendingLet, Active} arm | merged | runtime | M | none | — |
-| `RT-CARRIED-IH-DISPATCH-SITEOP` | Track-1 consumer (M3) — a boundary-carried CarriedWord value cannot present the ConstructorTag an effect seat demands (effects.rs:548), so object emission refuses; give the carried value a finite compile-time constructor discriminant it can present, reusing M4's defunctionalization | ready | runtime | M | none | — |
+| `RT-CARRIED-IH-DISPATCH-SITEOP` | Track-1 consumer (M3) — a boundary-carried CarriedWord value cannot present the ConstructorTag an effect seat demands (effects.rs:548), so object emission refuses; give the carried value a finite compile-time constructor discriminant it can present, reusing M4's defunctionalization | merged | runtime | M | none | — |
 | `RT-CARRIED-ORDINARY-COMPOSITION` | Carried ordinary elimination consumes exactly one frame — a composed suffix behind an ordinary carried eliminator is refused rather than continued | merged | runtime | M | none | — |
 | `RT-CARRIED-RESOURCE-SCALAR` | A carried word cannot satisfy a ResourceScalar effect seat -- same Need-not-in-Avail shape as the byte-span gap, different need, different seats | draft | runtime | TBD | none | — |
 | `RT-CARRIER-BYTESPAN-OBSERVE` | Carrier byte-span observation capability — every BytesPointerLength seat is SPECIALIZED_ONLY and the carrier has no total emitted byte-span observer, so a carried host result cannot satisfy a byte-span effect seat | merged | runtime | L | none | — |
@@ -493,11 +494,11 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
+- `LANG-MOD-NAT-PROVIDER-INTERFACE` — Nat's canonical home by prelude-floor membership: amend the GENERAL prelude membership rule (30-taxonomy §4) to a bootstrapping criterion that admits kernel-provided vocabulary the surface must reach and cannot re-derive with identity, with the coupled normative amendments (30 §5, 33 §3.3, 39, 50-stdlib) and identity/strict-accept/zero-allocation conformance pins. The Component B Nat prerequisite (spec WP).
 - `LANG-SYMBOLIC-OPERATOR-NAMES` — `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
-- `RT-CARRIED-IH-DISPATCH-SITEOP` — Track-1 consumer (M3) — a boundary-carried CarriedWord value cannot present the ConstructorTag an effect seat demands (effects.rs:548), so object emission refuses; give the carried value a finite compile-time constructor discriminant it can present, reusing M4's defunctionalization
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
 - `RT-CHECKED-IH-REALIZATION-AUTHORITY` — Mint the checked-IH realization authority -- pending marker, oriented plan, call template, slot and parent -- so the ComputationalRecursorClosure capsule is realizable IN PLACE at the source-machine Match seat, without widening the ordinary-Match selector and without any terminal-All licensing
 - `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` — the consuming-occurrence validator refusal has four defects that must land together: the production string sits in a cfg arm no test compiles; under cfg(test) the production arm is ABSENT rather than dead so a dropped return makes the validator silently ACCEPT a mismatched occurrence; and the classifier has two messages for FIVE causes, with the body arm a catch-all over an eliminator-kind defect, an identity-match failure and an ambiguity; and the sibling function 55 lines up has the same defect over four more causes, one of which the D2k probe only just measured
@@ -533,6 +534,7 @@ is itself not yet `merged`/`closed`:
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
 - `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: draft)
 - `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: ready)
+- `LANG-MOD-NAT-FLOOR-REALIZATION` blocked by `LANG-MOD-NAT-PROVIDER-INTERFACE` (status: ready)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: ready)
 - `PX10` blocked by `ABI-S5` (status: draft)
@@ -544,9 +546,7 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
-- `RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT` blocked by `RT-CARRIED-IH-DISPATCH-SITEOP` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
-- `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` blocked by `RT-CARRIED-IH-DISPATCH-SITEOP` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
 ## Gate progress

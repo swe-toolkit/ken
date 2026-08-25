@@ -208,14 +208,16 @@ ranges over the real population, not the stale count.
   provider unit under Strict, with ordinary export/import/re-export thereafter;
   NO new Decl / GlobalId / `trusted_base()` entry / surface syntax /
   mixed-resolution escape; all invalid registry/origin states fail closed.
-  Durable artifact: coupled normative amendments to spec 30-taxonomy §5,
-  33 §3.3/§4.3, 39 §2.0 + identity / strict-rejection / zero-allocation
-  conformance pins. This is now the prerequisite node
-  [[LANG-MOD-NAT-PROVIDER-INTERFACE]] (a spec-surface WP + a build WP), whose
-  material mechanism/scope is escalated to the operator (Decision
-  dec_1kqwn6hdvn7d2: build the registry vs descope Nat from the trial). B does
-  NOT improvise a redeclaration; Nat authoring, strict-caller migration, and
-  whole-catalog strict-green stay STOPPED until the prerequisite lands. Per the
+  Durable artifact: coupled normative amendments to spec 30-taxonomy §4/§5,
+  33 §3.3, 39 + identity / strict-accept / zero-allocation conformance pins.
+  The prerequisite is now the reframed spec WP [[LANG-MOD-NAT-PROVIDER-INTERFACE]]
+  + its build half [[LANG-MOD-NAT-FLOOR-REALIZATION]]. Decision dec_1kqwn6hdvn7d2
+  RESOLVED (2026-08-25): the provider-registry mechanism is SUPERSEDED — the
+  operator ruled the prelude membership rule itself the defect, and Nat's home is
+  prelude-floor membership (admit the existing kernel {Nat,Zero,Suc} into the
+  strict floor, reuse identity). B does NOT improvise a redeclaration; Nat
+  authoring, strict-caller migration, and whole-catalog strict-green stay STOPPED
+  until the build WP lands. Per the
   Architect one-pass ruling (evt_1d2cwjd3e4tjx, AC-B9): the OrdResult home + the
   relocated Core/Logic combinators + Derived + LawfulClasses + the census
   proceed as the partial increment meanwhile; ALL of Order and Gcd's Order/Nat

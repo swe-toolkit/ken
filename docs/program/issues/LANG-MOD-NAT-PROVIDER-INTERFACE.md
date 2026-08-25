@@ -1,110 +1,148 @@
 ---
 id: LANG-MOD-NAT-PROVIDER-INTERFACE
-title: "Compiler-realized package-provider interface for the canonical Nat home: a closed registry binding one designated module path to the existing kernel-checked {Nat, Zero, Suc} identities under Strict, with the coupled 30/33/39 normative amendments and identity/strict-rejection/zero-allocation conformance pins. The Component B Nat prerequisite."
-status: draft
+title: "Nat's canonical home by prelude-floor membership: amend the GENERAL prelude membership rule (30-taxonomy §4) to a bootstrapping criterion that admits kernel-provided vocabulary the surface must reach and cannot re-derive with identity, with the coupled normative amendments (30 §5, 33 §3.3, 39, 50-stdlib) and identity/strict-accept/zero-allocation conformance pins. The Component B Nat prerequisite (spec WP)."
+status: ready
 owner: spec
 size: L
 gate: none
 depends_on: []
-blocks: [LANG-MOD-CATALOG-COMPLETENESS]
+blocks: [LANG-MOD-NAT-FLOOR-REALIZATION, LANG-MOD-CATALOG-COMPLETENESS]
 github: null
-origin: "Component B hard stop (language-implementer evt_4757hgk2t2mj6 / language-leader evt_71apgcrce8fqf lineage), ruled a Spec+build prerequisite by the enclave: spec-author evt_33bwgcx226bxv, spec-leader evt_7nvtrx1fs6wf0, Architect deferred the mechanism to Spec evt_22r45y0x8nzbh. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]; material mechanism/scope escalated to the operator as Decision dec_1kqwn6hdvn7d2."
+origin: "Component B hard stop (language-implementer evt_4757hgk2t2mj6 / language-leader evt_71apgcrce8fqf lineage), ruled a Spec+build prerequisite by the enclave (spec-author evt_33bwgcx226bxv, spec-leader evt_7nvtrx1fs6wf0, Architect deferred the mechanism to Spec evt_22r45y0x8nzbh). Material mechanism/scope escalated to the operator as Decision dec_1kqwn6hdvn7d2 and RESOLVED there 2026-08-25: the prelude membership rule itself is the defect; realize Nat by prelude-floor membership, NOT the provider-registry. Steward-reframed under [[LANG-MODULE-IMPORT-SYSTEM]] to the ruled approach."
 ---
 
-> # DRAFT — release HELD on operator Decision dec_1kqwn6hdvn7d2
+> # OPERATOR-RULED — provider-registry mechanism SUPERSEDED
+> by prelude-floor membership
 >
-> This node introduces a NEW compiler mechanism + normative spec sections
-> beyond the original module/import decomposition, on the critical path to the
-> foundation catalog trial ([[CAT-GCD-REFACTOR]]). Per COORDINATION §3 the
-> material mechanism/scope is the operator's call, escalated as Decision
-> dec_1kqwn6hdvn7d2 (build the registry vs descope Nat from the trial;
-> Steward recommendation: build). Do NOT release/decompose into WPs until the
-> operator resolves it. The enclave ruling below is durable regardless of that
-> resolution — it is the home for the ruling, not the convo thread.
+> Decision dec_1kqwn6hdvn7d2 is RESOLVED. The operator ruled that the prelude
+> membership rule (`30-taxonomy §4`) is WRONG as written, and that Nat's home is
+> a bootstrapping problem, not a new compiler mechanism. This node is re-framed
+> from its prior "compiler-realized package-provider interface / closed registry
+> / head-ownership arm" mechanism (now DISSOLVED) to the ruled approach:
+> **amend the general membership rule, and admit the existing kernel `{Nat, Zero,
+> Suc}` into the strict prelude floor, reusing the kernel identity.** Nat becomes
+> ambiently present like `Bool`. The prior registry/provider-path/`Data.Numeric.
+> Nat` framing and the §5.3/§6.1 head-ownership sub-mechanism are NOT built.
+> This is the SPEC WP; the elaborator realization is
+> [[LANG-MOD-NAT-FLOOR-REALIZATION]].
 
-## The gap (enclave-ruled, grounded at 3a7114cf7 / re-grounded 6cadce775)
+## The operator ruling (dec_1kqwn6hdvn7d2, verbatim scope)
 
-The catalog cannot go whole-catalog strict-green while `Nat` has no
-strict-checkable, identity-preserving public home. At current main NO mechanism
-provides one for a NON-FLOOR native inductive:
+The prelude is the essential BOOTSTRAP interface — the vocabulary that cannot
+otherwise be defined, which enables the language kernel to be useful by the
+language surface. It is not a platonic minimal set derived from primitive
+signatures. Nat is kernel-provided, unreachable from a strict surface scope, and
+not re-derivable with the same identity — a bootstrapping problem — ergo Nat
+belongs. Amend the GENERAL rule (not a Nat carve-out) so later judgements are
+handled identically. The defect clause is **"and is not already provided by the
+kernel"** (`30-taxonomy §4`, the normative membership rule): it excludes exactly
+the kernel-provided vocabulary the surface must reach. The amended criterion
+INCLUDES kernel-provided vocabulary the surface must reach and cannot re-derive
+with identity; Nat (with `Zero`/`Suc`) is its first member. Realize it by
+admitting the EXISTING kernel `{Nat, Zero, Suc}` into the strict resolution
+floor — reuse the kernel identity (no second family), zero `trusted_base()`
+delta, fail-closed on non-canonical origin.
 
-- Under STRICT, `export Nat, Zero, Suc` has no lawful source: `Nat` is
-  non-floor native, unimported, non-ambient; the facade unit's own strict scope
-  does not contain it (`33 §3.3`, closed floor is exactly {Bool, Char, List}).
-- Legacy is not a provider a Strict dependency may traverse; recursive
-  `load_unit` passes one coherent `ResolutionMode` throughout
-  (`roots_resolution_mode` forbids mixing).
-- A fresh `data Nat = Zero | Suc Nat` allocates a SECOND family and constructor
-  identities; structural similarity is not canonical identity. The Architect's
-  ES2-Bool native-inductive-recognition lean is FORECLOSED by this.
-- Adding `Nat`/`Zero`/`Suc` to the ambient strict vocabulary or the prelude
-  floor contradicts the closed-floor/package contract (`Nat` is normatively
-  package-tier, not prelude — `50-stdlib/README §1`).
+## Why this is sound, not a floor-bloat regression
 
-The as-built path matches the law: `register_prelude` creates the existing
-kernel-checked `Nat`/`Zero`/`Suc` before source; `capture_strict_builtin_names`
-admits trusted native names + closed-floor constructors, not `Nat`;
-`resolve_ref` rejects `Nat` under Strict; the landed strict-Nat control already
-pins the rejection (`lang_mod_catalog_realization.rs:81-117`).
+The current rule (`30-taxonomy §4`, lines 99-105 at main) admits a type **iff**
+it is "named in a built-in primitive's type signature, **and is not already
+provided by the kernel**." The amendment adds a second, equally-checkable
+admission arm — the bootstrapping arm — and it has a standing precedent one
+layer down: the kernel's own closed `is_prelude` set `{Top, Bottom, tt}` (`64
+§1`) is "Ken-vocabulary excluded from `trusted_base()` yet always present." The
+surface prelude floor gains the identical shape for `Nat`: kernel-checked, out
+of `trusted_base()`, always present, closed. The criterion stays mechanically
+checkable (it is not a catch-all): a member must be (a) kernel-provided with a
+canonical identity, (b) reachable-required by the surface, and (c) not
+re-derivable at the surface with that same identity (a fresh `data Nat` mints a
+SECOND family — structural similarity is not canonical identity). The current
+"bloat vector" guard (a prelude type no primitive names) is preserved for the
+signature arm; the bootstrapping arm's analog guard is the identity requirement.
 
-## The ruled mechanism (spec-author evt_33bwgcx226bxv, spec-leader evt_7nvtrx1fs6wf0)
+## The coupled normative amendments (enclave authors the exact text)
 
-A narrowly-scoped compiler-realized package-provider interface. It must specify:
+The membership-rule amendment forces coupled edits. The enclave owns the precise
+normative wording; the Architect is the soundness reviewer. Reconcile at least:
 
-1. A closed registry binds an exact designated module path to existing, already
-   kernel-checked canonical identities. For Component B the inventory is exactly
-   `{Nat, Zero, Suc}`, and the constructor entries are validated as children of
-   that exact `Nat` family.
-2. Those bindings enter ONLY that provider unit's local scope under Strict —
-   never arbitrary units' ambient scope. The provider source then uses the
-   existing checked declaration `export Nat, Zero, Suc`; ordinary import/re-export
-   carry the same identities thereafter. No new surface syntax.
-3. Loading the provider allocates no `Decl` or `GlobalId`, changes no
-   `trusted_base()` entry, and does not relax the one-`ResolutionMode` rule.
-   Missing registry entries, wrong declaration kinds, mismatched constructor
-   parents, duplicate public origins, or unregistered modules fail closed
-   before publication.
-4. The taxonomy states explicitly that early compiler realization for internal
-   use does NOT promote a Ken-definable package to built-in/prelude status:
-   availability remains explicit-import-only through its one defining public
-   interface.
-5. HEAD-OWNERSHIP ARM (spec-author evt_6qqa946cnv0ja, spec-leader
-   evt_5z3tm4dfakwvv). The one registered provider path `Data.Numeric.Nat.Nat`
-   is the SOLE surface defined-at/head-owner of the existing Nat identities for
-   `33 §4.3` provenance and `§5.3` orphan checking (the compiler stays the
-   realization origin; import/re-export never transfers ownership). This makes
-   `instance Ord Nat` orphan-valid ONLY head-side in the provider module;
-   `Data.Numeric.Nat.Order` is a reader-facing re-export surface that carries
-   the one canonical instance under `§5.5.1` and mints no wrapper/second
-   registration. Extends the normative delta with `33 §5.3` (a registered
-   provider is the sole head-owner) and `39 §6.1` (instance registration
-   consults the closed provider-owner map before the unchanged overlap rule),
-   plus conformance: provider-local `instance Ord Nat` accepts against the exact
-   native ID; byte-identical Order-local and unregistered-facade instances
-   reject `OrphanInstance`; Order re-export carries the one instance/provenance;
-   a names-only import without admission rejects direct dispatch; the dictionary
-   adds one transparent declaration and zero `trusted_base()` delta. CONSEQUENCE
-   for the operator Decision: this is the build arm of dec_1kqwn6hdvn7d2 — if the
-   provider arm is DECLINED, `Ord Nat` is descoped with Nat (Order cannot
-   lawfully publish it under the current orphan contract).
+1. `30-taxonomy §4` — the membership rule itself: add the bootstrapping arm;
+   the closed derived set becomes `{Bool, Char, List, Nat}` (with `Nat`'s
+   constructors `Zero`/`Suc` reachable as its data constructors). State the
+   checkable criterion for the new arm.
+2. `30-taxonomy §5` (standard-package tier) and `50-stdlib/README §1` — these
+   currently classify `Nat` as **package-tier, not prelude**. That classification
+   was the stated reason floor-membership was "foreclosed"; it is now overturned.
+   Nat moves from package-tier to prelude-tier; reconcile both statements.
+3. `33 §3.3` — the closed floor set the strict scope contains: `{Bool, Char,
+   List}` becomes `{Bool, Char, List, Nat}` (Nat + its constructors).
+4. `39` and `33 §4.3/§5.3` — the `Ord Nat` / instance-provenance coupled
+   question. With Nat prelude-owned (kernel identity, no provider module), decide
+   and state who head-owns `instance Ord Nat` for `§4.3` provenance / `§5.3`
+   orphan checking. The prior node routed this through a provider-path head-owner
+   map; that map is dissolved. This sub-question must be answered, not dropped —
+   it is the reason `Ord Nat` was coupled to Nat in dec_1kqwn6hdvn7d2. If the
+   enclave finds prelude-ownership does not lawfully carry `Ord Nat` under the
+   current orphan contract, surface that to the Steward (it may re-scope the
+   Order half), do not silently descope it.
 
-## Deliverables (decompose at release, after the operator Decision)
+No `32` grammar edit (no new surface syntax — Nat is ambient, like Bool).
 
-- Spec-surface WP (enclave): coupled normative amendments to `30-taxonomy §5`,
-  `33 §3.3/§4.3`, and `39 §2.0`, plus conformance/acceptance pins — strict
-  provider + selective-consumer accepts and observes the pre-existing three IDs;
-  the identical facade at an UNREGISTERED module and a bare strict consumer
-  reject; provider loading adds zero declarations/trust; a redeclaration cannot
-  satisfy the identity assertion. No `32` grammar edit.
-- Build WP (language ring): the registry realization in the elaborator/loader,
-  the designated `Data/Numeric/Nat` provider source, and the roots-loader
-  controls. Cross-cutting invariant: zero `trusted_base()` delta, flat-Σ pin
-  stays green.
+## Deliverables
+
+- D0 (buildability probe FIRST, the M6/WP-2 pattern). Confirm the existing
+  kernel `{Nat, Zero, Suc}` identities are reachable to admit into the strict
+  floor at the seam WP-2 established (`install_prelude_floor` /
+  `capture_strict_builtin_names` / `PRELUDE_FLOOR_NAMES`, `modules.rs`), and that
+  admitting them reuses the kernel GlobalIds rather than minting new ones. A
+  grounded question the probe answers before the normative flip.
+- D1. The coupled normative amendments (section above), authored as exact spec
+  text with the derivation-path/`taxonomy` conformance table updated to the new
+  closed set.
+- D2. Conformance/acceptance pins (section below), specified so the build WP
+  ([[LANG-MOD-NAT-FLOOR-REALIZATION]]) has an executable target.
+
+## Acceptance criteria (spec-side; the build WP realizes them)
+
+- AC-1 (identity). Strict resolution of `Nat`/`Zero`/`Suc` in a root-loaded unit
+  yields the EXACT pre-existing kernel GlobalIds (identity assertion, not text /
+  not structural equality). A fresh `data Nat = Zero | Suc Nat` in a unit is a
+  distinct family and does NOT satisfy the identity.
+- AC-2 (strict-ACCEPT — the flipped control). The landed strict-Nat REJECTION
+  control (`crates/ken-elaborator/tests/lang_mod_catalog_realization.rs:81-117`)
+  pins the CURRENT behaviour (Nat rejected under Strict). When Nat joins the
+  floor this control inverts: it must be re-authored to assert strict ACCEPT +
+  the AC-1 identity. Its red on the build branch is the port landing, NOT a
+  regression — flag it as such so QA does not read the flip as a break.
+- AC-3 (closed floor, not catch-all). A non-floor, kernel-provided-but-not-
+  surface-required name (or a convenience global) still rejects strict — the
+  bootstrapping arm admits Nat and nothing the criterion does not name.
+- AC-4 (zero trust / zero allocation). Admitting Nat adds zero `trusted_base()`
+  entries and allocates no new `Decl`/`GlobalId`; the flat-Σ pin stays green.
+- AC-5 (Ord Nat provenance). Per section-4 resolution: the one canonical
+  `instance Ord Nat` resolves against the exact native Nat identity; a
+  byte-identical second-family instance rejects. (Scope may narrow to the Order
+  half if the enclave's §4 finding routes it back to the Steward.)
+- AC-NO-REGRESSION. Whole-suite green in CI; local targeted `-p` only.
+
+## Reviewers
+
+Architect (soundness: the amended rule must admit exactly the bootstrapping
+vocabulary and preserve the closed-set / no-catch-all discipline; the identity
+reuse must not grow the TCB) + conformance-validator (the derivation-path table
+and the strict accept/reject discriminators with the new closed set).
+
+## Capability tier
+
+T1 (a soundness-bearing amendment to a normative membership rule with coupled
+cross-section reconciliation and an instance-provenance sub-question; review
+turns on an argument, not a diff). Size L.
 
 ## Sequencing
 
-Prerequisite to [[LANG-MOD-CATALOG-COMPLETENESS]]'s Nat criterion (AC-B5a):
-Component B's Nat home, strict-caller migration, and whole-catalog strict-green
-stay STOPPED until this lands. Component B's OrdResult home, the homeless
-census, and Gcd's non-Nat reuse proceed as the partial increment meanwhile
-(COORDINATION §10-). This node in turn gates [[CAT-GCD-REFACTOR]]'s Nat import.
+Release FIRST (spec-surface); the build WP [[LANG-MOD-NAT-FLOOR-REALIZATION]]
+depends on it. Together they are the prerequisite to
+[[LANG-MOD-CATALOG-COMPLETENESS]]'s Nat criterion (AC-B5a): Component B's Nat
+home, strict-caller migration, and whole-catalog strict-green stay STOPPED until
+the build WP lands. Component B's OrdResult home, the homeless census, and Gcd's
+non-Nat reuse proceed as the authorized partial meanwhile (COORDINATION §10-).
+This chain in turn gates [[CAT-GCD-REFACTOR]]'s Nat import (lane 3).

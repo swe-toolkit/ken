@@ -71,13 +71,17 @@ resolution soundness core) is **`merged`** — its D0 census (`c64c62190`) + D1
 enforcement (`5a74301f4`) shipped inside the Component A/B realization; a
 2026-08-25 Steward re-release off its stale `ready` node was withdrawn on the
 implementer's hard stop (no non-duplicative delta). **So module/import is
-essentially complete, and the only remaining member work — Component B's
-remainder + the Nat/Order provider (`LANG-MOD-NAT-PROVIDER-INTERFACE`) +
-`CAT-GCD-REFACTOR` — is all gated on the Nat Decision `dec_1kqwn6hdvn7d2`
-(operator-pending).** Lane 2 has NO unblocked module/import work until that
-resolves; its interim direction (idle vs FO frontier vs surface-syntax) is an
-operator sequencing call, surfaced 2026-08-25. Do NOT re-release WP-2 off the
-node — re-measure the tree.
+essentially complete; the remaining member work is the Nat prerequisite +
+Component B's remainder + `CAT-GCD-REFACTOR`.** The Nat Decision
+`dec_1kqwn6hdvn7d2` is RESOLVED (2026-08-25): the operator ruled the prelude
+membership rule (`30-taxonomy §4`) itself the defect and superseded the
+provider-registry mechanism — Nat's home is PRELUDE-FLOOR MEMBERSHIP (amend the
+general rule to a bootstrapping arm; admit the existing kernel {Nat,Zero,Suc}
+into the strict floor, reuse identity). Reframed into a spec WP
+(`LANG-MOD-NAT-PROVIDER-INTERFACE`, `ready`, release FIRST) + a build WP
+(`LANG-MOD-NAT-FLOOR-REALIZATION`, held on the spec WP). Releasing the spec WP to
+the enclave unblocks the chain; do NOT re-release WP-2 off its node — re-measure
+the tree.
 
 The earlier lane-2 objectives are DONE and are history, not current work:
 `V3-FO-CHECKER-SOUNDNESS` is `closed` (FO checker-soundness theorem complete,
