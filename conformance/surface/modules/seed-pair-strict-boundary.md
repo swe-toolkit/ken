@@ -12,12 +12,14 @@ happens to use `Pair` as its local name. Those three uses do not create a
 package provider.
 
 The rejection and exact-floor cases describe the current Strict boundary. The
-named explicit-import, conversion, positivity, and cluster-closure cases are
-**RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE`**. The representation-only
+named explicit-import, conversion, and positivity cases are **RED-UNTIL
+`LANG-MOD-CANONICAL-PAIR-PACKAGE`**; the future graph-closure case additionally
+requires separately authorized consumer imports. The representation-only
 transparent-Sigma controls execute now through the kernel bindings named in
 AC5; they do not provide the named Pair interface. RED-UNTIL is not an accepted
-failure and not a green numerator: it identifies the prerequisite that must
-flip the same seam.
+failure and not a current census disposition. AC6 keeps the pre-provider
+evidence frontier separate from the later import graph that must be re-derived
+after authorized consumer imports exist.
 
 ## AC1 — compiler possession is not Strict provider availability
 
@@ -246,92 +248,107 @@ provider.
   through the canonical imported declaration rather than a spelling allow-list
   or a second mechanism.
 
-## AC6 — deferred cluster and later closure use one flipping seam
+## AC6 — the evidence frontier precedes provider/import closure
 
-### surface/modules/pair-cluster-is-deferred-not-green
+### surface/modules/pre-provider-census-stops-at-legacy-evidence-frontier
 
-- promise class: **transition sentinel** — a prerequisite is not an accepted
-  failure; `LANG-MOD-CANONICAL-PAIR-PACKAGE` retires this deferral
+- promise class: **durable invariant** — evidence availability bounds every
+  identity, migration, and closure inference
+- stage: **current pre-provider evidence frontier**
 - spec: `30 §5`; `33 §3.3`; `34 §"Canonical non-dependent pair package"`; `39
   §2.0`
-- given: before the canonical package lands, run the real strict roots loader on
-  the authoritative Pair-dependent whole-unit seeds
-  `Core.Logic.Compare`, `Core.Classes.LawfulClasses`, and
-  `Data.Collections.Derived`, and on the ruled mandatory consumers
-  `Data.Numeric.Nat.Order` and `Algorithm.Numeric.Gcd`. Use the loader-derived
-  catalog population and parsed import graph for any further transitive
-  consumers; do not derive membership from the first error or a spelling grep.
-- expect: every authoritative Pair-dependent whole unit is recorded
-  `DeferredOnCanonicalPairPackage`, never `StrictGreen` and never counted in a
-  green numerator. A non-authoritative strict failure remains a blocker rather
-  than entering this set. The current loader refusal is an observation, not the
-  membership authority.
-- controls: deleting a population row fails exact population equality; marking
-  a direct seed green must reach the real strict rejection; adding an import
-  edge from a formerly green unit to a seed changes reverse reachability and
-  invalidates a stale ledger; a catch-all defer mutation fails on an unrelated
-  strict error.
-- why: emptying a selected failure list can falsely claim closure. Whole-unit,
-  authority-derived disposition makes the temporary boundary explicit. This
-  Pair-specific case does not assert that the two dispositions cover the whole
-  current catalog: any unit outside the authoritative closure that fails Strict
-  remains a separately routed blocker.
+- given: enumerate the census subjects `Core.Logic.Compare`,
+  `Core.Classes.LawfulClasses`, `Data.Collections.Derived`,
+  `Data.Numeric.Nat.Order`, and `Algorithm.Numeric.Gcd`. Treat that list only as
+  an evidence-collection input, not as a Pair closure. Run each row through
+  Legacy. For a successful Legacy row, record only the exact `GlobalId`s
+  actually resolved in that run. For every row that does not complete Legacy
+  with exact-identity evidence, record its typed first failing stage as
+  `Unavailable(stage)`. Source spelling, an error spelling, semantic
+  familiarity, or a numeric origin supplies no missing identity.
+- expect: a successful Legacy row may carry its exact-identity ledger as
+  evidence about that Legacy run. The ledger creates no import edge, chooses no
+  future provider, and confers no migration or Strict status. Every other row
+  carries only `Unavailable(stage)`: no named Pair prerequisite, current
+  migration or provider-closure label, graph membership, or green/closure
+  numerator. `Unavailable` records evidence staging, not resolver state,
+  migration state, closure, or deferral.
+- controls: for a successful row, change one recorded id or delete the ledger
+  and require comparison with the resolver output to fail. For an unavailable
+  row, change the first failing stage and require the typed-stage assertion to
+  fail. Add a named prerequisite, provider identity, migration label, graph
+  edge, or numerator contribution to an `Unavailable` row and require the
+  census-artifact check to reject it. A source-name or diagnostic-text
+  mutation must not create identity evidence.
+- why: an enumerated source list and a failed run can select work to investigate
+  but cannot manufacture the parsed edge or exact identity needed to classify
+  provider closure. Stopping at the evidence frontier prevents planning
+  familiarity from becoming resolver authority.
 
-### surface/modules/pair-cluster-flips-only-after-explicit-import-closure
+### surface/modules/pair-closure-is-derived-only-after-authorized-imports
 
-- promise class: **durable invariant** — explicit-import identity closure
-  remains enforced after the prerequisite removes the temporary deferral
-- stage: **RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE`**
+- promise class: **durable invariant** — provider/import closure is derived
+  from real edges and exact identities, never projected from census staging
+- stage: **RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE` and separately
+  authorized consumer imports**
 - spec: `33 §3.3`/`§4.3`; `34 §"Canonical non-dependent pair package"`; `39
   §2.0`
-- given: after the canonical package lands, rerun the authoritative population
-  and strict roots from the preceding case. Record the four provider ids before
-  consumers load, and inspect all Pair-family/helper references emitted by each
-  Pair-dependent unit and transitive consumer.
-- expect: each affected unit has an explicit dependency path to the provider,
-  strict-loads successfully, and resolves every reference to the recorded
-  provider id. No implementation-native or competing id remains reachable;
-  imports allocate no replacement and add no trust. Every temporary Pair
-  deferral is removed and the full population is re-derived from scratch.
-- controls: remove one affected unit's Pair import and require its strict arm to
-  reject; redirect one import to a same-shaped competing provider and require
-  the identity assertion to fail; retain one stale deferred row after all
-  loader arms pass and require disposition equality to fail.
-- why: a new provider that nobody imports, a fallback to an old global, and a
-  permanently waived red row are three different false completions.
+- given: after the canonical package lands and a separately authorized
+  migration adds ordinary explicit consumer imports, record the four provider
+  ids before consumers load. Rebuild the parsed import/re-export graph from
+  those actual sources, derive the candidate population only from real paths to
+  the provider, and strict-load every graph member. Inspect every emitted
+  Pair-family/helper reference.
+- expect: every member of the newly derived graph population strict-loads and
+  resolves each reference to the recorded provider id. No prior Legacy ledger
+  or `Unavailable(stage)` row enters that population without a real import
+  path and a fresh successful Strict run. No implementation-native or competing
+  id remains reachable; imports allocate no replacement and add no trust. Rows
+  outside the real graph retain only their independently remeasured evidence.
+- controls: remove one real Pair import and require both graph membership and
+  the Strict arm to change; redirect one import to a same-shaped competing
+  provider and require the identity assertion to fail. Add a census row with no
+  parsed provider path to the closure population and require exact population
+  equality to fail. Retain `Unavailable(stage)` for a row whose authorized
+  import and Strict arm both pass and require current-evidence equality to fail.
+- why: a provider that nobody imports, a fallback to an old global, projection
+  from Legacy evidence, and automatic promotion of an unavailable row are four
+  different false completions. The future population must be re-derived rather
+  than inferred from today's census.
 
-## AC7 — prior downstream obligations survive Pair deferral
+## AC7 — prior obligations survive future migration and staging
 
-### surface/modules/pair-deferral-does-not-transfer-ord-nat-ownership
+### surface/modules/future-pair-migration-does-not-transfer-ord-nat-ownership
 
 - promise class: **durable invariant** — Pair availability does not change
   instance ownership or declaration provenance
 - evidence: **by reference** to the owning module/orphan seed named below
 - spec: `33 §5.3`/`§5.5.1`; `51 §7`
-- given: rerun `seed-modules.md`'s
-  `ord-nat-class-owner-and-reexport-use-one-dictionary` after the Pair-dependent
-  `LawfulClasses` unit re-enters strict closure.
+- given: after a separately authorized Pair migration makes `LawfulClasses`
+  available under Strict, rerun `seed-modules.md`'s
+  `ord-nat-class-owner-and-reexport-use-one-dictionary`.
 - expect: the sole `(Ord, Nat)` dictionary is still defined by
   `Core.Classes.LawfulClasses`; `Data.Numeric.Nat.Order` imports/re-exports that
   same identity and never redeclares or owns it.
-- why: delaying a whole unit changes availability, not the orphan rule or
-  declaration provenance.
+- why: future migration and staging may change availability. They do not change
+  the orphan rule or declaration provenance.
 
-### surface/modules/pair-deferral-does-not-discharge-attached-proof-conversions
+### surface/modules/future-pair-migration-does-not-discharge-attached-proofs
 
 - promise class: **durable invariant** — Pair availability does not change
   attached-proof ownership or mint a foreign proof identity
 - evidence: **by reference** to the ownership controls named below
 - spec: `33 §8.2`; `39 §2.0`; `LANG-MOD-ATTACHED-PROOF-OWNERSHIP`
-- given: when `LawfulClasses` and Order re-enter, rerun the provider-local accept,
-  consumer-foreign reject, and local ordinary-theorem controls from the attached
-  proof ownership seed.
+- given: after separately authorized migrations make `LawfulClasses` and Order
+  available under Strict, rerun the provider-local accept, consumer-foreign
+  reject, and local ordinary-theorem controls from the attached-proof ownership
+  seed.
 - expect: `pair_compare_eq_sound`, `pair_compare_lt_asym`, and
   `bool_or_eq_true_of_or` are ordinary private theorems at their settled owning
   units; no foreign attached-proof identity is minted. All remain checked and
   outside `trusted_base()`.
-- why: Pair deferral postpones the containing units. It neither reverses the
-  attachment ownership rule nor counts the conversions as already delivered.
+- why: future migration and staging neither reverse the attachment ownership
+  rule nor count the conversions as already delivered.
 
 ## Evidence posture
 
@@ -345,11 +362,13 @@ provider.
 - **CLAIMED:** the one-interface transparent-Σ contract, definitional β/η,
   explicit-import identity preservation, and representation-derived positivity
   are the behavior the later canonical package must realize.
-- **THE GAP:** no canonical Pair provider exists yet. The positive package and
-  cluster-re-entry cases remain RED-UNTIL; current native/Legacy acceptance is
-  not evidence for them. The current full-catalog probe also reports strict
-  blockers outside the authoritative Pair closure. This Pair artifact neither
-  reclassifies them nor claims a complete two-arm catalog disposition.
+- **THE GAP:** no canonical Pair provider or authorized consumer-import
+  migration exists yet. The positive package and future graph-closure cases
+  remain RED-UNTIL; current native/Legacy acceptance is not evidence for them.
+  No successful Legacy exact-identity evidence has authorized a current Pair
+  closure population. A row without that evidence is only
+  `Unavailable(stage)` and gains no named prerequisite or closure inference
+  from this artifact.
 
 ## Consistency and realization boundary
 
@@ -366,4 +385,4 @@ provider.
   remain outside the provider question.
 - The canonical package realization chooses its module path and transition
   mechanism separately. These cases fix the behavior it must expose and the
-  temporary vectors it must flip.
+  future RED-UNTIL vectors it must make executable.
