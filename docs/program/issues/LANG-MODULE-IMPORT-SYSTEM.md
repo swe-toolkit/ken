@@ -104,12 +104,35 @@ origin: "Operator directive 2026-08-22: module/import is its own campaign and, b
 > ([[LANG-MOD-CATALOG-COMPLETENESS]]), not Component A — the hard stop showed the
 > census population needs a canonical `Nat` home first (34 baseline-red, not 32).
 >
-> RELEASE GATE (all members): held until the language ring FINISHES
-> embedding-adequacy ([[V3-FO-EMBEDDING-ADEQUACY]]) per operator finish-then-
-> switch — do NOT interrupt the in-flight WP. WP-4 additionally gated on the
-> Or/Inl/Inr fork (escalated to operator, evt_6b9wrt1kwswcp) and on WP-1..3. The
-> wp/ frames are authored at release time grounded on the MERGED spec SHA (now
-> landed at def16ecf4), so WP-2/WP-3 conformance ACs cite CV's landed fold.
+> CAMPAIGN TAIL + z3 RESUME ORDER (operator direction, 2026-08-21 — SUPERSEDES
+> the original finish-then-switch note below). History: the FO-checker/z3
+> integration was INTERRUPTED (not finished) to prioritize this campaign, because
+> module/import blocks the foundation catalog trial. The operator's current
+> ordering for finishing the lane is:
+>
+> 1. [[LANG-MOD-CATALOG-COMPLETENESS]] (Component B) remainder — Nat criterion now
+>    prerequisite-unblocked ([[LANG-MOD-NAT-FLOOR-REALIZATION]] MERGED 2026-08-25
+>    at `d5c41ec1`, [[LANG-MOD-NAT-PROVIDER-INTERFACE]] merged). This is the front
+>    of the tail. Closing B closes the campaign's catalog criterion and unblocks
+>    [[CAT-GCD-REFACTOR]].
+> 2. THEN the two new LANG-MOD nodes, framed 2026-08-25 and scheduled here
+>    (`depends_on: [LANG-MOD-CATALOG-COMPLETENESS]`):
+>    [[LANG-MOD-KENFMT-DECL-LAYOUT]] (language) and
+>    [[LANG-MOD-ATTACHED-PROOF-OWNERSHIP]] (spec). These are the END of the
+>    LANG-MOD work.
+> 3. THEN RESUME the interrupted verify/z3 FO-checker integration:
+>    [[V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY]] (active) and
+>    [[V3-FO-EMBEDDING-ADEQUACY]] (ready). Do NOT resume z3 before the LANG-MOD
+>    tail (items 1-2) lands.
+>
+> ORIGINAL RELEASE GATE (2026-08-22, now historical): members were held until the
+> language ring FINISHES embedding-adequacy ([[V3-FO-EMBEDDING-ADEQUACY]]) per
+> operator finish-then-switch — do NOT interrupt the in-flight WP. That ordering
+> was inverted by the priority call above (z3 interrupted to serve this campaign).
+> WP-4 additionally gated on the Or/Inl/Inr fork (escalated to operator,
+> evt_6b9wrt1kwswcp) and on WP-1..3. The wp/ frames are authored at release time
+> grounded on the MERGED spec SHA (now landed at def16ecf4), so WP-2/WP-3
+> conformance ACs cite CV's landed fold.
 
 ## The measured gap (Steward, on main 2026-08-22)
 

@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-NAT-FLOOR-REALIZATION
 title: "Realize the landed nine-name prelude floor in the elaborator, BOTH halves: (a) admission — extend the strict resolution floor from the implemented {Bool, Char, List} to the landed closed set {Auth, Bool, Char, List, Nat, Option, ResourceKind, Result, Utf8Error}, binding each name to its EXISTING GlobalId (no new family/Decl/GlobalId, zero trusted_base() delta); and (b) immutability — fail closed on every same-spelling floor parent OR constructor collision with AmbiguousReference BEFORE any allocation, in every top-level module scope regardless of prefix, qualified/renamed access the lawful escape. The build half of the Nat prerequisite."
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
@@ -10,6 +10,19 @@ blocks: [LANG-MOD-CATALOG-COMPLETENESS]
 github: null
 origin: "Steward-filed 2026-08-25 as the build half of the operator-ruled Nat prelude-floor approach (Decision dec_1kqwn6hdvn7d2), split from the reframed spec WP [[LANG-MOD-NAT-PROVIDER-INTERFACE]]. Under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
+
+> # MERGED 2026-08-25 at squash `d5c41ec1` (PR #2917)
+>
+> The transparent-Pub evidence candidate `a9233e9dcf7a4bcb7b5f3b738ebcf55c385e9c05`
+> (tree `179f90ea`, 8 `crates/ken-elaborator` paths, +1492/-207) merged. All
+> three exact-SHA domain gates approved: language-qa `evt_2ema4k3m93jrc`, CV
+> `evt_65rnja90g62vk`, Architect component-fit `evt_10zrdx6rt7vb3` (the Architect
+> verdict discharged the transparent-wrapper closure that caused the three prior
+> Nat-floor rejections). Decision `dec_cer1cc2p5fwn` resolved; Steward blob-audit
+> confirms all 8 paths byte-identical to the approved candidate. This discharges
+> Component B's Nat criterion on the build side (the `blocks` edge onto
+> [[LANG-MOD-CATALOG-COMPLETENESS]] is cleared) — B's remainder is now
+> prerequisite-unblocked.
 
 > # FRAME CORRECTED 2026-08-25 — floor-immutability half added (Architect reject)
 >

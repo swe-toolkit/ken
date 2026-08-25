@@ -5,11 +5,24 @@ status: draft
 owner: language
 size: M
 gate: none
-depends_on: []
+depends_on: [LANG-MOD-CATALOG-COMPLETENESS]
 blocks: []
 github: null
 origin: "Component B (LANG-MOD-CATALOG-COMPLETENESS) f5be017f7 CI red on two kenfmt gates (kenfmt_b3_layout::ac7 width-bound on a 125-col OrdResult export line; kenfmt_c_capstone canonical-fixed-point on LawfulClasses import/proof wrapping). Diagnosed candidate-only REAL by the language ring (evt_7exmbjsvfrk7f); Steward-confirmed as a formatter-surface gap by reading the Doc-construction code, not the symptom. Filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
+
+> # FRAMED + SCHEDULED 2026-08-25 — LANG-MOD campaign tail (operator direction)
+>
+> WP frame authored: `docs/program/wp/LANG-MOD-KENFMT-DECL-LAYOUT.md`. Operator
+> (2026-08-21) directed the two new LANG-MOD nodes be scheduled at the END of the
+> module/import work — after Component B
+> ([[LANG-MOD-CATALOG-COMPLETENESS]]) — and BEFORE the interrupted verify/z3
+> FO-checker lane resumes
+> ([[V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY]] / [[V3-FO-EMBEDDING-ADEQUACY]]).
+> `depends_on: [LANG-MOD-CATALOG-COMPLETENESS]` now encodes that schedule
+> (technically buildable earlier, but sequenced here so D2 recombines B's
+> already-landed stopgap decls). Stays `draft` until Steward releases it as the
+> campaign tail. Not released yet.
 
 > # DRAFT — buildable; the RECOMBINATION TRIGGER for Component B's split stopgap
 >
