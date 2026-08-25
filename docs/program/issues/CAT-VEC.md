@@ -1,7 +1,7 @@
 ---
 id: CAT-VEC
 title: "Length-indexed Vector — Data/Vector: Vec n a with total head/index/zip/map and the length laws, the deliberate fully-dependent probe of the Foundation expressibility trial"
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none
@@ -10,6 +10,10 @@ blocks: []
 github: null
 origin: "Foundation expressibility trial (docs/program/wp/foundation-expressibility-trial.md), operator-directed 2026-08-21. Steward-filed, functional-build phase-1 scope. Target 5 of 5, non-sequential. The one fully-dependently-typed target and the highest expressibility risk (Fin is absent today); deliberately included per the operator's some-dependently-typed framing."
 ---
+
+> # MERGED 2026-08-25 — CAT-VEC catalog entry landed at `665059cfd`.
+> Foundation expressibility trial target 5/5 complete; the trial's five CAT
+> entries (SORT, GCD, DEQUE, BSEARCH, VEC) are all on main.
 
 ## Objective
 

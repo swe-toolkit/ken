@@ -1,7 +1,7 @@
 ---
 id: RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE
 title: "M3 successor (recut) — bind px8ta's causal residual (emit_carrier_dynamic_constructor's direct return_(-3) at StaticOriginId(34)) to one actual generated function/owner/SSA discriminator/compare/successor, then repair only the proven layer; the equality chain over discriminator 1 with a declared tag-1 alternative reaches its residual, which the hard-stop #3 research advisory places most plausibly in value-handle provenance, not integer equality"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,19 @@ blocks: []
 github: null
 origin: "Steward, 2026-08-25, from the Architect hard-stop #3 ruling after the research advisory (evt_1vhmndq7fscd1, thr_305pn5gzx37h). RECUT of RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT, which the Architect FALSIFIED as a product object: the exact-Int carrier already admits every valid exit code and the two named process consumers are not missing transport; the causal defect is a dynamic-constructor dispatch residual, not an ExitCode payload gap. The three consecutive hard stops shared one predicate (a downstream semantic classification used as upstream producer/provenance authority), so this replaces rather than amends. Steward framing call per COORDINATION section 2."
 ---
+
+> # MERGED 2026-08-25 — D1 landed at squash `c7541df21`
+>
+> D1 (branch-before-transfer, one active `HostResult` payload) merged: candidate
+> `0295a7f71` squashed to `c7541df21` (7 files, +305/-88); Steward blob-audit
+> confirms all 7 paths byte-identical to the candidate, no D0 remnants. px8ta
+> HALF B advanced — the eager inactive-error residual is gone; execution now
+> reaches `ConsoleIsTerminal`, then a distinct new obstruction `ControlledTrap
+> RuntimeTrap(4)` at the explicit entry trap (grounded in the landed test's
+> ignore reason). That is the next lane-1 object; it awaits the Architect's
+> object-distinctness read before framing (do not pre-frame).
+> [[RT-UNIT-FAILURE-STATUS-PROVENANCE]] (the separate `-3` reporter alias) is now
+> dependency-unblocked; Steward owns lane order.
 
 > # AMENDED 2026-08-25 — D0 done; D1 authorized (Architect hard-stop #1)
 >
