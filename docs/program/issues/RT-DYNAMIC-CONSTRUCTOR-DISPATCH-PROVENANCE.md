@@ -11,6 +11,16 @@ github: null
 origin: "Steward, 2026-08-25, from the Architect hard-stop #3 ruling after the research advisory (evt_1vhmndq7fscd1, thr_305pn5gzx37h). RECUT of RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT, which the Architect FALSIFIED as a product object: the exact-Int carrier already admits every valid exit code and the two named process consumers are not missing transport; the causal defect is a dynamic-constructor dispatch residual, not an ExitCode payload gap. The three consecutive hard stops shared one predicate (a downstream semantic classification used as upstream producer/provenance authority), so this replaces rather than amends. Steward framing call per COORDINATION section 2."
 ---
 
+> # AMENDED 2026-08-25 — D0 done; D1 authorized (Architect hard-stop #1)
+>
+> D0 selected a SIXTH class beyond the frame's five-class closure: an inactive
+> `HostResult` template eagerly materialized before the runtime sum choice
+> (`aggregates.rs::emit_carrier_transfer` transfers ok then error BEFORE the
+> discriminant). The Architect authorized D1 in place — branch-before-transfer,
+> one active payload (evt_6h546ckyzsgtf, thr_1b16f1grspdq8). New-chain hard-stop
+> count is 1; runtime held until the amendment released. Mechanism + controls are
+> in the frame's "D1 — authorized mechanism" + AC-3.
+
 > # M3 successor, recut — replaces the falsified ExitCode object
 >
 > The Architect falsified [[RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT]] as a product
