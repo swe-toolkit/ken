@@ -3159,10 +3159,12 @@ mod tests {
             }),
         );
         assert_eq!(trapped.status.code(), Some(1));
-        assert!(String::from_utf8_lossy(&trapped.stderr).contains("explicit entry trap"));
+        assert!(String::from_utf8_lossy(&trapped.stderr)
+            .contains("planned runtime trap token"));
 
         // This producer Match is the retired monolithic-lane sibling. Its
-        // runtime-reached default takes the root-only `-4` process sentinel.
+        // runtime-reached default crosses the generated-unit TrapWord route and
+        // therefore keeps its planner identity in the signed root token.
         let retained_root_trap = run(
             "px4-retained-root-trap",
             RuntimeExpr::Match {
@@ -3185,7 +3187,8 @@ mod tests {
             },
         );
         assert_eq!(retained_root_trap.status.code(), Some(1));
-        assert!(String::from_utf8_lossy(&retained_root_trap.stderr).contains("explicit entry trap"));
+        assert!(String::from_utf8_lossy(&retained_root_trap.stderr)
+            .contains("planned runtime trap token"));
     }
 
     #[cfg(target_os = "linux")]
@@ -3242,19 +3245,19 @@ mod tests {
 
         let (trapped, trapped_provenance) = run("px8tr-post-effect-route-disabled", true);
         assert_eq!(trapped.status.code(), Some(1));
-        assert!(String::from_utf8_lossy(&trapped.stderr).contains("explicit entry trap"));
+        assert!(String::from_utf8_lossy(&trapped.stderr)
+            .contains("planned runtime trap token"));
 
         // ── ⭐⭐ `RT-DECL-CLOSURE-PORT` `D6a` — EXACT TRAP PROVENANCE ──
         //
         // The frame requires the disabled half to be proven through *"the
         // planner trap identity at the unit `TrapWord` and root propagation
-        // seat"*, and says why in one clause: **the generic process `-4` string
-        // alone is not exact provenance.**
+        // seat"*, and says why in one clause: the generic signed-root-token
+        // report alone is not exact provenance.
         //
-        // ⛔ That clause is doing real work, and the exit code plus the stderr
-        // line above are exactly what it rules insufficient. `-4` is the root
-        // adapter's *single* process-trap sentinel and `explicit entry trap` is
-        // the starter's *single* trap line — both are emitted identically for
+        // That clause is doing real work, and the exit code plus the stderr
+        // line above are exactly what it rules insufficient. The signed token
+        // class and `planned runtime trap token` line are emitted identically for
         // every trap this fixture could reach. A row resting on them alone
         // passes whether the artifact took the checked-`ITree` default or any
         // other trap, including one reached by a defect.
@@ -3332,11 +3335,11 @@ mod tests {
         //
         // ⚠ This chain is **route-independent** — it is identical on the
         // success run — so it is provenance, not a discriminator, and it is
-        // recorded as such. Its job is to make the `-4` above legible: the
-        // identity survives every intermediate unit hop verbatim and is
-        // collapsed at exactly one seat, the root's process lane. ⛔ No
-        // identity is claimed at these seats because none is knowable there —
-        // the propagated word is a runtime `stack_load`.
+        // recorded as such. Its job is to make the signed root token above
+        // legible: the identity survives every intermediate unit hop verbatim
+        // and the root's process lane changes only its ABI envelope and sign.
+        // No compile-time identity value is claimed at these seats because the
+        // propagated word is a runtime `stack_load`.
         assert!(trapped_provenance.iter().any(|event| matches!(
             event,
             crate::cranelift_backend::Px8trTrapProvenanceEvent::UnitTrapWordPropagated {
@@ -3348,7 +3351,7 @@ mod tests {
             event,
             crate::cranelift_backend::Px8trTrapProvenanceEvent::UnitTrapWordPropagated {
                 seat: crate::cranelift_backend::PlannedTrapSeat::RootProcessSentinel,
-                identity_preserved: false,
+                identity_preserved: true,
             }
         )));
 

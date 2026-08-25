@@ -4115,16 +4115,18 @@ const AC1_SIBLING_SELECTED: &str = "ctor:fixture::AC1Sibling::One";
 #[cfg(test)]
 const AC1_SIBLING_UNSELECTED: &str = "ctor:fixture::AC1Sibling::Other";
 
-/// The payload the selected arm binds and returns. Arbitrary, but it must not
-/// collide with [`AC1_SIBLING_DEFAULT_STATUS`] or the pair below could not tell
-/// "selected and delivered" from "fell to the default".
+/// The payload the selected arm binds and returns. Arbitrary, but positive so
+/// it cannot collide with the signed planner-trap token for the closed default.
 #[cfg(test)]
 const AC1_SIBLING_PAYLOAD: i64 = 21;
 
-/// The status the match's closed default returns, spelled by
-/// `Lowering::seal_source_trap_branch`.
 #[cfg(test)]
-const AC1_SIBLING_DEFAULT_STATUS: i64 = -4;
+fn ac1_sibling_default() -> RuntimeTrap {
+    RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "ac1 specialized sibling default".to_string(),
+    }
+}
 
 #[cfg(test)]
 const AC1_SIBLING_CALLEE: &str = "fixture::ac1_sibling::sel";
@@ -4148,10 +4150,7 @@ fn ac1_sibling_declaration() -> RuntimeDeclaration {
                         // wrong.
                         body: RuntimeExpr::Var(0),
                     }],
-                    default: RuntimeTrap {
-                        code: RuntimeTrapCode::PatternMatchFailure,
-                        message: "ac1 specialized sibling default".to_string(),
-                    },
+                    default: ac1_sibling_default(),
                 }),
             },
         },
@@ -4165,7 +4164,7 @@ fn ac1_sibling_declaration() -> RuntimeDeclaration {
 /// `ExitFailure(Call(DeclarationRef(sel), [<producer>(21)]))`, run as a whole
 /// process, returning its exit code.
 #[cfg(test)]
-fn run_ac1_specialized_sibling(producer: &str) -> i64 {
+fn run_ac1_specialized_sibling(producer: &str) -> (i64, i64) {
     let declaration = ac1_sibling_declaration();
     let mut declarations = BTreeMap::new();
     declarations.insert(AC1_SIBLING_CALLEE, &declaration);
@@ -4197,6 +4196,15 @@ fn run_ac1_specialized_sibling(producer: &str) -> i64 {
         None,
     )
     .expect("the specialized sibling fixture lowers");
+    let default_identity = compiled
+        .trap_catalog()
+        .iter()
+        .position(|trap| trap == &ac1_sibling_default())
+        .and_then(|index| i64::try_from(index + 1).ok())
+        .expect("the closed default belongs to this compiled plan's catalog");
+    let default_status = -((default_identity
+        << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
+        | crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG);
     let input = BorrowedFixtureValue {
         kind: 1,
         tag: 0,
@@ -4209,11 +4217,12 @@ fn run_ac1_specialized_sibling(producer: &str) -> i64 {
         host_context: (&mut host_context as *mut ()).cast(),
         capability: 0,
     };
-    compiled
+    let status = compiled
         .run(Some((&invocation as *const RootIngressFixture).cast()))
         .expect("the specialized sibling fixture runs")
         .1
-        .expect("the specialized sibling fixture returns an exit code")
+        .expect("the specialized sibling fixture returns an exit code");
+    (status, default_status)
 }
 
 /// `AC-1` control family 4 -- a SPECIALIZED constructor scrutinee still selects
@@ -4222,7 +4231,7 @@ fn run_ac1_specialized_sibling(producer: &str) -> i64 {
 /// MEASURED: a whole-process fixture compiles and RUNS. With the selecting
 /// producer the process exits `21` -- the payload the case body bound and
 /// returned. With the producer swapped for a same-arity constructor the case
-/// list does not name, it exits `-4`, the match's closed default.
+/// list does not name, it returns the match default's signed planner-trap token.
 ///
 /// CLAIMED: the carried arm added to the source-machine `Match` operand
 /// dispatch did not disturb specialized selection, projection, or delivery of
@@ -4250,14 +4259,20 @@ fn run_ac1_specialized_sibling(producer: &str) -> i64 {
 /// selection reddens one.
 #[test]
 fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
-    let selected = run_ac1_specialized_sibling(AC1_SIBLING_SELECTED);
+    let (selected, selected_default) =
+        run_ac1_specialized_sibling(AC1_SIBLING_SELECTED);
     assert_eq!(
         selected, AC1_SIBLING_PAYLOAD,
         "the selecting producer must reach the case body and deliver the child \
          it bound"
     );
 
-    let unselected = run_ac1_specialized_sibling(AC1_SIBLING_UNSELECTED);
+    let (unselected, unselected_default) =
+        run_ac1_specialized_sibling(AC1_SIBLING_UNSELECTED);
+    assert_eq!(
+        selected_default, unselected_default,
+        "changing only the producer must not change the planned default identity"
+    );
     assert_ne!(
         unselected, AC1_SIBLING_PAYLOAD,
         "DISCRIMINATOR: a producer the case list does not name must not reach \
@@ -4265,7 +4280,7 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
          constructor identity at all"
     );
     assert_eq!(
-        unselected, AC1_SIBLING_DEFAULT_STATUS,
+        unselected, unselected_default,
         "the unselected producer must take the match's CLOSED DEFAULT, not a \
          trap, a neighbouring case, or a representation refusal"
     );
