@@ -1,7 +1,7 @@
 ---
 id: RT-UNIT-FAILURE-STATUS-PROVENANCE
 title: "Generated-unit failure-status provenance on the InvalidOffset witness path — preserve the root generated-unit failure's planned trap identity (calls.rs:2075-2090 TrapWord->-4) and fold the governed -3 producer through ONE signed-root-token mechanism decoded against the existing planner trap catalog at the linked reporting boundary, so the process reporter classifies by origin/kind instead of a bare scalar. Narrowed operative claim (NOT global closure): the other same-predicate producers are enumerated but out of this WP. Lands with SemanticErrorV1 still red, honestly reported as the ITree default — the InvalidOffset green belongs to the RT-ITREE-DEFAULT-SELECTION-PROVENANCE successor."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,22 @@ github: null
 origin: "Steward, 2026-08-25. Recut from the Architect umbrella arm(b) ruling (evt_7jpt4hm2nm6hh), then SCOPE-RECONCILED after the AC-5 hard stop fired: Architect ruling evt_3rq4xafrf7cqf (thr_6gmh4p1m0gch4) on runtime WIP 7094c29cd. AC-5 is valid — preserving trap identity exposed a distinct ITree-default producer (now the successor [[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]]). The same ruling corrected this frame twice: (1) a calls-only production boundary CANNOT satisfy 'report with origin/kind' — the frame must permit one subsuming typed envelope at the linked reporting boundary; (2) the structural census is wider than one syntactic site, so the operative closure claim must be narrowed explicitly. Steward owns the frame amendment + successor routing. Prior draft origin: Architect hard-stop #3 evt_1vhmndq7fscd1. Steward framing call per COORDINATION section 2."
 ---
 
+> # MERGED 2026-08-25 at squash `2a5b3cd0e` — honest witness-path provenance landed
+>
+> Candidate `7b5547fe6` (tree `f14e110f`, base `027f6bf26`, 3 commits, 19 paths
+> `+519/-80`) merged onto origin/main `2a5b3cd0e` through the GitHub PR publisher
+> (whole-suite CI gate passed). Exact-SHA APPROVES: Architect `evt_1f9f8cmsk4ej2`
+> (binds this SHA only, void on respin), runtime-qa `evt_461scgdfd5d0d`; Decision
+> `dec_4g8c1bcdpc6tn` resolved. BLOB-AUDIT clean: all 19 approved crate paths landed
+> byte-identical and nothing was touched outside `crates/`. The linked witness now
+> reports planned identity `40` / `PatternMatchFailure`
+> (`no runtime match case selected for decl:...::ITree`) instead of `unknown
+> terminal sentinel`; `lowering/core.rs` + `erasure.rs` blob-identical to base, zero
+> `#[ignore]` delta, no trusted-base change. SemanticErrorV1 lands honestly RED as
+> the ITree default — greening the exact `InvalidOffset` is the successor
+> [[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]]. Umbrella [[RT-NATIVE-CARRIED-VALUE]] and
+> PX8 stay blocked (three native witnesses remain).
+>
 > # SCOPE RECONCILE 2026-08-25 — AC-5 fired; two frame corrections (Architect)
 >
 > The AC-5 hard-stop arm fired as designed. Runtime WIP `7094c29cd` (tree
