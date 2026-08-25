@@ -1,7 +1,7 @@
 ---
 id: RT-RESOURCE-SEAT-TAG-DOMAIN
 title: "Lane-1 px8ta successor (replaces the falsified operand-pairing node) — carried resource-token seat tag-domain correction. lower_resource_token_seat's carried arm guards BoundaryTag::InvocationBorrowed == 7 (a transport tag byte in bits 0..8 of the carrier word) against emit_carrier_tag, which returns the semantic NODE_TAG_ID (0 for a borrowed opaque node); it therefore compares semantic node identity 0 with transport discriminant 7 and refuses the correct word. Replace ONLY that wrong identity query with the carrier contract's existing low-byte projection (band_imm word, BOUNDARY_TAG_MASK), keeping the InvocationBorrowed expected-tag, BorrowedOpaque class, and scalar guards exact. effects.rs is the sole production change; core.rs and units.rs stay byte-untouched; no continuation operand pairing."
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,19 @@ blocks: []
 github: null
 origin: "Steward, 2026-08-25, from Architect ruling evt_7rhvct552ts2w (thr_3t78aab0v2dh) — hard stop 1 for the falsified [[RT-CONTINUATION-RELEASE-OPERAND-PAIRING]]. The Architect UPHELD the implementer's D0 hard stop: the lineage table is correct, Parameter[0][0][1] is the exact raw capture v11 (runtime word 0x0507), and nothing in assemble_continuation_call_operands / the target-1 frame / the origin-171 Var(1) binding changes it into a neighbour. There is NO wrong operand and NO second release attempt to eliminate. The truthful object is a resource-carrier tag-domain correction at the consumer, not operand pairing. No design Decision and no Research trigger — the representation contract determines the answer. Steward owns the frame correction + fresh Runtime release. Symptom inventory durable at architect/rt-release-pairing-inventory @ 1e16fd99bf5a393eedcacc16028bc4eb959b8afd."
 ---
+
+> # MERGED 2026-08-25 at squash `d9bc68db0` — lane-1 px8ta object landed
+>
+> Candidate `94ce8455d` merged onto main. Exact-SHA gates on `94ce8455d`:
+> runtime-qa APPROVE (evt_6mgva5egwpxct) + Architect APPROVE (evt_245qfwrazva03);
+> Decision `dec_3zrvqa437t97k` resolved. Steward diff-scope self-verified and
+> routed the GitHub PR publisher; CI green, lieutenant published. BLOB-AUDIT clean:
+> production `effects.rs` byte-identical (`92c474176`) between reviewed `94ce8455d`
+> and landed `d9bc68db0`; `core.rs` (`675585a42`) and `units.rs` (`81f5cbab4`)
+> byte-unchanged (AC-6). The carried resource seat now reads the transport low-byte
+> tag (`BOUNDARY_TAG_MASK`) instead of the semantic `NODE_TAG_ID`. px8ta stays OPEN
+> until the native carried-value program lands; the next object awaits an Architect
+> object read at the landed squash.
 
 > # READY 2026-08-25 — replaces the FALSIFIED operand-pairing node
 >
