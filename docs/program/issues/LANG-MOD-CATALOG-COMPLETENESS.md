@@ -11,6 +11,48 @@ github: null
 origin: "Architect ruling evt_214z6r6qnwme0 (2026-08-24), unbundling the WP-4 strict whole-catalog co-gate off Component A. The co-gate gates a deliverable outside WP-4's authorized surface (a canonical home for the type Nat), so it is re-homed here. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
+> # RECUT #2 2026-08-25 — CENSUS-ONLY artifact (hard stop #2; enclave ruling)
+>
+> Hard stop #2 (language-implementer evt_58h0y21cqgvx4) FALSIFIED the RECUT-#1
+> disposition contract below with an authoritative parsed-graph probe: the
+> `StrictGreen | DeferredOnCanonicalPairPackage` two-arm sum is FALSE. The Pair
+> reverse closure is only 6 units; the other ~40 strict failures are NOT
+> Pair-deferrable — they are (a) absent-edge cluster members (`InsertionSort ->
+> UnboundName Ord`: no parsed import edge, so reverse-reachability cannot derive
+> it and byte-stability forbids adding it) and (b) an independent non-Pair
+> native-convenience population (`IO`, `FS`, `Empty`, `Unit`, ...). "Pair-
+> independent strict-green" is not achievable — the catalog depends on a WHOLE
+> non-floor-native-convenience surface; Pair was only the first hit.
+>
+> Enclave ruling (spec-author evt_50pbqsvxvmjjy, spec-leader evt_3a3pb0azsgtp9),
+> deductive from the settled floor/package/Strict contracts — Component B REDUCES
+> to a CENSUS-ONLY prerequisite artifact. It makes NO source edits, claims NO
+> newly-green unit, closes NOTHING (not the campaign, not the Pair cluster, not
+> Order/Gcd, not [[CAT-GCD-REFACTOR]]). See AC-CENSUS below; it SUPERSEDES the
+> RECUT-#1 AC-B1/AC-B3 disposition and the strict-green/Nat-home/Arithmetic
+> deliverables (those move to separately framed WPs).
+>
+> Key sub-rulings:
+> - Semantic identity evidence may authorize a MIGRATION census entry (grounded by
+>   the exact legacy-core `GlobalId`, NEVER by `UnboundName` text), but cannot act
+>   as a parsed import edge, a Strict resolver authority, or a third disposition
+>   arm. Byte-stability holds now; a later authorized migration WP adds the edge
+>   and re-runs Strict.
+> - `Unit`, `Empty`, `IO`, `FS` are canonical-PACKAGE-shaped, NOT floor-shaped
+>   (the executable primitive-signature census closes at exactly the nine
+>   {Auth,Bool,Char,List,Nat,Option,ResourceKind,Result,Utf8Error}; early
+>   compiler construction / built-in effect context is not a floor witness).
+>   Adding any to the floor is an operator-owned exact-floor change; the settled
+>   contract does not require it.
+> - The census SCOPES a follow-on canonical-home / import-migration PROGRAM
+>   (Steward/Architect framing under the existing contract). The operator-facing
+>   fork: preserve exact-nine and authorize the full program, OR reopen the floor
+>   for named candidates. Escalated to the operator; the census quantifies it.
+>
+> ------------------------------------------------------------------------------
+> RECUT #1 (below) is HISTORICAL — its two-arm disposition is superseded by
+> AC-CENSUS. Retained for the hard-stop-#1 Pair boundary ruling it records.
+
 > # RECUT 2026-08-25 — narrow-and-defer (enclave boundary ruling; arm B)
 >
 > Hard stop #1 (native `Pair` vs the exact-nine floor) is resolved by the Spec
@@ -217,6 +259,44 @@ baseline-red residuals (language-implementer evt_3j60e77n0ahsy). Completion
 ranges over the real population, not the stale count.
 
 # Acceptance criteria
+
+AC-CENSUS (RECUT #2, OPERATIVE — supersedes the AC-B* series below, which is
+retained only as historical context for the Pair boundary). Component B delivers
+ONE artifact: a truthful census/prerequisite graph. No source edits, no
+newly-green unit, no whole-catalog / Pair-cluster / Order-Gcd / campaign closure.
+
+- AC-C1 (population from real discovery). The population is derived from the real
+  loader's root discovery (`catalog_module_from_path` over the populated catalog
+  root); the observed count (50 at dcfa19210) is an observation, never a frozen
+  contract. Every discovered canonical unit appears in the ledger EXACTLY ONCE.
+- AC-C2 (two truthful classes). Each unit is classified as exactly one of:
+  `StrictGreenAtBase` — the UNCHANGED real Strict loader succeeds for the whole
+  unit now; or `BlockedOn {p1..pn}` — a nonempty finite set of NAMED
+  canonical-home / missing-import prerequisites (a unit may require several).
+- AC-C3 (`BlockedOn` grounded by identity, not error text). For each blocked
+  unit, derive its COMPLETE dependency set from the successfully elaborated legacy
+  core by exact `GlobalId`, reconcile it against parsed imports and known provider
+  interfaces, and record for each excess identity either its canonical
+  provider/import edge or its missing canonical-home prerequisite. Error strings,
+  first-error order, source grep, and reported counts are NOT authorities.
+- AC-C4 (hard-stop discipline). A legacy elaboration failure, an identity with no
+  classification, or a strict failure not explained by that complete identity
+  ledger is a HARD STOP — never a catch-all defer. Semantic identity evidence
+  identifies a future migration need; it is NEVER a parsed import edge, a Strict
+  resolver authority, or a third disposition arm.
+- AC-C5 (byte-stable, no closure). Zero source/catalog/test production edits;
+  every unit's source stays byte-stable; zero `trusted_base()` delta. The census
+  is never resolver input. It claims no strict-green unit and closes no downstream
+  node.
+- AC-C6 (scoping deliverable). The committed ledger is the closed
+  population/prerequisite graph that scopes the follow-on canonical-home /
+  import-migration program. Nat-home and Arithmetic strict-green delivery are NOT
+  in this node — they move to a separately framed WP with their own strict-green
+  acceptance.
+- AC-C-NO-REGRESSION — whole-suite green in CI; local targeted `-p`/`--test` only,
+  never `--workspace`.
+
+The AC-B* series below is HISTORICAL (superseded by AC-CENSUS):
 
 - AC-B1 (recut — whole-catalog claim WITHDRAWN; Pair-independent strict-green +
   closed disposition). The whole-catalog strict-green claim is withdrawn from this
