@@ -23,6 +23,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+use crate::ElabEnv;
 use crate::ast::{
     BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, ImportItem, ImportKind,
 };
@@ -31,7 +32,6 @@ use crate::resolve::{
     self, RCtorDecl, RDecl, RDeclKind, RExplicitCtorDecl, RExpr, RMatchArm, RPatKind, RPattern,
     RPropIntro, RTelescopeEntry, RType,
 };
-use crate::ElabEnv;
 
 /// Persistent cross-call module bookkeeping (lives on `ElabEnv`).
 #[derive(Default, Clone)]
@@ -79,9 +79,20 @@ pub struct ModuleState {
 
 /// The complete Ken-defined always-present floor (`30-taxonomy §4`).
 ///
-/// D0 exposes the installer's source of truth without changing resolution.
-/// D1 may consult [`is_prelude_floor_name`] instead of duplicating this set.
-pub const PRELUDE_FLOOR_NAMES: [&str; 3] = ["Bool", "Char", "List"];
+/// Strict resolution consults [`is_prelude_floor_name`] so the configured
+/// inventory has one source of truth. Its signature arm is independently
+/// derived from every primitive declaration type by the realization controls.
+pub const PRELUDE_FLOOR_NAMES: [&str; 9] = [
+    "Auth",
+    "Bool",
+    "Char",
+    "List",
+    "Nat",
+    "Option",
+    "ResourceKind",
+    "Result",
+    "Utf8Error",
+];
 
 pub fn is_prelude_floor_name(name: &str) -> bool {
     PRELUDE_FLOOR_NAMES.contains(&name)
