@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-26 02:45:13Z — from 453 issue file(s) in `docs/program/issues/`.
+2026-08-26 02:51:15Z — from 454 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -62,6 +62,7 @@ the committed file matches the generator's output.
 | `CAT-GCD-REFACTOR` | Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last) | draft | foundation | S | none | — |
 | `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | merged | foundation | M | none | — |
 | `CAT-ORDER-PUB-EXPORT` | Bring catalog Data/Numeric/Nat/Order.ken.md to the pub-export standard — mark its declared exported operations (leq_nat, sub, min, max, compare) pub so packages can selectively import them, matching the already-compliant Arithmetic.ken.md; verify standalone elaboration and cross-package import resolution. The catalog-reuse prerequisite that unblocks CAT-GCD-REFACTOR. | ready | foundation | S | none | — |
+| `CAT-REUSE-CENSUS` | Catalog-reuse modernization census — a catalog-wide, source-editing-free inventory that sizes the rework campaign: per catalog package, enumerate (a) definitions now redundant with the expanded prelude, (b) tools reimplemented locally that a sibling module now pub-exports, (c) bottom-up file arrangement, each item risk-tagged (low computational-dup / higher proof-scaffolding). The census that scopes the per-package rework WPs; makes no source edits and closes nothing. | ready | foundation | M | none | — |
 | `CAT-SORT` | Verified insertion sort — Algorithm/Sorting: sort an Ord-ordered List with the Sorted and Permutation laws proved, the simplest-first anchor of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-VEC` | Length-indexed Vector — Data/Vector: Vec n a with total head/index/zip/map and the length laws, the deliberate fully-dependent probe of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CB-HYGIENE` | cranelift_backend facade: strip WP-token narration, separate test material from implementation | merged | runtime | S | none | — |
@@ -499,6 +500,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `ABI-M1` — manifest v2 — family-scoped, versioned, generated from family schemas
 - `CAT-ORDER-PUB-EXPORT` — Bring catalog Data/Numeric/Nat/Order.ken.md to the pub-export standard — mark its declared exported operations (leq_nat, sub, min, max, compare) pub so packages can selectively import them, matching the already-compliant Arithmetic.ken.md; verify standalone elaboration and cross-package import resolution. The catalog-reuse prerequisite that unblocks CAT-GCD-REFACTOR.
+- `CAT-REUSE-CENSUS` — Catalog-reuse modernization census — a catalog-wide, source-editing-free inventory that sizes the rework campaign: per catalog package, enumerate (a) definitions now redundant with the expanded prelude, (b) tools reimplemented locally that a sibling module now pub-exports, (c) bottom-up file arrangement, each item risk-tagged (low computational-dup / higher proof-scaffolding). The census that scopes the per-package rework WPs; makes no source edits and closes nothing.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
