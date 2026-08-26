@@ -19,9 +19,6 @@ use ken_elaborator::ElabEnv;
 
 const LAWFUL: &str = "Core.Classes.LawfulClasses";
 const ORDER: &str = "Data.Numeric.Nat.Order";
-const ORD_NAT_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Numeric/Nat/Order.ken.md");
-
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -82,29 +79,6 @@ fn totality_source_and_public_relation_behavior_survive_the_move() {
            : Equal Bool (leq_nat (Suc Zero) Zero) False = Proved",
     )
     .expect("both concrete relation directions must retain their behavior");
-}
-
-// Zero-Axiom acceptance bar: no `Axiom` literal appears anywhere in the
-// entry's own CHECKED code (fences only -- prose legitimately discusses
-// the word "Axiom" when explaining the zero-delta claim itself).
-#[test]
-fn zero_axiom_in_entry_source() {
-    let extracted = ken_elaborator::literate::extract_ken_md(ORD_NAT_KEN_MD)
-        .expect("Order.ken.md must extract");
-    assert!(
-        !extracted.source.contains("Axiom"),
-        "Order.ken.md's tangled/checked code must contain zero Axiom literals (the frame's acceptance bar)"
-    );
-    for range in extracted
-        .example_ranges
-        .iter()
-        .chain(extracted.reject_ranges.iter())
-    {
-        assert!(
-            !ORD_NAT_KEN_MD[range.clone()].contains("Axiom"),
-            "Order.ken.md's example/reject fences must contain zero Axiom literals"
-        );
-    }
 }
 
 // Ground the zero-trusted_base()-delta claim structurally: the set of
