@@ -480,17 +480,19 @@ unrelated `ElabEnv` does not satisfy them.
 
 - promise class: **normative compatibility vector** — the exact floor is closed
   in both directions
-- spec: `30-taxonomy §4` (closed prelude floor), `33 §3.3` (exact nine-type
-  floor and no convenience-global fallback), `39 §2.0` step 4
+- stage: **RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE` floor realization**
+- spec: `30-taxonomy §4` (closed prelude floor), `33 §3.3` (exact ten-type
+  floor, three Pair companions, and no convenience-global fallback), `39 §2.0`
+  step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
   path to register the transparent Ken definition `def Ambient = Bool` under
   the bare implementation-global spelling `Ambient`. Then invoke the strict
   roots loader. The controlled arms are:
 
-  1. entry `Floor` contains checked aliases reaching all nine floor types,
-     values and exhaustive matches reaching every floor constructor,
-     `bytes_at`/`bytes_slice` uses whose results are matched as `Option`, and a
-     `bytes_decode` use matched as
+  1. entry `Floor` contains checked aliases reaching all ten floor types,
+     values and exhaustive matches reaching every floor constructor, all three
+     Pair companion bindings, `bytes_at`/`bytes_slice` uses whose results are
+     matched as `Option`, a `bytes_decode` use matched as
      `Result Utf8Error String`, and functions typed by `Cap a` and
      `Resource k`;
   2. entry `Leaky` contains only `pub def X = Ambient`;
@@ -502,8 +504,9 @@ unrelated `ElabEnv` does not satisfy them.
   Arms 2 and 3 both retain the pre-registered bare `Ambient` in the same kind
   of `ElabEnv`; arm 4 retains the compiler-installed checked `Prod`. No
   test-only export map is installed.
-- expect: arm 1 accepts and every resolved type/constructor reference carries
-  the recorded pre-source `GlobalId`. Arm 2 rejects `Ambient` as unbound even
+- expect: arm 1 accepts and every resolved type, constructor, and Pair-companion
+  reference carries the recorded pre-source `GlobalId`. Arm 2 rejects `Ambient`
+  as unbound even
   though the implementation global exists. Arm 3 accepts and resolves `X`
   through the imported provider declaration, not the bare global. Arm 4 rejects
   `Prod` as unbound. None changes `trusted_base()`.
@@ -514,10 +517,11 @@ unrelated `ElabEnv` does not satisfy them.
   checked convenience from a later arbitrary global. Widening all globals,
   removing the floor, or forbidding explicit imports each fails a different arm.
 
-The expanded floor arm and the four cases below are **RED UNTIL
-LANG-MOD-NAT-FLOOR-REALIZATION**. The existing strict-Nat rejection is a
-transition sentinel that this build must invert; it is not retained beside the
-new contract.
+The nine-member Nat realization is landed. The Pair additions to this floor arm
+and the Pair-specific rows below are **RED UNTIL the redirected
+`LANG-MOD-CANONICAL-PAIR-PACKAGE` floor-realization build**. The former
+strict-Pair rejection is historical evidence, not a sentinel retained beside
+the new contract.
 
 ### surface/modules/prelude-floor-reuses-exact-types-and-constructors
 
@@ -525,12 +529,13 @@ new contract.
   identity and trust do not
 - spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
-  of `Auth`, `Bool`, `Char`, `List`, `Nat`, `Option`, `ResourceKind`, `Result`,
-  and `Utf8Error`; record every constructor id and kernel parent; and snapshot
-  `declarations().len()`, `next_global_id()`, and `trusted_base()`. Through
-  strict roots elaborate an entry with checked declarations that reach every
-  recorded id, including actual `bytes_at`/`bytes_slice`/`bytes_decode`, `Cap`,
-  and `Resource` signatures.
+  of `Auth`, `Bool`, `Char`, `List`, `Nat`, `Option`, `Pair`, `ResourceKind`,
+  `Result`, and `Utf8Error`; record every constructor id and kernel parent;
+  record `mk_pair`, `pair_fst`, and `pair_snd` plus their exact reference to the
+  Pair id; and snapshot `declarations().len()`, `next_global_id()`, and
+  `trusted_base()`. Through strict roots elaborate an entry with checked
+  declarations that reach every recorded id, including actual
+  `bytes_at`/`bytes_slice`/`bytes_decode`, `Cap`, and `Resource` signatures.
 - expect: every emitted type/body contains the corresponding recorded id. The
   inductive members and their exact constructors are:
 
@@ -545,21 +550,24 @@ new contract.
   | `Result` | `Err`, `Ok` |
   | `Utf8Error` | `InvalidUtf8` |
 
-  `Char` is the checked transparent member and has no constructors. Every
-  constructor still reports the recorded parent. Declaration count and allocator
-  advance by exactly the number of source declarations, with no extra family or
-  constructor allocation. No recorded floor id enters `trusted_base()`.
+  `Char` and checked-transparent `Pair` have no constructors. Pair's three
+  companions are bindings, not type members, and each resolves to its recorded
+  id. Every constructor still reports the recorded parent. Declaration count
+  and allocator advance by exactly the number of source declarations, with no
+  extra family, constructor, or companion allocation. No recorded floor id
+  enters `trusted_base()`.
 - why: ids and parentage are the property. Comparing names or data shapes cannot
   distinguish a replacement family, and a source-only positive that never uses
   the byte/capability/resource primitives would not prove their public result
   and parameter types are nameable.
-- **MEASURED:** with only the nine-name floor inventory mutated at base
-  `06c62313af62`, all recorded ids are reused, every public signature use
-  elaborates, only source declarations allocate, and `trusted_base()` is
-  unchanged. **CLAIMED:** floor installation exposes the existing checked
-  identities without creating or trusting anything. **THE GAP:** the build must
-  derive every constructor from the recorded parent and must not substitute an
-  equal-shaped or same-spelling declaration.
+- **MEASURED:** the landed nine-type floor reuses all recorded ids and preserves
+  accounting and trust. At base `c1945c6fbbd7b0d8422123904fc6f7138fc85df9`,
+  the four transparent Pair-family declarations already exist as `g232`–`g235`
+  and remain untrusted. **CLAIMED:** the ten-type floor and three-companion
+  inventory expose those existing checked identities without creating or
+  trusting anything. **THE GAP:** the build must capture the Pair family through
+  the closed floor path, derive every constructor from recorded parentage, and
+  reject equal-shaped or same-spelling substitutions.
 
 ### surface/modules/prelude-floor-clash-and-lookalike-matrix
 
@@ -576,18 +584,24 @@ new contract.
      preserving the same declaration shape.
 
   For constructor-free `Char`, pair `def Char = Int` with the same-production
-  positive `def LocalChar = Int`.
+  positive `def LocalChar = Int`. For transparent `Pair` and its three companion
+  bindings, run the independent four-row collision matrix in
+  `seed-pair-strict-boundary.md`; pair every same-spelling reject with an
+  all-renamed transparent positive.
 - expect: every same-spelling row raises `AmbiguousReference` naming the one
   retained floor spelling before any declaration or `GlobalId` is allocated.
   Every all-renamed positive accepts. Each renamed inductive former and
   constructor has an id distinct from every floor id, and each constructor's
   parent is its renamed local former; `LocalChar` is likewise a distinct checked
-  transparent id. Every row preserves `trusted_base()`.
+  transparent id. The Pair-family rows likewise reject before allocation, while
+  every renamed transparent lookalike receives a fresh id. Every row preserves
+  `trusted_base()`.
 - why: a generic `expect_err`, or one all-names-collide fixture, can pass at the
   parser, positivity checker, or the wrong collision. One-axis rows plus
   same-production positives establish reachability and exact error phase for
-  every binding. The renamed lookalikes prove structural equality is not
-  canonical identity.
+  every binding. The companion matrix prevents a type-only floor check from
+  leaving helper replacement open. The renamed lookalikes prove structural
+  equality is not canonical identity.
 - **MEASURED:** all-renamed same-shape families elaborate under distinct ids;
   current root loading still admits and shadows a same-spelling floor
   declaration. **CLAIMED:** every floor name is immutable and rejects before
@@ -602,11 +616,11 @@ new contract.
 - spec: `33 §4.3`, `§5.3`, `§5.5.1`; `39 §6.1`;
   `50-stdlib/51 §7`
 - given: strict-load the realized `Core.Classes.LawfulClasses` and
-  `Data.Numeric.Nat.Order` units. Record the bootstrap `Nat` id and the
+  `Data.Numeric.Nat.Order` units. Record the kernel-origin floor `Nat` id and the
   `Ord_instance_Nat` dictionary declared by `LawfulClasses`. Exercise implicit
   `where Ord Nat` once through the class package's public surface and once
   through `Order`'s reader-facing re-export/admission surface.
-- expect: the instance record's head is the exact bootstrap `Nat`; both use
+- expect: the instance record's head is the exact floor `Nat`; both use
   sites select the same dictionary `GlobalId`; successful-resolution provenance
   names `Core.Classes.LawfulClasses`; and the environment contains one
   `(Ord, Nat)` structure entry. Loading/re-exporting `Order` adds no second
@@ -1318,14 +1332,14 @@ monotone-downward and revocation management actions remain runner/host-internal
   an arbitrary pre-registered Ken global. None can be implemented by clearing
   all imports or disabling the prelude.
 - **Floor availability, identity, and instance ownership are separate axes.**
-  Strict uses of all nine floor types and every exact constructor accept on the
-  recorded ids, including the public primitive signatures that require the
-  signature arm. Every same-spelling type/constructor declaration rejects while
-  each all-renamed lookalike gets distinct ids and local parentage. Ambient
-  availability still does not make an unrelated module a head owner. The actual
-  `Ord Nat` case then requires class-owned provenance and one carried
-  dictionary. Widening globals, comparing only shapes, or treating re-export as
-  ownership satisfies at most one axis.
+  Strict uses of all ten floor types, every exact constructor, and all three
+  Pair companions accept on the recorded ids, including the public primitive
+  signatures that require the signature arm. Every same-spelling floor binding
+  rejects while each all-renamed lookalike gets distinct ids and local
+  parentage. Ambient availability still does not make an unrelated module a
+  head owner. The actual `Ord Nat` and Pair-instance cases then require
+  class-owned provenance. Widening globals, comparing only shapes, or treating
+  re-export as ownership satisfies at most one axis.
 - **Root refusal does not decide multi-root precedence.** The root/path matrix
   accepts the one-root anchor and rejects zero or two populated roots in this
   source-world round. It says nothing about how a later package-manager round
@@ -1440,23 +1454,23 @@ identity/cycle/flat-`Σ` homes in §D5 remain unchanged. A direct call to the
 loader does not discharge the front-end row, and an eager scan does not
 discharge the lazy-poison pair.
 
-## Build-forward (closed signature + bootstrap floor)
+## Build-forward (closed signature + internal-provision floor)
 
-`LANG-MOD-NAT-FLOOR-REALIZATION` replaces the former three-name configuration
-with the explicit, mechanically checked nine-type inventory: `{Auth, Bool,
-Char, List, Nat, Option, ResourceKind, Result, Utf8Error}`. An executable
-closure check traverses every primitive declaration type, derives the
-eight-member signature arm, and requires exact equality with the configured
-inventory after adding bootstrap `Nat`; it never widens resolution implicitly.
-Constructor capture admits only ids with an exact recorded floor parent.
-It flips the current strict-Nat sentinel, exercises the public byte/capability/
-resource signatures under strict roots, keeps non-members such as `Prod`
-unavailable, and closes every root-unit floor clash before allocation. The one
-canonical `instance Ord Nat` moves to the class-owning
-`Core.Classes.LawfulClasses` unit; `Data.Numeric.Nat.Order` carries that same
-dictionary without redeclaring it. Floor installation adds zero declarations,
-ids, or trusted entries; the instance adds one transparent checked dictionary
-and zero trusted entries.
+`LANG-MOD-NAT-FLOOR-REALIZATION` landed the signature-eight plus kernel-origin
+`Nat` nine-type floor. The redirected
+`LANG-MOD-CANONICAL-PAIR-PACKAGE` build extends the same mechanism with
+compiler-origin `Pair`, producing the explicit ten-type inventory
+`{Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result, Utf8Error}`
+and the separate three-companion inventory
+`{mk_pair, pair_fst, pair_snd}`. The executable closure check derives the
+signature eight and exact internal `{Nat, Pair}` independently; it never widens
+resolution from compiler-global presence. Constructor capture remains exact
+parent-derived. Pair-family capture reuses the four pre-source ids and checks
+that every companion type references the exact Pair id. The build flips the
+four strict-Pair rows, keeps non-members such as `Prod` unavailable, and closes
+every Pair-binding clash before allocation. Canonical `Ord Nat`, `Ord Pair`,
+and `DecEq Pair` placement follows the class-owner rule. Floor installation adds
+zero declarations, ids, or trusted entries.
 
 ## Build-forward (N3 Lane B)
 

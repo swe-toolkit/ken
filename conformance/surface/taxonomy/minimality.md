@@ -43,18 +43,20 @@ here would be bloat. None found (all four are genuine).
 | **The effect / FFI boundary** — `foreign` + the base `IO`/effect primitive (`[Console]`/`[FS]`; `print_line` foreign) | I/O is not pure Ken — the effect boundary is where the world enters. |
 | **Base elaborator syntax** — λ/app/`let`/`match`/annotation/`data`/`view`/`instance`, refinement types, the **operator-infix + fixity** affordance, `if`-sugar, minimal `module`/`import` | the language forms themselves; the parser/elaborator realizes them. (Note: `if` *desugars* to `match`, and operator *semantics* is package — but the **syntactic affordance** to write them is base. Syntax built-in; semantics derivable.) |
 
-## B. The prelude set (closed signature + bootstrap inventories — AC2)
+## B. The prelude set (closed signature + internal-provision inventories — AC2)
 
 **Membership rule (normative, checkable):** the prelude is the closed union of
-(1) Ken-defined types named by built-in primitive signatures and (2)
-compiler-bootstrap identities that the surface contract requires source to name
-and that source cannot recreate with the same `GlobalId` (`30-taxonomy §4`).
-The signature arm is derived from the executable population: traverse the type
-of every `Decl::Primitive`, then retain references whose declaration is an
-ordinary checked inductive or transparent definition. The bootstrap arm requires
-an exact-identity, constructor-parentage, and no-allocation witness. This is the
-surface analog of the kernel's closed `is_prelude = {Top, Bottom, tt}` (`64 §1`),
-not a catch-all.
+(1) Ken-defined types named by built-in primitive signatures and (2) internally
+provided identities that the surface contract independently requires source to
+name and that source cannot recreate with the same `GlobalId` (`30-taxonomy
+§4`). An internal-provision witness names its origin as kernel boundary or
+compiler bootstrap and records the exact pre-source identity. Mere compiler
+map presence is not a witness. The signature arm is derived from the executable
+population: traverse the type of every `Decl::Primitive`, then retain references
+whose declaration is an ordinary checked inductive or transparent definition.
+The internal-provision arm requires exact identity, any constructor parentage,
+and no-allocation witnesses. This is the surface analog of the kernel's closed
+`is_prelude = {Top, Bottom, tt}` (`64 §1`), not a catch-all.
 
 | Prelude type | Membership witness | Derivation / identity witness |
 |---|---|---|
@@ -66,65 +68,73 @@ not a catch-all.
 | **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer`; the opaque primitive former needs this exact parameter identity. |
 | **`Result`** | signature: `bytes_decode : Bytes → Result Utf8Error String` | ordinary checked `data Result e a = Err e \| Ok a`; strict source must eliminate the exact result family. |
 | **`Utf8Error`** | signature: the error argument of `bytes_decode`'s result | ordinary checked `data Utf8Error = InvalidUtf8`; no replacement family can inhabit the primitive result. |
-| **`Nat`** | bootstrap identity: source must reach the compiler-installed family used as Ken's canonical natural/index carrier | ordinary checked `data Nat = Zero \| Suc Nat`; strict-floor installation reuses those exact ids and allocates none. |
+| **`Nat`** | internal provision, kernel origin: source must reach the canonical natural/index family | ordinary checked `data Nat = Zero \| Suc Nat`; strict-floor installation reuses those exact ids and allocates none. |
+| **`Pair`** | internal provision, compiler-bootstrap origin: source must reach the one transparent non-dependent Sigma family | ordinary checked transparent definition; floor installation reuses its exact id. Its exact companions `mk_pair`/`pair_fst`/`pair_snd` are bindings, not type members. |
 | **`Ω` (Omega)** | kernel syntax: no-overflow propositions land in `Ω₀` | **kernel-provided** (the strict-prop universe, `16 §1`) — a kernel built-in referenced directly, not a surface prelude binding. |
 
 The signature arm therefore closes to exactly **`{Auth, Bool, Char, List,
-Option, ResourceKind, Result, Utf8Error}`**; the bootstrap arm adds exactly
-**`Nat`**. For every inductive member, the floor admits constructors only by
-matching their kernel-recorded parent `GlobalId`; `Char` has no constructor arm.
-Every listed family/definition and constructor is outside `trusted_base()`.
-Compiler-installed checked declarations outside this union are not admitted by
-mere possession. In particular, `Pair` is absent from every primitive signature
-and has no bootstrap-identity witness; its transient implementation-global
-identity is not a floor member or a Strict provider.
+Option, ResourceKind, Result, Utf8Error}`**; the internal-provision arm adds
+exactly **`{Nat, Pair}`**. Their union is the exact ten-type floor. For every
+inductive member, the floor admits constructors only by matching their
+kernel-recorded parent `GlobalId`; `Char` and transparent `Pair` have no
+constructor arm. Pair's companion inventory is exactly
+`{mk_pair, pair_fst, pair_snd}`; each checked type is keyed to the exact Pair id.
+Every listed family, definition, constructor, and companion is outside
+`trusted_base()`. Compiler-installed checked declarations outside these closed
+inventories are not admitted by mere possession.
 
 ### surface/taxonomy/prelude-signature-inventory-is-executable-and-closed
 
 - promise class: **normative compatibility vector** — these exact identities are
-  the current public primitive-signature and bootstrap contract
+  the public primitive-signature and internal-provision contract
 - spec: `30-taxonomy §4`; `33 §3.3`; `39 §2.0`
 - given: in a fresh `ElabEnv`, walk the type term of **every**
   `Decl::Primitive`, collecting each referenced `GlobalId` whose declaration is
   `Decl::Inductive` or checked `Decl::Transparent`. Independently snapshot the
-  nine expected type ids, every constructor id and recorded parent,
-  `declarations().len()`, `next_global_id()`, and `trusted_base()`. Do not select
-  declarations by helper name, source file, or a hand-picked primitive list.
+  ten expected type ids, every constructor id and recorded parent, the three
+  Pair companion ids and checked types, `declarations().len()`,
+  `next_global_id()`, and `trusted_base()`. Do not select declarations by helper
+  name, source file, or a hand-picked primitive list.
 - expect: the checked dependency set is exactly `{Auth, Bool, Char, List,
-  Option, ResourceKind, Result, Utf8Error}`. Adding bootstrap `Nat` equals the
-  exact floor type set, and the pre-installed checked `Pair` identity is absent
-  from both sets. The constructor set is exactly the constructors recorded under
-  the seven inductive signature members plus `Nat`; no same-spelling
-  constructor with another parent qualifies. None of the type or constructor ids
-  appears in `trusted_base()`, and installing the floor changes neither
-  declaration count nor allocator position.
+  Option, ResourceKind, Result, Utf8Error}`. Adding the independently witnessed
+  internal-provision set `{Nat, Pair}` equals the exact ten-type floor. The
+  constructor set is exactly the constructors recorded under the seven
+  inductive signature members plus `Nat`; no same-spelling constructor with
+  another parent qualifies. The separate companion set is exactly
+  `{mk_pair, pair_fst, pair_snd}`, and every companion type references the exact
+  Pair id. None of the type, constructor, or companion ids appears in
+  `trusted_base()`, and installing the floor changes neither declaration count
+  nor allocator position.
 - controls: prove both equality directions with compile-preserving mutations.
   For under-inclusion, install a checked `Extra` type and a real test-only
   primitive whose signature names `Extra`, leaving the configured floor
   unchanged; the derived signature set grows and the assertion must red. For
-  over-inclusion, first add the existing checked `Pair` identity only to the
-  configured floor and, independently, repeat with pre-installed checked
-  `Prod`, without adding a primitive/bootstrap witness; the configured set
-  grows and the same assertion must red in each arm.
+  over-inclusion, add pre-installed checked `Prod` to the configured floor
+  without a signature or internal-provision witness; exact equality must red.
+  Independently count a companion as a type or substitute a fresh same-shaped
+  Pair id; the kind or identity assertion must red.
 - why: producer traversal closes the population by construction. A selected
   `reg_*` grep omits primitives registered through another helper; a spelling
   list cannot distinguish a constructor attached to a lookalike family.
-- **MEASURED:** at base `06c62313af62`, the producer traversal returns the exact
-  eight-id set above; admitting their union with `Nat` preserves all ids,
-  declaration/allocator accounting, and `trusted_base()`. A pre-installed
-  non-member such as `Prod` remains unbound in strict roots. **CLAIMED:** the
-  executable inventory is the whole prelude floor. **THE GAP:** conformance must
-  derive the signature set from all primitive declarations, compare it with the
-  explicit configured floor, and fail on a difference in either direction.
-  Production resolution must not auto-admit an unreviewed newly observed name.
+- **MEASURED:** at base `06c62313af62`, the producer traversal returned the
+  exact eight-id signature set; admitting its union with `Nat` preserved ids,
+  accounting, and trust. At base `c1945c6fbbd7b0d8422123904fc6f7138fc85df9`,
+  the compiler installs transparent `Pair = g232`, `mk_pair = g233`,
+  `pair_fst = g234`, and `pair_snd = g235`, all outside `trusted_base()`, while
+  the current configured floor remains nine. **CLAIMED:** the exact internal
+  witness set is `{Nat, Pair}`, its union with the signature set is the ten-type
+  target, and the three companions form a separate binding inventory.
+  **THE GAP:** the floor-realization build must make the executable derivation
+  and Strict resolution match those closed inventories. Production resolution
+  must not auto-admit an unreviewed newly observed name.
 
-This case and the strict source-reaching cases in
-`../modules/seed-modules.md` are **RED UNTIL
-`LANG-MOD-NAT-FLOOR-REALIZATION`**.
+This case and the Pair strict source-reaching cases in
+`../modules/seed-modules.md` are **RED UNTIL the redirected
+`LANG-MOD-CANONICAL-PAIR-PACKAGE` floor-realization build**.
 
 **AC2 bloat finding — `OrdResult`.** `data OrdResult = Lt | Eq | Gt`
 (`prelude.rs`) sits in the elaborator prelude, but no primitive signature names
-it and it has no independent bootstrap-identity witness. By the membership rule
+it and it has no independent internal-provision witness. By the membership rule
 it is **not prelude**. Its origin is a workaround for an opaque,
 non-matchable `Bool`; F1's ordinary `data Bool` removes that need. **Ruled
 (`30-taxonomy §6`, `7fa08cd`):** remove `OrdResult` as bloat; the `Ord` package's
@@ -142,7 +152,7 @@ load-bearing observation).
 |---|---|---|
 | **operators** (`+ - * % == < >`) | `Ord`/`Eq` **class methods** (Lc, landed — `lawful_classes.ken`) back `== < >`; `+ - * %` bind directly to the audited prim ops (`int_add` etc. via `reg_binop`) + operator-infix syntax — **`class Num`/`instance Num Int` are specified-but-not-built** (named forward obligation, a future `class Num` WP), so `+`/`*` are not yet class-abstracted; user types get `== < >` by writing `Eq`/`Ord` instances | the audited prim op (`reg_binop`/`reg_cmpop`) + operator-infix syntax (base) + Lc |
 | **`show`/formatting** (`Int.show`, …) | `Int` `div`/`mod` prims → digit `Char`s (literals) → `List Char` → **`list_char_to_string`** (landed) → concat via **`append`** (landed) | `div`/`mod` prims, Char literals, `list_char_to_string`, `append` (**all landed** `bytes.rs`/`numbers.rs`) |
-| **named non-dependent pair** (`Pair`/`mk_pair`/`pair_fst`/`pair_snd`) | checked transparent definitions over kernel `Sigma`/pair introduction/projections; fst/snd β and reconstruction η are definitional (`34 §"Canonical non-dependent pair package"`) | dependent-pair syntax + kernel Σ conversion (`13 §2`/`§6`); explicit package import, never floor |
+| **named non-dependent pair** (`Pair`/`mk_pair`/`pair_fst`/`pair_snd`) | one compiler-origin floor type plus three companion bindings, reusing checked transparent definitions over kernel `Sigma`/pair introduction/projections; fst/snd β and reconstruction η are definitional (`34 §"Canonical non-dependent pair floor family"`) | internal-provision witness + exact pre-source ids; kernel Σ conversion (`13 §2`/`§6`); no package identity or import |
 | **collection combinators** (`map`/`filter`/`fold`/`range`) | total structural recursion over `List`/`elim_List` (L2/L3); `range` = fuel-bounded unfold (`37 §5`, no coinduction) | `data List` + `elim_List` (L2), recursion + SCT |
 | **lawful classes** (`Monoid`/`Functor`/`Monad`/`Foldable`) | `class`/`instance` records (Lc, landed) carrying law propositions | Lc (`33 §5`, landed) + Ω (laws) |
 | **string manipulation** (`split`/`join`/`pad`/`toUpper`) | over `String↔List Char` (landed conversions) + `append` + the combinators | `String↔List Char` + `append` + combinators |
@@ -223,10 +233,11 @@ ordinary data representation.
   table exercises **bloat** (§B `OrdResult`, §D `Equal`/`And`/…) **and**
   hidden-built-in (§C, none found; the floor named).
 - **AC2** (prelude closed by the two-arm rule): §B — executable traversal of
-  every primitive type closes the eight-member signature set, the
-  exact-identity/no-allocation `Nat` bootstrap witness adds the ninth member,
-  and the `OrdResult` bloat finding proves the opposite direction (ruled remove;
-  `Ordering`→package, §6).
+  every primitive type closes the eight-member signature set; exact-identity,
+  origin, and no-allocation witnesses add the internal set `{Nat, Pair}` and
+  yield the ten-type floor plus three Pair companions. The `OrdResult` bloat
+  finding proves the opposite direction (ruled remove; `Ordering`→package,
+  §6).
 - **AC3** (load-bearing predicates specified as definitions): §D — `And`/
   `isSorted`/`Perm` with defining equations + Ω-sort witnesses; the
   verified-`sort` refinement (`37 §6`) unfolds them (green-vs-green against a

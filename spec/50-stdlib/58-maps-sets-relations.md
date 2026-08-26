@@ -138,11 +138,11 @@ order), transparent and match-based like the landed `bool_or`
 (`lawful_classes.ken:39`): `bool_and a b := match a { True => b ; False => False
 }` and `bool_not b := match b { True => False ; False => True }`.
 
-Every named `Pair`/`pair_fst`/`pair_snd` use in the operations below assumes an
-explicit import of the canonical transparent-Σ interface specified by
-`../30-surface/34 §"Canonical non-dependent pair package"`. Those positive
-strict vectors are RED-UNTIL the interface is realized; no ambient compiler
-convenience discharges the import.
+Every named `Pair`/`pair_fst`/`pair_snd` use in the operations below refers to
+the canonical compiler-origin transparent-Σ floor family specified by
+`../30-surface/34 §"Canonical non-dependent pair floor family"`. Those positive
+Strict vectors are RED-UNTIL the floor-realization build admits the existing
+identities; no package import or ambient fallback discharges that gate.
 
 ## 3. D1 — `delete` (rebuild-via-`from_list`, Fork D)
 

@@ -274,15 +274,15 @@ claim with no conformance case is a claim no one can rely on
   minting orthogonal. Each assertion names its parser, N4, or
   I-4 §B reachability gate; re-export-carried instance surfaces and multi-root
   precedence remain out.
-- `surface/modules/seed-pair-strict-boundary.md` — the non-floor convenience
-  boundary for named `Pair`: a four-name strict-bare reject matrix, local
-  same-shape/distinct-identity controls, Pair-specific exact-nine mutation, and
-  RED-UNTIL forward oracles for the one-interface transparent-Σ package,
-  definitional fst/snd β plus reconstruction η, representation-derived nested
-  positivity, and authoritative whole-unit cluster re-entry. It preserves the
-  class-owned `Ord Nat` and attached-proof obligations while excluding core
-  `Term::Pair`, runtime `EvalVal::Pair`, and local declarations that merely use
-  the spelling.
+- `surface/modules/seed-pair-strict-boundary.md` — the compiler-origin floor
+  boundary for named `Pair`: a build-gated four-name Strict accept matrix on the
+  existing ids, exact signature-eight/internal-`{Nat, Pair}`/ten-type derivation,
+  a separate three-companion inventory, collision and same-shape/distinct-id
+  controls, transparent-Sigma β/η, representation-derived nested positivity,
+  and fresh post-realization Strict closure. It preserves class-owned `Ord Nat`
+  and Pair-instance placement plus attached-proof obligations while excluding
+  core `Term::Pair`, runtime `EvalVal::Pair`, and local declarations that merely
+  use the spelling.
 - `runtime/seed-runtime.md` and `runtime/values/README.md` — closure-free
   canonical bytes + extensional equality with private storage;
   ordinary-closure opacity, aggregate `DecEq` absence, and transitive

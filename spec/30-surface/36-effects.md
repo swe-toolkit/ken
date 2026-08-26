@@ -926,9 +926,9 @@ run_state s₀ m  :  a × s        when F = ∅   -- pure collapse: ITree 𝟘 (
   that §4.2 returns (`(r, s)`, a right-nested Σ / record with η, `13 §3`),
   realized at runtime by the interpreter's `EvalVal::Pair` (`ken-interp`). This
   denotation uses raw dependent-pair syntax and the kernel term constructor; it
-  does not assume ambient availability of the named standard-package `Pair`.
-  Source that chooses the equivalent named `Pair a s` spelling imports its
-  canonical interface (`34 §"Canonical non-dependent pair package"`). A named
+  does not depend on name resolution for the canonical floor `Pair`. Source may
+  use the equivalent always-present `Pair a s` spelling and its companion
+  bindings (`34 §"Canonical non-dependent pair floor family"`). A named
   inductive `data Prod a b = MkProd a b` is a distinct checked convenience
   outside the strict floor; the denotation uses neither that identity nor an
   ambient fallback.

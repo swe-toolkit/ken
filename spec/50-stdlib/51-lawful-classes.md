@@ -357,18 +357,23 @@ delta for a primitive carrier, `§6`). This spec chapter is the **contract**; th
 Team-Language build follow-on lands the `.ken` source (classes + canonical
 law-carrying instances) + wires `where Ord a` to supply the comparator.
 
-**Canonical `Ord Nat` placement.** `Nat` is a compiler-bootstrap prelude head
-(`30 §4`), not a head defined by a source package. Under the unchanged orphan
-rule (`33 §5.3`), its canonical `Ord` dictionary therefore uses the class-owner
-arm: `instance Ord Nat` is declared in `Core.Classes.LawfulClasses`, the module
-that defines `Ord`, and is keyed by the exact bootstrap `Nat` identity. This is
-the existing class-side pattern for canonical carrier instances (`Bool` and
-`List`, and later the explicitly imported canonical `Pair` package), not a new
-ownership mechanism. Deferring the Pair-dependent `LawfulClasses` unit does not
-transfer `Ord Nat` ownership: the dictionary remains owed at this class-owned
-locus. The reader-facing `Data.Numeric.Nat.Order` module imports and re-exports
-the relevant
-class surface and carries that same dictionary under `33 §5.5.1`; it never
+**Canonical floor-head instance placement.** `Nat` is a kernel-origin member of
+the prelude's internal-provision arm (`30 §4`), not a head defined by a source
+package. Under the unchanged orphan rule (`33 §5.3`), its canonical `Ord`
+dictionary therefore uses the class-owner arm: `instance Ord Nat` is declared
+in `Core.Classes.LawfulClasses`, the module that defines `Ord`, and is keyed by
+the exact floor `Nat` identity. This is the existing class-side pattern for
+canonical carrier instances (`Bool` and `List`), not a new ownership mechanism.
+
+The compiler-origin floor `Pair` has the same ownership consequence. Canonical
+parameterised `Ord (Pair a b)` and `DecEq (Pair a b)` dictionaries are lawful
+only here, in the module that defines those classes, and are keyed by the exact
+floor `Pair` identity. No source package or facade owns that head. Deferring the
+Pair-dependent `LawfulClasses` unit until the Pair floor realization does not
+transfer `Ord Nat` or Pair-instance ownership: each dictionary remains owed at
+this class-owned locus. The reader-facing `Data.Numeric.Nat.Order` module
+imports and re-exports the relevant class surface and carries that same
+dictionary under `33 §5.5.1`; it never
 redeclares the instance and never becomes the head owner. The dictionary and
 its supporting proof terms are ordinary transparent, kernel-rechecked Ken, so
 the instance contributes zero `trusted_base()` entries. A local same-shaped

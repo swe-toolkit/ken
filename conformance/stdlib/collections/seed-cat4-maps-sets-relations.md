@@ -107,10 +107,11 @@ faithfulness rows retain their already-named design/defer boundary.
 
 ---
 
-Named `Pair` uses in the D1/map signatures below are positive package vectors.
-They are RED-UNTIL the canonical Pair package and, once realized, begin from an
-explicit import of its transparent-Σ interface. The relation representation's
-negative `Set (Pair K K)` discussion is comparative and grants no ambient name.
+Named `Pair` uses in the D1/map signatures below are positive floor-family
+vectors. They are RED-UNTIL the compiler-origin Pair floor realization and then
+use its always-present transparent-Σ bindings without a package import. The
+relation representation's negative `Set (Pair K K)` discussion is comparative
+and grants no unrelated ambient name.
 
 ## Scope — canonical shapes (Architect-pinned; reconcile spellings at merge)
 

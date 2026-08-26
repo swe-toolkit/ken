@@ -258,25 +258,26 @@ is a **surface error** (`24`) — it never reaches the kernel:
   module scope: its local declarations, its explicit imports, the kernel and
   built-in vocabulary, and the closed prelude floor from `30-taxonomy §4`.
   Among Ken-defined type names that floor is exactly `{Auth, Bool, Char, List,
-  Nat, Option, ResourceKind, Result, Utf8Error}`. Its constructor bindings are
-  derived, never listed by spelling alone: `ANone`/`APartial`/`AFull` must have
-  parent `Auth`; `True`/`False` parent `Bool`; `Nil`/`Cons` parent `List`;
+  Nat, Option, Pair, ResourceKind, Result, Utf8Error}`. Its constructor bindings
+  are derived, never listed by spelling alone: `ANone`/`APartial`/`AFull` must
+  have parent `Auth`; `True`/`False` parent `Bool`; `Nil`/`Cons` parent `List`;
   `Zero`/`Suc` parent `Nat`; `None`/`Some` parent `Option`;
   `FsHandle`/`Buffer` parent `ResourceKind`; `Err`/`Ok` parent `Result`; and
   `InvalidUtf8` parent `Utf8Error`. Each parent comparison is against the exact
-  floor `GlobalId`. `Char` is the constructor-free transparent member. Loading
-  a dependency is not an implicit import: the dependency cannot borrow imports
-  from its caller, and its own imports do not enter the caller's scope. An
-  implementation-private convenience registered outside the closed floor is
-  not ambient authority for name resolution. A package must import such a name
-  from its defining public interface; otherwise the reference is unbound even
-  if the implementation happens to hold a global entry with that spelling.
-  `Pair`, `mk_pair`, `pair_fst`, and `pair_snd` are the canonical boundary case:
-  they are absent from the exact-nine floor, so compiler-installed checked
-  versions do not enter a Strict scope. A local transparent `Pair` may be
-  definitionally equal to the same non-dependent Σ shape, but it has a distinct
-  `GlobalId`; it neither imports nor substitutes for the canonical package
-  declaration (`34 §"Canonical non-dependent pair package"`).
+  floor `GlobalId`. `Char` and transparent `Pair` are constructor-free.
+  `Pair`'s separate companion-binding inventory is exactly
+  `{mk_pair, pair_fst, pair_snd}`. Each companion is admitted only at its exact
+  pre-source identity with a checked type keyed to the exact floor `Pair`; the
+  three operations do not increase the ten-type count. Loading a dependency is
+  not an implicit import: the dependency cannot borrow imports from its caller,
+  and its own imports do not enter the caller's scope. An implementation-private
+  convenience registered outside the closed floor is not ambient authority for
+  name resolution. A package must import such a name from its defining public
+  interface; otherwise the reference is unbound even if the implementation
+  happens to hold a global entry with that spelling. A local transparent
+  Pair-shaped definition may be definitionally equal to non-dependent Σ, but it
+  has a distinct `GlobalId` and does not substitute for the floor declaration
+  (`34 §"Canonical non-dependent pair floor family"`).
 - Every failure — unresolved name, **`AmbiguousReference`** from a top-level
   clash, or an out-of-scope private name (`§4`) — is a **surface diagnostic**;
   the flattened `Σ` the kernel receives contains only resolved, in-scope
@@ -332,14 +333,15 @@ identity; it republishes the existing `GlobalId` and never mints another one.
 This remains true through renaming and any number of re-export hops. The export
 statement keeps the provenance grep-recoverable at the republishing module.
 
-A compiler-installed floor identity has a compiler origin rather than a source
+A compiler-installed floor identity has an internal origin rather than a source
 **defined-at** module. Its ambient availability and any public re-export still
 preserve that identity; neither operation manufactures a source owner. This
-holds for signature-arm and bootstrap-arm members alike. In particular,
-re-exporting the canonical `Nat` family or its constructors does not make the
-republishing module the module that defined the `Nat` head. A same-shaped source
-`data` declaration is a different family, never another path to the floor
-identity.
+holds for signature-arm members and for kernel- or compiler-origin members of
+the internal-provision arm. In particular, re-exporting the canonical `Nat`
+family or its constructors, or the canonical
+`Pair`/`mk_pair`/`pair_fst`/`pair_snd` family, does not make the republishing
+module the source owner. A same-shaped source declaration has a different
+identity, never another path to the floor identity.
 
 Two distinct identities may not occupy one surface name in a module interface:
 that is a hard surface error at the re-export site, reported with both the
@@ -520,12 +522,15 @@ head-owner arm. Its canonical structure instance must therefore be declared in
 the class's defining module; neither floor arm creates an orphan exception. The
 canonical `instance Ord Nat` is consequently declared in
 `Core.Classes.LawfulClasses`, which defines `Ord`, and is keyed by the exact
-bootstrap `Nat` `GlobalId`. `Data.Numeric.Nat.Order` may expose that existing
+floor `Nat` `GlobalId`. `Data.Numeric.Nat.Order` may expose that existing
 instance through the re-export carry rule (§5.5.1), but it neither owns nor
 redeclares it. An `instance Ord Nat` declaration in `Order` remains an orphan.
-A separately declared same-shaped family may support its own head-owned
-instance under its distinct key, but that dictionary is not `Ord` for the
-bootstrap `Nat`.
+For the compiler-origin floor `Pair`, canonical parameterised `Ord (Pair a b)`
+and `DecEq (Pair a b)` instances likewise use the class-owner arm and are
+lawful only in `Core.Classes.LawfulClasses`; no package or facade becomes a
+head owner. A separately declared same-shaped family may support its own
+head-owned instance under its distinct key, but that dictionary is not an
+instance for the floor identity.
 
 ### 5.4 Constraint `where C A` → an implicit instance argument
 
@@ -566,9 +571,8 @@ deterministic name, and the singular `d` generalizes. A constraint **of the form
 prefix `d` immediately followed by that variable's identifier, projected by
 explicit `.field`:
 
-The following example assumes that its unit explicitly imports the canonical
-`Pair` interface; loading that provider elsewhere or possessing an
-implementation-global `Pair` is insufficient.
+The following example uses the canonical compiler-origin floor `Pair` and its
+companion bindings; no provider import or ambient-global fallback participates.
 
 ```
 instance DecEq (Pair a b) where DecEq a, DecEq b { … }

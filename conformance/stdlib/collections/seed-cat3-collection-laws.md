@@ -45,9 +45,10 @@ The **Architect's three fork rulings** (`evt_4c3q1e611va69`), as transcribed in
 including the five formerly deferred surfaces and their negative controls.
 Historical row ids retain `red-until-built`; Pair-independent dispositions
 below are GREEN with the executing evidence that justifies the change. The lens
-rows that name `Pair` are RED-UNTIL the canonical Pair package and must
-explicitly import its four-name transparent-Σ interface; ambient native
-acceptance is measured implementation behavior, not strict package closure.
+rows that name `Pair` are RED-UNTIL the compiler-origin Pair floor realization;
+they use its always-present four-name transparent-Σ family with no package
+import. Current native acceptance is measured Legacy behavior, not Strict floor
+closure.
 
 ## Grounding (content-verified against the landed targets)
 
@@ -347,9 +348,9 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
   (endpoints)
 - given: the shipped concrete `lens` (`57 §4.4`) — a `Σ`-record of `get`/`set`
   + the three coherence proofs — onto the first component of `Pair Bool Bool`,
-  after explicit import of canonical `Pair`/`mk_pair`/`pair_fst`/`pair_snd`,
-  with `get := pair_fst` and `set s b := mk_pair b (pair_snd s)`, and the three
-  coherence laws proved by the provider's transparent Σ contract
+  using canonical floor `Pair`/`mk_pair`/`pair_fst`/`pair_snd`, with
+  `get := pair_fst` and `set s b := mk_pair b (pair_snd s)`, and the three
+  coherence laws proved by the floor family's transparent Σ contract
 - expect: **accepts** — the three coherence laws close **definitionally**, with
   the per-branch endpoint discipline (`55 §3.2`): **get-set**
   `Equal Bool (get (set s b)) b` computes by Σ-β to neutral `b` both sides →
@@ -365,7 +366,7 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
   (`mk_pair (pair_fst s) (pair_snd s) ≡ s`, `13 §6`) → `Refl`. Assert: the
   record elaborates, all three proofs close by `Refl`, zero `Axiom`, **no
   `match` on the Σ-pair** (Σ-η, not a case-split). The strict named-interface
-  vector is **RED-UNTIL the canonical Pair package**; the conversion body is
+  vector is **RED-UNTIL the Pair floor realization**; the conversion body is
   already measured by
   `cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs`, which
   passes the concrete records and all three laws, while

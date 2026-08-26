@@ -19,9 +19,10 @@ implementation-gated. DS-9, fresh-carrier, and composed-carrier admission
 execute un-gated, as do negative-under-positive and transparent-Sigma-negative
 rejection, unknown-head and nonpositive rejection, and unchanged direct/W-style
 behavior. The former bare-Pair vectors use a fresh checked transparent Sigma
-alias here; the canonical named-Pair instantiation is RED-UNTIL in
-`../../surface/modules/seed-pair-strict-boundary.md`. `nested-size-uses-lift`
-also executes un-gated through the named full-pipeline witnesses below. Both
+alias here; the canonical named floor-Pair instantiation is RED-UNTIL the floor
+realization pinned in `../../surface/modules/seed-pair-strict-boundary.md`.
+`nested-size-uses-lift` also executes un-gated through the named full-pipeline
+witnesses below. Both
 structural-result selector sorts are landed. The unary Ω residual positive and
 the binary final-recheck transition sentinel execute in
 `lang_structural_result_elab.rs`. `nested-dependent-motive-uses-lift` remains
@@ -80,9 +81,9 @@ both through the production positivity path.
   in its positive second component. Renaming Product while preserving its body
   leaves the verdict unchanged. This is the concrete DS-9 consumer and proves
   finite structural paths compose; the custom-carrier case below independently
-  prevents a `List` allow-list from satisfying the corpus. The future canonical
-  Pair provider must instantiate this same representation-derived arm; its
-  explicit-import vector is homed in the Pair-boundary seed.
+  prevents a `List` allow-list from satisfying the corpus. The canonical floor
+  Pair must instantiate this same representation-derived arm; its named
+  floor-realization vector is homed in the Pair-boundary seed.
 
 ### kernel/inductive/nested-fresh-carrier-admitted
 
@@ -611,9 +612,10 @@ Spec: `14 §8.6`; `§3`, `§3.1`, `§7.3`, `§7.7`, `§8.4`.
 - DS-9, fresh-carrier, and composed-carrier admission execute un-gated;
   negative-under-positive, transparent-Sigma-negative, unknown-head, and
   nonpositive controls reject; direct/W-style behavior remains unchanged. The
-  future canonical Pair instantiation remains RED-UNTIL in the Pair-boundary
-  seed without gating these representation controls. Their paired positive
-  controls admit while each exact negative/unknown mutation flips the verdict.
+  canonical floor-Pair instantiation remains RED-UNTIL its realization in the
+  Pair-boundary seed without gating these representation controls. Their paired
+  positive controls admit while each exact negative/unknown mutation flips the
+  verdict.
 - `nested-size-uses-lift` executes un-gated through the named kernel and
   full-pipeline witnesses, including the deeper residual-`Bag.join` fold and its
   `3`-versus-`1` discriminator. Both selector sorts are landed. The durable

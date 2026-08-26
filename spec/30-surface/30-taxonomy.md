@@ -46,13 +46,13 @@ invariant in **both** directions — no built-in has a derivation path
 | Tier | What it is | Trust level | In `trusted_base()`? |
 |---|---|---|---|
 | **Built-in** | irreducible — cannot be defined in Ken from other built-ins | the **surface TCB**: audited primitives / assumed at the boundary | **yes** (primitive/postulate) |
-| **Prelude** | Ken-defined and **always present**: a primitive signature names it, or bootstrap must expose one canonical checked identity | re-checked `definition` | **no** |
+| **Prelude** | Ken-defined and **always present**: a primitive signature names it, or internal provision exposes one canonical checked identity | re-checked `definition` | **no** |
 | **Standard package** | Ken-defined, **optional**, explicit `import` | re-checked `definition` | **no** |
 
 The two lower tiers are both **re-checked Ken** (out of the trusted base); they
 differ only in **availability**. A prelude entry is always in scope because the
 primitive-signature closure needs it or because source must reach one canonical
-compiler-bootstrap identity. A package is imported. "Always there" ≠
+internally provided identity. A package is imported. "Always there" ≠
 "irreducible" — a prelude entry is a definition the kernel re-checks, not a
 trust-root assumption.
 
@@ -97,30 +97,42 @@ Some Ken-definable types must be present before ordinary source-unit
 resolution. There are two reasons. A built-in primitive may name the type in
 its signature: comparison primitives have type `Int → Int → Bool`, so `Bool`
 must already exist even though it is ordinary `data Bool = True | False` Ken
-(§6, F1). Or the compiler bootstrap may already have installed one canonical,
+(§6, F1). Or the implementation may already have installed one canonical,
 kernel-checked identity that the surface contract requires source to name and
-that a source declaration cannot recreate. This is the surface analog of the
-kernel's `Top`/`Bottom`/`tt` prelude (`64 §1`): fixed Ken vocabulary excluded
-from `trusted_base()` yet always present in a closed set.
+that a source declaration cannot recreate. That identity may originate at the
+kernel boundary or in the compiler bootstrap: both are language internals that
+the prelude bridges to the surface. This is the surface analog of the kernel's
+`Top`/`Bottom`/`tt` prelude (`64 §1`): fixed Ken vocabulary excluded from
+`trusted_base()` yet always present in a closed set.
 
 > **Prelude membership rule (normative, checkable).** A Ken-defined,
 > source-resolved type is in the prelude **iff** at least one of these arms has a
 > witness:
 >
 > 1. **Signature arm.** A built-in primitive's type signature names the type.
-> 2. **Bootstrap-identity arm.** Before source-unit elaboration the compiler has
->    installed one canonical identity through ordinary kernel checking; the
->    surface contract requires programs to name that exact identity; and a
->    source declaration with the same structure would allocate a distinct
->    `GlobalId` rather than reproduce it.
+> 2. **Internal-provision arm.** Before source-unit elaboration, the
+>    implementation has installed one canonical identity through ordinary
+>    kernel checking. The witness records whether the identity originates at
+>    the kernel boundary or in the compiler bootstrap. The surface contract
+>    independently requires programs to name that exact identity, and a source
+>    declaration with the same structure would allocate a distinct `GlobalId`
+>    rather than reproduce it.
 >
 > The prelude is the **closed union** of the two witnessed inventories, never a
-> fallback to arbitrary compiler globals. A signature-arm type that no primitive
-> signature names is bloat. A bootstrap-arm type with no independent
-> source-reachability requirement, or whose identity source can reproduce, is
-> likewise bloat. A missing witnessed member is a gap. Kernel syntax and native
-> formers remain built-ins and are referenced directly rather than duplicated as
-> prelude bindings.
+> fallback to arbitrary compiler globals. Presence in the compiler's global map
+> is not an internal-provision witness. Each member has an explicit internal
+> origin and exact pre-source identity; a missing or substituted identity fails
+> closed. A signature-arm type that no primitive signature names is bloat. An
+> internal-provision type with no independent source-reachability requirement,
+> or whose identity source can reproduce, is likewise bloat. A missing witnessed
+> member is a gap. Kernel syntax and native formers remain built-ins and are
+> referenced directly rather than duplicated as prelude bindings.
+>
+> A companion operation joins an internal-provision member's floor-binding
+> closure only when that member's surface contract names it, its checked type is
+> keyed to the member's exact `GlobalId`, and floor installation reuses the
+> companion's exact pre-source `GlobalId`. This is a closed companion inventory,
+> not authority to expose arbitrary compiler helpers.
 
 The prelude is a **second minimality target** — the same TB-Sound discipline
 (`is_prelude` is exactly `{Top, Bottom, tt}`, no catch-all) applied at the
@@ -136,44 +148,58 @@ it is not a census of selected registration helpers. That inventory is exactly
 - the opaque primitive former `Cap : Auth → Type` names `Auth`, and
   `Resource : ResourceKind → Type` names `ResourceKind`.
 
-The bootstrap-identity arm adds exactly `Nat`. Thus today's Ken-defined surface
-floor is the closed set **`{Auth, Bool, Char, List, Nat, Option, ResourceKind,
-Result, Utf8Error}`**. Before source-unit elaboration, the compiler has already
-installed each identity through ordinary kernel checking: eight are witnessed
-by primitive signatures, and `Nat` is the ordinary checked inductive
+The internal-provision arm adds exactly `{Nat, Pair}`. This is one general arm
+over internal origin, not a Pair-specific exception or third membership route.
+`Nat` is the kernel-origin member: the ordinary checked inductive
 `data Nat = Zero | Suc Nat` that source must use as the canonical natural/index
-carrier. Floor installation reuses all nine existing `GlobalId`s and allocates
-nothing. For an inductive floor member, a constructor enters only when its
-kernel-recorded parent is that exact member; `Char` is the transparent,
-constructor-free case. A same-shaped source family has different identities
-and is not the floor member. Every floor type and constructor is re-checked and
-**out** of `trusted_base()`.
+carrier. `Pair` is the compiler-bootstrap member: one checked transparent type
+identity whose surface meaning is the non-dependent kernel Sigma (`34`). Thus
+the Ken-defined **type floor** is the closed ten-member set
+**`{Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result,
+Utf8Error}`**.
+
+The type count is ten, not twelve or thirteen. `Pair`'s floor-binding closure
+also contains the exact three companions `{mk_pair, pair_fst, pair_snd}`. They
+are operations, not type members. Their checked types reference the canonical
+`Pair` identity, and their bodies use the kernel pair-introduction and
+projection formers. The four-name surface
+`{Pair, mk_pair, pair_fst, pair_snd}` reuses the compiler-installed transparent
+`GlobalId`s; floor installation declares nothing, allocates no identity, and
+adds no `trusted_base()` entry. Kernel `Sigma`/`Pair`/`Proj1`/`Proj2` remain
+representation and computation authority, not provider declarations or another
+identity family.
+
+For an inductive floor member, a constructor enters only when its
+kernel-recorded parent is that exact member; `Char` and transparent `Pair` are
+constructor-free. A same-shaped source family or definition has a different
+identity and is not the floor member. Every floor type, constructor, and
+companion is re-checked and **out** of `trusted_base()`.
+
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
 return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2),
-and it has no independent bootstrap-identity witness. It is therefore a
-standard-package type; adding a `compare : A → A → Ordering`
-primitive *would* make it prelude, but that enlarges the built-in set for no
-minimality gain and is **not** taken. The derivation-path table
-(`../../conformance/surface/taxonomy/`) pins the exact closed set and flags any
-over-inclusion as bloat (§6, `OrdResult`).
+and it has no internal-provision witness. It is therefore a standard-package
+type; adding a `compare : A → A → Ordering` primitive *would* make it prelude,
+but that enlarges the built-in set for no minimality gain and is **not** taken.
+The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
+closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
+
+**Implementation staging.** The specification fixes the ten-type and
+three-companion target. Until the floor-realization build captures and admits
+the four existing Pair-family identities, current Strict loading may still
+reject their bare names. That implementation gap is not a package boundary and
+does not authorize a second identity or fallback route.
 
 ## 5. The standard-package tier — the dissolved stdlib
 
 Everything Ken-definable that **neither** prelude arm admits is a **standard
 package**: optional, explicitly imported, ordinary Ken with its **derivation
-path from the built-ins stated in-spec**. `Nat` is therefore no longer a
-package carrier: it is the bootstrap-identity member of the prelude. `Option`
-and `Result` are likewise not packages: public primitive signatures name their
-canonical compiler-installed identities. `Unit`, `Empty`, `Either`, and `Pair`
-remain packages; no primitive signature names them and they have no independent
-bootstrap-identity witness. In particular, compiler possession is not itself a
-bootstrap witness. A checked implementation-global `Pair` is outside the floor
-because the surface contract neither requires source to name that identity nor
-makes it reachable under Strict. It is an implementation convenience pending
-the canonical explicit-import package contract (`34 §"Canonical
-non-dependent pair package"`), not a provider or a third membership arm. A
-same-shaped source definition allocates a distinct identity and cannot convert
-compiler possession into package provenance.
+path from the built-ins stated in-spec**. `Nat` and `Pair` are therefore not
+package carriers: they are the kernel-origin and compiler-bootstrap members of
+the internal-provision arm. `Option` and `Result` are likewise not packages:
+public primitive signatures name their canonical compiler-installed
+identities. `Unit`, `Empty`, and `Either` remain packages. A same-shaped source
+definition of `Pair` allocates a distinct identity; it neither replaces the
+floor family nor converts structural equality into floor provenance.
 
 The reframed catalog is
 `../50-stdlib/README.md` — the lawful classes (`Num`/`Ord`/`Eq`/`Monoid`/
@@ -181,9 +207,9 @@ The reframed catalog is
 (`map`/`filter`/`fold`/ `range`), and formatting (`show`/`split`/`join`/`pad`).
 The monolithic **L8 stdlib dissolves** into this catalog
 (`docs/program/wp/L8-stdlib-core.md` superseded); its "laws are **proved, not
-postulated**" discipline carries to the package builds (ES4). A proposal to
-make `Pair` a tenth floor member reopens the exact-floor ruling and is outside
-this package contract; ordinary explicit import is the specified boundary.
+postulated**" discipline carries to the package builds (ES4). Pair's admission
+under the general internal-provision rule is part of the prelude boundary above,
+not a package exception.
 
 **The derivation-path discipline (normative).** Every catalog entry states a
 real Ken definition path from the built-ins. A catalog entry with **no** path is
@@ -215,7 +241,7 @@ coincide.
   both-components-keyed `sort_sigma`, `13 §4`).
 - **`is_sorted` / `Perm` → definitions (see `37 §6`).** These are **not**
   prelude: no primitive signature names them, and neither has an independent
-  bootstrap-identity witness. They are the verified-`sort` showcase's
+  internal-provision witness. They are the verified-`sort` showcase's
   predicates, and they **must be definitions**, specified in `37 §6` (§below).
   As postulates the flagship proof proves nothing.
 - **opaque `Bool` → `data Bool = True | False`** (F1). The current opaque
@@ -248,7 +274,7 @@ coincide.
 
 - **`OrdResult` → remove (bloat).** `data OrdResult = Lt | Eq | Gt`
   (`prelude.rs`) sits in the prelude but **no primitive signature names it**
-  (the comparisons return `Bool`) and it has no independent bootstrap-identity
+  (the comparisons return `Bool`) and it has no independent internal-provision
   witness, so by the membership rule (§4) it is a **bloat vector**. It exists
   only as a workaround for the opaque `Bool` (not
   matchable); F1's `data Bool` obviates it. Remove it; where a 3-way result is
