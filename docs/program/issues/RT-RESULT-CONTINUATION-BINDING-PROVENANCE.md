@@ -61,6 +61,32 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > monotonically to this later fail-closed boundary. This node is the D2/D3 half
 > of the RT-ITREE hard-stop-2 split (Architect evt_5w03f4zbg02ry).
 
+## Symptom inventory
+
+Append one line per hard stop; never rewrite history.
+
+1. Forcing the localized outer ITree carried match through an origin-only
+   checked-return bypass progressed into value-deduplicated
+   `ResourceBodyResult` defaults instead of `InvalidOffset` — keyed on an
+   artificial predecessor-route bypass, not a planner-authorized route.
+2. After D1's route repair the admitted programs naturally terminate at the
+   ordinary `ResourceBodyResult` match, but the expected result is absent from
+   the entire eight-entry receiving environment — keyed on a producer-to-binding
+   chain that never places the source continuation's result into environment
+   slot 1.
+3. The pre-repair localization phase's required AC-D2-4 positive must apply the
+   exact source continuation at the carried seam, but the complete runtime-test
+   census reaches neither arm and the admitted read program reaches only the
+   carried early-return arm — keyed on requiring the repaired operation as its
+   own pre-repair control.
+4. Exact WIP `7199330550f9eae611b417c30b289722cd8057b1` makes the governed
+   carried call execute and return a new value, but source control then runs
+   `CheckedComputationalIHInvocationReturn -> ConstructArgument(476) ->
+   TerminalResumeOuter -> Computational(301)`; the later Ret-case closure 460
+   still captures the prior transported environment at capture 0, and final
+   `Var(1)` reaches the same default — keyed on claiming a call result before
+   the intervening recursive ITree computation binds it to the later capture.
+
 ## Objective
 
 Localize the first unresolved authority, which is UPSTREAM of ordinary
