@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-PAIR-FLOOR-PROVIDER
 title: "Generalize the prelude membership rule to ONE internal-provision arm (kernel OR compiler origin) and admit Pair as its first compiler-provided member: the type floor becomes the closed TEN {Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result, Utf8Error} with Pair's {mk_pair, pair_fst, pair_snd} a separate closed three-companion inventory, reusing the four existing compiler-installed Pair GlobalIds (prelude.rs:951-1041); with the coupled normative flips (30 §4/§5, 33 §3.3/§4.3/§5.3, 34, 39 §2.0/§6.1, 51, 50-stdlib) and the conformance-pin contract. The SPEC WP; the elaborator realization is the build WP. Supersedes the merged LANG-MOD-PAIR-STRICT-BOUNDARY exact-nine/non-provider pins."
-status: ready
+status: merged
 owner: spec
 size: L
 gate: none

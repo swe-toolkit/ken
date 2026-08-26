@@ -5,12 +5,31 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE, RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]
+depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE, RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR, RT-CHECKED-IH-K-AVAILABILITY-LOCATOR]
 blocks: []
 github: null
 origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision). Hard-stop-5 ruling evt_494k61s04fnv9, 2026-08-26: D3B localization is VALID and lowering has reached the end of its authority — the missing component is an UPSTREAM planner-owned checked-IH result-successor relation, framed as the independently-landable predecessor RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR (which this node now depends_on); D3A stays frozen/non-landable until it lands, then the atomic D3A+D3B consumer builds and D3B consumes ONLY that successor projection. Inventory fold 244b2468afd4f0cd06837fd3079f291d7d330af5 (entry 5). Architect INCORPORATION ruling evt_2prk31prke9cc, 2026-08-26 (accepting Research advisory evt_261gm8y54xttt), grounded on origin/main@a09878026: the predecessor and this consumer conflated two semantic edges by pairing the D3A application result R1 forward to the later capture. Reconciled to the continuation-inheritance reading — D3A applies the inherited continuation capability K at each exact recursive arrival to yield the FRESH result R2, and D3B binds that R2 through ordinary Ret-case/capture semantics; the transitive R1 -> capture requirement is deleted from the operative Objective/Deliverables/ACs/pairing/suppressions/reviewers/Sequencing. Suppression and at-most-once controls are now THREE independent axes (inheritance, application, fresh-result binding). The advisory is incorporated and is NOT hard stop 6 (count remains five). Runtime stays HELD until the predecessor recut lands and the D3A+D3B work is explicitly re-released."
 ---
 
+> # HARD STOP 6 — held on a second predecessor extension (Architect evt_bqyqcvn0ng1d)
+>
+> Runtime hard-stopped building the D3A+D3B consumer: the landed predecessor
+> [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]] proves WHICH `K` survives and WHICH
+> invocation uses it, but exposes no locator into the `env` that
+> `RuntimeExpr::Var(index)` reads — semantic identity without immediate
+> availability. Two consumer guesses (source recursive slot; final recursor
+> residual) each returned runtime failure -1; the consumer branch reverted clean
+> at `c1945c6fb`. HS6 is this chain's designated sustained-Research trigger
+> (Research advisory `evt_1t84ypm156mqh`). The Architect HS6 component ruling
+> `evt_bqyqcvn0ng1d` (advisory incorporated) rules the closure is a planner-owned
+> predecessor EXTENSION — the immediate K-availability locator — framed as the
+> independently-landable [[RT-CHECKED-IH-K-AVAILABILITY-LOCATOR]] (this node now
+> `depends_on` it). D3A stays frozen/non-landable and the consumer branch stays
+> held clean until the locator lands, then the ATOMIC D3A+D3B consumer is
+> explicitly RE-RELEASED against the extended base and obtains `K` through the
+> existing accessor. The three suppression axes and the atomic contract are
+> UNCHANGED; HS6 is predecessor incompleteness, not a new consumer axis.
+>
 > # HARD STOP 3 DISCHARGED 2026-08-26 — option (c), D2/D3 phase separation (Architect evt_1hren6zm8mgxv)
 >
 > The Architect accepted Research advisory `evt_4cbecpkg2e0gs`: there is no
