@@ -1,14 +1,14 @@
 ---
 id: RT-RESULT-CONTINUATION-BINDING-PROVENANCE
 title: "RT-ITREE D2/D3A/D3B — the checked ITree Ret carried arm (call_checked_ih_transport_from_case_environment, core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word WITHOUT applying the source continuation. HS4 (evt_6mnawfvm8fc4j) proved applying it is real but insufficient: the call result becomes a new ITree node and crosses an active recursive computation (TerminalResumeOuter -> Computational 301) before the Ret-case closure 460 capture 0 / final Var(1) it must reach (301/460/459/452 are READ-side evidence coordinates only; the write analogue is derived independently), so an applied-but-unconsumed call is not semantics-preserving. D2 localization ACCEPTED as evidence (ac1ebdacb; no merge, no QA). D3A (evidence only): the exact carried application, per-arrival paired. D3B: localize then repair the FIRST graph-authorized edge where the applied result fails to reach the eventual Ret payload/closure capture. The merge is ATOMIC (D3A + graph-authorized result flow + product) — no application-only checkpoint."
-status: ready
+status: draft
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE]
+depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE, RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]
 blocks: []
 github: null
-origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision)."
+origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision). Hard-stop-5 ruling evt_494k61s04fnv9, 2026-08-26: D3B localization is VALID and lowering has reached the end of its authority — the missing component is an UPSTREAM planner-owned checked-IH result-successor relation, framed as the independently-landable predecessor RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR (which this node now depends_on); D3A stays frozen/non-landable until it lands, then the atomic D3A+D3B consumer builds and D3B consumes ONLY that successor projection. Inventory fold 244b2468afd4f0cd06837fd3079f291d7d330af5 (entry 5)."
 ---
 
 > # HARD STOP 3 DISCHARGED 2026-08-26 — option (c), D2/D3 phase separation (Architect evt_1hren6zm8mgxv)
@@ -118,6 +118,43 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > re-released. Next Research trigger remains hard stop 6. Inventory fold updated
 > to `529f21c43e1c0c5257d2f7898481aaa3dc3a0429` (entries 1-4).
 
+> # HARD STOP 5 DISCHARGED 2026-08-26 — the missing edge is UPSTREAM in the planner (Architect evt_494k61s04fnv9)
+>
+> HS5 accepted. Evidence WIP `4e516e54712a47cf14c47b7abf2840f943071af9` (tree
+> `9f7ac95f038bfb69bd6a881ec14133957e569078`, corrected base `14040ecae`) stays
+> EVIDENCE ONLY — no QA, no merge, no further lowering-side repair. Frozen HS4
+> `7199330550` unchanged. Hard-stop count is 5; Research is not triggered until
+> hard stop 6.
+>
+> **D3B localization is VALID and independently closed the fixed-input
+> correction.** Read paired through frame 301 / closure 460 / capture 459 / body
+> 452; write INDEPENDENTLY paired through frame 314 / closure 473 / capture 472 /
+> body 465 — not a reused coordinate. Each path reaches its own exact
+> active-self-resumption and then an ordinary ZERO-argument checked invocation for
+> which no planner-issued successor exists
+> (`checked_ih_environment_transport_for_invocation` returns `None` at both
+> `(Spec(2), cont 301, pos 1)` and `(Spec(5), cont 314, pos 1)`;
+> `recursive_unit_body=None`). The predeclared boundary-closure records (241/352)
+> establish code/capture layouts but do NOT prove a dynamic-environment crossing
+> and do NOT turn the zero-argument invocation into the later one-parameter
+> closure call.
+>
+> **Lowering has reached the end of its authority.** The next component is an
+> UPSTREAM planner-owned checked-IH result-successor relation — a genuine
+> predecessor, not a lowering fallback and not another continuation-identity lane.
+> It is framed as the independently-landable, behaviorally-inert predecessor
+> [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]] (this node now `depends_on` it). D3A
+> stays FROZEN/non-landable while that predecessor is built; after it lands, the
+> D3 branch rebases and builds the ATOMIC D3A+D3B consumer, whose D3B consumes
+> ONLY that exact successor projection through the existing shared D3A call lane
+> and ordinary active-continuation semantics. All existing D3A/D3B controls remain
+> mandatory. The five symptoms share the recorded predicate: a downstream semantic
+> result claimed before the graph-authorized predecessor operation that produces
+> or pairs it — the structural closure now belongs in the planner relation, not a
+> sixth lowering exception. Inventory fold `244b2468afd4f0cd06837fd3079f291d7d330af5`
+> (entry 5). Runtime stays HELD until the planner predecessor is framed, landed,
+> and the successor D3A+D3B work is explicitly re-released.
+
 ## Symptom inventory
 
 Append one line per hard stop; never rewrite history.
@@ -146,6 +183,16 @@ Append one line per hard stop; never rewrite history.
    (Origins 301/460/459/452 here are READ-side evidence coordinates only, from
    the disposable read-program probe; the write analogue is derived
    independently — frame fixed-input correction evt_10rgb8n31c5sj.)
+5. Exact corrected-base WIP `4e516e54712a47cf14c47b7abf2840f943071af9`
+   independently pairs the D3A result through construction, `ResumeOuter`, the
+   active-frame header, the recursive child, and self-resumption for both
+   programs. Read then reaches the exact zero-argument checked invocation at
+   frame 301/position 1; write independently reaches frame 314/position 1. Both
+   have no planner-issued checked-IH result-successor relation, while the
+   separately existing boundary-closure records do not supply that missing
+   successor or turn the zero-argument invocation into the later one-parameter
+   closure call — keyed on asking lowering to consume a result-flow edge the
+   planner never issued.
 
 ## Objective
 
@@ -208,6 +255,17 @@ the environment at runtime.
   environment) — application executed, result NOT delivered. Proves D3A
   feasibility; D3B (result flow) is unbuilt. `erasure.rs` blob `8532ced2...`
   unchanged; `RoutedAnswer::checked(` remains 3 callers. STAYS FROZEN.
+- HS5 D3B-localization object `4e516e54712a47cf14c47b7abf2840f943071af9` (tree
+  `9f7ac95f038bfb69bd6a881ec14133957e569078`, corrected base `14040ecae`, frame
+  blob `5e043db9`) — EVIDENCE ONLY, do NOT merge/QA. The mechanically-rebased D3A
+  feasibility tip; its D3B localization independently derived BOTH read (frame
+  301 / closure 460 / capture 459 / body 452) and write (frame 314 / closure 473
+  / capture 472 / body 465) paths from their own planner facts and proved each
+  reaches an ordinary zero-argument checked invocation with NO planner-issued
+  successor (`..._for_invocation` = `None` at `(Spec(2),301,1)` and
+  `(Spec(5),314,1)`). This is the object that established lowering's authority
+  boundary and motivated the upstream predecessor
+  [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]]. STAYS FROZEN.
 - Production-only parent `cc7dc7c021be67bb94f3d68de5aef8e93ffc3255` (base/current
   main `de304429c`): read naturally terminates at planned identity `36` /
   `decl:rt_parity_fs_read_at_offset_single::ResourceBodyResult`; write at `37` /
@@ -300,12 +358,18 @@ the environment at runtime.
     origins are report coordinates only. `CheckedIhBinding(None)` at the Ret
     capture is a NEGATIVE CONTROL — it forbids reclassifying the capture as an
     IH.
-  - If no existing planner relation pairs the D3A result through `ResumeOuter` to
-    the eventual Ret payload — HARD-STOP. Do NOT create a lowering-side reverse
-    search, a second binder catalog, a second identity catalog, an ABI lane, a
-    raw cast, an environment search, or a family-specific fallback; do NOT write
-    capture 0 directly, project a convenient result field, inject the result
-    after `ResumeOuter`, or change D1.
+  - HS5 UPDATE: the missing planner relation is now OWNED UPSTREAM by
+    [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]]. The atomic D3A+D3B consumer builds
+    ONLY after that predecessor lands; D3B then CONSUMES that exact successor
+    projection through the existing shared D3A call lane and ordinary
+    active-continuation semantics — it does NOT re-derive the relation in
+    lowering. Do NOT create a lowering-side reverse search, a second binder
+    catalog, a second identity catalog, an ABI lane, a raw cast, an environment
+    search, or a family-specific fallback; do NOT write capture 0 directly,
+    project a convenient result field, inject the result after `ResumeOuter`, or
+    change D1. If the predecessor cannot derive the complete relation from its
+    forward planner facts, that is HARD STOP 6 on the predecessor node (Research
+    triggered) — not a lowering exception here.
 
 ## Acceptance criteria
 
@@ -442,9 +506,14 @@ objects. Size M.
 
 Lane-1 (runtime, priority). D2 localization is ACCEPTED (evidence `ac1ebdacb`,
 no merge, no QA); D3A application feasibility is proven (evidence `719933055`,
-no merge, no QA). Runtime is HELD until this recut lands and is re-released; then
-the Runtime ring builds the ATOMIC D3A+D3B repair candidate (application +
-graph-authorized result flow + product) — no application-only checkpoint. After
+no merge, no QA); D3B localization is ACCEPTED (evidence `4e516e54`, HS5). The
+UPSTREAM planner-only predecessor [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]] lands
+FIRST (independently landable, behaviorally inert); Runtime is HELD on this node
+until that predecessor lands and the successor D3A+D3B work is explicitly
+re-released. Then the Runtime ring rebases the D3 branch and builds the ATOMIC
+D3A+D3B consumer candidate (application + planner-issued result-successor flow +
+product) — no application-only checkpoint; D3B consumes only the predecessor's
+successor projection. After
 this node greens `InvalidOffset`, [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]]
 (ReadSome/Wrote) and the final four-value closure fold follow; the D1 follow-up
 [[RT-CHECKED-SUCCESSOR-EMIT-REACHABILITY]] is sequenced after this node on the
