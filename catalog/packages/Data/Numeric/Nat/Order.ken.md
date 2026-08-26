@@ -196,6 +196,8 @@ canonical `leq_nat`.
 6. **Consumers.** Generic ordered algorithms can resolve `Ord Nat` through this
    facade; direct callers can use the local arithmetic and comparison operations
    once their visibility is intentionally widened.
-7. **Validation evidence.** Strict-root and identity controls check the carried
-   dictionary, canonical relation and bridge identities, zero local registration,
-   zero trust delta, examples, and rejection fences.
+7. **Validation evidence.** Deferred-boundary and compatibility-root identity
+   controls check the carried dictionary, canonical relation and bridge
+   identities, zero local registration, zero trust delta, examples, and
+   rejection fences. These controls are not Strict evidence; Strict closure and
+   the identity assertions rerun after `LANG-MOD-CANONICAL-PAIR-PACKAGE`.
