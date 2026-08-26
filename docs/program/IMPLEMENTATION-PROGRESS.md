@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-26 00:54:09Z — from 452 issue file(s) in `docs/program/issues/`.
+2026-08-26 02:45:13Z — from 453 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -61,6 +61,7 @@ the committed file matches the generator's output.
 | `CAT-DEQUE` | Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-GCD-REFACTOR` | Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last) | draft | foundation | S | none | — |
 | `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | merged | foundation | M | none | — |
+| `CAT-ORDER-PUB-EXPORT` | Bring catalog Data/Numeric/Nat/Order.ken.md to the pub-export standard — mark its declared exported operations (leq_nat, sub, min, max, compare) pub so packages can selectively import them, matching the already-compliant Arithmetic.ken.md; verify standalone elaboration and cross-package import resolution. The catalog-reuse prerequisite that unblocks CAT-GCD-REFACTOR. | ready | foundation | S | none | — |
 | `CAT-SORT` | Verified insertion sort — Algorithm/Sorting: sort an Ord-ordered List with the Sorted and Permutation laws proved, the simplest-first anchor of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-VEC` | Length-indexed Vector — Data/Vector: Vec n a with total head/index/zip/map and the length laws, the deliberate fully-dependent probe of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CB-HYGIENE` | cranelift_backend facade: strip WP-token narration, separate test material from implementation | merged | runtime | S | none | — |
@@ -497,6 +498,7 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `ABI-M1` — manifest v2 — family-scoped, versioned, generated from family schemas
+- `CAT-ORDER-PUB-EXPORT` — Bring catalog Data/Numeric/Nat/Order.ken.md to the pub-export standard — mark its declared exported operations (leq_nat, sub, min, max, compare) pub so packages can selectively import them, matching the already-compliant Arithmetic.ken.md; verify standalone elaboration and cross-package import resolution. The catalog-reuse prerequisite that unblocks CAT-GCD-REFACTOR.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
@@ -535,7 +537,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: ready)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
-- `CAT-GCD-REFACTOR` blocked by `LANG-MODULE-IMPORT-SYSTEM` (status: draft)
+- `CAT-GCD-REFACTOR` blocked by `CAT-ORDER-PUB-EXPORT` (status: ready)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
