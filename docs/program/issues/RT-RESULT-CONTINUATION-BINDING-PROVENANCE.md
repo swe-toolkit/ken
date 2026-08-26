@@ -11,6 +11,24 @@ github: null
 origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE. D1's two-parameter route transport is independently landable and advances the admitted programs MONOTONICALLY to a later natural fail-closed boundary: at production-only cc7dc7c02 read terminates at planned identity 36 / ResourceBodyResult (origin 451), write at 37 (origin 464), no bypass; the ordinary RuntimeExpr::Match reads env slot 1 (Var(1)) and the expected ResourceBodyResult is absent from the whole eight-entry receiving environment (EnvironmentHasNoReceivingIdentity). Hard-stop count 2. Steward-owned split per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) move here from RT-ITREE."
 ---
 
+> # D2 OBJECT 1 BLOCKED 2026-08-26 — AC-D2-4 evidence failure (Architect evt_3d1rkw99dmkpj)
+>
+> First D2 object `ac1ebdacb` is EVIDENCE, not a candidate, and is BLOCKED for a
+> corrected control (NOT hard stop 3 — an AC-D2-4 failure within hard-stop-2, no
+> new downstream boundary). The localization is SUBSTANTIALLY ACCEPTED: the
+> producer/result-root census (classification (i) never-minted — the source
+> continuation was not applied), slot-1 typed transport (`CheckedIhCapturedEnvironment`,
+> read record `608`/body `662`/result `939`; write `720`/`1238`/`1257`), and the
+> eight-slot plan/ABI census all hold. What FAILS is AC-D2-4: the committed
+> positive `d2_checked_ret_result_reaches_the_exact_continuation_capture` is a
+> one-case Direct `ITree::Ret` whose route trace never hits `CheckedSelectedRecursor`
+> — it proves ordinary static-worker capture ordering, not a checked Ret
+> continuation; its name/prose overclaim. The Architect NARROWED the first causal
+> authority to `call_checked_ih_transport_from_case_environment` (`core.rs:7701-7713`)
+> — see the sharpened AC-D2-4 and the conditional D3 scope below. Runtime returns a
+> fresh object-control correction ONLY; no QA, no repair, no D3 until the Architect
+> authorizes it on the corrected control. Held evidence stays frozen.
+>
 > # UNBLOCKED 2026-08-26 — D1 route slice landed at origin/main `21d62130`
 >
 > The blocking [[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]] D1 route-transport
@@ -108,11 +126,25 @@ at runtime.
      the REAL continuation-application or environment-insertion producer
      must reproduce the default while the positive control flips;
      post-default injection does NOT count.
-- D2-repair (GATED on the D2 object ruling) — repair the
-  continuation-application / environment-insertion producer so env slot 1
-  carries the exact `ResourceBodyResult` after the checked ITree `Ret`
-  route, greening the final `InvalidOffset`. NO repair site before the
-  object ruling.
+- D2-repair / D3 (CONDITIONAL scope, per Architect evt_3d1rkw99dmkpj, pending
+  the corrected AC-D2-4 control) — the first causal authority is localized to
+  `call_checked_ih_transport_from_case_environment` (`core.rs:7701-7713`): the
+  `Carried` selected-recursive-field arm treats the transported captured-
+  environment word as the semantic force result, settles the continuation
+  candidate `InlineNoCall`, and returns the word WITHOUT applying the source
+  worker (read `ContinuationSpecializationId(1)` / result `939` / record `608`
+  / body `662`; write specialization `3` / result `1257` / record `720` / body
+  `1238`). Repair ONLY that carried-environment early-return/application
+  authority: the carried word is an ENVIRONMENT, not a semantic answer — use the
+  exact `CheckedIhEnvironmentTransport`, source call identity, source record,
+  worker-body provenance, capture ordinals, and declared function-local target
+  to apply the source continuation ONCE and return its result. PROHIBITED: alter
+  the already-correct parameter/capture mapping; scan runtime tags; infer from
+  family/origin/index; remint `ResourceBodyResult`; duplicate the continuation
+  body; bypass a default; change D1. If the exact source worker cannot be
+  declared/applied from those existing planner facts, HARD-STOP rather than
+  invent a second identity or ABI lane. NO repair site before the corrected
+  object control lands and the Architect authorizes D3.
 
 ## Acceptance criteria
 
@@ -127,12 +159,25 @@ at runtime.
 - AC-D2-3 (typed carrier) — the live carrier is bound to a typed producer
   identity and the source value it represents is stated; no spelling / ABI /
   family / trap / field-count / `Var(1)`-index authority is introduced.
-- AC-D2-4 (positive control + real-producer mutation) — a
-  same-mechanism positive shows an ITree checked `Ret` continuation
-  producing a `ResourceBodyResult` received at its exact case identity; a
-  mutation at the real continuation-application / env-insertion producer
-  reproduces the default while the positive flips; post-default injection
-  does not count.
+- AC-D2-4 (positive control + real-producer mutation — SHARPENED by Architect
+  evt_3d1rkw99dmkpj after the first object's positive overclaimed) — the
+  positive must be an actual TWO-CASE Ret/Vis fixture whose route trace proves
+  an exact planner-authorized `CheckedSelectedRecursor` predecessor, a checked
+  `CarriedEliminationEntered`, and `CarriedFallbackEmitted`, followed by
+  downstream exact `ResourceBodyOk`/`ResourceBodyErr` selection. A one-case
+  Direct `ITree::Ret` program whose trace is
+  `DirectScrutinee -> CarriedEliminationEntered{Direct} -> CarriedDefaultSealed`
+  (no `CheckedSelectedRecursor`, no `CarriedFallbackEmitted`) does NOT satisfy
+  this AC — it proves only ordinary static-worker capture ordering, not a
+  checked Ret continuation. The mutation must act on the SOURCE-CONTINUATION
+  application/transport seam reached by that checked fixture (a generic
+  static-worker capture-order mutation on a Direct one-case program is
+  insufficient), reproduce the sole downstream default, and carry an
+  application witness; restore recovers the exact positive. The positive's
+  transported value must be bound to its exact planner source record and
+  worker-body identity — read `608`/`662`, write `720`/`1238` — so it is the
+  SAME mechanism as the governed programs, not a neighboring call path.
+  Post-default injection does not count.
 - AC-5 / AC-D1-PRODUCT (final product, GATED on D2-repair — relocated from
   RT-ITREE) — on BOTH admitted programs SUCCESS is the exact `InvalidOffset`
   SemanticErrorV1 observation with the preserved effect prefixes (read
