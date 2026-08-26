@@ -33,33 +33,35 @@ two lower tiers of the surface taxonomy (`../30-surface/30`):
   (`../30-surface/38`), and the base elaborator syntax.
 - **Prelude (Ken-defined, always-present, `30 §4`)** — the **closed** union of
   the primitive-signature arm (`Auth`, `Bool`, `Char`, `List`, `Option`,
-  `ResourceKind`, `Result`, `Utf8Error`) and the bootstrap-identity arm (`Nat`).
-  Constructors enter only through exact recorded parentage to those identities.
-  `Ordering` is **not** prelude — no primitive returns it and it has no
-  bootstrap-identity witness, so it is a package (`30 §4`). The kernel's own
+  `ResourceKind`, `Result`, `Utf8Error`) and the internal-provision arm
+  (`Nat`, kernel origin; `Pair`, compiler-bootstrap origin). This is the exact
+  ten-type floor. Constructors enter only through exact recorded parentage;
+  Pair's separate exact companion inventory is
+  `{mk_pair, pair_fst, pair_snd}`. `Ordering` is **not** prelude — no primitive
+  returns it and it has no internal-provision witness, so it is a package
+  (`30 §4`). The kernel's own
   logic vocabulary (`Ω`, `⊤`/`⊥`, the derived connectives, `Eq`,
   `Decidable`/`DecEq`, `../10-kernel/15`/`16`) is referenced, **not**
   re-declared (`30 §6`: `Equal` is deleted for the kernel's `Eq`).
 
 Everything below is a **package**: imported, derivable, re-checked. Core data
-`Unit`/`Empty`/`Either` and the named non-dependent `Pair` interface
-(`../30-surface/34 §"Canonical non-dependent pair package"`) plus the core
-combinators (`id`, `∘`, `const`, `flip`) are packages — Ken `data`/defs over the
-built-ins, not prelude. `Nat`, `Option`, and `Result` are deliberate exceptions
-among the core data carriers: source must reach their canonical
-compiler-installed identities because the bootstrap contract or public
-primitive signatures name them; a fresh `data` declaration cannot recreate
-those identities.
+`Unit`/`Empty`/`Either` plus the core combinators (`id`, `∘`, `const`, `flip`)
+are packages — Ken `data`/defs over the built-ins, not prelude. `Nat`, `Option`,
+`Pair`, and `Result` are deliberate exceptions among core data carriers: source
+must reach their canonical compiler-installed identities because the
+internal-provision contract or public primitive signatures name them; a fresh
+source declaration cannot recreate those identities.
 
-The `Pair` package derives transparently from the existing dependent Σ former:
-`Pair A B ≡ (x : A) × B`, with checked transparent introduction and projection
-helpers and definitional fst/snd β plus reconstruction η. It therefore needs no
-primitive, postulate, or trust entry. Its four names are available under Strict
-only through the one defining public interface; an implementation-global
-checked convenience is neither that interface nor an ambient fallback. Positive
-catalog contracts that use these names remain RED-UNTIL the canonical package
-is realized and then import it explicitly. The package path is selected by that
-realization, not by this index.
+The compiler-origin floor `Pair` derives transparently from the existing
+dependent Σ former: `Pair A B ≡ (x : A) × B`, with checked transparent
+introduction and projection helpers and definitional fst/snd β plus
+reconstruction η (`../30-surface/34 §"Canonical non-dependent pair floor
+family"`). It needs no primitive, postulate, package identity, or trust entry.
+The type floor contains `Pair`; its separate companion inventory contains
+`mk_pair`, `pair_fst`, and `pair_snd`. Positive catalog contracts that use these
+names remain RED-UNTIL the floor-realization build admits the four existing
+compiler-installed identities under Strict. No catalog import, alias, or
+fallback supplies them.
 
 Deferring those whole units changes neither declaration ownership nor proof
 ownership. The sole canonical `instance Ord Nat` remains defined by the
@@ -67,7 +69,11 @@ class-owning `Core.Classes.LawfulClasses`; `Data.Numeric.Nat.Order` may later
 import/re-export only that dictionary. The settled conversions of foreign
 attached proofs to private ordinary theorems—`pair_compare_eq_sound`,
 `pair_compare_lt_asym`, and `bool_or_eq_true_of_or`—remain owed when their
-containing units re-enter. Deferral neither reverses nor discharges them.
+containing units re-enter. Deferral neither reverses nor discharges them. At
+this spec revision, the catalog
+`Order → LawfulClasses → Compare → Pair` dependency remains gated until the
+Pair floor-realization build lands; spec text alone does not make that Strict
+path green.
 
 ## 2. Lawful classes (the verification-aware core) — packages
 

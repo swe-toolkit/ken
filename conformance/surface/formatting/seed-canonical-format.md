@@ -488,9 +488,10 @@ drives every currently parseable embedded orientation without a hand-built
 `FormattableSource`.
 
 The `record Pair` declarations in the formatting cases below are intentional
-local declarations, not uses of the canonical package. They require no import,
-receive their own identity if elaborated, and do not provide or alias the
-standard `Pair` interface. These cases assert formatting only.
+local text fixtures, not references to the canonical floor declaration. If
+elaborated as top-level source after Pair floor realization, their same spelling
+would clash rather than replace or alias the floor identity. These cases assert
+formatting only.
 
 ### surface/formatting/blank-runs-normalize-in-both-orientations (property)
 

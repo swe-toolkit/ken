@@ -670,7 +670,7 @@ defining shapes:
   forbid (CV's table surfaced this fork; CV-Spec blocked on it).
 
 Neither is prelude: no primitive signature names either one, and neither has
-an independent bootstrap-identity witness (`30 §4`). They are the
+an independent internal-provision witness (`30 §4`). They are the
 verified-`sort` showcase's own definitions.
 
 **L-classes staging boundary (flag, do not resolve).** The collection **types**

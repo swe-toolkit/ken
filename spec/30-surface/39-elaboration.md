@@ -91,20 +91,21 @@ The loader proceeds as follows:
    it at most once in the run; later edges reuse that result.
 4. Construct a fresh scope for each unit from exactly its local declarations,
    explicit imports, kernel and built-in vocabulary, and the closed prelude
-   floor. Its exact type-name set is `{Auth, Bool, Char, List, Nat, Option,
+   floor. Its exact type-name set is `{Auth, Bool, Char, List, Nat, Option, Pair,
    ResourceKind, Result, Utf8Error}`. Constructors are admitted only when the
    kernel records the exact corresponding floor parent: `ANone`/`APartial`/
    `AFull → Auth`, `True`/`False → Bool`, `Nil`/`Cons → List`, `Zero`/`Suc →
    Nat`, `None`/`Some → Option`, `FsHandle`/`Buffer → ResourceKind`, `Err`/`Ok →
-   Result`, and `InvalidUtf8 → Utf8Error`. `Char` has no constructors. Imports
-   are non-transitive in both directions, as required by `33 §3.3`: a unit
-   neither borrows its caller's
-   imports nor exports its own imports merely because it was loaded. An
-   unresolved bare name does not fall through to arbitrary implementation
-   globals outside that scope. This includes checked, transparent conveniences:
-   compiler possession of `Pair`, `mk_pair`, `pair_fst`, or `pair_snd` is not
-   provider availability. Until a unit explicitly imports their canonical
-   public interface, each bare name is unresolved under Strict.
+   Result`, and `InvalidUtf8 → Utf8Error`. `Char` and transparent `Pair` have no
+   constructors. Admit the separate Pair companion-binding inventory
+   `{mk_pair, pair_fst, pair_snd}` only at the three exact pre-source identities
+   whose checked types reference the exact floor `Pair`. Imports are
+   non-transitive in both directions, as required by `33 §3.3`: a unit neither
+   borrows its caller's imports nor exports its own imports merely because it
+   was loaded. An unresolved bare name does not fall through to arbitrary
+   implementation globals outside that scope. Pair's four names enter through
+   the witnessed closed floor inventories, never because the compiler global
+   map happens to contain them.
 5. Resolve every imported or re-exported name through the provider's public
    interface to the provider declaration's existing canonical identity. Enforce
    privacy, ambiguity, and re-export clashes before emitting the caller. An
@@ -115,25 +116,25 @@ The loader proceeds as follows:
    program, with an identical `trusted_base()` delta.
 
 Installing either kind of floor member is a resolution operation over
-declarations that already exist. The loader reuses all nine compiler-installed,
-kernel-checked type `GlobalId`s and the exact constructor ids derived from their
-recorded parentage; it allocates no declaration and adds no
-`trusted_base()` entry. A same-spelling top-level declaration for any floor type
-or constructor collides with the immutable floor and is rejected before
-admission. A separately named same-shaped family has distinct identities and
-cannot satisfy a reference to its floor counterpart. Failure to find a canonical
-type, any constructor-parent mismatch, or any name outside the closed inventory
-is a surface error; none falls back to a lookalike or arbitrary implementation
-global.
+declarations that already exist. The loader reuses all ten compiler-installed,
+kernel-checked type `GlobalId`s, the exact constructor ids derived from their
+recorded parentage, and the exact three Pair companion ids; it allocates no
+declaration and adds no `trusted_base()` entry. A same-spelling top-level
+declaration for any floor type, constructor, or companion collides with the
+immutable floor and is rejected before admission. A separately named
+same-shaped family has distinct identities and cannot satisfy a reference to its
+floor counterpart. Failure to find a canonical type or companion, any
+constructor-parent or companion-type identity mismatch, or any name outside the
+closed inventories is a surface error; none falls back to a lookalike or
+arbitrary implementation global.
 
 A same-shaped local definition does not change this rule. Resolution binds its
-new identity, while any already-checked declaration that contains the
-implementation `Pair` identity continues to contain that exact `GlobalId`;
-conversion of transparent bodies does not rewrite provenance. After the
-canonical package is realized, direct import and re-export bind the one provider
-identity and allocate no replacement (`34 §"Canonical non-dependent pair
-package"`). The unimported arm remains rejected even when the provider was
-loaded for another unit.
+new identity, while any already-checked declaration that contains the floor
+`Pair` identity continues to contain that exact `GlobalId`; conversion of
+transparent bodies does not rewrite provenance. An explicit re-export may
+republish the four floor bindings under `33 §4.3`, but it preserves their
+identities and allocates no replacement (`34 §"Canonical non-dependent pair
+floor family"`).
 
 A front end checking a source entry uses this loader whenever that entry is
 addressed through a catalog root. Reading the entry as an isolated file is not a
@@ -1030,9 +1031,12 @@ one entry:
   check therefore accepts its canonical instance only on the class-owner arm.
   For the key `(Ord, Nat)`, `Nat` is the exact floor family; the defining
   module is `Core.Classes.LawfulClasses`, because that module defines `Ord`.
-  Re-export or ambient floor membership can carry and select that dictionary
-  but never changes its declaration provenance. `Data.Numeric.Nat.Order` does
-  not register a second entry.
+  The same rule places canonical parameterised `(Ord, Pair)` and
+  `(DecEq, Pair)` entries in that class-owning module, keyed by the exact
+  compiler-origin floor `Pair`. Re-export or ambient floor membership can carry
+  and select those dictionaries but never changes their declaration provenance.
+  `Data.Numeric.Nat.Order` does not register a second `(Ord, Nat)` entry, and no
+  Pair facade becomes a head owner.
 
 ### 6.2 The search procedure
 

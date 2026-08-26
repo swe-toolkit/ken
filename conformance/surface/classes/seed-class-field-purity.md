@@ -308,7 +308,7 @@ projection), and `50-stdlib/56-effectful-classes.md §5.1`/`§5.2`
   counterpart only by the ordinary user declarations that already existed, not
   by any new primitive/postulate for purity. In particular, the class record
   type and instance record value are still kernel-checked `Term::Sigma` and
-  `Term::Pair` forms, not uses of the named Pair package.
+  `Term::Pair` forms, not uses of the named Pair floor family.
 - why: G5. Class-field purity is a surface classification layer. Any kernel
   constructor, trusted-base entry, or sort rule added for it is outside the WP
   frame and would invalidate the "erased before kernel" guarantee.

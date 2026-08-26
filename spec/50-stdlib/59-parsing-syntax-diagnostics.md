@@ -23,9 +23,9 @@ campaign report. It derives from:
 
 - built-in `Bytes`, `String`, `Bool`, and primitive byte/string operations
   (`37`/`38`);
-- prelude `Nat`, `List`, `Option`, and `Result`, plus the explicitly imported
-  canonical `Pair` package (`../30-surface/34 §"Canonical non-dependent pair
-  package"`) and the ordinary equality surface;
+- prelude `Nat`, `List`, `Option`, `Pair`, and `Result`, including Pair's
+  canonical companion bindings (`../30-surface/34 §"Canonical non-dependent
+  pair floor family"`), plus the ordinary equality surface;
 - CAT-1/CAT-2/CAT-3 list and lawful-class facilities where useful;
 - no kernel primitive, no compiler parser hook, and no hidden built-in syntax
   object.

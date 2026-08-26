@@ -930,11 +930,12 @@ flips to `-`, so `Nat` appears negatively and is caught.
 
 **Rejected (nested negative in application argument):**
 `data Bad3 = mk : Pair (Bad3 → Empty) Unit → Bad3`. The displayed surface
-spelling assumes explicit imports of the standard-package names; the kernel
-judgment operates on their already-resolved declarations. The canonical
-`Pair` is a checked transparent definition of the non-dependent Σ, not a host
+spelling uses floor `Pair` and assumes explicit imports for the
+standard-package `Empty` and `Unit` names; the kernel judgment operates on
+already-resolved declarations. The canonical `Pair` is a checked transparent
+definition of the non-dependent Σ, not a host
 name with specially recorded positive parameters (`../30-surface/34
-§"Canonical non-dependent pair package"`). Ordinary transparent reduction
+§"Canonical non-dependent pair floor family"`). Ordinary transparent reduction
 first exposes
 
 ```
@@ -1044,9 +1045,9 @@ data Json = ... | JsonArray (List Json)
                     | JsonObject (List (Pair String Json)) | ...
 ```
 
-The surface unit containing `JsonObject` explicitly imports the canonical
-`Pair` package interface. `List` supplies a checked positive parameter path;
-transparent reduction then exposes `Pair String Json` as primitive
+The surface unit containing `JsonObject` uses the canonical compiler-origin
+floor `Pair`. `List` supplies a checked positive parameter path; transparent
+reduction then exposes `Pair String Json` as primitive
 `(x : String) × Json`, whose second component is positive by the structural Σ
 rule. Renaming the Pair definition without changing that transparent body does
 not change admission. These are examples of the rule, not special cases in it.

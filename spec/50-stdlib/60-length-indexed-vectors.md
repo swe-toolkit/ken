@@ -146,15 +146,14 @@ buildability state (per the Architect's ground-truthed DS-5 ruling):
 | `zip` | `(A B : Type) → (n : Nat) → Vec A n → Vec B n → Vec (Pair A B) n` | **gated** (§6; DS-5c) |
 | `lookup` | `(A : Type) → (n : Nat) → Vec A n → Fin n → A` | **gated** (§6; DS-5c) |
 
-`Pair` in `zip`'s codomain is the canonical non-dependent pair package
-(`Pair : Type → Type → Type`, `../30-surface/34 §"Canonical non-dependent pair
-package"`). The `Vec` unit must explicitly import that interface. This positive
-strict vector is gated on both the canonical Pair realization and §6's `DS-5c`;
-a compiler-installed convenience is not provider availability. The length index
-`n` guarantees the two input vectors **align**, so `zip` is total and loses no
-elements — unlike the `List` `zip`, which must truncate. That guarantee is the
-second showcase; the Pair gate changes availability, not the design or the
-existing `DS-5c` elaboration boundary.
+`Pair` in `zip`'s codomain is the canonical non-dependent compiler-origin floor
+family (`Pair : Type → Type → Type`, `../30-surface/34 §"Canonical
+non-dependent pair floor family"`). This positive Strict vector is gated on
+both the Pair floor realization and §6's `DS-5c`; it requires no provider
+import. The length index `n` guarantees the two input vectors **align**, so
+`zip` is total and loses no elements — unlike the `List` `zip`, which must
+truncate. That guarantee is the second showcase; the Pair gate changes
+availability, not the design or the existing `DS-5c` elaboration boundary.
 
 ## 5. Laws (scoped to the totality showcase)
 

@@ -43,17 +43,18 @@
 > its binary positive plus independent wrong-result/association negatives land
 > together. Verify against the on-`main` `14`/kernel before building.
 
-## Canonical non-dependent pair package
+## Canonical non-dependent pair floor family
 
-The named surface family `Pair` is an ordinary standard-package definition over
-the kernel's dependent pair. It is not the kernel term constructor called
-`Pair` in core syntax, and it is not a member of the closed prelude floor. A
-source unit uses the named family only after importing it from its one defining
-public interface. Merely having an implementation-global definition with the
-same spelling does not provide that interface under Strict (`30 §4`/`§5`, `33
-§3.3`, `39 §2.0`).
+The named surface family `Pair` is the first compiler-origin member of the
+prelude's general internal-provision arm (`30 §4`). It is not the kernel term
+constructor called `Pair` in core syntax. Before source can speak, the compiler
+has installed one checked transparent declaration family, and floor realization
+reuses those exact identities rather than defining or importing a package. The
+type floor contains `Pair`; its separate companion-binding inventory contains
+`mk_pair`, `pair_fst`, and `pair_snd` (`33 §3.3`, `39 §2.0`).
 
-The public behavioral contract has four checked transparent declarations:
+The always-present behavioral contract has four checked transparent
+declarations:
 
 ```ken
 Pair     : Type -> Type -> Type
@@ -88,22 +89,26 @@ goal is no longer `Eq`-shaped. Reconstruction η at a neutral
 rejects there. Both terminals rely only on conversion, but they are not
 interchangeable.
 
-Each public name has exactly one defining module and one canonical `GlobalId`.
-A direct import and any re-export preserve those identities and allocate no
-replacement declaration. A separately authored definition with the same name,
-type, and transparent body has a different identity; definitional equality does
-not turn it into the provider declaration or rewrite an existing identity-keyed
+Each public name has one canonical compiler-bootstrap origin and one canonical
+`GlobalId`. Floor installation reuses those identities and allocates no
+replacement declaration. An explicit re-export may republish a floor binding,
+but it preserves the same identity and does not manufacture a source
+`defined-at` owner. A separately authored definition with the same name, type,
+and transparent body has a different identity; definitional equality does not
+turn it into the floor declaration or rewrite an existing identity-keyed
 reference. All four definitions are ordinary kernel-rechecked Ken and add
-nothing to `trusted_base()` or the flat `Σ` model beyond their checked package
-declarations.
+nothing to `trusted_base()` or the flat `Σ` model.
 
-Until the canonical interface is realized, positive package vectors that name
-these declarations are **RED-UNTIL the canonical Pair package**. Strict bare use
-continues to reject. The eventual package does not add `Pair` to the floor and
-does not retain an ambient, Legacy, compatibility-alias, or mixed-resolution
-route to an implementation convenience. The concrete package path and the
-transition mechanism are separately designed; this section fixes only the
-observable one-interface, one-identity, transparent-Σ contract.
+Until the Pair floor realization lands, positive Strict vectors that name these
+declarations are **RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE`**, the redirected
+floor-realization build WP. That staging does not revive the superseded package
+boundary: the build must admit the existing four identities through the closed
+floor path, with no package Pair, alias, registry, ambient fallback, or
+mixed-resolution route. Admitting the existing bindings changes only surface
+name resolution: it adds no kernel former, surface syntax, trust entry, or
+second provider mechanism. This section fixes the observable one-family,
+one-identity, transparent-Σ contract; the elaborator mechanism is specified by
+the build design.
 
 ## 1. Sum types (real, not stubbed)
 

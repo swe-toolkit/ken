@@ -164,12 +164,12 @@ than choose between them.
 
 ### surface/elaboration/let4-earlier-value-feeds-later-rhs-and-body
 
-- spec: S2/S4; `34 §"Canonical non-dependent pair package"`; `39
+- spec: S2/S4; `34 §"Canonical non-dependent pair floor family"`; `39
   §5.3`–`§5.5`; LET-4 AC2
-- given: after explicit import of canonical `Pair` and `mk_pair`,
+- given: using canonical floor `Pair` and `mk_pair` with no provider import,
   `const staged : Pair Nat Nat = let first = Zero; second = Suc first in
   mk_pair Nat Nat first second`
-- expect: **RED-UNTIL both the canonical Pair package and LET-4 surface —
+- expect: **RED-UNTIL both the Pair floor realization and LET-4 surface —
   accepted**; the later RHS resolves
   `first`, and the body resolves and consumes both `first` and `second`.
 - why: together with the two negative cases below, this is a controlled

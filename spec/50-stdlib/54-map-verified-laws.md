@@ -31,12 +31,13 @@
 > `declare_primitive`, no `declare_postulate`, **no `Axiom`** anywhere
 > (`catalog/packages/Data/Collections/Map.ken.md`).
 
-**Pair-package staging.** Every named use of `Pair`, `mk_pair`, `pair_fst`, or
-`pair_snd` below assumes an explicit import of the canonical interface specified
-by `../30-surface/34 §"Canonical non-dependent pair package"`. The equations
-used by these proofs are its definitional Σ-β/η contract. Current acceptance via
-an implementation-global convenience is not strict package closure; the named
-Pair-dependent vectors are RED-UNTIL that interface is realized and imported.
+**Pair-floor staging.** Every named use of `Pair`, `mk_pair`, `pair_fst`, or
+`pair_snd` below refers to the canonical compiler-origin floor family specified
+by `../30-surface/34 §"Canonical non-dependent pair floor family"`. The
+equations used by these proofs are its definitional Σ-β/η contract. The named
+Pair-dependent Strict vectors are RED-UNTIL the floor-realization build admits
+the existing four identities; no package import or ambient fallback discharges
+that gate.
 
 ## 1. What this module is
 
