@@ -17,25 +17,25 @@ enough. In particular, indexed `Vec.map` is not prelude `map`, the `Pair`-valued
 `Derived.zip` is not the prelude's `Prod`-valued `zip`, and field projectors for
 different `ProcessInput` fields are not duplicates.
 
-The checked producer uses the document's evidence-ref claim as its actual git
-operand and requires the reproduced output and command to name that same
-released ref. It validates every local name against its exact package source and
-every qualified target against its exact provider source. The seven explicitly
-absent prerequisite targets must be referenced by exact set equality. Composite
-families must contain each source constructor exactly once under its source data
-parent. Provider identities are exact code-span values, never substring markers.
-Each public-depth cell is a complete source-derived manifest over referenced
-targets: exact `public`, `private`, `absent`, and compiler `ambient` sets, plus
-the derived `[ambient]`/`[all-public]`/`[mixed]`/`[absent]`/`[all-private]` tag.
+This is point-in-time review evidence, not a living checked corpus. Review-time
+reproduction uses the stated evidence ref as the git operand. It independently
+compares every local name with its exact package source and every qualified
+target with its exact provider source. The seven explicitly absent prerequisite
+targets are compared as an exact set. Composite families are checked for source
+parentage and unique components. Provider identities are source declarations,
+not substring markers or allocation-order `GlobalId` values. Each public-depth
+cell records the complete source-derived state of referenced targets: exact
+`public`, `private`, `absent`, and compiler `ambient` sets, plus the derived
+`[ambient]`/`[all-public]`/`[mixed]`/`[absent]`/`[all-private]` tag.
 
-The producer does **not** decide semantic equivalence between a local body and an
-existing provider body; that judgment remains review-only, and the table records
-its conclusion rather than a machine-checked equivalence proof. The semantic
-choice of each package's headline is also review-only; §3.1 mechanically checks
-that the recorded first declaration and headline exist in source order and that
-the arrangement tag follows from them. Standalone/ownership result truth remains
-a direct `ken check` plus review judgment; the producer checks that each provider
-record carries one structurally valid `[installed]`/`[ok]`/`[higher]` depth.
+The following judgments remain **review-only** rather than mechanically proved:
+semantic equivalence between a local body and a provider body; whether the named
+provider is the right canonical owner beyond its source identity; each package's
+headline and adjacent one-line arrangement explanation; `low` versus `higher`
+risk; attached-proof ownership interpretation; and whether the proposed work
+groups are the best sequencing. The standalone exit results and source-order
+facts are mechanically reproducible at review time, but this document ships no
+persistent oracle for them.
 
 The table uses these tags:
 
@@ -138,11 +138,12 @@ provider code expands to both prerequisite depths in §2.
 
 ### 3.1 Arrangement source witnesses
 
-The producer reads declaration order from each exact package source. `TD` means
-the reviewed headline is the first checked declaration; `BU` means the recorded
-first declaration precedes that headline. The headline choice is semantic and
-remains review-only; first-declaration identity, headline existence/order, and
-the derived tag are mechanical.
+Review-time source inspection records declaration order from each exact package.
+`TD` means the reviewed headline is the first checked declaration; `BU` means the
+recorded first declaration precedes that headline. The headline choice and the
+one-line explanation in §3 remain review-only. First-declaration identity,
+headline existence/order, and the derived tag are mechanically reproducible
+from the evidence tree at review time.
 
 | Package | Exact first declaration | Reviewed headline | Derived tag |
 |---|---|---|---|
@@ -252,8 +253,8 @@ by recorded items fail direct standalone checking:
 
 The last three are closure facts, not permission to guess an import repair.
 Each requires its own standalone/ownership prerequisite before an export WP.
-Thus standalone failure is systemic in this reuse slice (**4 of 10 package
-providers checked**), while the orphan/foreign-attached ownership predicate is
+Thus standalone failure is systemic in this reuse slice (**4 of 11 package
+provider modules checked**), while the orphan/foreign-attached ownership predicate is
 currently measured only for the Nat-order component.
 
 The 27 higher-risk definition items are deliberately ungrouped:
@@ -272,12 +273,12 @@ The 27 higher-risk definition items are deliberately ungrouped:
 
 ### 4.4 Proposed low-risk work groups
 
-These groups contain every `[low]` item exactly once. The exact
-`package#local-name` keys are checked against the census risk map; a higher-risk,
-unknown, duplicate, or omitted item fails the producer. They are sequencing
-proposals, not source authorization, and each provider prerequisite lands first.
-The Steward may split a group per package to preserve the charter's
-single-package preference. No higher-risk item may ride one of these groups.
+These groups contain every recorded `[low]` item exactly once. Their exact
+`package#local-name` membership is mechanically recountable from §3 during
+review. The grouping itself is a review-only sequencing proposal, not source
+authorization, and each provider prerequisite lands first. The Steward may split
+a group per package to preserve the charter's single-package preference. No
+higher-risk item is proposed in these groups.
 
 1. **Prelude and functional-floor reuse**
    - `Core/Classes/LawfulFunctors.ken.md#list_map`
@@ -329,101 +330,50 @@ The 12 `BU` entries form a separate reader-facing exposition follow-on. It is
 restricted to dependency-lawful fence placement and implies no forward
 reference or proof-owner move.
 
-## 5. Reproduction and validation commands
+## 5. Review-time reproduction
 
-The checked-in coverage producer is runnable from any working directory:
-
-```sh
-python3 scripts/check-cat-reuse-census.py --self-test
-```
-
-It enumerates `*.ken.md` packages from the exact evidence commit with
-`git ls-tree`, rather than trusting the worktree or a copied count. It then
-checks the bounded package table without skipping malformed or extra rows, row
-numbering, bidirectional path-set equality, uniqueness, full-match risk and target
-syntax, exact-source local and provider declarations, composite parentage and
-component uniqueness, exact referenced-absence equality, provider-row shape,
-code uniqueness, exact identities and public manifests, both prerequisite-depth
-cells, source-ordered arrangement witnesses, low-only group closure, the
-population digest, every exact-output field exactly once, and all reported
-rollups. Its self-test applies 24 single-fault mutations and asserts the specific
-failure arm for each rather than accepting an arbitrary error.
-
-Exact output on this candidate:
-
-```text
-CAT-REUSE-CENSUS coverage PASS
-evidence_ref=ed5b4063f434cc7a2311143367928ee98f64fd86
-population=48 rows=48 unique=48 sha256=50ca4604db917bf7e2758e075c269c064ac181f871c246bea73d0d4b7e197333
-prelude=packages:3 items:5 low:5 higher:0
-sibling=packages:16 items:58 low:31 higher:27
-arrangement=TD:36 BU:12
-providers=ledger:13 referenced:13
-targets=qualified:42 present:35 absent:7
-low_groups=groups:7 items:36
-locals=items:63
-mutation=missing-row expected=PACKAGE_CLOSURE PASS
-mutation=duplicate-package expected=PACKAGE_CLOSURE PASS
-mutation=missing-risk-tag expected=ITEM_RISK PASS
-mutation=wrong-rollup expected=ROLLUP_SIBLING PASS
-mutation=nonexistent-target expected=TARGET_NOT_FOUND PASS
-mutation=missing-public-depth expected=PROVIDER_PUBLIC_DEPTH PASS
-mutation=missing-standalone-depth expected=PROVIDER_STANDALONE_DEPTH PASS
-mutation=malformed-provider expected=PROVIDER_SHAPE PASS
-mutation=duplicate-provider expected=PROVIDER_DUPLICATE PASS
-mutation=higher-in-low-group expected=LOW_GROUP_HIGHER PASS
-mutation=evidence-ref-drift expected=EVIDENCE_REF PASS
-mutation=fabricated-provider-identity expected=PROVIDER_IDENTITY PASS
-mutation=nonexistent-local expected=LOCAL_NOT_FOUND PASS
-mutation=malformed-composite expected=COMPOSITE_COMPONENTS PASS
-mutation=omitted-composite expected=COMPOSITE_COMPONENTS PASS
-mutation=wrong-composite-parent expected=COMPOSITE_PARENTAGE PASS
-mutation=incomplete-absence-set expected=ABSENCE_SET PASS
-mutation=arrangement-flip expected=ARRANGEMENT_MISMATCH PASS
-mutation=unknown-risk-tag expected=ITEM_RISK PASS
-mutation=malformed-package-row expected=PACKAGE_ROW_SHAPE PASS
-mutation=duplicate-evidence-output expected=EVIDENCE_REF_OCCURRENCE PASS
-mutation=duplicate-population-output expected=REPORTED_OUTPUT_OCCURRENCE PASS
-mutation=ignored-target-suffix expected=ITEM_TARGET_SYNTAX PASS
-mutation=altered-public-detail expected=PROVIDER_PUBLIC_DETAIL PASS
-self_test=PASS mutations=24/24
-```
-
-The provider states in §2 remain independently reproducible with:
+This one-time sizing artifact deliberately has **no checked-in test or script**.
+A reviewer reproduces its mechanical claims from the exact git object tree; a
+prose-only change must not red a software test. The population and source-stasis
+checks are:
 
 ```sh
-git diff --exit-code \
-  ed5b4063f434cc7a2311143367928ee98f64fd86 HEAD -- catalog/packages
+EVIDENCE=ed5b4063f434cc7a2311143367928ee98f64fd86
 
+git ls-tree -r --name-only "$EVIDENCE" -- catalog/packages \
+  | grep -E '^catalog/packages/.*\.ken\.md$' \
+  | LC_ALL=C sort > /tmp/cat-reuse-packages.txt
+wc -l /tmp/cat-reuse-packages.txt
+sha256sum /tmp/cat-reuse-packages.txt
+
+git diff --exit-code "$EVIDENCE" HEAD -- catalog/packages
+```
+
+At this candidate those commands report 48 paths, digest
+`50ca4604db917bf7e2758e075c269c064ac181f871c246bea73d0d4b7e197333`,
+and an empty catalog diff. Reviewers independently compare §3's path set with
+that list, recount the rollups, and inspect local/provider declarations,
+visibility, component parentage, and declaration order with `git show` against
+`$EVIDENCE`. Prelude identities are inspected at the exact Rust producer named
+in §2.
+
+Standalone package-provider results are reproduced with targeted behavior:
+
+```sh
 source scripts/ken-env.sh
 scripts/ken-cargo run -p ken-cli -- check \
   catalog/packages/<provider>.ken.md
 ```
 
-The first command proves that candidate package sources are the exact sources
-measured. The second was run for the ten package providers in the standalone
-sweep. Qualified declarations and visibility are read from those exact provider
-sources; the compiler-installed prelude declarations are read from the exact
-`prelude.rs` producer named in §2.
+The standalone sweep yielded the states recorded in §2 and §4.3. The exact
+failure spans are diagnostic observations at the evidence ref, not stable source
+coordinates. Reviewers judge the explicitly review-only properties listed in
+§1 from the source and record their independent conclusion; this document does
+not represent those judgments as machine-checked.
 
-Targeted controls are directly runnable:
-
-```sh
-source scripts/ken-env.sh
-scripts/ken-cargo test -p ken-elaborator \
-  --test lang_mod_strict_resolution_d0
-scripts/ken-cargo test -p ken-elaborator \
-  --test lang_mod_pub_eligibility
-scripts/ken-cargo test -p ken-elaborator \
-  --test lang_mod_catalog_realization
-```
-
-Their exact-candidate results were 4 passed, 5 passed, and 5 passed,
-respectively. The remaining checks were:
-
-- `git diff -- catalog/packages`: empty;
-- `git diff --check`: clean; and
-- non-table, non-fence Markdown lines over 85 columns: zero.
+The remaining candidate checks are `git diff --check`, Markdown width, exact
+one-file merge scope, and an empty `catalog/packages/` delta. No replacement
+corpus-text oracle is part of the deliverable.
 
 This document is census-only. It does not declare any package reworked, does not
 close a missing export or standalone gap, and does not authorize source edits.
