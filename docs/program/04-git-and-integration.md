@@ -95,20 +95,23 @@ separate checkouts.
 
 Exactly **one** credentialed GitHub identity exists: the **publisher**. It is
 operated through the scripted publisher path below, under Steward/operator
-control. It is the federation's whole GitHub-network surface — pushing
-`wp/<ID>` branches to trigger CI, reading check results, merging, and fetching
-`main`. Build/spec agents still hold no credentials and never run `gh`.
+control. It is the federation's whole GitHub *write* surface — pushing
+`wp/<ID>` branches to trigger CI, merging, and fetching `main`. No seat holds a
+standing credential; any seat may mint a short-lived token to run **read-only**
+`gh` (e.g. reading a failed run's Action logs). Who may write vs. read, and how
+to mint, are the `gh-access` skill (`agent/playbooks/tools/gh-access.md`).
 
 **All merge requests route to the Steward.** A ready WP branch (deps merged,
 gates green, merge Decision resolved) is handed off with a `git_request` to the
 **Steward**, who operates the publisher path — verify base/scope → push → CI
 gate → merge → relay the merge + retro routing. The Steward is the **sole merge
-router**, and no other seat holds a GitHub credential.
+router**, and the publisher is the fleet's only write credential.
 
 - **Why one identity.** It collapses the per-team-account apparatus to a single
-  account, removes the secret-exposure surface across the fleet, and lets every
-  build/spec agent stay entirely GitHub-unaware — they only know local git and
-  mootup.
+  **write** account and shrinks the standing-credential surface to that one
+  account. Build/spec agents stay GitHub-unaware for their normal work — local
+  git and mootup — and mint a read-only token only to diagnose a CI failure
+  (`gh-access` skill).
 - **The CPU offload is preserved — as a pre-merge gate.** The heavy work (full
   `--workspace` build + the conformance suite + the clean-room scan) still runs
   on **GitHub Actions**, on GitHub's CPU. Because the publisher pushes the WP
