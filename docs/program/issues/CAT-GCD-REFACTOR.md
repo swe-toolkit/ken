@@ -11,6 +11,28 @@ github: null
 origin: "Operator directive 2026-08-22, after CAT-GCD merged (3283528c4): Gcd.ken.md redundantly reimplements generic Nat tools that already exist in the catalog, and is arranged bottom-up. This is a well-factoring / arrangement follow-up, not a soundness re-open — CAT-GCD stays closed. Steward-filed. Held until the foundation ring is reseated to pi (see reseat directive) so the standard's first application runs on the new seating."
 ---
 
+> # AC-ARRANGE HARD STOP RULED 2026-08-26 — option (A), literate exposition (Steward)
+>
+> foundation-leader HS (evt_5712j1pm9h01): D0 confirmed the reuse/import premise
+> but falsified the LITERAL AC-ARRANGE at the checked catalog loader boundary —
+> `divides_gcd` before its carrier fails on `Algorithm.Numeric.Gcd.Divides`; the
+> carrier first then fails on later `gcd_spec_greatest`. The checked loader
+> requires dependency-ordered declarations; a literal "headline declaration
+> first" is unsatisfiable.
+>
+> RULING (Steward — a scope/AC-wording call, not soundness: gcd semantics and
+> `trusted_base` unchanged): option (A). AC-ARRANGE is satisfied by top-down
+> LITERATE EXPOSITION — the `.ken.md` leads with the headline contract in prose,
+> the checked declarations stay dependency-ordered. The literal declaration-order
+> reading is withdrawn as an ungrounded constraint (it fought the loader for an
+> aesthetic the literate format already delivers). Option (B) — a
+> forward-reference / loader-capability prerequisite WP — is REJECTED: there is no
+> capability gap; "headline first" is expressible now. AC-ARRANGE is amended below
+> accordingly. No loader repair, no proof duplication, no semantic change. One
+> confirming gate: foundation-qa/CV verify the resumed candidate against the
+> amended AC-ARRANGE + AC-REUSE + AC-LAWS. Architect notified-and-may-flag if it
+> sees a soundness dimension; the ring resumes on this ruling.
+>
 > # BLOCKED on BOTH Order successors 2026-08-26 (Architect split evt_6f4h4mhejp4bm)
 >
 > The Order half split further: the Architect ruled the pub-only fix incomplete (an
@@ -104,8 +126,18 @@ and arrangement**, which no soundness gate checks:
   WPs") reports zero local definitions in `Gcd.ken.md` shadowing a public export
   of an existing catalog module (or each surviving one carries a one-line
   distinct-tool justification the Architect accepts).
-- **AC-ARRANGE.** The headline gcd export appears before the low-level helpers it
-  depends on; the module reads top-down.
+- **AC-ARRANGE.** The module reads top-down as LITERATE EXPOSITION: it LEADS with
+  the headline contract (`divides_gcd` / the gcd law) — stated and motivated
+  first in the `.ken.md` prose — and the canonical checked declarations then
+  follow in the dependency order the checked catalog loader requires (each
+  definition after the carriers it uses; e.g. `Divides` before `divides_gcd`,
+  `gcd_spec_greatest` in its lawful place). "Top-down" is the reader's exposition
+  order, NOT the checked-declaration order; the literate format carries both. A
+  reader meets the point of the module before the plumbing while the loader still
+  sees dependency-ordered declarations. (Amended 2026-08-26 per the HS ruling
+  below: the literal "the headline declaration appears before its carriers"
+  reading is WITHDRAWN — it fought the checked loader's real dependency-order
+  requirement, which is not this AC's target.)
 - **AC-LAWS.** The gcd divisibility laws still hold — the CAT-GCD acceptance
   oracle stays green (trusted_base delta unchanged, laws instantiated). This is a
   behavior-preserving refactor.
