@@ -1,7 +1,7 @@
 ---
 id: RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR
 title: "RT-ITREE checked-IH continuation-inheritance successor — the UPSTREAM planner-only predecessor that derives and validates the missing checked-IH CONTINUATION-INHERITANCE relation: a SUCCESSOR PROJECTION of one existing CheckedIhEnvironmentTransport proving TWO separate facts — (a) INHERITANCE: the exact captured continuation environment/call capability K remains in scope at the exact recursively-exposed zero-argument checked self-resumption invocation, by a forward active-frame/self-resumption walk; and (b) FRESH-RESULT DESTINATION: conditional on applying K there, the FRESH result R2 is destined for the eventual ordinary ITree::Ret constructor-child binder and its exact lexical-closure capture. Two proofs, never one transitive pairing, and never a claim that the earlier D3A result R1 reaches the later capture. Keyed by the existing transport/call identity plus the full descendant checked invocation coordinate; closes inductively over repeated self-resumption. No lowering consumer, no emitted call/ABI/artifact/result/runtime change; behaviorally inert. RT-RESULT's atomic D3A+D3B consumer builds on top AFTER this lands. Architect incorporation evt_2prk31prke9cc (accepting Research advisory evt_261gm8y54xttt): this successor succeeds CONTINUATION AUTHORITY, never a dynamic result value."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
