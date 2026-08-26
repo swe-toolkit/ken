@@ -13,64 +13,75 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
+use std::path::PathBuf;
+
 use ken_elaborator::ElabEnv;
 
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
-const ORD_NAT_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Numeric/Nat/Order.ken.md");
+const LAWFUL: &str = "Core.Classes.LawfulClasses";
+const ORDER: &str = "Data.Numeric.Nat.Order";
+const ORD_NAT_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Data/Numeric/Nat/Order.ken.md");
+
+fn catalog_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages")
+}
 
 fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    let provider_state = catalog_or::core_logic_or_module_state(&env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD).expect("Core/Classes/LawfulClasses.ken must elaborate");
-    catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
+    env.elaborate_module_from_roots(&[catalog_root()], LAWFUL)
+        .expect("LawfulClasses must elaborate through its real provider closure");
     env
+}
+
+fn load_order(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_root()], ORDER)
+        .expect("Order must elaborate through its real provider closure");
 }
 
 #[test]
 fn entry_elaborates_with_every_checked_fence() {
     let mut env = base_env();
-    env.elaborate_ken_md_file(ORD_NAT_KEN_MD)
-        .expect("catalog/packages/Data/Numeric/Nat/Order.ken.md must elaborate (Definition + every checked fence)");
-    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "total_leq_nat");
-    assert!(env.globals.contains_key("Ord_instance_Nat"), "Ord_instance_Nat must be a real registered global");
+    load_order(&mut env);
+    env.execute_loaded_entry_checked_fences(ORDER)
+        .expect("Order Definition and every checked fence must elaborate");
+    catalog_or::assert_transparent_result_uses_core_logic_or(
+        &env,
+        "Core.Classes.LawfulClasses.total_leq_nat",
+    );
+    assert!(
+        env.globals.contains_key("Ord_instance_Nat"),
+        "Ord_instance_Nat must be a real registered global"
+    );
 }
 
-/// Promise class: durable invariant. `total_leq_nat` returns informative
-/// catalog `Or` data, so case analysis recovers which ordering side holds.
+/// Promise class: durable invariant. The provider-private `total_leq_nat`
+/// keeps its informative catalog `Or` result, while the public facade computes
+/// opposite concrete relation outcomes.
 ///
-/// **MEASURED:** the real Order package's left and right concrete witnesses
-/// reduce through `Inl` and `Inr` to opposite Bool tags. **CLAIMED:** the
-/// catalog migration preserves proof-relevant disjunction. **THE GAP:**
-/// constructor admission alone would not prove informative elimination; the
-/// two checked equalities consume the actual `total_leq_nat` results.
+/// **MEASURED:** the loader artifact gives `total_leq_nat` the canonical `Or`
+/// family in its result type, and Order-only imports reduce `leq_nat` to both
+/// `True` and `False`. **CLAIMED:** the ownership migration preserves the
+/// proof-relevant totality source and public relation behavior. **THE GAP:**
+/// result-family identity alone would not establish relation behavior, so the
+/// two concrete equalities supply the independent axis.
 #[test]
-fn total_leq_nat_preserves_proof_relevant_or_tags() {
+fn totality_source_and_public_relation_behavior_survive_the_move() {
     let mut env = base_env();
-    env.elaborate_ken_md_file(ORD_NAT_KEN_MD)
-        .expect("Order package must elaborate");
+    load_order(&mut env);
+    catalog_or::assert_transparent_result_uses_core_logic_or(
+        &env,
+        "Core.Classes.LawfulClasses.total_leq_nat",
+    );
     env.elaborate_file(
-        "fn order_or_tag (a : Omega) (b : Omega) (choice : Or a b) : Bool = \
-           match choice { Inl p |-> True ; Inr q |-> False } \
-         theorem order_total_left_tag \
-           : Equal Bool \
-               (order_or_tag \
-                 (Equal Bool (leq_nat Zero (Suc Zero)) True) \
-                 (Equal Bool (leq_nat (Suc Zero) Zero) True) \
-                 (total_leq_nat Zero (Suc Zero))) \
-               True = Proved \
-         theorem order_total_right_tag \
-           : Equal Bool \
-               (order_or_tag \
-                 (Equal Bool (leq_nat (Suc Zero) Zero) True) \
-                 (Equal Bool (leq_nat Zero (Suc Zero)) True) \
-                 (total_leq_nat (Suc Zero) Zero)) \
-               False = Proved",
+        "import Data.Numeric.Nat.Order (leq_nat)\n\
+         theorem order_total_left_behavior\n\
+           : Equal Bool (leq_nat Zero (Suc Zero)) True = Proved\n\
+         theorem order_total_right_behavior\n\
+           : Equal Bool (leq_nat (Suc Zero) Zero) False = Proved",
     )
-    .expect("both catalog Or tags must remain distinguishable by case analysis");
+    .expect("both concrete relation directions must retain their behavior");
 }
 
 // Zero-Axiom acceptance bar: no `Axiom` literal appears anywhere in the
@@ -84,7 +95,11 @@ fn zero_axiom_in_entry_source() {
         !extracted.source.contains("Axiom"),
         "Order.ken.md's tangled/checked code must contain zero Axiom literals (the frame's acceptance bar)"
     );
-    for range in extracted.example_ranges.iter().chain(extracted.reject_ranges.iter()) {
+    for range in extracted
+        .example_ranges
+        .iter()
+        .chain(extracted.reject_ranges.iter())
+    {
         assert!(
             !ORD_NAT_KEN_MD[range.clone()].contains("Axiom"),
             "Order.ken.md's example/reject fences must contain zero Axiom literals"
@@ -99,8 +114,7 @@ fn zero_axiom_in_entry_source() {
 fn trusted_base_delta_is_empty_across_the_entry() {
     let mut env = base_env();
     let before: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(ORD_NAT_KEN_MD)
-        .expect("catalog/packages/Data/Numeric/Nat/Order.ken.md must elaborate");
+    load_order(&mut env);
     let after: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         before, after,
