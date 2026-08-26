@@ -146,6 +146,16 @@ Append one line per hard stop; never rewrite history.
    (Origins 301/460/459/452 here are READ-side evidence coordinates only, from
    the disposable read-program probe; the write analogue is derived
    independently — frame fixed-input correction evt_10rgb8n31c5sj.)
+5. Exact corrected-base WIP `4e516e54712a47cf14c47b7abf2840f943071af9`
+   independently pairs the D3A result through construction, `ResumeOuter`, the
+   active-frame header, the recursive child, and self-resumption for both
+   programs. Read then reaches the exact zero-argument checked invocation at
+   frame 301/position 1; write independently reaches frame 314/position 1. Both
+   have no planner-issued checked-IH result-successor relation, while the
+   separately existing boundary-closure records do not supply that missing
+   successor or turn the zero-argument invocation into the later one-parameter
+   closure call — keyed on asking lowering to consume a result-flow edge the
+   planner never issued.
 
 ## Objective
 
