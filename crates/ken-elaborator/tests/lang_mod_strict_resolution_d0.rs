@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use ken_elaborator::modules::{
-    PRELUDE_FLOOR_NAMES, catalog_module_from_path, is_prelude_floor_name,
+    catalog_module_from_path, is_prelude_floor_name, PRELUDE_COMPANION_BINDING_NAMES,
+    PRELUDE_FLOOR_NAMES,
 };
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Level, Term};
@@ -274,6 +275,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "List",
             "Nat",
             "Option",
+            "Pair",
             "ResourceKind",
             "Result",
             "Utf8Error",
@@ -283,7 +285,9 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
     for name in PRELUDE_FLOOR_NAMES {
         assert!(is_prelude_floor_name(name));
     }
-    for name in ["True", "Int", "Ordering", "Equal", "Prod"] {
+    for name in [
+        "True", "Int", "Ordering", "Equal", "Prod", "mk_pair", "pair_fst", "pair_snd",
+    ] {
         assert!(!is_prelude_floor_name(name));
     }
 
@@ -327,6 +331,7 @@ fn strict_floor_env(extra_names: &BTreeSet<String>) -> ElabEnv {
             admitted.extend(inductive.constructors.iter().map(|ctor| ctor.id));
         }
     }
+    admitted.extend(PRELUDE_COMPANION_BINDING_NAMES.map(|name| env.globals[name]));
     env.globals
         .retain(|name, id| admitted.contains(id) || extra_names.contains(name));
     env
@@ -357,7 +362,7 @@ fn ambient_dependencies(root: &Path, entry: &str) -> Result<Vec<String>, String>
 }
 
 /// Transition sentinel for catalog migration: this is a behavioral census,
-/// not a source-text census. The nine-name floor intentionally removes its
+/// not a source-text census. The ten-type floor intentionally removes its
 /// families and constructors from these residual dependency vectors; every
 /// remaining name still requires an explicit provider migration.
 #[test]
@@ -393,15 +398,11 @@ fn catalog_ambient_passthrough_migration_census() {
                 "And",
                 "Bottom",
                 "Equal",
-                "Pair",
                 "Prop",
                 "Proved",
                 "and_fst",
                 "and_intro",
                 "and_snd",
-                "mk_pair",
-                "pair_fst",
-                "pair_snd",
             ]
             .into_iter()
             .map(str::to_string)
@@ -531,15 +532,11 @@ fn catalog_ambient_passthrough_migration_census() {
                 "And",
                 "Bottom",
                 "Equal",
-                "Pair",
                 "Prop",
                 "Proved",
                 "and_fst",
                 "and_intro",
                 "and_snd",
-                "mk_pair",
-                "pair_fst",
-                "pair_snd",
             ]
             .into_iter()
             .map(str::to_string)
@@ -547,18 +544,10 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Core.Logic.Compare".to_string(),
-            [
-                "And",
-                "Equal",
-                "Pair",
-                "Proved",
-                "and_intro",
-                "pair_fst",
-                "pair_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["And", "Equal", "Proved", "and_intro"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             "Core.Logic.EmptyDec".to_string(),
@@ -566,6 +555,29 @@ fn catalog_ambient_passthrough_migration_census() {
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
+        ),
+        (
+            "Data.Collections.Deque".to_string(),
+            ["Equal"].into_iter().map(str::to_string).collect(),
+        ),
+        (
+            "Data.Collections.Derived".to_string(),
+            [
+                "And",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
         ),
         (
             "Data.Numeric.Nat.Arithmetic".to_string(),
@@ -580,15 +592,11 @@ fn catalog_ambient_passthrough_migration_census() {
                 "And",
                 "Bottom",
                 "Equal",
-                "Pair",
                 "Prop",
                 "Proved",
                 "and_fst",
                 "and_intro",
                 "and_snd",
-                "mk_pair",
-                "pair_fst",
-                "pair_snd",
             ]
             .into_iter()
             .map(str::to_string)
@@ -661,8 +669,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Core.Classes.EffectfulClasses",
         "Core.Classes.LawfulFunctors",
         "Data.Binary.BytesKeys",
-        "Data.Collections.Deque",
-        "Data.Collections.Derived",
         "Data.Collections.Map",
         "Data.Collections.NonEmpty",
         "Data.Serialization.Json",

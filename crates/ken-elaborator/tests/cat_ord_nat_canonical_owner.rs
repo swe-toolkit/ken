@@ -1,17 +1,11 @@
 //! CAT-ORD-NAT-CANONICAL-OWNER acceptance controls.
 //!
 //! Promise classes: the identity, ownership, trust, and behavior controls are
-//! durable invariants. The deferred-boundary control is a transition sentinel:
-//! `LANG-MOD-CANONICAL-PAIR-PACKAGE` intentionally makes it red and retires it
-//! after rerunning the Strict identity controls. These controls use parsed
-//! module identities, loader-produced `GlobalId`s, and the class registry. They
-//! do not treat repository prose or frozen numeric ids as an oracle.
-//!
-//! The ordinary roots loader supplies the current compatibility `Pair`
-//! dependency. Its successful results below are buildability and identity
-//! evidence only; they are not Strict-closure evidence. Strict closure and
-//! these identity assertions must rerun after
-//! `LANG-MOD-CANONICAL-PAIR-PACKAGE` lands.
+//! durable invariants. Pair floor realization advances the former Pair boundary
+//! to its freshly measured next Strict frontier while ownership controls remain
+//! on the compatibility loader. These controls use parsed module identities,
+//! loader-produced `GlobalId`s, and the class registry. They do not treat
+//! repository prose or frozen numeric ids as an oracle.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -24,7 +18,6 @@ use ken_kernel::{GlobalId, Term};
 const ORDER: &str = "Data.Numeric.Nat.Order";
 const LAWFUL: &str = "Core.Classes.LawfulClasses";
 const COMPARE: &str = "Core.Logic.Compare";
-const PAIR_SUCCESSOR: &str = "LANG-MOD-CANONICAL-PAIR-PACKAGE";
 
 fn catalog_root() -> PathBuf {
     std::env::var_os("CAT_ORD_CATALOG_ROOT")
@@ -210,16 +203,13 @@ fn canonical_ord_nat(env: &ElabEnv) -> (GlobalId, GlobalId, GlobalId) {
 }
 
 /// MEASURED: parsed module identities give LawfulClasses -> Compare directly;
-/// Order reaches LawfulClasses either directly (candidate) or by resolving its
-/// parsed `instance Ord Nat` subject through the unique public provider (base).
-/// The parsed public-provider inventory contains no `Pair`, and the closed
-/// Strict floor excludes it. The unchanged Compare Strict load refuses at Pair.
-/// CLAIMED: the exact Order -> LawfulClasses -> Compare boundary is deferred on
-/// the canonical Pair package on either the base or candidate catalog root.
-/// THE GAP: the refusal text corroborates only; membership comes from the
-/// parsed graph plus the provider and floor inventories.
+/// Order reaches the unique LawfulClasses Ord provider, the catalog publishes no
+/// competing Pair identity, and Strict Compare advances past Pair to the next
+/// typed unavailable name. CLAIMED: Pair floor realization removes only the
+/// Pair boundary without projecting catalog closure. THE GAP: the diagnostic
+/// corroborates the next frontier; membership comes from the closed inventory.
 #[test]
-fn deferred_pair_boundary_is_structural_and_live() {
+fn pair_floor_advances_the_structural_compare_boundary() {
     let root = catalog_root();
     let units = discover_units(&root);
     let ord_providers: BTreeSet<_> = units
@@ -254,42 +244,39 @@ fn deferred_pair_boundary_is_structural_and_live() {
         .collect();
     assert!(
         pair_providers.is_empty(),
-        "canonical provider inventory unexpectedly contains Pair: {pair_providers:?}; retire the {PAIR_SUCCESSOR} transition control instead of widening this WP"
+        "the floor realization must not create a catalog Pair provider: {pair_providers:?}"
     );
-    assert!(
-        !PRELUDE_FLOOR_NAMES.contains(&"Pair"),
-        "Pair must not be introduced into the closed Strict floor by this WP"
-    );
+    assert!(PRELUDE_FLOOR_NAMES.contains(&"Pair"));
 
     let mut strict = ElabEnv::new().expect("base environment");
-    match strict.elaborate_module_from_roots_strict(&[root], COMPARE) {
-        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "Pair"),
-        other => panic!(
-            "unchanged Compare must retain the live {PAIR_SUCCESSOR} boundary; expected corroborating UnboundName(Pair), got {other:?}"
-        ),
-    }
+    let canonical_pair = strict.globals["Pair"];
+    let error = strict
+        .elaborate_module_from_roots_strict(&[root], COMPARE)
+        .expect_err("Compare retains later non-floor dependencies");
+    assert_eq!(strict.globals["Pair"], canonical_pair);
+    assert!(
+        matches!(error, ElabError::UnboundName { ref name, .. } if name == "Equal"),
+        "Pair must no longer be the first Strict boundary, got {error:?}"
+    );
 }
 
-/// MEASURED: ordinary roots elaborate both real units. CLAIMED: the ownership
-/// migration remains buildable on the compatibility surface. THE GAP: ordinary
-/// roots supply native Pair ambiently and therefore cannot establish Strict
-/// closure.
+/// MEASURED: ordinary roots elaborate both real units. CLAIMED: Pair floor
+/// realization changes no ownership or behavior on the compatibility surface.
+/// THE GAP: this is not Strict closure evidence.
 #[test]
-fn compatibility_roots_build_lawful_classes_and_order_but_are_not_strict_evidence() {
+fn compatibility_roots_still_build_lawful_classes_and_order() {
     for module in [LAWFUL, ORDER] {
         let mut env = ElabEnv::new().expect("base environment");
         env.elaborate_module_from_roots(&[catalog_root()], module)
-            .unwrap_or_else(|error| {
-                panic!("{module} must elaborate through compatibility roots only: {error}")
-            });
+            .unwrap_or_else(|error| panic!("{module} compatibility load failed: {error}"));
     }
 }
 
 /// MEASURED: the instance registry contains one entry keyed by the canonical
 /// class and native Nat identities; its package/module provenance is the class
 /// provider. CLAIMED: LawfulClasses is the defined-at owner and no Order or
-/// second dictionary registration exists. THE GAP: final Strict identity
-/// evidence is deliberately deferred to `LANG-MOD-CANONICAL-PAIR-PACKAGE`.
+/// second dictionary registration exists. THE GAP: this remains compatibility
+/// evidence until the later catalog re-entry closes its independent frontier.
 #[test]
 fn registry_has_one_lawful_classes_owned_ord_nat_dictionary() {
     let env = load_order();
@@ -318,8 +305,8 @@ fn registry_has_one_lawful_classes_owned_ord_nat_dictionary() {
 /// MEASURED: an Order-only selective import resolves the relation to the
 /// provider GlobalId and implicit dispatch records the same registry identity
 /// and defining package. CLAIMED: the facade carries identities without an
-/// alias or dictionary redeclaration. THE GAP: this is compatibility-surface
-/// evidence, not Strict evidence.
+/// alias or dictionary redeclaration. THE GAP: attached-proof identity is
+/// pinned independently below.
 #[test]
 fn order_facade_carries_relation_and_dictionary_identities() {
     let mut env = load_order();
