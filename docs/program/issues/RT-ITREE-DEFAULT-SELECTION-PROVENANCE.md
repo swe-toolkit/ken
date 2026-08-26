@@ -6,25 +6,58 @@ owner: runtime
 size: M
 gate: none
 depends_on: [RT-UNIT-FAILURE-STATUS-PROVENANCE]
-blocks: []
+blocks: [RT-RESULT-CONTINUATION-BINDING-PROVENANCE]
 github: null
 origin: "Steward, 2026-08-25, from the Architect AC-5 ruling (evt_3rq4xafrf7cqf, thr_6gmh4p1m0gch4) on runtime WIP 7094c29cd. Preserving the root generated-unit failure's planned trap identity (RT-UNIT-FAILURE-STATUS-PROVENANCE) exposed a DISTINCT downstream producer: the checked ITree-elimination default is selected for an admitted program. The Architect ruled AC-5 valid and directed this be framed as its own object (explicitly NOT the prohibited -3-vs-4 'third node'; it is a different producer requiring its own object read). Steward framing call per COORDINATION section 2."
 ---
 
+> # D1 SLICE + HARD-STOP-2 SPLIT 2026-08-26 — Architect ruling evt_5w03f4zbg02ry
+>
+> Hard stop 2 is ACCEPTED as a natural successor object. The D1 route
+> repair advanced the admitted read/write programs MONOTONICALLY to a
+> LATER fail-closed boundary: at production-only
+> `cc7dc7c021be67bb94f3d68de5aef8e93ffc3255` (base/current main
+> `de304429c`) read naturally terminates at planned identity `36` /
+> `ResourceBodyResult` (terminal ordinary `Match` origin 451), write at
+> `37` (origin 464), with NO force-origin or route bypass — the ordinary
+> `RuntimeExpr::Match` path reads env slot 1 (`Var(1)`), and the expected
+> `ResourceBodyResult` is NOT present anywhere in the eight-entry receiving
+> environment (`EnvironmentHasNoReceivingIdentity` on both). `erasure.rs`
+> unchanged; 36/37 are bound from the production-only parent
+> (`e701eaeb972505097371761807f5dd8fa18a1522` is instrumentation evidence
+> ONLY — its pre-interning shifts diagnostics to 78/79 — and must NOT be
+> promoted). Hard-stop count is now 2 (no Research trigger yet). Symptom
+> entry 2 folded below.
+>
+> SPLIT (Steward-owned). D1's two-parameter route transport is INDEPENDENTLY LANDABLE:
+> it repairs an already-proved predecessor-route loss, advances the programs to the
+> later boundary, changes no carrier / ABI / trust / default, and does not need D2 for
+> soundness. THIS node is now scoped to that D1 slice and CLOSES when the slice lands —
+> via a FRESH MINIMAL candidate carrying the D1-LOCAL controls ONLY (AC-D1-HEADER-
+> CLOSURE / -CHECKED-MUTATION / -DIRECT-NEGATIVE / -UNKNOWN / -ORDINARY-PRECEDENCE /
+> -SCOPE) plus a TRANSITIONAL route/frontier witness (AC-D1-WITNESS). The final-product
+> obligations — AC-5, AC-D1-PRODUCT, and the final nonignored `InvalidOffset`
+> witnesses — MOVE to the new successor [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]]
+> (D2, localization first). `cc7dc7c02` remains evidence, not a candidate (no D1
+> controls / QA / CI). Runtime holds both evidence objects and starts NEITHER D1
+> completion NOR D2 localization until this amendment lands.
+>
 > # D1 AUTHORIZED 2026-08-26 — D0b object ruling (Architect evt_4eazg432n8xb8): class (b) bound
 >
 > D0b object `3b4a6a087a3643c3bd0931fe79b46ce0f834e5f5` (tree `a157394c`, base
 > `6d1753454`, 11 crate paths, empty current-main intersection) is ACCEPTED and
 > binds classification **(b): a checked answer whose exact producer route was
 > dropped**. The first repair authority is the active-self-resumption header
-> transport: `lowering/core.rs:12394-12435` finds the active elimination by origin
-> and jumps with only `scrutinee.word` into the header `:12437-12460` created for
-> the INITIAL direct arrival, and `:13001-13004` chooses the fallback from the
-> lexically captured initial route — so the checked recursive edge is joined into a
-> body compiled under the initial DIRECT route. NOT (a) (the reentry carrier is
-> `Constructor` outside the receiving authority, 8 read / 7 write fields — a checked
-> answer, not a malformed ordinary ITree constructor) and NOT (c) (the selected
-> layer is `SelectsOccurrence` and authorizes `CheckedSelectedRecursor`).
+> transport: `lowering/core.rs:12394-12435` finds the active elimination by
+> origin and jumps with only `scrutinee.word` into the header
+> `:12437-12460` created for the INITIAL direct arrival, and
+> `:13001-13004` chooses the fallback from the lexically captured initial
+> route — so the checked recursive edge is joined into a body compiled
+> under the initial DIRECT route. NOT (a) (the reentry carrier is
+> `Constructor` outside the receiving authority, 8 read / 7 write fields —
+> a checked answer, not a malformed ordinary ITree constructor) and NOT (c)
+> (the selected layer is `SelectsOccurrence` and authorizes
+> `CheckedSelectedRecursor`).
 >
 > D1 is AUTHORIZED at that transport, subject to the fail-able ACs below (AC-D1-*).
 > Runtime Leader HOLDS `3b4a6a087` as evidence and starts a FRESH MINIMAL D1 from
@@ -122,6 +155,13 @@ Append one line per hard stop; never rewrite history.
    checked-return bypass progresses into value-deduplicated `ResourceBodyResult`
    defaults instead of `InvalidOffset` — keyed on an artificial predecessor-route
    bypass, not a planner-authorized route.
+2. After D1's route repair the admitted programs naturally terminate at the ordinary
+   `ResourceBodyResult` match (read id 36 / write id 37): the expected
+   `ResourceBodyResult` is absent from the entire eight-entry receiving environment
+   (`EnvironmentHasNoReceivingIdentity`), so the producer-to-binding chain never
+   places it into env slot 1 after the checked ITree `Ret` route — a missing-authority
+   boundary upstream of ordinary selection, not a repair site. (Hard stop 2; Architect
+   evt_5w03f4zbg02ry.)
 
 ## Layer and first authority (Architect ruling — read before framing a repair)
 
@@ -243,15 +283,16 @@ error-text, first-failure, numeric-origin, body-shape, or family-name authority.
      consumed before this frame.
   5. Do NOT add a `RoutedAnswer::checked` caller — this transports existing
      authority; it mints none.
-  Update the `lowering/mod.rs:9593-9605` claim honestly: the route stays absent from
-  the carrier / public ABI, but a route crossing a runtime CFG join must reach
-  emitted CFG as a compiler-authored control lane — never inferred from or packed
-  into the value. Do NOT emit two copies of the computational eliminator by route
-  (its body consumes/mints planner and affine authorities; duplication is not
-  identity-preserving). If the one-header/two-parameter form is not buildable,
-  HARD-STOP. Build a FRESH MINIMAL D1 from then-current `origin/main`; do NOT promote
-  the D0 object's `+1305/-91` instrumentation — retain only durable
-  production-transport tests.
+  Update the `lowering/mod.rs:9593-9605` claim honestly: the route stays
+  absent from the carrier / public ABI, but a route crossing a runtime CFG
+  join must reach emitted CFG as a compiler-authored control lane — never
+  inferred from or packed into the value. Do NOT emit two copies of the
+  computational eliminator by route (its body consumes/mints planner and
+  affine authorities; duplication is not identity-preserving). If the
+  one-header/two-parameter form is not buildable, HARD-STOP. Build a FRESH
+  MINIMAL D1 from then-current `origin/main`; do NOT promote the D0 object's
+  `+1305/-91` instrumentation — retain only durable production-transport
+  tests.
 
 ## Acceptance criteria
 
@@ -266,9 +307,10 @@ error-text, first-failure, numeric-origin, body-shape, or family-name authority.
 - AC-4 — the repair is at the graph/claim route; the erasure fail-closed default
   (`erasure.rs:2740-2744`) is byte-unchanged; no error-text / first-failure /
   numeric-origin / body-shape / family-name authority is introduced.
-- AC-5 — SUCCESS is the original exact `InvalidOffset` SemanticErrorV1 observation
-  with the same no-`FsReadAt` prefix on BOTH the read-offset and write-offset full
-  programs — not merely the absence of the trap.
+- AC-5 — RELOCATED to [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] (D2 successor):
+  the final exact `InvalidOffset` SemanticErrorV1 SUCCESS on BOTH programs is a
+  D2-line obligation, NOT this D1 slice's. The slice advances the programs to the
+  ResourceBodyResult frontier; it does not green `InvalidOffset`.
 - AC-D0b-1 — the supplying `ComputationalRecursorLayer` for read `301` and write
   `314` is bound from provenance (role `SelectsOccurrence`/`ExitsScope`,
   `semantic_pending`, checked frame + invocation identity/source/depth, producer
@@ -304,29 +346,33 @@ error-text, first-failure, numeric-origin, body-shape, or family-name authority.
 - AC-D1-DIRECT-NEGATIVE — a natural `Direct` carrier that misses the ordinary cases
   seals the default, and mutating THAT edge to `Checked` reddens. The initial
   read/write arrival is insufficient — it matches case 1 before the discriminator.
-- AC-D1-UNKNOWN — a test-only out-of-domain control word seals the default, proven
-  beside an exact-checked positive.
+- AC-D1-UNKNOWN — a test-only out-of-domain control word seals the
+  default, proven beside an exact-checked positive.
 - AC-D1-ORDINARY-PRECEDENCE — the initial case-1 arrival continues through its
   ordinary case despite a checked path in the same loop.
-- AC-D1-PRODUCT — on BOTH admitted full programs the product outcome preserves
-  command / status / effects and yields `SemanticErrorV1::InvalidOffset` with the
-  `FsOpen -> BufferAllocate -> ResourceRelease(FsHandle) -> ResourceRelease(Buffer)`
-  prefix and no read/write-at dispatch.
-- AC-D1-WITNESS — the nonignored read test asserting ITree trap provenance (false by
-  design after the repair) is REPLACED; durable nonignored read AND write route
-  witnesses are added WITHOUT broad ignore removal (the final four-value fold still
-  owns that removal).
-- AC-D1-SCOPE — `erasure.rs:2740-2744` byte-identical; no family / error / trap /
-  origin authority, no `ResourceBodyResult` bypass, no production `KEN_RT_ITREE_D0*`
-  switch, no public API, no trust change; no second `RoutedAnswer::checked` caller;
-  the route-control word is never carrier / boundary ABI / checked interface /
-  environment binding / result, and no eliminator body is duplicated by route.
-- AC-D1-RERUN (hard-stop-2 gate) — rerun read/write immediately after the repair. A
-  natural post-repair `ResourceBodyResult` default is HARD STOP 2, NOT a bypass
-  target: append Symptom inventory entry 2, preserve the natural observation, and
-  return its occurrence/authority object; do NOT bypass it or promise `InvalidOffset`
-  green. Whether the route repair lands independently or atomically with the
-  successor is decided then.
+- AC-D1-PRODUCT — RELOCATED to [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] (D2
+  successor). The `SemanticErrorV1::InvalidOffset` product on both admitted programs
+  is no longer this slice's obligation; the slice ends at the ResourceBodyResult
+  fail-closed frontier.
+- AC-D1-WITNESS — REPLACE the now-false nonignored ITree-provenance read
+  witness with a clearly TRANSITIONAL route/frontier witness: it may record
+  that D1's route reaches the named downstream hard-stop object (the
+  ResourceBodyResult frontier), but must NOT advertise ResourceBodyResult
+  failure as the final contract. No broad ignore removal (the final
+  four-value fold owns that; the final `InvalidOffset` witnesses are the
+  D2 successor's).
+- AC-D1-SCOPE — `erasure.rs:2740-2744` byte-identical; no family / error /
+  trap / origin authority, no `ResourceBodyResult` bypass, no production
+  `KEN_RT_ITREE_D0*` switch, no public API, no trust change; no second
+  `RoutedAnswer::checked` caller; the route-control word is never carrier /
+  boundary ABI / checked interface / environment binding / result, and no
+  eliminator body is duplicated by route.
+- AC-D1-RERUN (SATISFIED — hard stop 2 fired and was ACCEPTED, Architect
+  evt_5w03f4zbg02ry) — the natural post-repair `ResourceBodyResult` default was
+  preserved and returned as objects `cc7dc7c02` (production-only) / `e701eaeb9`
+  (instrumentation); it is NOT bypassed. The route repair is ruled INDEPENDENTLY
+  LANDABLE, and the ResourceBodyResult continuation-binding localization is split to
+  the D2 successor [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]].
 - AC-NO-REGRESSION — whole-suite green in CI; local targeted `-p ken-runtime` /
   `-p ken-cli` / `-p ken-verify` only, never `--workspace`.
 
@@ -347,10 +393,15 @@ which selection authority), not a differential diff. Size M.
 
 ## Sequencing
 
-Lane-1 (runtime, priority). Sequenced AFTER
-[[RT-UNIT-FAILURE-STATUS-PROVENANCE]] lands (honest reporting first) and must not
-co-run with it. This node greens the SemanticErrorV1 witness. After it lands,
-[[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] (ReadSome/Wrote) and the final
-four-value closure fold follow per the Steward sequence. PX8 stays blocked until
-the whole native carried-value program lands. Release queued behind
-RT-UNIT-FAILURE-STATUS-PROVENANCE; the Architect reviews the WP at release.
+Lane-1 (runtime, priority). Now scoped to the INDEPENDENTLY-LANDABLE D1
+route-transport slice (Architect evt_5w03f4zbg02ry): it CLOSES when a fresh
+minimal candidate carrying the D1-LOCAL controls + the transitional
+route/frontier witness lands. It does NOT green `InvalidOffset` — that is
+the D2 successor's obligation. Chain after this slice lands:
+[[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] (D2, the ResourceBodyResult
+continuation-binding localization, observed on top of the landed slice,
+greens the final `InvalidOffset`) -> [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]]
+(ReadSome/Wrote) -> the final four-value closure fold. PX8 stays blocked
+until the whole native carried-value program lands. The Architect +
+runtime-qa review the D1 slice candidate at release
+([[RT-UNIT-FAILURE-STATUS-PROVENANCE]] is already merged).

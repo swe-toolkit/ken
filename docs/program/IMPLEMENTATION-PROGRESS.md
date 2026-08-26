@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-26 03:27:25Z — from 455 issue file(s) in `docs/program/issues/`.
+2026-08-26 04:47:39Z — from 456 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -402,6 +402,7 @@ the committed file matches the generator's output.
 | `RT-REQUIRED-OCCURRENCE-PROJECTION` | Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier | merged | runtime | M | none | — |
 | `RT-RESOURCE-RELEASE-CARRIED-OBSERVE` | Genuinely-live effect seats needing ResourceScalar cannot observe their need in the CarriedWord phase, so the withResource path fails object emission -- the (A)-family carried-observation CLOSURE over the ResourceScalar need (ResourceRelease/FsHandleMetadata/FsReadAt Argument(0)): observe the need in the carried phase on the lower_buffer_freeze_resource_seat EITHER_PHASE precedent, keyed (need=ResourceScalar, phase=Carried), WITHOUT widening the seat's direct Need-subset-Avail partition | merged | runtime | M | none | — |
 | `RT-RESOURCE-SEAT-TAG-DOMAIN` | Lane-1 px8ta successor (replaces the falsified operand-pairing node) — carried resource-token seat tag-domain correction. lower_resource_token_seat's carried arm guards BoundaryTag::InvocationBorrowed == 7 (a transport tag byte in bits 0..8 of the carrier word) against emit_carrier_tag, which returns the semantic NODE_TAG_ID (0 for a borrowed opaque node); it therefore compares semantic node identity 0 with transport discriminant 7 and refuses the correct word. Replace ONLY that wrong identity query with the carrier contract's existing low-byte projection (band_imm word, BOUNDARY_TAG_MASK), keeping the InvocationBorrowed expected-tag, BorrowedOpaque class, and scalar guards exact. effects.rs is the sole production change; core.rs and units.rs stay byte-untouched; no continuation operand pairing. | merged | runtime | S | none | — |
+| `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` | RT-ITREE D2 successor — after D1's route repair advances the admitted programs to a later fail-closed boundary, the expected ResourceBodyResult is ABSENT from the entire eight-entry receiving environment (EnvironmentHasNoReceivingIdentity, read id 36 / write id 37). Localize the missing authority in the producer-to-binding chain that should place the continuation's ResourceBodyResult into environment slot 1 after the checked ITree Ret route, then repair it so the read/write programs green InvalidOffset. Localization FIRST (object read), repair gated on the object ruling. | draft | runtime | M | none | — |
 | `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` | Call-target-resolution successor — a retained body (StaticOriginId) has no graph-derived call target in its unit, so object emission refuses at calls.rs:1638 (call_declared_unit / unit_calls map) after M3's effect-seat crossing succeeds | draft | runtime | M | none | — |
 | `RT-RETIRED-CENSUS-ROT` | Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement | ready | runtime | S | none | — |
 | `RT-ROOT-AUTHORITY-BLAME-DOMAIN` | The three root-authority guards report a compiler-owned invariant failure through the unsupported-construct channel, which reverses the fault domain -- and the correct arm, BackendFailure::PlannerInvariant, already exists with 40 producers in the same crate | merged | runtime | M | none | — |
@@ -562,6 +563,7 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
+- `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` blocked by `RT-ITREE-DEFAULT-SELECTION-PROVENANCE` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
 ## Gate progress
