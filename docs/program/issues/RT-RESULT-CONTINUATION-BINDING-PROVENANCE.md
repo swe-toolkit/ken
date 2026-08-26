@@ -1,6 +1,6 @@
 ---
 id: RT-RESULT-CONTINUATION-BINDING-PROVENANCE
-title: "RT-ITREE D2/D3 — the checked ITree Ret carried arm (call_checked_ih_transport_from_case_environment, core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word WITHOUT applying the source continuation, so the expected ResourceBodyResult is never minted and the admitted read/write programs reach their fail-closed default. D2 localization is ACCEPTED as evidence (ac1ebdacb; no merge, no QA); D3 repairs the carried arm to apply the source continuation ONCE and green InvalidOffset. Option (c) phase separation (Architect evt_1hren6zm8mgxv): D2 measures natural reachability only; D3 owns the same-path application positive + the causal application-removal mutation."
+title: "RT-ITREE D2/D3A/D3B — the checked ITree Ret carried arm (call_checked_ih_transport_from_case_environment, core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word WITHOUT applying the source continuation. HS4 (evt_6mnawfvm8fc4j) proved applying it is real but insufficient: the call result becomes a new ITree node and crosses an active recursive computation (TerminalResumeOuter -> Computational 301) before the Ret-case closure 460 capture 0 / final Var(1) it must reach, so an applied-but-unconsumed call is not semantics-preserving. D2 localization ACCEPTED as evidence (ac1ebdacb; no merge, no QA). D3A (evidence only): the exact carried application, per-arrival paired. D3B: localize then repair the FIRST graph-authorized edge where the applied result fails to reach the eventual Ret payload/closure capture. The merge is ATOMIC (D3A + graph-authorized result flow + product) — no application-only checkpoint."
 status: ready
 owner: runtime
 size: M
@@ -8,7 +8,7 @@ gate: none
 depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE]
 blocks: []
 github: null
-origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here."
+origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4)."
 ---
 
 > # HARD STOP 3 DISCHARGED 2026-08-26 — option (c), D2/D3 phase separation (Architect evt_1hren6zm8mgxv)
@@ -61,26 +61,117 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > monotonically to this later fail-closed boundary. This node is the D2/D3 half
 > of the RT-ITREE hard-stop-2 split (Architect evt_5w03f4zbg02ry).
 
+> # HARD STOP 4 DISCHARGED 2026-08-26 — D3 split into coupled D3A + D3B (Architect evt_6mnawfvm8fc4j)
+>
+> HS4 accepted. Exact WIP `7199330550f9eae611b417c30b289722cd8057b1` (tree
+> `9f838714182f6a2b837b5819fe6b194adc1e569a`, base `6f00843de`) stays EVIDENCE
+> ONLY — no QA, no merge, no further capture/result rewrite. The application
+> repair is REAL but NOT SUFFICIENT. The Architect independently reproduced the
+> read product (`1 passed`, `ResourceBodyResult` frontier) and traced the first
+> governed application (spec 2, source record 608, SSA `v1629`) whose source
+> continuation is `CheckedComputationalIHInvocationReturn -> ConstructArgument
+> (origin 476) -> TerminalResumeOuter -> Computational (origin 301, Ret binders=1
+> recursive=[], Vis binders=2 recursive=[1])`. The call result first becomes a
+> NEW ITree node and CROSSES an active recursive computation; it is not an
+> immediate consumer of closure 460's capture 0. Closure 460 (under
+> `460 -> 465 child 1 -> 301 child 1`, inside origin 301's Ret case) has capture 0
+> = source occurrence 459, plain `Var(0)`, which `build_checked_ih_bindings`
+> classifies `None` — correctly the ordinary Ret payload, NOT an IH binder. Body
+> 452 reads `Var(1)` and requires that capture to be the `ResourceBodyResult`; in
+> the WIP CFG capture 0 instead receives later SSA `v1650`/`v1673`, neither the
+> application result `v1629` nor the constructed `v1637`.
+>
+> **The frame's causal sentence — "returning the declared call result makes it
+> flow into closure 460 capture 0" — is FALSE and is WITHDRAWN.** The first next
+> predecessor operation is `TerminalResumeOuter -> resume_active_continuation` on
+> the exact active computational frame, NOT closure-capture insertion. A direct
+> capture-0 replacement would skip the intervening ITree semantics and is
+> PROHIBITED. Treating capture `Var(0)` as an IH from its numeric index would
+> contradict the planner derivation.
+>
+> **D2 narrow-form correction.** D2 remains valid ONLY in its narrow form: the
+> carried arm itself emitted no application and returned
+> `CheckedIhCapturedEnvironment`. Its stronger causal gloss — that this omission
+> ALONE explains the final closure capture/default — is WITHDRAWN. The WIP proves
+> application FEASIBILITY through the ruled transport/projection/envelope/
+> single-call, but NOT result delivery, and must NOT land alone: an
+> applied-but-unconsumed call is not semantics-preserving, and the two reported
+> executions of one continuation target are not yet paired to distinct governed
+> arrivals.
+>
+> **Recut (this edit).** The single D3 application leap is replaced by two
+> COUPLED phases: D3A (exact carried application, per-arrival paired, evidence
+> only — no final-capture/`InvalidOffset` claim) and D3B (localize then repair
+> the FIRST graph-authorized edge where the applied result fails to reach the
+> eventual `ITree::Ret` payload / closure capture). The final merge is ATOMIC:
+> application + graph-authorized result flow + product controls; no
+> application-only checkpoint. Runtime stays HELD until this recut lands and is
+> re-released. Next Research trigger remains hard stop 6. Inventory fold updated
+> to `529f21c43e1c0c5257d2f7898481aaa3dc3a0429` (entries 1-4).
+
+## Symptom inventory
+
+Append one line per hard stop; never rewrite history.
+
+1. Forcing the localized outer ITree carried match through an origin-only
+   checked-return bypass progressed into value-deduplicated
+   `ResourceBodyResult` defaults instead of `InvalidOffset` — keyed on an
+   artificial predecessor-route bypass, not a planner-authorized route.
+2. After D1's route repair the admitted programs naturally terminate at the
+   ordinary `ResourceBodyResult` match, but the expected result is absent from
+   the entire eight-entry receiving environment — keyed on a producer-to-binding
+   chain that never places the source continuation's result into environment
+   slot 1.
+3. The pre-repair localization phase's required AC-D2-4 positive must apply the
+   exact source continuation at the carried seam, but the complete runtime-test
+   census reaches neither arm and the admitted read program reaches only the
+   carried early-return arm — keyed on requiring the repaired operation as its
+   own pre-repair control.
+4. Exact WIP `7199330550f9eae611b417c30b289722cd8057b1` makes the governed
+   carried call execute and return a new value, but source control then runs
+   `CheckedComputationalIHInvocationReturn -> ConstructArgument(476) ->
+   TerminalResumeOuter -> Computational(301)`; the later Ret-case closure 460
+   still captures the prior transported environment at capture 0, and final
+   `Var(1)` reaches the same default — keyed on claiming a call result before
+   the intervening recursive ITree computation binds it to the later capture.
+
 ## Objective
 
 Localize the first unresolved authority, which is UPSTREAM of ordinary
 `ResourceBodyResult` selection: the checked ITree `Ret` carried arm that should
-apply the source continuation and place its `ResourceBodyResult` into the
-receiving environment, but instead returns the transported captured-environment
-word unapplied. Then repair that arm so the admitted read-offset and
-write-offset full programs green the exact `InvalidOffset` observation. Runtime
-must NOT repair the default or search the environment at runtime.
+apply the source continuation and (HS4) whose applied result must then flow —
+through the source-control chain and the active recursive ITree computation — to
+the eventual `ITree::Ret` payload the Ret-case closure consumes, instead of the
+carried arm returning the transported captured-environment word unapplied. Then
+repair the FIRST graph-authorized edge on that path so the admitted read-offset
+and write-offset full programs green the exact `InvalidOffset` observation.
+Runtime must NOT repair the default, write closure capture 0 directly, or search
+the environment at runtime.
 
-## Phase structure (option (c), Architect evt_1hren6zm8mgxv)
+## Phase structure (option (c) + HS4 split, Architect evt_1hren6zm8mgxv / evt_6mnawfvm8fc4j)
 
 - **D2 — localization. ACCEPTED as evidence (`ac1ebdacb`); NOT a merge
-  candidate; NO QA.** Its residual is exactly D3: the lawful application
-  mechanism. Its ACs are the census (AC-D2-1/2/3, satisfied by the accepted
-  evidence) plus the reworded natural-reachability AC-D2-4.
-- **D3 — repair. The MERGE candidate.** Runtime builds it after this recut
-  lands and a fresh release. It owns the same-path application positive, the
-  causal application-removal mutation, the authorized component shape, the
-  conjunctive controls, and the final `InvalidOffset` product.
+  candidate; NO QA.** Narrow form only: the carried arm emitted no application
+  and returned `CheckedIhCapturedEnvironment` (the stronger causal gloss is
+  WITHDRAWN — HS4). Its ACs are the census (AC-D2-1/2/3, satisfied by the
+  accepted evidence) plus the reworded natural-reachability AC-D2-4.
+- **D3A — exact carried application. EVIDENCE ONLY; must NOT land alone.** The
+  ruled `CheckedIhEnvironmentTransport` single-application shape (proven feasible
+  by WIP `719933055`), with every governed arrival paired to its exact
+  transport/call identity. Makes NO claim about the final capture or
+  `InvalidOffset`.
+- **D3B — result-flow localization then single-edge repair.** On both unchanged
+  admitted programs, trace each D3A returned value through the exact
+  source-control chain and every constructed ITree value, `TerminalResumeOuter`,
+  and the active computational frames until the eventual `ITree::Ret` payload
+  that origin 301 (read) and its write analogue consume; bind that payload
+  through the Ret case's `CheckedCaseBinderLayout` to the exact ordinary
+  closure-capture occurrence and body read; identify the FIRST edge where the
+  expected typed result is replaced by (or fails to replace) the transported
+  environment. ONLY that edge may be repaired.
+- **The MERGE is ATOMIC:** D3A application + D3B graph-authorized result flow +
+  the product controls, landed together — no application-only checkpoint.
+  Runtime builds this after the recut lands and a fresh release.
 
 ## Evidence objects (Architect probe-verified; evidence ONLY, not candidates)
 
@@ -93,6 +184,18 @@ must NOT repair the default or search the environment at runtime.
   arm with read `608`/`662`/`939`/spec 1, write `720`/`1238`/`1257`/spec 3.
   Durable inventory anchor `7e5d54b9839451d8d31d76070934af84516e7cf8` over
   current main. STAYS FROZEN — do not edit, do not promote, no QA.
+- HS4 application-feasibility object `7199330550f9eae611b417c30b289722cd8057b1`
+  (tree `9f838714182f6a2b837b5819fe6b194adc1e569a`, base `6f00843de`) — EVIDENCE
+  ONLY, do NOT merge/QA. One production path, `core.rs +124/-41`, no fallback:
+  revalidates the two-endpoint transport, validates `source_record` and capture
+  counts, projects ordinals via `checked_ih_capture_origin`, one envelope walk,
+  one `continuation_calls[transport.source_call_identity()]` lookup, one
+  `call_declared_unit_target`. LLDB proves `ken_continuation_1` executes at the
+  new carried site (returned words `0x0f09`/`0x1109`), but final closure body 452
+  capture 0 / `Var(1)` still reads `0x1009` (the untagged transported
+  environment) — application executed, result NOT delivered. Proves D3A
+  feasibility; D3B (result flow) is unbuilt. `erasure.rs` blob `8532ced2...`
+  unchanged; `RoutedAnswer::checked(` remains 3 callers. STAYS FROZEN.
 - Production-only parent `cc7dc7c021be67bb94f3d68de5aef8e93ffc3255` (base/current
   main `de304429c`): read naturally terminates at planned identity `36` /
   `decl:rt_parity_fs_read_at_offset_single::ResourceBodyResult`; write at `37` /
@@ -126,9 +229,8 @@ must NOT repair the default or search the environment at runtime.
   provable on the unchanged programs plus an entry-marker/refusal mutation at
   the carried branch that does NOT apply the worker or inject a result. NO
   repair site, NO QA on the evidence object.
-- **D3 (repair — the MERGE candidate). Authorized component shape (Architect
-  evt_1hren6zm8mgxv); Runtime builds to exactly this after the recut lands and
-  a fresh release:**
+- **D3A (exact carried application — evidence only; the ruled component shape,
+  proven feasible by `719933055`; Architect evt_1hren6zm8mgxv):**
   - Keep the exact `CheckedIhEnvironmentTransport` as the sole two-endpoint
     authority. In the `Carried(word)` branch, validate its planner record as the
     exact `CheckedIhCapturedEnvironment` for the transport's source owner and
@@ -148,15 +250,41 @@ must NOT repair the default or search the environment at runtime.
   - Resolve only
     `function_local.continuation_calls[transport.source_call_identity()]`,
     emit ONE declared call through the existing call authority, record it under
-    the exact transport, settle through the existing candidate discipline, and
-    return that call's result. Factor the `StaticWorker` and carried-capture
+    the exact transport, and pair every governed arrival to that exact
+    transport/call identity. Factor the `StaticWorker` and carried-capture
     sources into one downstream envelope/call path rather than duplicating the
-    continuation body or creating a second call lane.
+    continuation body or creating a second call lane. This phase makes NO claim
+    about the final capture or `InvalidOffset` and must NOT land alone.
   - If the source record cannot be validated, its captures cannot be projected
     from existing planner facts, or the exact continuation target was not
     already declared into this destination function — HARD-STOP. Do NOT add a
     second identity catalog, ABI lane, raw cast, environment search, or
     family-specific fallback.
+- **D3B (result-flow localization then single-edge repair — the coupled atomic
+  half; Architect evt_6mnawfvm8fc4j):**
+  - On both unchanged admitted programs, trace each D3A returned value through
+    the exact source-control chain (`CheckedComputationalIHInvocationReturn ->
+    ConstructArgument -> TerminalResumeOuter -> Computational` active frame(s)),
+    every constructed ITree value, and the active computational-frame lineage
+    until the eventual `ITree::Ret` payload that origin 301 (read) and its write
+    analogue consume.
+  - Bind that payload through the Ret case's `CheckedCaseBinderLayout` to the
+    exact ordinary closure-capture occurrence (capture 0 = occurrence 459,
+    `Var(0)`) and the body-452 `Var(1)` read. Identify the FIRST edge where the
+    expected typed result is replaced by (or fails to replace) the transported
+    environment. ONLY that edge may be repaired.
+  - Authority comes from EXISTING graph/planner facts: source-continuation frame
+    identity, active-frame lineage, constructed occurrence/result edge, Ret-case
+    binder role, and the exact boundary-closure capture descriptor. Numeric
+    origins are report coordinates only. `CheckedIhBinding(None)` at the Ret
+    capture is a NEGATIVE CONTROL — it forbids reclassifying the capture as an
+    IH.
+  - If no existing planner relation pairs the D3A result through `ResumeOuter` to
+    the eventual Ret payload — HARD-STOP. Do NOT create a lowering-side reverse
+    search, a second binder catalog, a second identity catalog, an ABI lane, a
+    raw cast, an environment search, or a family-specific fallback; do NOT write
+    capture 0 directly, project a convenient result field, inject the result
+    after `ResumeOuter`, or change D1.
 
 ## Acceptance criteria
 
@@ -187,26 +315,42 @@ must NOT repair the default or search the environment at runtime.
   test may remain as instrument/regression health only and MUST NOT be credited
   as same-path evidence. This AC is discharged by the accepted evidence plus the
   reachability-marker mutation; it does NOT require a post-repair positive.
-- AC-D3-POSITIVE (same-path application positive — MOVED here from D2) — on the
-  UNCHANGED admitted read/write programs, the unmutated D3 candidate makes each
-  governed carried arrival apply its exact source continuation and proceed
-  through exact `ResourceBodyOk` / `ResourceBodyErr` selection to the
-  independently specified `InvalidOffset` observation and effect prefix.
-- AC-D3-PAIRING (one application per arrival) — pair EVERY governed
+- AC-D3A-APPLICATION (carried application executes — D3A, evidence only) — on
+  the UNCHANGED admitted read/write programs the D3A candidate makes each
+  governed carried arrival apply its exact source continuation through the ruled
+  transport/projection/envelope/single-call shape and return the call result.
+  This AC makes NO claim about the final capture or `InvalidOffset` and does NOT
+  land alone.
+- AC-D3A-PAIRING (one application per arrival) — pair EVERY governed
   carried-branch arrival with EXACTLY ONE application event carrying the same
   transport identity, source record, worker body, source result, and
   destination owner. Unpaired scalar totals are INSUFFICIENT — the programs may
   legitimately reach the seam more than once.
-- AC-D3-CAUSAL (application-removal mutation — MOVED here from D2) — suppress
-  ONLY that production application while keeping entry, descriptor, and detector
-  live; require BOTH unchanged admitted programs to return to the localized sole
-  default; restore byte-identically and recover the exact positive.
-- AC-D3-ATMOSTONCE — prove at-most-once STRUCTURALLY, or add the opposite
-  duplicate-application mutation. A removal mutation proves at-least-once only.
+- AC-D3B-RESULTFLOW (result-delivery positive — D3B) — on the UNCHANGED admitted
+  read/write programs the atomic (D3A+D3B) candidate makes each application
+  result flow through the exact source-control chain, `TerminalResumeOuter`, and
+  the active computational frames to the eventual `ITree::Ret` payload, binds it
+  through the Ret-case `CheckedCaseBinderLayout` to the exact closure-capture
+  occurrence (capture 0 / occurrence 459) and body-452 `Var(1)` read, and
+  proceeds through exact `ResourceBodyOk` / `ResourceBodyErr` selection to the
+  independently specified `InvalidOffset` observation and effect prefix.
+- AC-D3B-RESULTFLOW-PAIRING (per-step result-flow pairing) — pair the exact
+  application result through EACH successor operation to the exact eventual Ret
+  payload and closure capture. No scalar-total substitution; a bare
+  target-call / consumption count does not suffice.
+- AC-D3-DUAL-SUPPRESS (two independent causal mutations) — (i) suppress ONLY the
+  D3A production application after the full repair, keeping
+  entry/descriptor/detector live, and require BOTH programs to return to the
+  localized sole default; (ii) SEPARATELY suppress ONLY the newly repaired D3B
+  successor edge while leaving D3A live, and require the SAME default. Restore
+  byte-identically after each and recover both exact products.
+- AC-D3-ATMOSTONCE — prove at-most-once for the application AND for the
+  successor consumption INDEPENDENTLY, each either STRUCTURALLY or via the
+  opposite duplicate mutation. A removal mutation proves at-least-once only.
 - AC-D3-CHECKED-TRACE — retain a SEPARATE exact checked-route trace through
   `CheckedSelectedRecursor`, checked `CarriedEliminationEntered`, and
   `CarriedFallbackEmitted`, but do NOT substitute that trace for the
-  carried-application pairing.
+  carried-application or result-flow pairing.
 - AC-D3-INDEPENDENT-ORACLE — keep expected `InvalidOffset` and the effect
   prefixes INDEPENDENT of the new lowering logic. No result derived from the
   repair mechanism may serve as its own oracle.
@@ -218,47 +362,67 @@ must NOT repair the default or search the environment at runtime.
   ResourceRelease(sink)`, no `FsWriteAt`) — not merely the absence of the trap.
   The transitional route/frontier witness left by the D1 slice is replaced by
   the durable nonignored `InvalidOffset` witnesses here.
-- AC-D3-SCOPE — both fail-closed defaults, `erasure.rs`, D1's private route
-  lane, ordinary-case precedence, the checked-answer caller population, and the
-  respective read/write effect prefixes are all preserved. PROHIBITED: scanning
-  environment tags in production to "find" a matching value; family-specific
-  routing; raw casts; reminting the checked answer as a `ResourceBodyResult`;
-  duplicating the continuation body; bypassing the default; altering the
-  already-correct parameter/capture mapping; changing D1.
+- AC-D3-SCOPE — both fail-closed defaults, `erasure.rs` (blob `8532ced2...`),
+  D1's private route lane, ordinary-case precedence, the checked-answer caller
+  population, and the respective read/write effect prefixes are all preserved.
+  PROHIBITED (HS4-augmented): writing closure capture 0 directly; projecting a
+  convenient result field; injecting the call result after `ResumeOuter`; keying
+  on runtime words / tags / family / spelling / field counts; using `Var(0)` or a
+  capture ordinal as authority; reclassifying the `CheckedIhBinding(None)` Ret
+  capture as an IH; a lowering-side reverse search or second binder catalog;
+  scanning environment tags in production to "find" a matching value;
+  family-specific routing; raw casts; reminting the checked answer as a
+  `ResourceBodyResult`; synthesizing a worker; duplicating the continuation body;
+  adding a second transport / identity catalog / ABI lane; bypassing the default;
+  altering the already-correct parameter/capture mapping; changing D1.
 - AC-NO-REGRESSION — whole-suite green in CI; local targeted `-p ken-runtime` /
   `-p ken-cli` / `-p ken-verify` only, never `--workspace`.
 
 ## Reviewers
 
 Architect (D2 reworded reachability introduces no application/result and no
-spelling/ABI/family/trap/field-count/index authority; the D3 repair is the
-authorized `CheckedIhEnvironmentTransport` single-application shape — sole
-two-endpoint authority, projected capture ordinals, single envelope/call path,
-no `StaticWorkerBinding` synthesis, no second identity catalog/ABI lane; both
+spelling/ABI/family/trap/field-count/index authority; D3A is the authorized
+`CheckedIhEnvironmentTransport` single-application shape — sole two-endpoint
+authority, projected capture ordinals, single envelope/call path, no
+`StaticWorkerBinding` synthesis, no second identity catalog/ABI lane — and does
+NOT land alone; D3B repairs the FIRST graph-authorized result-flow edge with
+authority from EXISTING planner relations only (source-continuation frame
+identity, active-frame lineage, constructed occurrence/result edge, Ret-case
+binder role, closure-capture descriptor), with no lowering-side reverse search,
+no second binder catalog, no direct capture-0 write, and the
+`CheckedIhBinding(None)` Ret capture preserved as a negative control; both
 fail-closed defaults and `erasure.rs` intact) + runtime-qa (AC-D2-4 proves
-natural reachability WITHOUT applying/injecting; the D3 pairing is
-one-application-per-arrival with the causal removal mutation reddening and a
-structural at-most-once or duplicate-application control; the checked-route
-trace is retained but NOT substituted for the pairing; the final `InvalidOffset`
-product holds on both programs with the exact effect prefixes, independent of
-the lowering logic). QA is requested on the D3 candidate only — NOT on the
-frozen `ac1ebdacb` evidence.
+natural reachability WITHOUT applying/injecting; D3A pairing is
+one-application-per-arrival; D3B adds per-step result-flow pairing to the
+eventual Ret payload / closure capture with no scalar-total substitution; the
+two independent causal suppressions — D3A application and the repaired D3B edge —
+each redden to the localized default and byte-restore; at-most-once holds for
+BOTH application and successor consumption; the checked-route trace is retained
+but NOT substituted for the pairings; the final `InvalidOffset` product holds on
+both programs with the exact effect prefixes, independent of the lowering logic).
+QA is requested on the atomic D3A+D3B candidate only — NOT on the frozen
+`ac1ebdacb` or `719933055` evidence.
 
 ## Capability tier
 
 T1 — a graph/claim continuation-binding repair reviewed on the provenance
 argument (which transport, which projected capture ordinals, one application per
-arrival), not a differential diff; the pre-repair localization is already an
-accepted object. Size M.
+arrival, and the FIRST graph-authorized result-flow edge from the application
+result to the eventual Ret payload / closure capture), not a differential diff;
+the pre-repair localization and D3A application feasibility are already accepted
+objects. Size M.
 
 ## Sequencing
 
 Lane-1 (runtime, priority). D2 localization is ACCEPTED (evidence `ac1ebdacb`,
-no merge, no QA). Runtime is HELD until this recut lands and is re-released;
-then the Runtime ring builds the D3 repair candidate (the merge). After this
-node greens `InvalidOffset`, [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]]
+no merge, no QA); D3A application feasibility is proven (evidence `719933055`,
+no merge, no QA). Runtime is HELD until this recut lands and is re-released; then
+the Runtime ring builds the ATOMIC D3A+D3B repair candidate (application +
+graph-authorized result flow + product) — no application-only checkpoint. After
+this node greens `InvalidOffset`, [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]]
 (ReadSome/Wrote) and the final four-value closure fold follow; the D1 follow-up
 [[RT-CHECKED-SUCCESSOR-EMIT-REACHABILITY]] is sequenced after this node on the
 single Runtime ring (ring contention, no logical dependency). PX8 stays blocked
 until the whole native carried-value program lands. Single Runtime lane object
-at a time.
+at a time. Inventory fold `529f21c43e1c0c5257d2f7898481aaa3dc3a0429` (entries
+1-4, appended by this recut).
