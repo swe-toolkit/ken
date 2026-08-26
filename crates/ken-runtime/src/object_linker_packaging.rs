@@ -3238,6 +3238,48 @@ mod tests {
                 return_constructor,
             } if return_constructor == "ctor:fixture::PX8TR::ITree::Ret"
         )));
+
+        // Durable invariant. MEASURED: this non-degenerate carried loop emits
+        // exactly the closed initial plus active-self-resumption predecessor
+        // population, and each sends the carried word beside its exact explicit
+        // control. CLAIMED: no unlabeled predecessor reaches the two-parameter
+        // header. THE GAP: the fixture closes the shared emitter's edge enum;
+        // review closes a future raw jump that bypasses the private emitter.
+        let header_edges = success_provenance
+            .iter()
+            .filter_map(|event| match event {
+                crate::cranelift_backend::Px8trTrapProvenanceEvent::CarriedLoopHeaderEdgeEmitted {
+                    checked_frame_id,
+                    edge,
+                    authored_control_word,
+                    emitted_control_word,
+                } => Some((
+                    *checked_frame_id,
+                    *edge,
+                    *authored_control_word,
+                    *emitted_control_word,
+                )),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            header_edges,
+            vec![
+                (
+                    Some(7),
+                    crate::cranelift_backend::CarriedComputationalLoopEdge::Initial,
+                    1,
+                    1,
+                ),
+                (
+                    Some(7),
+                    crate::cranelift_backend::CarriedComputationalLoopEdge::ActiveSelfResumption,
+                    1,
+                    1,
+                ),
+            ],
+            "the carried loop header has exactly two labeled word-plus-control predecessors"
+        );
         assert!(!success_provenance.iter().any(|event| matches!(
             event,
             crate::cranelift_backend::Px8trTrapProvenanceEvent::FinalProcessObjectTrap { .. }
@@ -3355,21 +3397,18 @@ mod tests {
             }
         )));
 
-        // ── ⭐ THE DISCRIMINATING PAIR ──
-        //
-        // Same fixture, same plan, one bit flipped. With the checked-answer
-        // fallback enabled the planned checked-`ITree` default is not emitted
-        // **at any seat** — the fallback took the return case instead of
-        // sealing the closed default. This is what makes the disabled half
-        // evidence about the route rather than about the fixture.
-        assert!(
-            !success_provenance.iter().any(|event| matches!(
-                event,
-                crate::cranelift_backend::Px8trTrapProvenanceEvent::PlannedTrapEmitted { trap, .. }
-                    if trap == &expected
-            )),
-            "the enabled route must not seal the checked-ITree default anywhere"
-        );
+        // The two-parameter header deliberately emits both the checked and
+        // fail-closed CFG successors. Therefore the exact default identity is
+        // present in both artifacts; compile-time presence no longer claims the
+        // runtime checked edge selected it. The discriminating pair is runtime:
+        // exact control exits 0 above, while the disabled route exits 1 through
+        // this exact default.
+        assert!(success_provenance.iter().any(|event| matches!(
+            event,
+            crate::cranelift_backend::Px8trTrapProvenanceEvent::PlannedTrapEmitted { trap, .. }
+                if trap == &expected
+        )));
+        assert_ne!(success.status.code(), trapped.status.code());
     }
 
     #[cfg(target_os = "linux")]

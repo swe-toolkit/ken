@@ -2084,6 +2084,21 @@ impl D6aObservation {
             .collect()
     }
 
+    fn header_controls(&self) -> Vec<(CarriedComputationalLoopEdge, i64, i64)> {
+        self.provenance
+            .iter()
+            .filter_map(|event| match event {
+                Px8trTrapProvenanceEvent::CarriedLoopHeaderEdgeEmitted {
+                    edge,
+                    authored_control_word,
+                    emitted_control_word,
+                    ..
+                } => Some((*edge, *authored_control_word, *emitted_control_word)),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Whether the artifact sealed the **exact planned** checked-`ITree`
     /// default into a generated unit's `TrapWord`, with the planner-issued
     /// identity intact. ⛔ Not "did it trap" — the fixture plans a second,
@@ -2194,32 +2209,30 @@ fn d6a_the_exact_claimed_call_result_reaches_the_carried_consumer_as_checked() {
         "exactly one carried elimination is entered on this witness, and it is entered checked"
     );
     assert_eq!(run.fallbacks(), 1, "the checked-answer fallback is emitted once");
-    assert!(
-        run.defaults().is_empty(),
-        "no carried consumer may seal a closed default on the enabled route"
+    assert_eq!(
+        run.defaults(),
+        vec![SourceComputationalAnswerRoute::CheckedSelectedRecursor],
+        "the fail-closed successor is emitted beside the checked successor"
     );
     assert!(
-        !run.sealed_the_exact_checked_itree_default(),
-        "the enabled route must not plant the checked-ITree default anywhere"
+        run.sealed_the_exact_checked_itree_default(),
+        "the two-parameter header must retain the exact fail-closed default beside the checked CFG successor"
     );
 }
 
-/// **`D6a` upstream 2/8 — dropping ONLY the call-result route recreates the
-/// exact planned default.**
+/// **`D6a` upstream 2/8 — dropping ONLY the call-result route emits Direct at
+/// the existing two-parameter header.**
 ///
-/// ⭐ The mutation is surgical: producer 1 is untouched and still supplies
+/// The mutation is surgical: producer 1 is untouched and still supplies
 /// `CheckedSelectedRecursor` at its own seat. Only the exactly claimed call
-/// result comes back `DirectScrutinee`. The composed consumer then joins
-/// direct-with-direct, the fallback is not emitted, and the closed default is
-/// sealed with the **exact planned** checked-`ITree` trap identity.
-///
-/// ⛔ Note what is asserted about the trap: the planner-issued identity, at the
-/// unit `TrapWord`, equal to the word actually emitted. *"It trapped"* would be
-/// satisfied by the fixture's other planned default too.
+/// result comes back `DirectScrutinee`; the composed consumer joins
+/// direct-with-direct and the initial edge emits explicit Direct control. Both
+/// CFG successors remain present, including the exact planned fail-closed
+/// default. Runtime selection is pinned by the D1 full-program child controls.
 ///
 /// **Promise class: durable invariant.**
 #[test]
-fn d6a_dropping_only_the_call_result_route_recreates_the_exact_planned_default() {
+fn d6a_dropping_only_the_call_result_route_emits_direct_header_control() {
     let run = observe_d6a("d6a_drop_call_result", D6aRouteMutation::DropCallResultRoute);
     assert!(
         run.applications > 0,
@@ -2244,15 +2257,21 @@ fn d6a_dropping_only_the_call_result_route_recreates_the_exact_planned_default()
         "the recursor-layer producer must be untouched by this mutation"
     );
 
-    assert_eq!(run.fallbacks(), 0, "the fallback must not be emitted");
+    assert_eq!(
+        run.fallbacks(),
+        1,
+        "the shared two-successor CFG is emitted independently of runtime control"
+    );
     assert_eq!(
         run.defaults(),
-        vec![SourceComputationalAnswerRoute::DirectScrutinee],
-        "the carried consumer must seal its closed default, on a DIRECT route"
+        vec![SourceComputationalAnswerRoute::DirectScrutinee]
     );
+    assert!(run.header_controls().iter().any(|(edge, authored, emitted)| {
+        *edge == CarriedComputationalLoopEdge::Initial && *authored == 0 && *emitted == 0
+    }));
     assert!(
         run.sealed_the_exact_checked_itree_default(),
-        "the exact planned checked-ITree default identity must reach a unit TrapWord"
+        "the exact fail-closed successor must remain present beside the checked successor"
     );
 }
 
@@ -2429,7 +2448,12 @@ fn d6a_the_recursor_layer_producer_stays_green_independently() {
         1,
         "the emission on this witness is producer 2's, so dropping producer 1 must not move it"
     );
-    assert!(!run.sealed_the_exact_checked_itree_default());
+    assert!(run.sealed_the_exact_checked_itree_default());
+    assert!(run.header_controls().iter().any(|(edge, authored, emitted)| {
+        *edge == CarriedComputationalLoopEdge::ActiveSelfResumption
+            && *authored == 0
+            && *emitted == 0
+    }));
 }
 
 /// **`D6a` upstream 6/8 — mixed-route predecessors at one origin are preserved
@@ -2492,7 +2516,10 @@ fn d6a_mixed_route_predecessors_at_one_origin_stay_separate() {
          carrying the scalar the merge chose"
     );
     assert_eq!(run.fallbacks(), 1);
-    assert!(run.defaults().is_empty());
+    assert_eq!(
+        run.defaults(),
+        vec![SourceComputationalAnswerRoute::CheckedSelectedRecursor]
+    );
 }
 
 /// **`D6a` upstream 7/8 — planned, claimed and emitted call identity agree on
@@ -2581,10 +2608,17 @@ fn d6a_the_frame_field_must_not_overwrite_an_incoming_checked_route() {
         SourceComputationalAnswerRoute::DirectScrutinee,
         "the overwrite must be what erases the route"
     );
-    assert_eq!(run.fallbacks(), 0);
+    assert_eq!(
+        run.fallbacks(),
+        1,
+        "the shared two-successor CFG remains emitted under a Direct control"
+    );
+    assert!(run.header_controls().iter().any(|(edge, authored, emitted)| {
+        *edge == CarriedComputationalLoopEdge::Initial && *authored == 0 && *emitted == 0
+    }));
     assert!(
         run.sealed_the_exact_checked_itree_default(),
-        "the erased route must land on the exact planned checked-ITree default"
+        "the erased route must retain the exact planned fail-closed successor"
     );
 }
 

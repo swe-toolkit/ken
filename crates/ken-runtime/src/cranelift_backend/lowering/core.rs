@@ -12213,9 +12213,12 @@ impl<'a> Lowering<'a> {
             .rev()
             .find(|(origin, _)| *origin == eliminator.static_origin)
         {
-            let route_control = builder
-                .ins()
-                .iconst(types::I64, eliminator.answer_route.control_word());
+            let route_control_word = carried_computational_loop_control_word(
+                eliminator.checked_frame_id,
+                CarriedComputationalLoopEdge::ActiveSelfResumption,
+                eliminator.answer_route,
+            );
+            let route_control = builder.ins().iconst(types::I64, route_control_word);
             builder
                 .ins()
                 .jump(*header, &[scrutinee.word.into(), route_control.into()]);
@@ -12227,9 +12230,12 @@ impl<'a> Lowering<'a> {
         let header = builder.create_block();
         builder.append_block_param(header, types::I64);
         builder.append_block_param(header, types::I64);
-        let route_control = builder
-            .ins()
-            .iconst(types::I64, eliminator.answer_route.control_word());
+        let route_control_word = carried_computational_loop_control_word(
+            eliminator.checked_frame_id,
+            CarriedComputationalLoopEdge::Initial,
+            eliminator.answer_route,
+        );
+        let route_control = builder.ins().iconst(types::I64, route_control_word);
         builder.ins().jump(
             header,
             &[scrutinee.word.into(), route_control.into()],
@@ -12642,6 +12648,11 @@ impl<'a> Lowering<'a> {
             }
 
             builder.switch_to_block(default_route);
+            #[cfg(test)]
+            record_d6a_route_event(D6aRouteEvent::CarriedDefaultSealed {
+                static_origin: eliminator.static_origin,
+                route: eliminator.answer_route,
+            });
             let defaulted = LoweringOperand::Specialized(Lowered::Trap(eliminator.default.clone()));
             if !self.seal_source_trap_branch(builder, &defaulted)? {
                 return Err(unsupported(

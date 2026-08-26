@@ -572,6 +572,17 @@ pub(crate) enum Px8trTrapProvenanceEvent {
         checked_frame_id: u64,
         return_constructor: RuntimeSymbol,
     },
+    /// One compiler-authored predecessor of a carried computational loop
+    /// header, paired with the exact route and control word it emitted.
+    ///
+    /// This is emission evidence only. Runtime behavior is established by the
+    /// linked-artifact controls that consume the emitted word.
+    CarriedLoopHeaderEdgeEmitted {
+        checked_frame_id: Option<u64>,
+        edge: CarriedComputationalLoopEdge,
+        authored_control_word: i64,
+        emitted_control_word: i64,
+    },
     FinalProcessObjectTrap {
         trap: RuntimeTrap,
     },
@@ -2343,9 +2354,9 @@ pub(in crate::cranelift_backend) enum D6aRouteEvent {
     CarriedFallbackEmitted {
         static_origin: StaticOriginId,
     },
-    /// The carried consumer took its closed default instead. ⛔ Recorded for
-    /// **every** reason it can do so, including a `DirectScrutinee` route, so
-    /// the trace can never show a consumer that neither emitted nor defaulted.
+    /// The carried consumer emitted its closed default successor. Under the
+    /// two-parameter header this is recorded beside the checked successor; it
+    /// says the fail-closed CFG arm exists, not that runtime selected it.
     CarriedDefaultSealed {
         static_origin: StaticOriginId,
         route: SourceComputationalAnswerRoute,
@@ -9542,6 +9553,95 @@ impl SourceComputationalAnswerRoute {
     }
 }
 
+/// The closed predecessor population of one carried computational loop header.
+///
+/// Both variants emit the same two-parameter shape: the carried word and the
+/// control word authored by that exact edge. Keeping the edge kind sealed makes
+/// a third unlabeled predecessor unrepresentable through the shared emitter.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CarriedComputationalLoopEdge {
+    Initial,
+    ActiveSelfResumption,
+}
+
+fn carried_computational_loop_control_word(
+    checked_frame_id: Option<u64>,
+    edge: CarriedComputationalLoopEdge,
+    authored_route: SourceComputationalAnswerRoute,
+) -> i64 {
+    let authored = authored_route.control_word();
+    let emitted = authored;
+    #[cfg(not(any(test, feature = "px8-ds-test-support")))]
+    let _ = (checked_frame_id, edge);
+    // Test-support mutations run in isolated child processes. They replace only
+    // the exact frame-1 producer named by the governed full-program controls;
+    // the feature is absent from ordinary runtime artifacts.
+    #[cfg(feature = "px8-ds-test-support")]
+    let emitted = match std::env::var("KEN_RT_ITREE_D1_ROUTE_CONTROL").as_deref() {
+        Err(std::env::VarError::NotPresent) => emitted,
+        Err(std::env::VarError::NotUnicode(_)) => {
+            panic!("KEN_RT_ITREE_D1_ROUTE_CONTROL must be Unicode")
+        }
+        Ok("active-checked-to-direct")
+            if checked_frame_id == Some(1)
+                && edge == CarriedComputationalLoopEdge::ActiveSelfResumption
+                && authored_route
+                    == SourceComputationalAnswerRoute::CheckedSelectedRecursor =>
+        {
+            eprintln!(
+                "RT_ITREE_D1_CONTROL_APPLIED mode=active-checked-to-direct frame=1 edge=active"
+            );
+            SourceComputationalAnswerRoute::DIRECT_CONTROL_WORD
+        }
+        Ok("active-direct-to-checked")
+            if checked_frame_id == Some(1)
+                && edge == CarriedComputationalLoopEdge::ActiveSelfResumption
+                && authored_route == SourceComputationalAnswerRoute::DirectScrutinee =>
+        {
+            eprintln!(
+                "RT_ITREE_D1_CONTROL_APPLIED mode=active-direct-to-checked frame=1 edge=active"
+            );
+            SourceComputationalAnswerRoute::CHECKED_CONTROL_WORD
+        }
+        Ok("active-checked-to-unknown")
+            if checked_frame_id == Some(1)
+                && edge == CarriedComputationalLoopEdge::ActiveSelfResumption
+                && authored_route
+                    == SourceComputationalAnswerRoute::CheckedSelectedRecursor =>
+        {
+            eprintln!(
+                "RT_ITREE_D1_CONTROL_APPLIED mode=active-checked-to-unknown frame=1 edge=active"
+            );
+            2
+        }
+        Ok("initial-direct-to-unknown")
+            if checked_frame_id == Some(1)
+                && edge == CarriedComputationalLoopEdge::Initial
+                && authored_route == SourceComputationalAnswerRoute::DirectScrutinee =>
+        {
+            eprintln!(
+                "RT_ITREE_D1_CONTROL_APPLIED mode=initial-direct-to-unknown frame=1 edge=initial"
+            );
+            2
+        }
+        Ok("active-checked-to-direct")
+        | Ok("active-direct-to-checked")
+        | Ok("active-checked-to-unknown")
+        | Ok("initial-direct-to-unknown") => emitted,
+        Ok(other) => panic!("unknown KEN_RT_ITREE_D1_ROUTE_CONTROL mode: {other}"),
+    };
+
+    #[cfg(test)]
+    px8tr_record_trap_provenance(Px8trTrapProvenanceEvent::CarriedLoopHeaderEdgeEmitted {
+        checked_frame_id,
+        edge,
+        authored_control_word: authored,
+        emitted_control_word: emitted,
+    });
+
+    emitted
+}
+
 /// **`RT-DECL-CLOSURE-PORT` `D6a` upstream half — one lowering predecessor's
 /// operand paired with the route it arrived by.**
 ///
@@ -9693,6 +9793,27 @@ impl SourceComputationalAnswerRoute {
             Self::DirectScrutinee
         } else {
             route
+        };
+        // This test-support mutation changes the real recursor-layer producer,
+        // not the downstream default or header consumer. The isolated child
+        // control pairs it with the exact route-control mutation.
+        #[cfg(feature = "px8-ds-test-support")]
+        let route = match std::env::var("KEN_RT_ITREE_D1_RECURSOR_ROUTE").as_deref() {
+            Err(std::env::VarError::NotPresent) => route,
+            Err(std::env::VarError::NotUnicode(_)) => {
+                panic!("KEN_RT_ITREE_D1_RECURSOR_ROUTE must be Unicode")
+            }
+            Ok("drop-checked-frame-1")
+                if layer.checked_frame_id == Some(1)
+                    && route == Self::CheckedSelectedRecursor =>
+            {
+                eprintln!(
+                    "RT_ITREE_D1_RECURSOR_APPLIED mode=drop-checked-frame-1 frame=1"
+                );
+                Self::DirectScrutinee
+            }
+            Ok("drop-checked-frame-1") => route,
+            Ok(other) => panic!("unknown KEN_RT_ITREE_D1_RECURSOR_ROUTE mode: {other}"),
         };
         #[cfg(test)]
         record_d6a_route_event(D6aRouteEvent::RecursorLayerSupplied {
