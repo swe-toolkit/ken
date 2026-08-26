@@ -1,7 +1,7 @@
 ---
 id: CAT-REUSE-CENSUS
 title: "Catalog-reuse modernization census — a catalog-wide, source-editing-free inventory that sizes the rework campaign: per catalog package, enumerate (a) definitions now redundant with the expanded prelude, (b) tools reimplemented locally that a sibling module now pub-exports, (c) bottom-up file arrangement, each item risk-tagged (low computational-dup / higher proof-scaffolding). The census that scopes the per-package rework WPs; makes no source edits and closes nothing."
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none
@@ -11,6 +11,18 @@ github: null
 origin: "Steward, 2026-08-26, launching the operator-concurred catalog-reuse modernization campaign (charter docs/program/wp/catalog-reuse-modernization.md). Census-first shape: this inventory sizes the campaign so per-package rework WPs are framed from evidence, not blind. Runs on the foundation ring beside/after the CAT-ORDER-PUB-EXPORT + CAT-GCD-REFACTOR pilot. Steward-filed per COORDINATION section 2."
 ---
 
+> # MERGED 2026-08-26 — census document landed at origin/main `6f00843de`
+>
+> The doc-only review-evidence candidate `0479ce611` merged (census document
+> `docs/program/cat-reuse-census.md`, +379/-0, no checked-in oracle per the
+> ruling below). Gate: foundation-qa APPROVE `evt_11dbp1rywhjeq` + CV APPROVE
+> `evt_b8tntz94n5c8` on the exact SHA (independent reproduction), resolved merge
+> Decision `dec_1sf7k968ssr6e`. Ring retro boundary closed: QA `evt_3qn0br99s5jb4`,
+> implementer `evt_63wnfg9tgh3vd`, foundation coordination retro — carry is
+> node-internal (classify a pin's subject before hardening a review inventory);
+> no follow-up WP triggered. Its D1 rollup is the input for the per-package
+> rework WPs the campaign will frame next.
+>
 > # SCOPE/AUTHORITY RULING 2026-08-26 — census is REVIEW EVIDENCE, no checked-in oracle (Steward)
 >
 > The recut cycle hard-stopped on a real authority fork (foundation-leader
