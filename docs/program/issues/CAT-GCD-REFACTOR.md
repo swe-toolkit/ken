@@ -5,12 +5,34 @@ status: draft
 owner: foundation
 size: S
 gate: none
-depends_on: [CAT-GCD, LANG-MODULE-IMPORT-SYSTEM]
+depends_on: [CAT-GCD, CAT-ORDER-PUB-EXPORT]
 blocks: []
 github: null
 origin: "Operator directive 2026-08-22, after CAT-GCD merged (3283528c4): Gcd.ken.md redundantly reimplements generic Nat tools that already exist in the catalog, and is arranged bottom-up. This is a well-factoring / arrangement follow-up, not a soundness re-open — CAT-GCD stays closed. Steward-filed. Held until the foundation ring is reseated to pi (see reseat directive) so the standard's first application runs on the new seating."
 ---
 
+> # REFRAME 2026-08-26 — import surface RE-MEASURED; Order half extracted (operator: continue foundation)
+>
+> Operator ruled the three-lane feasibility trial passed and directed the
+> foundation lane to continue. Re-measured the falsified premise against current
+> main: the Arithmetic half is now RESOLVED — `add`/`mul` are `pub fn` and
+> `Arithmetic.ken.md` imports `Core.Logic.Transport (cong, sym, trans)` (the old
+> `UnresolvedCon "cong"` standalone-load failure is gone). The reuse mechanism is
+> demonstrated (a `pub fn` WITH attached proofs already exports and elaborates).
+> The remaining gap is the Order half: `Order.ken.md` still has ZERO pub exports, so
+> `leq_nat`/`sub` are not importable. Per the 2026-08-22 hold's own scope ruling (do
+> NOT expand this Gcd-only WP into dependency-package repairs), that Order
+> remediation is extracted to [[CAT-ORDER-PUB-EXPORT]] (released now).
+>
+> This node stays `draft` (Gcd-only) and RESUMES after [[CAT-ORDER-PUB-EXPORT]]
+> lands: import `add`/`mul` from Arithmetic and `leq_nat`/`sub` from Order, drop the
+> local reimplementations, arrange top-down. `depends_on` retargeted from the draft
+> `LANG-MODULE-IMPORT-SYSTEM` umbrella to the specific Order prerequisite. The
+> import surface must be RE-VERIFIED at pickup, not inherited — that was the
+> original defect. This is the PILOT instance of the wider catalog-modernization
+> pattern (prelude-redundancy removal + import-reuse + top-down arrangement) the
+> operator raised 2026-08-26; the campaign shape is a separate operator scope call.
+>
 > # HELD — FRAME PREMISE FALSIFIED, reframe owed (Steward, 2026-08-22)
 >
 > Released to the reseated pi foundation ring and immediately hard-stopped by the
