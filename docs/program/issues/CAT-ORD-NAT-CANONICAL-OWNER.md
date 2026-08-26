@@ -1,7 +1,7 @@
 ---
 id: CAT-ORD-NAT-CANONICAL-OWNER
 title: "Migrate the canonical Ord Nat component to its defined-at home — move leq_nat (with refl/trans/antisym), total_leq_nat, the bool_or::eq_true_of_or bridge, and the sole instance Ord Nat from Data/Numeric/Nat/Order into Core/Classes/LawfulClasses, and make Order a reader-facing facade that imports and re-exports the LawfulClasses Ord surface. The atomic two-package ownership migration that resolves the OrphanInstance blocking CAT-ORDER-PUB-EXPORT."
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none

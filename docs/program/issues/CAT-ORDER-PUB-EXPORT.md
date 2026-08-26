@@ -1,7 +1,7 @@
 ---
 id: CAT-ORDER-PUB-EXPORT
 title: "Bring catalog Data/Numeric/Nat/Order.ken.md to the pub-export standard — mark its declared exported operations (leq_nat, sub, min, max, compare) pub so packages can selectively import them, matching the already-compliant Arithmetic.ken.md; verify standalone elaboration and cross-package import resolution. The catalog-reuse prerequisite that unblocks CAT-GCD-REFACTOR."
-status: draft
+status: merged
 owner: foundation
 size: S
 gate: none
