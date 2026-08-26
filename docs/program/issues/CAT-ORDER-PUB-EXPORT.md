@@ -1,7 +1,7 @@
 ---
 id: CAT-ORDER-PUB-EXPORT
 title: "Bring catalog Data/Numeric/Nat/Order.ken.md to the pub-export standard — mark its declared exported operations (leq_nat, sub, min, max, compare) pub so packages can selectively import them, matching the already-compliant Arithmetic.ken.md; verify standalone elaboration and cross-package import resolution. The catalog-reuse prerequisite that unblocks CAT-GCD-REFACTOR."
-status: ready
+status: draft
 owner: foundation
 size: S
 gate: none
@@ -11,8 +11,34 @@ github: null
 origin: "Steward, 2026-08-26, on operator direction to continue the foundation lane after the three-lane feasibility trial passed. Measured prerequisite for [[CAT-GCD-REFACTOR]] (held since 2026-08-22 on a falsified import-surface premise): Arithmetic.ken.md now pub-exports add/mul and imports its transport lemmas (standalone-load failure resolved), but Order.ken.md still has ZERO pub exports (leq_nat/sub — the two tools Gcd needs — are plain fn). The reuse mechanism is demonstrated (Arithmetic pub-exports fns WITH attached proofs and elaborates), so this is execution, not design. Steward-filed per COORDINATION section 2."
 ---
 
-> # RELEASE 2026-08-26 — catalog-reuse prerequisite (operator: continue foundation lane)
+> # HELD 2026-08-26 — D0 HARD-STOP: pub-only frame cannot authorize the fix; design ruling routed to Architect
 >
+> The verify-first D0 fired as designed. Foundation-leader hard-stopped
+> (evt_6s39mc9d7a5cp) at clean branch `2afacd0c0`: this is a FALSE D0(a) premise,
+> not a pub-only implementation defect. `Order.ken.md` does NOT elaborate standalone
+> PRE-EDIT — it fails at `leq_nat::antisym` — and resolving its actual dependencies
+> exposes a nonlocal attached-proof ownership conflict at
+> `bool_or::eq_true_of_or`.
+> That trips D0 clause (c) (attached-proof ownership) and clause (a)
+> (standalone elaboration): both were written as hard-stop-to-spec/Architect gates,
+> and they caught the gap before any edit. This is the campaign's intended payoff —
+> a gap finding, not a failed WP.
+>
+> The pub-only frame CANNOT authorize the required provider/attachment change.
+> Foundation-leader routed the component-ownership design ruling to the Architect.
+> This node HOLDS (`ready` -> `draft`) pending that ruling. Do NOT accept a
+> visibility-only candidate or D1 as a deliverable — the D0 hard-stop stands, and
+> marking `pub` without resolving the attached-proof ownership would move the subject
+> below the boundary the node claims. On the Architect ruling, the Steward reframes:
+> the fix likely needs a provider/attachment WP AHEAD of any pub-only step, so this
+> node's shape depends on that ruling. [[CAT-GCD-REFACTOR]] stays blocked on this.
+>
+> Systemic sizing of this wall is now routed to [[CAT-REUSE-CENSUS]] (amended to
+> record standalone-load + attached-proof ownership per module, not just pub status).
+>
+> ---
+>
+> Prior release banner (superseded by the hold above):
 > The foundation lane's next step, extracted from [[CAT-GCD-REFACTOR]]'s falsified
 > premise per that node's 2026-08-22 scope ruling (do NOT fold dependency-package
 > repairs into the Gcd-only WP). Arithmetic is already compliant; Order is not.

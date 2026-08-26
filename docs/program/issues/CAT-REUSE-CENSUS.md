@@ -36,9 +36,15 @@ prerequisite) is included as a worked example / calibration row, not excluded.
   2. **Sibling reimplementation**: local tools that a sibling catalog module now
      `pub`-exports (e.g. `add`/`mul` from `Data.Numeric.Nat.Arithmetic`,
      `leq_nat`/`sub` from `Data.Numeric.Nat.Order`). Name the local def, the
-     exporting module, and whether that module currently `pub`-exports the tool
-     (if NOT, flag the missing-export prerequisite, as `Order` needed
-     [[CAT-ORDER-PUB-EXPORT]]).
+     exporting module, and record the prerequisite at BOTH depths — the pilot
+     [[CAT-ORDER-PUB-EXPORT]] showed "not `pub` yet" is only the shallow one:
+     (i) whether that module currently `pub`-exports the tool (if NOT, flag the
+     missing-export prerequisite); and (ii) whether that module ELABORATES
+     STANDALONE at Omega with its attached proofs owned locally, or hits a
+     standalone-load / attached-proof ownership gap (as `Order` did — it fails at
+     `leq_nat::antisym` with a nonlocal conflict at `bool_or::eq_true_of_or`, a
+     design-ruling prerequisite the pub-only step cannot reach). Depth (ii) is a
+     `higher`-risk prerequisite (routes to spec/Architect), depth (i) is `low`.
   3. **Arrangement**: whether the file is bottom-up (fundamentals first) vs
      top-down (headline result first), a boolean plus a one-line note.
   Each item in (1) and (2) carries a **risk tag**: `low` (computational-tool
@@ -61,10 +67,13 @@ prerequisite) is included as a worked example / calibration row, not excluded.
   name-spelling match; a claimed duplicate is backed by identity evidence.
 - AC-3 (risk-tagged) — every (1)/(2) item carries a `low`/`higher` risk tag per
   the charter's depth policy; `higher` items name why (which proof obligation).
-- AC-4 (prerequisites surfaced) — every sibling-reuse item whose exporting module
-  does NOT yet `pub`-export the tool is flagged as a missing-export prerequisite
-  (the [[CAT-ORDER-PUB-EXPORT]] pattern), so the Steward sequences the prerequisite
-  before the consumer.
+- AC-4 (prerequisites surfaced, both depths) — every sibling-reuse item whose
+  exporting module does NOT yet `pub`-export the tool is flagged as a missing-export
+  prerequisite (the [[CAT-ORDER-PUB-EXPORT]] pattern), AND every exporting module
+  that does NOT elaborate standalone or carries an attached-proof ownership gap is
+  flagged as a `higher`-risk design-ruling prerequisite (the `Order` wall), so the
+  Steward sequences each prerequisite — and routes the design-ruling ones to
+  spec/Architect — before the consumer.
 - AC-5 (census-only) — NO file under `catalog/packages/` is edited; no package is
   claimed reworked; nothing is closed. The deliverable is the inventory + rollup.
 - AC-NO-REGRESSION — none applicable (no source change); the census document
