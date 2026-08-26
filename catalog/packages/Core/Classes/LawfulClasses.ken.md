@@ -18,8 +18,9 @@ equality vocabulary — no new kernel former.
 
 The Definition introduces the public class vocabulary and the small supporting
 operations it needs. Laws & proofs is grouped by carrier and proof family:
-the audited primitive `Int` boundary, finite `Bool` case splits, then the
-projection transports for `Char`. Trust & derivation records the corresponding
+the audited primitive `Int` boundary, finite `Bool` case splits, structural
+`Nat` induction, then the projection transports for `Char`. Trust & derivation
+records the corresponding
 trusted-base posture and validation evidence.
 
 ## 1. Motivation
@@ -143,8 +144,9 @@ internally.
 The public law shape lives in the three class declarations above; this section
 shows how each carrier inhabits it. Read the families in order when auditing the
 trust boundary: `Int` reuses one named certificate and visibly audited ordering
-laws, `Bool` proves finite cases in the kernel, and `Char` introduces no new
-assumption because it projects the already-existing `Int` dictionaries.
+laws, `Bool` proves finite cases in the kernel, `Nat` proves its order by
+structural recursion, and `Char` introduces no new assumption because it
+projects the already-existing `Int` dictionaries.
 
 ### 4.1 Canonical `Int` instances
 
@@ -440,7 +442,145 @@ instance DecEq Bool {
 }
 ```
 
-### 4.3 `Ord Char` — transport from `Ord Int`
+```ken
+fn compare_bool_cases (b : Bool) : Or (Equal Bool b True) (Equal Bool b False) =
+  match b {
+    True ↦ Inl (Equal Bool True True) (Equal Bool True False) Proved;
+    False ↦ Inr (Equal Bool False True) (Equal Bool False False) Proved
+  }
+
+proof left_true_intro for bool_or
+      (x : Bool) (y : Bool) (hx : Equal Bool x True)
+    : Equal Bool (bool_or x y) True =
+  J (λw _. Equal Bool (bool_or w y) True) Proved (sym Bool x True hx)
+
+proof right_true_intro for bool_or
+      (x : Bool) (y : Bool) (hy : Equal Bool y True)
+    : Equal Bool (bool_or x y) True =
+  match compare_bool_cases x {
+    Inl hx ↦ J (λw _. Equal Bool (bool_or w y) True) Proved (sym Bool x True hx);
+    Inr hx ↦ J (λw _. Equal Bool (bool_or w y) True) hy (sym Bool x False hx)
+  }
+```
+
+### 4.3 Canonical `Nat` order
+
+`Nat` is a compiler-floor inductive, so its canonical `Ord` dictionary uses the
+class-owner arm of the orphan rule. The relation, its attached laws, totality
+program, Boolean bridge, and dictionary live together here. The
+reader-facing `Data.Numeric.Nat.Order` package re-exports this surface without
+minting an alias or a second dictionary.
+
+The structural recursion makes every law a real kernel-checked proof. The
+`Or`-valued totality program retains which direction holds; the attached
+`bool_or` bridge erases only that choice when assembling `Ord.total`.
+
+```ken
+pub fn leq_nat (m : Nat) (n : Nat) : Bool =
+  match m {
+    Zero ↦ True;
+    Suc m2 ↦
+      match n {
+        Zero ↦ False;
+        Suc n2 ↦ leq_nat m2 n2
+      }
+  }
+
+pub proof refl for leq_nat (x : Nat) : Equal Bool (leq_nat x x) True =
+  match x {
+    Zero ↦ Proved;
+    Suc x2 ↦ proof refl for leq_nat x2
+  }
+
+pub proof trans for leq_nat
+      (x : Nat)
+    : (y : Nat)
+      → (z : Nat)
+      → Equal Bool (leq_nat x y) True
+      → Equal Bool (leq_nat y z) True
+      → Equal Bool (leq_nat x z) True =
+  match x {
+    Zero ↦ λy. λz. λp. λq. Proved;
+    Suc x2 ↦
+      λy.
+        match y {
+          Zero ↦ λz. λp. λq. absurd p;
+          Suc y2 ↦
+            λz.
+              match z {
+                Zero ↦ λp. λq. absurd q;
+                Suc z2 ↦ λp. λq. proof trans for leq_nat x2 y2 z2 p q
+              }
+        }
+  }
+
+pub proof antisym for leq_nat
+      (x : Nat)
+    : (y : Nat)
+      → Equal Bool (leq_nat x y) True
+      → Equal Bool (leq_nat y x) True
+      → Equal Nat x y =
+  match x {
+    Zero ↦
+      λy.
+        match y {
+          Zero ↦ λp. λq. Proved;
+          Suc y2 ↦ λp. λq. absurd q
+        };
+    Suc x2 ↦
+      λy.
+        match y {
+          Zero ↦ λp. λq. absurd p;
+          Suc y2 ↦ λp. λq. cong Nat Nat x2 y2 Suc ((proof antisym for leq_nat) x2 y2 p q)
+        }
+  }
+
+fn total_leq_nat
+      (x : Nat) (y : Nat)
+    : Or (Equal Bool (leq_nat x y) True) (Equal Bool (leq_nat y x) True) =
+  match x {
+    Zero ↦ Inl (Equal Bool (leq_nat Zero y) True) (Equal Bool (leq_nat y Zero) True) Proved;
+    Suc x2 ↦
+      match y {
+        Zero ↦
+          Inr
+            (Equal Bool (leq_nat (Suc x2) Zero) True)
+            (Equal Bool (leq_nat Zero (Suc x2)) True)
+            Proved;
+        Suc y2 ↦
+          match total_leq_nat x2 y2 {
+            Inl h ↦
+              Inl
+                (Equal Bool (leq_nat (Suc x2) (Suc y2)) True)
+                (Equal Bool (leq_nat (Suc y2) (Suc x2)) True)
+                h;
+            Inr h ↦
+              Inr
+                (Equal Bool (leq_nat (Suc x2) (Suc y2)) True)
+                (Equal Bool (leq_nat (Suc y2) (Suc x2)) True)
+                h
+          }
+      }
+  }
+
+pub proof eq_true_of_or for bool_or
+      (p : Bool) (q : Bool) (h : Or (Equal Bool p True) (Equal Bool q True))
+    : IsTrue (bool_or p q) =
+  match h {
+    Inl hp ↦ proof left_true_intro for bool_or p q hp;
+    Inr hq ↦ proof right_true_intro for bool_or p q hq
+  }
+
+instance Ord Nat {
+  leq = leq_nat;
+  refl = proof refl for leq_nat;
+  antisym = proof antisym for leq_nat;
+  trans = proof trans for leq_nat;
+  total = λx.λy.proof eq_true_of_or for bool_or (leq_nat x y) (leq_nat y x) (total_leq_nat x y)
+}
+```
+
+### 4.4 `Ord Char` — transport from `Ord Int`
 
 Re-homed from the Decimal/Char DEMOTE
 (`docs/program/wp/lawful-classes-lane.md`), this instance uses refinement
@@ -470,7 +610,7 @@ instance Ord Char {
 }
 ```
 
-### 4.4 `DecEq Char` — the same transport
+### 4.5 `DecEq Char` — the same transport
 
 ADR 0013's Layer 1 states its intended consequence: "someone writes the
 trivial `instance DecEq Char`." The shape is identical to `Ord Char`
@@ -487,7 +627,7 @@ instance DecEq Char {
 }
 ```
 
-### 4.5 Structural `DecEq` liftings for `Pair` and `List`
+### 4.6 Structural `DecEq` liftings for `Pair` and `List`
 
 `Pair` and `List` are prelude carriers, so their canonical `DecEq` instances
 home with the `DecEq` class. Both lift the supplied element dictionaries
@@ -518,12 +658,6 @@ proof right for bool_and (a : Bool) (b : Bool) : IsTrue (bool_and a b) → IsTru
   match a {
     True ↦ λh. h;
     False ↦ λh. absurd h
-  }
-
-fn compare_bool_cases (b : Bool) : Or (Equal Bool b True) (Equal Bool b False) =
-  match b {
-    True ↦ Inl (Equal Bool True True) (Equal Bool True False) Proved;
-    False ↦ Inr (Equal Bool False True) (Equal Bool False False) Proved
   }
 
 fn compare_second_result (b : Bool) : OrdResult =
@@ -851,19 +985,6 @@ theorem bool_true_false_absurd
       (z : Bool) (ht : Equal Bool z True) (hf : Equal Bool z False)
     : Bottom =
   absurd (J (λw _. Equal Bool w True) ht hf)
-
-proof left_true_intro for bool_or
-      (x : Bool) (y : Bool) (hx : Equal Bool x True)
-    : Equal Bool (bool_or x y) True =
-  J (λw _. Equal Bool (bool_or w y) True) Proved (sym Bool x True hx)
-
-proof right_true_intro for bool_or
-      (x : Bool) (y : Bool) (hy : Equal Bool y True)
-    : Equal Bool (bool_or x y) True =
-  match compare_bool_cases x {
-    Inl hx ↦ J (λw _. Equal Bool (bool_or w y) True) Proved (sym Bool x True hx);
-    Inr hx ↦ J (λw _. Equal Bool (bool_or w y) True) hy (sym Bool x False hx)
-  }
 
 fn pair_ord_leq
       (a : Type) (b : Type) (da : Ord a) (db : Ord b) (x : Pair a b) (y : Pair a b)
@@ -2158,9 +2279,11 @@ Ken-native; no external reference implementation informed its source.
    posture.md` + `docs/program/wp/DS-6a-int-deceq-certificate.md` (the
    `Eq`/`DecEq Int` certificate collapse + `DecEq Char`).
 2. **Public API.** `IsTrue`, `class Eq`, `class DecEq`, `bool_or`,
-   `class Ord`, `instance Eq Int`, `instance DecEq Int`,
-   `instance Ord Int`, `instance Ord Bool`, `instance Eq Bool`,
-   `instance DecEq Bool`, `instance Ord Char`, `instance DecEq Char`.
+   `class Ord`, `leq_nat`, `leq_nat::refl`, `leq_nat::trans`,
+   `leq_nat::antisym`, `bool_or::eq_true_of_or`, `instance Ord Nat`,
+   `instance Eq Int`, `instance DecEq Int`, `instance Ord Int`,
+   `instance Ord Bool`, `instance Eq Bool`, `instance DecEq Bool`,
+   `instance Ord Char`, and `instance DecEq Char`.
 3. **Source map.**
 
    | Task | Section |
@@ -2168,7 +2291,7 @@ Ken-native; no external reference implementation informed its source.
    | Choose a class or inspect its public field shape | [Definition](#2-definition) |
    | See the three classes | [Definition](#2-definition) |
    | Project a field off a dictionary | [Using it](#3-using-it) |
-   | Audit the `Int`, `Bool`, or `Char` proof family | [Laws & proofs](#4-laws--proofs) |
+   | Audit the `Int`, `Bool`, `Nat`, or `Char` proof family | [Laws & proofs](#4-laws--proofs) |
    | The `Proved`-vs-`Refl`/K7 story, the restructuring discipline | [Laws & proofs](#4-laws--proofs) |
    | Why `Eq Bool`/`Ord Char` needed the fixes they did | [Design notes](#5-design-notes) |
    | Check assumptions, consumers, and validation evidence | [Trust & derivation](#8-trust--derivation) |
@@ -2187,7 +2310,9 @@ Ken-native; no external reference implementation informed its source.
    it, no postulate of their own. `Bool` instances are real
    `elim_Bool`-into-`Omega` case-split proofs (K4), using `Proved`/`absurd` (K5)
    over operation-wrapped equations that require K7's operand-whnf to
-   collapse. `Ord Char`/`DecEq Char` transport every field via
+   collapse. `Ord Nat` uses structural recursion for its relation, laws, and
+   proof-relevant totality program, then a provider-owned `bool_or` bridge to
+   assemble the class field. `Ord Char`/`DecEq Char` transport every field via
    `.`-projection off `Ord_instance_Int`/`DecEq_instance_Int`.
 5. **`trusted_base()` delta.** `Ord Int`: 4 `Axiom` entries (`refl`/
    `antisym`/`trans`/`total`), each a real, grep-able `Decl::Opaque` —
@@ -2203,8 +2328,10 @@ Ken-native; no external reference implementation informed its source.
    duplicated per catalog package — this is the "5→2 Axiom, relocated not
    eliminated" honest accounting ADR 0013 describes. `Bool` instances:
    **zero** — every law field is a genuine kernel-checked proof, no `Axiom`
-   anywhere in `Ord Bool`/`Eq Bool`/`DecEq Bool`. `Ord Char`/`DecEq Char`:
-   **zero-NEW-delta** — mint no new postulate, transport `Ord Int`'s
+   anywhere in `Ord Bool`/`Eq Bool`/`DecEq Bool`. `Ord Nat`: **zero** — its
+   structural relation, attached laws, totality program, bridge, and dictionary
+   contain no postulate. `Ord Char`/`DecEq Char`: **zero-NEW-delta** — mint no
+   new postulate, transport `Ord Int`'s
    `Axiom`s / `DecEq Int`'s certificate reference via projection.
 6. **Proof families.** `Bool` instances: full case-split on every
    quantified variable (`x`, `y`, and for `trans`, `z`), 4–8 branches per
@@ -2213,12 +2340,16 @@ Ken-native; no external reference implementation informed its source.
    `§4`'s restructuring discipline is why each hypothesis stays reusable
    at binder time. `Eq Int`: `J`-eliminator composition over `Equal Int`,
    converting through `DecEq Int`'s `sound`/`complete` at each end — no
-   case-split (`Int` has none to do). `Ord Char`/`DecEq Char`: no
-   case-split, pure `.`-projection.
-7. **Consumers.** `catalog/packages/Core/Logic/EmptyDec.ken.md` inlines its own
-   `DecEq Bool` for self-containment (same idiom, independently); the
-   sort/comparison threads across `Data/Collections/Derived.ken` and
-   `Data/Collections/Map.ken` depend on `Ord`'s `leq` field.
+   case-split (`Int` has none to do). `Ord Nat`: structural recursion over
+   `Nat`, with the `Or`-to-`bool_or` bridge assembled from the provider's two
+   introduction proofs. `Ord Char`/`DecEq Char`: no case-split, pure
+   `.`-projection.
+7. **Consumers.** `Data/Numeric/Nat/Order.ken.md` imports and re-exports the
+   canonical `Ord`/`leq_nat` surface and carries this same dictionary.
+   `catalog/packages/Core/Logic/EmptyDec.ken.md` inlines its own `DecEq Bool`
+   for self-containment (same idiom, independently); the sort/comparison threads
+   across `Data/Collections/Derived.ken` and `Data/Collections/Map.ken` depend on
+   `Ord`'s `leq` field.
 8. **Validation evidence.**
    `crates/ken-elaborator/tests/es4_classes_acceptance.rs` — confirms all
    three `Bool` instances are complete zero-`Axiom` lawful instances (every
@@ -2228,3 +2359,7 @@ Ken-native; no external reference implementation informed its source.
    `crates/ken-elaborator/tests/ds6a_int_deceq_acceptance.rs` — confirms
    `Eq Int`/`DecEq Int`'s zero-catalog-`Axiom` posture, `DecEq Char`'s
    transport, and the certificate's soundness/neutrality conformance arms.
+   The canonical-owner acceptance controls independently load LawfulClasses and
+   the Order facade, census the one exact-floor `Ord Nat` dictionary, verify
+   canonical relation/bridge identities, exercise carried resolution, and prove
+   the Nat component's zero-delta posture.

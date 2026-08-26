@@ -1,183 +1,42 @@
-# `Ord Nat` — a lawful total order on `Nat`, and its operations
+# `Ord Nat` — the reader-facing order facade and `Nat` operations
 
-`Nat` is inductive and kernel-proved, so its total order can be a real,
-zero-`Axiom` `instance Ord Nat` — unlike `Int`, which is an opaque
-primitive and can only postulate its laws. This entry exports that
-instance plus the small set of `Nat` operations (`min`, `max`, `sub`,
-`compare`) that build on it.
+`Nat` is inductive and kernel-proved, so its total order is a real,
+zero-`Axiom` dictionary. The canonical relation, laws, and dictionary live with
+the `Ord` class in `Core.Classes.LawfulClasses`. This entry re-exports that
+surface under the natural-number path and keeps the small `Nat` operations
+`min`, `max`, `sub`, and `compare` beside their readers.
 
 ## Contents
 
 1. [Motivation](#1-motivation)
-2. [Order and its laws](#2-order-and-its-laws)
+2. [Canonical order facade](#2-canonical-order-facade)
 3. [Using it](#3-using-it)
-4. [Laws  proofs](#4-laws--proofs)
+4. [Laws & proofs](#4-laws--proofs)
 5. [Design notes](#5-design-notes)
 6. [References](#6-references)
-7. [Trust  derivation](#7-trust--derivation)
+7. [Trust & derivation](#7-trust--derivation)
 
 ## 1. Motivation
 
 Natural numbers have a structural total order: it is reflexive,
-antisymmetric, transitive, and total. This entry exposes that order as an
-`Ord Nat` instance, so generic code can use the same ordering interface for
-`Nat` that it uses for other ordered carriers. It also provides the everyday
+antisymmetric, transitive, and total. The class-owning package defines that
+single canonical dictionary for the compiler-floor `Nat` identity. This entry
+re-exports the class surface without redeclaration, so generic code sees the
+same dictionary through either package path. It also provides the everyday
 operations `min`, `max`, `sub`, and `compare`.
 
-## 2. Order and its laws
+## 2. Canonical order facade
 
-`leq_nat` follows the constructors of `Nat`. Its reflexivity, transitivity,
-and antisymmetry proofs have the same shape as the corresponding `Ord`
-fields. Because `IsTrue b` is defined as `Equal Bool b True`, these proofs
-fit those fields by ordinary unfolding; no conversion is needed. Each
-recursive law is attached to `leq_nat` and uses its `leq_nat::name` path for
-self-reference.
-
-```ken
-import Core.Logic.Or (Or, Inl, Inr)
-
-fn leq_nat (m : Nat) (n : Nat) : Bool =
-  match m {
-    Zero ↦ True;
-    Suc m2 ↦
-      match n {
-        Zero ↦ False;
-        Suc n2 ↦ leq_nat m2 n2
-      }
-  }
-
-proof refl for leq_nat (x : Nat) : Equal Bool (leq_nat x x) True =
-  match x {
-    Zero ↦ Proved;
-    Suc x2 ↦ proof refl for leq_nat x2
-  }
-
-proof trans for leq_nat
-      (x : Nat)
-    : (y : Nat)
-      → (z : Nat)
-      → Equal Bool (leq_nat x y) True
-      → Equal Bool (leq_nat y z) True
-      → Equal Bool (leq_nat x z) True =
-  match x {
-    Zero ↦ λy. λz. λp. λq. Proved;
-    Suc x2 ↦
-      λy.
-        match y {
-          Zero ↦ λz. λp. λq. absurd p;
-          Suc y2 ↦
-            λz.
-              match z {
-                Zero ↦ λp. λq. absurd q;
-                Suc z2 ↦ λp. λq. proof trans for leq_nat x2 y2 z2 p q
-              }
-        }
-  }
-
-proof antisym for leq_nat
-      (x : Nat)
-    : (y : Nat)
-      → Equal Bool (leq_nat x y) True
-      → Equal Bool (leq_nat y x) True
-      → Equal Nat x y =
-  match x {
-    Zero ↦
-      λy.
-        match y {
-          Zero ↦ λp. λq. Proved;
-          Suc y2 ↦ λp. λq. absurd q
-        };
-    Suc x2 ↦
-      λy.
-        match y {
-          Zero ↦ λp. λq. absurd p;
-          Suc y2 ↦ λp. λq. cong Nat Nat x2 y2 Suc ((proof antisym for leq_nat) x2 y2 p q)
-        }
-  }
-```
-
-**Why `total_leq_nat` is a `fn`, not a `proof`.** `Or : Omega → Omega →
-Type`. Its two alternatives are propositions, but the disjoint sum is data:
-case-splitting on whether the left or right alternative holds must preserve
-which branch was chosen. An `Omega`-valued disjunction would make `Inl` and
-`Inr` proof-irrelevantly equal and erase that choice; a proof-relevant,
-two-constructor inductive therefore cannot live at `Omega`.
-
-`total_leq_nat` computes whether `leq_nat x y` or `leq_nat y x` holds and
-returns the corresponding tag. It is therefore a program and is declared as
-a `fn`. In contrast, `leq_nat::refl`, `leq_nat::trans`, and
-`leq_nat::antisym` conclude `Equal` or `IsTrue` propositions at `Omega`:
-proof-irrelevant facts, so they are declared as `proof`. The vocabulary
-follows the `Omega`/`Type` boundary: `theorem` and `proof` establish
-irrelevant propositions; `const` and `fn` compute data.
+`Core.Classes.LawfulClasses` is the defined-at home of the canonical `Ord Nat`
+component. A facade import binds the names for this package's own definitions;
+the matching export republishes the same provider identities to consumers. A
+re-export never mints an `Order.leq_nat` alias, and instance carry keeps the
+single class-owned dictionary available through this path.
 
 ```ken
-fn total_leq_nat
-      (x : Nat) (y : Nat)
-    : Or (Equal Bool (leq_nat x y) True) (Equal Bool (leq_nat y x) True) =
-  match x {
-    Zero ↦ Inl (Equal Bool (leq_nat Zero y) True) (Equal Bool (leq_nat y Zero) True) Proved;
-    Suc x2 ↦
-      match y {
-        Zero ↦
-          Inr
-            (Equal Bool (leq_nat (Suc x2) Zero) True)
-            (Equal Bool (leq_nat Zero (Suc x2)) True)
-            Proved;
-        Suc y2 ↦
-          match total_leq_nat x2 y2 {
-            Inl h ↦
-              Inl
-                (Equal Bool (leq_nat (Suc x2) (Suc y2)) True)
-                (Equal Bool (leq_nat (Suc y2) (Suc x2)) True)
-                h;
-            Inr h ↦
-              Inr
-                (Equal Bool (leq_nat (Suc x2) (Suc y2)) True)
-                (Equal Bool (leq_nat (Suc y2) (Suc x2)) True)
-                h
-          }
-      }
-  }
-```
+import Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
 
-`total`'s field, `IsTrue (bool_or (leq x y) (leq y x))`, is genuinely a
-different shape from `total_leq_nat`'s `Or`-of-equalities — `bool_or`
-short-circuits on its first argument, so
-`bool_or::eq_true_of_or` case-splits on `p` once to compute `bool_or`'s
-reduction, then discharges each side directly (the `Inl` branch needs
-`cong`/`trans` to carry the equality through `bool_or`'s first-argument
-position; the `Inr` branch's own case-split on `p` makes both `bool_or
-True q` and `bool_or False q` reduce to a literal, so `Proved`/the hypothesis
-itself close it):
-
-```ken
-proof eq_true_of_or for bool_or
-      (p : Bool) (q : Bool) (h : Or (Equal Bool p True) (Equal Bool q True))
-    : IsTrue (bool_or p q) =
-  match h {
-    Inl hp ↦
-      trans
-        Bool
-        (bool_or p q)
-        (bool_or True q)
-        True
-        (cong Bool Bool p True (λv. bool_or v q) hp)
-        Proved;
-    Inr hq ↦
-      match p {
-        True ↦ Proved;
-        False ↦ hq
-      }
-  }
-
-instance Ord Nat {
-  leq = leq_nat;
-  refl = proof refl for leq_nat;
-  antisym = proof antisym for leq_nat;
-  trans = proof trans for leq_nat;
-  total = λx.λy.proof eq_true_of_or for bool_or (leq_nat x y) (leq_nat y x) (total_leq_nat x y)
-}
+export Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
 ```
 
 `min` and `max` follow `leq_nat`'s recursion directly. `sub` is saturating
@@ -243,19 +102,17 @@ const compare_two_three : OrdResult = compare (Suc (Suc Zero)) (Suc (Suc (Suc Ze
 const compare_three_three : OrdResult = compare (Suc (Suc (Suc Zero))) (Suc (Suc (Suc Zero)))
 ```
 
-`Ord_instance_Nat` is the dictionary value generated by the
-`instance Ord Nat { ... }` declaration. Its `.leq` field is an ordinary value;
-the `.total` projection below establishes an `Omega`-typed fact and is therefore
-presented as a checked lemma:
+A consumer asks for `Ord Nat` through an ordinary constraint. Resolution uses
+the single dictionary carried by the facade; no generated private global or
+Order-local declaration is part of the interface:
 
 ```ken example
-const ord_nat_leq : Bool = (Ord_instance_Nat).leq (Suc Zero) (Suc (Suc Zero))
+fn carried_nat_leq (x : Nat) (y : Nat) : Bool where Ord Nat = d.leq x y
 
-theorem ord_nat_total : IsTrue (bool_or (leq_nat (Suc Zero) Zero) (leq_nat Zero (Suc Zero))) =
-  (Ord_instance_Nat).total (Suc Zero) Zero
+const ord_nat_leq : Bool = carried_nat_leq (Suc Zero) (Suc (Suc Zero))
 ```
 
-## 4. Laws  proofs
+## 4. Laws & proofs
 
 `min`/`max`/`sub` earn their place with the computation facts a caller
 relies on:
@@ -291,24 +148,16 @@ proof self_is_zero_wrong for sub (n : Nat) : Equal Nat (sub n n) Zero = Refl
 
 ## 5. Design notes
 
-**Why `refl`/`trans`/`antisym` needed no conversion, but `total` did.**
-`class Ord`'s three "pointwise" fields are phrased directly over `IsTrue`,
-which unfolds to exactly the shape `leq_nat`'s own proofs already carry
-(`Equal Bool … True`) — a byproduct of `IsTrue`'s own definition, not
-anything specific to `Nat`. `total`, by contrast, asks for a single
-`Bool`-valued disjunction (`bool_or`) rather than a disjoint sum
-(`total_leq_nat`'s `Or`) — a genuinely different STATEMENT shape (which side
-holds is erased into one Bool, not carried as a tag), so a real conversion
-lemma is unavoidable there regardless of carrier. `Ord Bool`'s own `total`
-sidesteps this because `Bool`'s order is provable by direct case-split
-down to concrete constructors without ever building an intermediate `Or` —
-it isn't a template for the `Or`-to-`bool_or` bridge specifically, only
-for the overall proof STYLE (case-split to `Proved`/`absurd`), which
-`bool_or::eq_true_of_or` also follows.
+**The facade preserves one identity.** The canonical relation, attached proofs,
+Boolean bridge, and dictionary are declared with the `Ord` class. This package
+imports the relation for its own `compare` implementation and re-exports the
+same identities for readers. A facade export changes reachability, not
+provenance, so it cannot create a second comparator or dictionary.
 
-**Local definitions keep proof terms direct.** The order and arithmetic
-operations are written here as structural definitions, so their computation
-rules remain visible beside the laws that use them.
+**Local operations keep computation direct.** `min`, `max`, `sub`, and
+`compare` remain structural definitions in this package. Their computation
+rules stay visible beside their laws, while `compare` consumes the imported
+canonical `leq_nat`.
 
 ## 6. References
 
@@ -321,33 +170,32 @@ rules remain visible beside the laws that use them.
   consulted for the general shape of a structural `Nat` order (no source
   copied, `CLEAN-ROOM.md`).
 
-## 7. Trust  derivation
+## 7. Trust & derivation
 
-1. **Public API.** `leq_nat`, `leq_nat::refl`, `leq_nat::trans`,
-   `leq_nat::antisym`, `total_leq_nat`, `bool_or::eq_true_of_or`,
-   `Ord_instance_Nat` (via `instance Ord Nat`), `min`, `max`, `sub`, `compare`.
+1. **Public API.** This facade re-exports `Ord`, `IsTrue`, `bool_or`, and
+   `leq_nat` with their provider identities. `OrdResult`, `min`, `max`, `sub`,
+   and `compare` remain package-local until their dedicated visibility step.
 2. **Source map.**
 
    | Task | Section |
    |---|---|
-   | See the shape | [Order and its laws](#2-order-and-its-laws) |
-   | Use it | [Using it](#3-using-it) |
-   | Check the computation facts | [Laws  proofs](#4-laws--proofs) |
-   | Why `total` needed a bridge, `refl`/`trans`/`antisym` didn't | [Design notes](#5-design-notes) |
+   | Find the canonical surface | [Canonical order facade](#2-canonical-order-facade) |
+   | Use the carried dictionary | [Using it](#3-using-it) |
+   | Check the local computation facts | [Laws & proofs](#4-laws--proofs) |
+   | Understand facade identity | [Design notes](#5-design-notes) |
 
-3. **Derivation path.** `leq_nat` and its order laws are structural
-   definitions and proofs over `Nat`. `bool_or::eq_true_of_or`
-   converts the disjoint totality result into the Boolean form required by
-   `Ord`. `min`, `max`, `sub`, and `compare` are ordinary recursive
-   functions.
-4. **`trusted_base()` delta.** **Zero.** Every `Ord` law field is a real,
-   kernel-checked proof term. The entry introduces no `Axiom`, primitive, or
-   postulate.
-5. **Proof families.** Reflexivity, transitivity, and antisymmetry follow
-   the structure of `Nat`; totality uses the two-case Boolean-disjunction
-   bridge.
-6. **Consumers.** Generic ordered algorithms can use the `Ord Nat` instance;
-   direct callers can use the arithmetic and comparison operations.
-7. **Validation evidence.** The catalog checks the four `Ord` fields, the
-   totality bridge, the instance declaration, the zero-`Axiom` trust posture,
-   and every source, example, and rejection fence.
+3. **Derivation path.** The imported `leq_nat` and carried `Ord Nat` dictionary
+   come from `Core.Classes.LawfulClasses`. The facade republishes their existing
+   identities. `min`, `max`, `sub`, and `compare` are ordinary recursive
+   functions; `compare` uses the imported relation.
+4. **`trusted_base()` delta.** **Zero.** Re-exporting a checked identity adds no
+   declaration or trust. The local operations introduce no `Axiom`, primitive,
+   or postulate.
+5. **Proof families.** The provider owns the structural `Nat` order proofs. This
+   package's checked laws cover the local arithmetic operations.
+6. **Consumers.** Generic ordered algorithms can resolve `Ord Nat` through this
+   facade; direct callers can use the local arithmetic and comparison operations
+   once their visibility is intentionally widened.
+7. **Validation evidence.** Strict-root and identity controls check the carried
+   dictionary, canonical relation and bridge identities, zero local registration,
+   zero trust delta, examples, and rejection fences.
