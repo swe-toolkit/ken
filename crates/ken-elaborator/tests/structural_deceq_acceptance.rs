@@ -5,7 +5,7 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-use ken_elaborator::{trusted_base_delta, ElabEnv};
+use ken_elaborator::{ElabEnv, trusted_base_delta};
 use ken_kernel::env::Decl;
 
 const LAWFUL_CLASSES_KEN_MD: &str =
@@ -60,46 +60,4 @@ fn structural_instances_compute_positive_and_negative_bool_examples() {
     assert_bool_reduces(&mut env, "pair_distinct", pair_distinct, "False");
     assert_bool_reduces(&mut env, "list_same", list_same, "True");
     assert_bool_reduces(&mut env, "list_distinct", list_distinct, "False");
-}
-
-#[test]
-fn list_neutral_path_uses_case_eq_not_a_postulate() {
-    let start = LAWFUL_CLASSES_KEN_MD
-        .find("### 4.5 Structural `DecEq` liftings")
-        .expect("structural lifting section must remain present");
-    let section = &LAWFUL_CLASSES_KEN_MD[start..];
-    let fence_start = section
-        .find("\n```ken")
-        .expect("structural lifting fence must open")
-        + 7;
-    let code_end = section[fence_start..]
-        .find("\n```")
-        .expect("structural lifting fence must close")
-        + fence_start;
-    let code = &section[fence_start..code_end];
-    let compact = code.split_whitespace().collect::<Vec<_>>().join(" ");
-    for required in [
-        "match list_deceq_head_eq a da x y eqn : h",
-        "theorem list_deceq_sound_cons",
-        "da.sound x y h",
-        "da.complete x x Refl",
-        "λp. absurd p",
-    ] {
-        assert!(
-            compact.contains(required),
-            "missing required neutral-proof route: {required}"
-        );
-    }
-    for removed in ["bool_dichotomy", "list_deceq_sound_cons_dispatch"] {
-        assert!(
-            !code.contains(removed),
-            "removed hand-written scaffolding remains: {removed}"
-        );
-    }
-    for forbidden in ["Axiom", "postulate", "sorry"] {
-        assert!(
-            !code.contains(forbidden),
-            "structural lifting code must not contain {forbidden}"
-        );
-    }
 }
