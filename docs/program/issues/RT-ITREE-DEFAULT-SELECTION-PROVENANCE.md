@@ -1,7 +1,7 @@
 ---
 id: RT-ITREE-DEFAULT-SELECTION-PROVENANCE
 title: "AC-5 successor exposed by identity-preserving trap provenance — an admitted checked program's runtime lowering SELECTS the generated ITree-elimination fail-closed default (planned identity 40, PatternMatchFailure 'no runtime match case selected for ...::ITree') where the synthesized Err InvalidOffset should continue through the checked ITree/result path. The erasure default VALUE (erasure.rs:2740-2744) is CORRECT and fail-closed; the first causally wrong authority is the lowering branch that selected it, and identity 40 cannot locate the occurrence (Planner::intern_trap value-dedups). First deliverable is occurrence localization by graph-derived StaticOriginId, not repair."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,19 @@ github: null
 origin: "Steward, 2026-08-25, from the Architect AC-5 ruling (evt_3rq4xafrf7cqf, thr_6gmh4p1m0gch4) on runtime WIP 7094c29cd. Preserving the root generated-unit failure's planned trap identity (RT-UNIT-FAILURE-STATUS-PROVENANCE) exposed a DISTINCT downstream producer: the checked ITree-elimination default is selected for an admitted program. The Architect ruled AC-5 valid and directed this be framed as its own object (explicitly NOT the prohibited -3-vs-4 'third node'; it is a different producer requiring its own object read). Steward framing call per COORDINATION section 2."
 ---
 
+> # MERGED 2026-08-26 — D1 route-transport slice landed at origin/main `21d62130`
+>
+> The independently-landable D1 route slice landed via PR #2948 (base
+> `5272a68d4`, exact candidate `7b1820194`), gated by Runtime QA APPROVE
+> `evt_3h3qn487kcyrm` + Architect APPROVE `evt_392w3nyn2mdse`, resolved
+> Decision `dec_6rrdctkxczs53`, and whole-suite CI. Steward blob-audited the
+> six authored crate/test paths byte-identical and confirmed the concurrent
+> Reviewers-para fix (`e3a31614f`) survived the 3-way merge. This node's scope
+> — the two-parameter private CFG route-control lane — is COMPLETE. The
+> remaining fail-closed boundary (the `ResourceBodyResult` continuation
+> binding, AC-5 / AC-D1-PRODUCT / final `InvalidOffset`) is the D2 successor
+> [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]], now unblocked.
+>
 > # D1 SLICE + HARD-STOP-2 SPLIT 2026-08-26 — Architect ruling evt_5w03f4zbg02ry
 >
 > Hard stop 2 is ACCEPTED as a natural successor object. The D1 route
