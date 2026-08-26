@@ -11,6 +11,35 @@ github: null
 origin: "Steward, 2026-08-26, launching the operator-concurred catalog-reuse modernization campaign (charter docs/program/wp/catalog-reuse-modernization.md). Census-first shape: this inventory sizes the campaign so per-package rework WPs are framed from evidence, not blind. Runs on the foundation ring beside/after the CAT-ORDER-PUB-EXPORT + CAT-GCD-REFACTOR pilot. Steward-filed per COORDINATION section 2."
 ---
 
+> # SCOPE/AUTHORITY RULING 2026-08-26 — census is REVIEW EVIDENCE, no checked-in oracle (Steward)
+>
+> The recut cycle hard-stopped on a real authority fork (foundation-leader
+> evt_5a861a3wae10r): the CV review standard demanded a fail-closed checker
+> (`scripts/check-cat-reuse-census.py`) that rejects document-side mutations,
+> while Foundation QA — correctly applying the operator Build-QA prohibited-
+> subject rule (`agent/playbooks/build/qa-test-design.md` §"never assert facts
+> about repository TEXT": occurrence counts, heading inventories, section
+> presence, or a hardcoded census of where words appear in `catalog/`/`docs/`
+> are BLOCKED, "not weighed against usefulness") — retracted approval because
+> that checker IS the prohibited corpus-text oracle (its own motivating example
+> is "a milestone census frozen as a permanent test").
+>
+> Steward ruling, option (a), grounded in that operator rule + PRINCIPLES (small
+> auditable TCB, honesty about the boundary, subsume-don't-proliferate): the
+> census is a ONE-TIME campaign-sizing artifact and ships as REVIEW EVIDENCE —
+> the census DOCUMENT alone, with NO checked-in test oracle. `check-cat-reuse-
+> census.py` is NOT merged (it was a review aid; it may be used at review time to
+> reproduce, never checked in as a test). The CV's legitimate "support-not-self-
+> assert" concern is met by INDEPENDENT REPRODUCTION at review time — exactly the
+> enumeration/source-grounding/mutation work QA and CV have already done — not by
+> a merged oracle. Any claim the reviewers cannot mechanically ground at review
+> time is DISCLOSED in the document as review-only, not printed as checked. This
+> also makes the next candidate DOC-ONLY (lieutenant squash, no PR CI). The frame
+> never required a checker; its ACs (below) are satisfied by the document. This
+> was my framing gap to own; flagged to the operator on return — they may elect
+> option (b) a generated living census from a non-document data model if a
+> standing artifact is wanted, but (a) fits the sizing purpose.
+>
 > # CENSUS-ONLY 2026-08-26 — inventory that scopes the campaign; NO source edits, closes nothing
 
 ## Objective
@@ -76,15 +105,26 @@ prerequisite) is included as a worked example / calibration row, not excluded.
   spec/Architect — before the consumer.
 - AC-5 (census-only) — NO file under `catalog/packages/` is edited; no package is
   claimed reworked; nothing is closed. The deliverable is the inventory + rollup.
+- AC-6 (no checked-in oracle — per the ruling above) — the merged deliverable is
+  the census DOCUMENT only. NO test/script asserting facts about repository text
+  (`scripts/check-cat-reuse-census.py` or any successor) is checked in — that is
+  the prohibited corpus-text-oracle subject. The document's claims are verified by
+  the reviewers via INDEPENDENT REPRODUCTION at review time; any claim not
+  mechanically groundable then is DISCLOSED in the document as review-only rather
+  than asserted as checked.
 - AC-NO-REGRESSION — none applicable (no source change); the census document
   builds/renders.
 
 ## Reviewers
 
 foundation-qa (coverage is complete and counted; items are identity-grounded not
-name-matched; risk tags and prerequisites are correct) + conformance-validator
-(the census axes match the catalog implementation standard). No Architect review
-unless the census itself surfaces a design gap.
+name-matched; risk tags and prerequisites are correct; AND no checked-in
+corpus-text oracle ships — the merged artifact is the document, per AC-6) +
+conformance-validator (independently REPRODUCES the census's claims at review
+time — enumeration, canonical-identity grounding, prerequisite depths — and
+confirms the disclosed review-only residual is honest; the CV's verification is
+its own reproduction, NOT a demand for a merged fail-closed checker). No
+Architect review unless the census itself surfaces a design gap.
 
 ## Capability tier
 
