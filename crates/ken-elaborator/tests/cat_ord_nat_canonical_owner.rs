@@ -420,7 +420,11 @@ fn ownership_move_preserves_trust_posture_and_behavior() {
          theorem cat_ord_lt_behavior\n\
            : Equal Bool (leq_nat Zero (Suc Zero)) True = Proved\n\
          theorem cat_ord_gt_behavior\n\
-           : Equal Bool (leq_nat (Suc Zero) Zero) False = Proved",
+           : Equal Bool (leq_nat (Suc Zero) Zero) False = Proved\n\
+         fn cat_ord_dictionary_leq (x : Nat) (y : Nat) : Bool =\n\
+           (Ord_instance_Nat).leq x y\n\
+         theorem cat_ord_dictionary_behavior\n\
+           : Equal Bool (cat_ord_dictionary_leq Zero (Suc Zero)) True = Proved",
     )
     .expect("the relation must preserve opposite concrete behavior");
 }
