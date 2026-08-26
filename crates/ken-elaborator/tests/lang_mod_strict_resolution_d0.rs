@@ -562,6 +562,26 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
+            "Data.Numeric.Nat.Order".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Pair",
+                "Prop",
+                "Proved",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "mk_pair",
+                "pair_fst",
+                "pair_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Data.Sums.Combinators".to_string(),
             ["Equal", "Proved"]
                 .into_iter()
@@ -632,7 +652,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Data.Collections.Derived",
         "Data.Collections.Map",
         "Data.Collections.NonEmpty",
-        "Data.Numeric.Nat.Order",
         "Data.Serialization.Json",
         "Data.Sums.Validation",
         "Data.Text.Codec",
