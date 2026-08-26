@@ -8,7 +8,9 @@ ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` befor
 
 0b. DISK. `df -h /workspaces/ken /` -- BOTH, different filesystems. Either below 5G: `.moot/truncate-logs.sh`; aged `tmp/ken-*`; `git gc` if garbage; a RETIRED seat's `target/`. Verify a seat dead 3 ways; NEVER touch a live ring's target.
 
-1. THE LANE'S PRIORITY IS RT-BACKEND-MODULE-SPLIT (operator, 2026-08-18). It REPLACED the retirement residuals. Sixteen slice frames are filed as a strict depends_on chain; item 4 RT-PLANNER-UNITS-ABI-SPLIT is released. As each lands, flip the next from draft to ready and release it -- that is the standing loop. Only RT-BACKEND-SPLIT-CLOSURE discharges the operator's 10k constraint; no earlier slice may claim phase closure. Residuals (RT-BRANCH-LOCAL-DECLARED-CALLABLE's post-D0 cut, the carrier D3/D4/D5) are NOT cancelled but are no longer what the lane is for. RT-CHECKED-IH-REALIZATION-AUTHORITY stays HELD.
+0c. INTEGRATOR seat is RETIRED (operator 2026-08-26, permanent) -- NEVER rouse/reseat/route it. Its offline last-seen and stale PR #365 post are EXPECTED, not a stall.
+
+1. LANE ROSTER LIVES IN `steward/lanes.md` -- read it; time-varying operator direction, NOT baked here. As of 2026-08-25: THREE lanes (1 runtime / 2 language / 3 foundation), never collapse to one. Sweep EACH active lane's ring for its next deliverable; as a node lands flip the next depends_on draft->ready and release it. No measurement re-scopes a lane -- surface to operator.
 
 2. ARE THE LANE'S CRATES MOVING? `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so it silently reports 0.
 
