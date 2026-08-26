@@ -9530,6 +9530,18 @@ enum SourceComputationalAnswerRoute {
     CheckedSelectedRecursor,
 }
 
+impl SourceComputationalAnswerRoute {
+    const DIRECT_CONTROL_WORD: i64 = 0;
+    const CHECKED_CONTROL_WORD: i64 = 1;
+
+    fn control_word(self) -> i64 {
+        match self {
+            Self::DirectScrutinee => Self::DIRECT_CONTROL_WORD,
+            Self::CheckedSelectedRecursor => Self::CHECKED_CONTROL_WORD,
+        }
+    }
+}
+
 /// **`RT-DECL-CLOSURE-PORT` `D6a` upstream half — one lowering predecessor's
 /// operand paired with the route it arrived by.**
 ///
@@ -9540,9 +9552,11 @@ enum SourceComputationalAnswerRoute {
 /// with the ordinary direct scrutinee of that origin, so any occurrence-global
 /// projection marks the ordinary direct predecessor checked too.
 ///
-/// ⛔ Compiler-path metadata only. It is **not** a field in the runtime word,
-/// not a carrier lane, and not a runtime discriminator — nothing here reaches
-/// the emitted CFG.
+/// ⛔ Compiler-authored control only. It is **not** a field in the runtime word,
+/// not a carrier lane, and not public ABI. When distinct predecessor routes cross
+/// the carried computational loop's runtime CFG join, the route reaches that join
+/// only as a private control word beside the carried value; it is never inferred
+/// from or packed into the value.
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — one continuation target's operands,
 /// assembled at its exact call edge.**
 ///
