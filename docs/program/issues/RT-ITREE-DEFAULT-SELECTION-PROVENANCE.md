@@ -378,12 +378,23 @@ error-text, first-failure, numeric-origin, body-shape, or family-name authority.
 
 ## Reviewers
 
-Architect (the occurrence is localized by graph-derived identity, not by trap
-value / family spelling / numeric origin; the erasure default is untouched; the
-repair is at the selection authority and greens the exact InvalidOffset
-observation) + runtime-qa (the discrimination controls AC-2/AC-3 red as specified;
-fail-closed default intact). An object read may HARD-STOP into an Architect ruling
-if D0 exposes a further distinct authority.
+Architect (the route is transported as a compiler-authored private CFG control
+lane — a second block parameter, not a carrier/ABI/environment/result lane and
+not an enum-discriminant cast; the predecessor edge population is closed to
+exactly Initial + ActiveSelfResumption; ordinary-case precedence holds before
+the control comparison; direct/unknown words seal the unchanged fail-closed
+default; `erasure.rs` and the `RoutedAnswer::checked` caller population are
+untouched; the transitional frontier witness asserts only the ResourceBodyResult
+frontier and claims no final behavior) + runtime-qa (the D1-local controls red
+as specified — active Checked→Direct returns the ITree default on read and write,
+active unknown defaults, initial Direct preserves its ordinary case, a real
+recursor-layer Direct producer defaults while misrouting that edge Checked
+reaches the frontier; mutation provenance is at the literal active-self-resumption
+emitter; held `cc7dc7c02`/`e701eaeb9` are not promoted; no D2/product/InvalidOffset
+claim, ResourceBodyResult bypass, or broad ignore removal). This D1 slice does NOT
+green `InvalidOffset` — that final product is the D2 successor
+[[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]]'s obligation. An object read may
+HARD-STOP into an Architect ruling if a further distinct authority is exposed.
 
 ## Capability tier
 
