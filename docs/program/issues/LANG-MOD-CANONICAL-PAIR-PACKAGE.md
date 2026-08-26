@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-CANONICAL-PAIR-PACKAGE
 title: "Pair floor realization — admit the compiler-origin Pair to the prelude type floor as its tenth member and the three companions {mk_pair, pair_fst, pair_snd} as a SEPARATE closed binding inventory, resolving all four to the EXISTING compiler-installed GlobalIds (prelude.rs:951-1041) with no declare_def, no allocated identity, no alias/registry/fallback route, and zero trusted_base delta: split the conflated PRELUDE_FLOOR_NAMES type/binding inventory in modules.rs, close every Pair-binding collision before allocation, keep Prod and arbitrary compiler globals non-ambient, and flip the RED-UNTIL Strict conformance rows green. Realizes the landed spec LANG-MOD-PAIR-FLOOR-PROVIDER; the spec names this WP as the gate on those rows (34-data-match.md:102-111)."
-status: ready
+status: active
 owner: language
 size: M
 gate: none
