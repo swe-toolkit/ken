@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Term};
 
 const ORDER: &str = "Data.Numeric.Nat.Order";
@@ -95,6 +95,57 @@ fn order_facade_exports_all_four_owned_operation_identities() {
     assert!(!env.globals.contains_key("max"));
     assert!(!env.globals.contains_key("sub"));
     assert!(!env.globals.contains_key("compare"));
+}
+
+/// MEASURED: loading Order also loads the fully-qualified LawfulClasses
+/// totality bridge as a transparent artifact, while selecting it directly from
+/// its provider remains an exact interface `UnboundName`. CLAIMED: the bridge
+/// remains provider-private rather than becoming a public compatibility path.
+/// THE GAP: privacy is observed through the real loader export table; kernel
+/// transparency alone would not establish interface reachability.
+#[test]
+fn lawful_totality_bridge_remains_a_private_transparent_provider_artifact() {
+    let mut env = load_order();
+    let provider_name = format!("{LAWFUL}.total_leq_nat");
+    let provider = env.globals[&provider_name];
+    assert!(
+        env.env.transparent_body(provider).is_some(),
+        "the provider-private totality bridge must remain kernel-checked and transparent"
+    );
+
+    match env.elaborate_file("import Core.Classes.LawfulClasses (total_leq_nat)") {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, provider_name),
+        Err(other) => panic!("provider-private import must fail as UnboundName: {other:?}"),
+        Ok(_) => panic!("provider-private totality bridge became selectively importable"),
+    }
+}
+
+/// MEASURED: after the real roots loader closes Order, no fully-qualified
+/// `Order.total_leq_nat` artifact exists. CLAIMED: the facade does not mint a
+/// local totality bridge. THE GAP: the independent import-refusal control below
+/// covers interface reachability; this control covers artifact existence.
+#[test]
+fn order_facade_does_not_mint_a_totality_bridge() {
+    let env = load_order();
+    assert!(
+        !env.globals.contains_key(&format!("{ORDER}.total_leq_nat")),
+        "Order must not mint a total_leq_nat artifact"
+    );
+}
+
+/// MEASURED: the real loader rejects an Order-only selective import at the
+/// exact fully-qualified target. CLAIMED: provider-private totality is absent
+/// from the facade's public interface. THE GAP: the independent artifact
+/// control above distinguishes export absence from a hidden Order-local alias.
+#[test]
+fn order_facade_does_not_export_the_totality_bridge() {
+    let mut env = load_order();
+    let forbidden = format!("{ORDER}.total_leq_nat");
+    match env.elaborate_file("import Data.Numeric.Nat.Order (total_leq_nat)") {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, forbidden),
+        Err(other) => panic!("forbidden facade import must fail as UnboundName: {other:?}"),
+        Ok(_) => panic!("Order.total_leq_nat became selectively importable"),
+    }
 }
 
 /// MEASURED: an Order-only selective consumer retains the Order `sub`
