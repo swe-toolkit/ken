@@ -8,7 +8,7 @@ gate: none
 depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE, RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]
 blocks: []
 github: null
-origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision). Hard-stop-5 ruling evt_494k61s04fnv9, 2026-08-26: D3B localization is VALID and lowering has reached the end of its authority — the missing component is an UPSTREAM planner-owned checked-IH result-successor relation, framed as the independently-landable predecessor RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR (which this node now depends_on); D3A stays frozen/non-landable until it lands, then the atomic D3A+D3B consumer builds and D3B consumes ONLY that successor projection. Inventory fold 244b2468afd4f0cd06837fd3079f291d7d330af5 (entry 5)."
+origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision). Hard-stop-5 ruling evt_494k61s04fnv9, 2026-08-26: D3B localization is VALID and lowering has reached the end of its authority — the missing component is an UPSTREAM planner-owned checked-IH result-successor relation, framed as the independently-landable predecessor RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR (which this node now depends_on); D3A stays frozen/non-landable until it lands, then the atomic D3A+D3B consumer builds and D3B consumes ONLY that successor projection. Inventory fold 244b2468afd4f0cd06837fd3079f291d7d330af5 (entry 5). Architect INCORPORATION ruling evt_2prk31prke9cc, 2026-08-26 (accepting Research advisory evt_261gm8y54xttt), grounded on origin/main@a09878026: the predecessor and this consumer conflated two semantic edges by pairing the D3A application result R1 forward to the later capture. Reconciled to the continuation-inheritance reading — D3A applies the inherited continuation capability K at each exact recursive arrival to yield the FRESH result R2, and D3B binds that R2 through ordinary Ret-case/capture semantics; the transitive R1 -> capture requirement is deleted from the operative Objective/Deliverables/ACs/pairing/suppressions/reviewers/Sequencing. Suppression and at-most-once controls are now THREE independent axes (inheritance, application, fresh-result binding). The advisory is incorporated and is NOT hard stop 6 (count remains five). Runtime stays HELD until the predecessor recut lands and the D3A+D3B work is explicitly re-released."
 ---
 
 > # HARD STOP 3 DISCHARGED 2026-08-26 — option (c), D2/D3 phase separation (Architect evt_1hren6zm8mgxv)
@@ -155,6 +155,43 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > (entry 5). Runtime stays HELD until the planner predecessor is framed, landed,
 > and the successor D3A+D3B work is explicitly re-released.
 
+> # CONTINUATION-INHERITANCE RECONCILE 2026-08-26 (Architect incorporation evt_2prk31prke9cc)
+>
+> Architect incorporation `evt_2prk31prke9cc` (accepting Research advisory
+> `evt_261gm8y54xttt`), grounded on `origin/main@a09878026`. The advisory is
+> INCORPORATED; it is NOT hard stop 6 and the count remains FIVE (no new
+> implementer hard stop produced it). This supersedes the earlier standing note
+> that hard stops 4 and 5 do not consult Research.
+>
+> **The prior operative reading conflated two semantic edges.** The Objective,
+> D3B Deliverables, `AC-D3B-RESULTFLOW`, its pairing, the suppressions, the
+> reviewer text, and the Sequencing paired the D3A application result forward
+> through the source-control chain and the active recursive computation into the
+> later Ret capture. A forward source path proves CONTROL and AVAILABILITY, not
+> dynamic VALUE identity. This recut deletes that transitive requirement from the
+> operative text and reconciles to the continuation-inheritance reading:
+>
+> - **`K`** — the exact captured continuation environment / call capability
+>   authorized by one existing `CheckedIhEnvironmentTransport`;
+> - **`R1`** — the earlier D3A result that constructs / resumes the next ITree
+>   computation;
+> - **`R2`** — the FRESH result produced when `K` is applied at the recursively
+>   exposed zero-argument checked invocation.
+>
+> **D3A** applies the inherited `K` at each exact recursive arrival and yields
+> fresh `R2`. **D3B** binds THAT `R2` through ordinary Ret-case /
+> `CheckedCaseBinderLayout` / lexical-capture semantics to the exact closure
+> capture and the `InvalidOffset` product — it does NOT trace `R1` forward, does
+> NOT assert `R1` reaches the capture, and does NOT re-derive the relation in
+> lowering. Both D3A's application site and D3B's fresh-result destination consume
+> ONLY the predecessor [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]]'s
+> continuation-inheritance projection (the `K`-inheritance proof and the
+> fresh-`R2`-destination proof, exposed separately). Suppression and at-most-once
+> controls are now THREE independent axes — inheritance, application, and
+> fresh-result binding — with no scalar totals. Runtime stays HELD until the
+> predecessor recut lands and this D3A+D3B work is explicitly re-released; QA and
+> the Architect review the exact atomic candidate.
+
 ## Symptom inventory
 
 Append one line per hard stop; never rewrite history.
@@ -198,14 +235,18 @@ Append one line per hard stop; never rewrite history.
 
 Localize the first unresolved authority, which is UPSTREAM of ordinary
 `ResourceBodyResult` selection: the checked ITree `Ret` carried arm that should
-apply the source continuation and (HS4) whose applied result must then flow —
-through the source-control chain and the active recursive ITree computation — to
-the eventual `ITree::Ret` payload the Ret-case closure consumes, instead of the
-carried arm returning the transported captured-environment word unapplied. Then
-repair the FIRST graph-authorized edge on that path so the admitted read-offset
-and write-offset full programs green the exact `InvalidOffset` observation.
-Runtime must NOT repair the default, write closure capture 0 directly, or search
-the environment at runtime.
+apply the inherited continuation capability `K` at the exact recursively-exposed
+checked invocation and yield the FRESH result `R2`, instead of the carried arm
+returning the transported captured-environment word unapplied. Consuming the
+predecessor's continuation-inheritance projection (the `K`-inheritance proof and
+the fresh-`R2`-destination proof), bind that FRESH `R2` — NOT the earlier D3A
+result `R1` traced forward — through ordinary Ret-case / closure-capture
+semantics to the exact capture the Ret-case closure consumes. Then repair the
+FIRST graph-authorized edge where the fresh `R2` fails to reach that ordinary
+capture, so the admitted read-offset and write-offset full programs green the
+exact `InvalidOffset` observation. Runtime must NOT repair the default, write
+closure capture 0 directly, search the environment at runtime, trace `R1`
+transitively into the capture, or re-derive the inheritance relation in lowering.
 
 ## Phase structure (option (c) + HS4 split, Architect evt_1hren6zm8mgxv / evt_6mnawfvm8fc4j)
 
@@ -214,23 +255,27 @@ the environment at runtime.
   and returned `CheckedIhCapturedEnvironment` (the stronger causal gloss is
   WITHDRAWN — HS4). Its ACs are the census (AC-D2-1/2/3, satisfied by the
   accepted evidence) plus the reworded natural-reachability AC-D2-4.
-- **D3A — exact carried application. EVIDENCE ONLY; must NOT land alone.** The
-  ruled `CheckedIhEnvironmentTransport` single-application shape (proven feasible
-  by WIP `719933055`), with every governed arrival paired to its exact
-  transport/call identity. Makes NO claim about the final capture or
-  `InvalidOffset`.
-- **D3B — result-flow localization then single-edge repair.** On both unchanged
-  admitted programs, trace each D3A returned value through the exact
-  source-control chain and every constructed ITree value, `TerminalResumeOuter`,
-  and the active computational frames until the eventual `ITree::Ret` payload
-  that origin 301 (read) and its write analogue consume; bind that payload
-  through the Ret case's `CheckedCaseBinderLayout` to the exact ordinary
-  closure-capture occurrence and body read; identify the FIRST edge where the
-  expected typed result is replaced by (or fails to replace) the transported
-  environment. ONLY that edge may be repaired.
-- **The MERGE is ATOMIC:** D3A application + D3B graph-authorized result flow +
-  the product controls, landed together — no application-only checkpoint.
-  Runtime builds this after the recut lands and a fresh release.
+- **D3A — apply the inherited continuation capability. EVIDENCE ONLY; must NOT
+  land alone.** The ruled `CheckedIhEnvironmentTransport` single-application shape
+  (proven feasible by WIP `719933055`) applies the inherited `K` at each exact
+  recursively-exposed arrival — the site supplied by the predecessor's
+  `K`-inheritance proof — and yields the FRESH result `R2`. Every governed arrival
+  is paired to its exact transport/call identity. Makes NO claim about the final
+  capture or `InvalidOffset`, and asserts NO identity between `R1` and `R2`.
+- **D3B — fresh-result destination binding then single-edge repair.** On both
+  unchanged admitted programs, take D3A's FRESH `R2` and bind it, through the
+  predecessor's fresh-`R2`-destination projection, via the Ret case's
+  `CheckedCaseBinderLayout` to the exact ordinary closure-capture occurrence and
+  body read (read: closure 460 / capture 459 / body 452; write: its independently
+  derived analogue closure 473 / capture 472 / body 465). Identify the FIRST
+  graph-authorized edge where the fresh `R2` fails to reach that ordinary capture.
+  ONLY that edge may be repaired. D3B does NOT trace `R1` forward through the
+  source-control chain, does NOT re-derive the inheritance relation in lowering,
+  and consumes ONLY the predecessor's continuation-inheritance projection.
+- **The MERGE is ATOMIC:** D3A application of inherited `K` + D3B fresh-`R2`
+  destination binding + the product controls, landed together — no
+  application-only checkpoint. Runtime builds this after the predecessor recut
+  lands and a fresh release.
 
 ## Evidence objects (Architect probe-verified; evidence ONLY, not candidates)
 
@@ -332,23 +377,24 @@ the environment at runtime.
     family-specific fallback.
 - **D3B (result-flow localization then single-edge repair — the coupled atomic
   half; Architect evt_6mnawfvm8fc4j):**
-  - On both unchanged admitted programs, trace each D3A returned value through
-    the exact source-control chain (`CheckedComputationalIHInvocationReturn ->
-    ConstructArgument -> TerminalResumeOuter -> Computational` active frame(s)),
-    every constructed ITree value, and the active computational-frame lineage
-    until the eventual `ITree::Ret` payload the Ret-case closure consumes. The
-    READ program's coordinates are origin 301 active frame / closure 460 /
-    capture occurrence 459 / body 452 — READ-side EVIDENCE coordinates only, from
-    the disposable Architect probe. The WRITE program's active frame, eventual
-    Ret payload, ordinary capture occurrence, and body read MUST be derived
+  - On both unchanged admitted programs, take D3A's FRESH `R2` (the result of
+    applying inherited `K` at the exact recursively-exposed invocation) and,
+    through the predecessor's fresh-`R2`-destination projection, carry it to the
+    eventual ordinary `ITree::Ret` payload the Ret-case closure consumes. Do NOT
+    trace the earlier D3A result `R1` transitively through the source-control
+    chain into the capture — that is the withdrawn reading. The READ program's
+    destination coordinates are origin 301 active frame / closure 460 / capture
+    occurrence 459 / body 452 — READ-side EVIDENCE coordinates only, from the
+    disposable Architect probe. The WRITE program's active frame, eventual Ret
+    payload, ordinary capture occurrence, and body read MUST be derived
     INDEPENDENTLY from its OWN existing graph/planner facts before any repair —
     never reused from, or inferred by similarity to, the read coordinates.
-  - Bind each program's payload through the Ret case's `CheckedCaseBinderLayout`
+  - Bind each program's FRESH `R2` through the Ret case's `CheckedCaseBinderLayout`
     to THAT program's own exact ordinary closure-capture occurrence and body read
     (read: capture 0 = occurrence 459, `Var(0)`, body-452 `Var(1)`; write: its
-    independently derived analogue). Identify the FIRST edge where the expected
-    typed result is replaced by (or fails to replace) the transported
-    environment. ONLY that edge may be repaired.
+    independently derived analogue). Identify the FIRST edge where the fresh `R2`
+    fails to reach that ordinary capture (the transported environment persists in
+    its place). ONLY that edge may be repaired.
   - If the write analogue cannot be derived from existing planner relations,
     HARD-STOP under the D3B rule below (hard stop 5) — do NOT infer it by source
     similarity to the read program.
@@ -411,32 +457,41 @@ the environment at runtime.
   transport identity, source record, worker body, source result, and
   destination owner. Unpaired scalar totals are INSUFFICIENT — the programs may
   legitimately reach the seam more than once.
-- AC-D3B-RESULTFLOW (result-delivery positive — D3B; TWO separately paired
-  paths) — the atomic (D3A+D3B) candidate makes each application result flow
-  through the exact source-control chain, `TerminalResumeOuter`, and the active
-  computational frames to the eventual `ITree::Ret` payload, binds it through the
-  Ret-case `CheckedCaseBinderLayout` to THAT program's own exact closure-capture
-  occurrence and body read, and proceeds through exact `ResourceBodyOk` /
+- AC-D3B-RESULTFLOW (fresh-result-delivery positive — D3B; TWO separately paired
+  paths) — the atomic (D3A+D3B) candidate applies inherited `K` at each exact
+  recursively-exposed invocation, yields the FRESH result `R2`, and binds THAT
+  `R2` — through the predecessor's fresh-`R2`-destination projection and the
+  Ret-case `CheckedCaseBinderLayout` — to THAT program's own exact closure-capture
+  occurrence and body read, then proceeds through exact `ResourceBodyOk` /
   `ResourceBodyErr` selection to the independently specified `InvalidOffset`
-  observation and effect prefix. The READ path is paired through its exact
-  read-side evidence coordinates (origin 301 / closure 460 / capture occurrence
-  459 / body 452 `Var(1)`); the WRITE path is paired through its OWN newly
-  derived exact analogue. Reusing the read numeric coordinates as write authority
-  is FORBIDDEN; if the write analogue cannot be derived from existing planner
-  relations, hard-stop (HS5).
-- AC-D3B-RESULTFLOW-PAIRING (per-step result-flow pairing) — pair the exact
-  application result through EACH successor operation to the exact eventual Ret
-  payload and closure capture. No scalar-total substitution; a bare
-  target-call / consumption count does not suffice.
-- AC-D3-DUAL-SUPPRESS (two independent causal mutations) — (i) suppress ONLY the
-  D3A production application after the full repair, keeping
-  entry/descriptor/detector live, and require BOTH programs to return to the
-  localized sole default; (ii) SEPARATELY suppress ONLY the newly repaired D3B
-  successor edge while leaving D3A live, and require the SAME default. Restore
-  byte-identically after each and recover both exact products.
-- AC-D3-ATMOSTONCE — prove at-most-once for the application AND for the
-  successor consumption INDEPENDENTLY, each either STRUCTURALLY or via the
-  opposite duplicate mutation. A removal mutation proves at-least-once only.
+  observation and effect prefix. The candidate does NOT trace the earlier D3A
+  result `R1` transitively through the source-control chain into the capture, and
+  asserts NO identity between `R1` and `R2`. The READ path is paired through its
+  exact read-side destination coordinates (origin 301 / closure 460 / capture
+  occurrence 459 / body 452 `Var(1)`); the WRITE path is paired through its OWN
+  newly derived exact analogue. Reusing the read numeric coordinates as write
+  authority is FORBIDDEN; if the write analogue cannot be derived from existing
+  planner relations, hard-stop.
+- AC-D3B-RESULTFLOW-PAIRING (two separate pairings, never one transitive) — pair,
+  SEPARATELY: (i) the `K`-inheritance — the inherited continuation capability to
+  the exact recursively-exposed zero-argument invocation; and (ii) the fresh `R2`
+  — the result of applying `K` there to the exact eventual Ret payload and closure
+  capture. Do NOT collapse the two into one transitive pairing from `R1` to the
+  capture. No scalar-total substitution; a bare target-call / consumption count
+  does not suffice.
+- AC-D3-TRIPLE-SUPPRESS (three independent causal mutations) — after the full
+  repair, INDEPENDENTLY: (i) suppress ONLY the `K`-inheritance (the inherited
+  continuation capability at the recursively-exposed invocation), keeping
+  application and binding paths live; (ii) suppress ONLY the D3A production
+  application of `K`, keeping entry/descriptor/detector and the inheritance live;
+  (iii) suppress ONLY the newly repaired D3B fresh-`R2` binding edge, keeping
+  inheritance and application live. EACH must return BOTH programs to the
+  localized sole default, and restore byte-identically to recover both exact
+  products. No scalar-total substitution.
+- AC-D3-ATMOSTONCE — prove at-most-once INDEPENDENTLY for the `K`-inheritance, the
+  application of `K`, AND the fresh-`R2` binding, each either STRUCTURALLY or via
+  the opposite duplicate mutation. A removal mutation proves at-least-once only;
+  no scalar total substitutes for any of the three.
 - AC-D3-CHECKED-TRACE — retain a SEPARATE exact checked-route trace through
   `CheckedSelectedRecursor`, checked `CarriedEliminationEntered`, and
   `CarriedFallbackEmitted`, but do NOT substitute that trace for the
@@ -471,27 +526,31 @@ the environment at runtime.
 ## Reviewers
 
 Architect (D2 reworded reachability introduces no application/result and no
-spelling/ABI/family/trap/field-count/index authority; D3A is the authorized
-`CheckedIhEnvironmentTransport` single-application shape — sole two-endpoint
-authority, projected capture ordinals, single envelope/call path, no
-`StaticWorkerBinding` synthesis, no second identity catalog/ABI lane — and does
-NOT land alone; D3B repairs the FIRST graph-authorized result-flow edge with
-authority from EXISTING planner relations only (source-continuation frame
-identity, active-frame lineage, constructed occurrence/result edge, Ret-case
-binder role, closure-capture descriptor), with no lowering-side reverse search,
-no second binder catalog, no direct capture-0 write, and the
-`CheckedIhBinding(None)` Ret capture preserved as a negative control; both
-fail-closed defaults and `erasure.rs` intact) + runtime-qa (AC-D2-4 proves
-natural reachability WITHOUT applying/injecting; D3A pairing is
-one-application-per-arrival; D3B adds per-step result-flow pairing to the
-eventual Ret payload / closure capture with no scalar-total substitution; the
-two independent causal suppressions — D3A application and the repaired D3B edge —
-each redden to the localized default and byte-restore; at-most-once holds for
-BOTH application and successor consumption; the checked-route trace is retained
-but NOT substituted for the pairings; the final `InvalidOffset` product holds on
-both programs with the exact effect prefixes, independent of the lowering logic).
-QA is requested on the atomic D3A+D3B candidate only — NOT on the frozen
-`ac1ebdacb` or `719933055` evidence.
+spelling/ABI/family/trap/field-count/index authority; D3A applies the inherited
+`K` at the exact recursively-exposed invocation supplied by the predecessor's
+`K`-inheritance proof — the authorized `CheckedIhEnvironmentTransport`
+single-application shape, sole two-endpoint authority, projected capture ordinals,
+single envelope/call path, no `StaticWorkerBinding` synthesis, no second identity
+catalog/ABI lane — yields fresh `R2`, and does NOT land alone; D3B binds that
+FRESH `R2` (never `R1` traced transitively) through the predecessor's
+fresh-`R2`-destination projection and the Ret-case binder to the exact ordinary
+closure capture, repairing the FIRST graph-authorized edge where `R2` fails to
+reach it, with authority from EXISTING planner relations only, no lowering-side
+reverse search, no second binder catalog, no direct capture-0 write, the
+`CheckedIhBinding(None)` Ret capture preserved as a negative control, and no
+re-derivation of the inheritance relation in lowering; both fail-closed defaults
+and `erasure.rs` intact) + runtime-qa (AC-D2-4 proves natural reachability WITHOUT
+applying/injecting; D3A pairing is one-application-per-arrival; AC-D3B-RESULTFLOW
+binds the FRESH `R2` with no `R1`->capture trace and no scalar-total substitution;
+AC-D3B-RESULTFLOW-PAIRING keeps the `K`-inheritance and fresh-`R2` pairings
+SEPARATE; the THREE independent causal suppressions — inheritance, application,
+and the repaired fresh-`R2` binding edge — each redden to the localized default
+and byte-restore; at-most-once holds INDEPENDENTLY for inheritance, application,
+and fresh-result binding; the checked-route trace is retained but NOT substituted
+for the pairings; the final `InvalidOffset` product holds on both programs with
+the exact effect prefixes, independent of the lowering logic). QA is requested on
+the atomic D3A+D3B candidate only — NOT on the frozen `ac1ebdacb` or `719933055`
+evidence.
 
 ## Capability tier
 
@@ -511,11 +570,13 @@ UPSTREAM planner-only predecessor [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]] lands
 FIRST (independently landable, behaviorally inert); Runtime is HELD on this node
 until that predecessor lands and the successor D3A+D3B work is explicitly
 re-released. Then the Runtime ring rebases the D3 branch and builds the ATOMIC
-D3A+D3B consumer candidate (application + planner-issued result-successor flow +
-product) — no application-only checkpoint; D3B consumes only the predecessor's
-successor projection. After
-this node greens `InvalidOffset`, [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]]
-(ReadSome/Wrote) and the final four-value closure fold follow; the D1 follow-up
+D3A+D3B consumer candidate (D3A application of inherited `K` yielding fresh `R2` +
+D3B fresh-`R2` destination binding to the ordinary Ret capture + product) — no
+application-only checkpoint; D3A and D3B consume ONLY the predecessor's
+continuation-inheritance projection, never re-deriving it in lowering and never
+tracing `R1` into the capture. After this node greens `InvalidOffset`,
+[[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] (ReadSome/Wrote) and the final
+four-value closure fold follow; the D1 follow-up
 [[RT-CHECKED-SUCCESSOR-EMIT-REACHABILITY]] is sequenced after this node on the
 single Runtime ring (ring contention, no logical dependency). PX8 stays blocked
 until the whole native carried-value program lands. Single Runtime lane object
