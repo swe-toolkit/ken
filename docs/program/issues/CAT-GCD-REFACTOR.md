@@ -5,12 +5,23 @@ status: draft
 owner: foundation
 size: S
 gate: none
-depends_on: [CAT-GCD, CAT-ORDER-PUB-EXPORT]
+depends_on: [CAT-GCD, CAT-ORDER-PUB-EXPORT, CAT-ORD-NAT-CANONICAL-OWNER]
 blocks: []
 github: null
 origin: "Operator directive 2026-08-22, after CAT-GCD merged (3283528c4): Gcd.ken.md redundantly reimplements generic Nat tools that already exist in the catalog, and is arranged bottom-up. This is a well-factoring / arrangement follow-up, not a soundness re-open — CAT-GCD stays closed. Steward-filed. Held until the foundation ring is reseated to pi (see reseat directive) so the standard's first application runs on the new seating."
 ---
 
+> # BLOCKED on BOTH Order successors 2026-08-26 (Architect split evt_6f4h4mhejp4bm)
+>
+> The Order half split further: the Architect ruled the pub-only fix incomplete (an
+> orphan `instance Ord Nat`), so the Order rework is now TWO nodes — the ownership
+> migration [[CAT-ORD-NAT-CANONICAL-OWNER]] then the narrow
+> [[CAT-ORDER-PUB-EXPORT]]. This Gcd-only refactor resumes only after BOTH land, and
+> the import surface must be RE-VERIFIED at pickup: after the migration `leq_nat` is
+> imported from `Core.Classes.LawfulClasses` (its canonical home), NOT from Order —
+> Order re-exports it. `sub` is still imported from Order. Re-measure before
+> building.
+>
 > # REFRAME 2026-08-26 — import surface RE-MEASURED; Order half extracted (operator: continue foundation)
 >
 > Operator ruled the three-lane feasibility trial passed and directed the
