@@ -12213,7 +12213,15 @@ impl<'a> Lowering<'a> {
             .rev()
             .find(|(origin, _)| *origin == eliminator.static_origin)
         {
-            builder.ins().jump(*header, &[scrutinee.word.into()]);
+            let route_control_word = carried_computational_loop_control_word(
+                eliminator.checked_frame_id,
+                CarriedComputationalLoopEdge::ActiveSelfResumption,
+                eliminator.answer_route,
+            );
+            let route_control = builder.ins().iconst(types::I64, route_control_word);
+            builder
+                .ins()
+                .jump(*header, &[scrutinee.word.into(), route_control.into()]);
             let unreachable = builder.create_block();
             builder.switch_to_block(unreachable);
             return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
@@ -12221,16 +12229,28 @@ impl<'a> Lowering<'a> {
 
         let header = builder.create_block();
         builder.append_block_param(header, types::I64);
-        builder.ins().jump(header, &[scrutinee.word.into()]);
+        builder.append_block_param(header, types::I64);
+        let route_control_word = carried_computational_loop_control_word(
+            eliminator.checked_frame_id,
+            CarriedComputationalLoopEdge::Initial,
+            eliminator.answer_route,
+        );
+        let route_control = builder.ins().iconst(types::I64, route_control_word);
+        builder.ins().jump(
+            header,
+            &[scrutinee.word.into(), route_control.into()],
+        );
         builder.switch_to_block(header);
         let scrutinee = CarriedBoundaryWord {
             word: builder.block_params(header)[0],
         };
+        let route_control = builder.block_params(header)[1];
         self.active_carried_computational_eliminations
             .push((eliminator.static_origin, header));
         let lowered = self.lower_carried_computational_match_inner(
             builder,
             scrutinee,
+            route_control,
             eliminator,
             remaining_eliminators,
         );
@@ -12247,6 +12267,7 @@ impl<'a> Lowering<'a> {
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         scrutinee: CarriedBoundaryWord,
+        route_control: cranelift_codegen::ir::Value,
         eliminator: ComputationalEliminatorFrame<'_>,
         remaining_eliminators: &[EliminatorFrame<'_>],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
@@ -12523,10 +12544,7 @@ impl<'a> Lowering<'a> {
         // constructor is matched by name. The guard is a compile-time property
         // of the case *topology*, identical to the specialized arm's, and the
         // word never participates in it.
-        let checked_answer_fallback = eliminator.answer_route
-            == SourceComputationalAnswerRoute::CheckedSelectedRecursor
-            && px8tr_deforested_answer_route_enabled();
-        let return_case = if checked_answer_fallback {
+        let return_case = if px8tr_deforested_answer_route_enabled() {
             // The strict existing topology, re-derived here exactly as the
             // specialized arm derives it: one `Ret` case with one binder, one
             // `Vis` case, two cases total, and no checked control markers in the
@@ -12552,6 +12570,18 @@ impl<'a> Lowering<'a> {
         };
 
         if let Some((return_index, return_case)) = return_case {
+            let checked_route = builder.create_block();
+            let default_route = builder.create_block();
+            let route_is_checked = builder.ins().icmp_imm(
+                cranelift_codegen::ir::condcodes::IntCC::Equal,
+                route_control,
+                SourceComputationalAnswerRoute::CHECKED_CONTROL_WORD,
+            );
+            builder
+                .ins()
+                .brif(route_is_checked, checked_route, &[], default_route, &[]);
+            builder.switch_to_block(checked_route);
+
             // ⭐ The EMISSION discriminator for this branch.
             //
             // ⚠ Deliberately not `DeforestedAnswerResumed`. That event is
@@ -12615,6 +12645,20 @@ impl<'a> Lowering<'a> {
                     "a carried checked-answer arm",
                 )?;
                 builder.ins().jump(merge, &[word.word.into()]);
+            }
+
+            builder.switch_to_block(default_route);
+            #[cfg(test)]
+            record_d6a_route_event(D6aRouteEvent::CarriedDefaultSealed {
+                static_origin: eliminator.static_origin,
+                route: eliminator.answer_route,
+            });
+            let defaulted = LoweringOperand::Specialized(Lowered::Trap(eliminator.default.clone()));
+            if !self.seal_source_trap_branch(builder, &defaulted)? {
+                return Err(unsupported(
+                    "ComputationalMatch",
+                    "the carried computational match's closed default did not seal its branch",
+                ));
             }
         } else {
             // ⛔ Every other way of arriving here keeps the existing closed

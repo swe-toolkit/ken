@@ -665,16 +665,15 @@ fn buffer_allocate_malformed_capacity_narrows_to_invalid_bounds() {
 
 // -- FsReadAt ------------------------------------------------------------
 
-/// Durable invariant. MEASURED: the exact checked-source InvalidOffset witness
-/// reaches the linked process boundary as a nonzero planner identity whose
-/// artifact-bound catalog element is the ITree default, and stderr reports that
-/// same origin and kind. CLAIMED: the witness-path generated-unit failure keeps
-/// exact trap provenance through linked reporting. THE GAP: this deliberately
-/// does not claim the ITree default is the right source producer; the adjacent
-/// SemanticError parity row stays ignored until
-/// RT-ITREE-DEFAULT-SELECTION-PROVENANCE.
+/// Transition sentinel. MEASURED: the exact checked-source InvalidOffset
+/// witness crosses the repaired private route lane and reaches the named
+/// ResourceBodyResult fail-closed frontier with recoverable planner provenance.
+/// CLAIMED: D1 no longer terminates at the earlier ITree default. THE GAP: the
+/// ResourceBodyResult default is not final behavior and this test intentionally
+/// retires when RT-RESULT-CONTINUATION-BINDING-PROVENANCE replaces it with the
+/// durable nonignored InvalidOffset product witness.
 #[test]
-fn fs_read_at_malformed_offset_reports_exact_itree_default_trap_provenance() {
+fn fs_read_at_malformed_offset_reaches_resource_body_result_frontier() {
     in_large_stack_thread("rt-parity-read-offset-provenance", || {
         let Differential { native, .. } =
             differential("fs-read-at-offset-provenance", "rt_read_offset_stage");
@@ -694,7 +693,7 @@ fn fs_read_at_malformed_offset_reports_exact_itree_default_trap_provenance() {
         assert_eq!(
             provenance.trap.message,
             "no runtime match case selected for \
-             decl:rt_parity_fs_read_at_offset_provenance::ITree"
+             decl:rt_parity_fs_read_at_offset_provenance::ResourceBodyResult"
         );
         let stderr = String::from_utf8_lossy(&native.stderr);
         assert!(stderr.contains("PatternMatchFailure"));
@@ -714,6 +713,149 @@ fn fs_read_at_malformed_offset_reports_exact_itree_default_trap_provenance() {
             ]
         );
     });
+}
+
+const D1_ROUTE_CONTROL_CHILD: &str = "KEN_RT_ITREE_D1_ROUTE_CONTROL_CHILD";
+
+fn assert_d1_route_control_child() {
+    let mode = std::env::var(D1_ROUTE_CONTROL_CHILD).expect("D1 child mode");
+    let (case, entry, expected_family, expected_effects) = match mode.as_str() {
+        "exact-write" => (
+            "fs-write-at-offset-single",
+            "rt_write_writable_stage",
+            "ResourceBodyResult",
+            vec![
+                ken_runtime::HostOpV1::FsOpen,
+                ken_runtime::HostOpV1::FsOpen,
+                ken_runtime::HostOpV1::ResourceRelease,
+                ken_runtime::HostOpV1::ResourceRelease,
+            ],
+        ),
+        "drop-read" | "unknown-read" | "direct-read" => (
+            "fs-read-at-offset-single",
+            "rt_read_offset_stage",
+            "ITree",
+            vec![
+                ken_runtime::HostOpV1::FsOpen,
+                ken_runtime::HostOpV1::BufferAllocate,
+                ken_runtime::HostOpV1::ResourceRelease,
+                ken_runtime::HostOpV1::ResourceRelease,
+            ],
+        ),
+        "drop-write" => (
+            "fs-write-at-offset-single",
+            "rt_write_writable_stage",
+            "ITree",
+            vec![
+                ken_runtime::HostOpV1::FsOpen,
+                ken_runtime::HostOpV1::FsOpen,
+                ken_runtime::HostOpV1::ResourceRelease,
+                ken_runtime::HostOpV1::ResourceRelease,
+            ],
+        ),
+        "ordinary-read" | "misroute-direct-read" => (
+            "fs-read-at-offset-single",
+            "rt_read_offset_stage",
+            "ResourceBodyResult",
+            vec![
+                ken_runtime::HostOpV1::FsOpen,
+                ken_runtime::HostOpV1::BufferAllocate,
+                ken_runtime::HostOpV1::ResourceRelease,
+                ken_runtime::HostOpV1::ResourceRelease,
+            ],
+        ),
+        other => panic!("unknown D1 route-control child mode: {other}"),
+    };
+    let Differential { native, .. } = differential(case, entry);
+    let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+        native.terminal_error.as_ref()
+    else {
+        panic!("{mode}: expected typed frontier trap, got {native:?}");
+    };
+    assert_eq!(provenance.trap.code, ken_runtime::RuntimeTrapCode::PatternMatchFailure);
+    assert!(
+        provenance.trap.message.ends_with(&format!("::{expected_family}")),
+        "{mode}: expected {expected_family} frontier, got {}",
+        provenance.trap.message
+    );
+    assert_eq!(
+        native
+            .effect_trace
+            .iter()
+            .map(|event| event.operation)
+            .collect::<Vec<_>>(),
+        expected_effects,
+        "{mode}: route perturbation must preserve the pre-dispatch effect prefix"
+    );
+}
+
+/// Durable invariant. MEASURED: isolated child compiles of both admitted full
+/// programs replace the active checked edge's control with Direct and return to
+/// the exact ITree default; an unknown active control also defaults; malformed
+/// initial Direct control cannot shadow an ordinary case; and a real
+/// recursor-layer Direct producer defaults unless that same edge is misrouted
+/// Checked. CLAIMED: both header edges consume only their exact route control,
+/// ordinary cases precede fallback, and all out-of-domain controls fail closed.
+/// THE GAP: these are test-support mutations at frame 1, not production route
+/// authority; the unmutated transitional witness above records the later
+/// ResourceBodyResult frontier and D2 owns final InvalidOffset behavior.
+#[test]
+fn d1_route_control_full_program_mutations_are_fail_closed() {
+    if std::env::var_os(D1_ROUTE_CONTROL_CHILD).is_some() {
+        in_large_stack_thread("rt-parity-d1-route-child", assert_d1_route_control_child);
+        return;
+    }
+
+    let cases = [
+        ("exact-write", None, None),
+        ("drop-read", Some("active-checked-to-direct"), None),
+        ("drop-write", Some("active-checked-to-direct"), None),
+        ("unknown-read", Some("active-checked-to-unknown"), None),
+        ("ordinary-read", Some("initial-direct-to-unknown"), None),
+        ("direct-read", None, Some("drop-checked-frame-1")),
+        (
+            "misroute-direct-read",
+            Some("active-direct-to-checked"),
+            Some("drop-checked-frame-1"),
+        ),
+    ];
+    for (mode, control, recursor) in cases {
+        let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"));
+        child
+            .arg("--exact")
+            .arg("d1_route_control_full_program_mutations_are_fail_closed")
+            .arg("--nocapture")
+            .env(D1_ROUTE_CONTROL_CHILD, mode)
+            .env_remove("KEN_RT_ITREE_D1_ROUTE_CONTROL")
+            .env_remove("KEN_RT_ITREE_D1_RECURSOR_ROUTE")
+            .env_remove("RUST_MIN_STACK");
+        if let Some(control) = control {
+            child.env("KEN_RT_ITREE_D1_ROUTE_CONTROL", control);
+        }
+        if let Some(recursor) = recursor {
+            child.env("KEN_RT_ITREE_D1_RECURSOR_ROUTE", recursor);
+        }
+        let output = child.output().expect("spawn isolated D1 control child");
+        assert!(
+            output.status.success(),
+            "{mode} child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if let Some(control) = control {
+            assert!(
+                stderr.contains(&format!("RT_ITREE_D1_CONTROL_APPLIED mode={control}")),
+                "{mode}: the route-control mutation did not reach its real producer: {stderr}"
+            );
+        }
+        if let Some(recursor) = recursor {
+            assert!(
+                stderr.contains(&format!("RT_ITREE_D1_RECURSOR_APPLIED mode={recursor}")),
+                "{mode}: the recursor-route mutation did not reach its real producer: {stderr}"
+            );
+        }
+    }
 }
 
 #[test]
