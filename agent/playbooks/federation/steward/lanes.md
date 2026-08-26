@@ -46,7 +46,7 @@ each node (`git fetch`; read status) before acting; a node id decays.
 |---|---|---|
 | 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (M-series defunctionalization). M6/M4/M3 merged. Active successor: `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` (`ready`, the ExitCode recut). `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` + `RT-UNIT-FAILURE-STATUS-PROVENANCE` `draft`. |
 | 2 | language | Module/import campaign `LANG-MODULE-IMPORT-SYSTEM` — essentially COMPLETE (WP-1/2/3/4A merged incl. strict resolution). Remaining member work (Component B remainder, Nat provider, `CAT-GCD-REFACTOR`) is gated on the Nat Decision `dec_1kqwn6hdvn7d2`; lane-2 interim direction is an operator call (surfaced 2026-08-25). |
-| 3 | foundation | Expressibility trial — CAT WPs. `CAT-DEQUE`/`CAT-BSEARCH`/`CAT-VEC` `ready` now; `CAT-GCD-REFACTOR` waits on module/import. The Architect-burden probe. |
+| 3 | foundation | Catalog-reuse modernization. Expressibility trial COMPLETE (all CAT algos merged; Architect not overloaded = 3-lane feasibility PROVEN, operator 2026-08-26). Lane now: pilot `CAT-ORDER-PUB-EXPORT` (released 2afacd0c0) then `CAT-GCD-REFACTOR`; a catalog-wide census/campaign is PROPOSED, pending operator scope. |
 
 **Lane 1 — runtime (priority).** The native carried-value program
 `RT-NATIVE-CARRIED-VALUE` (Architect frame `evt_9kat78d438cb`): a finite
@@ -97,20 +97,35 @@ both fragments); `CI-Z3-BASE-IMAGE` + the FO/Z3 chain landed;
 not the module/import priority. Verify/kernel are reviewers here, not a separate
 active lane.
 
-**Lane 3 — foundation: expressibility trial (bounded).** Five independent,
-non-sequential CAT WPs — `CAT-SORT`, `CAT-GCD`, `CAT-DEQUE`, `CAT-BSEARCH`,
-`CAT-VEC` — authoring verified catalog algorithms against Ken's current surface.
-Charter: `docs/program/wp/foundation-expressibility-trial.md`. Launched
-2026-08-22 (anchor `evt_4r550cbd3fvvb`, simplest-first, VEC last). Current state
-(re-measure before acting): `CAT-SORT` + `CAT-GCD` merged; **`CAT-DEQUE`,
-`CAT-BSEARCH`, `CAT-VEC` are `ready`, `gate: none`, no deps — releasable to the
-foundation ring NOW.** Foundation is NOT idle-by-design when these are ready. The
-separate reuse-remediation node `CAT-GCD-REFACTOR` `depends_on`
-`LANG-MODULE-IMPORT-SYSTEM` (do not cut/release it until module/import lands).
-Architect NOT a default reviewer; QA reviews; a surface-gap report is what routes
-to spec/Architect. Stop-on-gap: a gap finding is the trial's payoff. **This lane
-is the instrument for the Architect-burden question** — the reason it runs
-concurrently is to measure that.
+**Lane 3 — foundation: catalog-reuse modernization campaign.** The expressibility
+trial (five CAT algos — `CAT-SORT`/`CAT-GCD`/`CAT-DEQUE`/`CAT-BSEARCH`/`CAT-VEC`,
+charter `docs/program/wp/foundation-expressibility-trial.md`) is COMPLETE — all
+merged. Its purpose (measure whether three lanes overload the Architect) is
+DISCHARGED: the operator ruled 2026-08-26 that feasibility is PROVEN and directed
+the lane to continue.
+
+The lane's new objective is the **catalog-reuse modernization** campaign
+(operator 2026-08-26; charter `docs/program/wp/catalog-reuse-modernization.md`):
+now that the prelude is expanded and module imports work, rework catalog packages
+along three axes — (a) remove defs redundant with the prelude, (b) import canonical
+tools from sibling modules instead of reimplementing, (c) restructure files
+top-down. Census-first, conservative/risk-tagged depth, lane-3 priority.
+
+Current state (re-measure before acting):
+- PILOT (proves the per-package recipe): `CAT-ORDER-PUB-EXPORT` (`ready`, RELEASED
+  2afacd0c0 — the Order pub-export prerequisite) then `CAT-GCD-REFACTOR` (`draft`,
+  Gcd-only import+dedup+top-down, `depends_on CAT-ORDER-PUB-EXPORT`). Note the CAT
+  reuse-remediation is NO LONGER blocked on the `LANG-MODULE-IMPORT-SYSTEM`
+  umbrella — the import + pub-export capability it needs is LANDED; only the Order
+  half remained, now extracted to the pilot prerequisite.
+- CAMPAIGN SCOPING: `CAT-REUSE-CENSUS` (`ready`) — the catalog-wide inventory that
+  sizes the rework. Runs on the single foundation ring AFTER/beside the pilot.
+
+Reviewers: foundation-qa + conformance-validator (catalog implementation
+standard); a genuine design/spec gap (eligibility, attached-proof ownership)
+HARD-STOPS to spec/Architect — a gap finding is the payoff. The three-lane
+Architect-burden question is now ANSWERED (feasible), so this lane runs as normal
+directed foundation work, not a probe.
 
 ## Not a lane
 
