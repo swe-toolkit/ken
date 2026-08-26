@@ -5,12 +5,26 @@ status: draft
 owner: language
 size: L
 gate: none
-depends_on: [LANG-MOD-PAIR-STRICT-BOUNDARY]
+depends_on: [LANG-MOD-PAIR-FLOOR-PROVIDER]
 blocks: [CAT-GCD-REFACTOR]
 github: null
 origin: "Spec enclave boundary ruling (spec-author evt_6nk4xxkppz3k5, spec-leader evt_w7v4dvvzjr8k) + Architect mechanism ruling (evt_53295hb0v21mw), on Component B hard stop #1. The deferred cluster's re-entry prerequisite. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
 
+> # REDIRECTED 2026-08-26 — now the FLOOR-REALIZATION build WP under [[LANG-MOD-PAIR-FLOOR-PROVIDER]]
+>
+> The operator + Architect recut (evt_7d0ecgkd8ate3) supersedes the exact-nine
+> boundary: Pair is admitted to the prelude FLOOR by ONE general
+> internal-provision arm, REUSING the four existing compiler-installed Pair
+> `GlobalId`s (`prelude.rs:951-1041`) — NOT retiring them for a package Pair. This
+> node is redirected from its package-migration plan to the floor-realization
+> build WP that realizes the split inventories and flips the strict rows AFTER the
+> spec WP [[LANG-MOD-PAIR-FLOOR-PROVIDER]] lands (`depends_on` repointed
+> accordingly). The title/objective/deliverables below still describe the OLD
+> retire-and-migrate plan and are superseded; they will be rewritten to the
+> reuse-the-four-ids floor-realization contract against the actually-landed spec
+> text, not before it.
+>
 > # FRAMED 2026-08-25 — deferred-cluster re-entry prerequisite (mechanism RULED)
 >
 > Component B's recut ([[LANG-MOD-CATALOG-COMPLETENESS]]) defers the whole
