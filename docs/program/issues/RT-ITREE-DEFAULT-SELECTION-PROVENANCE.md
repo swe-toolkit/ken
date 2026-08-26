@@ -1,32 +1,39 @@
 ---
 id: RT-ITREE-DEFAULT-SELECTION-PROVENANCE
 title: "AC-5 successor exposed by identity-preserving trap provenance — an admitted checked program's runtime lowering SELECTS the generated ITree-elimination fail-closed default (planned identity 40, PatternMatchFailure 'no runtime match case selected for ...::ITree') where the synthesized Err InvalidOffset should continue through the checked ITree/result path. The erasure default VALUE (erasure.rs:2740-2744) is CORRECT and fail-closed; the first causally wrong authority is the lowering branch that selected it, and identity 40 cannot locate the occurrence (Planner::intern_trap value-dedups). First deliverable is occurrence localization by graph-derived StaticOriginId, not repair."
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-UNIT-FAILURE-STATUS-PROVENANCE, RT-LINKED-NEGATIVE-TERMINAL-CLASSIFICATION]
+depends_on: [RT-UNIT-FAILURE-STATUS-PROVENANCE]
 blocks: []
 github: null
 origin: "Steward, 2026-08-25, from the Architect AC-5 ruling (evt_3rq4xafrf7cqf, thr_6gmh4p1m0gch4) on runtime WIP 7094c29cd. Preserving the root generated-unit failure's planned trap identity (RT-UNIT-FAILURE-STATUS-PROVENANCE) exposed a DISTINCT downstream producer: the checked ITree-elimination default is selected for an admitted program. The Architect ruled AC-5 valid and directed this be framed as its own object (explicitly NOT the prohibited -3-vs-4 'third node'; it is a different producer requiring its own object read). Steward framing call per COORDINATION section 2."
 ---
 
-> # HELD 2026-08-25 — PREEMPTED by RT-LINKED-NEGATIVE-TERMINAL-CLASSIFICATION
+> # RE-RELEASED 2026-08-26 — erratum preemption RETRACTED (Architect hard stop evt_sj7wr86hw1w4)
 >
-> A LIVE fail-closed regression on merged [[RT-UNIT-FAILURE-STATUS-PROVENANCE]]
-> (adversary evt_4am5ebv5p4xnn) took priority (Architect ruling evt_530y3skvjk8y6):
-> the linked consumer refuses the fixed process-boundary sentinels that
-> `emit_process_exit_status` legitimately emits, hard-erroring valid programs. The
-> runtime ring HOLDS this node at a clean D0 checkpoint — D0 occurrence-localization
-> instrumentation preserved/committed on `wp/RT-ITREE-DEFAULT-SELECTION-PROVENANCE`,
-> NO D1, no repair-site selection — and fixes
-> [[RT-LINKED-NEGATIVE-TERMINAL-CLASSIFICATION]] first. When that lands, RT-ITREE
-> re-anchors on then-current main and replays ONLY its D0 evidence into a fresh
-> candidate before continuing. Its full-program observations must be read through the
-> repaired reporting boundary, so this ordering holds even if the fix avoids
-> `calls.rs`. `depends_on` now carries the erratum.
+> The RT-UNIT-FAILURE "LIVE regression" that preempted this node is RETRACTED. The
+> Architect ruled (hard stop 1 on the erratum mechanism) that the `ExitFailure(300)
+> -> -3` witness lives BELOW the admission boundary: `ExitCode` is kernel-checked
+> `Success | Failure UInt8` (`prelude.rs:2524`), a checked `Failure` payload cannot
+> naturally be `300`, and the only `-3` route used a naked runtime object plus a
+> manually assembled artifact — not a checked bound-process program. No natural
+> admitted producer reaches a fixed negative sentinel, so there is no valid-program
+> regression, and RT-UNIT-FAILURE's merge stands.
+> [[RT-LINKED-NEGATIVE-TERMINAL-CLASSIFICATION]] is reclassified to a DEFERRED
+> boundary investigation (production-reachability census first); its WIP `406e86742`
+> is parked as evidence only and must NOT be folded here.
 >
-> # RELEASED 2026-08-25 — dependency landed; base re-grounded to current main
+> NO regression repair lands first. This node resumes NOW from current `origin/main`
+> `0253dd0f6` (a doc-only advance over the `e7dca2de7` it was cut from — identical
+> crate base), replaying ONLY its committed D0 evidence/instrumentation (checkpoint
+> `9faf52e5`) into a fresh candidate. Read its full-program observations through the
+> CURRENT reporting boundary — the earlier "read through the repaired boundary"
+> conditioning is VOID (no repair). The D0 prohibition is unchanged: do NOT select a
+> repair site before the graph authority is known. `depends_on` drops the erratum.
+>
+> # RELEASED 2026-08-25 (SUPERSEDED by RE-RELEASED above) — its base `2a5b3cd0e` is stale; the current re-release base is `0253dd0f6`
 >
 > [[RT-UNIT-FAILURE-STATUS-PROVENANCE]] merged at `2a5b3cd0e` (honest witness-path
 > provenance: the exact row now reports planned identity `40` /

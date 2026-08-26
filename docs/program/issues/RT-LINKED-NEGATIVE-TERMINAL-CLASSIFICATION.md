@@ -1,17 +1,67 @@
 ---
 id: RT-LINKED-NEGATIVE-TERMINAL-CLASSIFICATION
 title: "Linked reporting-boundary negative-terminal classification erratum — the linked negative-terminal wire domain is HETEROGENEOUS but RT-UNIT-FAILURE's new consumer treats the whole domain as planner-trap tokens, so the total decode_signed_root_trap refuses the fixed process-boundary sentinels (-1..-4) that emit_process_exit_status legitimately emits, hard-erroring valid programs (runtime-computed ExitFailure(300) -> -3). Partition the consumer into a disjoint union (fixed sentinels -> typed process-boundary Ok observation; 0xff-tagged signed root token -> planner provenance; else fail-closed), owned by ONE sealed sentinel authority the Rust classifier AND generated C both consume so the two reporters cannot drift. Consumer-classification closure, NOT producer-provenance closure."
-status: ready
+status: draft
 owner: runtime
 size: M
 gate: none
 depends_on: [RT-UNIT-FAILURE-STATUS-PROVENANCE]
-blocks: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE]
+blocks: []
 github: null
 origin: "Steward, 2026-08-25, from the Architect ruling evt_530y3skvjk8y6 (thr_6gmh4p1m0gch4) on adversary M8 finding evt_4am5ebv5p4xnn against merged [[RT-UNIT-FAILURE-STATUS-PROVENANCE]] (2a5b3cd0e). The landed tree is byte-identical to the reviewed tree (contrary independent validation of the exact-SHA approval, not a landing mismatch). The Architect ruled the defect node-worthy, not deferrable, and directed it to PREEMPT [[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]]. Steward owns the frame; the fix boundary, sealing requirements, and pins below are the Architect's ruling transcribed. Steward framing call per COORDINATION section 2."
 ---
 
-> # ERRATUM 2026-08-25 — LIVE regression on merged RT-UNIT-FAILURE; PREEMPTS RT-ITREE
+> # DEFERRED 2026-08-26 — regression characterization RETRACTED (Architect hard stop evt_sj7wr86hw1w4)
+>
+> Hard stop 1 on the erratum mechanism. The Architect RETRACTED the
+> `evt_530y3skvjk8y6` LIVE-regression classification: the required production premise
+> is false on the current admitted surface. `ExitCode` is kernel-checked
+> `Success | Failure UInt8` (`prelude.rs:2524`); a checked `Failure` payload cannot
+> naturally be `300` (`Failure (add_int 299 1)` is correctly rejected `Int` vs
+> `UInt8`). `int_to_uint8_raw` is an internal unchecked cast whose contract
+> requires a prior range check; driving it with `300` violates that contract
+> and the real bound
+> path reaches `-1`, not `-3`. The only observed `-3` route used a naked runtime
+> object plus a manually assembled `BoundProcessExecutableArtifact`, below the
+> admission boundary — a low-level emitter/classifier measurement, not a checked
+> bound-process program. So a "valid full program returning runtime-computed
+> `ExitFailure(300)`" does NOT exist on the present production surface: there is no
+> valid-program regression, and RT-UNIT-FAILURE's merge stands.
+>
+> RECLASSIFIED: urgent regression -> DRAFT/DEFERRED boundary investigation. The
+> consumer-partition WIP `406e86742ba559b76b629c4502ac8db35affc526` is coherent as a
+> mechanism but is NOT an authorized candidate; it is PARKED as evidence only and
+> must NOT be folded into [[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]]. Do NOT
+> amend AC-1 to the naked-object/manual-artifact domain — that greens the
+> test by moving the subject below the boundary this node claims. The typed
+> partition is not landed
+> merely because the generated C defensive reporter has branches.
+>
+> FIRST DELIVERABLE (before any mechanism work) — a closed production-reachability
+> census:
+> 1. Enumerate the negative terminal classes reachable through
+>    `build_bound_process_starter_executable_artifact` from admitted checked
+>    programs, without internal raw-cast precondition violations, naked
+>    emitters, or manual artifact construction.
+> 2. For each reachable fixed sentinel, name the exact typed producer authority and
+>    give a natural full-program witness.
+> 3. If NO fixed sentinel is reachable, record that the high-level consumer's refusal
+>    is the correct invariant-violation boundary — do NOT land the typed partition.
+> 4. If a fixed sentinel IS reachable, only then decide the high-level contract and
+>    revive the typed partition against that natural witness.
+>
+> The raw-cast `-1` observation and both coherent-fixture `-1` observations are
+> UNRESOLVED routes in that census, not proof of valid-program reachability; the
+> naked-object `-3` is a low-level measurement only. The latent `joins.rs` provenance
+> loss and vacuous artifact comparison remain separately latent. RT-ITREE is
+> UNBLOCKED and re-released immediately from checkpoint `9faf52e5` — no repair
+> lands first
+> (Architect sequencing correction). `blocks` cleared.
+>
+> Everything BELOW is the SUPERSEDED urgent-regression framing, retained for the
+> mechanism design (revived only under census step 4 above).
+>
+> # ERRATUM 2026-08-25 (SUPERSEDED) — LIVE regression on merged RT-UNIT-FAILURE; PREEMPTS RT-ITREE
 >
 > [[RT-UNIT-FAILURE-STATUS-PROVENANCE]] (merged `2a5b3cd0e`) narrowed its PRODUCER
 > claim to two routes while making the linked CONSUMER global:
