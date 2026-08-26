@@ -389,10 +389,23 @@ fn catalog_ambient_passthrough_migration_census() {
     let expected = vec![
         (
             "Algorithm.Numeric.Gcd".to_string(),
-            ["Equal", "Proved"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Pair",
+                "Prop",
+                "Proved",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "mk_pair",
+                "pair_fst",
+                "pair_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
         ),
         (
             "Capability.Console.Text".to_string(),

@@ -1,31 +1,69 @@
-//! CAT-GCD Euclidean-gcd acceptance.
+//! CAT-GCD Euclidean-gcd acceptance and catalog-reuse controls.
 //!
-//! Public names are compatibility vectors. Computation, law instantiation,
-//! and the zero-trust delta are durable semantic invariants.
+//! Public names are compatibility vectors. Computation, law artifacts,
+//! provider identity, and the zero-trust delta are durable semantic invariants.
+//! The controls use the real roots loader and kernel artifacts; repository text
+//! and declaration allocation order are not oracles.
 
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 use ken_elaborator::ElabEnv;
-use ken_interp::eval::{eval, EvalStore, EvalVal};
-use ken_kernel::Decl;
+use ken_interp::eval::{EvalStore, EvalVal, eval};
+use ken_kernel::{Decl, GlobalId, Term};
 
-const GCD_KEN_MD: &str = include_str!("../../../catalog/packages/Algorithm/Numeric/Gcd.ken.md");
+const GCD: &str = "Algorithm.Numeric.Gcd";
+const ARITHMETIC: &str = "Data.Numeric.Nat.Arithmetic";
+const ORDER: &str = "Data.Numeric.Nat.Order";
+const LAWFUL: &str = "Core.Classes.LawfulClasses";
+
+fn catalog_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages")
+}
 
 fn base_env() -> ElabEnv {
-    ElabEnv::empty().expect("prelude bootstrap")
+    ElabEnv::new().expect("prelude bootstrap")
 }
 
 fn loaded_env() -> ElabEnv {
     let mut env = base_env();
-    env.elaborate_ken_md_file(GCD_KEN_MD)
-        .expect("Algorithm/Numeric/Gcd.ken.md must elaborate");
+    env.elaborate_module_from_roots(&[catalog_root()], GCD)
+        .expect("Algorithm.Numeric.Gcd must elaborate through the real roots loader");
     env
 }
 
-fn nat(n: u32) -> String {
-    let mut result = "Zero".to_string();
+fn global(env: &ElabEnv, module: &str, name: &str) -> GlobalId {
+    env.globals[&format!("{module}.{name}")]
+}
+
+fn transparent(env: &ElabEnv, id: GlobalId) -> (&Term, &Term) {
+    match env.env.lookup(id) {
+        Some(Decl::Transparent { ty, body, .. }) => (ty, body),
+        other => panic!("expected transparent artifact {id:?}, got {other:?}"),
+    }
+}
+
+fn term_mentions(term: &Term, target: GlobalId) -> bool {
+    match term {
+        Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. }
+            if *id == target =>
+        {
+            true
+        }
+        Term::Elim { fam, .. } if *fam == target => true,
+        _ => term
+            .children()
+            .into_iter()
+            .any(|child| term_mentions(child, target)),
+    }
+}
+
+fn nat_term(env: &ElabEnv, n: u32) -> Term {
+    let mut result = Term::constructor(env.prelude_env.zero_id, vec![]);
     for _ in 0..n {
-        result = format!("Suc ({result})");
+        result = Term::app(Term::constructor(env.prelude_env.suc_id, vec![]), result);
     }
     result
 }
@@ -40,22 +78,23 @@ fn nat_count(env: &ElabEnv, value: &EvalVal) -> u64 {
     }
 }
 
-fn evaluate_nat(env: &ElabEnv, id: ken_kernel::GlobalId) -> u64 {
-    let body = match env.env.lookup(id) {
-        Some(Decl::Transparent { body, .. }) => body,
-        other => panic!("gcd vector must be transparent, got {other:?}"),
-    };
-    nat_count(env, &eval(&[], body, &env.env, &mut EvalStore::new()))
+fn evaluate_gcd(env: &ElabEnv, gcd: GlobalId, a: u32, b: u32) -> u64 {
+    let term = Term::app(
+        Term::app(Term::const_(gcd, vec![]), nat_term(env, a)),
+        nat_term(env, b),
+    );
+    nat_count(env, &eval(&[], &term, &env.env, &mut EvalStore::new()))
 }
 
 #[test]
-fn entry_elaborates_and_registers_algorithm_and_laws() {
+fn roots_loader_registers_gcd_artifacts_with_exact_catalog_provider_identities() {
     let env = loaded_env();
     for name in [
+        "Divides",
+        "BoolView",
+        "GcdSpec",
         "gcd_fuel",
         "gcd",
-        "Divides",
-        "GcdSpec",
         "gcd_fuel_spec",
         "gcd_spec",
         "gcd_divides_left",
@@ -63,52 +102,97 @@ fn entry_elaborates_and_registers_algorithm_and_laws() {
         "divides_gcd",
     ] {
         assert!(
-            env.globals.contains_key(name),
-            "`{name}` must be a real kernel-checked global"
+            env.globals.contains_key(&format!("{GCD}.{name}")),
+            "{name} must remain a real Gcd kernel artifact"
         );
+    }
+
+    for duplicate in ["add", "mul", "leq_nat", "sub"] {
+        assert!(
+            !env.globals.contains_key(&format!("{GCD}.{duplicate}")),
+            "Gcd must not mint a local replacement for catalog operation {duplicate}"
+        );
+    }
+
+    let add = global(&env, ARITHMETIC, "add");
+    let mul = global(&env, ARITHMETIC, "mul");
+    let leq = global(&env, LAWFUL, "leq_nat");
+    let sub = global(&env, ORDER, "sub");
+    assert!(
+        !env.globals.contains_key(&format!("{ORDER}.leq_nat")),
+        "the Order facade must carry the LawfulClasses identity without an alias"
+    );
+    for provider in [add, mul, leq, sub] {
+        assert!(env.env.transparent_body(provider).is_some());
+    }
+
+    let (_, gcd_body) = transparent(&env, global(&env, GCD, "gcd"));
+    assert!(term_mentions(gcd_body, add));
+    let (_, fuel_body) = transparent(&env, global(&env, GCD, "gcd_fuel"));
+    assert!(term_mentions(fuel_body, leq));
+    assert!(term_mentions(fuel_body, sub));
+    let (_, mul_add_body) = transparent(&env, global(&env, GCD, "mul_add"));
+    assert!(term_mentions(mul_add_body, add));
+    assert!(term_mentions(mul_add_body, mul));
+
+    let constructor = global(&env, GCD, "MkDivides");
+    let (family, index) = env
+        .env
+        .constructor(constructor)
+        .expect("MkDivides must remain a checked constructor");
+    assert!(term_mentions(&family.constructors[index].type_, mul));
+}
+
+#[test]
+fn entry_adds_no_trust_beyond_the_preexisting_provider_closure() {
+    let mut env = base_env();
+    env.elaborate_module_from_roots(&[catalog_root()], ARITHMETIC)
+        .expect("Arithmetic provider must elaborate");
+    env.elaborate_module_from_roots(&[catalog_root()], ORDER)
+        .expect("Order facade and provider closure must elaborate");
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_module_from_roots(&[catalog_root()], GCD)
+        .expect("Gcd must elaborate after its exact provider closure");
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(
+        before, after,
+        "Euclidean gcd itself must add zero trusted declarations"
+    );
+    for name in [
+        "add",
+        "mul",
+        "leq_nat",
+        "sub",
+        "gcd",
+        "gcd_fuel",
+        "divides_gcd",
+    ] {
+        let id = if matches!(name, "add" | "mul") {
+            global(&env, ARITHMETIC, name)
+        } else if name == "leq_nat" {
+            global(&env, LAWFUL, name)
+        } else if name == "sub" {
+            global(&env, ORDER, name)
+        } else {
+            global(&env, GCD, name)
+        };
+        assert!(!after.contains(&id), "{name} must remain outside the TCB");
     }
 }
 
 #[test]
-fn entry_adds_no_trusted_declarations() {
-    let mut env = base_env();
-    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(GCD_KEN_MD)
-        .expect("Algorithm/Numeric/Gcd.ken.md must elaborate");
-    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(
-        before, after,
-        "Euclidean gcd must add zero trusted declarations"
-    );
-}
-
-#[test]
-fn gcd_vectors_compute_and_all_laws_instantiate() {
-    let mut env = loaded_env();
-    env.elaborate_file(
-        "fn cat_gcd_ac1_left (a : Nat) (b : Nat) : Divides (gcd a b) a = \
-           gcd_divides_left a b\n\
-         fn cat_gcd_ac1_right (a : Nat) (b : Nat) : Divides (gcd a b) b = \
-           gcd_divides_right a b\n\
-         fn cat_gcd_ac2 \
-             (d : Nat) (a : Nat) (b : Nat) \
-             (da : Divides d a) (db : Divides d b) \
-           : Divides d (gcd a b) = \
-           divides_gcd d a b da db",
-    )
-    .expect("both divisibility directions and greatestness must instantiate generically");
-
-    let two = nat(2);
-    let four = nat(4);
-    let six = nat(6);
-    env.elaborate_decl(&format!(
-        "const cat_gcd_two_divides_result : Divides ({two}) (gcd ({four}) ({six})) = \
-         divides_gcd ({two}) ({four}) ({six}) \
-           (MkDivides ({two}) ({four}) ({two}) Proved) \
-           (MkDivides ({two}) ({six}) ({nat_three}) Proved)",
-        nat_three = nat(3),
-    ))
-    .expect("greatestness must accept concrete quotient witnesses");
+fn gcd_vectors_compute_and_divisibility_law_artifacts_remain_checked() {
+    let env = loaded_env();
+    let divides = global(&env, GCD, "Divides");
+    let gcd = global(&env, GCD, "gcd");
+    for law in ["gcd_divides_left", "gcd_divides_right", "divides_gcd"] {
+        let (ty, _) = transparent(&env, global(&env, GCD, law));
+        assert!(
+            term_mentions(ty, divides),
+            "{law} must retain Divides in its type"
+        );
+        assert!(term_mentions(ty, gcd), "{law} must retain gcd in its type");
+    }
 
     for (name, a, b, expected) in [
         ("zero_zero", 0, 0, 0),
@@ -119,13 +203,6 @@ fn gcd_vectors_compute_and_all_laws_instantiate() {
         ("twelve_eight", 12, 8, 4),
         ("five_three", 5, 3, 1),
     ] {
-        let id = env
-            .elaborate_decl(&format!(
-                "const cat_gcd_{name} : Nat = gcd ({}) ({})",
-                nat(a),
-                nat(b)
-            ))
-            .unwrap_or_else(|error| panic!("gcd vector {name} must elaborate: {error}"));
-        assert_eq!(evaluate_nat(&env, id), expected, "gcd vector {name}");
+        assert_eq!(evaluate_gcd(&env, gcd, a, b), expected, "gcd vector {name}");
     }
 }
