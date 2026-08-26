@@ -88,7 +88,13 @@ pub use lowering::with_px8ds_retired_flat_order;
 // census suites are what keep it honest.
 // `RT-CAPTURE-PROJECTION-GROW` `D1` — the worker-prefix deferral ledger.
 #[cfg(feature = "px8-ds-test-support")]
-pub use planning::{with_worker_prefix_deferrals, WorkerPrefixDeferral};
+pub use planning::{
+    checked_ih_continuation_inheritance_mutation_is_exact,
+    with_checked_ih_continuation_inheritance_mutation,
+    with_checked_ih_continuation_inheritance_observations, with_worker_prefix_deferrals,
+    CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
+    WorkerPrefixDeferral,
+};
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::core::{

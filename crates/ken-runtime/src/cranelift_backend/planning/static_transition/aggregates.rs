@@ -16,8 +16,14 @@
 //! `docs/program/issues/RT-PLANNER-AGGREGATES-SPLIT.md`.
 
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(feature = "px8-ds-test-support")]
+use std::cell::{Cell, RefCell};
 
-use super::continuations::{ContinuationOrdinaryEnvelopeRole, ContinuationWorkerCaptureSource};
+use super::continuations::{
+    build_checked_binder_provenance, CheckedBinderProvenance, CheckedCaseBinderLayout,
+    CheckedCaseBinderRole, CheckedIhBinding, ContinuationOrdinaryEnvelopeRole,
+    ContinuationWorkerCaptureSource,
+};
 
 use super::{
     inline_synthesized_seat_emission_owners, occurrence_authority,
@@ -215,6 +221,115 @@ pub(in crate::cranelift_backend) enum CheckedIhTransportInputDestination {
     EntryFrame(u32),
 }
 
+/// The forward proof that one already-issued captured continuation capability
+/// remains in scope at one recursively exposed checked invocation.
+///
+/// Every field is an existing occurrence, frame, binder, or call fact. The
+/// record carries no dynamic result identity: in particular, the transport's
+/// earlier source result is not an input to this proof.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhSelfResumptionStep {
+    construct_origin: StaticOriginId,
+    active_frame_origin: StaticOriginId,
+    recursive_child_origin: StaticOriginId,
+    selected_case_body_origin: StaticOriginId,
+    invocation_origin: StaticOriginId,
+    call_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+    callee_binding: CheckedIhBinding,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhCapabilityInheritance {
+    destination_owner: ContinuationEmissionOwner,
+    destination_body_origin: StaticOriginId,
+    self_resumption_steps: Vec<CheckedIhSelfResumptionStep>,
+}
+
+/// The ordinary Ret/capture destination of the fresh result conditionally
+/// produced by applying an inherited continuation capability.
+///
+/// This is intentionally a sibling of [`CheckedIhCapabilityInheritance`], not
+/// its tail. It names no transport source result and states no value equality.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhFreshResultDestination {
+    active_frame_origin: StaticOriginId,
+    ret_case_body_origin: StaticOriginId,
+    constructor_child: CheckedBinderProvenance,
+    closure_environment_record: AggregateOccurrenceId,
+    closure_origin: StaticOriginId,
+    closure_body_origin: StaticOriginId,
+    closure_parameter_count: u32,
+    capture_ordinal: u32,
+    capture_occurrence: StaticOriginId,
+    body_capture_reads: Vec<StaticOriginId>,
+}
+
+/// One planner-only continuation-inheritance projection of an existing
+/// checked-IH environment transport.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhContinuationInheritance {
+    transport: CheckedIhEnvironmentTransport,
+    capability: CheckedIhCapabilityInheritance,
+    fresh_result_destination: CheckedIhFreshResultDestination,
+}
+
+/// Read-only split view returned by the exact continuation-inheritance
+/// accessor. The two proofs cannot be mistaken for one transitive result edge.
+pub(in crate::cranelift_backend) struct CheckedIhContinuationInheritanceView<'plan> {
+    transport: &'plan CheckedIhEnvironmentTransport,
+    capability: &'plan CheckedIhCapabilityInheritance,
+    fresh_result_destination: &'plan CheckedIhFreshResultDestination,
+}
+
+impl CheckedIhContinuationInheritanceView<'_> {
+    pub(in crate::cranelift_backend) fn transport(&self) -> &CheckedIhEnvironmentTransport {
+        self.transport
+    }
+
+    pub(in crate::cranelift_backend) fn capability(&self) -> &CheckedIhCapabilityInheritance {
+        self.capability
+    }
+
+    pub(in crate::cranelift_backend) fn fresh_result_destination(
+        &self,
+    ) -> &CheckedIhFreshResultDestination {
+        self.fresh_result_destination
+    }
+}
+
+impl CheckedIhCapabilityInheritance {
+    pub(in crate::cranelift_backend) fn destination_owner(&self) -> ContinuationEmissionOwner {
+        self.destination_owner
+    }
+
+    pub(in crate::cranelift_backend) fn destination_body_origin(&self) -> StaticOriginId {
+        self.destination_body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn active_frame_origin(&self) -> StaticOriginId {
+        self.self_resumption_steps
+            .last()
+            .expect("a validated inheritance has at least one self-resumption step")
+            .callee_binding
+            .frame_origin
+    }
+
+    pub(in crate::cranelift_backend) fn recursive_position(&self) -> u32 {
+        self.self_resumption_steps
+            .last()
+            .expect("a validated inheritance has at least one self-resumption step")
+            .callee_binding
+            .recursive_position
+    }
+}
+
+impl CheckedIhFreshResultDestination {
+    pub(in crate::cranelift_backend) fn closure_environment_record(&self) -> AggregateOccurrenceId {
+        self.closure_environment_record
+    }
+}
+
 impl CheckedIhEnvironmentTransport {
     pub(in crate::cranelift_backend) fn source_owner(&self) -> ContinuationEmissionOwner {
         self.source_owner
@@ -339,6 +454,303 @@ impl<'plan> PlannedAggregateView<'plan> {
         self.record.declared_children
     }
 }
+/// Test-only, closure-free observation of one issued continuation-inheritance
+/// projection. Numeric origins are reports only; production selection never
+/// consumes this type.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CheckedIhContinuationInheritanceObservation {
+    pub source_specialization: u32,
+    pub source_call_identity: String,
+    pub source_result_origin: u32,
+    pub destination_specialization: u32,
+    pub destination_body_origin: u32,
+    pub active_frame_lineage: Vec<u32>,
+    pub destination_construct_origin: u32,
+    pub recursive_child_origin: u32,
+    pub selected_case_body_origin: u32,
+    pub active_frame_origin: u32,
+    pub recursive_position: u32,
+    pub invocation_origin: u32,
+    pub call_origin: u32,
+    pub callee_origin: u32,
+    pub ret_case_body_origin: u32,
+    pub closure_origin: u32,
+    pub capture_ordinal: u32,
+    pub capture_occurrence: u32,
+    pub closure_body_origin: u32,
+    pub body_capture_reads: Vec<u32>,
+    pub closure_parameter_count: usize,
+    pub fresh_destination_mentions_source_result: bool,
+    pub ordinary_non_governed_exclusion_count: usize,
+    pub descriptor_only_exclusion_count: usize,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static CONTINUATION_INHERITANCE_OBSERVATION_ACTIVE: Cell<bool> = const { Cell::new(false) };
+    static CONTINUATION_INHERITANCE_OBSERVATIONS:
+        RefCell<Vec<CheckedIhContinuationInheritanceObservation>> = const { RefCell::new(Vec::new()) };
+    static CONTINUATION_INHERITANCE_DESCRIPTOR_ONLY_EXCLUSIONS: Cell<usize> = const { Cell::new(0) };
+}
+
+/// Run one compile observation window. The predecessor remains behaviorally
+/// inert; this only exposes planner records to governed cross-crate controls.
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_continuation_inheritance_observations<T>(
+    f: impl FnOnce() -> T,
+) -> (T, Vec<CheckedIhContinuationInheritanceObservation>) {
+    CONTINUATION_INHERITANCE_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
+    CONTINUATION_INHERITANCE_DESCRIPTOR_ONLY_EXCLUSIONS.with(|count| count.set(0));
+    CONTINUATION_INHERITANCE_OBSERVATION_ACTIVE.with(|active| active.set(true));
+    let result = f();
+    CONTINUATION_INHERITANCE_OBSERVATION_ACTIVE.with(|active| active.set(false));
+    let observations = CONTINUATION_INHERITANCE_OBSERVATIONS
+        .with(|observations| std::mem::take(&mut *observations.borrow_mut()));
+    (result, observations)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn record_checked_ih_continuation_inheritances(
+    plan: &StaticTransitionPlan<'_>,
+    inheritances: &[CheckedIhContinuationInheritance],
+) {
+    if !CONTINUATION_INHERITANCE_OBSERVATION_ACTIVE.with(Cell::get) {
+        return;
+    }
+    let mut ordinary_non_governed = BTreeSet::new();
+    let calls = plan
+        .continuation_calls()
+        .expect("validated plan exposes continuation calls");
+    for inheritance in inheritances {
+        let final_step = inheritance
+            .capability
+            .self_resumption_steps
+            .last()
+            .expect("validated continuation inheritance has a final step");
+        for call in &calls {
+            if call.emission_owner() != inheritance.capability.destination_owner
+                || (call.continuation_origin() == final_step.callee_binding.frame_origin
+                    && call.recursive_position() == final_step.callee_binding.recursive_position)
+            {
+                continue;
+            }
+            let excluded = plan
+                .checked_ih_continuation_inheritance_for_invocation(
+                    &inheritance.transport.source_call_identity,
+                    inheritance.capability.destination_owner,
+                    None,
+                    call.continuation_origin(),
+                    call.recursive_position(),
+                )
+                .expect("validated exclusion accessor query");
+            if excluded.is_none() {
+                ordinary_non_governed.insert((
+                    format!("{:?}", inheritance.transport.source_call_identity),
+                    call.continuation_origin(),
+                    call.recursive_position(),
+                ));
+            }
+        }
+    }
+    let ordinary_non_governed_exclusion_count = ordinary_non_governed.len();
+    let descriptor_only_exclusion_count =
+        CONTINUATION_INHERITANCE_DESCRIPTOR_ONLY_EXCLUSIONS.with(Cell::get);
+    CONTINUATION_INHERITANCE_OBSERVATIONS.with(|observations| {
+        let mut observations = observations.borrow_mut();
+        for inheritance in inheritances {
+            let destination_specialization = match inheritance.capability.destination_owner {
+                ContinuationEmissionOwner::Specialization(id) => id.0,
+                ContinuationEmissionOwner::Predeclared(_)
+                | ContinuationEmissionOwner::Fusion(_) => continue,
+            };
+            let source_result_origin = inheritance.transport.source_result_origin.0;
+            let destination = &inheritance.fresh_result_destination;
+            let final_step = inheritance
+                .capability
+                .self_resumption_steps
+                .last()
+                .expect("validated continuation inheritance has a final step");
+            let mut destination_origins = vec![
+                destination.active_frame_origin.0,
+                destination.ret_case_body_origin.0,
+                destination.closure_origin.0,
+                destination.closure_body_origin.0,
+                destination.capture_occurrence.0,
+            ];
+            destination_origins
+                .extend(destination.body_capture_reads.iter().map(|origin| origin.0));
+            observations.push(CheckedIhContinuationInheritanceObservation {
+                source_specialization: inheritance.transport.source_specialization.0,
+                source_call_identity: format!("{:?}", inheritance.transport.source_call_identity),
+                source_result_origin,
+                destination_specialization,
+                destination_body_origin: inheritance.capability.destination_body_origin.0,
+                active_frame_lineage: inheritance
+                    .capability
+                    .self_resumption_steps
+                    .iter()
+                    .map(|step| step.active_frame_origin.0)
+                    .collect(),
+                destination_construct_origin: final_step.construct_origin.0,
+                recursive_child_origin: final_step.recursive_child_origin.0,
+                selected_case_body_origin: final_step.selected_case_body_origin.0,
+                active_frame_origin: final_step.callee_binding.frame_origin.0,
+                recursive_position: final_step.callee_binding.recursive_position,
+                invocation_origin: final_step.invocation_origin.0,
+                call_origin: final_step.call_origin.0,
+                callee_origin: final_step.callee_origin.0,
+                ret_case_body_origin: destination.ret_case_body_origin.0,
+                closure_origin: destination.closure_origin.0,
+                capture_ordinal: destination.capture_ordinal,
+                capture_occurrence: destination.capture_occurrence.0,
+                closure_body_origin: destination.closure_body_origin.0,
+                body_capture_reads: destination
+                    .body_capture_reads
+                    .iter()
+                    .map(|origin| origin.0)
+                    .collect(),
+                closure_parameter_count: destination.closure_parameter_count as usize,
+                fresh_destination_mentions_source_result: destination_origins
+                    .contains(&source_result_origin),
+                ordinary_non_governed_exclusion_count,
+                descriptor_only_exclusion_count,
+            });
+        }
+    });
+}
+
+/// Compile-preserving mutations for the continuation-inheritance validator.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckedIhContinuationInheritanceMutation {
+    Exact,
+    RemoveInheritedCapability,
+    DuplicateInheritedCapability,
+    SwapInheritedEndpoints,
+    BreakSelfResumptionStep,
+    ReclassifyRetChildAsIh,
+    SubstituteDescriptorOnlyAuthority,
+    SubstituteEarlierResult,
+    SwapReadWriteEndpoints,
+    /// Test-only inertness baseline: omit this otherwise validated planner-only
+    /// projection so emitted artifacts can be compared byte-for-byte.
+    SuppressForInertness,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static CONTINUATION_INHERITANCE_MUTATION:
+        Cell<CheckedIhContinuationInheritanceMutation> =
+            const { Cell::new(CheckedIhContinuationInheritanceMutation::Exact) };
+    static CAPTURED_CONTINUATION_INHERITANCE_ENDPOINT:
+        RefCell<Option<ContinuationCallIdentity>> = const { RefCell::new(None) };
+}
+
+/// Scope one validator mutation and restore exact production behavior even if
+/// the compile under test unwinds.
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_continuation_inheritance_mutation<T>(
+    mutation: CheckedIhContinuationInheritanceMutation,
+    f: impl FnOnce() -> T,
+) -> T {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CONTINUATION_INHERITANCE_MUTATION
+                .with(|active| active.set(CheckedIhContinuationInheritanceMutation::Exact));
+            CAPTURED_CONTINUATION_INHERITANCE_ENDPOINT
+                .with(|endpoint| endpoint.borrow_mut().take());
+        }
+    }
+    CONTINUATION_INHERITANCE_MUTATION.with(|active| active.set(mutation));
+    CAPTURED_CONTINUATION_INHERITANCE_ENDPOINT.with(|endpoint| endpoint.borrow_mut().take());
+    let _restore = Restore;
+    f()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn checked_ih_continuation_inheritance_mutation_is_exact() -> bool {
+    CONTINUATION_INHERITANCE_MUTATION.with(Cell::get)
+        == CheckedIhContinuationInheritanceMutation::Exact
+        && CAPTURED_CONTINUATION_INHERITANCE_ENDPOINT.with(|endpoint| endpoint.borrow().is_none())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn apply_checked_ih_continuation_inheritance_mutation(
+    inheritances: &mut Vec<CheckedIhContinuationInheritance>,
+) {
+    use CheckedIhContinuationInheritanceMutation as Mutation;
+    match CONTINUATION_INHERITANCE_MUTATION.with(Cell::get) {
+        Mutation::Exact => {}
+        Mutation::RemoveInheritedCapability => {
+            inheritances.pop();
+        }
+        Mutation::DuplicateInheritedCapability => {
+            if let Some(inheritance) = inheritances.last().cloned() {
+                inheritances.push(inheritance);
+            }
+        }
+        Mutation::SwapInheritedEndpoints => {
+            if inheritances.len() >= 2 {
+                let split = inheritances.len() - 1;
+                let (left, right) = inheritances.split_at_mut(split);
+                std::mem::swap(
+                    &mut left[split - 1].transport.source_call_identity,
+                    &mut right[0].transport.source_call_identity,
+                );
+            }
+        }
+        Mutation::BreakSelfResumptionStep => {
+            if let Some(inheritance) = inheritances
+                .iter_mut()
+                .rev()
+                .find(|inheritance| inheritance.capability.self_resumption_steps.len() >= 2)
+            {
+                let first = inheritance.capability.self_resumption_steps[0].recursive_child_origin;
+                inheritance.capability.self_resumption_steps[1].recursive_child_origin = first;
+            }
+        }
+        Mutation::ReclassifyRetChildAsIh => {
+            if let Some(inheritance) = inheritances.last_mut() {
+                let binding = inheritance
+                    .capability
+                    .self_resumption_steps
+                    .last()
+                    .expect("mutation requires one inherited step")
+                    .callee_binding;
+                inheritance.fresh_result_destination.constructor_child =
+                    CheckedBinderProvenance::InductionHypothesis(binding);
+            }
+        }
+        Mutation::SubstituteDescriptorOnlyAuthority => {
+            if let Some(inheritance) = inheritances.last_mut() {
+                inheritance.fresh_result_destination.constructor_child =
+                    CheckedBinderProvenance::Ordinary;
+            }
+        }
+        Mutation::SubstituteEarlierResult => {
+            if let Some(inheritance) = inheritances.last_mut() {
+                inheritance.fresh_result_destination.capture_occurrence =
+                    inheritance.transport.source_result_origin;
+            }
+        }
+        Mutation::SwapReadWriteEndpoints => {
+            if let Some(inheritance) = inheritances.last_mut() {
+                CAPTURED_CONTINUATION_INHERITANCE_ENDPOINT.with(|captured| {
+                    let mut captured = captured.borrow_mut();
+                    if let Some(read_endpoint) = captured.as_ref() {
+                        inheritance.transport.source_call_identity = read_endpoint.clone();
+                    } else {
+                        *captured = Some(inheritance.transport.source_call_identity.clone());
+                    }
+                });
+            }
+        }
+        Mutation::SuppressForInertness => inheritances.clear(),
+    }
+}
+
 /// The allocation lane the ruled lifetime meet selects for one aggregate.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) enum PlannedAggregateAllocation {
@@ -1702,6 +2114,55 @@ impl StaticTransitionPlan<'_> {
         Ok(Some(transport))
     }
 
+    /// Resolve one existing captured continuation capability at one exact
+    /// descendant checked invocation.
+    ///
+    /// The source call identity and the full descendant coordinate are the
+    /// key. `worker_body_origin` may refine that coordinate, but its absence
+    /// never authorizes a candidate or first match: ambiguity still refuses.
+    pub(in crate::cranelift_backend) fn checked_ih_continuation_inheritance_for_invocation(
+        &self,
+        source_call_identity: &ContinuationCallIdentity,
+        destination_owner: ContinuationEmissionOwner,
+        worker_body_origin: Option<StaticOriginId>,
+        continuation_origin: StaticOriginId,
+        recursive_position: u32,
+    ) -> Result<Option<CheckedIhContinuationInheritanceView<'_>>, CraneliftBackendError> {
+        let mut matched = self
+            .checked_ih_continuation_inheritances
+            .iter()
+            .filter(|inheritance| {
+                &inheritance.transport.source_call_identity == source_call_identity
+                    && inheritance.capability.destination_owner == destination_owner
+                    && worker_body_origin
+                        .is_none_or(|body| inheritance.capability.destination_body_origin == body)
+                    && inheritance
+                        .capability
+                        .self_resumption_steps
+                        .last()
+                        .is_some_and(|step| {
+                            step.callee_binding
+                                == (CheckedIhBinding {
+                                    frame_origin: continuation_origin,
+                                    recursive_position,
+                                })
+                        })
+            });
+        let Some(inheritance) = matched.next() else {
+            return Ok(None);
+        };
+        if matched.next().is_some() {
+            return Err(planner_error(
+                "one transport/call identity and descendant invocation coordinate resolve more than one continuation inheritance",
+            ));
+        }
+        Ok(Some(CheckedIhContinuationInheritanceView {
+            transport: &inheritance.transport,
+            capability: &inheritance.capability,
+            fresh_result_destination: &inheritance.fresh_result_destination,
+        }))
+    }
+
     pub(in crate::cranelift_backend) fn checked_ih_environment_transport_at(
         &self,
         destination_owner: ContinuationEmissionOwner,
@@ -2705,6 +3166,627 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
     if transports != build_checked_ih_environment_transports(plan)? {
         return Err(planner_error(
             "checked-IH environment transports are not the exact closed escape derivation",
+        ));
+    }
+    Ok(())
+}
+
+fn derive_active_resume_lineage(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+    target: StaticOriginId,
+    active_lineage: &[StaticOriginId],
+    found: &mut Vec<Vec<StaticOriginId>>,
+) -> Result<(), CraneliftBackendError> {
+    if origin == target {
+        found.push(active_lineage.to_vec());
+        return Ok(());
+    }
+    let expr = plan.planned_occurrence_expr(origin)?;
+    let children = plan.semantic.child_origins(origin)?.to_vec();
+    if let RuntimeExpr::ComputationalMatch { cases, .. } = expr {
+        let scrutinee = children
+            .first()
+            .copied()
+            .ok_or_else(|| planner_error("a computational frame has no forward scrutinee child"))?;
+        let mut nested = active_lineage.to_vec();
+        nested.push(origin);
+        derive_active_resume_lineage(plan, scrutinee, target, &nested, found)?;
+        if children.len() != cases.len() + 1 {
+            return Err(planner_error(
+                "a computational frame's forward child run disagrees with its cases",
+            ));
+        }
+        for body in children.iter().skip(1).copied() {
+            // The frame itself has been consumed before its selected body runs.
+            // A terminal value from that body resumes the already-active outer
+            // lineage, not the frame whose case is being evaluated.
+            derive_active_resume_lineage(plan, body, target, active_lineage, found)?;
+        }
+    } else {
+        for child in children {
+            derive_active_resume_lineage(plan, child, target, active_lineage, found)?;
+        }
+    }
+    Ok(())
+}
+
+fn exact_zero_argument_self_resumption(
+    plan: &StaticTransitionPlan<'_>,
+    case_body: StaticOriginId,
+    binding: CheckedIhBinding,
+    binder_provenance: &BTreeMap<StaticOriginId, CheckedBinderProvenance>,
+) -> Result<Option<(StaticOriginId, StaticOriginId, StaticOriginId)>, CraneliftBackendError> {
+    let mut pending = vec![case_body];
+    let mut found = Vec::new();
+    while let Some(origin) = pending.pop() {
+        if matches!(
+            plan.planned_occurrence_expr(origin)?,
+            RuntimeExpr::CheckedComputationalIHInvocation { .. }
+        ) {
+            let call_origin = plan.semantic.child_origin(origin, 0)?;
+            if let RuntimeExpr::Call { args, .. } = plan.planned_occurrence_expr(call_origin)? {
+                if args.is_empty() {
+                    let callee_origin = plan.semantic.child_origin(call_origin, 0)?;
+                    if binder_provenance.get(&callee_origin)
+                        == Some(&CheckedBinderProvenance::InductionHypothesis(binding))
+                    {
+                        found.push((origin, call_origin, callee_origin));
+                    }
+                }
+            }
+        }
+        pending.extend(plan.semantic.child_origins(origin)?.iter().rev().copied());
+    }
+    match found.as_slice() {
+        [] => Ok(None),
+        [one] => Ok(Some(*one)),
+        _ => Err(planner_error(
+            "one checked recursive case exposes the same zero-argument self-resumption more than once",
+        )),
+    }
+}
+
+fn next_self_resumption_construct(
+    plan: &StaticTransitionPlan<'_>,
+    case_body: StaticOriginId,
+    invocation_origin: StaticOriginId,
+    next_active_frame: StaticOriginId,
+    recursive_position: usize,
+) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+    let RuntimeExpr::ComputationalMatch { cases, .. } =
+        plan.planned_occurrence_expr(next_active_frame)?
+    else {
+        return Err(planner_error(
+            "a continuation-inheritance outer frame is not computational",
+        ));
+    };
+    let mut found = Vec::new();
+    let mut pending = vec![case_body];
+    while let Some(origin) = pending.pop() {
+        if let RuntimeExpr::Construct { args, .. } = plan.planned_occurrence_expr(origin)? {
+            if args.get(recursive_position).is_some()
+                && plan.semantic.child_origin(origin, recursive_position)? == invocation_origin
+            {
+                let constructor = plan.constructor_symbol_identity(origin)?;
+                let selects_recursive_case =
+                    cases
+                        .iter()
+                        .enumerate()
+                        .try_fold(false, |selected, (alternative, case)| {
+                            Ok::<_, CraneliftBackendError>(
+                                selected
+                                    || (case.recursive_positions.contains(&recursive_position)
+                                        && plan.case_constructor_identity(
+                                            next_active_frame,
+                                            alternative,
+                                        )? == constructor),
+                            )
+                        })?;
+                if selects_recursive_case {
+                    found.push(origin);
+                }
+            }
+        }
+        pending.extend(plan.semantic.child_origins(origin)?.iter().rev().copied());
+    }
+    match found.as_slice() {
+        [] => Ok(None),
+        [origin] => Ok(Some(*origin)),
+        _ => Err(planner_error(
+            "one self-resumption invocation feeds more than one constructor for the next active frame",
+        )),
+    }
+}
+
+fn fresh_result_destination(
+    plan: &StaticTransitionPlan<'_>,
+    active_frame: StaticOriginId,
+    binder_provenance: &BTreeMap<StaticOriginId, CheckedBinderProvenance>,
+) -> Result<Option<CheckedIhFreshResultDestination>, CraneliftBackendError> {
+    let RuntimeExpr::ComputationalMatch { cases, .. } =
+        plan.planned_occurrence_expr(active_frame)?
+    else {
+        return Err(planner_error(
+            "a continuation-inheritance active frame is not computational",
+        ));
+    };
+    let mut destinations = Vec::new();
+    for (alternative, case) in cases.iter().enumerate() {
+        // A recursive case binds induction hypotheses, not the ordinary fresh
+        // result accepted by Ret. We do not identify Ret by spelling or tag;
+        // the exact ordinary ConstructorChild -> lexical capture proof below is
+        // what distinguishes the destination.
+        if !case.recursive_positions.is_empty() {
+            continue;
+        }
+        let layout = CheckedCaseBinderLayout::for_case(case)?;
+        let case_body = plan.semantic.child_origin(active_frame, 1 + alternative)?;
+        let mut pending = vec![case_body];
+        while let Some(origin) = pending.pop() {
+            if matches!(
+                plan.planned_occurrence_expr(origin)?,
+                RuntimeExpr::LexicalClosure { .. }
+            ) {
+                if let Some(environment) = plan.predeclared_boundary_closure_environment(origin)? {
+                    if environment.params().len() != 1 {
+                        return Err(planner_error(
+                            "a fresh-result destination closure is not the distinct one-parameter ordinary operation",
+                        ));
+                    }
+                    for (capture_ordinal, capture_occurrence) in
+                        environment.capture_origins().iter().copied().enumerate()
+                    {
+                        let Some(
+                            provenance @ CheckedBinderProvenance::ConstructorChild {
+                                frame_origin,
+                                field_position,
+                            },
+                        ) = binder_provenance.get(&capture_occurrence).copied()
+                        else {
+                            continue;
+                        };
+                        if frame_origin != active_frame {
+                            continue;
+                        }
+                        let binder_index = layout
+                            .induction_hypotheses
+                            .len()
+                            .checked_add(field_position as usize)
+                            .ok_or_else(|| {
+                                planner_capacity_error(
+                                    "fresh-result constructor-child binder index exhausted",
+                                )
+                            })?;
+                        if layout.role_at(binder_index)
+                            != (CheckedCaseBinderRole::ConstructorChild { field_position })
+                        {
+                            return Err(planner_error(
+                                "a fresh-result capture's binder is not the exact ordinary ConstructorChild issued by the case layout",
+                            ));
+                        }
+                        let capture_ordinal = u32::try_from(capture_ordinal).map_err(|_| {
+                            planner_capacity_error("fresh-result lexical capture ordinal exhausted")
+                        })?;
+                        let mut body_capture_reads = binder_provenance
+                            .iter()
+                            .filter_map(|(read_origin, held)| {
+                                (*held
+                                    == CheckedBinderProvenance::LexicalClosureCapture {
+                                        closure_origin: origin,
+                                        capture_ordinal,
+                                        source_origin: capture_occurrence,
+                                    })
+                                .then_some(*read_origin)
+                            })
+                            .collect::<Vec<_>>();
+                        body_capture_reads.sort_unstable();
+                        if body_capture_reads.is_empty() {
+                            // A descriptor whose captured constructor child is
+                            // never read is the positive descriptor-only
+                            // exclusion, not a destination candidate.
+                            #[cfg(feature = "px8-ds-test-support")]
+                            if CONTINUATION_INHERITANCE_OBSERVATION_ACTIVE.with(Cell::get) {
+                                CONTINUATION_INHERITANCE_DESCRIPTOR_ONLY_EXCLUSIONS
+                                    .with(|count| count.set(count.get() + 1));
+                            }
+                            continue;
+                        }
+                        destinations.push(CheckedIhFreshResultDestination {
+                            active_frame_origin: active_frame,
+                            ret_case_body_origin: case_body,
+                            constructor_child: provenance,
+                            closure_environment_record: environment.record(),
+                            closure_origin: environment.seat(),
+                            closure_body_origin: environment.body_origin(),
+                            closure_parameter_count: u32::try_from(environment.params().len())
+                                .map_err(|_| {
+                                    planner_capacity_error(
+                                        "fresh-result closure parameter count exhausted",
+                                    )
+                                })?,
+                            capture_ordinal,
+                            capture_occurrence,
+                            body_capture_reads,
+                        });
+                    }
+                }
+            }
+            pending.extend(plan.semantic.child_origins(origin)?.iter().rev().copied());
+        }
+    }
+    match destinations.as_slice() {
+        [] => Ok(None),
+        [destination] => Ok(Some(destination.clone())),
+        _ => Err(planner_error(
+            "one inherited continuation invocation has more than one ordinary fresh-result capture destination",
+        )),
+    }
+}
+
+fn validate_fresh_result_disjointness(
+    transport: &CheckedIhEnvironmentTransport,
+    destination: &CheckedIhFreshResultDestination,
+) -> Result<(), CraneliftBackendError> {
+    let earlier_result = transport.source_result_origin;
+    let mut destination_origins = vec![
+        destination.active_frame_origin,
+        destination.ret_case_body_origin,
+        destination.closure_origin,
+        destination.closure_body_origin,
+        destination.capture_occurrence,
+    ];
+    destination_origins.extend(destination.body_capture_reads.iter().copied());
+    if destination_origins.contains(&earlier_result) {
+        return Err(planner_error(
+            "an earlier transport source result was substituted into the fresh-result destination",
+        ));
+    }
+    Ok(())
+}
+
+fn derive_checked_ih_continuation_inheritance(
+    plan: &StaticTransitionPlan<'_>,
+    transport: &CheckedIhEnvironmentTransport,
+    binder_provenance: &BTreeMap<StaticOriginId, CheckedBinderProvenance>,
+) -> Result<Option<CheckedIhContinuationInheritance>, CraneliftBackendError> {
+    let ContinuationEmissionOwner::Specialization(destination_specialization) =
+        transport.destination_owner
+    else {
+        return Ok(None);
+    };
+    let destination_unit = plan
+        .continuation_units()?
+        .into_iter()
+        .find(|unit| unit.id() == destination_specialization)
+        .ok_or_else(|| {
+            planner_error(
+                "a checked-IH transport destination owner has no continuation specialization",
+            )
+        })?;
+    if destination_unit.worker_body_origin() != transport.destination_body_origin {
+        return Err(planner_error(
+            "a checked-IH transport destination body disagrees with its specialization owner",
+        ));
+    }
+
+    let seed = [destination_unit.continuation_origin()];
+    let mut lineages = Vec::new();
+    derive_active_resume_lineage(
+        plan,
+        transport.destination_body_origin,
+        transport.destination_construct_origin,
+        &seed,
+        &mut lineages,
+    )?;
+    let [initial_active_lineage] = lineages.as_slice() else {
+        if lineages.is_empty() {
+            return Ok(None);
+        }
+        return Err(planner_error(
+            "one transport destination construct has more than one forward active-frame lineage",
+        ));
+    };
+    let recursive_position = usize::try_from(transport.recursive_position)
+        .map_err(|_| planner_capacity_error("checked-IH transport recursive position exhausted"))?;
+    let mut active_lineage = initial_active_lineage.clone();
+    let mut construct_origin = transport.destination_construct_origin;
+    let mut steps = Vec::new();
+    let bound = plan
+        .source_occurrences
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| planner_capacity_error("checked-IH inheritance depth exhausted"))?;
+
+    while steps.len() < bound {
+        let Some(active_frame) = active_lineage.last().copied() else {
+            return Ok(None);
+        };
+        let RuntimeExpr::Construct { args, .. } = plan.planned_occurrence_expr(construct_origin)?
+        else {
+            return Err(planner_error(
+                "a checked-IH inheritance step does not begin at a constructor",
+            ));
+        };
+        if args.get(recursive_position).is_none() {
+            return Err(planner_error(
+                "a checked-IH inheritance step has no declared recursive child",
+            ));
+        }
+        let recursive_child_origin = plan
+            .semantic
+            .child_origin(construct_origin, recursive_position)?;
+        if steps.is_empty() && recursive_child_origin != transport.seat {
+            return Err(planner_error(
+                "a checked-IH transport destination field no longer contains its exact captured continuation seat",
+            ));
+        }
+
+        let RuntimeExpr::ComputationalMatch { cases, .. } =
+            plan.planned_occurrence_expr(active_frame)?
+        else {
+            return Err(planner_error(
+                "a checked-IH inheritance step resumes a non-computational active frame",
+            ));
+        };
+        let constructor = plan.constructor_symbol_identity(construct_origin)?;
+        let mut selected = Vec::new();
+        for (alternative, case) in cases.iter().enumerate() {
+            if plan.case_constructor_identity(active_frame, alternative)? == constructor
+                && case.recursive_positions.contains(&recursive_position)
+            {
+                selected.push((alternative, case));
+            }
+        }
+        let [(alternative, _selected_case)] = selected.as_slice() else {
+            if selected.is_empty() {
+                return Ok(None);
+            }
+            return Err(planner_error(
+                "one inherited constructor selects more than one recursive active-frame case",
+            ));
+        };
+        let selected_case_body_origin =
+            plan.semantic.child_origin(active_frame, 1 + alternative)?;
+        let binding = CheckedIhBinding {
+            frame_origin: active_frame,
+            recursive_position: transport.recursive_position,
+        };
+        let Some((invocation_origin, call_origin, callee_origin)) =
+            exact_zero_argument_self_resumption(
+                plan,
+                selected_case_body_origin,
+                binding,
+                binder_provenance,
+            )?
+        else {
+            return Ok(None);
+        };
+        steps.push(CheckedIhSelfResumptionStep {
+            construct_origin,
+            active_frame_origin: active_frame,
+            recursive_child_origin,
+            selected_case_body_origin,
+            invocation_origin,
+            call_origin,
+            callee_origin,
+            callee_binding: binding,
+        });
+
+        if let Some(fresh_result_destination) =
+            fresh_result_destination(plan, active_frame, binder_provenance)?
+        {
+            validate_fresh_result_disjointness(transport, &fresh_result_destination)?;
+            return Ok(Some(CheckedIhContinuationInheritance {
+                transport: transport.clone(),
+                capability: CheckedIhCapabilityInheritance {
+                    destination_owner: transport.destination_owner,
+                    destination_body_origin: transport.destination_body_origin,
+                    self_resumption_steps: steps,
+                },
+                fresh_result_destination,
+            }));
+        }
+
+        active_lineage.pop();
+        let Some(next_active_frame) = active_lineage.last().copied() else {
+            return Ok(None);
+        };
+        let Some(next_construct) = next_self_resumption_construct(
+            plan,
+            selected_case_body_origin,
+            invocation_origin,
+            next_active_frame,
+            recursive_position,
+        )?
+        else {
+            return Ok(None);
+        };
+        construct_origin = next_construct;
+    }
+    Err(planner_error(
+        "checked-IH continuation inheritance exceeded the finite source-occurrence depth bound",
+    ))
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_ih_continuation_inheritances(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<CheckedIhContinuationInheritance>, CraneliftBackendError> {
+    let binder_provenance = build_checked_binder_provenance(plan)?;
+    let mut inheritances = Vec::new();
+    for transport in &plan.checked_ih_environment_transports {
+        if let Some(inheritance) =
+            derive_checked_ih_continuation_inheritance(plan, transport, &binder_provenance)?
+        {
+            inheritances.push(inheritance);
+        }
+    }
+    let mut keys = BTreeSet::new();
+    for inheritance in &inheritances {
+        let final_step = inheritance
+            .capability
+            .self_resumption_steps
+            .last()
+            .ok_or_else(|| {
+                planner_error("an inherited continuation capability has no self-resumption step")
+            })?;
+        let key = (
+            inheritance.transport.source_call_identity.clone(),
+            inheritance.capability.destination_owner,
+            inheritance.capability.destination_body_origin,
+            final_step.callee_binding,
+        );
+        if !keys.insert(key) {
+            return Err(planner_error(
+                "one inherited continuation capability was issued twice for the same descendant invocation",
+            ));
+        }
+    }
+    Ok(inheritances)
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn validate_checked_ih_continuation_inheritances(
+    plan: &StaticTransitionPlan<'_>,
+    inheritances: &[CheckedIhContinuationInheritance],
+) -> Result<(), CraneliftBackendError> {
+    #[cfg(feature = "px8-ds-test-support")]
+    if inheritances.is_empty()
+        && CONTINUATION_INHERITANCE_MUTATION.with(Cell::get)
+            == CheckedIhContinuationInheritanceMutation::SuppressForInertness
+    {
+        return Ok(());
+    }
+    let mut keys = BTreeSet::new();
+    for inheritance in inheritances {
+        if !plan
+            .checked_ih_environment_transports
+            .contains(&inheritance.transport)
+        {
+            return Err(planner_error(
+                "a continuation-inheritance projection does not reference one exact existing transport endpoint",
+            ));
+        }
+        validate_fresh_result_disjointness(
+            &inheritance.transport,
+            &inheritance.fresh_result_destination,
+        )?;
+        let [first_step, ..] = inheritance.capability.self_resumption_steps.as_slice() else {
+            return Err(planner_error(
+                "an inherited continuation capability has no self-resumption step",
+            ));
+        };
+        if first_step.construct_origin != inheritance.transport.destination_construct_origin
+            || first_step.recursive_child_origin != inheritance.transport.seat
+        {
+            return Err(planner_error(
+                "the first continuation-inheritance step is not the transport's exact destination field",
+            ));
+        }
+        for pair in inheritance.capability.self_resumption_steps.windows(2) {
+            if pair[1].recursive_child_origin != pair[0].invocation_origin {
+                return Err(planner_error(
+                    "one continuation-inheritance self-resumption step is disconnected from its predecessor invocation",
+                ));
+            }
+        }
+        for step in &inheritance.capability.self_resumption_steps {
+            if step.active_frame_origin != step.callee_binding.frame_origin
+                || step.callee_binding.recursive_position
+                    != inheritance.transport.recursive_position
+            {
+                return Err(planner_error(
+                    "one continuation-inheritance step disagrees with its exact checked invocation binding",
+                ));
+            }
+        }
+        let Some(final_step) = inheritance.capability.self_resumption_steps.last() else {
+            return Err(planner_error(
+                "an inherited continuation capability has no self-resumption step",
+            ));
+        };
+        let key = (
+            inheritance.transport.source_call_identity.clone(),
+            inheritance.capability.destination_owner,
+            inheritance.capability.destination_body_origin,
+            final_step.callee_binding,
+        );
+        if !keys.insert(key) {
+            return Err(planner_error(
+                "one inherited continuation capability was issued twice for the same descendant invocation",
+            ));
+        }
+        let last_frame = final_step.active_frame_origin;
+        if last_frame != final_step.callee_binding.frame_origin
+            || inheritance.fresh_result_destination.active_frame_origin != last_frame
+        {
+            return Err(planner_error(
+                "the inherited capability and fresh-result destination expose different active frames",
+            ));
+        }
+        for worker_body_origin in [None, Some(inheritance.capability.destination_body_origin)] {
+            let view = plan
+                .checked_ih_continuation_inheritance_for_invocation(
+                    &inheritance.transport.source_call_identity,
+                    inheritance.capability.destination_owner,
+                    worker_body_origin,
+                    final_step.callee_binding.frame_origin,
+                    final_step.callee_binding.recursive_position,
+                )?
+                .ok_or_else(|| {
+                    planner_error(
+                        "an issued continuation inheritance is absent from its own exact accessor",
+                    )
+                })?;
+            if view.transport() != &inheritance.transport
+                || view.capability() != &inheritance.capability
+                || view.fresh_result_destination() != &inheritance.fresh_result_destination
+            {
+                return Err(planner_error(
+                    "the continuation-inheritance accessor returned a different split proof",
+                ));
+            }
+        }
+        let destination_environment = plan.boundary_closure_environment_by_record(
+            inheritance
+                .fresh_result_destination
+                .closure_environment_record(),
+        )?;
+        let destination_capture = destination_environment
+            .capture_origins()
+            .get(inheritance.fresh_result_destination.capture_ordinal as usize)
+            .copied();
+        if destination_environment.seat() != inheritance.fresh_result_destination.closure_origin
+            || destination_environment.body_origin()
+                != inheritance.fresh_result_destination.closure_body_origin
+            || u32::try_from(destination_environment.params().len()).ok()
+                != Some(inheritance.fresh_result_destination.closure_parameter_count)
+            || destination_capture != Some(inheritance.fresh_result_destination.capture_occurrence)
+        {
+            return Err(planner_error(
+                "the fresh-result destination does not reference its exact existing boundary-closure environment record",
+            ));
+        }
+        match inheritance.fresh_result_destination.constructor_child {
+            CheckedBinderProvenance::ConstructorChild { frame_origin, .. }
+                if frame_origin == last_frame => {}
+            CheckedBinderProvenance::InductionHypothesis(_) => {
+                return Err(planner_error(
+                    "the ordinary Ret constructor child was reclassified as an induction hypothesis",
+                ));
+            }
+            CheckedBinderProvenance::ConstructorChild { .. }
+            | CheckedBinderProvenance::LexicalClosureParameter { .. }
+            | CheckedBinderProvenance::LexicalClosureCapture { .. }
+            | CheckedBinderProvenance::Ordinary => {
+                return Err(planner_error(
+                    "a descriptor-only closure was substituted for the proven ordinary Ret ConstructorChild destination",
+                ));
+            }
+        }
+    }
+    if inheritances != build_checked_ih_continuation_inheritances(plan)? {
+        return Err(planner_error(
+            "checked-IH continuation inheritances are not the exact closed forward derivation",
         ));
     }
     Ok(())

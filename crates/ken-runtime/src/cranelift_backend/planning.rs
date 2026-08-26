@@ -14,7 +14,13 @@ use crate::{RuntimeDeclaration, RuntimeDeclarationKind, RuntimeExpr, RuntimeProg
 mod static_transition;
 
 #[cfg(feature = "px8-ds-test-support")]
-pub use static_transition::{with_worker_prefix_deferrals, WorkerPrefixDeferral};
+pub use static_transition::{
+    checked_ih_continuation_inheritance_mutation_is_exact,
+    with_checked_ih_continuation_inheritance_mutation,
+    with_checked_ih_continuation_inheritance_observations, with_worker_prefix_deferrals,
+    CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
+    WorkerPrefixDeferral,
+};
 
 pub(super) use static_transition::build_static_continuation_fusion_plan;
 /// Fixture re-export so the lowering-side reconcile controls can plan a real
@@ -70,8 +76,9 @@ pub(super) use static_transition::{
 // `RT-DECL-CLOSURE-PORT` `D7` — the aggregate ownership lane, read by the
 // carrier producers. Namespace re-export only.
 pub(super) use static_transition::{
-    AggregateOccurrenceId, BoundaryClosureEnvironment, CheckedIhEnvironmentTransport,
-    CheckedIhTransportInputDestination,
+    AggregateOccurrenceId, BoundaryClosureEnvironment, CheckedIhCapabilityInheritance,
+    CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
+    CheckedIhFreshResultDestination, CheckedIhTransportInputDestination,
     FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape, PlannedAggregateOwnership,
     PlannedReferentLifetime, SynthesizedAggregateNode, SynthesizedAggregatePath,
     SynthesizedAggregateRoot,

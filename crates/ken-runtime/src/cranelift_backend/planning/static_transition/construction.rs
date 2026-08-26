@@ -29,6 +29,11 @@ use super::abi::{
     build_abi_plane, install_continuation_context_abi, install_continuation_specialization_abi,
     AbiPlane, AbiRootIngress,
 };
+#[cfg(feature = "px8-ds-test-support")]
+use super::aggregates::{
+    apply_checked_ih_continuation_inheritance_mutation,
+    record_checked_ih_continuation_inheritances,
+};
 #[cfg(test)]
 #[allow(unused_imports)]
 use super::aggregates::{
@@ -38,8 +43,9 @@ use super::aggregates::{
 };
 #[allow(unused_imports)]
 use super::aggregates::{
-    build_aggregate_ownership_plan, build_checked_ih_environment_transports,
-    lifetime_referent_affinity, validate_aggregate_ownership_plan,
+    build_aggregate_ownership_plan, build_checked_ih_continuation_inheritances,
+    build_checked_ih_environment_transports, lifetime_referent_affinity,
+    validate_aggregate_ownership_plan, validate_checked_ih_continuation_inheritances,
     validate_checked_ih_environment_transports, AggregateOccurrenceId, AggregateOccurrenceProducer,
     PlannedAggregateAllocation, PlannedAggregateOwnership, PlannedAggregateShape,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,
@@ -271,6 +277,7 @@ impl<'src> Planner<'src> {
                 case_emissions: Vec::new(),
                 aggregate_ownership: Vec::new(),
                 checked_ih_environment_transports: Vec::new(),
+                checked_ih_continuation_inheritances: Vec::new(),
                 host_effect_seats: Vec::new(),
                 occurrence_authorities: Vec::new(),
                 continuation_specializations: Vec::new(),
@@ -1222,6 +1229,21 @@ impl<'src> Planner<'src> {
             &self.plan,
             &self.plan.checked_ih_environment_transports,
         )?;
+        self.plan.checked_ih_continuation_inheritances =
+            build_checked_ih_continuation_inheritances(&self.plan)?;
+        #[cfg(feature = "px8-ds-test-support")]
+        apply_checked_ih_continuation_inheritance_mutation(
+            &mut self.plan.checked_ih_continuation_inheritances,
+        );
+        validate_checked_ih_continuation_inheritances(
+            &self.plan,
+            &self.plan.checked_ih_continuation_inheritances,
+        )?;
+        #[cfg(feature = "px8-ds-test-support")]
+        record_checked_ih_continuation_inheritances(
+            &self.plan,
+            &self.plan.checked_ih_continuation_inheritances,
+        );
         // ⛔ After `join_results` for the same reason the ownership plan is: a
         // seat's consumer phase is a fact about the child's planned result
         // representation, which does not exist until that line.
