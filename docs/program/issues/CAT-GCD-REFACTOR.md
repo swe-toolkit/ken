@@ -1,7 +1,7 @@
 ---
 id: CAT-GCD-REFACTOR
 title: "Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last)"
-status: draft
+status: active
 owner: foundation
 size: S
 gate: none
