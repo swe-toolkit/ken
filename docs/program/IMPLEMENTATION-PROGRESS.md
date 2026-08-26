@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-26 22:10:26Z — from 460 issue file(s) in `docs/program/issues/`.
+2026-08-26 22:29:21Z — from 461 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -61,6 +61,7 @@ the committed file matches the generator's output.
 | `CAT-DEQUE` | Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-GCD-REFACTOR` | Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last) | merged | foundation | S | none | — |
 | `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | merged | foundation | M | none | — |
+| `CAT-NAT-REUSE-CONSUMERS` | Catalog-reuse rework, first scoped batch: the nine unblocked low-risk Nat arithmetic/order consumer duplicates from the census (groups 2 and 3), across six packages — each package imports add/leq_nat/sub/min from its canonical owner and drops the local reimplementation, one independently-releasable increment per package | ready | foundation | M | none | — |
 | `CAT-ORD-NAT-CANONICAL-OWNER` | Migrate the canonical Ord Nat component to its defined-at home — move leq_nat (with refl/trans/antisym), total_leq_nat, the bool_or::eq_true_of_or bridge, and the sole instance Ord Nat from Data/Numeric/Nat/Order into Core/Classes/LawfulClasses, and make Order a reader-facing facade that imports and re-exports the LawfulClasses Ord surface. The atomic two-package ownership migration that resolves the OrphanInstance blocking CAT-ORDER-PUB-EXPORT. | merged | foundation | M | none | — |
 | `CAT-ORDER-PUB-EXPORT` | Bring catalog Data/Numeric/Nat/Order.ken.md to the pub-export standard — mark its declared exported operations (leq_nat, sub, min, max, compare) pub so packages can selectively import them, matching the already-compliant Arithmetic.ken.md; verify standalone elaboration and cross-package import resolution. The catalog-reuse prerequisite that unblocks CAT-GCD-REFACTOR. | merged | foundation | S | none | — |
 | `CAT-REUSE-CENSUS` | Catalog-reuse modernization census — a catalog-wide, source-editing-free inventory that sizes the rework campaign: per catalog package, enumerate (a) definitions now redundant with the expanded prelude, (b) tools reimplemented locally that a sibling module now pub-exports, (c) bottom-up file arrangement, each item risk-tagged (low computational-dup / higher proof-scaffolding). The census that scopes the per-package rework WPs; makes no source edits and closes nothing. | merged | foundation | M | none | — |
@@ -505,6 +506,7 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `ABI-M1` — manifest v2 — family-scoped, versioned, generated from family schemas
+- `CAT-NAT-REUSE-CONSUMERS` — Catalog-reuse rework, first scoped batch: the nine unblocked low-risk Nat arithmetic/order consumer duplicates from the census (groups 2 and 3), across six packages — each package imports add/leq_nat/sub/min from its canonical owner and drops the local reimplementation, one independently-releasable increment per package
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
