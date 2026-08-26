@@ -11,27 +11,47 @@ github: null
 origin: "Operator directive 2026-08-22, after CAT-GCD merged (3283528c4): Gcd.ken.md redundantly reimplements generic Nat tools that already exist in the catalog, and is arranged bottom-up. This is a well-factoring / arrangement follow-up, not a soundness re-open — CAT-GCD stays closed. Steward-filed. Held until the foundation ring is reseated to pi (see reseat directive) so the standard's first application runs on the new seating."
 ---
 
-> # AC-ARRANGE HARD STOP RULED 2026-08-26 — option (A), literate exposition (Steward)
+> # AC-ARRANGE HARD STOP RULED 2026-08-26 — Architect carrier-first / headline-first-function layout (literal AC-ARRANGE PRESERVED)
 >
-> foundation-leader HS (evt_5712j1pm9h01): D0 confirmed the reuse/import premise
-> but falsified the LITERAL AC-ARRANGE at the checked catalog loader boundary —
-> `divides_gcd` before its carrier fails on `Algorithm.Numeric.Gcd.Divides`; the
-> carrier first then fails on later `gcd_spec_greatest`. The checked loader
-> requires dependency-ordered declarations; a literal "headline declaration
-> first" is unsatisfiable.
+> foundation-leader HS (evt_5712j1pm9h01): D0 confirmed the reuse/import premise.
+> The implementer measured that `divides_gcd` before its `Divides` carrier fails
+> (`UnresolvedCon Algorithm.Numeric.Gcd.Divides`), and moving only that carrier
+> then fails on later `gcd_spec_greatest`. The A/B fork offered: (A) weaken
+> AC-ARRANGE to prose-only literate exposition, or (B) a loader-prerequisite WP.
 >
-> RULING (Steward — a scope/AC-wording call, not soundness: gcd semantics and
-> `trusted_base` unchanged): option (A). AC-ARRANGE is satisfied by top-down
-> LITERATE EXPOSITION — the `.ken.md` leads with the headline contract in prose,
-> the checked declarations stay dependency-ordered. The literal declaration-order
-> reading is withdrawn as an ungrounded constraint (it fought the loader for an
-> aesthetic the literate format already delivers). Option (B) — a
-> forward-reference / loader-capability prerequisite WP — is REJECTED: there is no
-> capability gap; "headline first" is expressible now. AC-ARRANGE is amended below
-> accordingly. No loader repair, no proof duplication, no semantic change. One
-> confirming gate: foundation-qa/CV verify the resumed candidate against the
-> amended AC-ARRANGE + AC-REUSE + AC-LAWS. Architect notified-and-may-flag if it
-> sees a soundness dimension; the ring resumes on this ruling.
+> SUPERSEDED. My interim ruling picked (A). The Architect then supplied a grounded
+> mechanism-fidelity ruling (evt_1qew47n3zr0bc) that FALSIFIES the premise behind
+> (A): literal AC-ARRANGE IS expressible on current `origin/main`, without
+> weakening it to prose and without a loader prerequisite. The loader's SCC
+> dependency ordering applies to one maximal run of function/proof declarations; a
+> `data` declaration breaks that run — which is why moving only `Divides` exposed
+> the next carrier break, NOT proof that top-down function order is impossible.
+>
+> OPERATIVE RULING (Architect, mechanism-fidelity — component/mechanism is the
+> Architect's call; Steward reconciles the AC to it, evt below): the literal
+> AC-ARRANGE stands. Achieve it with this exact shape —
+> 1. imports;
+> 2. the dependency-ordered carrier `data` declarations `Divides`, `BoolView`,
+>    then `GcdSpec`;
+> 3. `divides_gcd` as the FIRST function in the following uninterrupted
+>    function/proof run;
+> 4. every implementation helper and proof function after it, with no later `data`
+>    declaration splitting that run.
+>
+> This puts the headline operation before every low-level helper (literal
+> AC-ARRANGE) while the loader still sees carriers before their use. The Architect
+> independently executed this transformation (including the four ruled imports and
+> local-duplicate removal) in a disposable exact-base worktree and passed a
+> roots-loader probe (`elaborate_module_from_roots([catalog_root],
+> "Algorithm.Numeric.Gcd")`, 1 passed). Option (B) stays REJECTED (no capability
+> gap). No loader repair, no proof duplication, no semantic change; `trusted_base`
+> unchanged. One confirming gate: foundation-qa/CV verify the candidate against
+> the (literal) AC-ARRANGE below + AC-REUSE + AC-LAWS. The ring resumed on this
+> ruling and reported fresh D0 green on the exact layout (evt_4k24efhx3gzn5).
+>
+> Steward reconciliation (evt_qz3r769mmcrz handback): this doc-only supersedes the
+> prior prose-only amendment; the literal reading is RESTORED as operative. AC
+> body below re-states the literal layout accordingly.
 >
 > # BLOCKED on BOTH Order successors 2026-08-26 (Architect split evt_6f4h4mhejp4bm)
 >
@@ -126,18 +146,18 @@ and arrangement**, which no soundness gate checks:
   WPs") reports zero local definitions in `Gcd.ken.md` shadowing a public export
   of an existing catalog module (or each surviving one carries a one-line
   distinct-tool justification the Architect accepts).
-- **AC-ARRANGE.** The module reads top-down as LITERATE EXPOSITION: it LEADS with
-  the headline contract (`divides_gcd` / the gcd law) — stated and motivated
-  first in the `.ken.md` prose — and the canonical checked declarations then
-  follow in the dependency order the checked catalog loader requires (each
-  definition after the carriers it uses; e.g. `Divides` before `divides_gcd`,
-  `gcd_spec_greatest` in its lawful place). "Top-down" is the reader's exposition
-  order, NOT the checked-declaration order; the literate format carries both. A
-  reader meets the point of the module before the plumbing while the loader still
-  sees dependency-ordered declarations. (Amended 2026-08-26 per the HS ruling
-  below: the literal "the headline declaration appears before its carriers"
-  reading is WITHDRAWN — it fought the checked loader's real dependency-order
-  requirement, which is not this AC's target.)
+- **AC-ARRANGE.** The module is arranged top-down with the headline operation
+  before every low-level helper, in this exact loader-valid shape (Architect
+  ruling evt_1qew47n3zr0bc): (1) imports; (2) the dependency-ordered carrier
+  `data` declarations `Divides`, `BoolView`, then `GcdSpec`; (3) `divides_gcd` as
+  the FIRST function in the following uninterrupted function/proof run; (4) every
+  implementation helper and proof function after it, with no later `data`
+  declaration splitting that run. The vocabulary carriers precede their use (so
+  the checked loader's SCC ordering is satisfied) while the reader meets the
+  headline `divides_gcd` before any low-level helper. This is the LITERAL
+  AC-ARRANGE, verified at the real qualified roots-loader boundary — not a
+  prose-only weakening. (The 2026-08-26 interim prose-only amendment is SUPERSEDED
+  by this ruling; see the banner above.)
 - **AC-LAWS.** The gcd divisibility laws still hold — the CAT-GCD acceptance
   oracle stays green (trusted_base delta unchanged, laws instantiated). This is a
   behavior-preserving refactor.
