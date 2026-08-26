@@ -1,7 +1,7 @@
 ---
 id: RT-RESULT-CONTINUATION-BINDING-PROVENANCE
 title: "RT-ITREE D2 successor — after D1's route repair advances the admitted programs to a later fail-closed boundary, the expected ResourceBodyResult is ABSENT from the entire eight-entry receiving environment (EnvironmentHasNoReceivingIdentity, read id 36 / write id 37). Localize the missing authority in the producer-to-binding chain that should place the continuation's ResourceBodyResult into environment slot 1 after the checked ITree Ret route, then repair it so the read/write programs green InvalidOffset. Localization FIRST (object read), repair gated on the object ruling."
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,16 @@ github: null
 origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE. D1's two-parameter route transport is independently landable and advances the admitted programs MONOTONICALLY to a later natural fail-closed boundary: at production-only cc7dc7c02 read terminates at planned identity 36 / ResourceBodyResult (origin 451), write at 37 (origin 464), no bypass; the ordinary RuntimeExpr::Match reads env slot 1 (Var(1)) and the expected ResourceBodyResult is absent from the whole eight-entry receiving environment (EnvironmentHasNoReceivingIdentity). Hard-stop count 2. Steward-owned split per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) move here from RT-ITREE."
 ---
 
+> # UNBLOCKED 2026-08-26 — D1 route slice landed at origin/main `21d62130`
+>
+> The blocking [[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]] D1 route-transport
+> slice landed (PR #2948), so the `ResourceBodyResult` continuation-binding
+> boundary is now reachable and this node flips `draft` -> `ready`. Held
+> evidence stays frozen and NOT promoted: production-only `cc7dc7c02` and
+> instrumentation `e701eaeb9`. This is D2 in the RT-ITREE object-read
+> discipline — localization FIRST (return the object, then HARD-STOP for the
+> Architect ruling); NO repair site before that ruling.
+>
 > # FRESH D2 SUCCESSOR 2026-08-26 — RT-ITREE hard-stop-2 split (Architect evt_5w03f4zbg02ry)
 >
 > The D2 half of the split. [[RT-ITREE-DEFAULT-SELECTION-PROVENANCE]] keeps
