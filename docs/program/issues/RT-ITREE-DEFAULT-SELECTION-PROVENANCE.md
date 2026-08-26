@@ -11,6 +11,29 @@ github: null
 origin: "Steward, 2026-08-25, from the Architect AC-5 ruling (evt_3rq4xafrf7cqf, thr_6gmh4p1m0gch4) on runtime WIP 7094c29cd. Preserving the root generated-unit failure's planned trap identity (RT-UNIT-FAILURE-STATUS-PROVENANCE) exposed a DISTINCT downstream producer: the checked ITree-elimination default is selected for an admitted program. The Architect ruled AC-5 valid and directed this be framed as its own object (explicitly NOT the prohibited -3-vs-4 'third node'; it is a different producer requiring its own object read). Steward framing call per COORDINATION section 2."
 ---
 
+> # D0b AMENDMENT 2026-08-26 — D0 hard stop 1 (Architect object ruling evt_ts40fq959fvx)
+>
+> D0 evidence `49a7aff4999f3f6f64a9b5df790bc27da87183b7` (tree `f96ce855`, base
+> `0253dd0f6`, four-path `+119/-2`) is ACCEPTED as PARTIAL: it localizes the
+> terminal-producing outer carried `ComputationalMatch` to graph occurrence `301`
+> (read) / `314` (write), owned by `main` at source path `[0,1,1,0,0,2,1,0,0]`,
+> checked frame 1, invocation 0; forcing only 301/314 changes the terminal, forcing
+> neighbors does not; NO repair site selected. It does NOT establish that the
+> observed `ResourceBodyResult` default is a second natural product defect — that
+> default appears only AFTER `KEN_RT_ITREE_D0_FORCE_ORIGIN` makes an origin-keyed
+> bypass of the predecessor-route authority (`eliminator.answer_route ==
+> CheckedSelectedRecursor` weakened to "checked OR this origin named"). A failure
+> downstream of an artificial bypass is probe aftermath until the bypass's semantic
+> authority is established.
+>
+> Therefore: NO D1 and NO ResourceBodyResult repair node. Runtime Leader HOLDS at
+> `49a7aff49`; resumes D0b ONLY after this amendment; returns the next object read.
+> Hard-stop count 1 (no Research trigger). Identities 36/37 and populations read
+> `451/661`, write `464/675/887` are retained as probe-aftermath evidence ONLY
+> (value-deduplicated; none localizes an occurrence; no family-specific repair
+> authorized). Symptom entry 1 folded below (was Architect one-file commit
+> `bdbd82c1`). D0b requirements are the Deliverables/AC-D0b-* below.
+>
 > # RE-RELEASED 2026-08-26 — erratum preemption RETRACTED (Architect hard stop evt_sj7wr86hw1w4)
 >
 > The RT-UNIT-FAILURE "LIVE regression" that preempted this node is RETRACTED. The
@@ -66,6 +89,15 @@ origin: "Steward, 2026-08-25, from the Architect AC-5 ruling (evt_3rq4xafrf7cqf,
 > first) and must not co-run with it. This node greens the SemanticErrorV1 witness
 > that RT-UNIT-FAILURE-STATUS-PROVENANCE deliberately leaves red.
 
+## Symptom inventory
+
+Append one line per hard stop; never rewrite history.
+
+1. Forcing the localized outer ITree carried match through an origin-only
+   checked-return bypass progresses into value-deduplicated `ResourceBodyResult`
+   defaults instead of `InvalidOffset` — keyed on an artificial predecessor-route
+   bypass, not a planner-authorized route.
+
 ## Layer and first authority (Architect ruling — read before framing a repair)
 
 - The failure is an ITree-elimination default SELECTION for an admitted program.
@@ -110,20 +142,47 @@ error-text, first-failure, numeric-origin, body-shape, or family-name authority.
 
 ## Deliverables (occurrence localization FIRST; repair only after)
 
-- D0 — on the exact read-offset and write-offset full programs, record the
-  runtime-taken default occurrence by graph-derived `StaticOriginId` / source path
-  and owning declaration — NOT by trap value or family spelling. At that same
-  emitted branch, record match kind, checked frame/invocation identities,
-  `SourceComputationalAnswerRoute`, actual carried class/tag/field-count, and the
-  planner-issued case identities. Count the COMPLETE candidate population before
-  selecting a repair site. Prove a positive neighboring ITree case takes its
-  ordinary/checked-return case and NOT the default; prove a natural route/identity
-  mutation makes the exact full-program occurrence take the default while the
-  instrument still identifies THAT occurrence. If D0 exposes yet another distinct
-  authority, HARD-STOP and return the object read (do not repair).
-- D1 — only after the occurrence and first differing authority are known, repair
-  the graph/claim route so the synthesized `Err InvalidOffset` continues through
-  the checked ITree/result path. The erasure fail-closed default remains intact.
+- D0 (DONE, PARTIAL — Architect object ruling evt_ts40fq959fvx) — evidence
+  `49a7aff49` localizes the runtime-taken outer carried `ComputationalMatch` to
+  read `301` / write `314` (owner `main`, source path `[0,1,1,0,0,2,1,0,0]`,
+  checked frame 1, invocation 0) with occurrence-specific influence isolation
+  (forcing only 301/314 changes the terminal; neighbors do not). No repair site
+  selected. The `ResourceBodyResult` default observed under the origin-force probe
+  is NOT yet a second natural defect (probe aftermath — see D0b).
+- D0b (NEXT — predecessor-route and recursor-layer disposition; kept in THIS node,
+  not a family-specific successor) — for read `301` and write `314`, bind ALL of
+  the following from graph/claim provenance, NONE inferred from occurrence, family,
+  message, or numeric origin:
+  1. The exact `ComputationalRecursorLayer` that supplied the frame: `role`
+     (`SelectsOccurrence` vs `ExitsScope`), `semantic_pending`, checked frame +
+     invocation identity/source/depth, producer origin, and — for an exit layer —
+     scope origin plus parent scope.
+  2. The exact predecessor `RoutedAnswer`: its `route`, independent
+     `EliminatorRole`, and the producer that minted those fields. Record the frame
+     field and the result of `RoutedAnswer::raise` SEPARATELY.
+  3. The actual runtime carrier at the taken outer default: `BoundaryClass`, exact
+     typed `ConstructorIdentity` OR a fail-closed "not in the artifact's closed
+     constructor authority", and field count. A compile-time `Value`/SSA handle is
+     NOT this measurement. A test-only observation may transport the planner/graph-
+     derived origin and typed identity but must add no production API, second
+     identity catalog, error-text authority, or family-name dispatch.
+  4. The receiving ITree case identities and the predecessor's planner-authored
+     answer interface. Classify the mismatch BEFORE choosing a repair: (a) ordinary
+     ITree constructor with wrong identity transport; (b) checked answer whose exact
+     producer route was dropped; or (c) an answer already past one computational
+     frame presented to the wrong selection/unwind layer.
+  5. One positive control using the same producer/consumer mechanism where the
+     planner-authorized predecessor takes its ordinary/checked-return route
+     successfully. The natural mutation must act at the REAL route/role producer;
+     `KEN_RT_ITREE_D0_FORCE_ORIGIN` is an isolation probe ONLY and cannot discharge
+     the route-authority mutation.
+  Return another object read after D0b. ONLY if it proves the origin bypass was
+  semantically authorized AND a natural full-program path still reaches a localized
+  `ResourceBodyResult` default does that occurrence become the next object.
+- D1 — only after D0b identifies the occurrence AND the first differing graph/claim
+  authority, repair the graph/claim route so the synthesized `Err InvalidOffset`
+  continues through the checked ITree/result path. The erasure fail-closed default
+  remains intact. NO D1 until D0b binds that authority.
 
 ## Acceptance criteria
 
@@ -141,6 +200,32 @@ error-text, first-failure, numeric-origin, body-shape, or family-name authority.
 - AC-5 — SUCCESS is the original exact `InvalidOffset` SemanticErrorV1 observation
   with the same no-`FsReadAt` prefix on BOTH the read-offset and write-offset full
   programs — not merely the absence of the trap.
+- AC-D0b-1 — the supplying `ComputationalRecursorLayer` for read `301` and write
+  `314` is bound from provenance (role `SelectsOccurrence`/`ExitsScope`,
+  `semantic_pending`, checked frame + invocation identity/source/depth, producer
+  origin; exit-layer scope + parent scope), NOT inferred from
+  occurrence/family/message/numeric origin.
+- AC-D0b-2 — the predecessor `RoutedAnswer` is bound (route, independent
+  `EliminatorRole`, minting producer), with the frame field and the
+  `RoutedAnswer::raise` result recorded SEPARATELY.
+- AC-D0b-3 — the actual runtime carrier at the taken outer default is measured as
+  `BoundaryClass` + typed `ConstructorIdentity` (or fail-closed "not in the closed
+  constructor authority") + field count — NOT a compile-time `Value`/SSA handle;
+  the test-only observation adds no production API, second catalog, error-text, or
+  family-name dispatch.
+- AC-D0b-4 — the receiving ITree case identities and the predecessor's
+  planner-authored answer interface are recorded, and the mismatch is classified as
+  exactly one of (a)/(b)/(c) BEFORE any repair site is named.
+- AC-D0b-5 — a positive control at the real route/role producer shows the
+  planner-authorized predecessor taking its ordinary/checked-return route;
+  `KEN_RT_ITREE_D0_FORCE_ORIGIN` does NOT stand in for this route-authority
+  mutation.
+- AC-D0b-SCOPE — `erasure.rs:2740-2744` byte-identical; no third
+  `RoutedAnswer::checked` caller; no reclassification of checked frames; no keying
+  on `ITree`/`ResourceBodyResult`; trap identities 36/37/40/43 are NOT occurrence
+  authority; the forced-route chain is NOT continued by bypassing
+  `ResourceBodyResult` cases one at a time; `KEN_RT_ITREE_D0_FORCE_ORIGIN` remains
+  an isolation probe.
 - AC-NO-REGRESSION — whole-suite green in CI; local targeted `-p ken-runtime` /
   `-p ken-cli` / `-p ken-verify` only, never `--workspace`.
 
