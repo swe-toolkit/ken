@@ -11,6 +11,31 @@ github: null
 origin: "Steward, 2026-08-25, from the Architect AC-5 ruling (evt_3rq4xafrf7cqf, thr_6gmh4p1m0gch4) on runtime WIP 7094c29cd. Preserving the root generated-unit failure's planned trap identity (RT-UNIT-FAILURE-STATUS-PROVENANCE) exposed a DISTINCT downstream producer: the checked ITree-elimination default is selected for an admitted program. The Architect ruled AC-5 valid and directed this be framed as its own object (explicitly NOT the prohibited -3-vs-4 'third node'; it is a different producer requiring its own object read). Steward framing call per COORDINATION section 2."
 ---
 
+> # D1 AUTHORIZED 2026-08-26 — D0b object ruling (Architect evt_4eazg432n8xb8): class (b) bound
+>
+> D0b object `3b4a6a087a3643c3bd0931fe79b46ce0f834e5f5` (tree `a157394c`, base
+> `6d1753454`, 11 crate paths, empty current-main intersection) is ACCEPTED and
+> binds classification **(b): a checked answer whose exact producer route was
+> dropped**. The first repair authority is the active-self-resumption header
+> transport: `lowering/core.rs:12394-12435` finds the active elimination by origin
+> and jumps with only `scrutinee.word` into the header `:12437-12460` created for
+> the INITIAL direct arrival, and `:13001-13004` chooses the fallback from the
+> lexically captured initial route — so the checked recursive edge is joined into a
+> body compiled under the initial DIRECT route. NOT (a) (the reentry carrier is
+> `Constructor` outside the receiving authority, 8 read / 7 write fields — a checked
+> answer, not a malformed ordinary ITree constructor) and NOT (c) (the selected
+> layer is `SelectsOccurrence` and authorizes `CheckedSelectedRecursor`).
+>
+> D1 is AUTHORIZED at that transport, subject to the fail-able ACs below (AC-D1-*).
+> Runtime Leader HOLDS `3b4a6a087` as evidence and starts a FRESH MINIMAL D1 from
+> then-current `origin/main` ONLY after this amendment — do NOT promote the D0
+> object's `+1305/-91` instrumentation; retain only durable production-transport
+> tests. No QA/candidate review yet. Hard-stop count remains 1 (D0b was the required
+> object return from stop 1, not a new wall; no Research trigger). The authorized D1
+> design + controls are Deliverable D1 and AC-D1-* below. If a natural post-repair
+> `ResourceBodyResult` default appears, that is HARD STOP 2 (AC-D1-RERUN) — preserve
+> and return its object; do not bypass or promise `InvalidOffset` green.
+>
 > # D0b AMENDMENT 2026-08-26 — D0 hard stop 1 (Architect object ruling evt_ts40fq959fvx)
 >
 > D0 evidence `49a7aff4999f3f6f64a9b5df790bc27da87183b7` (tree `f96ce855`, base
@@ -149,9 +174,11 @@ error-text, first-failure, numeric-origin, body-shape, or family-name authority.
   (forcing only 301/314 changes the terminal; neighbors do not). No repair site
   selected. The `ResourceBodyResult` default observed under the origin-force probe
   is NOT yet a second natural defect (probe aftermath — see D0b).
-- D0b (NEXT — predecessor-route and recursor-layer disposition; kept in THIS node,
-  not a family-specific successor) — for read `301` and write `314`, bind ALL of
-  the following from graph/claim provenance, NONE inferred from occurrence, family,
+- D0b (DONE — object `3b4a6a087` returned + accepted as class (b); Architect
+  evt_4eazg432n8xb8. Predecessor-route and recursor-layer disposition; kept in THIS
+  node, not a family-specific successor) — for read `301` and write `314`, bind
+  ALL of the following from graph/claim provenance, NONE inferred from
+  occurrence, family,
   message, or numeric origin:
   1. The exact `ComputationalRecursorLayer` that supplied the frame: `role`
      (`SelectsOccurrence` vs `ExitsScope`), `semantic_pending`, checked frame +
@@ -179,10 +206,52 @@ error-text, first-failure, numeric-origin, body-shape, or family-name authority.
   Return another object read after D0b. ONLY if it proves the origin bypass was
   semantically authorized AND a natural full-program path still reaches a localized
   `ResourceBodyResult` default does that occurrence become the next object.
-- D1 — only after D0b identifies the occurrence AND the first differing graph/claim
-  authority, repair the graph/claim route so the synthesized `Err InvalidOffset`
-  continues through the checked ITree/result path. The erasure fail-closed default
-  remains intact. NO D1 until D0b binds that authority.
+- D1 (AUTHORIZED — Architect object ruling evt_4eazg432n8xb8; class (b), the
+  active-self-resumption header transport) — preserve the exact predecessor route
+  through the existing function-local computational-loop CFG join as a SECOND block
+  parameter beside `scrutinee.word`. Use an explicit PRIVATE encoding, never an
+  enum-discriminant cast:
+
+  ```rust
+  impl SourceComputationalAnswerRoute {
+      const DIRECT_CONTROL_WORD: i64 = 0;
+      const CHECKED_CONTROL_WORD: i64 = 1;
+
+      fn control_word(self) -> i64 {
+          match self {
+              Self::DirectScrutinee => Self::DIRECT_CONTROL_WORD,
+              Self::CheckedSelectedRecursor => Self::CHECKED_CONTROL_WORD,
+          }
+      }
+  }
+  ```
+
+  Mechanism (exactly as ruled):
+  1. The loop header has two production parameters: the carried word plus the
+     route-control word. The route-control word is function-local CFG state ONLY —
+     not `CarriedBoundaryWord`, boundary ABI, checked interface, environment
+     binding, or result.
+  2. The initial edge and the active-self-resumption edge each emit the constant
+     from that edge's exact `eliminator.answer_route`. Those TWO edges are the
+     closed producer population — no value / occurrence / frame / family /
+     constructor / trap inference.
+  3. Ordinary constructor comparisons stay FIRST. After they all miss, compare the
+     lane with `CHECKED_CONTROL_WORD`: exact checked plus the valid existing return
+     topology takes the checked fallback; Direct and every unknown/malformed word
+     seal the existing default.
+  4. Do NOT transport `EliminatorRole` — it is independently `Scrutinee` and already
+     consumed before this frame.
+  5. Do NOT add a `RoutedAnswer::checked` caller — this transports existing
+     authority; it mints none.
+  Update the `lowering/mod.rs:9593-9605` claim honestly: the route stays absent from
+  the carrier / public ABI, but a route crossing a runtime CFG join must reach
+  emitted CFG as a compiler-authored control lane — never inferred from or packed
+  into the value. Do NOT emit two copies of the computational eliminator by route
+  (its body consumes/mints planner and affine authorities; duplication is not
+  identity-preserving). If the one-header/two-parameter form is not buildable,
+  HARD-STOP. Build a FRESH MINIMAL D1 from then-current `origin/main`; do NOT promote
+  the D0 object's `+1305/-91` instrumentation — retain only durable
+  production-transport tests.
 
 ## Acceptance criteria
 
@@ -226,6 +295,38 @@ error-text, first-failure, numeric-origin, body-shape, or family-name authority.
   authority; the forced-route chain is NOT continued by bypassing
   `ResourceBodyResult` cases one at a time; `KEN_RT_ITREE_D0_FORCE_ORIGIN` remains
   an isolation probe.
+- AC-D1-HEADER-CLOSURE — every predecessor of the loop header supplies exactly
+  `(carried word, route-control word)`; the complete predecessor census is the
+  initial edge plus the active-self-resumption edge, with NO unlabeled third jump.
+- AC-D1-CHECKED-MUTATION — emitting `Direct` at the natural reentry edge makes the
+  exact read AND write full programs regress to the localized ITree default; then
+  byte-restore.
+- AC-D1-DIRECT-NEGATIVE — a natural `Direct` carrier that misses the ordinary cases
+  seals the default, and mutating THAT edge to `Checked` reddens. The initial
+  read/write arrival is insufficient — it matches case 1 before the discriminator.
+- AC-D1-UNKNOWN — a test-only out-of-domain control word seals the default, proven
+  beside an exact-checked positive.
+- AC-D1-ORDINARY-PRECEDENCE — the initial case-1 arrival continues through its
+  ordinary case despite a checked path in the same loop.
+- AC-D1-PRODUCT — on BOTH admitted full programs the product outcome preserves
+  command / status / effects and yields `SemanticErrorV1::InvalidOffset` with the
+  `FsOpen -> BufferAllocate -> ResourceRelease(FsHandle) -> ResourceRelease(Buffer)`
+  prefix and no read/write-at dispatch.
+- AC-D1-WITNESS — the nonignored read test asserting ITree trap provenance (false by
+  design after the repair) is REPLACED; durable nonignored read AND write route
+  witnesses are added WITHOUT broad ignore removal (the final four-value fold still
+  owns that removal).
+- AC-D1-SCOPE — `erasure.rs:2740-2744` byte-identical; no family / error / trap /
+  origin authority, no `ResourceBodyResult` bypass, no production `KEN_RT_ITREE_D0*`
+  switch, no public API, no trust change; no second `RoutedAnswer::checked` caller;
+  the route-control word is never carrier / boundary ABI / checked interface /
+  environment binding / result, and no eliminator body is duplicated by route.
+- AC-D1-RERUN (hard-stop-2 gate) — rerun read/write immediately after the repair. A
+  natural post-repair `ResourceBodyResult` default is HARD STOP 2, NOT a bypass
+  target: append Symptom inventory entry 2, preserve the natural observation, and
+  return its occurrence/authority object; do NOT bypass it or promise `InvalidOffset`
+  green. Whether the route repair lands independently or atomically with the
+  successor is decided then.
 - AC-NO-REGRESSION — whole-suite green in CI; local targeted `-p ken-runtime` /
   `-p ken-cli` / `-p ken-verify` only, never `--workspace`.
 
