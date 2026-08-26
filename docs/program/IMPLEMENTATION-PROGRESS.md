@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-26 14:43:21Z — from 458 issue file(s) in `docs/program/issues/`.
+2026-08-26 19:54:20Z — from 459 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -174,6 +174,7 @@ the committed file matches the generator's output.
 | `LANG-MOD-NAT-PROVIDER-INTERFACE` | Nat's canonical home by prelude-floor membership: amend the GENERAL prelude membership rule (30-taxonomy §4) to a bootstrapping criterion that admits kernel-provided vocabulary the surface must reach and cannot re-derive with identity, with the coupled normative amendments (30 §5, 33 §3.3, 39, 50-stdlib) and identity/strict-accept/zero-allocation conformance pins. The Component B Nat prerequisite (spec WP). | merged | spec | L | none | — |
 | `LANG-MOD-OR-CANONICAL-HOME` | Or arm (b), NODE B — author Core.Logic.Or (data Or (a:Omega)(b:Omega):Type with Inl/Inr, field-for-field the prelude shape), migrate every checked-source consumer to import it, and retire the Rust prelude Or/Inl/Inr registration so exactly one catalog Or identity exists | merged | language | L | none | — |
 | `LANG-MOD-OR-OMEGA-PARAM-ELAB` | Or arm (b), NODE A (prerequisite) — teach explicit-data parameter/index elaboration to honor an Omega-sorted binder, so a catalog package can declare Or : Omega -> Omega -> Type; the result-sort admission is unchanged, preserving the ban on proof-relevant multi-constructor Omega-valued families | merged | language | S | none | — |
+| `LANG-MOD-PAIR-FLOOR-PROVIDER` | Generalize the prelude membership rule to ONE internal-provision arm (kernel OR compiler origin) and admit Pair as its first compiler-provided member: the type floor becomes the closed TEN {Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result, Utf8Error} with Pair's {mk_pair, pair_fst, pair_snd} a separate closed three-companion inventory, reusing the four existing compiler-installed Pair GlobalIds (prelude.rs:951-1041); with the coupled normative flips (30 §4/§5, 33 §3.3/§4.3/§5.3, 34, 39 §2.0/§6.1, 51, 50-stdlib) and the conformance-pin contract. The SPEC WP; the elaborator realization is the build WP. Supersedes the merged LANG-MOD-PAIR-STRICT-BOUNDARY exact-nine/non-provider pins. | ready | spec | L | none | — |
 | `LANG-MOD-PAIR-STRICT-BOUNDARY` | Durable Spec/Conformance boundary artifact — compiler possession of a non-floor convenience (native Pair) is NOT strict provider availability; pin the strict bare-Pair rejection, same-shape distinct-identity, exact-nine stability, and the deferred/later-closure conformance shape. | merged | spec | S | none | — |
 | `LANG-MOD-PUB-ELIGIBILITY` | WP-3 — semantic gate rejecting pub on ineligible placements with a surface diagnostic; pub proof retains the subject-must-be-public rule | merged | language | M | none | — |
 | `LANG-MOD-STRICT-RESOLUTION` | WP-2 — strict root-loaded resolution: a bare name in a loader-built scope resolves only through locals, explicit imports, kernel vocabulary, and the closed prelude floor; no fall-through to arbitrary program globals (the soundness core) | merged | language | L | none | — |
@@ -508,6 +509,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
+- `LANG-MOD-PAIR-FLOOR-PROVIDER` — Generalize the prelude membership rule to ONE internal-provision arm (kernel OR compiler origin) and admit Pair as its first compiler-provided member: the type floor becomes the closed TEN {Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result, Utf8Error} with Pair's {mk_pair, pair_fst, pair_snd} a separate closed three-companion inventory, reusing the four existing compiler-installed Pair GlobalIds (prelude.rs:951-1041); with the coupled normative flips (30 §4/§5, 33 §3.3/§4.3/§5.3, 34, 39 §2.0/§6.1, 51, 50-stdlib) and the conformance-pin contract. The SPEC WP; the elaborator realization is the build WP. Supersedes the merged LANG-MOD-PAIR-STRICT-BOUNDARY exact-nine/non-provider pins.
 - `LANG-SYMBOLIC-OPERATOR-NAMES` — `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
@@ -552,6 +554,7 @@ is itself not yet `merged`/`closed`:
 - `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: draft)
 - `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: ready)
 - `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
+- `LANG-MOD-CANONICAL-PAIR-PACKAGE` blocked by `LANG-MOD-PAIR-FLOOR-PROVIDER` (status: ready)
 - `LANG-MOD-KENFMT-DECL-LAYOUT` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: ready)
