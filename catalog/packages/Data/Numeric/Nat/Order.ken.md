@@ -46,7 +46,7 @@ natural-number subtraction, and `compare` returns the three-way result
 ```ken
 data OrdResult = Lt | Eq | Gt
 
-fn min (m : Nat) (n : Nat) : Nat =
+pub fn min (m : Nat) (n : Nat) : Nat =
   match m {
     Zero ↦ Zero;
     Suc m2 ↦
@@ -56,7 +56,7 @@ fn min (m : Nat) (n : Nat) : Nat =
       }
   }
 
-fn max (m : Nat) (n : Nat) : Nat =
+pub fn max (m : Nat) (n : Nat) : Nat =
   match m {
     Zero ↦ n;
     Suc m2 ↦
@@ -66,7 +66,7 @@ fn max (m : Nat) (n : Nat) : Nat =
       }
   }
 
-fn sub (a : Nat) (b : Nat) : Nat =
+pub fn sub (a : Nat) (b : Nat) : Nat =
   match b {
     Zero ↦ a;
     Suc n ↦
@@ -76,7 +76,7 @@ fn sub (a : Nat) (b : Nat) : Nat =
       }
   }
 
-fn compare (a : Nat) (b : Nat) : OrdResult =
+pub fn compare (a : Nat) (b : Nat) : OrdResult =
   match leq_nat a b {
     True ↦
       match leq_nat b a {
@@ -173,8 +173,8 @@ canonical `leq_nat`.
 ## 7. Trust & derivation
 
 1. **Public API.** This facade re-exports `Ord`, `IsTrue`, `bool_or`, and
-   `leq_nat` with their provider identities. `OrdResult`, `min`, `max`, `sub`,
-   and `compare` remain package-local until their dedicated visibility step.
+   `leq_nat` with their provider identities. It exports its defined-at `min`,
+   `max`, `sub`, and `compare` operations; `OrdResult` remains package-local.
 2. **Source map.**
 
    | Task | Section |
@@ -194,8 +194,8 @@ canonical `leq_nat`.
 5. **Proof families.** The provider owns the structural `Nat` order proofs. This
    package's checked laws cover the local arithmetic operations.
 6. **Consumers.** Generic ordered algorithms can resolve `Ord Nat` through this
-   facade; direct callers can use the local arithmetic and comparison operations
-   once their visibility is intentionally widened.
+   facade; direct callers can selectively import the local arithmetic and
+   comparison operations.
 7. **Validation evidence.** Deferred-boundary and compatibility-root identity
    controls check the carried dictionary, canonical relation and bridge
    identities, zero local registration, zero trust delta, examples, and
