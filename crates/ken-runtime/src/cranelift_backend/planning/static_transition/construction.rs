@@ -32,7 +32,9 @@ use super::abi::{
 #[cfg(feature = "px8-ds-test-support")]
 use super::aggregates::{
     apply_checked_ih_continuation_inheritance_mutation,
+    checked_ih_intervening_binder_population_control_is_active,
     record_checked_ih_continuation_inheritances,
+    run_checked_ih_intervening_binder_population_control,
 };
 #[cfg(test)]
 #[allow(unused_imports)]
@@ -1240,10 +1242,12 @@ impl<'src> Planner<'src> {
             &self.plan.checked_ih_continuation_inheritances,
         )?;
         #[cfg(feature = "px8-ds-test-support")]
-        record_checked_ih_continuation_inheritances(
-            &self.plan,
-            &self.plan.checked_ih_continuation_inheritances,
-        );
+        if !checked_ih_intervening_binder_population_control_is_active() {
+            record_checked_ih_continuation_inheritances(
+                &self.plan,
+                &self.plan.checked_ih_continuation_inheritances,
+            );
+        }
         // ⛔ After `join_results` for the same reason the ownership plan is: a
         // seat's consumer phase is a fact about the child's planned result
         // representation, which does not exist until that line.
@@ -1258,6 +1262,8 @@ impl<'src> Planner<'src> {
         #[cfg(test)]
         apply_static_worker_member_mutation(&mut self.plan);
         self.plan.validate()?;
+        #[cfg(feature = "px8-ds-test-support")]
+        run_checked_ih_intervening_binder_population_control(&self.plan)?;
         Ok(self.plan)
     }
 }

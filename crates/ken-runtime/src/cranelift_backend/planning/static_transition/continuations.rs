@@ -5007,6 +5007,36 @@ pub(super) enum CheckedBinderProvenance {
     Ordinary,
 }
 
+/// The result of resolving one `Var` through the exact forward binder walk.
+///
+/// `provenance` says which semantic binder the occurrence names. The immediate
+/// environment index says where this occurrence reads that binder now. Keeping
+/// both facts in one resolution prevents a later consumer from reconstructing
+/// availability from semantic identity or from running a second binder walk.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(super) struct CheckedBinderResolution {
+    pub(super) provenance: CheckedBinderProvenance,
+    pub(super) immediate_environment_index: u32,
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(super) preceding_environment_provenance: Option<CheckedBinderProvenance>,
+}
+
+fn resolve_checked_binder(
+    environment: &[CheckedBinderProvenance],
+    index: u32,
+) -> Option<CheckedBinderResolution> {
+    let immediate_environment_index = usize::try_from(index).ok()?;
+    let provenance = environment.get(immediate_environment_index).copied()?;
+    Some(CheckedBinderResolution {
+        provenance,
+        immediate_environment_index: index,
+        #[cfg(feature = "px8-ds-test-support")]
+        preceding_environment_provenance: immediate_environment_index
+            .checked_sub(1)
+            .and_then(|preceding| environment.get(preceding).copied()),
+    })
+}
+
 /// Resolve every `Var` occurrence that names a compiler-minted induction
 /// hypothesis, by threading the binder environment the lowering builds.
 ///
@@ -5034,14 +5064,14 @@ pub(super) fn derive_checked_ih_bindings(
     plan: &StaticTransitionPlan<'_>,
     origin: StaticOriginId,
     environment: &[CheckedBinderProvenance],
-    out: &mut BTreeMap<StaticOriginId, CheckedBinderProvenance>,
+    out: &mut BTreeMap<StaticOriginId, CheckedBinderResolution>,
 ) -> Result<(), CraneliftBackendError> {
     let expr = plan.planned_occurrence_expr(origin)?;
     let child = |position| plan.semantic.child_origin(origin, position);
     match expr {
         RuntimeExpr::Var(index) => {
-            if let Some(provenance) = environment.get(*index as usize).copied() {
-                out.insert(origin, provenance);
+            if let Some(resolution) = resolve_checked_binder(environment, *index) {
+                out.insert(origin, resolution);
             }
         }
         RuntimeExpr::CheckedJoinSite { .. }
@@ -5360,7 +5390,7 @@ pub(super) fn build_checked_transport(
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn build_checked_binder_provenance(
     plan: &StaticTransitionPlan<'_>,
-) -> Result<BTreeMap<StaticOriginId, CheckedBinderProvenance>, CraneliftBackendError> {
+) -> Result<BTreeMap<StaticOriginId, CheckedBinderResolution>, CraneliftBackendError> {
     let mut out = BTreeMap::new();
     if let Some(root) = plan.root_occurrence {
         derive_checked_ih_bindings(plan, root, &[], &mut out)?;
@@ -5376,7 +5406,7 @@ pub(super) fn build_checked_ih_bindings(
 ) -> Result<BTreeMap<StaticOriginId, CheckedIhBinding>, CraneliftBackendError> {
     Ok(build_checked_binder_provenance(plan)?
         .into_iter()
-        .filter_map(|(origin, provenance)| match provenance {
+        .filter_map(|(origin, resolution)| match resolution.provenance {
             CheckedBinderProvenance::InductionHypothesis(binding) => Some((origin, binding)),
             CheckedBinderProvenance::ConstructorChild { .. }
             | CheckedBinderProvenance::LexicalClosureParameter { .. }
@@ -7615,6 +7645,34 @@ pub(in crate::cranelift_backend) mod tests {
     use super::*;
     #[allow(unused_imports)]
     use crate::{RuntimeComputationalMatchCase, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
+
+    /// Supplementary local resolution law. The governing discriminator is the
+    /// population-side `Let` insertion exercised through the full planner.
+    #[test]
+    fn checked_binder_resolution_rederives_an_intervening_binder_shift() {
+        let binding = CheckedIhBinding {
+            frame_origin: StaticOriginId(41),
+            recursive_position: 3,
+        };
+        let unshifted_environment = [CheckedBinderProvenance::InductionHypothesis(binding)];
+        let shifted_environment = [
+            CheckedBinderProvenance::Ordinary,
+            CheckedBinderProvenance::InductionHypothesis(binding),
+        ];
+
+        let unshifted = resolve_checked_binder(&unshifted_environment, 0)
+            .expect("the checked binder is immediately available");
+        let shifted = resolve_checked_binder(&shifted_environment, 1)
+            .expect("the same checked binder remains available past one binder");
+
+        assert_eq!(unshifted.provenance, shifted.provenance);
+        assert_eq!(
+            unshifted.provenance,
+            CheckedBinderProvenance::InductionHypothesis(binding)
+        );
+        assert_eq!(unshifted.immediate_environment_index, 0);
+        assert_eq!(shifted.immediate_environment_index, 1);
+    }
 
 pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_seed_capture_worker_fixture() -> RuntimeExpr {
         // `Closure` rather than `LexicalClosure`: its captures are SYMBOLS, so
