@@ -1,6 +1,6 @@
 ---
 id: RT-RESULT-CONTINUATION-BINDING-PROVENANCE
-title: "RT-ITREE D2/D3A/D3B — the checked ITree Ret carried arm (call_checked_ih_transport_from_case_environment, core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word WITHOUT applying the source continuation. HS4 (evt_6mnawfvm8fc4j) proved applying it is real but insufficient: the call result becomes a new ITree node and crosses an active recursive computation (TerminalResumeOuter -> Computational 301) before the Ret-case closure 460 capture 0 / final Var(1) it must reach, so an applied-but-unconsumed call is not semantics-preserving. D2 localization ACCEPTED as evidence (ac1ebdacb; no merge, no QA). D3A (evidence only): the exact carried application, per-arrival paired. D3B: localize then repair the FIRST graph-authorized edge where the applied result fails to reach the eventual Ret payload/closure capture. The merge is ATOMIC (D3A + graph-authorized result flow + product) — no application-only checkpoint."
+title: "RT-ITREE D2/D3A/D3B — the checked ITree Ret carried arm (call_checked_ih_transport_from_case_environment, core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word WITHOUT applying the source continuation. HS4 (evt_6mnawfvm8fc4j) proved applying it is real but insufficient: the call result becomes a new ITree node and crosses an active recursive computation (TerminalResumeOuter -> Computational 301) before the Ret-case closure 460 capture 0 / final Var(1) it must reach (301/460/459/452 are READ-side evidence coordinates only; the write analogue is derived independently), so an applied-but-unconsumed call is not semantics-preserving. D2 localization ACCEPTED as evidence (ac1ebdacb; no merge, no QA). D3A (evidence only): the exact carried application, per-arrival paired. D3B: localize then repair the FIRST graph-authorized edge where the applied result fails to reach the eventual Ret payload/closure capture. The merge is ATOMIC (D3A + graph-authorized result flow + product) — no application-only checkpoint."
 status: ready
 owner: runtime
 size: M
@@ -8,7 +8,7 @@ gate: none
 depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE]
 blocks: []
 github: null
-origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4)."
+origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision)."
 ---
 
 > # HARD STOP 3 DISCHARGED 2026-08-26 — option (c), D2/D3 phase separation (Architect evt_1hren6zm8mgxv)
@@ -81,6 +81,15 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > the WIP CFG capture 0 instead receives later SSA `v1650`/`v1673`, neither the
 > application result `v1629` nor the constructed `v1637`.
 >
+> **Read-side coordinates only (frame fixed-input correction evt_10rgb8n31c5sj).**
+> The disposable probe established origins 301 / 460 / 459 / 452 for the READ
+> program only. They are read-side EVIDENCE coordinates, not write authority. The
+> WRITE program's active frame, eventual Ret payload, ordinary capture
+> occurrence, and body read MUST be derived INDEPENDENTLY from its OWN existing
+> graph/planner facts before any repair — never reused from, or inferred by
+> similarity to, the read coordinates. If the write analogue cannot be derived
+> from existing planner relations, hard-stop (HS5).
+>
 > **The frame's causal sentence — "returning the declared call result makes it
 > flow into closure 460 capture 0" — is FALSE and is WITHDRAWN.** The first next
 > predecessor operation is `TerminalResumeOuter -> resume_active_continuation` on
@@ -134,6 +143,9 @@ Append one line per hard stop; never rewrite history.
    still captures the prior transported environment at capture 0, and final
    `Var(1)` reaches the same default — keyed on claiming a call result before
    the intervening recursive ITree computation binds it to the later capture.
+   (Origins 301/460/459/452 here are READ-side evidence coordinates only, from
+   the disposable read-program probe; the write analogue is derived
+   independently — frame fixed-input correction evt_10rgb8n31c5sj.)
 
 ## Objective
 
@@ -266,13 +278,22 @@ the environment at runtime.
     the exact source-control chain (`CheckedComputationalIHInvocationReturn ->
     ConstructArgument -> TerminalResumeOuter -> Computational` active frame(s)),
     every constructed ITree value, and the active computational-frame lineage
-    until the eventual `ITree::Ret` payload that origin 301 (read) and its write
-    analogue consume.
-  - Bind that payload through the Ret case's `CheckedCaseBinderLayout` to the
-    exact ordinary closure-capture occurrence (capture 0 = occurrence 459,
-    `Var(0)`) and the body-452 `Var(1)` read. Identify the FIRST edge where the
-    expected typed result is replaced by (or fails to replace) the transported
+    until the eventual `ITree::Ret` payload the Ret-case closure consumes. The
+    READ program's coordinates are origin 301 active frame / closure 460 /
+    capture occurrence 459 / body 452 — READ-side EVIDENCE coordinates only, from
+    the disposable Architect probe. The WRITE program's active frame, eventual
+    Ret payload, ordinary capture occurrence, and body read MUST be derived
+    INDEPENDENTLY from its OWN existing graph/planner facts before any repair —
+    never reused from, or inferred by similarity to, the read coordinates.
+  - Bind each program's payload through the Ret case's `CheckedCaseBinderLayout`
+    to THAT program's own exact ordinary closure-capture occurrence and body read
+    (read: capture 0 = occurrence 459, `Var(0)`, body-452 `Var(1)`; write: its
+    independently derived analogue). Identify the FIRST edge where the expected
+    typed result is replaced by (or fails to replace) the transported
     environment. ONLY that edge may be repaired.
+  - If the write analogue cannot be derived from existing planner relations,
+    HARD-STOP under the D3B rule below (hard stop 5) — do NOT infer it by source
+    similarity to the read program.
   - Authority comes from EXISTING graph/planner facts: source-continuation frame
     identity, active-frame lineage, constructed occurrence/result edge, Ret-case
     binder role, and the exact boundary-closure capture descriptor. Numeric
@@ -326,14 +347,19 @@ the environment at runtime.
   transport identity, source record, worker body, source result, and
   destination owner. Unpaired scalar totals are INSUFFICIENT — the programs may
   legitimately reach the seam more than once.
-- AC-D3B-RESULTFLOW (result-delivery positive — D3B) — on the UNCHANGED admitted
-  read/write programs the atomic (D3A+D3B) candidate makes each application
-  result flow through the exact source-control chain, `TerminalResumeOuter`, and
-  the active computational frames to the eventual `ITree::Ret` payload, binds it
-  through the Ret-case `CheckedCaseBinderLayout` to the exact closure-capture
-  occurrence (capture 0 / occurrence 459) and body-452 `Var(1)` read, and
-  proceeds through exact `ResourceBodyOk` / `ResourceBodyErr` selection to the
-  independently specified `InvalidOffset` observation and effect prefix.
+- AC-D3B-RESULTFLOW (result-delivery positive — D3B; TWO separately paired
+  paths) — the atomic (D3A+D3B) candidate makes each application result flow
+  through the exact source-control chain, `TerminalResumeOuter`, and the active
+  computational frames to the eventual `ITree::Ret` payload, binds it through the
+  Ret-case `CheckedCaseBinderLayout` to THAT program's own exact closure-capture
+  occurrence and body read, and proceeds through exact `ResourceBodyOk` /
+  `ResourceBodyErr` selection to the independently specified `InvalidOffset`
+  observation and effect prefix. The READ path is paired through its exact
+  read-side evidence coordinates (origin 301 / closure 460 / capture occurrence
+  459 / body 452 `Var(1)`); the WRITE path is paired through its OWN newly
+  derived exact analogue. Reusing the read numeric coordinates as write authority
+  is FORBIDDEN; if the write analogue cannot be derived from existing planner
+  relations, hard-stop (HS5).
 - AC-D3B-RESULTFLOW-PAIRING (per-step result-flow pairing) — pair the exact
   application result through EACH successor operation to the exact eventual Ret
   payload and closure capture. No scalar-total substitution; a bare
