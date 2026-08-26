@@ -110,14 +110,25 @@ use continuations::{
 #[cfg(test)]
 use continuations::ContinuationProductionMutation;
 
+#[cfg(feature = "px8-ds-test-support")]
+pub use aggregates::{
+    checked_ih_continuation_inheritance_mutation_is_exact,
+    with_checked_ih_continuation_inheritance_mutation,
+    with_checked_ih_continuation_inheritance_observations,
+    CheckedIhContinuationInheritanceMutation,
+    CheckedIhContinuationInheritanceObservation,
+};
+
 // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — the aggregates domain's cross-boundary
 // surface: `lowering` and `planning`'s own re-export both reach these through
 // this module, unchanged from before the move.
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use aggregates::{
     AggregateOccurrenceId, AggregateOccurrenceProducer, BoundaryClosureEnvironment,
-    CheckedIhEnvironmentTransport,
-    CheckedIhTransportInputDestination, PlannedAggregateAllocation, PlannedAggregateOwnership,
+    CheckedIhCapabilityInheritance, CheckedIhContinuationInheritance,
+    CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
+    CheckedIhFreshResultDestination, CheckedIhTransportInputDestination,
+    PlannedAggregateAllocation, PlannedAggregateOwnership,
     PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
     SynthesizedAggregateRole, SynthesizedAggregateRoot, SynthesizedDynamicSet,
 };
@@ -548,6 +559,12 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// checked-IH environment to an escaping closure crossing. These reference
     /// `aggregate_ownership`; they never issue a second record.
     checked_ih_environment_transports: Vec<CheckedIhEnvironmentTransport>,
+    /// Planner-only successor projections proving, separately, that an
+    /// existing captured continuation capability remains in scope at a
+    /// descendant checked invocation and that its conditional fresh result has
+    /// one ordinary Ret/capture destination. This plane is inert: lowering has
+    /// no consumer in this predecessor.
+    checked_ih_continuation_inheritances: Vec<CheckedIhContinuationInheritance>,
     /// `RT-DECL-CLOSURE-PORT` `D7`. One record per capability/argument seat of
     /// every admitted host effect occurrence. Read by lowering, which claims
     /// exactly one of these per seat it consumes.

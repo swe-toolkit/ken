@@ -715,6 +715,266 @@ fn fs_read_at_malformed_offset_reaches_resource_body_result_frontier() {
     });
 }
 
+#[test]
+fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
+    in_large_stack_thread("rt-parity-continuation-inheritance", || {
+        let (read_result, read) =
+            ken_runtime::with_checked_ih_continuation_inheritance_observations(|| {
+                differential("fs-read-at-offset-single", "rt_read_offset_stage")
+            });
+        let (write_result, write) =
+            ken_runtime::with_checked_ih_continuation_inheritance_observations(|| {
+                differential("fs-write-at-offset-single", "rt_write_writable_stage")
+            });
+
+        let select = |rows: &[ken_runtime::CheckedIhContinuationInheritanceObservation],
+                      source_specialization,
+                      destination_specialization,
+                      active_frame_origin| {
+            let found = rows
+                .iter()
+                .filter(|row| {
+                    row.source_specialization == source_specialization
+                        && row.destination_specialization == destination_specialization
+                        && row.active_frame_origin == active_frame_origin
+                        && row.recursive_position == 1
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                found.len(),
+                1,
+                "one exact transport/call identity must inherit to one descendant coordinate: {found:?}"
+            );
+            found[0].clone()
+        };
+        let read_target = select(&read, 1, 2, 301);
+        assert_eq!(read_target.active_frame_lineage, vec![470, 301]);
+        assert_eq!(read_target.destination_construct_origin, 476);
+        assert_eq!(read_target.recursive_child_origin, 474);
+        assert_eq!(read_target.selected_case_body_origin, 308);
+        assert_eq!(read_target.invocation_origin, 305);
+        assert_eq!(read_target.call_origin, 304);
+        assert_eq!(read_target.callee_origin, 303);
+        assert_eq!(read_target.ret_case_body_origin, 465);
+        assert_eq!(read_target.closure_origin, 460);
+        assert_eq!(read_target.capture_ordinal, 0);
+        assert_eq!(read_target.capture_occurrence, 459);
+        assert_eq!(read_target.closure_body_origin, 452);
+        assert_eq!(read_target.body_capture_reads, vec![450]);
+        assert_eq!(read_target.closure_parameter_count, 1);
+        assert!(!read_target.fresh_destination_mentions_source_result);
+        assert!(read_target.ordinary_non_governed_exclusion_count > 0);
+
+        let write_target = select(&write, 3, 5, 314);
+        assert_eq!(write_target.active_frame_lineage, vec![483, 314]);
+        assert_eq!(write_target.destination_construct_origin, 489);
+        assert_eq!(write_target.recursive_child_origin, 487);
+        assert_eq!(write_target.selected_case_body_origin, 321);
+        assert_eq!(write_target.invocation_origin, 318);
+        assert_eq!(write_target.call_origin, 317);
+        assert_eq!(write_target.callee_origin, 316);
+        assert_eq!(write_target.ret_case_body_origin, 478);
+        assert_eq!(write_target.closure_origin, 473);
+        assert_eq!(write_target.capture_ordinal, 0);
+        assert_eq!(write_target.capture_occurrence, 472);
+        assert_eq!(write_target.closure_body_origin, 465);
+        assert_eq!(write_target.body_capture_reads, vec![463]);
+        assert_eq!(write_target.closure_parameter_count, 1);
+        assert!(!write_target.fresh_destination_mentions_source_result);
+        assert!(write_target.ordinary_non_governed_exclusion_count > 0);
+        assert!(write_target.descriptor_only_exclusion_count > 0);
+
+        assert_ne!(
+            read_target.source_call_identity, write_target.source_call_identity,
+            "read and write must retain their independently issued K authority"
+        );
+        for rows in [&read, &write] {
+            let keys = rows
+                .iter()
+                .map(|row| {
+                    (
+                        row.source_call_identity.as_str(),
+                        row.destination_specialization,
+                        row.active_frame_origin,
+                        row.recursive_position,
+                    )
+                })
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(keys.len(), rows.len(), "inheritance keys must be injective");
+        }
+        let write_depths = write
+            .iter()
+            .map(|row| row.active_frame_lineage.len())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            write_depths.contains(&1) && write_depths.contains(&2),
+            "the same typed self-resumption rule must close at varied depths: {write_depths:?}"
+        );
+
+        for (label, result, forbidden_operation) in [
+            ("read", read_result, ken_runtime::HostOpV1::FsReadAt),
+            ("write", write_result, ken_runtime::HostOpV1::FsWriteAt),
+        ] {
+            let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+                result.native.terminal_error.as_ref()
+            else {
+                panic!("{label}: planner-only relation must preserve the fail-closed product");
+            };
+            assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
+            assert!(result
+                .native
+                .effect_trace
+                .iter()
+                .all(|event| event.operation != forbidden_operation));
+        }
+    });
+}
+
+#[test]
+fn checked_ih_continuation_inheritance_is_byte_inert() {
+    in_large_stack_thread("rt-parity-continuation-inheritance-inert", || {
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+        let exact_root = output_dir("continuation-inheritance-inert-exact");
+        let suppressed_root = output_dir("continuation-inheritance-inert-suppressed");
+        let exact = ken_cli::build_native_program(
+            &source,
+            ken_cli::SourceFormat::Ken,
+            "rt_parity_continuation_inheritance_inert",
+            exact_root.path(),
+        )
+        .expect("exact continuation-inheritance artifact");
+        let suppressed = ken_runtime::with_checked_ih_continuation_inheritance_mutation(
+            ken_runtime::CheckedIhContinuationInheritanceMutation::SuppressForInertness,
+            || {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    "rt_parity_continuation_inheritance_inert",
+                    suppressed_root.path(),
+                )
+            },
+        )
+        .expect("suppressed continuation-inheritance artifact");
+
+        assert_eq!(exact.plan_transport_hash, suppressed.plan_transport_hash);
+        assert_eq!(
+            exact.runtime_program.core_semantic_hash,
+            suppressed.runtime_program.core_semantic_hash
+        );
+        assert_eq!(
+            exact.runtime_program.artifact_hash,
+            suppressed.runtime_program.artifact_hash
+        );
+        assert_eq!(
+            exact.artifact.executable_hash,
+            suppressed.artifact.executable_hash
+        );
+        assert_eq!(
+            std::fs::read(&exact.artifact.executable_path).expect("exact executable bytes"),
+            std::fs::read(&suppressed.artifact.executable_path)
+                .expect("suppressed executable bytes"),
+            "planner-only continuation inheritance must change no emitted ABI, call, or artifact byte"
+        );
+        assert!(ken_runtime::checked_ih_continuation_inheritance_mutation_is_exact());
+    });
+}
+
+const CONTINUATION_INHERITANCE_MUTATION_CHILD: &str =
+    "KEN_RT_ITREE_CONTINUATION_INHERITANCE_MUTATION_CHILD";
+
+fn assert_continuation_inheritance_mutation_child() {
+    use ken_runtime::CheckedIhContinuationInheritanceMutation as Mutation;
+
+    let mode = std::env::var(CONTINUATION_INHERITANCE_MUTATION_CHILD)
+        .expect("continuation-inheritance mutation child mode");
+    let mutation = match mode.as_str() {
+        "remove" => Mutation::RemoveInheritedCapability,
+        "duplicate" => Mutation::DuplicateInheritedCapability,
+        "swap" => Mutation::SwapInheritedEndpoints,
+        "break-step" => Mutation::BreakSelfResumptionStep,
+        "reclassify-ret" => Mutation::ReclassifyRetChildAsIh,
+        "descriptor-only" => Mutation::SubstituteDescriptorOnlyAuthority,
+        "earlier-result" => Mutation::SubstituteEarlierResult,
+        "read-write-swap" => Mutation::SwapReadWriteEndpoints,
+        other => panic!("unknown continuation-inheritance mutation: {other}"),
+    };
+    let red = ken_runtime::with_checked_ih_continuation_inheritance_mutation(mutation, || {
+        if mutation == Mutation::SwapReadWriteEndpoints {
+            differential("fs-read-at-offset-single", "rt_read_offset_stage");
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                differential("fs-write-at-offset-single", "rt_write_writable_stage")
+            }))
+        } else {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                differential("fs-read-at-offset-single", "rt_read_offset_stage")
+            }))
+        }
+    });
+    assert!(
+        red.is_err(),
+        "{mode}: mutation did not redden its validator arm"
+    );
+    assert!(
+        ken_runtime::checked_ih_continuation_inheritance_mutation_is_exact(),
+        "{mode}: scoped mutation state did not restore exactly"
+    );
+}
+
+#[test]
+fn checked_ih_continuation_inheritance_mutations_bite_their_own_arms() {
+    if std::env::var_os(CONTINUATION_INHERITANCE_MUTATION_CHILD).is_some() {
+        in_large_stack_thread(
+            "rt-parity-continuation-inheritance-mutation-child",
+            assert_continuation_inheritance_mutation_child,
+        );
+        return;
+    }
+
+    let cases = [
+        ("remove", "not the exact closed forward derivation"),
+        (
+            "duplicate",
+            "resolve more than one continuation inheritance",
+        ),
+        (
+            "swap",
+            "does not reference one exact existing transport endpoint",
+        ),
+        ("break-step", "self-resumption step is disconnected"),
+        ("reclassify-ret", "reclassified as an induction hypothesis"),
+        ("descriptor-only", "descriptor-only closure was substituted"),
+        (
+            "earlier-result",
+            "earlier transport source result was substituted",
+        ),
+        (
+            "read-write-swap",
+            "does not reference one exact existing transport endpoint",
+        ),
+    ];
+    for (mode, expected) in cases {
+        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .arg("--exact")
+            .arg("checked_ih_continuation_inheritance_mutations_bite_their_own_arms")
+            .arg("--nocapture")
+            .env(CONTINUATION_INHERITANCE_MUTATION_CHILD, mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated continuation-inheritance mutation child");
+        assert!(
+            output.status.success(),
+            "{mode}: mutation child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(expected),
+            "{mode}: mutation missed its intended validator arm; stderr:\n{stderr}"
+        );
+    }
+}
+
 const D1_ROUTE_CONTROL_CHILD: &str = "KEN_RT_ITREE_D1_ROUTE_CONTROL_CHILD";
 
 fn assert_d1_route_control_child() {
@@ -772,9 +1032,15 @@ fn assert_d1_route_control_child() {
     else {
         panic!("{mode}: expected typed frontier trap, got {native:?}");
     };
-    assert_eq!(provenance.trap.code, ken_runtime::RuntimeTrapCode::PatternMatchFailure);
+    assert_eq!(
+        provenance.trap.code,
+        ken_runtime::RuntimeTrapCode::PatternMatchFailure
+    );
     assert!(
-        provenance.trap.message.ends_with(&format!("::{expected_family}")),
+        provenance
+            .trap
+            .message
+            .ends_with(&format!("::{expected_family}")),
         "{mode}: expected {expected_family} frontier, got {}",
         provenance.trap.message
     );

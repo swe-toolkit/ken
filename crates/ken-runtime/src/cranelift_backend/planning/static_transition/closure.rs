@@ -38,7 +38,8 @@ use super::aggregates::{
 #[allow(unused_imports)]
 use super::aggregates::{
     build_aggregate_ownership_plan, lifetime_referent_affinity, validate_aggregate_ownership_plan,
-    validate_checked_ih_environment_transports, AggregateOccurrenceId, AggregateOccurrenceProducer,
+    validate_checked_ih_continuation_inheritances, validate_checked_ih_environment_transports,
+    AggregateOccurrenceId, AggregateOccurrenceProducer,
     PlannedAggregateAllocation, PlannedAggregateOwnership, PlannedAggregateShape,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,
     SynthesizedAggregateRoot, SynthesizedDynamicSet,
@@ -2087,6 +2088,10 @@ impl<'src> StaticTransitionPlan<'src> {
         validate_continuation_specialization_plan(self)?;
         validate_aggregate_ownership_plan(self, &self.aggregate_ownership)?;
         validate_checked_ih_environment_transports(self, &self.checked_ih_environment_transports)?;
+        validate_checked_ih_continuation_inheritances(
+            self,
+            &self.checked_ih_continuation_inheritances,
+        )?;
         validate_host_effect_seat_plan(self, &self.host_effect_seats)?;
         validate_substrate_preallocation_closure(
             self,

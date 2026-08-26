@@ -4978,11 +4978,32 @@ pub(in crate::cranelift_backend) struct CheckedIhBinding {
 /// one of them `CaseProducerFact::open(origin)`, so the count is right and the
 /// role is absent. Carrying the role is what lets a `Var` be **resolved** to the
 /// hypothesis it names rather than **recognised by shape**.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) enum CheckedBinderProvenance {
     InductionHypothesis(CheckedIhBinding),
-    /// Every other binder: an ordinary constructor child, a `Let` value, a
-    /// `Match` case binder, a closure parameter or capture.
+    /// One ordinary constructor field introduced by a checked computational
+    /// case. The frame and declared field position come directly from
+    /// [`CheckedCaseBinderLayout`]; neither is inferred from the `Var` that
+    /// later resolves to it.
+    ConstructorChild {
+        frame_origin: StaticOriginId,
+        field_position: u32,
+    },
+    /// One parameter of an ordinary lexical closure.
+    LexicalClosureParameter {
+        closure_origin: StaticOriginId,
+        parameter_ordinal: u32,
+    },
+    /// One captured value in an ordinary lexical closure body. The source
+    /// occurrence is the capture expression evaluated outside the body.
+    LexicalClosureCapture {
+        closure_origin: StaticOriginId,
+        capture_ordinal: u32,
+        source_origin: StaticOriginId,
+    },
+    /// Every other binder: a `Let` value, an ordinary `Match` case binder, or
+    /// a symbolic `Closure` parameter/capture whose source occurrence is not
+    /// represented in the lexical child plane.
     Ordinary,
 }
 
@@ -5013,16 +5034,14 @@ pub(super) fn derive_checked_ih_bindings(
     plan: &StaticTransitionPlan<'_>,
     origin: StaticOriginId,
     environment: &[CheckedBinderProvenance],
-    out: &mut BTreeMap<StaticOriginId, CheckedIhBinding>,
+    out: &mut BTreeMap<StaticOriginId, CheckedBinderProvenance>,
 ) -> Result<(), CraneliftBackendError> {
     let expr = plan.planned_occurrence_expr(origin)?;
     let child = |position| plan.semantic.child_origin(origin, position);
     match expr {
         RuntimeExpr::Var(index) => {
-            if let Some(CheckedBinderProvenance::InductionHypothesis(binding)) =
-                environment.get(*index as usize).copied()
-            {
-                out.insert(origin, binding);
+            if let Some(provenance) = environment.get(*index as usize).copied() {
+                out.insert(origin, provenance);
             }
         }
         RuntimeExpr::CheckedJoinSite { .. }
@@ -5086,8 +5105,13 @@ pub(super) fn derive_checked_ih_bindings(
                                 recursive_position,
                             })
                         }
-                        CheckedCaseBinderRole::ConstructorChild { .. }
-                        | CheckedCaseBinderRole::FrameEnvironment => {
+                        CheckedCaseBinderRole::ConstructorChild { field_position } => {
+                            CheckedBinderProvenance::ConstructorChild {
+                                frame_origin: origin,
+                                field_position,
+                            }
+                        }
+                        CheckedCaseBinderRole::FrameEnvironment => {
                             CheckedBinderProvenance::Ordinary
                         }
                     });
@@ -5116,9 +5140,23 @@ pub(super) fn derive_checked_ih_bindings(
                 derive_checked_ih_bindings(plan, child(1 + position)?, environment, out)?;
             }
             let mut body_environment = Vec::with_capacity(captures.len() + params.len());
-            body_environment.extend(
-                (0..params.len() + captures.len()).map(|_| CheckedBinderProvenance::Ordinary),
-            );
+            for parameter_ordinal in 0..params.len() {
+                body_environment.push(CheckedBinderProvenance::LexicalClosureParameter {
+                    closure_origin: origin,
+                    parameter_ordinal: u32::try_from(parameter_ordinal).map_err(|_| {
+                        planner_capacity_error("lexical closure parameter ordinal exhausted")
+                    })?,
+                });
+            }
+            for capture_ordinal in 0..captures.len() {
+                body_environment.push(CheckedBinderProvenance::LexicalClosureCapture {
+                    closure_origin: origin,
+                    capture_ordinal: u32::try_from(capture_ordinal).map_err(|_| {
+                        planner_capacity_error("lexical closure capture ordinal exhausted")
+                    })?,
+                    source_origin: child(1 + capture_ordinal)?,
+                });
+            }
             derive_checked_ih_bindings(plan, child(0)?, &body_environment, out)?;
         }
         RuntimeExpr::Call { args, .. } => {
@@ -5320,9 +5358,9 @@ pub(super) fn build_checked_transport(
 /// root and every transparent declaration -- each with an empty environment,
 /// because neither has binders in scope at its own occurrence.
 #[cfg_attr(not(test), allow(dead_code))]
-pub(super) fn build_checked_ih_bindings(
+pub(super) fn build_checked_binder_provenance(
     plan: &StaticTransitionPlan<'_>,
-) -> Result<BTreeMap<StaticOriginId, CheckedIhBinding>, CraneliftBackendError> {
+) -> Result<BTreeMap<StaticOriginId, CheckedBinderProvenance>, CraneliftBackendError> {
     let mut out = BTreeMap::new();
     if let Some(root) = plan.root_occurrence {
         derive_checked_ih_bindings(plan, root, &[], &mut out)?;
@@ -5331,6 +5369,21 @@ pub(super) fn build_checked_ih_bindings(
         derive_checked_ih_bindings(plan, origin, &[], &mut out)?;
     }
     Ok(out)
+}
+
+pub(super) fn build_checked_ih_bindings(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<BTreeMap<StaticOriginId, CheckedIhBinding>, CraneliftBackendError> {
+    Ok(build_checked_binder_provenance(plan)?
+        .into_iter()
+        .filter_map(|(origin, provenance)| match provenance {
+            CheckedBinderProvenance::InductionHypothesis(binding) => Some((origin, binding)),
+            CheckedBinderProvenance::ConstructorChild { .. }
+            | CheckedBinderProvenance::LexicalClosureParameter { .. }
+            | CheckedBinderProvenance::LexicalClosureCapture { .. }
+            | CheckedBinderProvenance::Ordinary => None,
+        })
+        .collect())
 }
 
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — why one body receives no
