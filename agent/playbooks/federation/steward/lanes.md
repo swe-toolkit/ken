@@ -45,7 +45,7 @@ each node (`git fetch`; read status) before acting; a node id decays.
 | lane | ring | objective |
 |---|---|---|
 | 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (M-series defunctionalization). M6/M4/M3 merged. Active successor: `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` (`ready`, the ExitCode recut). `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` + `RT-UNIT-FAILURE-STATUS-PROVENANCE` `draft`. |
-| 2 | language | Module/import campaign `LANG-MODULE-IMPORT-SYSTEM` — essentially COMPLETE (WP-1/2/3/4A merged incl. strict resolution). Remaining member work (Component B remainder, Nat provider, `CAT-GCD-REFACTOR`) is gated on the Nat Decision `dec_1kqwn6hdvn7d2`; lane-2 interim direction is an operator call (surfaced 2026-08-25). |
+| 2 | language | CURRENT: the internal-provision prelude recut `LANG-MOD-PAIR-FLOOR-PROVIDER` (spec WP, LAUNCHED 2026-08-26 — spec ring authoring; admits Pair to the prelude floor by one general internal-provision arm, reusing the four compiler-installed Pair GlobalIds). NEXT after it lands: the z3 integration campaign (operator 2026-08-26). Module/import umbrella `LANG-MODULE-IMPORT-SYSTEM` is essentially COMPLETE (WP-1/2/3/4A merged incl. strict resolution). |
 | 3 | foundation | Catalog-reuse modernization. Expressibility trial COMPLETE (all CAT algos merged; Architect not overloaded = 3-lane feasibility PROVEN, operator 2026-08-26). Lane now: pilot `CAT-ORDER-PUB-EXPORT` (released 2afacd0c0) then `CAT-GCD-REFACTOR`; a catalog-wide census/campaign is PROPOSED, pending operator scope. |
 
 **Lane 1 — runtime (priority).** The native carried-value program
@@ -65,8 +65,24 @@ sequenced after; not folded). `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` (`draft`
 stays distinct. The NHC chain + `RT-BACKEND-MODULE-SPLIT` are drained/merged.
 Architect is required reviewer on the M-series — the Architect-heavy lane.
 
-**Lane 2 — language: module/import campaign `LANG-MODULE-IMPORT-SYSTEM`.** This
-is the lane's current objective and it UNBLOCKS lane-3 foundation. Framing is
+**Lane 2 — language. CURRENT (2026-08-26): the internal-provision prelude recut
+`LANG-MOD-PAIR-FLOOR-PROVIDER`, then the z3 integration campaign.** Operator
+2026-08-26: "first launch the internal-provision prelude recut and finish that
+effort, then return to the z3 integration campaign." The recut is a Steward-owned
+spec WP (Architect shaping `evt_7d0ecgkd8ate3`) — LAUNCHED: frame landed
+`c1945c6fb`, spec ring authoring on anchor `evt_6yc0k921tf3j`. It generalizes
+prelude membership to ONE internal-provision arm (kernel or compiler origin),
+admits Pair as the first compiler-provided member reusing the four existing
+compiler-installed Pair `GlobalId`s, and supersedes the exact-nine boundary of
+`LANG-MOD-PAIR-STRICT-BOUNDARY`. Its build successor
+`LANG-MOD-CANONICAL-PAIR-PACKAGE` (`depends_on` repointed) realizes the split
+inventories after the spec lands. After the recut lands, lane 2 returns to the
+z3 integration campaign (verify/FO-checker resume). The module/import history
+below is DONE.
+
+**Module/import campaign `LANG-MODULE-IMPORT-SYSTEM` (history — essentially
+COMPLETE).** This was the lane's prior objective and it UNBLOCKED lane-3
+foundation. Framing is
 COMPLETE (Architect 4-WP decomposition `evt_hpnhqy1ex286`; spec-surface merged
 `def16ecf4`). Member-WP state (re-measure before acting): WP-1
 `LANG-MOD-LOADER-ENTRY` merged; WP-3 `LANG-MOD-PUB-ELIGIBILITY` merged; WP-4A
