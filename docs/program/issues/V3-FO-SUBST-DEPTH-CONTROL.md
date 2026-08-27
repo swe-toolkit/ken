@@ -11,6 +11,25 @@ github: https://github.com/swe-toolkit/ken/pull/2382
 origin: "Steward, 2026-08-16, dispositioning Adversary hunt evt_d1wy8d6kytpw on the merged range 790c16ea6..197374712. The hunt answered a question the Steward handed it on V3-FO-GUARD-SHIFT-DIFFERENTIAL's merge -- whether the depth<=1 refutation shape generalizes -- and it does. Every coordinate re-verified by symbol against origin/main b03c1084b before filing. Steward-filed per COORDINATION section 2."
 ---
 
+> # 2026-08-27 — THIS NODE'S CONTROL IS NOW INSUFFICIENT. SUBSUMED, NOT RE-CUT.
+>
+> **Stays `merged`; its deliverables landed.** Architect ruling
+> `evt_6hx31xvw9tqs2` names the substitution control this node built as
+> **insufficient**: the required oracle is over **at least two nested binders in
+> BOTH mixed world/object orders**, distinguishing the **consumed**, the
+> **inner**, and the **strictly-higher** bound references.
+>
+> **That obligation is subsumed as `AC-4` of
+> [[V3-FO-SORTED-EIGENPARAMETER-DERIVATION]]**, not re-cut as its own node —
+> `subst0` on this path is being replaced by typed parameter instantiation there,
+> so a separate deepening of the control would be measuring a function that is
+> about to change.
+>
+> **This node's finding is load-bearing for that successor and is restated in
+> it:** the producer (`search`) and the checker (`check_tree`) share
+> `subst0_form`, so a depth or sort error is applied identically on both sides
+> and **no route through search-then-check can discriminate it at any depth.**
+
 ## The finding, measured, and it is not the same size as its predecessor
 
 **`subst_form_at` raises `depth + 1` at `ForallWorld` and `ForallObj`

@@ -50,7 +50,7 @@ a pointer to check, not a fact.
 | lane | ring | objective |
 |---|---|---|
 | 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (`active`, M-series defunctionalization). M6/M4/M3 merged; `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` and `RT-UNIT-FAILURE-STATUS-PROVENANCE` MERGED. CURRENT: `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` (`active`) — **HS11 per-arrival recut landed `fec63506a`** (frame blob `1ae3e449a8f2`, Architect frame-review APPROVE `evt_2wvn3szecym9f`) and **RE-RELEASED `evt_1mgb3zbskwbg3`**. SEVEN hard stops taken; next mandatory §1a/§1b advisory trigger is **stop 12, NOT 10** (Architect `evt_2s144kdddyckn`). It blocks `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` (`active`), whose D3A+D3B stays FROZEN pending its own separate release. `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` still `draft`. |
-| 2 | language | `LANG-INDEX-REFINEMENT-OMEGA-ARM` **MERGED** — both deliverables landed (D1 `e13df606a`, D2 `ef91b8225`, blob-verified); no D3. `LANG-MOD-CANONICAL-PAIR-PACKAGE` **MERGED `40e7f1199`** (blob-verified; its surviving `wp/` branch is the pre-squash remnant, NOT an unlanded candidate). **`V3-FO-EMBEDDING-ADEQUACY` D2 is HELD, NOT current**: its landed D1 statement `fok_embedding_adequacy_statement` is REFUTED by an accepted capture-exploiting certificate (`evt_2yh515wg0mczy`) — a kernel-checked theorem derives `Bottom`, so no D2 proof or fragment can be authored. Architect owes the soundness ruling; Steward disposition follows. Route FO is fail-safe meanwhile (`prover.rs:562-604` withholds `Unknown`, never `Proved`). Only remaining candidate active: `LANG-MOD-CATALOG-COMPLETENESS` (authorized partial; remainder held on Nat Decision `dec_1kqwn6hdvn7d2`). HAZARD for any Omega-elimination work: the omega arm retains a bounded TWO-INDEX limitation as UNSUPPORTED (Architect `evt_7wbrfyvwv5517`) — single-index only; a multi-index need HARD-STOPS to Steward + Architect. NEXT: the z3 integration campaign (operator 2026-08-26). `LANG-MODULE-IMPORT-SYSTEM` COMPLETE. |
+| 2 | language | `LANG-INDEX-REFINEMENT-OMEGA-ARM` **MERGED** — both deliverables landed (D1 `e13df606a`, D2 `ef91b8225`, blob-verified); no D3. `LANG-MOD-CANONICAL-PAIR-PACKAGE` **MERGED `40e7f1199`** (blob-verified; its surviving `wp/` branch is the pre-squash remnant, NOT an unlanded candidate). **FO IS RECUT INTO A THREE-NODE REPAIR SEQUENCE (2026-08-27).** The landed D1 statement `fok_embedding_adequacy_statement` is REFUTED by an accepted capture-exploiting certificate (`evt_2yh515wg0mczy`); Architect `evt_6hx31xvw9tqs2` REJECTED the whole checker/derivation/adequacy interface as a semantic soundness gate, not repairable by finishing the proof. Sequence: `CORE-FO-CHECK-TREE-SORT-VALIDATION` (`ready`, predecessor) → `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` (`draft`, NEW, the ATOMIC lockstep increment — never split it) → `V3-FO-EMBEDDING-ADEQUACY` D2a/D2b. `V3-FO-CHECKER-SOUNDNESS` and `V3-FO-SUBST-DEPTH-CONTROL` stay `merged` with superseded-banners. Route FO is fail-safe meanwhile (`prover.rs:562-604` withholds `Unknown`, never `Proved`) — the rejection invalidates the proposed THEOREM GATE, not the production verdict boundary. Only remaining candidate active: `LANG-MOD-CATALOG-COMPLETENESS` (authorized partial; remainder held on Nat Decision `dec_1kqwn6hdvn7d2`). HAZARD for any Omega-elimination work: the omega arm retains a bounded TWO-INDEX limitation as UNSUPPORTED (Architect `evt_7wbrfyvwv5517`) — single-index only; a multi-index need HARD-STOPS to Steward + Architect. NEXT: the z3 integration campaign (operator 2026-08-26). `LANG-MODULE-IMPORT-SYSTEM` COMPLETE. |
 | 3 | foundation | Catalog-reuse modernization. Expressibility trial COMPLETE (3-lane feasibility PROVEN, operator 2026-08-26). Pilot chain DONE: `CAT-ORDER-PUB-EXPORT`, `CAT-GCD-REFACTOR`, `CAT-REUSE-CENSUS` all MERGED. CURRENT: `CAT-NAT-REUSE-CONSUMERS` (`active`) — six per-package increments. D1 `6ba6f6bef`, D2 `428ea1188`, D3 `9de02daff` MERGED. **D4 released `evt_5smy0nbdt3qcy`**, in build. D5/D6 held, each needs its own explicit release, D6 (`Derived.ken.md`) LAST as the risk increment. **A consuming TEST FIXTURE's root set is part of an increment's path set here** — established by D1 (cc6a/cc7/cc8) and D2 (cc2/cc3/cc4/ds9/d0), ruled for D4 at `evt_1b31assx1ktg8`/`evt_6snwh0xy60jh8`/`evt_2r8cavz7b1bms`. Carry that authorization INTO the D5 release so it does not hard-stop for it again. |
 
 **Lane 1 — runtime (priority).** The native carried-value program
@@ -105,6 +105,43 @@ supersedes the other. `LANG-MOD-CATALOG-COMPLETENESS` and
 `LANG-MOD-CANONICAL-PAIR-PACKAGE` also `active`. The z3 integration campaign is
 NEXT, once these drain. The prelude recut below is DONE and is history, not
 current work.
+
+**THE FO RECUT (2026-08-27), which supersedes the FO paragraph above.** The
+Architect REJECTED the current FO checker/derivation/adequacy interface as a
+semantic soundness gate (`evt_6hx31xvw9tqs2`, base `ef91b8225`) and ruled it
+**not repairable by finishing the current proof**. Cause: both Rust and Ken give
+`ForallRight` an arbitrary eigenterm, the guard checks only non-occurrence in the
+conclusion, and the shared untyped de Bruijn substitution installs a fresh
+`Bound(k)` across world AND object binders. **Freshness is not eigenparameter
+provenance.** `fok_checker_soundness` is a STRUCTURAL REFLECTION theorem for the
+relation it is given, and that relation carries the same permissive rule — so a
+Rust-side guard alone does not close the class.
+
+**Steward disposition: three nodes, not four**, confirmed against the frames
+rather than asserted:
+
+1. `CORE-FO-CHECK-TREE-SORT-VALIDATION` — `ready`, PROMOTED from optional
+   hardening to PREDECESSOR. Its old "Why this is hardening and NOT a soundness
+   fix" section is FALSIFIED and removed (it was keyed on formula reachability;
+   the refutation is on the certificate axis). **The tag-vs-pass fork is now
+   RULED: validation pass, no sort tag on the target datatypes** — a carried tag
+   moves the datatype `fok_checker_soundness` is stated over and would collapse
+   the sequence into one atomic frame. Discovering the pass is insufficient is a
+   HARD STOP to the Steward, not something to absorb.
+2. `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` — NEW, `draft`, **ONE ATOMIC
+   INCREMENT and it cannot be split** (envelope item 5 lockstep: Rust
+   checker/search + Ken checker + `FokDerivation` constructors + reflection
+   proofs together). It SUPERSEDES the relation `V3-FO-CHECKER-SOUNDNESS` proved
+   and SUBSUMES `V3-FO-SUBST-DEPTH-CONTROL`'s control obligation as its `AC-4`.
+   Both of those stay `merged` — their deliverables did land — and carry banners.
+3. `V3-FO-EMBEDDING-ADEQUACY` — D2 recut into `D2a` (re-measure whether the
+   landed statement text survives the corrected relation; may hard-stop) + `D2b`
+   (prove it). **Do not pre-decide `D2a`**: `fok_classically_valid` is
+   `fok_derives (⊢ q)`, so correcting `FokDerivation` changes what the statement
+   MEANS without necessarily changing what it SAYS.
+
+**Say this whenever quoting "REJECT": production is unaffected.** The ruling
+invalidates the proposed theorem gate, not the production verdict boundary.
 
 > **Carry this into any lane-2 work that eliminates index-dependent Omega
 > evidence.** The omega arm fixed decisions 1-3 but explicitly did NOT close the
