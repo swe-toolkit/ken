@@ -24,7 +24,9 @@ is acceptance — if your only reason to name someone is that you received / agr
 with / are proceeding on their message, mention **no one** and post **nothing**.
 
 - A status/checkpoint report mentions nobody.
-- A reviewer's APPROVE needs no ack.
+- A reviewer's APPROVE needs no ack. **This means the REQUESTER does not ack the
+  vote. It does NOT mean the vote itself goes unmentioned** — see the gate-vote
+  case below, which is the one place "mention nobody" is actively wrong.
 - "Packaging X / relaying to Y" is just **done** — mention Y iff Y moves next,
   never announced back to the requester.
 - On a substantive routing post (decision, finding, handoff), mention **only the
@@ -36,6 +38,40 @@ because I posted?"* If no, drop the mention — often the whole post.
 **Why:** a mention that expects no move is pure noise that trains the fleet to
 tune mentions out, which then buries the ones that do need action.
 Honesty-about- the-boundary, applied to attention.
+
+## A GATE VOTE ALWAYS MENTIONS THE SEAT THAT ROUTES IT
+
+**Measured 2026-08-27, lane 2.** `language-qa` posted an exact-SHA APPROVE on
+D1 candidate `3cc2ea718` and a release status, **neither carrying a `mentions`
+array**. The implementer knew. The leader — the seat that owns the Decision and
+the merge routing — did not, and its sweep correctly concluded *"D1 QA remains
+pending."* The ring sat waiting on a vote that had already been cast, and the
+Steward broke it by reading QA's pane. `language-qa` confirmed the omission.
+
+**This is not a contradiction of the rule above; it is the rule applied.** A
+gate vote is the paradigm case of *"the next actor is someone specific"* — an
+APPROVE hands the leader its next move (raise the Decision, route the merge), and
+a REJECT hands the implementer its next move. So:
+
+- **APPROVE / REJECT on an exact SHA: mention the routing seat** (the leader,
+  and the Steward where it gates). Never zero mentions.
+- **Release / stand-down / status after the vote: mention nobody.** That half
+  was correct.
+
+**Why it hides.** At the waiting end, *"the vote has not been cast"* and *"the
+vote was cast without notifying me"* produce **identical evidence** — no
+notification, and a leader status that truthfully says pending. Nothing in the
+leader's view distinguishes them, so the ring can idle indefinitely with every
+seat individually correct. The waiter cannot detect this; only the voter can
+prevent it, or an outside seat reading the voter's pane.
+
+**Generalisation worth keeping:** *"mention nobody"* is safe for anything that
+reports state, and unsafe for anything that **transfers an obligation**. Before
+dropping the mention, ask whether your post moves work onto someone else's desk.
+If it does, the mention is not courtesy — it is the delivery mechanism.
+
+Related: [[a-candidate-handoff-that-skips-the-leader-deadlocks-the-ring]] (the
+same deadlock reached by mentioning the wrong seat rather than none).
 
 ## Who — grep the id, never type it
 
