@@ -11,13 +11,14 @@ use ken_kernel::{declare_primitive, Decl, GlobalId, PrimReduction, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const LANDED_FLOOR_NAMES: [&str; 9] = [
+const LANDED_FLOOR_NAMES: [&str; 10] = [
     "Auth",
     "Bool",
     "Char",
     "List",
     "Nat",
     "Option",
+    "Pair",
     "ResourceKind",
     "Result",
     "Utf8Error",
@@ -29,7 +30,7 @@ struct FloorCase {
     source: &'static str,
 }
 
-const FLOOR_CASES: [FloorCase; 9] = [
+const FLOOR_CASES: [FloorCase; 10] = [
     FloorCase {
         name: "Auth",
         constructors: &["ANone", "APartial", "AFull"],
@@ -59,6 +60,11 @@ const FLOOR_CASES: [FloorCase; 9] = [
         name: "Option",
         constructors: &["None", "Some"],
         source: "fn witness (x : Option Bool) : Option Bool = match x { None |-> Some Bool True ; Some y |-> None Bool }",
+    },
+    FloorCase {
+        name: "Pair",
+        constructors: &[],
+        source: "fn witness (x : Pair Bool Bool) : Pair Bool Bool = x",
     },
     FloorCase {
         name: "ResourceKind",
@@ -310,22 +316,23 @@ fn primitive_signature_type_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
         .collect()
 }
 
-/// Promise class: normative compatibility vector. The configured floor must be
-/// exactly the executable primitive-signature inventory plus bootstrap Nat.
+/// Promise class: normative compatibility vector. The configured type floor
+/// must be exactly the executable primitive-signature inventory plus the two
+/// internal-provision identities Nat and Pair.
 ///
 /// **MEASURED:** walking every kernel `Decl::Primitive` type reaches exactly
 /// the eight checked surface-type identities and a test-only primitive extends
 /// that result with its checked `Extra` parameter. **CLAIMED:** the signature
-/// arm is producer-closed rather than a selected helper census, and adding Nat
-/// yields exactly the configured floor. **THE GAP:** bootstrap Nat membership
-/// remains a separately specified identity arm; the primitive traversal does
-/// not derive it.
+/// arm is producer-closed rather than a selected helper census, and adding the
+/// two independently specified internal identities yields exactly the configured
+/// floor. **THE GAP:** the primitive traversal does not derive either internal
+/// provision witness.
 #[test]
 fn primitive_signature_inventory_is_executable_and_closed() {
     let mut env = ElabEnv::new().expect("base environment");
     let expected_signature = LANDED_FLOOR_NAMES
         .into_iter()
-        .filter(|name| *name != "Nat")
+        .filter(|name| !matches!(*name, "Nat" | "Pair"))
         .map(|name| env.globals[name])
         .collect::<BTreeSet<_>>();
     let observed = primitive_signature_type_ids(&env);
@@ -335,9 +342,10 @@ fn primitive_signature_inventory_is_executable_and_closed() {
         .into_iter()
         .map(|name| env.globals[name])
         .collect::<BTreeSet<_>>();
-    let mut observed_plus_nat = observed.clone();
-    assert!(observed_plus_nat.insert(env.globals["Nat"]));
-    assert_eq!(configured, observed_plus_nat);
+    let mut observed_plus_internal_provision = observed.clone();
+    assert!(observed_plus_internal_provision.insert(env.globals["Nat"]));
+    assert!(observed_plus_internal_provision.insert(env.globals["Pair"]));
+    assert_eq!(configured, observed_plus_internal_provision);
     assert!(!configured.contains(&env.globals["Prod"]));
 
     env.elaborate_file("data Extra = MkExtra")
@@ -370,12 +378,12 @@ fn primitive_signature_inventory_is_executable_and_closed() {
 /// **MEASURED:** each per-family fixture elaborates through strict roots, its
 /// checked type/body mentions the pre-existing family and constructor ids, and
 /// only the fixture's one witness declaration is allocated. **CLAIMED:** the
-/// nine-name floor reuses canonical identities and is constructor-parent
+/// ten-name type floor reuses canonical identities and is constructor-parent
 /// closed with zero trust growth. **THE GAP:** this checks the current closed
 /// inventory; the producer-derived signature equality above guards why eight
 /// members belong.
 #[test]
-fn strict_roots_accept_all_nine_canonical_families_and_constructors() {
+fn strict_roots_accept_all_ten_canonical_families_and_constructors() {
     assert_eq!(
         PRELUDE_FLOOR_NAMES.as_slice(),
         LANDED_FLOOR_NAMES.as_slice()
@@ -433,7 +441,7 @@ fn strict_roots_accept_all_nine_canonical_families_and_constructors() {
 #[test]
 fn strict_floor_export_allocates_nothing_and_nonmember_prod_rejects() {
     let root = FixtureRoot::new("zero-allocation");
-    root.write("export Auth, Bool, Char, List, Nat, Option, ResourceKind, Result, Utf8Error");
+    root.write("export Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result, Utf8Error");
     let mut env = ElabEnv::new().expect("base environment");
     let ids_before = LANDED_FLOOR_NAMES.map(|name| env.globals[name]);
     let declarations_before = env.env.declarations().len();

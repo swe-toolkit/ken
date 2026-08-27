@@ -9,7 +9,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use ken_elaborator::modules::{catalog_module_from_path, PRELUDE_FLOOR_NAMES};
+use ken_elaborator::modules::{
+    catalog_module_from_path, PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES,
+};
 use ken_elaborator::{literate, parser, Decl as SurfaceDecl, ElabEnv, ElabError, ExportForm, Span};
 use ken_kernel::{
     ConstructorDecl, Decl, GlobalId, InductiveDecl, KernelError, Level, ParameterPolarity,
@@ -362,6 +364,7 @@ fn strict_available_ids(base: &ElabEnv) -> BTreeSet<GlobalId> {
         .collect();
     let mut available = trusted;
     available.extend(floor_formers.iter().copied());
+    available.extend(PRELUDE_COMPANION_BINDING_NAMES.map(|name| base.globals[name]));
     for id in base.globals.values().copied() {
         if base
             .env

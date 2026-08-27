@@ -250,7 +250,7 @@ impl ElabEnv {
             &elab.env,
             &elab.globals,
             &elab.prelude_env.native_trusted_base,
-        );
+        )?;
         Ok(elab)
     }
 

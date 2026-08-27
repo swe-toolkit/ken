@@ -1114,7 +1114,7 @@ fn unknown_ctor_in_pattern_is_error() {
 #[test]
 fn data_two_arg_ctor_match_accepted() {
     let mut env = mk_env();
-    elab_ok(&mut env, "data Pair = P Int Int");
+    elab_ok(&mut env, "data Duo = P Int Int");
 
     let id = elab_ok(
         &mut env,
@@ -1123,12 +1123,12 @@ fn data_two_arg_ctor_match_accepted() {
     let body = body_of(&env, id);
     assert!(matches!(body, Term::Elim { .. }));
 
-    // ι-reduces: elim_Pair M [λx.λy.x] (P 1 2) ⇝ (λx.λy.x) 1 2 ⇝ 1
+    // ι-reduces: elim_Duo M [λx.λy.x] (P 1 2) ⇝ (λx.λy.x) 1 2 ⇝ 1
     let ctx = Context::new();
     let reduced = whnf(&env.env, &ctx, &body);
     assert!(
         !matches!(reduced, Term::Elim { .. }),
-        "Pair match should ι-reduce"
+        "Duo match should ι-reduce"
     );
 }
 

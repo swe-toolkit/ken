@@ -80,25 +80,48 @@ pub struct ModuleState {
     roots_resolution_mode: Option<ResolutionMode>,
 }
 
-/// The complete Ken-defined always-present floor (`30-taxonomy §4`).
+/// The complete Ken-defined always-present type floor (`30-taxonomy §4`).
 ///
-/// Strict resolution consults [`is_prelude_floor_name`] so the configured
+/// Strict resolution consults [`is_prelude_floor_name`] so the configured type
 /// inventory has one source of truth. Its signature arm is independently
-/// derived from every primitive declaration type by the realization controls.
-pub const PRELUDE_FLOOR_NAMES: [&str; 9] = [
+/// derived from every primitive declaration type by the realization controls;
+/// `Nat` and `Pair` have separate internal-provision witnesses.
+pub const PRELUDE_FLOOR_NAMES: [&str; 10] = [
     "Auth",
     "Bool",
     "Char",
     "List",
     "Nat",
     "Option",
+    "Pair",
     "ResourceKind",
     "Result",
     "Utf8Error",
 ];
 
+/// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
+/// These are not type-floor members and do not increase its ten-member count.
+pub const PRELUDE_COMPANION_BINDING_NAMES: [&str; 3] = ["mk_pair", "pair_fst", "pair_snd"];
+
 pub fn is_prelude_floor_name(name: &str) -> bool {
     PRELUDE_FLOOR_NAMES.contains(&name)
+}
+
+fn term_mentions_global(term: &ken_kernel::Term, target: ken_kernel::GlobalId) -> bool {
+    match term {
+        ken_kernel::Term::Const { id, .. }
+        | ken_kernel::Term::IndFormer { id, .. }
+        | ken_kernel::Term::Constructor { id, .. }
+            if *id == target =>
+        {
+            true
+        }
+        ken_kernel::Term::Elim { fam, .. } if *fam == target => true,
+        _ => term
+            .children()
+            .into_iter()
+            .any(|child| term_mentions_global(child, target)),
+    }
 }
 
 impl ModuleState {
@@ -125,11 +148,50 @@ impl ModuleState {
         env: &ken_kernel::GlobalEnv,
         globals: &HashMap<String, ken_kernel::GlobalId>,
         native_trusted_base: &std::collections::BTreeSet<ken_kernel::GlobalId>,
-    ) {
+    ) -> Result<(), ElabError> {
         let floor_formers: HashSet<_> = PRELUDE_FLOOR_NAMES
             .iter()
-            .filter_map(|name| globals.get(*name).copied())
-            .collect();
+            .map(|name| {
+                globals.get(*name).copied().ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "prelude type-floor member `{name}` has no pre-source identity"
+                    ))
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        let pair_id = globals.get("Pair").copied().ok_or_else(|| {
+            ElabError::Internal(
+                "prelude type-floor member `Pair` has no pre-source identity".to_string(),
+            )
+        })?;
+
+        let companion_bindings = PRELUDE_COMPANION_BINDING_NAMES
+            .iter()
+            .map(|name| {
+                let id = globals.get(*name).copied().ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "prelude Pair companion `{name}` has no pre-source identity"
+                    ))
+                })?;
+                if !matches!(env.lookup(id), Some(ken_kernel::Decl::Transparent { .. })) {
+                    return Err(ElabError::Internal(format!(
+                        "prelude Pair companion `{name}` is not checked-transparent"
+                    )));
+                }
+                let (_, ty) = env.const_type(id).ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "prelude Pair companion `{name}` is not a checked constant"
+                    ))
+                })?;
+                if !term_mentions_global(&ty, pair_id) {
+                    return Err(ElabError::Internal(format!(
+                        "prelude Pair companion `{name}` is not keyed to the exact Pair identity"
+                    )));
+                }
+                Ok((name.to_string(), id))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
         self.prelude_binding_names = self.prelude_names.clone();
         self.strict_builtin_names = globals
             .iter()
@@ -143,6 +205,11 @@ impl ModuleState {
                 (native_trusted_base.contains(id) || floor_constructor).then_some(name.clone())
             })
             .collect();
+        for (name, _) in companion_bindings {
+            self.prelude_binding_names.insert(name.clone());
+            self.strict_builtin_names.insert(name);
+        }
+        Ok(())
     }
 }
 
