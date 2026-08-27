@@ -18,8 +18,8 @@
 //! rule) therefore need its provider closure concatenated ahead of their own
 //! source. This legacy runner extracts the canonical closure, removes every
 //! now-redundant import edge from the flattened provider sources with exact
-//! cardinality checks, and orders Transport, Or, OrdResult, Compare, then
-//! Derived.
+//! cardinality checks, and orders Transport, Or, OrdResult, Compare, the
+//! canonical Nat operations, then Derived.
 //!
 //! **This concatenation is NOT applied blanket to every example.**
 //! Empirically, unconditionally prepending declarations that a given
@@ -75,11 +75,69 @@ fn remove_flattened_import(source: &mut String, owner: &str, import: &str) {
     source.replace_range(start..start + import.len(), "");
 }
 
+fn flattened_braced_declaration(source: &str, owner: &str, start: &str) -> std::ops::Range<usize> {
+    let mut starts = source.match_indices(start);
+    let (start_offset, _) = starts
+        .next()
+        .unwrap_or_else(|| panic!("{owner} must carry declaration `{start}`"));
+    assert!(
+        starts.next().is_none(),
+        "{owner} must carry exactly one declaration `{start}`"
+    );
+
+    let body = &source[start_offset..];
+    let mut depth = 0usize;
+    let mut opened = false;
+    for (offset, byte) in body.bytes().enumerate() {
+        match byte {
+            b'{' => {
+                opened = true;
+                depth += 1;
+            }
+            b'}' if opened => {
+                depth -= 1;
+                if depth == 0 {
+                    return start_offset..start_offset + offset + 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    panic!("{owner} declaration `{start}` must close");
+}
+
+fn remove_flattened_segment(source: &mut String, owner: &str, start: &str, next: &str) {
+    let declaration = flattened_braced_declaration(source, owner, start);
+    let mut nexts = source.match_indices(next);
+    let (next_offset, _) = nexts
+        .next()
+        .unwrap_or_else(|| panic!("{owner} must carry following declaration `{next}`"));
+    assert!(
+        nexts.next().is_none(),
+        "{owner} must carry exactly one following declaration `{next}`"
+    );
+    assert!(
+        declaration.end <= next_offset && source[declaration.end..next_offset].trim().is_empty(),
+        "{owner}: `{next}` must immediately follow `{start}`"
+    );
+    source.replace_range(declaration.start..next_offset, "");
+}
+
+fn remove_flattened_tail(source: &mut String, owner: &str, start: &str) {
+    let declaration = flattened_braced_declaration(source, owner, start);
+    assert!(
+        source[declaration.end..].trim().is_empty(),
+        "{owner} declaration `{start}` must be last"
+    );
+    source.replace_range(declaration, "");
+}
+
 fn collections_prelude() -> String {
     let transport = catalog_source("catalog/packages/Core/Logic/Transport.ken.md");
     let or_source = catalog_source("catalog/packages/Core/Logic/Or.ken.md");
     let ord_result = catalog_source("catalog/packages/Core/Logic/OrdResult.ken.md");
     let mut compare = catalog_source("catalog/packages/Core/Logic/Compare.ken.md");
+    let mut nat_order = catalog_source("catalog/packages/Data/Numeric/Nat/Order.ken.md");
     let mut collections = catalog_source("catalog/packages/Data/Collections/Derived.ken.md");
 
     // `ken run` consumes one flat source unit here. Remove every import whose
@@ -92,17 +150,28 @@ fn collections_prelude() -> String {
     ] {
         remove_flattened_import(&mut compare, "Compare", import);
     }
+    for flattened_edge in [
+        "import Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)",
+        "export Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)",
+        "data OrdResult = Lt | Eq | Gt",
+    ] {
+        remove_flattened_import(&mut nat_order, "Nat.Order", flattened_edge);
+    }
+    remove_flattened_segment(&mut nat_order, "Nat.Order", "pub fn max", "pub fn sub");
+    remove_flattened_tail(&mut nat_order, "Nat.Order", "pub fn compare");
+
     for import in [
         "import Core.Logic.Compare (list_compare, list_eq)",
         "import Core.Logic.Or (Or, Inl, Inr)",
         "import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)",
         "import Core.Logic.OrdResult\n  (ord_result_leq, ord_result_dispatch2, ord_result_elim, ord_result_elim2)",
         "import Core.Logic.Transport (cong, sym, trans)",
+        "import Data.Numeric.Nat.Order (min, sub)",
     ] {
         remove_flattened_import(&mut collections, "Derived", import);
     }
 
-    format!("{transport}\n{or_source}\n{ord_result}\n{compare}\n{collections}")
+    format!("{transport}\n{or_source}\n{ord_result}\n{compare}\n{nat_order}\n{collections}")
 }
 
 enum Oracle {

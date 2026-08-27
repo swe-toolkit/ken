@@ -8,11 +8,58 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-use ken_elaborator::{foreign::trusted_base_delta, ElabEnv};
-use ken_kernel::Decl;
+use std::collections::BTreeSet;
+
+use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
+use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_kernel::{Decl, GlobalId, Term};
 
 const COLLECTIONS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
+
+fn term_reference_count(term: &Term, target: GlobalId) -> usize {
+    let here = usize::from(matches!(term, Term::Const { id, .. } if *id == target));
+    here + term
+        .children()
+        .into_iter()
+        .map(|child| term_reference_count(child, target))
+        .sum::<usize>()
+}
+
+fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
+    match value {
+        NumericLitVal::Int(n) => EvalVal::from(n.clone()),
+        NumericLitVal::Float(f) => EvalVal::Float(*f),
+        NumericLitVal::Float32(f) => EvalVal::Float32(*f),
+        NumericLitVal::Decimal { coeff, exp } => {
+            ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
+        }
+        NumericLitVal::Str(s) => EvalVal::Str(s.clone()),
+        NumericLitVal::Bytes(b) => EvalVal::Bytes(b.clone()),
+    }
+}
+
+fn make_store(env: &ElabEnv) -> EvalStore {
+    let mut store = EvalStore::new();
+    let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;
+    for (id, value) in &env.num_values {
+        store
+            .num_values
+            .insert(*id, lit_to_eval(value, mkdecimalpair_id));
+    }
+    store.list_char_ids = Some(ListCharIds {
+        nil_id: env.prelude_env.nil_id,
+        cons_id: env.prelude_env.cons_id,
+    });
+    store
+}
+
+fn eval_transparent(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) -> EvalVal {
+    match env.env.lookup(id) {
+        Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
+        other => panic!("evaluation witness must be transparent, got {other:?}"),
+    }
+}
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
@@ -37,7 +84,6 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
         "filter",
         "mem",
         "length",
-        "min",
         "take_drop_decomposition",
         "map_length",
         "length_take_min",
@@ -107,6 +153,99 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
     }
 }
 
+/// Promise class: durable invariant.
+///
+/// MEASURED: the real roots-loaded Derived law types and slice body retain the
+/// canonical Order provider GlobalIds, no distinct local operation, and no
+/// trusted-base growth after the provider closure is loaded. CLAIMED: Derived
+/// reuses canonical `min` and saturating `sub` directly. THE GAP: the existing
+/// proof and behavior tests separately establish the laws and slice semantics.
+#[test]
+fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
+    let mut env = ElabEnv::new().expect("base env");
+    catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env);
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
+        .expect("canonical Nat order provider must roots-load");
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    catalog_or::load_derived_fixture(&mut env);
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Derived reuse must add zero trust");
+
+    let min = env.globals["Data.Numeric.Nat.Order.min"];
+    let sub = env.globals["Data.Numeric.Nat.Order.sub"];
+    assert!(env.env.transparent_body(min).is_some());
+    assert!(env.env.transparent_body(sub).is_some());
+    assert!(
+        !env.globals.contains_key("Data.Collections.Derived.nat_sub"),
+        "Derived must not mint local `nat_sub`"
+    );
+    for (local_name, provider) in [
+        ("Data.Collections.Derived.min", min),
+        ("Data.Collections.Derived.sub", sub),
+    ] {
+        if let Some(local_binding) = env.globals.get(local_name) {
+            assert_eq!(
+                *local_binding, provider,
+                "a module-local imported binding must preserve provider identity"
+            );
+        }
+    }
+
+    for law in ["length_take_min", "zip_length"] {
+        let id = env.globals[law];
+        let ty = match env.env.lookup(id) {
+            Some(Decl::Transparent { ty, .. }) => ty,
+            other => panic!("{law} must be transparent, got {other:?}"),
+        };
+        assert_eq!(
+            term_reference_count(ty, min),
+            1,
+            "{law}'s checked statement must use canonical min directly"
+        );
+    }
+
+    let slice = env.globals["slice"];
+    let body = match env.env.lookup(slice) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("slice must be transparent, got {other:?}"),
+    };
+    assert_eq!(
+        term_reference_count(body, sub),
+        1,
+        "slice must use canonical saturating sub directly"
+    );
+}
+
+#[test]
+fn slice_width_is_end_minus_start_through_production_slice() {
+    let mut env = mk_env();
+    let ordinary = env
+        .elaborate_decl(
+            "const cat3_slice_ordinary : String = \
+             slice (Suc Zero) (Suc (Suc (Suc Zero))) \"abcde\"",
+        )
+        .expect("ordinary production slice witness must elaborate");
+    let underflow = env
+        .elaborate_decl(
+            "const cat3_slice_underflow : String = \
+             slice (Suc (Suc (Suc Zero))) (Suc Zero) \"abcde\"",
+        )
+        .expect("underflow production slice control must elaborate");
+    let mut store = make_store(&env);
+
+    assert_eq!(
+        eval_transparent(&env, &mut store, ordinary),
+        EvalVal::Str("bc".into()),
+        "slice 1 3 must use end minus start and return bc"
+    );
+    assert_eq!(
+        eval_transparent(&env, &mut store, underflow),
+        EvalVal::Str(String::new().into()),
+        "slice 3 1 must saturate end minus start to zero"
+    );
+}
+
 #[test]
 fn cat3_d1_law_surfaces_are_proof_returning_not_prop_wrappers() {
     let compact = COLLECTIONS_KEN_MD
@@ -168,6 +307,9 @@ fn cat3_d1_law_surfaces_are_proof_returning_not_prop_wrappers() {
 #[test]
 fn cat3_d1_positive_surfaces_check_against_real_package_defs() {
     let mut env = mk_env();
+    let canonical_min = env.globals["Data.Numeric.Nat.Order.min"];
+    env.globals
+        .insert("cat3_canonical_min".to_owned(), canonical_min);
     env.elaborate_decl("fn cat3_to_true (x : Nat) : Bool = True")
         .expect("helper predicate should elaborate");
     env.elaborate_decl("fn cat3_nat_eq_all (x : Nat) (y : Nat) : Bool = True")
@@ -197,7 +339,7 @@ fn cat3_d1_positive_surfaces_check_against_real_package_defs() {
         "theorem cat3_length_take_min_sample \
            : Equal Nat \
               (length Nat (take Nat (Suc Zero) (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))) \
-              (min (Suc Zero) (length Nat (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))) \
+              (cat3_canonical_min (Suc Zero) (length Nat (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))) \
            = length_take_min Nat (Suc Zero) (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))",
     )
     .expect("length/take/min proof should check on a concrete list");

@@ -9,8 +9,6 @@ use std::collections::BTreeSet;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::Decl;
-
-const LAWFUL_CLASSES: &str = include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const BYTES_KEYS: &str =
     include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
 
@@ -18,9 +16,9 @@ fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES)
-        .expect("LawfulClasses package");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("LawfulClasses provider must roots-load");
+    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
     env
 }
 

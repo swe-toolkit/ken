@@ -15,8 +15,6 @@ use ken_kernel::Decl;
 mod catalog_or;
 
 const MODULE: &str = "Algorithm.Searching.OrderedSearch";
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const ORDERED_SEARCH_KEN_MD: &str =
     include_str!("../../../catalog/packages/Algorithm/Searching/OrderedSearch.ken.md");
 
@@ -38,8 +36,6 @@ fn legacy_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD)
-        .expect("Core.Classes.LawfulClasses must elaborate");
 
     let extracted = ken_elaborator::literate::extract_ken_md(ORDERED_SEARCH_KEN_MD)
         .expect("OrderedSearch literate source must extract");

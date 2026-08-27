@@ -10,6 +10,7 @@ const ORD_RESULT_MODULE: &str = "Core.Logic.OrdResult";
 const COMPARE_MODULE: &str = "Core.Logic.Compare";
 const DERIVED_MODULE: &str = "Data.Collections.Derived";
 const LAWFUL_MODULE: &str = "Core.Classes.LawfulClasses";
+const ORDER_MODULE: &str = "Data.Numeric.Nat.Order";
 
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -30,6 +31,20 @@ fn mentions_global(term: &Term, target: GlobalId) -> bool {
             .into_iter()
             .any(|child| mentions_global(child, target)),
     }
+}
+
+fn trusted_delta_qualified_names(
+    env: &ElabEnv,
+    before: &BTreeSet<GlobalId>,
+    after: &BTreeSet<GlobalId>,
+) -> BTreeSet<String> {
+    after
+        .difference(before)
+        .map(|id| match env.env.lookup(*id) {
+            Some(Decl::Opaque { name, .. }) => name.clone(),
+            other => panic!("new trusted entry {id:?} must be named and opaque, got {other:?}"),
+        })
+        .collect()
 }
 
 /// Promise class: durable invariant.
@@ -94,7 +109,64 @@ fn real_derived_consumer_reuses_canonical_logic_providers() {
     assert!(!env
         .globals
         .contains_key("Data.Collections.Derived.OrdResult"));
-    assert!(!env.globals.contains_key("Data.Numeric.Nat.Order.OrdResult"));
+
+    let order_local = env.globals["Data.Numeric.Nat.Order.OrdResult"];
+    assert!(matches!(
+        env.env.lookup(order_local),
+        Some(Decl::Inductive { .. })
+    ));
+    assert_ne!(
+        order_local, canonical,
+        "Order's package-local comparison codomain must remain distinct"
+    );
+
+    let mut derived_compare_bodies = Vec::new();
+    for name in ["compare_char", "compare"] {
+        let id = env.globals[&format!("Data.Collections.Derived.{name}")];
+        let (ty, body) = match env.env.lookup(id) {
+            Some(Decl::Transparent { ty, body, .. }) => (ty, body),
+            other => panic!("Derived {name} must be transparent, got {other:?}"),
+        };
+        assert!(
+            mentions_global(ty, canonical),
+            "Derived {name} must return canonical Core.Logic OrdResult"
+        );
+        assert!(
+            !mentions_global(ty, order_local),
+            "Derived {name} must not return Order's package-local OrdResult"
+        );
+        assert!(
+            !mentions_global(body, order_local),
+            "Derived {name} body must exclude Order's package-local OrdResult"
+        );
+        derived_compare_bodies.push((name, id, body));
+    }
+
+    let compare_char_body = derived_compare_bodies[0].2;
+    for provider in ["ord_eq", "ord_lt", "ord_gt"] {
+        let provider_id = env.globals[&format!("Core.Logic.OrdResult.{provider}")];
+        assert!(
+            mentions_global(compare_char_body, provider_id),
+            "Derived compare_char must use canonical {provider}"
+        );
+    }
+
+    let compare_body = derived_compare_bodies[1].2;
+    for (provider, provider_id) in [
+        (
+            "Core.Logic.Compare.list_compare",
+            env.globals["Core.Logic.Compare.list_compare"],
+        ),
+        (
+            "Data.Collections.Derived.compare_char",
+            derived_compare_bodies[0].1,
+        ),
+    ] {
+        assert!(
+            mentions_global(compare_body, provider_id),
+            "Derived compare must use exact provider {provider}"
+        );
+    }
 
     for name in [
         "pair_compare",
@@ -123,7 +195,20 @@ fn real_derived_consumer_reuses_canonical_logic_providers() {
     assert_eq!(env.loaded_module_count(), loaded_before);
 
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(before, after, "the real consumer closure must add no trust");
+    let derived_delta = trusted_delta_qualified_names(&env, &before, &after);
+
+    let mut canonical_order = ElabEnv::new().expect("canonical Order trust baseline");
+    let order_before: BTreeSet<_> = canonical_order.env.trusted_base().into_iter().collect();
+    canonical_order
+        .elaborate_module_from_roots(&[catalog_root()], ORDER_MODULE)
+        .expect("canonical Order must roots-load independently");
+    let order_after: BTreeSet<_> = canonical_order.env.trusted_base().into_iter().collect();
+    let order_delta = trusted_delta_qualified_names(&canonical_order, &order_before, &order_after);
+
+    assert_eq!(
+        derived_delta, order_delta,
+        "the real consumer closure must inherit exactly canonical Order's qualified-name trust delta"
+    );
 }
 
 /// Promise class: durable invariant.

@@ -8,8 +8,6 @@ use std::collections::BTreeSet;
 use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
-
-const LAWFUL_CLASSES: &str = include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const LAWFUL_FUNCTORS: &str = include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
 const BYTES_KEYS: &str =
     include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
@@ -19,15 +17,14 @@ fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("Core.Classes.LawfulClasses must roots-load");
+    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
+    env.elaborate_ken_md_file(BYTES_KEYS)
+        .expect("Data.Binary.BytesKeys must elaborate before the Nat-order closure");
     catalog_or::load_derived_fixture(&mut env);
-    for (name, source) in [
-        ("Core.Classes.LawfulClasses", LAWFUL_CLASSES),
-        ("Core.Classes.LawfulFunctors", LAWFUL_FUNCTORS),
-        ("Data.Binary.BytesKeys", BYTES_KEYS),
-    ] {
-        env.elaborate_ken_md_file(source)
-            .unwrap_or_else(|error| panic!("{name} must elaborate: {error}"));
-    }
+    env.elaborate_ken_md_file(LAWFUL_FUNCTORS)
+        .expect("Core.Classes.LawfulFunctors must elaborate");
     env
 }
 

@@ -27,10 +27,10 @@ ordinary fold through `bytes_to_list` with no cached length or local `Axiom`.
 `L3-strings-roundtrip`, landed the real `string_to_list_char`/
 `list_char_to_string` round trip this package rides) needs a `List`/`Nat`
 combinator floor and five derived `String` operations, stated once as
-ordinary checked Ken rather than re-derived per consumer. The floor is 7
-combinators, not 6: the WP's original frame assumed a landed saturating
-`Nat` subtraction (`sub`) that does not exist (only signed non-saturating
-`sub_int` is a primitive) — `nat_sub` is the 7th, derived in `§4.5` below.
+ordinary checked Ken rather than re-derived per consumer. The floor has seven
+combinators. Saturating `Nat` subtraction is the canonical
+`sub` operation imported from `Data.Numeric.Nat.Order` and described in `§4.5`
+below.
 Every combinator, law, and string op is a termination-checked recursive
 `declare_def` (upgrading opaque to transparent on `sct_check` success) over
 the real generic eliminator — a `match` on `List`/`Nat` lowers to a real
@@ -55,10 +55,12 @@ The first four of the seven floor combinators follow: `list_append`
 FS-effect, `crates/ken-elaborator/src/bytes.rs` — this is the pure
 `List a -> List a -> List a` op and must not shadow or be shadowed by it),
 `nth`, `take`, and `drop`. `list_eq` and `list_compare` are imported from
-the canonical comparison provider; `nat_sub` is declared in `§4.5`, next to
-the string ops that need it.
+the canonical comparison provider; `sub` is imported from the canonical Nat
+order provider and described in `§4.5`, next to the string ops that need it.
 
 ```ken
+import Data.Numeric.Nat.Order (min, sub)
+
 import Core.Logic.Compare (list_compare, list_eq)
 
 import Core.Logic.Or (Or, Inl, Inr)
@@ -162,16 +164,6 @@ fn length (a : Type) (xs : List a) : Nat =
   match xs {
     Nil ↦ Zero;
     Cons h t ↦ Suc (length a t)
-  }
-
-fn min (m : Nat) (n : Nat) : Nat =
-  match m {
-    Zero ↦ Zero;
-    Suc m2 ↦
-      match n {
-        Zero ↦ Zero;
-        Suc n2 ↦ Suc (min m2 n2)
-      }
   }
 
 theorem take_drop_decomposition
@@ -799,10 +791,10 @@ instance SetoidMorphism Unit {
 
 ### 4.5 The remaining floor combinators
 
-`nat_sub` is saturating `Nat` monus (never underflows) — `§4.6`'s `slice`
-needs exactly this shape for its length computation, identical to the
-landed `val1_string_literals.rs:327` `nat_sub` precedent. The imported
-`list_eq` and `list_compare` complete the seven-combinator floor from `§1`.
+`sub`, imported from the canonical `Data.Numeric.Nat.Order` provider, is
+saturating `Nat` monus and never underflows. `§4.6`'s `slice` needs exactly
+this structural computation for its length. The imported `list_eq` and
+`list_compare` complete the seven-combinator floor from `§1`.
 `compare_char` is a faithful 3-way repackaging of the landed `leqChar`/`eqChar`
 (`crates/ken-elaborator/src/decimal_char.rs`, Rust-side primitives — not
 catalog declarations, so their own names are untouched by this catalog's
@@ -812,16 +804,6 @@ directly; otherwise `Lt`/`Gt` follow from `leqChar`'s antisymmetry and
 totality (both landed `Ord Char` laws, by transport from `Ord Int`).
 
 ```ken
-fn nat_sub (a : Nat) (b : Nat) : Nat =
-  match b {
-    Zero ↦ a;
-    Suc n ↦
-      match a {
-        Zero ↦ Zero;
-        Suc m ↦ nat_sub m n
-      }
-  }
-
 fn compare_char (a : Char) (b : Char) : OrdResult =
   match eqChar a b {
     True ↦ ord_eq;
@@ -842,7 +824,7 @@ tested-not-trusted Boolean/decision ops, not lawful `DecEq String`/
 landed — a tracked follow-on; filing these as proof-carrying instances now
 would over-claim the trust level). `slice` clamps by construction: `drop`
 past the end yields `Nil`, `take` past the end stops at the end, and the
-length `nat_sub j i` saturates at `0` when `j < i` — never an underflow,
+length `sub j i` saturates at `0` when `j < i` — never an underflow,
 never stuck. `char_at` is total and honest about absence — `Option Char`,
 never a sentinel or a partial index. `eq` is codepoint-wise equality over
 the scalar sequence, riding the landed `eqChar` — this is never
@@ -860,7 +842,7 @@ fn slice (i : Nat) (j : Nat) (s : String) : String =
   let
     characters = string_to_list_char s;
     suffix = drop Char i characters;
-    slice_width = nat_sub j i;
+    slice_width = sub j i;
     selected_window = take Char slice_width suffix
   in
     list_char_to_string selected_window
@@ -944,7 +926,7 @@ reference implementation.
    §2.5.1/§4.1`; WP `L3-strings-surface` (this package, slice 2/2);
    `L3-strings-roundtrip` (slice 1, the native round trip this rides).
 2. **Public API.** `OrdResult`, `list_append`, `nth`, `take`, `drop`,
-   `nat_sub`, `list_eq`, `list_compare` (the 7-combinator floor); `map`,
+   `sub`, `list_eq`, `list_compare` (the 7-combinator floor); `map`,
    `filter`, `mem`, `length`, `min`, `take_drop_decomposition`,
    `map_length`, `length_take_min` (CAT-3 D1); `reverse`, `reverse::involutive`,
    `zip`, `concat_map`, `range`, `foldl` and their proofs (DS-4); `count`,
