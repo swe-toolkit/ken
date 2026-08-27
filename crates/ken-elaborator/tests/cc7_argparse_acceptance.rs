@@ -9,8 +9,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const LAWFUL_FUNCTORS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
 const EFFECTFUL_CLASSES_KEN_MD: &str =
@@ -42,8 +40,19 @@ fn dependency_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("Core.Classes.LawfulClasses must load as a qualified module");
+    let lawful_prefix = "Core.Classes.LawfulClasses.";
+    let lawful_aliases: Vec<_> = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            name.strip_prefix(lawful_prefix)
+                .map(|suffix| (suffix.to_owned(), *id))
+        })
+        .collect();
+    env.globals.extend(lawful_aliases);
     for (source, label) in [
-        (LAWFUL_CLASSES_KEN_MD, "Core.Classes.LawfulClasses"),
         (LAWFUL_FUNCTORS_KEN_MD, "Core.Classes.LawfulFunctors"),
         (EFFECTFUL_CLASSES_KEN_MD, "Core.Classes.EffectfulClasses"),
         (NONEMPTY_KEN_MD, "Data.Collections.NonEmpty"),

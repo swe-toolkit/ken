@@ -4,16 +4,18 @@
 mod catalog_or;
 
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, apply, eval};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
-const DIAGNOSTIC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
-const CURSOR_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
-const ARGUMENTS_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Process/Arguments.ken.md");
+const DIAGNOSTIC_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
+const CURSOR_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
+const ARGUMENTS_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Process/Arguments.ken.md");
 const EXIT_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
 
 fn dependency_env() -> ElabEnv {
@@ -21,19 +23,43 @@ fn dependency_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD)
-        .expect("Core.Classes.LawfulClasses must elaborate third");
+    env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("canonical Nat relation provider must elaborate third");
     env.elaborate_ken_md_file(DIAGNOSTIC_KEN_MD)
-        .expect("Capability.Diagnostics.Core must elaborate fourth");
+        .expect("Capability.Diagnostics.Core must elaborate third");
     env.elaborate_ken_md_file(CURSOR_KEN_MD)
-        .expect("Capability.Parsing.Cursor must elaborate fifth");
+        .expect("Capability.Parsing.Cursor must elaborate fourth");
     env
+}
+
+fn catalog_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages")
+}
+
+fn expose_module_aliases(env: &mut ElabEnv, module: &str) {
+    let prefix = format!("{module}.");
+    let aliases: Vec<_> = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            name.strip_prefix(&prefix)
+                .map(|suffix| (suffix.to_owned(), *id))
+        })
+        .collect();
+    env.globals.extend(aliases);
+}
+
+fn load_arguments_module(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_root()], "Capability.Process.Arguments")
+        .expect("Capability.Process.Arguments must load after Capability.Parsing.Cursor");
+    expose_module_aliases(env, "Capability.Process.Arguments");
 }
 
 fn full_env() -> ElabEnv {
     let mut env = dependency_env();
-    env.elaborate_ken_md_file(ARGUMENTS_KEN_MD)
-        .expect("Capability.Process.Arguments must elaborate after Capability.Parsing.Cursor");
+    load_arguments_module(&mut env);
     env.elaborate_ken_md_file(EXIT_KEN_MD)
         .expect("Capability.Process.Exit must elaborate after Capability.Process.Arguments");
     env
@@ -49,6 +75,21 @@ fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
             env.env.transparent_body(id).is_some(),
             "`{name}` must be a real transparent, kernel-checked term"
         );
+    }
+}
+
+fn term_mentions(term: &Term, target: GlobalId) -> bool {
+    match term {
+        Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. }
+            if *id == target =>
+        {
+            true
+        }
+        Term::Elim { fam, .. } if *fam == target => true,
+        _ => term
+            .children()
+            .into_iter()
+            .any(|child| term_mentions(child, target)),
     }
 }
 
@@ -186,7 +227,6 @@ fn ordered_dependency_closure_elaborates_both_packages() {
             "process_argument_at",
             "argument_at",
             "argument_bytes_at",
-            "argument_nat_leq",
             "argument_slice_location",
             "exit_success",
             "exit_failure",
@@ -194,6 +234,48 @@ fn ordered_dependency_closure_elaborates_both_packages() {
             "exit_from_result",
         ],
     );
+}
+
+#[test]
+fn arguments_reuses_the_canonical_lawful_classes_relation() {
+    let mut env = dependency_env();
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    load_arguments_module(&mut env);
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Arguments reuse must add zero trust");
+
+    let provider = env.globals["Core.Classes.LawfulClasses.leq_nat"];
+    assert!(env.env.transparent_body(provider).is_some());
+    assert!(
+        !env.globals.contains_key("Data.Numeric.Nat.Order.sub"),
+        "Arguments must import the canonical owner without loading the Order facade"
+    );
+    assert!(
+        !env.globals
+            .contains_key("Capability.Process.Arguments.argument_nat_leq"),
+        "Arguments must not mint a local Nat relation"
+    );
+    let slice = env.globals["Capability.Process.Arguments.argument_slice_location"];
+    let body = match env.env.lookup(slice) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("argument_slice_location must be transparent: {other:?}"),
+    };
+    assert!(
+        term_mentions(body, provider),
+        "argument_slice_location must retain the canonical provider GlobalId"
+    );
+
+    env.elaborate_file(
+        "import Core.Classes.LawfulClasses (leq_nat)\n\
+         fn cc6a_reused_leq (x : Nat) (y : Nat) : Bool = leq_nat x y",
+    )
+    .expect("canonical leq_nat must remain selectively importable");
+    let wrapper = env.globals["cc6a_reused_leq"];
+    let wrapper_body = match env.env.lookup(wrapper) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("selective-import wrapper must be transparent: {other:?}"),
+    };
+    assert!(term_mentions(wrapper_body, provider));
 }
 
 #[test]
@@ -352,8 +434,8 @@ fn exit_policy_is_total_explicit_and_keeps_uint8_payloads() {
 fn cc6a_has_zero_trust_delta_and_no_new_carrier_or_string_hop() {
     let arguments = ken_elaborator::literate::extract_ken_md(ARGUMENTS_KEN_MD)
         .expect("Capability.Process.Arguments must extract");
-    let exit =
-        ken_elaborator::literate::extract_ken_md(EXIT_KEN_MD).expect("Capability.Process.Exit must extract");
+    let exit = ken_elaborator::literate::extract_ken_md(EXIT_KEN_MD)
+        .expect("Capability.Process.Exit must extract");
     for (name, source) in [
         ("Capability.Process.Arguments", arguments.source.as_str()),
         ("Capability.Process.Exit", exit.source.as_str()),
@@ -386,8 +468,7 @@ fn cc6a_has_zero_trust_delta_and_no_new_carrier_or_string_hop() {
 
     let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(ARGUMENTS_KEN_MD)
-        .expect("Capability.Process.Arguments must elaborate in the shared environment");
+    load_arguments_module(&mut env);
     env.elaborate_ken_md_file(EXIT_KEN_MD)
         .expect("Capability.Process.Exit must elaborate in the shared environment");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
