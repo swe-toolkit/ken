@@ -22,10 +22,16 @@
 //!   covered by the full pre-existing suite staying green; direct check
 //!   here too).
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::EvalVal;
-use ken_kernel::KernelError;
+use ken_kernel::{check as kernel_check, Context, KernelError};
 use std::collections::BTreeSet;
+
+const FOK_SOURCE: &str =
+    include_str!("../../../catalog/packages/Tooling/Verification/FoKripke.ken");
 
 /// Structural equality on evaluated `Ctor` values, ignoring the K3 interning
 /// `slot` (which is store-assignment-order-dependent, not content-derived
@@ -71,6 +77,28 @@ fn elab_ok(env: &mut ElabEnv, src: &str) {
 fn expect_err_val(env: &mut ElabEnv, src: &str) -> ElabError {
     env.elaborate_decl(src)
         .expect_err("declaration unexpectedly elaborated")
+}
+
+fn env_with_fok() -> ElabEnv {
+    let mut env = mk_env();
+    catalog_or::load_core_logic_or(&mut env);
+    env.elaborate_file(FOK_SOURCE)
+        .expect("FoKripke including the landed derivation apparatus");
+    env
+}
+
+fn assert_transparent_body_kernel_checks(env: &ElabEnv, id: ken_kernel::GlobalId) {
+    let (body_levels, body) = env
+        .env
+        .transparent_body(id)
+        .expect("the checked declaration must remain transparent");
+    let (type_levels, ty) = env
+        .env
+        .const_type(id)
+        .expect("the checked declaration must retain its type");
+    assert!(body_levels.is_empty() && type_levels.is_empty());
+    kernel_check(&env.env, &Context::new(), &body, &ty)
+        .expect("the Omega-refined transparent body must kernel-check independently");
 }
 
 fn vec_env() -> ElabEnv {
@@ -619,4 +647,123 @@ fn interleaved_let_alias_of_enclosing_field_rejects_differently_under_region_set
              behaviour needs re-measuring: {other:?}"
         ),
     }
+}
+
+/// `LANG-INDEX-REFINEMENT-OMEGA-ARM` D1.
+///
+/// Promise class: durable invariant. Indexed constructor evidence may grow in
+/// shape, but any Omega-classified field depending on the refined index must
+/// remain structurally eliminable through the direct-J position arm. The base
+/// blob rejects this exact program with the former Type-only diagnostic.
+#[test]
+fn omega_classified_reindexed_position_uses_kernel_checked_transport() {
+    let mut env = mk_env();
+    elab_ok(
+        &mut env,
+        "data FokD2ProbeEquality : Nat -> Type where { \
+         FokD2ProbeEqualityMk : (n : Nat) -> Equal Nat n n \
+           -> FokD2ProbeEquality n }",
+    );
+    let id = env
+        .elaborate_decl(
+            "fn fok_d2_probe_equality \
+             (n : Nat) (d : FokD2ProbeEquality n) : Nat = \
+             match d { FokD2ProbeEqualityMk m h ↦ m }",
+        )
+        .expect("the held Probe source must transition from rejection to acceptance");
+    assert_transparent_body_kernel_checks(&env, id);
+}
+
+/// `AC-REAL-CONSUMER` and held-Probe transition. Both source programs below
+/// are byte-for-byte the two `FokDerivation` programs in evidence `3f687a460`:
+/// all four constructors under Type and Omega motives. The ordinary indexed,
+/// unindexed `FokCert`, and truncation-into-Omega controls remain positive too.
+#[test]
+fn real_fok_derivation_structural_consumers_cover_type_and_omega_motives() {
+    let mut env = env_with_fok();
+    elab_ok(
+        &mut env,
+        "data FokD2ProbePlain : Nat -> Type where { \
+         FokD2ProbePlainMk : (n : Nat) -> FokD2ProbePlain n }",
+    );
+    elab_ok(
+        &mut env,
+        "fn fok_d2_probe_plain (n : Nat) (d : FokD2ProbePlain n) : Nat = \
+         match d { FokD2ProbePlainMk m ↦ m }",
+    );
+    elab_ok(
+        &mut env,
+        "fn fok_d2_probe_cert (pi : FokCert) : Nat = \
+         match pi { FokMkCert conclusion rule children ↦ Zero }",
+    );
+    elab_ok(&mut env, "const fok_d2_probe_trunc : Omega = ‖Bool‖");
+    elab_ok(
+        &mut env,
+        "theorem fok_d2_probe_trunc_into_omega \
+         (t : fok_d2_probe_trunc) : Top = \
+         elim_trunc Top (λb. Proved) t",
+    );
+
+    let type_id = env
+        .elaborate_decl(
+            "fn fok_d2_probe_derivation \
+             (s : FokSequent) (d : FokDerivation s) : Nat = \
+             match d { \
+               FokDerivInit gamma delta left right g target gl dl same ↦ Zero; \
+               FokDerivImpRight gamma delta right p q selected child ↦ Zero; \
+               FokDerivForallWorldRight gamma delta right eigen body selected fresh child ↦ Zero; \
+               FokDerivForallObjRight gamma delta right eigen body selected fresh child ↦ Zero \
+             }",
+        )
+        .expect("all four derivation constructors must elaborate under Type");
+    let omega_id = env
+        .elaborate_decl(
+            "theorem fok_d2_probe_derivation_into_omega \
+             (s : FokSequent) (d : FokDerivation s) : Top = \
+             match d { \
+               FokDerivInit gamma delta left right g target gl dl same ↦ Proved; \
+               FokDerivImpRight gamma delta right p q selected child ↦ Proved; \
+               FokDerivForallWorldRight gamma delta right eigen body selected fresh child ↦ Proved; \
+               FokDerivForallObjRight gamma delta right eigen body selected fresh child ↦ Proved \
+             }",
+        )
+        .expect("all four derivation constructors must elaborate under Omega");
+    assert_transparent_body_kernel_checks(&env, type_id);
+    assert_transparent_body_kernel_checks(&env, omega_id);
+}
+
+/// The recursive Omega consumer uses each constructor's exact recursive child
+/// path rather than discarding the IH. This is distinct from the four-arm
+/// structural consumer above: mutating any child argument to its parent must
+/// red SCT or typing.
+#[test]
+fn real_fok_recursive_omega_consumer_uses_all_three_child_paths() {
+    let mut env = env_with_fok();
+    let id = env
+        .elaborate_decl(
+            "theorem fok_recursive_omega_consumer \
+             (s : FokSequent) (d : FokDerivation s) : Top = \
+             match d { \
+               FokDerivInit gamma delta left right g target gl dl same ↦ Proved; \
+               FokDerivImpRight gamma delta right p q selected child ↦ \
+                 fok_recursive_omega_consumer \
+                   (FokMkSequent \
+                     (fok_list_form_append_one gamma p) \
+                     (fok_list_form_set_nth delta right q)) child; \
+               FokDerivForallWorldRight \
+                   gamma delta right eigen body selected fresh child ↦ \
+                 fok_recursive_omega_consumer \
+                   (FokMkSequent gamma \
+                     (fok_list_form_set_nth delta right \
+                       (fok_subst0_form body eigen))) child; \
+               FokDerivForallObjRight \
+                   gamma delta right eigen body selected fresh child ↦ \
+                 fok_recursive_omega_consumer \
+                   (FokMkSequent gamma \
+                     (fok_list_form_set_nth delta right \
+                       (fok_subst0_form body eigen))) child \
+             }",
+        )
+        .expect("the recursive Omega theorem must consume every exact child path");
+    assert_transparent_body_kernel_checks(&env, id);
 }
