@@ -1,7 +1,7 @@
 ---
 id: CORE-FO-CHECK-TREE-SORT-VALIDATION
 title: "Make both checker surfaces' own domain honest: derive and validate world/object sorts and binder scope in check_tree and in the Ken checker, fail-closed, instead of relying on every caller to pass embed's image"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1

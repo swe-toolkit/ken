@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-27 09:59:39Z — from 464 issue file(s) in `docs/program/issues/`.
+2026-08-27 15:05:36Z — from 464 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -88,7 +88,7 @@ the committed file matches the generator's output.
 | `CONF-VERIFY-OLD-ROW-UNSATISFIABLE` | The seed's only unclaimed row states expect: accepts against a landed elaborator that rejects unconditionally, and the Coverage map rolls it up as a satisfied family | merged | spec-enclave | S | none | — |
 | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS` | Four v1_acceptance tests claim verify/spec-syntax conformance rows that were never authored -- invisible until the row-claim checker's namespace widening, and now a mechanical merge blocker for CI-ROW-CLAIM-NAMESPACE | merged | spec-enclave | S | none | — |
 | `CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY` | Every postulate audit label is a canonical artifact-identity input: decide whether a semantic hash should encode label prose, and if not, migrate | draft | language | L | none | — |
-| `CORE-FO-CHECK-TREE-SORT-VALIDATION` | Make both checker surfaces' own domain honest: derive and validate world/object sorts and binder scope in check_tree and in the Ken checker, fail-closed, instead of relying on every caller to pass embed's image | ready | language | M | none | — |
+| `CORE-FO-CHECK-TREE-SORT-VALIDATION` | Make both checker surfaces' own domain honest: derive and validate world/object sorts and binder scope in check_tree and in the Ken checker, fail-closed, instead of relying on every caller to pass embed's image | active | language | M | none | — |
 | `DOC-AGENT-CITE` | agent core modules name normative authorities as a reading list rather than binding them to claim classes, so seven of seven cold runs made material claims without citing the sources D2 requires | merged | doc | M | none | — |
 | `DOC-ASBUILT-AGENTS` | As-built slice 6 — reconcile the thirteen-page agents corpus against its 7 shared drifted sources; it is instructions machines follow, not prose people skim | merged | doc | M | none | — |
 | `DOC-ASBUILT-AUDIT` | As-built reconciliation — 28 cited sources have drifted from their attestations, so the library's currency claim is unbacked corpus-wide | merged | doc | L | none | — |
@@ -510,7 +510,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `ABI-M1` — manifest v2 — family-scoped, versioned, generated from family schemas
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
-- `CORE-FO-CHECK-TREE-SORT-VALIDATION` — Make both checker surfaces' own domain honest: derive and validate world/object sorts and binder scope in check_tree and in the Ken checker, fail-closed, instead of relying on every caller to pass embed's image
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
@@ -569,7 +568,7 @@ is itself not yet `merged`/`closed`:
 - `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` blocked by `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 - `V3-FO-EMBEDDING-ADEQUACY` blocked by `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` (status: draft)
-- `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` blocked by `CORE-FO-CHECK-TREE-SORT-VALIDATION` (status: ready)
+- `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` blocked by `CORE-FO-CHECK-TREE-SORT-VALIDATION` (status: active)
 
 ## Gate progress
 
