@@ -176,9 +176,15 @@ Return type is unchanged (`Option<(Term, Term)>`): the pair is still
 
 Widen `elab.rs:3392-3405` from `matches!(..., Term::Type(_))` to an explicit
 `Term::Type(_) | Term::Omega(_)` admission, then delegate to `try_reindex_cast`
-as it already does. A classifier outside that pair keeps `continue`ing only if
-that is what it does today for a non-`Type`; do not convert the existing skip
-into a new error, and do not inline the arm choice here.
+as it already does. Do not inline the arm choice here.
+
+**What happens to a classifier outside `Type | Omega` at this decision is NOT
+settled by this section** — it is an open question the increment must resolve
+with evidence under **AC-DECISION-3-DEFAULT**. Preserving today's silent
+`continue` is the conservative default and the starting assumption, but it is
+an assumption, not a ruling: this frame does not authorize converting the
+existing skip into a new error, and it does not authorize widening past
+`Type | Omega` either. Resolve which, and say so.
 
 **The requirement is that a lawful Omega position stops being silently
 skipped.** AC-PREFILTER measures that with a witness, not by reading the
@@ -215,20 +221,34 @@ than merely elaborating.
 ## Deliverables
 
 **Two independently landable increments. Each lands with its OWN evidence —
-D1's controls may NOT be deferred to a later shared test deliverable**
+D1's controls may NOT be deferred to D2 or to a later shared test deliverable**
 (Architect, call 3). Size each for the one-hour turn target.
+
+> **THE COMPLETE ACCEPTANCE-CRITERIA SET BELOW BINDS BOTH INCREMENTS.** Every
+> AC applies to each separately landing candidate, including the global scope
+> constraints AC-KERNEL-UNCHANGED, AC-BLAST-RADIUS and AC-NO-REGRESSION. The
+> per-increment lists name the **mechanism-dependent local discharges** that
+> increment must produce on top of that; they are **not** a licence to omit a
+> global AC, and an AC absent from a list is still binding. An AC that names
+> per-decision halves is owned by whichever increment changes that decision.
 
 - **D1 — decisions 1 and 3.** `try_reindex_cast` classifies over `Type ∪ Ω`
   with the direct-`J` Omega arm; the hidden-result outer-binding prefilter
-  admits `Type | Omega` and delegates. **Lands with** AC-OMEGA-REINDEX-POSITION,
-  AC-PREFILTER, AC-J-MOTIVE-EXACT, AC-CORE-KERNEL-CHECKS, AC-TYPE-ARM-UNCHANGED,
-  AC-DIRECTION, AC-FAIL-CLOSED, AC-NO-INDEX-WIDENING, AC-REAL-CONSUMER,
-  AC-KERNEL-UNCHANGED, AC-BLAST-RADIUS, AC-NO-REGRESSION.
+  admits `Type | Omega` and delegates. **Local discharges:**
+  AC-OMEGA-REINDEX-POSITION; AC-PREFILTER; AC-DECISION-3-DEFAULT;
+  AC-J-MOTIVE-EXACT for the decision-1 constructor; AC-FAIL-CLOSED **decision-1
+  half**; AC-MUTATION classes **(a), (b) and (c)** — all three are D1
+  properties, since they inject at `try_reindex_cast`, at its motive
+  ascription, and at the prefilter; AC-DIRECTION; AC-CORE-KERNEL-CHECKS;
+  AC-TYPE-ARM-UNCHANGED; AC-NO-INDEX-WIDENING; AC-REAL-CONSUMER.
 - **D2 — decision 2.** `refine_branch_goal` classifies over `Type ∪ Ω`; the
   returned restoration becomes a tagged Type-Cast/Omega-J plan and
-  `elab.rs:2244`'s caller dispatches on it. **Lands with** AC-OMEGA-BRANCH-GOAL,
-  AC-PLAN-TYPED, AC-PROBE, and its own re-run of AC-CORE-KERNEL-CHECKS,
-  AC-TYPE-ARM-UNCHANGED, AC-DIRECTION and AC-NO-REGRESSION.
+  `elab.rs:2244`'s caller dispatches on it. **Local discharges:**
+  AC-OMEGA-BRANCH-GOAL; AC-PLAN-TYPED; AC-FAIL-CLOSED **decision-2 half**;
+  AC-D2-MOTIVE-PROVENANCE (which supplies D2's own exact-motive discharge and
+  its own collapse / drop-ascription mutations, or proves reuse instead);
+  AC-PROBE; and its own re-run of AC-CORE-KERNEL-CHECKS,
+  AC-TYPE-ARM-UNCHANGED and AC-DIRECTION.
 
 Tests land in
 `crates/ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs`
@@ -316,9 +336,47 @@ respectively. A read of the unchanged source does not satisfy this — each site
 has to be shown still firing.
 
 **AC-FAIL-CLOSED.** A classifier that is neither `Type` nor `Omega` still
-raises `ElabError::Internal` at decisions 1 and 2, and the message names the
-actual classifier found. Needs a real witness, not an inspection of the
-fallthrough arm.
+raises `ElabError::Internal`, and the message names the actual classifier
+found. Needs a real witness, not an inspection of the fallthrough arm. **Two
+halves, each owned by the increment that changes its decision:** the
+**decision-1 half** at `try_reindex_cast` lands with D1; the **decision-2 half**
+at `refine_branch_goal` lands with D2. Decision 3's default is a separate
+question and is governed by AC-DECISION-3-DEFAULT, not by this AC.
+
+**AC-DECISION-3-DEFAULT.** Decision 3's behaviour for a classifier outside
+`Type | Omega` must be **resolved with evidence, not left to prose.** As
+written, §3 says today's silent `continue` is preserved there, but AC-PREFILTER
+measures only the Omega case and AC-FAIL-CLOSED covers only decisions 1 and 2 —
+so accepting bare `_`, or converting the old skip into an error, would fail
+nothing. Resolve it one of two ways and say which:
+
+- **If a non-sort is reachable** after a successful `kernel_infer` at that site,
+  supply a witness that reaches it and show the silent skip preserved.
+- **If well-formed context formation closes the successful population to
+  exactly `Type | Omega`**, state that closure argument explicitly and mark the
+  `_ => continue` branch **defensive and unreachable**. Do not manufacture a
+  production witness for an unreachable state.
+
+**In either case, bare `_` admission at decision 3 is an explicit
+NON-DISCHARGE.** Widening the prefilter to accept anything beyond
+`Type | Omega` fails this AC regardless of suite colour. Do not resolve this by
+guessing which branch is true; establish it.
+
+**AC-D2-MOTIVE-PROVENANCE.** D1's exact-motive pin proves nothing about a
+**separately built** delayed-restoration `J` arm, so D2 must discharge its own
+motive provenance. Either:
+
+- **prove reuse** — D2's Omega restoration routes through the *same* exact
+  already-pinned constructor as decision 1, via a structurally unique call, and
+  D2 proves that use rather than asserting it (this is the preferred shape,
+  mirroring how `refine_branch_goal` and `try_reindex_cast` already share
+  `build_index_type_cong` on the Type arm); or
+- **carry its own controls** — D2 supplies its own AC-J-MOTIVE-EXACT against
+  the built `Term` plus its own collapse-to-Type and drop-ascription mutations
+  at the branch-goal restoration producer *and* consumer.
+
+Choosing the second because the first was not attempted is a reportable
+finding, not a free choice.
 
 **AC-PLAN-TYPED.** Mutation control on D2: a mutation that applies the
 Type-Cast restoration to an Omega-tagged plan entry must be **caught by the
@@ -327,10 +385,18 @@ injection point, not by its effect.
 
 **AC-MUTATION.** Three mutation classes minimum, hashed logs, each named by
 injection point: (a) collapse the Omega arm to the Type arm at
-`try_reindex_cast`; (b) drop the ascription from the Omega motive; (c) restore
-the prefilter at `elab.rs:3392-3405` to `Term::Type(_)` only. AC-DIRECTION and
-AC-PLAN-TYPED supply two more. All must red. A mutation that stays green is a
-gap in the suite and is reportable as a finding.
+`try_reindex_cast`; (b) drop the ascription from that Omega motive; (c) restore
+the prefilter at `elab.rs:3392-3405` to `Term::Type(_)` only.
+
+**All three inject into decision 1 or decision 3, so all three are D1
+properties and land with D1** — they are not deferrable to D2 or to a later
+shared deliverable. AC-DIRECTION supplies a fourth, also D1's. **D2's mutation
+obligations are its own** and come from AC-PLAN-TYPED and
+AC-D2-MOTIVE-PROVENANCE; D1's (a) and (b) do not cover the separately built
+restoration arm.
+
+All must red. A mutation that stays green is a gap in the suite and is
+reportable as a finding.
 
 **AC-KERNEL-UNCHANGED.** Zero diff under `crates/ken-kernel/`. No new kernel
 capability, no trust delta, no `FokDerivation` change, no V3-FO D1 change, no
