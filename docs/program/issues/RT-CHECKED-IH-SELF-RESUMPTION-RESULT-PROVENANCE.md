@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-SELF-RESUMPTION-RESULT-PROVENANCE
 title: "RT-ITREE checked-IH self-resumption RESULT-PRODUCER predecessor — the THIRD sibling proof the landed architecture lacks. It has (1) exact inherited K authority plus its governed application coordinate, and (2) the exact fresh-result DESTINATION; it does NOT have the proof of WHICH EMITTED CONTROL EDGE PRODUCES the fresh dynamic result of that application. CheckedIhFreshResultDestination names a destination, never a producer. This node derives a planner-owned, typed, sealed fresh-result PRODUCER relation over the COMPLETE governed population (conceptually DirectInvocationResult / CarriedLoopExitResult; absence is NOT a default), keyed from the existing governed call coordinate plus typed active-frame/eliminator graph facts, rebuilt and validated for totality and functional agreement before publication, and extends the sanitized compile-time projection with ONLY the producer proof. A MANDATORY D0 measures the four marker-producing governed keys through the emitted carried header and owning merge FIRST: a NO is a SUCCESSFUL D0 that stops and returns coordinates to the Architect, and choosing a recursive call / frame morphism / explicit continuation is NOT pre-authorized. The predecessor neither applies K nor binds R2, so it lands BEHAVIORALLY INERT. Architect hard-stop-8 ruling evt_54efxydhb3n6w."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
