@@ -11,6 +11,51 @@ github: null
 origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision). Hard-stop-5 ruling evt_494k61s04fnv9, 2026-08-26: D3B localization is VALID and lowering has reached the end of its authority — the missing component is an UPSTREAM planner-owned checked-IH result-successor relation, framed as the independently-landable predecessor RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR (which this node now depends_on); D3A stays frozen/non-landable until it lands, then the atomic D3A+D3B consumer builds and D3B consumes ONLY that successor projection. Inventory fold 244b2468afd4f0cd06837fd3079f291d7d330af5 (entry 5). Architect INCORPORATION ruling evt_2prk31prke9cc, 2026-08-26 (accepting Research advisory evt_261gm8y54xttt), grounded on origin/main@a09878026: the predecessor and this consumer conflated two semantic edges by pairing the D3A application result R1 forward to the later capture. Reconciled to the continuation-inheritance reading — D3A applies the inherited continuation capability K at each exact recursive arrival to yield the FRESH result R2, and D3B binds that R2 through ordinary Ret-case/capture semantics; the transitive R1 -> capture requirement is deleted from the operative Objective/Deliverables/ACs/pairing/suppressions/reviewers/Sequencing. Suppression and at-most-once controls are now THREE independent axes (inheritance, application, fresh-result binding). The advisory is incorporated and is NOT hard stop 6 (count remains five). Runtime stays HELD until the predecessor recut lands and the D3A+D3B work is explicitly re-released."
 ---
 
+> # HARD STOP 7 — the DECOMPOSITION was the defect (Architect evt_1z1p9t4tdyd2v)
+>
+> Runtime hard-stopped a third time, on the landed locator base `b76943684`
+> (runtime-implementer `evt_dqa3989tfmm2`; leader routing `evt_7fhdmyaqk4371`).
+> The locator makes `K` immediately indexable ONLY AFTER
+> `checked_ih_continuation_inheritance_for_invocation` selects the inheritance
+> view, and that accessor requires the earlier transport's full
+> `ContinuationCallIdentity` — which the generated descendant re-entry boundary
+> does not carry. A compile-preserving path-local propagation experiment
+> validated `K` and then showed the final application is never reached; it was
+> fully reverted, leaving the consumer branch clean with no candidate.
+>
+> **The Architect ruled that the repeated last-gap decomposition is ITSELF the
+> design defect.** Three consecutive planner-owned predecessors — HS5's
+> result-successor relation, HS6's K-availability locator, and the proposed
+> source-call-identity half — are all components of ONE accessor, each scoped to
+> the last observed gap, each landing and revealing the next. **Do NOT frame a
+> fourth narrow predecessor.** Frame ONE complete generated-descendant-entry
+> access predecessor, specified from the CONSUMER'S ACTUAL ENTRY CONDITIONS: a
+> closed `CheckedIhGeneratedEntryAccess` relation (name provisional) joining the
+> emitted generated-context population to the continuation-inheritance
+> population, re-derived and validated for totality and exact bijection,
+> installed in `define_continuation_context_bodies` as COMPILE-TIME
+> function-definition authority, and consumed at the governed descendant
+> invocation through the EXISTING full accessor. The carrier is NEVER a runtime
+> parameter — not ABI, frame header, environment binding, carried value,
+> `RoutedAnswer`, `SourceControl` member, or runtime tag. The ruling's six
+> numbered requirements, its required controls, and its forbidden list are
+> authoritative; read `evt_1z1p9t4tdyd2v` in full before framing.
+>
+> Per the hard-stop-chain rule the Steward triggered one bounded Research
+> advisory before freezing the replacement frame (`evt_6ysq39xjpbjk4`): Q1 the
+> generated-context join's functional/non-functional census — whether
+> `(ContinuationContextId, final invocation, callee)` maps to more than one
+> `ContinuationCallIdentity`, which decides whether the predecessor attaches one
+> validated row or must refine the existing `intern_generated_contexts` key and
+> statically retarget callers; Q2 prior-art failure modes for compile-time
+> context splitting. The advisory may sharpen the row/key controls; it may not
+> reopen the authority boundary or propose a runtime carrier.
+>
+> **D3A stays frozen and non-landable. The atomic D3A+D3B contract and the three
+> independent suppression axes are UNCHANGED.** After the complete predecessor
+> lands through ordinary gates, the Steward must EXPLICITLY re-release this same
+> atomic consumer; landing alone authorizes nothing.
+
 > # HARD STOP 6 — held on a second predecessor extension (Architect evt_bqyqcvn0ng1d)
 >
 > Runtime hard-stopped building the D3A+D3B consumer: the landed predecessor

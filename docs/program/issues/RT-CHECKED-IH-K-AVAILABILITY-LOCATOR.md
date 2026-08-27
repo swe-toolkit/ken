@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-K-AVAILABILITY-LOCATOR
 title: "RT checked-IH immediate K-availability locator — the planner-only predecessor EXTENSION that completes the operational witness of the existing K-inheritance proof: enrich the forward binder-resolution walk so that where derive_checked_ih_bindings sees RuntimeExpr::Var(index) resolve to CheckedBinderProvenance::InductionHypothesis(binding) it RETAINS an immediate K-binding locator instead of discarding index; the locator is a dedicated non-interchangeable checked-IH type naming the exact descendant invocation_origin, the exact callee_origin whose immediate environment is indexed, an explicit immediate-invocation-environment domain tag, and the environment index (consumer + environment identity travel with the number), stored on the same CheckedIhSelfResumptionStep that already carries invocation_origin/call_origin/callee_origin/callee_binding, derived only when the zero-argument callee's exact binder resolution yields that step's CheckedIhBinding, re-derived and exact-equality-checked by the planner validator. It exposes semantic K identity and immediate availability SEPARATELY (as inheritance and fresh-R2 destination already remain separate), adds NO standalone search accessor, changes NO emitted call/ABI/artifact/result/runtime behavior, and is INDEPENDENTLY LANDABLE. It is HS6 predecessor incompleteness, not a third semantic successor; the atomic D3A+D3B consumer is explicitly RE-RELEASED against this extended base AFTER it lands. Architect HS6 component ruling evt_bqyqcvn0ng1d incorporating Research advisory evt_1t84ypm156mqh."
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
