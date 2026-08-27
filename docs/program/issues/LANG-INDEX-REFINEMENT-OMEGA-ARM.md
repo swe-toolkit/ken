@@ -1,7 +1,7 @@
 ---
 id: LANG-INDEX-REFINEMENT-OMEGA-ARM
 title: "Make dependent-match index refinement sort-general: of five classifier decisions in elab.rs, widen the re-indexed-position helper, the branch goal, and the hidden-result outer-binding prefilter to Type union Omega, transporting Omega-classified types by a direct J arm alongside the existing Type-plus-Cast arm, while both index-type classifiers stay Type-only"
-status: active
+status: merged
 owner: language
 size: M
 gate: none
@@ -10,6 +10,23 @@ blocks: [V3-FO-EMBEDDING-ADEQUACY]
 github: null
 origin: "Steward, 2026-08-27, discharging the predecessor the Architect assigned across TWO CUMULATIVE rulings: the detailed mechanism ruling evt_1wnk1ek4s8sgj and the concise status clarification evt_pw69nxgxn99j (thread thr_1czkntcjrvvz9). The first is why the outer prefilter, the real-consumer controls, and the direction mutation exist; the second confirms the route is viable and no additional discriminator is needed. NEITHER SUPERSEDES THE OTHER. V3-FO-EMBEDDING-ADEQUACY D2 hard-stopped immediately on release (implementer hard stop evt_5fxgv9eeqm68f, leader route evt_74q124wnb3zaf): eliminating the proof-indexed FokDerivation with index-dependent Omega evidence fails elaboration with ElabError::Internal(\"index refinement: ... not classified by a Type universe, found Omega0\"). The Steward routed it to the Architect (evt_nrvb2atg0xay) without diagnosing it. The first cut of this frame was BLOCKED by the Architect (evt_367papv4k57kk) for a three-decision census that missed the hidden-result outer-binding prefilter, for citing the two rulings as replacement rather than cumulative provenance, for swapped hard-stop authorship, for dropping the ruled real-consumer and direction controls, and for discharging a byte-identity claim with suite greenness. This is the recut. All fixed inputs measured at origin/main 6a37b92c7ce02edf0e73be7306776253ca68e8c4."
 ---
+
+> # MERGED 2026-08-27 — both deliverables landed, the node has no third
+>
+> `D1` landed as `e13df606a` and `D2` as
+> `ef91b8225087cbad0e511fa973aee23a2a8f7f8c` (both blob-verified; `D1` is an
+> ancestor of the `D2` landing). The Deliverables section defines exactly two
+> increments, so the node is complete and its predecessor gate on
+> [[V3-FO-EMBEDDING-ADEQUACY]] is fully discharged.
+>
+> **What it does NOT deliver, and this is load-bearing for anything downstream:**
+> the bounded **two-index goal-restoration limitation is RETAINED as unsupported
+> and unrepaired** (Architect `evt_7wbrfyvwv5517`). The supported transition is
+> the single-index branch-goal witness; no multi-index closure is claimed. Both
+> Type and Omega multi-restoration cases still reject, and the Type behaviour is
+> unchanged for all inputs — the gap predates this node, which merely exposed it.
+> A consumer needing multi-index support hard-stops to the Steward and Architect
+> rather than repairing the elaborator from a downstream node.
 
 > # WHAT THE ARCHITECT RULED — evt_1wnk1ek4s8sgj + evt_pw69nxgxn99j, CUMULATIVE
 >

@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-CANONICAL-PAIR-PACKAGE
 title: "Pair floor realization — admit the compiler-origin Pair to the prelude type floor as its tenth member and the three companions {mk_pair, pair_fst, pair_snd} as a SEPARATE closed binding inventory, resolving all four to the EXISTING compiler-installed GlobalIds (prelude.rs:951-1041) with no declare_def, no allocated identity, no alias/registry/fallback route, and zero trusted_base delta: split the conflated PRELUDE_FLOOR_NAMES type/binding inventory in modules.rs, close every Pair-binding collision before allocation, keep Prod and arbitrary compiler globals non-ambient, and flip the RED-UNTIL Strict conformance rows green. Realizes the landed spec LANG-MOD-PAIR-FLOOR-PROVIDER; the spec names this WP as the gate on those rows (34-data-match.md:102-111)."
-status: active
+status: merged
 owner: language
 size: M
 gate: none
@@ -10,6 +10,31 @@ blocks: [CAT-GCD-REFACTOR]
 github: null
 origin: "Spec enclave boundary ruling (spec-author evt_6nk4xxkppz3k5, spec-leader evt_w7v4dvvzjr8k) + Architect mechanism ruling (evt_53295hb0v21mw), on Component B hard stop #1. REDIRECTED 2026-08-26 by the operator + Architect recut (evt_7d0ecgkd8ate3) from a package-migration plan to the floor realization. REWRITTEN 2026-08-26 by the Steward against the ACTUALLY-LANDED spec text after LANG-MOD-PAIR-FLOOR-PROVIDER merged at 8f3b6fd2c, as that node's REDIRECTED banner required (rewrite against landed text, not before it). Operator 2026-08-26: 'first launch the internal-provision prelude recut and finish that effort, then return to the z3 integration campaign' — the spec WP alone does not make Strict green, so this realization is the completion of that effort. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
+
+> # MERGED 2026-08-27 as `40e7f1199` — this node is DONE. Do not release it.
+>
+> The floor realization landed as squash
+> `40e7f1199a19d18007ae4935dd90aa4752b7522f` (2026-08-27 02:40:33), from
+> `wp/LANG-MOD-CANONICAL-PAIR-PACKAGE` at `db3b8af78`. Eight paths, +684/-98.
+> Seven are byte-identical between that branch commit and `origin/main`
+> `bd68352bb`, including `modules.rs` (`36503cf710b7c49ecf8a5b8709dadfcd0be0ffab`)
+> and the 515-line `lang_mod_pair_floor_realization.rs`
+> (`343ee7dc890b7e1c5d688e9c909b7d91076344d1`). The eighth,
+> `lang_mod_strict_resolution_d0.rs`, differs only because
+> [[CAT-NAT-REUSE-CONSUMERS]] D2 (`428ea1188`) touched it afterwards — main is
+> newer there, not missing this work.
+>
+> **The surviving `wp/LANG-MOD-CANONICAL-PAIR-PACKAGE` branch is the pre-squash
+> remnant of THIS landing, not an unlanded candidate.** It reads as "not an
+> ancestor of `origin/main`" for the ordinary reason that the publisher squashes.
+> Ancestry is the wrong instrument for a landing question; blob identity is the
+> right one. Leave the ref alone — it costs nothing and keeps the object
+> reachable.
+>
+> **This node's status read `active` until 2026-08-27**, and the Steward released
+> it on that stale status (`evt_19mgss08dkyy4`, withdrawn `evt_6m6mzkdqgzxc8`)
+> without re-measuring the node against the tree. The language-leader's pickup
+> preflight caught it before any implementer was kicked.
 
 > # REWRITTEN 2026-08-26 against the landed spec — this is the FLOOR-REALIZATION build WP
 >

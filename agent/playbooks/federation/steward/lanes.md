@@ -50,7 +50,7 @@ a pointer to check, not a fact.
 | lane | ring | objective |
 |---|---|---|
 | 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (`active`, M-series defunctionalization). M6/M4/M3 merged; `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` and `RT-UNIT-FAILURE-STATUS-PROVENANCE` MERGED. CURRENT: `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` (`active`) — **HS11 per-arrival recut landed `fec63506a`** (frame blob `1ae3e449a8f2`, Architect frame-review APPROVE `evt_2wvn3szecym9f`) and **RE-RELEASED `evt_1mgb3zbskwbg3`**. SEVEN hard stops taken; next mandatory §1a/§1b advisory trigger is **stop 12, NOT 10** (Architect `evt_2s144kdddyckn`). It blocks `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` (`active`), whose D3A+D3B stays FROZEN pending its own separate release. `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` still `draft`. |
-| 2 | language | `LANG-INDEX-REFINEMENT-OMEGA-ARM` is **COMPLETE — both** of its two deliverables landed: D1 `e13df606a`, D2 `ef91b8225` (blob-verified). It has no D3. CURRENT: **`V3-FO-EMBEDDING-ADEQUACY` D2, RE-RELEASED `evt_52vwvmn0ee859`** once that predecessor gate was fully discharged. HAZARD: the omega arm retains a bounded TWO-INDEX goal-restoration limitation as UNSUPPORTED/UNREPAIRED (Architect `evt_7wbrfyvwv5517`) — supported transition is single-index only, so a multi-index need there HARD-STOPS to Steward + Architect and must not repair the elaborator. Also `active`: `LANG-MOD-CATALOG-COMPLETENESS`, `LANG-MOD-CANONICAL-PAIR-PACKAGE`. `LANG-MOD-PAIR-FLOOR-PROVIDER` and both Nat nodes MERGED. NEXT once the actives drain: the z3 integration campaign (operator 2026-08-26). Module/import umbrella `LANG-MODULE-IMPORT-SYSTEM` COMPLETE. |
+| 2 | language | `LANG-INDEX-REFINEMENT-OMEGA-ARM` **MERGED** — both deliverables landed (D1 `e13df606a`, D2 `ef91b8225`, blob-verified); no D3. `LANG-MOD-CANONICAL-PAIR-PACKAGE` **MERGED `40e7f1199`** (blob-verified; its surviving `wp/` branch is the pre-squash remnant, NOT an unlanded candidate). **`V3-FO-EMBEDDING-ADEQUACY` D2 is HELD, NOT current**: its landed D1 statement `fok_embedding_adequacy_statement` is REFUTED by an accepted capture-exploiting certificate (`evt_2yh515wg0mczy`) — a kernel-checked theorem derives `Bottom`, so no D2 proof or fragment can be authored. Architect owes the soundness ruling; Steward disposition follows. Route FO is fail-safe meanwhile (`prover.rs:562-604` withholds `Unknown`, never `Proved`). Only remaining candidate active: `LANG-MOD-CATALOG-COMPLETENESS` (authorized partial; remainder held on Nat Decision `dec_1kqwn6hdvn7d2`). HAZARD for any Omega-elimination work: the omega arm retains a bounded TWO-INDEX limitation as UNSUPPORTED (Architect `evt_7wbrfyvwv5517`) — single-index only; a multi-index need HARD-STOPS to Steward + Architect. NEXT: the z3 integration campaign (operator 2026-08-26). `LANG-MODULE-IMPORT-SYSTEM` COMPLETE. |
 | 3 | foundation | Catalog-reuse modernization. Expressibility trial COMPLETE (3-lane feasibility PROVEN, operator 2026-08-26). Pilot chain DONE: `CAT-ORDER-PUB-EXPORT`, `CAT-GCD-REFACTOR`, `CAT-REUSE-CENSUS` all MERGED. CURRENT: `CAT-NAT-REUSE-CONSUMERS` (`active`) — six per-package increments. D1 `6ba6f6bef`, D2 `428ea1188`, D3 `9de02daff` MERGED. **D4 released `evt_5smy0nbdt3qcy`**, in build. D5/D6 held, each needs its own explicit release, D6 (`Derived.ken.md`) LAST as the risk increment. **A consuming TEST FIXTURE's root set is part of an increment's path set here** — established by D1 (cc6a/cc7/cc8) and D2 (cc2/cc3/cc4/ds9/d0), ruled for D4 at `evt_1b31assx1ktg8`/`evt_6snwh0xy60jh8`/`evt_2r8cavz7b1bms`. Carry that authorization INTO the D5 release so it does not hard-stop for it again. |
 
 **Lane 1 — runtime (priority).** The native carried-value program
@@ -231,6 +231,24 @@ not `crates/`) — it is the standing exception, not a lane (`CLAUDE.md`).
 
 ## Roster history
 
+- 2026-08-27 (third refresh, at `bd68352bb`): **no roster change.** Corrected two
+  nodes still reading `active` that had in fact MERGED —
+  `LANG-MOD-CANONICAL-PAIR-PACKAGE` (`40e7f1199`) and
+  `LANG-INDEX-REFINEMENT-OMEGA-ARM` (both deliverables in). **The Steward
+  released the first of those off its stale status and had to withdraw it**
+  (`evt_19mgss08dkyy4` → `evt_6m6mzkdqgzxc8`); the language-leader's pickup
+  preflight caught it before an implementer was kicked.
+  > **THE LESSON, and it indicts the refresh two entries below.** That refresh
+  > re-measured the rows I was actively working and **carried the rest forward
+  > unverified** — which is worse than not refreshing, because it launders stale
+  > rows as freshly checked. **A citation refresh that only re-measures the nodes
+  > you are already thinking about is not a refresh.** The cheap complete sweep:
+  > enumerate every `status: active` node from the tree, then `git log --grep`
+  > each id against `origin/main` for a landing commit, and blob-verify any hit.
+  > That is one command and it found both stale rows.
+  > **And it must be blob identity, never ancestry** — an unlanded-looking `wp/`
+  > branch is the expected appearance of landed work, because the publisher
+  > squashes.
 - 2026-08-27 (second refresh, at `ef91b8225`): **no roster change — citation
   re-measurement only.** Three landings in one stretch moved all three lanes:
   lane 1's HS11 recut `fec63506a`, lane 2's omega-arm D2 `ef91b8225` (completing
