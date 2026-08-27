@@ -64,12 +64,16 @@ origin: "Runtime hard stop 7 on RT-RESULT-CONTINUATION-BINDING-PROVENANCE (runti
 > would each change or weaken the frame, and Runtime refused all four rather
 > than closing the gap by weakening its own acceptance condition.
 >
-> **HELD — do not recut section 5 yet.** HS9 triggers the mandatory ninth-stop
-> Research advisory, and the Architect is holding the `Specialized`-versus-
-> `Carried` ruling rather than grinding a mechanism in parallel
-> (`evt_18e2zbvbsanty`).
-> Advisory reach is this predecessor and the two unchanged witnesses; it is
-> advisory only and does not select the design. Evidence preserved outside the
+> **HS9 IS NOW RULED — section 5 is recut below, not held.** The mandatory
+> ninth-stop Research advisory landed (`evt_6q5zq12zmftf4`) and the Architect
+> ruled the representation (`evt_2kgb55azx3ej3`): inherited `K` IS the complete
+> `Value(Specialized(ComputationalRecursorClosure { .. }))` capsule at the exact
+> locator, directly applicable, and its `Carried` residual is the value `K`
+> continues over rather than `K` itself. No conversion, no residual extraction,
+> no environment move, no other seat. The advisory was accepted within its
+> stated reach — this predecessor and the two unchanged witnesses only, not a
+> theorem about arbitrary programs and not a discharge of successor totality.
+> Evidence preserved outside the
 > worktree: note SHA-256
 > `e55a964c1e24bb6b7c9fa7b1e8b3b13623c9d93da8a54328e603afefbbc2ea00`, 1,142-line
 > implementation/probe diff
@@ -343,19 +347,79 @@ proved source identity absent there.**
 
 ### 5. The consumer-adjacent seat
 
-> **HS9 STOPPED HERE — this section's `Value(Carried(_))` requirement is
-> unsatisfiable as written at exact `56c51fe31`; the binding is
-> `Value(Specialized(_))`. HELD pending the ninth-stop Research advisory and
-> the Architect's ruling (`evt_18e2zbvbsanty`). Everything in sections 1-4 was
-> confirmed by reaching this stop. Do not recut this section, and do not accept
-> or convert `Specialized`, before the ruling. See the symptom inventory.**
+> **RECUT 2026-08-27 on Architect HS9 representation ruling
+> `evt_2kgb55azx3ej3`**, grounded at exact `56c51fe31` / tree `6401ac7df`, on
+> Research advisory `evt_6q5zq12zmftf4` accepted within its stated reach. The
+> falsified `Value(Carried(_))` terminal premise is REPLACED below. **Sections
+> 1-4 are unchanged** — the quotient, every member validation, the five set
+> closures, source-specific reopening, sanitized access, the exact single
+> `BTreeMap::get`, context installation, identity and the fresh-result
+> projection all stand as written, and HS9 confirmed them by reaching this seat.
 
-At the real D3A seat, the predecessor instrument uses the returned projection to
-require `ImmediateInvocationEnvironment`, an in-range `Value(Carried(_))`, and
-the exact fresh-result destination. **It neither applies `K` nor binds `R2`.**
-The W0/W1 seat is visited ONCE with one certificate whose membership is
-`{A, B}`; **membership closure, not duplicated execution, proves both sources
-authorize it.**
+**Inherited `K` IS the complete compiler-local capsule**, at the exact
+`CheckedIhImmediateKBindingLocator`:
+
+```text
+LoweringEnvironmentBinding::Value(
+  LoweringOperand::Specialized(
+    Lowered::ComputationalRecursorClosure { residual, activation, invocation }
+  )
+)
+```
+
+The capsule is **directly applicable `K`**. Its measured `residual` is
+`LoweringOperand::Carried(_)`, but that residual is the recursive value `K`
+continues over — **it is not `K`**. There is no `Specialized(K) == Carried(K)`
+relation and no reification boundary to add.
+
+Grounding, all at the exact base and all in
+`crates/ken-runtime/src/cranelift_backend/lowering/`: `make_computational_recursor`
+constructs the full capsule and returns it as `LoweringOperand::Specialized`
+(`mod.rs:11353-11575`); the capsule owns residual plus activation and invocation
+segment (`mod.rs:3352-3390`); source `Var` reads the exact environment binding
+through `value_at` and clones the operand unchanged (`source.rs:684-700`);
+`source_call_state` requires a specialized callee, matches the exact
+`ComputationalRecursorClosure`, and consumes it through the existing checked
+invocation/decomposition path (`source.rs:3775-3788`, `3845-4055`;
+`mod.rs:8643-8660`); and the carrier boundary independently refuses this capsule
+before descending into its residual because it names an in-flight activation
+(`boundary.rs:1028-1052`, `1280-1283`; `mod.rs:6521-6545`).
+
+### The terminal premise — SIX CONJUNCTS, all required
+
+At the real D3A seat the predecessor instrument uses the returned projection to
+require **all** of:
+
+1. projection/current destination owner, body, binding, invocation, call and
+   callee agree by their **typed identities**;
+2. locator domain is exactly `ImmediateInvocationEnvironment` and its index is
+   in range;
+3. the callee child's **checked binder provenance resolves to that exact
+   index**;
+4. that binding is exactly
+   `Value(Specialized(ComputationalRecursorClosure { .. }))` — **bare
+   `Specialized(_)` is FORBIDDEN**;
+5. for the bounded read/write population, the capsule's
+   `CarriedInvocationCoordinates`, checked frame, computational-IH slot and
+   current call template agree with the projection/current application, and its
+   residual is `Carried`;
+6. the fresh-result destination remains a sibling proof and is **only observed**
+   here.
+
+The exact compiler enum match is **compile-time representation refinement at an
+already-authorized seat**, not runtime discrimination. It neither applies `K`
+nor binds `R2`. The W0/W1 seat is visited ONCE with one certificate whose
+membership is `{A, B}`; **membership closure, not duplicated execution, proves
+both sources authorize it.**
+
+> **DO NOT turn Research's diagnostic `capsule_equal` into authority.** It
+> compares a *rendered projection* — residual kind and some ids and counts — not
+> every residual, unwind or dynamic-edge member. The lawful relation is stronger
+> and structural: the exact callee child is the binder-provenance `Var` resolved
+> to the locator's immediate-environment index, and `value_at` forwards that
+> operand directly into `source_call_state`. **Pin that typed graph/binder/call
+> relation.** Do not compare debug strings, scan environments, compare runtime
+> words, or infer identity from numbers or payload shape.
 
 ### Forbidden
 
@@ -485,12 +549,41 @@ guarded is withdrawn**, and saying so explicitly is part of the recut:
   generated-context lowering path observes, on the unchanged read program and
   the independently derived write program, that the seat is reached with the
   projection obtained through the single sanitized route, and that the
-  projection supplies `ImmediateInvocationEnvironment`, an in-range
-  `Value(Carried(_))`, and the exact fresh-result destination. **The W0/W1 seat
+  projection satisfies **all six conjuncts of section 5's terminal premise** —
+  typed-identity agreement, exact `ImmediateInvocationEnvironment` with an
+  in-range index, callee-child binder provenance resolving to that exact index,
+  a binding of exactly
+  `Value(Specialized(ComputationalRecursorClosure { .. }))`, capsule
+  coordinate/frame/slot/call-template agreement with a `Carried` residual, and
+  the fresh-result destination observed only. **The W0/W1 seat
   is visited ONCE with membership `{A, B}` — per-identity arrival is NOT the
   shape here and must not be asserted.** The instrument does NOT apply `K` and
   does NOT bind `R2`. Read and write are derived independently from their own
   planner facts and never cross-used.
+- **AC-CAPSULE-NEGATIVES** (HS9 ruling controls — INDEPENDENTLY reject) — each
+  of these must reject on its own: an outer `Carried`; **every non-recursor
+  `Specialized` sibling class**, used as a mutant, so that a bare
+  `Specialized(_)` arm cannot pass; `StaticWorker`; a wrong locator domain or
+  index; a wrong binder, frame, computational-IH slot, invocation, call or
+  callee; a wrong destination owner or body; a non-`Carried` residual for these
+  governed rows; and a locator/callee provenance mismatch. **Deleting the guard
+  and accepting bare `Specialized(_)` are EXPLICIT NON-DISCHARGES** — neither
+  may be offered as evidence, whatever the suite reports. **Mutate the governed
+  property or population, never the detector.**
+- **AC-NO-TRANSFER** (the refusal that already exists must stay, and must not
+  become the route) — the existing carrier-boundary refusal of this capsule is
+  preserved, and a control proves that **neither residual extraction nor
+  `transfer_into_carrier` becomes the application route**. The capsule is not
+  converted, its residual is not extracted as `K`, no environment is moved, and
+  no other seat is selected.
+- **AC-GUARD-DISABLED-IS-NOT-EVIDENCE** (bounds how HS9's own probe may be
+  cited) — the write compile in Research's advisory was reached by DISABLING the
+  frame's Carried-only refusal, and the governed command then passed `1/1`.
+  That number is observation reachability only. **A green governed command
+  obtained with any acceptance guard removed discharges nothing here**, and the
+  positive must pass with the six-conjunct premise of section 5 in force. Note
+  that the falsified Carried-only predicate itself cannot remain — what remains
+  intact is fail-closed rejection OUTSIDE the ruled admissible arm.
 - **AC-CONSUMER-ADJACENT-CLOSURE** — consumer-adjacent read and write
   observations independently close raw `(coordinate, source identity)` pairs,
   class members, installed keys, and reached keys, as sets.
@@ -575,8 +668,19 @@ re-releases the node.** Frame landing alone authorizes nothing.
 
 **D3A stays frozen and non-landable throughout.** The atomic D3A+D3B contract
 and the THREE independent suppression axes (inheritance, application,
-fresh-result binding) are UNCHANGED and are not reopened here. After this
-predecessor passes Architect review, QA, its merge Decision, and publisher CI,
+fresh-result binding) are UNCHANGED and are not reopened here.
+
+**What the HS9 ruling fixes about the eventual successor, so it is not
+re-litigated later** (Architect `evt_2kgb55azx3ej3`): this predecessor validates
+that the existing exact callee IS the lawful capsule before the ordinary
+consumer proceeds. When D3A+D3B is later released, **D3A authorizes exactly ONE
+application of this exact capsule to produce fresh `R2`, and D3B binds that
+fresh result at the already-proved destination. The existing call, continuation
+and result are NOT duplicated.** That is a constraint on the successor, not an
+authorization of it — nothing here releases D3A.
+
+After this predecessor passes Architect review, QA, its merge Decision, and
+publisher CI,
 and lands, the **Steward must EXPLICITLY re-release the same atomic D3A+D3B
 consumer — landing alone authorizes nothing, and neither frame landing nor
 predecessor landing authorizes consumer work.** The consumer branch stays clean
