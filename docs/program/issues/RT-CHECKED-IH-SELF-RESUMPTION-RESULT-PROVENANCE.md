@@ -5,10 +5,10 @@ status: ready
 owner: runtime
 size: M
 gate: none
-depends_on: []
+depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE, RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR, RT-CHECKED-IH-K-AVAILABILITY-LOCATOR, RT-CHECKED-IH-GENERATED-ENTRY-ACCESS]
 blocks: [RT-RESULT-CONTINUATION-BINDING-PROVENANCE]
 github: null
-origin: "Architect hard-stop-8 ruling evt_54efxydhb3n6w, 2026-08-27 (thr_2g0w05my2d5ym), verified on exact base 00e66312b4ef617eb658a2e75db9f99ff2c56492 / tree e286949f8fe5053e4719e54d0cc66adbe073dcdf with ambient RUST_MIN_STACK unset. Runtime hard-stopped an eighth time on the same mechanism chain (implementer observation accepted; Architect independently reproduced, log SHA-256 401c52398b2f221bfff2987f36c6f29b003318d6ecd78b8f7c53bf0c605d5352, source bytes restored to blob 4ea7b32e2295ae98ce53906a4f1941bb33fce421). The exact governed K application does NOT yield a fresh R2 on four of five governed coordinates: the active self-resumption arm jumps to the already-active loop header, switches the builder to an unreachable block, and returns Lowered::RecursiveBackedge, which source.rs defines in its own comment as a PROTOCOL MARKER, not a value. The ruling establishes that the missing piece is a COMPONENT BOUNDARY — a third sibling proof — and NOT one more D3B field, because adding it inside the atomic consumer would make lowering invent the very edge whose authority is absent and would repeat this chain's decomposition failure. It deliberately does NOT authorize a recursive call or frame morphism: spec/40-runtime/42-evaluation.md section 6.2 specifies the ITree driver as tail-resumptive and therefore realizable as a loop without a suspended-resumption stack, so the first candidate producer to MEASURE is the existing carried-loop exit. Steward-owned frame; the Architect supplied the provisional node name. RT-RESULT-CONTINUATION-BINDING-PROVENANCE is frozen and recut to depend_on this node; its atomic D3A+D3B consumer needs a SECOND explicit Steward release after this lands."
+origin: "Architect hard-stop-8 ruling evt_54efxydhb3n6w, 2026-08-27 (thr_2g0w05my2d5ym), verified on exact base 00e66312b4ef617eb658a2e75db9f99ff2c56492 / tree e286949f8fe5053e4719e54d0cc66adbe073dcdf with ambient RUST_MIN_STACK unset. Runtime hard-stopped an eighth time on the same mechanism chain (implementer observation accepted; Architect independently reproduced, log SHA-256 401c52398b2f221bfff2987f36c6f29b003318d6ecd78b8f7c53bf0c605d5352, source bytes restored to blob 4ea7b32e2295ae98ce53906a4f1941bb33fce421). On four of five governed coordinates the exact governed K application exposes NO LOCAL LoweringOperand result at CheckedComputationalIHInvocationReturn: the active self-resumption arm jumps to the already-active loop header, switches the builder to an unreachable block, and returns Lowered::RecursiveBackedge, which source.rs defines in its own comment as a PROTOCOL MARKER, not a value. This is an absence of a LOCAL result, NOT a proof that no fresh dynamic result is eventually produced — the owning carried merge may still produce it, and that is exactly what D0 measures. The ruling establishes that the missing piece is a COMPONENT BOUNDARY — a third sibling proof — and NOT one more D3B field, because adding it inside the atomic consumer would make lowering invent the very edge whose authority is absent and would repeat this chain's decomposition failure. It deliberately does NOT authorize a recursive call or frame morphism: spec/40-runtime/42-evaluation.md section 6.2 specifies the ITree driver as tail-resumptive and therefore realizable as a loop without a suspended-resumption stack, so the first candidate producer to MEASURE is the existing carried-loop exit. Steward-owned frame; the Architect supplied the provisional node name. RT-RESULT-CONTINUATION-BINDING-PROVENANCE is frozen and recut to depend_on this node; its atomic D3A+D3B consumer needs a SECOND explicit Steward release after this lands. Architect PRE-RELEASE FRAME REVIEW evt_33ajd0hmezn2c, 2026-08-27, on landed blob 94a1d4f74a6b559738ee171f8fa571f9515ab10f (origin/main f868f43c1, crates tree ae84c42092f3c1233878a8b9772b8f80fb4b6d69): mechanism, component boundary, D0 fork and its YES/NO dispositions, total sealed producer relation, typed planner-to-emission provenance, sanitized projection, three-proof separation, mutation families, absence of an arrival-count pin, tail-loop preservation, stop-9 trigger, and two-stage explicit release all APPROVED as faithful to evt_54efxydhb3n6w, with the D0 NO arm confirmed correctly written as a successful delivered result. Release was withheld pending four narrow text-only corrections, folded here: (1) this node's depends_on stated the real proof inputs instead of an empty list; (2) the local-result absence is no longer overclaimed as 'does not yield a fresh R2' in either origin or the consumer banner; (3) the Objective and Deliverables no longer authorize a second keyed read — the producer proof is a field of Governed(projection), reached through the existing single admission lookup; (4) AC-PRODUCER-KEY now pins the DirectInvocationResult variant by typed static provenance of the governed CheckedComputationalIHInvocationReturn result edge, and AC-PRODUCER-MUTATIONS splits wrong-direct-edge and wrong-loop-edge into independent mutations each with its own same-shape positive, so a neighbouring carried invocation result is not admissible as the governed producer. No mechanism, scope, fork, or sequencing change was made beyond that text, so the approval carries and no new Architect round is required."
 ---
 
 > # THIRD SIBLING PROOF — a PRODUCER, not a destination (evt_54efxydhb3n6w)
@@ -69,7 +69,10 @@ Derive and validate a planner-owned, typed, sealed **fresh-result producer**
 relation over the COMPLETE governed population: for each governed key, the exact
 emitted control edge that produces the fresh dynamic result of the governed `K`
 application. Extend the existing sanitized compile-time projection with only that
-producer proof, and expose it as one exact keyed read.
+producer proof. Because the producer proof is a FIELD of `Governed(projection)`,
+it is **available through the existing single admission lookup, with no
+additional keyed or authority read** — there is no producer map and no producer
+accessor.
 
 The node produces the relation, its validation, its projection extension, and its
 controls. It emits nothing, changes no runtime behavior, and is independently
@@ -185,7 +188,10 @@ facts to the Architect, through the runtime leader, and wait.
   governed key, functional agreement by typed equality across every quotient
   class.
 - The sanitized-projection extension carrying ONLY the producer proof (item 4),
-  and one exact keyed read of it.
+  **available through the existing single admission lookup, with no additional
+  keyed or authority read.** The producer proof is a field of
+  `Governed(projection)`; do NOT add a producer map, a producer accessor, or a
+  second lookup of any kind.
 - The acceptance controls below, using the landed mutation-harness pattern.
 - **On the D0 NO arm, the deliverable is the measured coordinate report instead**
   — and the node is complete at that point pending the Architect.
@@ -206,19 +212,32 @@ No lowering behavior change. No emitted-behavior change.
   equality. Re-derived in the validator and required EXACTLY equal to the
   planner-issued relation.
 - **AC-PRODUCER-KEY** — the relation is keyed from the existing governed call
-  coordinate plus typed active-frame / eliminator graph facts. A loop-exit
-  variant identifies the owning carried elimination and the exact merge/result
-  edge through typed static provenance. Substituting any Cranelift block number,
-  dense numeric origin, template number, runtime word, tag, or debug string as
-  AUTHORITY (as opposed to a diagnostic) FAILS.
+  coordinate plus typed active-frame / eliminator graph facts. **BOTH variants
+  are pinned independently, by typed static provenance:**
+  - a **loop-exit** variant identifies the owning carried elimination AND the
+    exact merge/result edge;
+  - a **direct** variant identifies the exact governed application's
+    `CheckedComputationalIHInvocationReturn` result edge — **never by `Carried`
+    shape, never by template number, and never by "there was a local result
+    here."** A NEIGHBOURING carried invocation result must NOT be admissible as
+    the governed producer.
+
+  Substituting any Cranelift block number, dense numeric origin, template
+  number, runtime word, tag, or debug string as AUTHORITY (as opposed to a
+  diagnostic) FAILS.
 - **AC-PRODUCER-POSITIVES** — consumer-adjacent positives independently cover
   BOTH producer variants, and show the loop rows reach an exact carried loop-exit
   result while the direct row remains direct. **No hard-coded arrival totals**;
   the present one-direct/four-loop split is a transition witness, not a law.
 - **AC-PRODUCER-MUTATIONS** — INDEPENDENTLY: producer removal; producer
-  duplication; cross-variant collapse; wrong active frame/eliminator; wrong
-  result edge/representation; wrong governed key. **Each must reject at its OWN
-  NAMED arm**, with near-identical positives, and restore byte-identically.
+  duplication; cross-variant collapse; wrong active frame/eliminator; **wrong
+  DIRECT invocation/result edge**; **wrong LOOP merge/result edge**; wrong
+  governed key. **Each must reject at its OWN NAMED arm**, and restore
+  byte-identically. **The two wrong-edge mutations are SEPARATE mutations, each
+  with its OWN SAME-SHAPE POSITIVE** — a single merged "wrong result edge"
+  mutation does not satisfy this AC, because it cannot distinguish a direct
+  variant that is merely observing some local `Carried` outcome from one that
+  has actually proved the governed result edge.
 - **AC-PRODUCER-DISAGREE** — a population mutation making two source members at
   one generated-entry class DISAGREE on the producer must REJECT. It may not
   select the first member and may not split at runtime.
