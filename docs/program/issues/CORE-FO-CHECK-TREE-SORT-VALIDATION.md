@@ -111,6 +111,23 @@ explicitly whether the pass can reject every term shape items 1 and 2 name.** If
 it cannot, stop here per the fork above — a `D0` that hard-stops with that
 answer is a **complete result**, not a failure.
 
+**The mechanism, ruled sufficient for this slice** (Architect
+`evt_ayw7409xg5ty`): maintain an **ephemeral binder-sort stack** plus a
+**certificate-wide parameter-sort constraint environment**. The principal
+quantifier supplies the expected sort for a parameter eigen; **every occurrence
+of the same parameter must unify with that assignment**; **every `Bound(i)` must
+resolve through the binder stack.** This is behaviourally sufficient **without
+changing `FokQTerm` or `FokForm`.**
+
+**`D0` MUST make the certificate-wide parameter constraint OPERATIVE, not
+implicit.** One **shared** parameter-sort constraint environment across the whole
+checked tree, seeded by each quantifier rule's principal binder and checked at
+every atom occurrence. **Per-form local inference is INSUFFICIENT: it can infer
+the same `FokQParameter n` as a world in one formula and an object in another and
+accept both.** That is a distinct defect from the single-formula ill-sorting the
+QA probe shows, and a pass that only does local inference will pass `AC-1` while
+leaving it open.
+
 **`D1` — the Rust boundary.** `check_tree` derives sorts and scope and
 **rejects fail-closed** a derivation that places a parameter or bound reference
 of one sort into a slot of another, or that references a binder not in scope.
@@ -142,6 +159,14 @@ strictly-stricter checker that also rejects well-sorted parameter certificates
 has broken the route rather than hardened it. Pin at least one accepted lawful
 certificate per quantifier rule.
 
+**`AC-2a`. A certificate that uses ONE parameter at TWO different sorts in TWO
+different formulas is REJECTED.** The control carries `FokQParameter n` as a
+world in one formula of the tree and as an object in another, each locally
+consistent, and the checker must refuse it. **This is the AC that distinguishes
+one shared certificate-wide constraint environment from per-form local
+inference** — a locally-inferring pass passes `AC-1` and fails this. Required by
+Architect `evt_ayw7409xg5ty`.
+
 **`AC-3`. Independent wrong-sort mutations each preserve refusal**, measured
 separately, not as one bundled row: a **world** eigenparameter landing in an
 **object** binder; an **object** eigenparameter landing in a **world** binder; a
@@ -156,9 +181,20 @@ is satisfied by a checker that rejects everything.
 control.** Name the injection point of each mutation, not its effect — two
 sites share one English description.
 
-**`AC-6`. No behaviour change for any well-sorted `Form` in the image of
-`embed` on `IForm Sigma`.** This is a domain restriction on the excess and on
-the ill-sorted, not a semantic change to the route.
+**`AC-6`. Behaviour is preserved for FULLY well-sorted, well-scoped
+CERTIFICATES — not for every well-sorted root formula.** Preserve acceptance
+only where the certificate's **complete stored formula tree, its rule-side
+parameter constraints, and its bound occurrences are ALL well-sorted and
+scoped.**
+
+> **Corrected on Architect ruling `evt_ayw7409xg5ty`; the earlier wording was
+> too broad and would have forbidden the repair's own purpose.** It read "no
+> behaviour change for any well-sorted `Form` in the image of `embed`". **A
+> well-sorted embedded ROOT can still be paired with an ill-sorted, out-of-scope,
+> or capturing CERTIFICATE**, and rejecting exactly that pairing is what this
+> node is for — the refuting certificate reaches the checker through
+> `fok_embed`'s image. Keying preservation on the root formula would have made
+> `AC-6` contradict `AC-1`.
 
 **`AC-7`. No `proved` for FO and no slice widening.** Route FO continues to
 return the audited `Unknown`. This node does not move the verdict boundary and
@@ -166,9 +202,22 @@ must not be reviewed as if it did.
 
 **`AC-8`. No new kernel primitive and no trusted axiom.**
 
-**`AC-9`. The landed `fok_checker_soundness` still elaborates unchanged.** This
-is the mechanical check that the validation-pass arm was actually taken — if a
-datatype moved, this reddens, and that is the fork's hard stop arriving late.
+**`AC-9`. What must remain UNCHANGED is the interface, not every proof helper.**
+Specifically unchanged: the **`FokDerivation` datatype and its constructors**,
+the **public `fok_checker_soundness` theorem TYPE**, and the **old calculus
+relation**. A **monotonic validation adapter is PERMITTED** — extracting
+old-checker acceptance from validated-checker acceptance — and so are the helper
+changes it requires. If the final theorem body stays textually unchanged through
+an adapted helper, say so; that is the intended reading. This is still the
+mechanical check that the validation-pass arm was taken: **if a target datatype
+moved, this reddens.**
+
+> **Corrected on Architect ruling `evt_ayw7409xg5ty`.** The earlier wording —
+> "the landed `fok_checker_soundness` still elaborates unchanged" — was not
+> feasible as stated. **Adding a Boolean validation guard to
+> `fok_check_tree`/`fok_check_cert` generally REQUIRES a proof adapter**, so
+> demanding byte-unchanged reflection helpers would have made the node
+> unbuildable while appearing to be a cheap safety check.
 
 **`AC-10`.** No-regression, in CI (`COORDINATION §12`).
 
@@ -179,6 +228,10 @@ datatype moved, this reddens, and that is the fork's hard stop arriving late.
   the `FokDerivation` constructors, and the reflection proofs are the **atomic
   lockstep** increment [[V3-FO-SORTED-EIGENPARAMETER-DERIVATION]]. Taking any
   part of it here splits a bundle that cannot be split.
+  **Precisely: any change to the `ForallRight` RELATION, or to its constructor
+  and reflection arm, is banned until node 2.** The **monotonic validation
+  adapter permitted by `AC-9` is NOT such a change** — it derives old-checker
+  acceptance from validated-checker acceptance and leaves the relation alone.
 - **Re-establishing adequacy.** [[V3-FO-EMBEDDING-ADEQUACY]], last in the
   sequence.
 - **Adding a sort tag to the target datatypes.** Ruled out above; discovering it

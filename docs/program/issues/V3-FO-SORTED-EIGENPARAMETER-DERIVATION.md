@@ -37,11 +37,21 @@ fok_prop_check_tree_sound_type :
   Equal Bool (fok_check_tree expected pi) True → FokDerivation expected
 ```
 
-(`FoKripke.ken:1553-1555`). Land a stricter checker without restating
-`FokDerivation`, and the theorem still elaborates while asserting strictly less
-than it appears to. Restate `FokDerivation` without the checker, and the
-reflection proof fails to elaborate. **Either half alone leaves the tracker
-claiming a gate that is not there.** There is no intermediate state in which
+(`FoKripke.ken:1553-1555`). Land **the corrected parameter-only `ForallRight`
+checker rule from this node** without restating `FokDerivation`, and the theorem
+still elaborates while asserting strictly less than it appears to. Restate
+`FokDerivation` without that rule, and the reflection proof fails to elaborate.
+**Either half alone leaves the tracker claiming a gate that is not there.**
+
+> **This argument is about THIS node's transition, and does not condemn the
+> predecessor** (Architect `evt_ayw7409xg5ty`). **External domain validation and
+> a changed calculus rule are different transitions.**
+> [[CORE-FO-CHECK-TREE-SORT-VALIDATION]] adds a fail-closed domain predicate over
+> the existing representation: its obligation is **monotonic** — acceptance by
+> the validated checker implies acceptance by the old structural checker — so it
+> changes neither the calculus rule nor `FokDerivation`'s relation, and asserts
+> no new semantic theorem. **This node changes the inference rule itself**, which
+> is why it alone cannot be split. There is no intermediate state in which
 both surfaces are honest, which is the Architect's own criterion for subsuming
 into a single frame.
 
