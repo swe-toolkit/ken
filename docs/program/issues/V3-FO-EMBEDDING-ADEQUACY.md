@@ -17,13 +17,15 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > ring is held. Eliminating the proof-indexed `FokDerivation` with
 > index-dependent Omega evidence fails elaboration:
 > `index refinement: ... not classified by a Type universe, found Ω0`
-> (language-implementer `evt_74q124wnb3zaf`, leader `evt_5fxgv9eeqm68f`; the
+> (implementer hard stop `evt_5fxgv9eeqm68f`, leader route `evt_74q124wnb3zaf`; the
 > minimal `Probe` reproduces, ordinary indexed-family and unindexed `FokCert`
 > controls pass). The Steward routed it without diagnosing it
 > (`evt_nrvb2atg0xay`).
 >
-> **The Architect ruled the route VIABLE** (`evt_pw69nxgxn99j`, superseding
-> `evt_1wnk1ek4s8sgj`). The defect is in the elaborator, not here:
+> **The Architect ruled the route VIABLE** across two CUMULATIVE rulings — the
+> detailed mechanism ruling `evt_1wnk1ek4s8sgj` and the concise status
+> clarification `evt_pw69nxgxn99j`. **Neither supersedes the other.** The defect
+> is in the elaborator, not here:
 >
 > - It is **not** prohibited elimination out of Omega. D2 eliminates
 >   `‖FokDerivation s‖` into the Omega-valued denotation, and its method
@@ -44,9 +46,9 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > by the Architect) is **held transition evidence, not a D2 candidate**. Do not
 > advance it toward one.
 >
-> **The ring resumes only on an explicit Steward re-release** after the
-> predecessor lands through publisher CI. The predecessor landing does not by
-> itself release D2.
+> **The ring resumes only on an explicit Steward re-release** after **both**
+> increments of the predecessor land through publisher CI. A predecessor
+> landing does not by itself release D2.
 
 > # FRAMED 2026-08-22 — the second route-FO `proved` theorem, on the structural arm
 >
