@@ -40,11 +40,8 @@ fn dependency_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_module_from_roots(
-        &[catalog_or::catalog_root()],
-        "Data.Numeric.Nat.Arithmetic",
-    )
-    .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
+        .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
     let lawful_prefix = "Core.Classes.LawfulClasses.";
