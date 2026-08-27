@@ -224,6 +224,16 @@ pub(in crate::cranelift_backend) use super::compiled::{CompiledModule, ResultDec
 pub(in crate::cranelift_backend) use super::planning::{
     StaticContinuationFusionDescriptor, StaticContinuationFusionKey, StaticContinuationFusionPlan,
 };
+#[cfg(feature = "px8-ds-test-support")]
+use super::planning::{
+    checked_ih_generated_entry_arrival_mutation,
+    record_checked_ih_generated_entry_governed_validation,
+    record_checked_ih_generated_entry_installed,
+    record_checked_ih_generated_entry_ordinary_continuation,
+    record_checked_ih_generated_entry_raw_arrival,
+    record_checked_ih_generated_entry_reached,
+    CheckedIhGeneratedEntryArrivalMutation,
+};
 pub(in crate::cranelift_backend) use super::planning::{
     collect_checked_oriented_markers, collect_checked_subcontinuation_frames,
     build_static_continuation_fusion_plan, plan_static_transition_graph_with_symbols,
@@ -239,8 +249,11 @@ pub(in crate::cranelift_backend) use super::planning::{
     // `planning.rs`, because a `cfg(test)` re-export of an item production reads
     // is an unresolved import the test profile cannot see.
     BoolMatchCaseOrdinals, BoundaryClosureEnvironment, CheckedCaseBinderLayout,
-    CheckedCaseBinderRole, CheckedIhEnvironmentTransport,
-    CheckedIhTransportInputDestination, CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
+    CheckedCaseBinderRole, CheckedIhBinding, CheckedIhEnvironmentTransport,
+    CheckedIhGeneratedEntryAccess, CheckedIhGeneratedEntryAdmission,
+    CheckedIhGeneratedEntryProjection, CheckedIhKAvailabilityDomain,
+    CheckedIhTransportInputDestination,
+    CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
     DeclarationCallTargetClass,
     ContinuationContextId, ContinuationEmissionOwner,
     ContinuationInputView, ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
@@ -935,6 +948,7 @@ impl ArtifactHelpers<'_> {
             defining_abi_slot_kinds: Vec::new(),
             generated_context_captures: None,
             constructed_context_frame: None,
+            checked_ih_generated_entry_access: None,
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
             checked_ih_transport_emissions: Vec::new(),
@@ -1213,6 +1227,10 @@ struct FunctionLocalRefs {
     /// `generated_context_captures` is: the operands are `ir::Value`s of this
     /// Function.
     constructed_context_frame: Option<ConstructedContextFrame>,
+    /// Sanitized planner authority installed only while defining one generated
+    /// context function. Source identities, retarget callers, transports, and
+    /// derivation ancestry are absent from its type.
+    checked_ih_generated_entry_access: Option<CheckedIhGeneratedEntryAccess>,
     /// **`RT-CONTSPEC-ACTIVATE` `D3`** -- this Function's own `FuncRef` per
     /// causal token it owns, keyed by the complete four-field identity.
     /// Minted into this `Function`; never passed across functions.
@@ -3746,6 +3764,9 @@ struct PendingCheckedIhCall {
     /// IH-subsequence ordinal is translated through it before comparison with
     /// the emitted runtime `Var`.
     binder_morphism: crate::CheckedComputationalIHBinderMorphism,
+    /// The checked invocation marker occurrence. It is part of the exact
+    /// sanitized generated-entry key and never enters runtime state.
+    invocation_origin: StaticOriginId,
     /// The occurrence of the application this marker denotes. Only a call being
     /// lowered AT this occurrence may consume the marker.
     application_origin: StaticOriginId,
@@ -10573,6 +10594,7 @@ impl<'a> Lowering<'a> {
         kind: crate::CheckedComputationalIHInvocationKind,
         binder_morphism: crate::CheckedComputationalIHBinderMorphism,
         body: &RuntimeExpr,
+        invocation_origin: StaticOriginId,
         // `D8f` — the occurrence of the application this marker denotes,
         // supplied by the caller from the same `child_origin(marker, 0)` it
         // already derives to lower the body. ⛔ Not recomputed here: a second
@@ -10587,6 +10609,7 @@ impl<'a> Lowering<'a> {
                 call_template_id,
                 kind,
                 binder_morphism,
+                invocation_origin,
                 application_origin,
             })
             .is_some()

@@ -16,10 +16,31 @@ mod static_transition;
 #[cfg(feature = "px8-ds-test-support")]
 pub use static_transition::{
     checked_ih_continuation_inheritance_mutation_is_exact,
+    checked_ih_generated_entry_admission_mutation_is_exact,
+    checked_ih_generated_entry_arrival_mutation_is_exact,
+    checked_ih_generated_entry_confluence_mutation_is_exact,
     with_checked_ih_continuation_inheritance_mutation,
-    with_checked_ih_continuation_inheritance_observations, with_worker_prefix_deferrals,
+    with_checked_ih_continuation_inheritance_observations,
+    with_checked_ih_generated_entry_admission_mutation,
+    with_checked_ih_generated_entry_admission_observations,
+    with_checked_ih_generated_entry_arrival_mutation,
+    with_checked_ih_generated_entry_confluence_mutation,
+    with_checked_ih_generated_entry_observations, with_worker_prefix_deferrals,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
+    CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
+    CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
+    CheckedIhGeneratedEntryObservation,
     WorkerPrefixDeferral,
+};
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) use static_transition::{
+    checked_ih_generated_entry_arrival_mutation,
+    record_checked_ih_generated_entry_governed_validation,
+    record_checked_ih_generated_entry_installed,
+    record_checked_ih_generated_entry_ordinary_continuation,
+    record_checked_ih_generated_entry_raw_arrival,
+    record_checked_ih_generated_entry_reached,
 };
 
 pub(super) use static_transition::build_static_continuation_fusion_plan;
@@ -78,7 +99,9 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{
     AggregateOccurrenceId, BoundaryClosureEnvironment, CheckedIhCapabilityInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
-    CheckedIhFreshResultDestination, CheckedIhImmediateKBindingLocator,
+    CheckedIhFreshResultDestination, CheckedIhGeneratedEntryAccess,
+    CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
+    CheckedIhImmediateKBindingLocator,
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
     FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape, PlannedAggregateOwnership,
     PlannedReferentLifetime, SynthesizedAggregateNode, SynthesizedAggregatePath,
@@ -110,7 +133,7 @@ pub(super) use static_transition::{
     // lowering's test targets so its control can compare the authority against
     // the prefix production actually assembled, rather than against its own
     // recomputation of the same rule. Namespace re-export only.
-    CheckedCaseBinderLayout, CheckedCaseBinderRole,
+    CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhBinding,
     // `RT-CONTSRC-PRODUCER-LOCAL` `D3b` — the emission consumer's fail-closed
     // check that it is indexing where the coordinate actually sits.
     verify_current_lexical_availability,

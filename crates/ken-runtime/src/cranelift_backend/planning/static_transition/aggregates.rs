@@ -329,6 +329,159 @@ pub(in crate::cranelift_backend) struct CheckedIhContinuationInheritance {
     fresh_result_destination: CheckedIhFreshResultDestination,
 }
 
+/// The exact generated-function entry at which one or more source-specific
+/// continuation inheritances converge.
+///
+/// This is the quotient key. Source-call identity is deliberately absent: it
+/// is a class member, not a discriminator available at generated entry.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(super) struct CheckedIhGeneratedEntryCoordinate {
+    context: super::ContinuationContextId,
+    enclosing_specialization: ContinuationSpecializationId,
+    worker_body_origin: StaticOriginId,
+    binding: CheckedIhBinding,
+    invocation_origin: StaticOriginId,
+    call_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+}
+
+/// The complete typed authority common to every source-specific member of one
+/// generated-entry quotient class.
+///
+/// It carries no source identity, transport, or derivation ancestry. Equality
+/// disagreement is a planner error; it must never create another class.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhGeneratedEntryProjection {
+    destination_owner: ContinuationEmissionOwner,
+    destination_body_origin: StaticOriginId,
+    binding: CheckedIhBinding,
+    immediate_k_locator: CheckedIhImmediateKBindingLocator,
+    fresh_result_destination: CheckedIhFreshResultDestination,
+}
+
+/// Planner-only proof that all source-specific inheritances reaching one exact
+/// generated entry agree on the consumer authority lowering needs there.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct CheckedIhGeneratedEntryConfluence {
+    members: BTreeSet<ContinuationCallIdentity>,
+    retarget_caller: ContinuationCallIdentity,
+    projection: CheckedIhGeneratedEntryProjection,
+}
+
+/// Capsule-independent coordinate of one checked-IH call that can arrive at
+/// source-call dispatch in an access-bearing generated function.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct CheckedIhGeneratedEntryCallCoordinate {
+    invocation_origin: StaticOriginId,
+    call_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+}
+
+/// The total, planner-derived classification of one call-coordinate member.
+/// `NonGoverned` is positive membership in the closed `P \\ G` relation; it is
+/// never synthesized from lookup absence or a fallback arm.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum CheckedIhGeneratedEntryAdmission {
+    Governed(CheckedIhGeneratedEntryProjection),
+    NonGoverned,
+}
+
+/// Sanitized compile-time authority installed in exactly one generated
+/// function. The source-specific certificate members and graph caller are
+/// intentionally unrepresentable here.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhGeneratedEntryAccess {
+    context: super::ContinuationContextId,
+    enclosing_specialization: ContinuationSpecializationId,
+    worker_body_origin: StaticOriginId,
+    admissions: BTreeMap<
+        CheckedIhGeneratedEntryCallCoordinate,
+        CheckedIhGeneratedEntryAdmission,
+    >,
+}
+
+impl CheckedIhGeneratedEntryAccess {
+    pub(in crate::cranelift_backend) fn context(&self) -> super::ContinuationContextId {
+        self.context
+    }
+
+    pub(in crate::cranelift_backend) fn enclosing_specialization(
+        &self,
+    ) -> ContinuationSpecializationId {
+        self.enclosing_specialization
+    }
+
+    pub(in crate::cranelift_backend) fn worker_body_origin(&self) -> StaticOriginId {
+        self.worker_body_origin
+    }
+
+    /// The sole generated-entry lookup. The map is total over the closed
+    /// planner-derived call population, so absence is always a planner error.
+    pub(in crate::cranelift_backend) fn admission_for(
+        &self,
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+    ) -> Option<&CheckedIhGeneratedEntryAdmission> {
+        let key = CheckedIhGeneratedEntryCallCoordinate {
+            invocation_origin,
+            call_origin,
+            callee_origin,
+        };
+        #[cfg(feature = "px8-ds-test-support")]
+        let operation_count = match checked_ih_generated_entry_arrival_mutation() {
+            CheckedIhGeneratedEntryArrivalMutation::DuplicateLookup => 2,
+            CheckedIhGeneratedEntryArrivalMutation::SkipLookup => 0,
+            _ => 1,
+        };
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let operation_count = 1;
+
+        let mut selected = None;
+        for _ in 0..operation_count {
+            let current = self.admissions.get(&key);
+            #[cfg(feature = "px8-ds-test-support")]
+            if let Some(admission) = current {
+                record_checked_ih_generated_entry_admission_outcome(
+                    self,
+                    key,
+                    matches!(admission, CheckedIhGeneratedEntryAdmission::Governed(_)),
+                );
+            }
+            selected = current;
+        }
+        selected
+    }
+}
+
+impl CheckedIhGeneratedEntryProjection {
+    pub(in crate::cranelift_backend) fn destination_owner(
+        &self,
+    ) -> ContinuationEmissionOwner {
+        self.destination_owner
+    }
+
+    pub(in crate::cranelift_backend) fn destination_body_origin(&self) -> StaticOriginId {
+        self.destination_body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn binding(&self) -> CheckedIhBinding {
+        self.binding
+    }
+
+    pub(in crate::cranelift_backend) fn immediate_k_locator(
+        &self,
+    ) -> &CheckedIhImmediateKBindingLocator {
+        &self.immediate_k_locator
+    }
+
+    pub(in crate::cranelift_backend) fn fresh_result_destination(
+        &self,
+    ) -> &CheckedIhFreshResultDestination {
+        &self.fresh_result_destination
+    }
+}
+
 /// Read-only split view returned by the exact continuation-inheritance
 /// accessor. The two proofs cannot be mistaken for one transitive result edge.
 pub(in crate::cranelift_backend) struct CheckedIhContinuationInheritanceView<'plan> {
@@ -564,6 +717,529 @@ thread_local! {
     static CONTINUATION_INHERITANCE_OBSERVATIONS:
         RefCell<Vec<CheckedIhContinuationInheritanceObservation>> = const { RefCell::new(Vec::new()) };
     static CONTINUATION_INHERITANCE_DESCRIPTOR_ONLY_EXCLUSIONS: Cell<usize> = const { Cell::new(0) };
+    static GENERATED_ENTRY_OBSERVATION_ACTIVE: Cell<bool> = const { Cell::new(false) };
+    static GENERATED_ENTRY_OBSERVATIONS:
+        RefCell<Vec<CheckedIhGeneratedEntryObservation>> = const { RefCell::new(Vec::new()) };
+    static GENERATED_ENTRY_ADMISSION_OBSERVATIONS:
+        RefCell<Vec<CheckedIhGeneratedEntryAdmissionObservation>> =
+            const { RefCell::new(Vec::new()) };
+    static GENERATED_ENTRY_ARRIVAL_MUTATION:
+        Cell<CheckedIhGeneratedEntryArrivalMutation> =
+            const { Cell::new(CheckedIhGeneratedEntryArrivalMutation::Exact) };
+    static GENERATED_ENTRY_ADMISSION_MUTATION:
+        Cell<CheckedIhGeneratedEntryAdmissionMutation> =
+            const { Cell::new(CheckedIhGeneratedEntryAdmissionMutation::Exact) };
+}
+
+/// Closure-free report of one planner certificate class and its downstream
+/// installation/reach state. Numeric origins are reports only.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CheckedIhGeneratedEntryObservation {
+    pub context: u32,
+    pub enclosing_specialization: u32,
+    pub worker_body_origin: u32,
+    pub binding_frame_origin: u32,
+    pub binding_recursive_position: u32,
+    pub invocation_origin: u32,
+    pub call_origin: u32,
+    pub callee_origin: u32,
+    pub members: Vec<String>,
+    pub retarget_caller: String,
+    pub destination_owner: String,
+    pub destination_body_origin: u32,
+    pub locator_invocation_origin: u32,
+    pub locator_callee_origin: u32,
+    pub locator_domain: String,
+    pub locator_index: u32,
+    pub fresh_result_destination: String,
+    pub installed: bool,
+    pub reached_count: usize,
+    pub reached_exact_capsule: bool,
+    pub reached_carried_residual: bool,
+}
+
+/// Closure-free report of the complete total-admission population. The
+/// planner-derived binding remains observation-only for `NonGoverned` rows and
+/// never enters the sanitized lowering object.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CheckedIhGeneratedEntryAdmissionObservation {
+    pub context: u32,
+    pub enclosing_specialization: u32,
+    pub worker_body_origin: u32,
+    pub binding_frame_origin: u32,
+    pub binding_recursive_position: u32,
+    pub invocation_origin: u32,
+    pub call_origin: u32,
+    pub callee_origin: u32,
+    pub governed: bool,
+    pub installed: bool,
+    pub installation_count: usize,
+    pub raw_arrival_count: usize,
+    pub admission_outcome_count: usize,
+    pub governed_validation_count: usize,
+    pub ordinary_continuation_count: usize,
+}
+
+/// Operation-side mutations for the per-arrival equality. Each moves the real
+/// lookup, full validation, or sealed continuation while leaving the four
+/// independently incremented observation counters unchanged.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckedIhGeneratedEntryArrivalMutation {
+    Exact,
+    DuplicateLookup,
+    SkipLookup,
+    DuplicateGovernedValidation,
+    SkipGovernedValidation,
+    GovernedThroughNonGoverned,
+    NonGovernedThroughGoverned,
+}
+
+/// Population-side mutations for both variants of the closed P/G/N admission
+/// partition. Each perturbs the real map before its unchanged set laws run.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckedIhGeneratedEntryAdmissionMutation {
+    Exact,
+    DropGoverned,
+    DropNonGoverned,
+    DuplicateGoverned,
+    DuplicateNonGoverned,
+    GovernedToNonGoverned,
+    NonGovernedToGoverned,
+    GovernedProjectedCollision,
+    NonGovernedProjectedCollision,
+}
+
+/// Population-side mutations for the generated-entry quotient and its exact
+/// typed projection. Each variant perturbs a governed member before the
+/// unchanged certificate checks consume it.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckedIhGeneratedEntryConfluenceMutation {
+    Exact,
+    ContextOnlyKey,
+    SourceIdentityInKey,
+    ProjectionInKey,
+    DestinationOwner,
+    DestinationBody,
+    BindingFrame,
+    BindingPosition,
+    LocatorInvocation,
+    LocatorCallee,
+    LocatorDomain,
+    LocatorIndex,
+    FreshActiveFrame,
+    FreshRetBody,
+    FreshConstructorRole,
+    FreshConstructorCoordinate,
+    FreshClosureRecord,
+    FreshClosureOrigin,
+    FreshClosureBody,
+    FreshClosureParameterCount,
+    FreshCaptureOrdinal,
+    FreshCaptureOccurrence,
+    FreshBodyReadMembership,
+    RemoveFirstMember,
+    DuplicateFirstMember,
+    FilterCollidingMember,
+    PermuteInheritanceOrder,
+    PermuteContextInterningOrder,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static GENERATED_ENTRY_CONFLUENCE_MUTATION:
+        Cell<CheckedIhGeneratedEntryConfluenceMutation> =
+            const { Cell::new(CheckedIhGeneratedEntryConfluenceMutation::Exact) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_generated_entry_confluence_mutation<T>(
+    mutation: CheckedIhGeneratedEntryConfluenceMutation,
+    f: impl FnOnce() -> T,
+) -> T {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            GENERATED_ENTRY_CONFLUENCE_MUTATION.with(|active| {
+                active.set(CheckedIhGeneratedEntryConfluenceMutation::Exact)
+            });
+        }
+    }
+    GENERATED_ENTRY_CONFLUENCE_MUTATION.with(|active| active.set(mutation));
+    let _restore = Restore;
+    f()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn checked_ih_generated_entry_confluence_mutation_is_exact() -> bool {
+    GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get)
+        == CheckedIhGeneratedEntryConfluenceMutation::Exact
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_generated_entry_arrival_mutation<T>(
+    mutation: CheckedIhGeneratedEntryArrivalMutation,
+    f: impl FnOnce() -> T,
+) -> T {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            GENERATED_ENTRY_ARRIVAL_MUTATION
+                .with(|active| active.set(CheckedIhGeneratedEntryArrivalMutation::Exact));
+        }
+    }
+    GENERATED_ENTRY_ARRIVAL_MUTATION.with(|active| active.set(mutation));
+    let _restore = Restore;
+    f()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn checked_ih_generated_entry_arrival_mutation_is_exact() -> bool {
+    checked_ih_generated_entry_arrival_mutation()
+        == CheckedIhGeneratedEntryArrivalMutation::Exact
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn checked_ih_generated_entry_arrival_mutation(
+) -> CheckedIhGeneratedEntryArrivalMutation {
+    GENERATED_ENTRY_ARRIVAL_MUTATION.with(Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_generated_entry_admission_mutation<T>(
+    mutation: CheckedIhGeneratedEntryAdmissionMutation,
+    f: impl FnOnce() -> T,
+) -> T {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            GENERATED_ENTRY_ADMISSION_MUTATION
+                .with(|active| active.set(CheckedIhGeneratedEntryAdmissionMutation::Exact));
+        }
+    }
+    GENERATED_ENTRY_ADMISSION_MUTATION.with(|active| active.set(mutation));
+    let _restore = Restore;
+    f()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn checked_ih_generated_entry_admission_mutation_is_exact() -> bool {
+    GENERATED_ENTRY_ADMISSION_MUTATION.with(Cell::get)
+        == CheckedIhGeneratedEntryAdmissionMutation::Exact
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn checked_ih_generated_entry_admission_mutation() -> CheckedIhGeneratedEntryAdmissionMutation {
+    GENERATED_ENTRY_ADMISSION_MUTATION.with(Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn checked_ih_generated_entry_context_permutation_is_active() -> bool {
+    GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get)
+        == CheckedIhGeneratedEntryConfluenceMutation::PermuteContextInterningOrder
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_generated_entry_observations<T>(
+    f: impl FnOnce() -> T,
+) -> (T, Vec<CheckedIhGeneratedEntryObservation>) {
+    GENERATED_ENTRY_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
+    GENERATED_ENTRY_OBSERVATION_ACTIVE.with(|active| active.set(true));
+    let result = f();
+    GENERATED_ENTRY_OBSERVATION_ACTIVE.with(|active| active.set(false));
+    let observations = GENERATED_ENTRY_OBSERVATIONS
+        .with(|observations| std::mem::take(&mut *observations.borrow_mut()));
+    (result, observations)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_generated_entry_admission_observations<T>(
+    f: impl FnOnce() -> T,
+) -> (T, Vec<CheckedIhGeneratedEntryAdmissionObservation>) {
+    GENERATED_ENTRY_ADMISSION_OBSERVATIONS
+        .with(|observations| observations.borrow_mut().clear());
+    GENERATED_ENTRY_OBSERVATION_ACTIVE.with(|active| active.set(true));
+    let result = f();
+    GENERATED_ENTRY_OBSERVATION_ACTIVE.with(|active| active.set(false));
+    let observations = GENERATED_ENTRY_ADMISSION_OBSERVATIONS
+        .with(|observations| std::mem::take(&mut *observations.borrow_mut()));
+    (result, observations)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn record_checked_ih_generated_entry_confluences(
+    confluences: &BTreeMap<
+        CheckedIhGeneratedEntryCoordinate,
+        CheckedIhGeneratedEntryConfluence,
+    >,
+) {
+    if !GENERATED_ENTRY_OBSERVATION_ACTIVE.with(Cell::get) {
+        return;
+    }
+    GENERATED_ENTRY_OBSERVATIONS.with(|observations| {
+        let mut observations = observations.borrow_mut();
+        for (coordinate, confluence) in confluences {
+            observations.push(CheckedIhGeneratedEntryObservation {
+                context: coordinate.context.0,
+                enclosing_specialization: coordinate.enclosing_specialization.0,
+                worker_body_origin: coordinate.worker_body_origin.0,
+                binding_frame_origin: coordinate.binding.frame_origin.0,
+                binding_recursive_position: coordinate.binding.recursive_position,
+                invocation_origin: coordinate.invocation_origin.0,
+                call_origin: coordinate.call_origin.0,
+                callee_origin: coordinate.callee_origin.0,
+                members: confluence.members.iter().map(|member| format!("{member:?}")).collect(),
+                retarget_caller: format!("{:?}", confluence.retarget_caller),
+                destination_owner: format!("{:?}", confluence.projection.destination_owner),
+                destination_body_origin: confluence.projection.destination_body_origin.0,
+                locator_invocation_origin: confluence.projection.immediate_k_locator.invocation_origin.0,
+                locator_callee_origin: confluence.projection.immediate_k_locator.callee_origin.0,
+                locator_domain: format!("{:?}", confluence.projection.immediate_k_locator.environment_domain),
+                locator_index: confluence.projection.immediate_k_locator.environment_index,
+                fresh_result_destination: format!("{:?}", confluence.projection.fresh_result_destination),
+                installed: false,
+                reached_count: 0,
+                reached_exact_capsule: false,
+                reached_carried_residual: false,
+            });
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_checked_ih_generated_entry_installed(
+    access: &CheckedIhGeneratedEntryAccess,
+) {
+    if !GENERATED_ENTRY_OBSERVATION_ACTIVE.with(Cell::get) {
+        return;
+    }
+    GENERATED_ENTRY_ADMISSION_OBSERVATIONS.with(|observations| {
+        let mut observations = observations.borrow_mut();
+        for (key, admission) in &access.admissions {
+            let mut matches = observations
+                .iter_mut()
+                .filter(|observation| {
+                    observation.context == access.context.0
+                        && observation.enclosing_specialization
+                            == access.enclosing_specialization.0
+                        && observation.worker_body_origin == access.worker_body_origin.0
+                        && observation.invocation_origin == key.invocation_origin.0
+                        && observation.call_origin == key.call_origin.0
+                        && observation.callee_origin == key.callee_origin.0
+                        && observation.governed
+                            == matches!(
+                                admission,
+                                CheckedIhGeneratedEntryAdmission::Governed(_)
+                            )
+                })
+                .collect::<Vec<_>>();
+            if matches.len() != 1 {
+                panic!("one total admission key must match one planner population row");
+            }
+            let observation = matches.pop().expect("length checked above");
+            observation.installed = true;
+            observation.installation_count = observation
+                .installation_count
+                .checked_add(1)
+                .expect("admission installation count exhausted");
+            observation.raw_arrival_count = 0;
+            observation.admission_outcome_count = 0;
+            observation.governed_validation_count = 0;
+            observation.ordinary_continuation_count = 0;
+        }
+    });
+    GENERATED_ENTRY_OBSERVATIONS.with(|observations| {
+        let mut observations = observations.borrow_mut();
+        for (key, admission) in &access.admissions {
+            let CheckedIhGeneratedEntryAdmission::Governed(projection) = admission else {
+                continue;
+            };
+            let mut matches = observations
+                .iter_mut()
+                .filter(|observation| {
+                    observation.context == access.context.0
+                        && observation.enclosing_specialization == access.enclosing_specialization.0
+                        && observation.worker_body_origin == access.worker_body_origin.0
+                        && observation.binding_frame_origin == projection.binding.frame_origin.0
+                        && observation.binding_recursive_position == projection.binding.recursive_position
+                        && observation.invocation_origin == key.invocation_origin.0
+                        && observation.call_origin == key.call_origin.0
+                        && observation.callee_origin == key.callee_origin.0
+                })
+                .collect::<Vec<_>>();
+            if matches.len() != 1 {
+                panic!("one sanitized generated-entry key must match one certificate observation");
+            }
+            let observation = matches.pop().expect("length checked above");
+            if observation.destination_body_origin != projection.destination_body_origin.0 {
+                panic!("installed generated-entry projection changed its destination body");
+            }
+            observation.installed = true;
+            observation.reached_count = 0;
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_checked_ih_generated_entry_reached(
+    access: &CheckedIhGeneratedEntryAccess,
+    binding: CheckedIhBinding,
+    invocation_origin: StaticOriginId,
+    call_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+    projection: &CheckedIhGeneratedEntryProjection,
+) {
+    if !GENERATED_ENTRY_OBSERVATION_ACTIVE.with(Cell::get) {
+        return;
+    }
+    GENERATED_ENTRY_OBSERVATIONS.with(|observations| {
+        let mut observations = observations.borrow_mut();
+        let mut matches = observations
+            .iter_mut()
+            .filter(|observation| {
+                observation.context == access.context.0
+                    && observation.enclosing_specialization == access.enclosing_specialization.0
+                    && observation.worker_body_origin == access.worker_body_origin.0
+                    && observation.binding_frame_origin == binding.frame_origin.0
+                    && observation.binding_recursive_position == binding.recursive_position
+                    && observation.invocation_origin == invocation_origin.0
+                    && observation.call_origin == call_origin.0
+                    && observation.callee_origin == callee_origin.0
+            })
+            .collect::<Vec<_>>();
+        if matches.len() != 1 {
+            panic!("one reached generated-entry key must match one certificate observation");
+        }
+        let observation = matches.pop().expect("length checked above");
+        if observation.destination_body_origin != projection.destination_body_origin.0 {
+            panic!("reached generated-entry projection changed its destination body");
+        }
+        observation.reached_count = observation
+            .reached_count
+            .checked_add(1)
+            .expect("generated-entry validation count exhausted");
+        observation.reached_exact_capsule = true;
+        observation.reached_carried_residual = true;
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn with_checked_ih_generated_entry_admission_observation(
+    access: &CheckedIhGeneratedEntryAccess,
+    key: CheckedIhGeneratedEntryCallCoordinate,
+    governed: Option<bool>,
+    f: impl FnOnce(&mut CheckedIhGeneratedEntryAdmissionObservation),
+) {
+    if !GENERATED_ENTRY_OBSERVATION_ACTIVE.with(Cell::get) {
+        return;
+    }
+    GENERATED_ENTRY_ADMISSION_OBSERVATIONS.with(|observations| {
+        let mut observations = observations.borrow_mut();
+        let mut matches = observations
+            .iter_mut()
+            .filter(|observation| {
+                observation.context == access.context.0
+                    && observation.enclosing_specialization
+                        == access.enclosing_specialization.0
+                    && observation.worker_body_origin == access.worker_body_origin.0
+                    && observation.invocation_origin == key.invocation_origin.0
+                    && observation.call_origin == key.call_origin.0
+                    && observation.callee_origin == key.callee_origin.0
+                    && governed.map_or(true, |governed| observation.governed == governed)
+            })
+            .collect::<Vec<_>>();
+        if matches.len() != 1 {
+            panic!("one arrival operation must match one closed admission row");
+        }
+        f(matches.pop().expect("length checked above"));
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_checked_ih_generated_entry_raw_arrival(
+    access: &CheckedIhGeneratedEntryAccess,
+    invocation_origin: StaticOriginId,
+    call_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+) {
+    let key = CheckedIhGeneratedEntryCallCoordinate {
+        invocation_origin,
+        call_origin,
+        callee_origin,
+    };
+    with_checked_ih_generated_entry_admission_observation(access, key, None, |observation| {
+        observation.raw_arrival_count = observation
+            .raw_arrival_count
+            .checked_add(1)
+            .expect("raw generated-entry arrival count exhausted");
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_checked_ih_generated_entry_admission_outcome(
+    access: &CheckedIhGeneratedEntryAccess,
+    key: CheckedIhGeneratedEntryCallCoordinate,
+    governed: bool,
+) {
+    with_checked_ih_generated_entry_admission_observation(access, key, Some(governed), |observation| {
+        observation.admission_outcome_count = observation
+            .admission_outcome_count
+            .checked_add(1)
+            .expect("generated-entry admission outcome count exhausted");
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_checked_ih_generated_entry_governed_validation(
+    access: &CheckedIhGeneratedEntryAccess,
+    invocation_origin: StaticOriginId,
+    call_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+) {
+    with_checked_ih_generated_entry_admission_observation(
+        access,
+        CheckedIhGeneratedEntryCallCoordinate {
+            invocation_origin,
+            call_origin,
+            callee_origin,
+        },
+        Some(true),
+        |observation| {
+            observation.governed_validation_count = observation
+                .governed_validation_count
+                .checked_add(1)
+                .expect("governed generated-entry validation count exhausted");
+        },
+    );
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_checked_ih_generated_entry_ordinary_continuation(
+    access: &CheckedIhGeneratedEntryAccess,
+    invocation_origin: StaticOriginId,
+    call_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+    governed: bool,
+) {
+    with_checked_ih_generated_entry_admission_observation(
+        access,
+        CheckedIhGeneratedEntryCallCoordinate {
+            invocation_origin,
+            call_origin,
+            callee_origin,
+        },
+        Some(governed),
+        |observation| {
+            observation.ordinary_continuation_count = observation
+                .ordinary_continuation_count
+                .checked_add(1)
+                .expect("ordinary generated-entry continuation count exhausted");
+        },
+    );
 }
 
 /// Run one compile observation window. The predecessor remains behaviorally
@@ -4219,6 +4895,855 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
         ));
     }
     Ok(())
+}
+
+fn generated_entry_retarget_caller(
+    plan: &StaticTransitionPlan<'_>,
+    enclosing: ContinuationSpecializationId,
+) -> Result<ContinuationCallIdentity, CraneliftBackendError> {
+    let mut found = None;
+    for call in plan.continuation_calls()? {
+        if call.target() != enclosing {
+            continue;
+        }
+        let identity = plan
+            .continuation_call_binding_for(
+                call.producer_construct_origin(),
+                call.continuation_origin(),
+                call.producer_alternative(),
+                call.recursive_position(),
+            )?
+            .ok_or_else(|| {
+                planner_error(
+                    "a generated-entry retarget caller is absent from its own exact planner \
+                     selector",
+                )
+            })?;
+        if identity.target() != enclosing {
+            return Err(planner_error(
+                "a generated-entry retarget caller reopens to a different specialization",
+            ));
+        }
+        if found.replace(identity).is_some() {
+            return Err(planner_error(
+                "one generated-entry specialization has more than one retarget-seat incoming call",
+            ));
+        }
+    }
+    found.ok_or_else(|| {
+        planner_error("a generated-entry specialization has no retarget-seat incoming call")
+    })
+}
+
+fn checked_ih_generated_entry_row(
+    plan: &StaticTransitionPlan<'_>,
+    inheritance: &CheckedIhContinuationInheritance,
+) -> Result<
+    Option<(
+        CheckedIhGeneratedEntryCoordinate,
+        ContinuationCallIdentity,
+        ContinuationCallIdentity,
+        CheckedIhGeneratedEntryProjection,
+    )>,
+    CraneliftBackendError,
+> {
+    let ContinuationEmissionOwner::Specialization(enclosing_specialization) =
+        inheritance.capability.destination_owner
+    else {
+        return Ok(None);
+    };
+    let worker_body_origin = inheritance.capability.destination_body_origin;
+    let Some(context) = plan
+        .continuation_context_for(enclosing_specialization, worker_body_origin)?
+    else {
+        return Ok(None);
+    };
+    let final_step = inheritance
+        .capability
+        .self_resumption_steps
+        .last()
+        .ok_or_else(|| planner_error("a generated-entry inheritance has no final step"))?;
+    let view = plan
+        .checked_ih_continuation_inheritance_for_invocation(
+            &inheritance.transport.source_call_identity,
+            inheritance.capability.destination_owner,
+            Some(worker_body_origin),
+            final_step.callee_binding.frame_origin,
+            final_step.callee_binding.recursive_position,
+        )?
+        .ok_or_else(|| {
+            planner_error(
+                "a governed generated-entry inheritance is absent from the existing exact accessor",
+            )
+        })?;
+    if view.transport() != &inheritance.transport
+        || view.capability() != &inheritance.capability
+        || view.fresh_result_destination() != &inheritance.fresh_result_destination
+    {
+        return Err(planner_error(
+            "a generated-entry inheritance reopens to a different typed view",
+        ));
+    }
+    let final_step = view
+        .capability
+        .self_resumption_steps
+        .last()
+        .ok_or_else(|| planner_error("a reopened generated-entry view has no final step"))?;
+    let immediate_k_locator = view
+        .capability()
+        .immediate_k_locator()
+        .ok_or_else(|| {
+            planner_error("a reopened generated-entry view has no unique immediate K locator")
+        })?
+        .clone();
+    let coordinate = CheckedIhGeneratedEntryCoordinate {
+        context: context.id(),
+        enclosing_specialization,
+        worker_body_origin,
+        binding: final_step.callee_binding,
+        invocation_origin: final_step.invocation_origin,
+        call_origin: final_step.call_origin,
+        callee_origin: final_step.callee_origin,
+    };
+    let projection = CheckedIhGeneratedEntryProjection {
+        destination_owner: view.capability().destination_owner(),
+        destination_body_origin: view.capability().destination_body_origin(),
+        binding: final_step.callee_binding,
+        immediate_k_locator,
+        fresh_result_destination: view.fresh_result_destination().clone(),
+    };
+    let retarget_caller = generated_entry_retarget_caller(plan, enclosing_specialization)?;
+    Ok(Some((
+        coordinate,
+        inheritance.transport.source_call_identity.clone(),
+        retarget_caller,
+        projection,
+    )))
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn mutate_checked_ih_generated_entry_projection(
+    projection: &mut CheckedIhGeneratedEntryProjection,
+    mutation: CheckedIhGeneratedEntryConfluenceMutation,
+) {
+    use CheckedIhGeneratedEntryConfluenceMutation as Mutation;
+    let shifted = |origin: StaticOriginId| StaticOriginId(origin.0.wrapping_add(1));
+    match mutation {
+        Mutation::DestinationOwner => {
+            projection.destination_owner = match projection.destination_owner {
+                ContinuationEmissionOwner::Specialization(id) => {
+                    ContinuationEmissionOwner::Predeclared(PredeclaredFunctionId(id.0))
+                }
+                ContinuationEmissionOwner::Predeclared(id) => {
+                    ContinuationEmissionOwner::Specialization(ContinuationSpecializationId(id.0))
+                }
+                ContinuationEmissionOwner::Fusion(_) => return,
+            };
+        }
+        Mutation::DestinationBody => {
+            projection.destination_body_origin = shifted(projection.destination_body_origin)
+        }
+        Mutation::BindingFrame => {
+            projection.binding.frame_origin = shifted(projection.binding.frame_origin)
+        }
+        Mutation::BindingPosition => {
+            projection.binding.recursive_position =
+                projection.binding.recursive_position.wrapping_add(1)
+        }
+        Mutation::LocatorInvocation => {
+            projection.immediate_k_locator.invocation_origin =
+                shifted(projection.immediate_k_locator.invocation_origin)
+        }
+        Mutation::LocatorCallee => {
+            projection.immediate_k_locator.callee_origin =
+                shifted(projection.immediate_k_locator.callee_origin)
+        }
+        Mutation::LocatorDomain => {
+            projection.immediate_k_locator.environment_domain =
+                CheckedIhKAvailabilityDomain::ForeignRuntimeEnvironment
+        }
+        Mutation::LocatorIndex => {
+            projection.immediate_k_locator.environment_index =
+                projection.immediate_k_locator.environment_index.wrapping_add(1)
+        }
+        Mutation::FreshActiveFrame => {
+            projection.fresh_result_destination.active_frame_origin =
+                shifted(projection.fresh_result_destination.active_frame_origin)
+        }
+        Mutation::FreshRetBody => {
+            projection.fresh_result_destination.ret_case_body_origin =
+                shifted(projection.fresh_result_destination.ret_case_body_origin)
+        }
+        Mutation::FreshConstructorRole => {
+            projection.fresh_result_destination.constructor_child =
+                CheckedBinderProvenance::Ordinary
+        }
+        Mutation::FreshConstructorCoordinate => {
+            if let CheckedBinderProvenance::ConstructorChild {
+                frame_origin,
+                field_position,
+            } = &mut projection.fresh_result_destination.constructor_child
+            {
+                *frame_origin = shifted(*frame_origin);
+                *field_position = field_position.wrapping_add(1);
+            }
+        }
+        Mutation::FreshClosureRecord => {
+            projection
+                .fresh_result_destination
+                .closure_environment_record = AggregateOccurrenceId(
+                projection
+                    .fresh_result_destination
+                    .closure_environment_record
+                    .0
+                    .wrapping_add(1),
+            )
+        }
+        Mutation::FreshClosureOrigin => {
+            projection.fresh_result_destination.closure_origin =
+                shifted(projection.fresh_result_destination.closure_origin)
+        }
+        Mutation::FreshClosureBody => {
+            projection.fresh_result_destination.closure_body_origin =
+                shifted(projection.fresh_result_destination.closure_body_origin)
+        }
+        Mutation::FreshClosureParameterCount => {
+            projection
+                .fresh_result_destination
+                .closure_parameter_count = projection
+                .fresh_result_destination
+                .closure_parameter_count
+                .wrapping_add(1)
+        }
+        Mutation::FreshCaptureOrdinal => {
+            projection.fresh_result_destination.capture_ordinal = projection
+                .fresh_result_destination
+                .capture_ordinal
+                .wrapping_add(1)
+        }
+        Mutation::FreshCaptureOccurrence => {
+            projection.fresh_result_destination.capture_occurrence =
+                shifted(projection.fresh_result_destination.capture_occurrence)
+        }
+        Mutation::FreshBodyReadMembership => {
+            if projection
+                .fresh_result_destination
+                .body_capture_reads
+                .pop()
+                .is_none()
+            {
+                projection
+                    .fresh_result_destination
+                    .body_capture_reads
+                    .push(StaticOriginId(0));
+            }
+        }
+        Mutation::Exact
+        | Mutation::ContextOnlyKey
+        | Mutation::SourceIdentityInKey
+        | Mutation::ProjectionInKey
+        | Mutation::RemoveFirstMember
+        | Mutation::DuplicateFirstMember
+        | Mutation::FilterCollidingMember
+        | Mutation::PermuteInheritanceOrder
+        | Mutation::PermuteContextInterningOrder => {}
+    }
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_ih_generated_entry_confluences(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<
+    BTreeMap<CheckedIhGeneratedEntryCoordinate, CheckedIhGeneratedEntryConfluence>,
+    CraneliftBackendError,
+> {
+    let mut confluences: BTreeMap<
+        CheckedIhGeneratedEntryCoordinate,
+        CheckedIhGeneratedEntryConfluence,
+    > = BTreeMap::new();
+    let mut caller_by_context = BTreeMap::new();
+    #[allow(unused_mut)]
+    let mut inheritance_order = plan
+        .checked_ih_continuation_inheritances
+        .iter()
+        .collect::<Vec<_>>();
+    #[cfg(feature = "px8-ds-test-support")]
+    if GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get)
+        == CheckedIhGeneratedEntryConfluenceMutation::PermuteInheritanceOrder
+    {
+        inheritance_order.reverse();
+    }
+    #[cfg(feature = "px8-ds-test-support")]
+    let mut first_coordinate_by_context: BTreeMap<
+        super::ContinuationContextId,
+        CheckedIhGeneratedEntryCoordinate,
+    > = BTreeMap::new();
+    for inheritance in inheritance_order {
+        #[allow(unused_mut)]
+        let Some((mut coordinate, mut member, retarget_caller, mut projection)) =
+            checked_ih_generated_entry_row(plan, inheritance)?
+        else {
+            continue;
+        };
+        #[cfg(feature = "px8-ds-test-support")]
+        {
+            use CheckedIhGeneratedEntryConfluenceMutation as Mutation;
+            let mutation = GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get);
+            if mutation == Mutation::ContextOnlyKey {
+                match first_coordinate_by_context.get(&coordinate.context) {
+                    Some(first) => coordinate = first.clone(),
+                    None => {
+                        first_coordinate_by_context
+                            .insert(coordinate.context, coordinate.clone());
+                    }
+                }
+            }
+            let collides = confluences.contains_key(&coordinate);
+            if collides {
+                match mutation {
+                    Mutation::SourceIdentityInKey => {
+                        coordinate.call_origin =
+                            StaticOriginId(coordinate.call_origin.0.wrapping_add(1));
+                    }
+                    Mutation::ProjectionInKey => {
+                        projection.destination_body_origin = StaticOriginId(
+                            projection.destination_body_origin.0.wrapping_add(1),
+                        );
+                        coordinate.call_origin =
+                            StaticOriginId(coordinate.call_origin.0.wrapping_add(1));
+                    }
+                    Mutation::DuplicateFirstMember => {
+                        member = confluences
+                            .get(&coordinate)
+                            .and_then(|class| class.members.first())
+                            .expect("a colliding class has one prior member")
+                            .clone();
+                    }
+                    Mutation::FilterCollidingMember => continue,
+                    _ => mutate_checked_ih_generated_entry_projection(
+                        &mut projection,
+                        mutation,
+                    ),
+                }
+            }
+        }
+        if let Some(existing) = caller_by_context.insert(coordinate.context, retarget_caller.clone())
+        {
+            if existing != retarget_caller {
+                return Err(planner_error(
+                    "two generated-entry classes for one context name different retarget callers",
+                ));
+            }
+        }
+        match confluences.get_mut(&coordinate) {
+            Some(confluence) => {
+                if confluence.projection != projection {
+                    return Err(planner_error(
+                        "source-specific inheritances at one generated entry disagree on their typed consumer projection",
+                    ));
+                }
+                if confluence.retarget_caller != retarget_caller {
+                    return Err(planner_error(
+                        "source-specific inheritances at one generated entry disagree on the audited retarget caller",
+                    ));
+                }
+                if !confluence.members.insert(member) {
+                    return Err(planner_error(
+                        "one source-call identity was inserted twice into one generated-entry class",
+                    ));
+                }
+            }
+            None => {
+                confluences.insert(
+                    coordinate,
+                    CheckedIhGeneratedEntryConfluence {
+                        members: BTreeSet::from([member]),
+                        retarget_caller,
+                        projection,
+                    },
+                );
+            }
+        }
+    }
+    #[cfg(feature = "px8-ds-test-support")]
+    if GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get)
+        == CheckedIhGeneratedEntryConfluenceMutation::RemoveFirstMember
+    {
+        if let Some(class) = confluences
+            .values_mut()
+            .find(|class| class.members.len() > 1)
+        {
+            let member = class
+                .members
+                .first()
+                .expect("a nonempty class has a first member")
+                .clone();
+            class.members.remove(&member);
+        }
+    }
+    Ok(confluences)
+}
+
+fn checked_ih_generated_entry_call_population(
+    plan: &StaticTransitionPlan<'_>,
+    worker_body_origin: StaticOriginId,
+    binder_resolutions: &BTreeMap<StaticOriginId, CheckedBinderResolution>,
+) -> Result<
+    BTreeMap<CheckedIhGeneratedEntryCallCoordinate, CheckedIhBinding>,
+    CraneliftBackendError,
+> {
+    let mut pending = vec![worker_body_origin];
+    let mut visited = BTreeSet::new();
+    let mut population = BTreeMap::new();
+    while let Some(origin) = pending.pop() {
+        if !visited.insert(origin) {
+            continue;
+        }
+        if matches!(
+            plan.planned_occurrence_expr(origin)?,
+            RuntimeExpr::CheckedComputationalIHInvocation { .. }
+        ) {
+            let call_origin = plan.semantic.child_origin(origin, 0)?;
+            let RuntimeExpr::Call { .. } = plan.planned_occurrence_expr(call_origin)? else {
+                return Err(planner_error(
+                    "a checked-IH call-population row does not wrap one exact call",
+                ));
+            };
+            let callee_origin = plan.semantic.child_origin(call_origin, 0)?;
+            let RuntimeExpr::Var(index) = plan.planned_occurrence_expr(callee_origin)? else {
+                return Err(planner_error(
+                    "a checked-IH call-population row has no exact Var callee",
+                ));
+            };
+            let resolution = binder_resolutions.get(&callee_origin).ok_or_else(|| {
+                planner_error(
+                    "a checked-IH call-population Var has no forward binder resolution",
+                )
+            })?;
+            let CheckedBinderProvenance::InductionHypothesis(binding) = resolution.provenance
+            else {
+                return Err(planner_error(
+                    "a checked-IH call-population Var is not a typed induction-hypothesis binding",
+                ));
+            };
+            if resolution.immediate_environment_index != *index {
+                return Err(planner_error(
+                    "a checked-IH call-population Var disagrees with its immediate binder index",
+                ));
+            }
+            let key = CheckedIhGeneratedEntryCallCoordinate {
+                invocation_origin: origin,
+                call_origin,
+                callee_origin,
+            };
+            if population.insert(key, binding).is_some() {
+                return Err(planner_error(
+                    "one checked-IH call-population key was derived more than once",
+                ));
+            }
+        }
+        pending.extend(plan.semantic.child_origins(origin)?.iter().rev().copied());
+    }
+    Ok(population)
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_ih_generated_entry_accesses(
+    plan: &StaticTransitionPlan<'_>,
+    confluences: &BTreeMap<
+        CheckedIhGeneratedEntryCoordinate,
+        CheckedIhGeneratedEntryConfluence,
+    >,
+) -> Result<
+    BTreeMap<super::ContinuationContextId, CheckedIhGeneratedEntryAccess>,
+    CraneliftBackendError,
+> {
+    let binder_resolutions = build_checked_binder_provenance(plan)?;
+    let context_ids = confluences
+        .keys()
+        .map(|coordinate| coordinate.context)
+        .collect::<BTreeSet<_>>();
+    let contexts = plan.continuation_contexts()?;
+    let mut accesses = BTreeMap::new();
+    for context_id in context_ids {
+        let context = contexts
+            .iter()
+            .find(|context| context.id() == context_id)
+            .ok_or_else(|| planner_error("a generated-entry class names no exact context"))?;
+        let population = checked_ih_generated_entry_call_population(
+            plan,
+            context.worker_body_origin(),
+            &binder_resolutions,
+        )?;
+        let population_keys = population.keys().copied().collect::<BTreeSet<_>>();
+
+        let mut governed = BTreeMap::new();
+        #[cfg(feature = "px8-ds-test-support")]
+        let mut first_governed_key = None;
+        for (coordinate, confluence) in confluences {
+            if coordinate.context != context_id {
+                continue;
+            }
+            if coordinate.enclosing_specialization != context.enclosing_specialization()
+                || coordinate.worker_body_origin != context.worker_body_origin()
+            {
+                return Err(planner_error(
+                    "a generated-entry class disagrees with its exact context identity",
+                ));
+            }
+            let key = CheckedIhGeneratedEntryCallCoordinate {
+                invocation_origin: coordinate.invocation_origin,
+                call_origin: coordinate.call_origin,
+                callee_origin: coordinate.callee_origin,
+            };
+            #[cfg(feature = "px8-ds-test-support")]
+            let key = if checked_ih_generated_entry_admission_mutation()
+                == CheckedIhGeneratedEntryAdmissionMutation::GovernedProjectedCollision
+            {
+                match first_governed_key {
+                    Some(first) => first,
+                    None => {
+                        first_governed_key = Some(key);
+                        key
+                    }
+                }
+            } else {
+                key
+            };
+            if let Some(existing) = governed.insert(key, confluence.projection.clone()) {
+                if existing != confluence.projection {
+                    return Err(planner_error(
+                        "two governed coordinates project one call key to different typed projections",
+                    ));
+                }
+            }
+        }
+        let governed_keys = governed.keys().copied().collect::<BTreeSet<_>>();
+        if !governed_keys.is_subset(&population_keys) {
+            return Err(planner_error(
+                "governed generated-entry call keys are not a subset of the closed call population",
+            ));
+        }
+        let non_governed_keys = population_keys
+            .difference(&governed_keys)
+            .copied()
+            .collect::<BTreeSet<_>>();
+
+        let mut admissions = BTreeMap::new();
+        for (key, projection) in governed {
+            if admissions
+                .insert(key, CheckedIhGeneratedEntryAdmission::Governed(projection))
+                .is_some()
+            {
+                return Err(planner_error(
+                    "one governed generated-entry admission key was inserted twice",
+                ));
+            }
+        }
+        #[cfg(feature = "px8-ds-test-support")]
+        let mut first_non_governed_key = None;
+        for key in &non_governed_keys {
+            #[cfg(feature = "px8-ds-test-support")]
+            let key = if checked_ih_generated_entry_admission_mutation()
+                == CheckedIhGeneratedEntryAdmissionMutation::NonGovernedProjectedCollision
+            {
+                match first_non_governed_key {
+                    Some(first) => first,
+                    None => {
+                        first_non_governed_key = Some(*key);
+                        *key
+                    }
+                }
+            } else {
+                *key
+            };
+            #[cfg(not(feature = "px8-ds-test-support"))]
+            let key = *key;
+            if admissions
+                .insert(key, CheckedIhGeneratedEntryAdmission::NonGoverned)
+                .is_some()
+            {
+                return Err(planner_error(
+                    "one NonGoverned generated-entry admission key was inserted twice or overlapped Governed",
+                ));
+            }
+        }
+
+        #[cfg(feature = "px8-ds-test-support")]
+        match checked_ih_generated_entry_admission_mutation() {
+            CheckedIhGeneratedEntryAdmissionMutation::DropGoverned => {
+                if let Some(key) = governed_keys.first() {
+                    admissions.remove(key);
+                }
+            }
+            CheckedIhGeneratedEntryAdmissionMutation::DropNonGoverned => {
+                if let Some(key) = non_governed_keys.first() {
+                    admissions.remove(key);
+                }
+            }
+            CheckedIhGeneratedEntryAdmissionMutation::DuplicateGoverned => {
+                if let Some(key) = governed_keys.first() {
+                    let admission = admissions
+                        .get(key)
+                        .expect("the governed admission was inserted above")
+                        .clone();
+                    if admissions.insert(*key, admission).is_some() {
+                        return Err(planner_error(
+                            "one Governed generated-entry admission key was inserted twice",
+                        ));
+                    }
+                }
+            }
+            CheckedIhGeneratedEntryAdmissionMutation::DuplicateNonGoverned => {
+                if let Some(key) = non_governed_keys.first() {
+                    if admissions
+                        .insert(*key, CheckedIhGeneratedEntryAdmission::NonGoverned)
+                        .is_some()
+                    {
+                        return Err(planner_error(
+                            "one NonGoverned generated-entry admission key was inserted twice",
+                        ));
+                    }
+                }
+            }
+            CheckedIhGeneratedEntryAdmissionMutation::GovernedToNonGoverned => {
+                if let Some(key) = governed_keys.first() {
+                    admissions.insert(*key, CheckedIhGeneratedEntryAdmission::NonGoverned);
+                }
+            }
+            CheckedIhGeneratedEntryAdmissionMutation::NonGovernedToGoverned => {
+                if let (Some(non_governed), Some(projection)) = (
+                    non_governed_keys.first(),
+                    admissions.values().find_map(|admission| match admission {
+                        CheckedIhGeneratedEntryAdmission::Governed(projection) => {
+                            Some(projection.clone())
+                        }
+                        CheckedIhGeneratedEntryAdmission::NonGoverned => None,
+                    }),
+                ) {
+                    admissions.insert(
+                        *non_governed,
+                        CheckedIhGeneratedEntryAdmission::Governed(projection),
+                    );
+                }
+            }
+            CheckedIhGeneratedEntryAdmissionMutation::Exact
+            | CheckedIhGeneratedEntryAdmissionMutation::GovernedProjectedCollision
+            | CheckedIhGeneratedEntryAdmissionMutation::NonGovernedProjectedCollision => {}
+        }
+
+        let admission_keys = admissions.keys().copied().collect::<BTreeSet<_>>();
+        let admitted_governed = admissions
+            .iter()
+            .filter_map(|(key, admission)| {
+                matches!(admission, CheckedIhGeneratedEntryAdmission::Governed(_))
+                    .then_some(*key)
+            })
+            .collect::<BTreeSet<_>>();
+        let admitted_non_governed = admissions
+            .iter()
+            .filter_map(|(key, admission)| {
+                matches!(admission, CheckedIhGeneratedEntryAdmission::NonGoverned)
+                    .then_some(*key)
+            })
+            .collect::<BTreeSet<_>>();
+        if admission_keys != population_keys {
+            return Err(planner_error(
+                "total generated-entry admission keys are not equal to the closed call population",
+            ));
+        }
+        if admitted_governed != governed_keys {
+            return Err(planner_error(
+                "governed generated-entry admission keys are not equal to the projected governed set",
+            ));
+        }
+        if admitted_non_governed != non_governed_keys {
+            return Err(planner_error(
+                "non-governed generated-entry admission keys are not equal to the explicit P-minus-G set",
+            ));
+        }
+        if !admitted_governed.is_disjoint(&admitted_non_governed) {
+            return Err(planner_error(
+                "governed and non-governed generated-entry admissions are not disjoint",
+            ));
+        }
+        accesses.insert(
+            context_id,
+            CheckedIhGeneratedEntryAccess {
+                context: context_id,
+                enclosing_specialization: context.enclosing_specialization(),
+                worker_body_origin: context.worker_body_origin(),
+                admissions,
+            },
+        );
+    }
+    Ok(accesses)
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn validate_checked_ih_generated_entry_accesses(
+    plan: &StaticTransitionPlan<'_>,
+    confluences: &BTreeMap<
+        CheckedIhGeneratedEntryCoordinate,
+        CheckedIhGeneratedEntryConfluence,
+    >,
+    accesses: &BTreeMap<super::ContinuationContextId, CheckedIhGeneratedEntryAccess>,
+) -> Result<(), CraneliftBackendError> {
+    if accesses != &build_checked_ih_generated_entry_accesses(plan, confluences)? {
+        return Err(planner_error(
+            "checked-IH generated-entry admissions are not the exact closed P/G/N derivation",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn record_checked_ih_generated_entry_admissions(
+    plan: &StaticTransitionPlan<'_>,
+    accesses: &BTreeMap<super::ContinuationContextId, CheckedIhGeneratedEntryAccess>,
+) -> Result<(), CraneliftBackendError> {
+    if !GENERATED_ENTRY_OBSERVATION_ACTIVE.with(Cell::get) {
+        return Ok(());
+    }
+    let binder_resolutions = build_checked_binder_provenance(plan)?;
+    let mut rows = Vec::new();
+    for access in accesses.values() {
+        let population = checked_ih_generated_entry_call_population(
+            plan,
+            access.worker_body_origin,
+            &binder_resolutions,
+        )?;
+        for (key, binding) in population {
+            let admission = access.admissions.get(&key).ok_or_else(|| {
+                planner_error("an observed admission population row is absent after validation")
+            })?;
+            rows.push(CheckedIhGeneratedEntryAdmissionObservation {
+                context: access.context.0,
+                enclosing_specialization: access.enclosing_specialization.0,
+                worker_body_origin: access.worker_body_origin.0,
+                binding_frame_origin: binding.frame_origin.0,
+                binding_recursive_position: binding.recursive_position,
+                invocation_origin: key.invocation_origin.0,
+                call_origin: key.call_origin.0,
+                callee_origin: key.callee_origin.0,
+                governed: matches!(admission, CheckedIhGeneratedEntryAdmission::Governed(_)),
+                installed: false,
+                installation_count: 0,
+                raw_arrival_count: 0,
+                admission_outcome_count: 0,
+                governed_validation_count: 0,
+                ordinary_continuation_count: 0,
+            });
+        }
+    }
+    rows.sort_by_key(|row| {
+        (
+            row.context,
+            row.invocation_origin,
+            row.call_origin,
+            row.callee_origin,
+        )
+    });
+    GENERATED_ENTRY_ADMISSION_OBSERVATIONS.with(|observations| {
+        *observations.borrow_mut() = rows;
+    });
+    Ok(())
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn validate_checked_ih_generated_entry_confluences(
+    plan: &StaticTransitionPlan<'_>,
+    confluences: &BTreeMap<
+        CheckedIhGeneratedEntryCoordinate,
+        CheckedIhGeneratedEntryConfluence,
+    >,
+) -> Result<(), CraneliftBackendError> {
+    let rebuilt = build_checked_ih_generated_entry_confluences(plan)?;
+    if confluences != &rebuilt {
+        return Err(planner_error(
+            "checked-IH generated-entry confluences are not the exact closed planner derivation",
+        ));
+    }
+
+    let mut governed_pairs = BTreeSet::new();
+    for inheritance in &plan.checked_ih_continuation_inheritances {
+        if let Some((coordinate, member, _, _)) =
+            checked_ih_generated_entry_row(plan, inheritance)?
+        {
+            governed_pairs.insert((coordinate, member));
+        }
+    }
+    let certificate_pairs = confluences
+        .iter()
+        .flat_map(|(coordinate, confluence)| {
+            confluence
+                .members
+                .iter()
+                .cloned()
+                .map(|member| (coordinate.clone(), member))
+        })
+        .collect::<BTreeSet<_>>();
+    if governed_pairs != certificate_pairs {
+        return Err(planner_error(
+            "governed generated-entry rows and certificate members are not equal as sets",
+        ));
+    }
+
+    let certificate_keys = confluences.keys().cloned().collect::<BTreeSet<_>>();
+    let accesses = build_checked_ih_generated_entry_accesses(plan, confluences)?;
+    let mut installed_keys = BTreeSet::new();
+    for access in accesses.values() {
+        for (key, admission) in &access.admissions {
+            let CheckedIhGeneratedEntryAdmission::Governed(projection) = admission else {
+                continue;
+            };
+            installed_keys.insert(CheckedIhGeneratedEntryCoordinate {
+                context: access.context,
+                enclosing_specialization: access.enclosing_specialization,
+                worker_body_origin: access.worker_body_origin,
+                binding: projection.binding,
+                invocation_origin: key.invocation_origin,
+                call_origin: key.call_origin,
+                callee_origin: key.callee_origin,
+            });
+        }
+    }
+    if certificate_keys != installed_keys {
+        return Err(planner_error(
+            "certificate and sanitized context-installed generated-entry keys are not equal as sets",
+        ));
+    }
+    Ok(())
+}
+
+impl StaticTransitionPlan<'_> {
+    pub(in crate::cranelift_backend) fn checked_ih_generated_entry_access_for_context(
+        &self,
+        context: super::ContinuationContextId,
+        enclosing_specialization: ContinuationSpecializationId,
+        worker_body_origin: StaticOriginId,
+    ) -> Result<Option<CheckedIhGeneratedEntryAccess>, CraneliftBackendError> {
+        let exact_context = self
+            .continuation_contexts()?
+            .into_iter()
+            .find(|candidate| candidate.id() == context)
+            .ok_or_else(|| planner_error("a generated-entry access names no emitted context"))?;
+        if exact_context.enclosing_specialization() != enclosing_specialization
+            || exact_context.worker_body_origin() != worker_body_origin
+        {
+            return Err(planner_error(
+                "a generated-entry access request disagrees with its context identity",
+            ));
+        }
+        let access = self.checked_ih_generated_entry_accesses.get(&context).cloned();
+        if let Some(access) = &access {
+            if access.context != context
+                || access.enclosing_specialization != enclosing_specialization
+                || access.worker_body_origin != worker_body_origin
+            {
+                return Err(planner_error(
+                    "a stored generated-entry access disagrees with its requested context identity",
+                ));
+            }
+        }
+        Ok(access)
+    }
 }
 
 /// One static target admitted at a bind-resume site.

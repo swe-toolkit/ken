@@ -921,6 +921,639 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
     });
 }
 
+/// **Promise class: transition sentinel.** A reviewed change to the fixed
+/// read/write planner graph may replace its dense coordinates, but must replace
+/// this witness while preserving quotient membership and exact-capsule reach.
+///
+/// **MEASURED:** the two fixed products' complete governed certificate classes,
+/// installation state, and successful six-conjunct validation observations.
+/// **CLAIMED:** W0/W1 share one typed projection while context-sharing siblings
+/// remain separate, and every governed key is reached at least once.
+/// **THE GAP:** the fixed coordinate table is independent of the certificate
+/// builder and is paired with population-side disagreement mutations below.
+#[test]
+fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
+    in_large_stack_thread("rt-parity-generated-entry-confluence", || {
+        let (read_result, read) = ken_runtime::with_checked_ih_generated_entry_observations(|| {
+            differential("fs-read-at-offset-single", "rt_read_offset_stage")
+        });
+        let (write_result, write) =
+            ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                differential("fs-write-at-offset-single", "rt_write_writable_stage")
+            });
+
+        assert_eq!(read.len(), 2, "read has two distinct entry coordinates");
+        assert_eq!(write.len(), 3, "write has three distinct entry coordinates");
+        assert_eq!(
+            read.iter().map(|row| row.context).collect::<std::collections::BTreeSet<_>>().len(),
+            1,
+            "read context sharing must not quotient distinct coordinates"
+        );
+        assert_eq!(
+            write.iter().map(|row| row.context).collect::<std::collections::BTreeSet<_>>().len(),
+            2,
+            "write context count remains unchanged"
+        );
+        assert_eq!(read.iter().map(|row| row.members.len()).sum::<usize>(), 2);
+        assert_eq!(write.iter().map(|row| row.members.len()).sum::<usize>(), 4);
+
+        let collision = write
+            .iter()
+            .find(|row| row.binding_frame_origin == 737 && row.invocation_origin == 741)
+            .expect("the real W0/W1 coordinate");
+        assert_eq!(collision.members.len(), 2);
+        assert_ne!(collision.members[0], collision.members[1]);
+        assert_eq!(collision.call_origin, 740);
+        assert_eq!(collision.callee_origin, 739);
+        assert_eq!(collision.locator_index, 0);
+        assert_eq!(collision.locator_domain, "ImmediateInvocationEnvironment");
+        assert!(
+            collision.reached_count > 0,
+            "the real collision certificate is reused by at least one arrival"
+        );
+
+        let write_singleton = write
+            .iter()
+            .find(|row| row.context == collision.context && row.invocation_origin == 529)
+            .expect("W2 stays separate despite sharing the context");
+        assert_eq!(write_singleton.members.len(), 1);
+        assert_ne!(write_singleton.callee_origin, collision.callee_origin);
+        for row in read.iter().chain(&write) {
+            assert!(row.installed, "every certificate key is installed: {row:?}");
+            assert!(
+                row.reached_count > 0,
+                "every installed governed key is validated on at least one arrival: {row:?}"
+            );
+            assert!(row.reached_exact_capsule, "the exact recursor arm is required");
+            assert!(row.reached_carried_residual, "K's residual remains Carried");
+            assert_eq!(row.destination_body_origin, row.worker_body_origin);
+            assert_eq!(row.invocation_origin, row.locator_invocation_origin);
+            assert_eq!(row.callee_origin, row.locator_callee_origin);
+        }
+
+        for (label, result) in [("read", read_result), ("write", write_result)] {
+            let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+                result.native.terminal_error.as_ref()
+            else {
+                panic!("{label}: predecessor must preserve the fail-closed product");
+            };
+            assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
+        }
+    });
+}
+
+/// **Promise class: transition sentinel.** A reviewed change to the fixed
+/// read/write fixture's static occurrence graph must replace this exact P/G/N
+/// witness while preserving totality, disjointness, and the per-arrival laws.
+///
+/// **MEASURED:** the complete planner-derived admission-key sets for both fixed
+/// product witnesses, including every explicit `NonGoverned` row.
+/// **CLAIMED:** the sanitized map is total over P rather than a governed sample.
+/// **THE GAP:** expected rows come from the independently fixed witness table,
+/// not from re-projecting the map under test.
+#[test]
+fn checked_ih_generated_entry_admission_population_is_total() {
+    in_large_stack_thread("rt-parity-generated-entry-admissions", || {
+        let (read_result, read) =
+            ken_runtime::with_checked_ih_generated_entry_admission_observations(|| {
+                differential("fs-read-at-offset-single", "rt_read_offset_stage")
+            });
+        let (write_result, write) =
+            ken_runtime::with_checked_ih_generated_entry_admission_observations(|| {
+                differential("fs-write-at-offset-single", "rt_write_writable_stage")
+            });
+        let keys = |rows: &[ken_runtime::CheckedIhGeneratedEntryAdmissionObservation]| {
+            rows.iter()
+                .map(|row| {
+                    (
+                        row.enclosing_specialization,
+                        row.worker_body_origin,
+                        row.binding_frame_origin,
+                        row.binding_recursive_position,
+                        row.invocation_origin,
+                        row.call_origin,
+                        row.callee_origin,
+                        row.governed,
+                    )
+                })
+                .collect::<std::collections::BTreeSet<_>>()
+        };
+        let expected_read = std::collections::BTreeSet::from([
+            (2, 941, 301, 1, 305, 304, 303, true),
+            (2, 941, 470, 1, 474, 473, 472, false),
+            (2, 941, 511, 1, 515, 514, 513, true),
+            (2, 941, 681, 1, 685, 684, 683, false),
+        ]);
+        let expected_write = std::collections::BTreeSet::from([
+            (3, 1238, 525, 1, 529, 528, 527, true),
+            (3, 1238, 696, 1, 700, 699, 698, false),
+            (3, 1238, 737, 1, 741, 740, 739, true),
+            (3, 1238, 909, 1, 913, 912, 911, false),
+            (5, 1259, 314, 1, 318, 317, 316, true),
+            (5, 1259, 483, 1, 487, 486, 485, false),
+            (5, 1259, 525, 1, 529, 528, 527, false),
+            (5, 1259, 696, 1, 700, 699, 698, false),
+            (5, 1259, 737, 1, 741, 740, 739, false),
+            (5, 1259, 909, 1, 913, 912, 911, false),
+        ]);
+        assert_eq!(keys(&read), expected_read, "the read admission population P is closed");
+        assert_eq!(keys(&write), expected_write, "the write admission population P is closed");
+        for row in read.iter().chain(&write) {
+            assert!(row.installed);
+            assert_eq!(row.installation_count, 1);
+            assert_eq!(
+                row.raw_arrival_count, row.admission_outcome_count,
+                "every raw arrival performs exactly one total-map lookup: {row:?}"
+            );
+            if row.governed {
+                assert!(row.raw_arrival_count > 0, "every governed key is reached: {row:?}");
+                assert_eq!(
+                    row.raw_arrival_count, row.governed_validation_count,
+                    "every governed arrival completes one full validation: {row:?}"
+                );
+                assert_eq!(row.ordinary_continuation_count, 0);
+            } else {
+                assert_eq!(row.governed_validation_count, 0);
+                assert_eq!(
+                    row.raw_arrival_count, row.ordinary_continuation_count,
+                    "every NonGoverned arrival continues ordinary dispatch once: {row:?}"
+                );
+            }
+        }
+        for result in [read_result, write_result] {
+            assert!(matches!(
+                result.native.terminal_error,
+                Some(ken_runtime::TerminalErrorV1::RuntimeTrap(_))
+            ));
+        }
+    });
+}
+
+const GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD: &str =
+    "KEN_RT_CHECKED_IH_GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD";
+
+fn assert_generated_entry_arrival_mutation_child() {
+    use ken_runtime::CheckedIhGeneratedEntryArrivalMutation as Mutation;
+
+    let mode = std::env::var(GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD)
+        .expect("generated-entry arrival mutation child mode");
+    let mutation = match mode.as_str() {
+        "duplicate-lookup" => Mutation::DuplicateLookup,
+        "skip-lookup" => Mutation::SkipLookup,
+        "duplicate-validation" => Mutation::DuplicateGovernedValidation,
+        "skip-validation" => Mutation::SkipGovernedValidation,
+        "governed-through-non-governed" => Mutation::GovernedThroughNonGoverned,
+        "non-governed-through-governed" => Mutation::NonGovernedThroughGoverned,
+        other => panic!("unknown generated-entry arrival mutation: {other}"),
+    };
+    let root = output_dir(&format!("generated-entry-arrival-{mode}"));
+    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+    let (build, rows) = ken_runtime::with_checked_ih_generated_entry_admission_observations(|| {
+        ken_runtime::with_checked_ih_generated_entry_arrival_mutation(mutation, || {
+            ken_cli::build_native_program(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &format!("rt_parity_generated_entry_arrival_{}", mode.replace('-', "_")),
+                root.path(),
+            )
+        })
+    });
+    assert!(
+        rows.iter().any(|row| row.installed && row.raw_arrival_count > 0),
+        "{mode}: mutation never reached the production arrival seam"
+    );
+    let mismatch = rows.iter().any(|row| match mode.as_str() {
+        "duplicate-lookup" => row.admission_outcome_count > row.raw_arrival_count,
+        "skip-lookup" => row.admission_outcome_count < row.raw_arrival_count,
+        "duplicate-validation" => {
+            row.governed && row.governed_validation_count > row.raw_arrival_count
+        }
+        "skip-validation" => {
+            row.governed && row.governed_validation_count < row.raw_arrival_count
+        }
+        "governed-through-non-governed" => {
+            row.governed
+                && row.ordinary_continuation_count > 0
+                && row.governed_validation_count < row.raw_arrival_count
+        }
+        "non-governed-through-governed" => {
+            !row.governed && row.ordinary_continuation_count < row.raw_arrival_count
+        }
+        _ => unreachable!(),
+    });
+    assert!(
+        mismatch,
+        "{mode}: operation-path mutation did not break the per-key equality; build_ok={} rows={rows:#?}",
+        build.is_ok()
+    );
+    assert!(
+        ken_runtime::checked_ih_generated_entry_arrival_mutation_is_exact(),
+        "{mode}: scoped arrival mutation state did not restore"
+    );
+}
+
+/// **Promise class: durable invariant.** Intended extensions may change how
+/// many times a static call arrives, but must keep one lookup and one sealed
+/// continuation action paired with every arrival.
+///
+/// **MEASURED:** independently incremented raw-arrival, map-lookup outcome,
+/// governed-validation, and ordinary-continuation counts per installed key.
+/// **CLAIMED:** operation count, not today's arrival magnitude, is exactly one
+/// per arrival for both sealed variants.
+/// **THE GAP:** each control therefore mutates the real operation/control path,
+/// never the observation counters, and must make the corresponding relation
+/// unequal.
+#[test]
+fn checked_ih_generated_entry_per_arrival_operation_mutations_break_equality() {
+    if std::env::var_os(GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD).is_some() {
+        in_large_stack_thread(
+            "rt-parity-generated-entry-arrival-mutation-child",
+            assert_generated_entry_arrival_mutation_child,
+        );
+        return;
+    }
+    for mode in [
+        "duplicate-lookup",
+        "skip-lookup",
+        "duplicate-validation",
+        "skip-validation",
+        "governed-through-non-governed",
+        "non-governed-through-governed",
+    ] {
+        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .arg("--exact")
+            .arg("checked_ih_generated_entry_per_arrival_operation_mutations_break_equality")
+            .arg("--nocapture")
+            .env(GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated generated-entry arrival mutation child");
+        assert!(
+            output.status.success(),
+            "{mode}: arrival mutation child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+const GENERATED_ENTRY_ADMISSION_MUTATION_CHILD: &str =
+    "KEN_RT_CHECKED_IH_GENERATED_ENTRY_ADMISSION_MUTATION_CHILD";
+
+fn assert_generated_entry_admission_mutation_child() {
+    use ken_runtime::CheckedIhGeneratedEntryAdmissionMutation as Mutation;
+
+    let mode = std::env::var(GENERATED_ENTRY_ADMISSION_MUTATION_CHILD)
+        .expect("generated-entry admission mutation child mode");
+    let mutation = match mode.as_str() {
+        "drop-governed" => Mutation::DropGoverned,
+        "drop-non-governed" => Mutation::DropNonGoverned,
+        "duplicate-governed" => Mutation::DuplicateGoverned,
+        "duplicate-non-governed" => Mutation::DuplicateNonGoverned,
+        "governed-to-non-governed" => Mutation::GovernedToNonGoverned,
+        "non-governed-to-governed" => Mutation::NonGovernedToGoverned,
+        "governed-key-collision" => Mutation::GovernedProjectedCollision,
+        "non-governed-key-collision" => Mutation::NonGovernedProjectedCollision,
+        other => panic!("unknown generated-entry admission mutation: {other}"),
+    };
+    let red = ken_runtime::with_checked_ih_generated_entry_admission_mutation(mutation, || {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            differential("fs-write-at-offset-single", "rt_write_writable_stage")
+        }))
+    });
+    assert!(red.is_err(), "{mode}: admission population mutation did not redden");
+    assert!(
+        ken_runtime::checked_ih_generated_entry_admission_mutation_is_exact(),
+        "{mode}: scoped admission mutation state did not restore"
+    );
+}
+
+/// **Promise class: durable invariant.** Intended planner extensions may grow
+/// P, but every row must still have one explicit, disjoint Governed/NonGoverned
+/// classification and governed call-key projection must remain functional.
+///
+/// **MEASURED:** drop, duplicate, cross-variant reclassification, and projected
+/// collision mutations applied to the real admission population.
+/// **CLAIMED:** the six closed-partition laws reject both variants at their
+/// named planner-validation arms.
+/// **THE GAP:** the child asserts the exact error text for each arm, so an
+/// earlier unrelated rejection cannot masquerade as admission validation.
+#[test]
+fn checked_ih_generated_entry_admission_population_mutations_reject() {
+    if std::env::var_os(GENERATED_ENTRY_ADMISSION_MUTATION_CHILD).is_some() {
+        in_large_stack_thread(
+            "rt-parity-generated-entry-admission-mutation-child",
+            assert_generated_entry_admission_mutation_child,
+        );
+        return;
+    }
+    let cases = [
+        (
+            "drop-governed",
+            "total generated-entry admission keys are not equal to the closed call population",
+        ),
+        (
+            "drop-non-governed",
+            "total generated-entry admission keys are not equal to the closed call population",
+        ),
+        (
+            "duplicate-governed",
+            "one Governed generated-entry admission key was inserted twice",
+        ),
+        (
+            "duplicate-non-governed",
+            "one NonGoverned generated-entry admission key was inserted twice",
+        ),
+        (
+            "governed-to-non-governed",
+            "governed generated-entry admission keys are not equal to the projected governed set",
+        ),
+        (
+            "non-governed-to-governed",
+            "governed generated-entry admission keys are not equal to the projected governed set",
+        ),
+        (
+            "governed-key-collision",
+            "two governed coordinates project one call key to different typed projections",
+        ),
+        (
+            "non-governed-key-collision",
+            "one NonGoverned generated-entry admission key was inserted twice or overlapped Governed",
+        ),
+    ];
+    for (mode, expected) in cases {
+        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .arg("--exact")
+            .arg("checked_ih_generated_entry_admission_population_mutations_reject")
+            .arg("--nocapture")
+            .env(GENERATED_ENTRY_ADMISSION_MUTATION_CHILD, mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated generated-entry admission mutation child");
+        assert!(
+            output.status.success(),
+            "{mode}: admission mutation child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(expected),
+            "{mode}: admission mutation missed intended arm; stderr:\n{stderr}"
+        );
+    }
+}
+
+const GENERATED_ENTRY_MUTATION_CHILD: &str =
+    "KEN_RT_CHECKED_IH_GENERATED_ENTRY_MUTATION_CHILD";
+
+fn assert_generated_entry_mutation_child() {
+    use ken_runtime::CheckedIhGeneratedEntryConfluenceMutation as Mutation;
+
+    let mode = std::env::var(GENERATED_ENTRY_MUTATION_CHILD)
+        .expect("generated-entry mutation child mode");
+    let mutation = match mode.as_str() {
+        "context-key" => Mutation::ContextOnlyKey,
+        "identity-key" => Mutation::SourceIdentityInKey,
+        "projection-key" => Mutation::ProjectionInKey,
+        "destination-owner" => Mutation::DestinationOwner,
+        "destination-body" => Mutation::DestinationBody,
+        "binding-frame" => Mutation::BindingFrame,
+        "binding-position" => Mutation::BindingPosition,
+        "locator-invocation" => Mutation::LocatorInvocation,
+        "locator-callee" => Mutation::LocatorCallee,
+        "locator-domain" => Mutation::LocatorDomain,
+        "locator-index" => Mutation::LocatorIndex,
+        "fresh-active-frame" => Mutation::FreshActiveFrame,
+        "fresh-ret-body" => Mutation::FreshRetBody,
+        "fresh-constructor-role" => Mutation::FreshConstructorRole,
+        "fresh-constructor-coordinate" => Mutation::FreshConstructorCoordinate,
+        "fresh-closure-record" => Mutation::FreshClosureRecord,
+        "fresh-closure-origin" => Mutation::FreshClosureOrigin,
+        "fresh-closure-body" => Mutation::FreshClosureBody,
+        "fresh-closure-parameters" => Mutation::FreshClosureParameterCount,
+        "fresh-capture-ordinal" => Mutation::FreshCaptureOrdinal,
+        "fresh-capture-occurrence" => Mutation::FreshCaptureOccurrence,
+        "fresh-body-reads" => Mutation::FreshBodyReadMembership,
+        "remove-member" => Mutation::RemoveFirstMember,
+        "duplicate-member" => Mutation::DuplicateFirstMember,
+        "filter-member" => Mutation::FilterCollidingMember,
+        other => panic!("unknown generated-entry mutation: {other}"),
+    };
+    let red = ken_runtime::with_checked_ih_generated_entry_confluence_mutation(mutation, || {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            differential("fs-write-at-offset-single", "rt_write_writable_stage")
+        }))
+    });
+    assert!(red.is_err(), "{mode}: mutation did not redden");
+    assert!(
+        ken_runtime::checked_ih_generated_entry_confluence_mutation_is_exact(),
+        "{mode}: scoped mutation state did not restore"
+    );
+}
+
+/// **Promise class: durable invariant.** Every quotient-key weakening,
+/// projection disagreement, and set-membership corruption must reject before a
+/// certificate can be published.
+#[test]
+fn checked_ih_generated_entry_confluence_mutations_reject() {
+    if std::env::var_os(GENERATED_ENTRY_MUTATION_CHILD).is_some() {
+        in_large_stack_thread(
+            "rt-parity-generated-entry-mutation-child",
+            assert_generated_entry_mutation_child,
+        );
+        return;
+    }
+    let projection_disagreement = "disagree on their typed consumer projection";
+    let cases = [
+        ("context-key", projection_disagreement),
+        ("identity-key", "not equal as sets"),
+        ("projection-key", "not equal as sets"),
+        ("destination-owner", projection_disagreement),
+        ("destination-body", projection_disagreement),
+        ("binding-frame", projection_disagreement),
+        ("binding-position", projection_disagreement),
+        ("locator-invocation", projection_disagreement),
+        ("locator-callee", projection_disagreement),
+        ("locator-domain", projection_disagreement),
+        ("locator-index", projection_disagreement),
+        ("fresh-active-frame", projection_disagreement),
+        ("fresh-ret-body", projection_disagreement),
+        ("fresh-constructor-role", projection_disagreement),
+        ("fresh-constructor-coordinate", projection_disagreement),
+        ("fresh-closure-record", projection_disagreement),
+        ("fresh-closure-origin", projection_disagreement),
+        ("fresh-closure-body", projection_disagreement),
+        ("fresh-closure-parameters", projection_disagreement),
+        ("fresh-capture-ordinal", projection_disagreement),
+        ("fresh-capture-occurrence", projection_disagreement),
+        ("fresh-body-reads", projection_disagreement),
+        ("remove-member", "not equal as sets"),
+        ("duplicate-member", "inserted twice"),
+        ("filter-member", "not equal as sets"),
+    ];
+    for (mode, expected) in cases {
+        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .arg("--exact")
+            .arg("checked_ih_generated_entry_confluence_mutations_reject")
+            .arg("--nocapture")
+            .env(GENERATED_ENTRY_MUTATION_CHILD, mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated generated-entry mutation child");
+        assert!(
+            output.status.success(),
+            "{mode}: mutation child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(expected),
+            "{mode}: mutation missed intended arm; stderr:\n{stderr}"
+        );
+    }
+}
+
+const GENERATED_ENTRY_CAPSULE_MUTATION_CHILD: &str =
+    "KEN_RT_CHECKED_IH_GENERATED_ENTRY_CAPSULE_MUTATION_CHILD";
+
+fn assert_generated_entry_capsule_mutation_child() {
+    use ken_runtime::CheckedIhGeneratedEntryCapsuleMutation as Mutation;
+    let mode = std::env::var(GENERATED_ENTRY_CAPSULE_MUTATION_CHILD)
+        .expect("generated-entry capsule mutation child mode");
+    let mutation = match mode.as_str() {
+        "outer-carried" => Mutation::OuterCarried,
+        "specialized-sibling" => Mutation::SpecializedSibling,
+        "static-worker" => Mutation::StaticWorker,
+        "wrong-frame" => Mutation::WrongFrame,
+        "wrong-slot" => Mutation::WrongSlot,
+        "wrong-invocation" => Mutation::WrongInvocation,
+        "non-carried-residual" => Mutation::NonCarriedResidual,
+        "provenance-index" => Mutation::ProvenanceIndex,
+        other => panic!("unknown generated-entry capsule mutation: {other}"),
+    };
+    let red = ken_runtime::with_checked_ih_generated_entry_capsule_mutation(mutation, || {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            differential("fs-read-at-offset-single", "rt_read_offset_stage")
+        }))
+    });
+    assert!(red.is_err(), "{mode}: capsule mutation did not redden");
+    assert!(
+        ken_runtime::checked_ih_generated_entry_capsule_mutation_is_exact(),
+        "{mode}: scoped capsule mutation state did not restore"
+    );
+}
+
+/// **Promise class: durable invariant.** Only the exact computational-recursor
+/// capsule satisfying every governed fact may pass the pre-dispatch guard; each
+/// independently varied sibling/fact must reject at its named arm.
+#[test]
+fn checked_ih_generated_entry_capsule_mutations_reject() {
+    if std::env::var_os(GENERATED_ENTRY_CAPSULE_MUTATION_CHILD).is_some() {
+        in_large_stack_thread(
+            "rt-parity-generated-entry-capsule-mutation-child",
+            assert_generated_entry_capsule_mutation_child,
+        );
+        return;
+    }
+    let cases = [
+        ("outer-carried", "does not name a specialized computational-recursor capsule"),
+        ("specialized-sibling", "is not a computational-recursor capsule"),
+        (
+            "static-worker",
+            "StaticWorkerBinding: a source-machine Var in value position is a value-producing position",
+        ),
+        ("wrong-frame", "checked frame, slot, call template, or residual phase"),
+        ("wrong-slot", "checked frame, slot, call template, or residual phase"),
+        (
+            "wrong-invocation",
+            "projection disagrees with its current function, binding, or call coordinate",
+        ),
+        ("non-carried-residual", "checked frame, slot, call template, or residual phase"),
+        ("provenance-index", "callee Var disagrees with the immediate K locator index"),
+    ];
+    for (mode, expected) in cases {
+        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .arg("--exact")
+            .arg("checked_ih_generated_entry_capsule_mutations_reject")
+            .arg("--nocapture")
+            .env(GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated generated-entry capsule mutation child");
+        assert!(
+            output.status.success(),
+            "{mode}: capsule mutation child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(expected),
+            "{mode}: capsule mutation missed intended arm; stderr:\n{stderr}"
+        );
+    }
+}
+
+/// **Promise class: durable invariant.** Dense numbering may move, but planner
+/// iteration and context-interning order must not change class/member/caller
+/// association or the product observation.
+#[test]
+fn checked_ih_generated_entry_confluence_is_interning_and_inheritance_order_independent() {
+    in_large_stack_thread("rt-parity-generated-entry-permute", || {
+        let (exact_result, exact) =
+            ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                differential("fs-write-at-offset-single", "rt_write_writable_stage")
+            });
+        let (permuted_result, permuted) =
+            ken_runtime::with_checked_ih_generated_entry_confluence_mutation(
+                ken_runtime::CheckedIhGeneratedEntryConfluenceMutation::PermuteInheritanceOrder,
+                || {
+                    ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                        differential("fs-write-at-offset-single", "rt_write_writable_stage")
+                    })
+                },
+            );
+        let (context_result, context_permuted) =
+            ken_runtime::with_checked_ih_generated_entry_confluence_mutation(
+                ken_runtime::CheckedIhGeneratedEntryConfluenceMutation::PermuteContextInterningOrder,
+                || {
+                    ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                        differential("fs-write-at-offset-single", "rt_write_writable_stage")
+                    })
+                },
+            );
+        assert_eq!(exact, permuted, "association must not depend on row order");
+        let normalize = |mut rows: Vec<ken_runtime::CheckedIhGeneratedEntryObservation>| {
+            for row in &mut rows {
+                row.context = 0;
+            }
+            rows.sort_by_key(|row| {
+                (
+                    row.enclosing_specialization,
+                    row.worker_body_origin,
+                    row.binding_frame_origin,
+                    row.invocation_origin,
+                    row.call_origin,
+                    row.callee_origin,
+                )
+            });
+            rows
+        };
+        assert_eq!(
+            normalize(exact.clone()),
+            normalize(context_permuted),
+            "dense context numbering may move, but key/member/caller association must not"
+        );
+        assert_eq!(exact_result.native.effect_trace, permuted_result.native.effect_trace);
+        assert_eq!(exact_result.native.effect_trace, context_result.native.effect_trace);
+        assert_eq!(exact_result.native.terminal_error, permuted_result.native.terminal_error);
+        assert_eq!(exact_result.native.terminal_error, context_result.native.terminal_error);
+        assert!(ken_runtime::checked_ih_generated_entry_confluence_mutation_is_exact());
+    });
+}
+
 #[test]
 fn checked_ih_continuation_inheritance_is_byte_inert() {
     in_large_stack_thread("rt-parity-continuation-inheritance-inert", || {

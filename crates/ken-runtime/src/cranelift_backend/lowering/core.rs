@@ -3412,6 +3412,7 @@ impl<'a> Lowering<'a> {
                     *kind,
                     *binder_morphism,
                     body.expr,
+                    static_origin,
                     body.static_origin,
                 )?;
                 let value = self.lower_computational_producer_expr(
@@ -12813,6 +12814,7 @@ impl<'a> Lowering<'a> {
                     *kind,
                     *binder_morphism,
                     body.expr,
+                    static_origin,
                     body.static_origin,
                 )?;
                 let value = self.lower_expr(builder, body, env)?;

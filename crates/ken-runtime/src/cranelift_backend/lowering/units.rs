@@ -2819,6 +2819,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
         offsets: Vec<u32>,
         header_parameters: u32,
         header_captures: u32,
+        checked_ih_generated_entry_access: Option<CheckedIhGeneratedEntryAccess>,
     }
     // Own every projected fact before the loop: the projection borrows the plan
     // and definition below needs the compiler mutably.
@@ -2847,6 +2848,13 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                         "a generated context's raw owner has no ABI descriptor".to_string(),
                     )
                 })?;
+            let checked_ih_generated_entry_access = compiler
+                .static_transition_plan
+                .checked_ih_generated_entry_access_for_context(
+                    context.id(),
+                    context.enclosing_specialization(),
+                    context.worker_body_origin(),
+                )?;
             Ok(OwnedContext {
                 id: context.id(),
                 enclosing: context.enclosing_specialization(),
@@ -2859,6 +2867,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 offsets,
                 header_parameters: context.header().parameters,
                 header_captures: context.header().captures,
+                checked_ih_generated_entry_access,
             })
         })
         .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
@@ -3008,6 +3017,23 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                     backend_module("generated context trap slot offset exceeds range".to_string())
                 })?,
             )?;
+            if let Some(access) = &context.checked_ih_generated_entry_access {
+                if access.context() != context.id
+                    || access.enclosing_specialization() != context.enclosing
+                    || access.worker_body_origin() != context.worker_body_origin
+                {
+                    return Err(backend_module(
+                        "a sanitized checked-IH generated-entry access disagrees with the exact context function being defined"
+                            .to_string(),
+                    ));
+                }
+            }
+            function_local.checked_ih_generated_entry_access =
+                context.checked_ih_generated_entry_access.clone();
+            #[cfg(feature = "px8-ds-test-support")]
+            if let Some(access) = &function_local.checked_ih_generated_entry_access {
+                record_checked_ih_generated_entry_installed(access);
+            }
             compiler.function_local = function_local;
             compiler.open_aggregate_events(id)?;
             // `D8o` — same binding, same unchanged domain: the emission owner is
