@@ -199,6 +199,23 @@ fn head_global(term: &ken_kernel::Term) -> Option<ken_kernel::GlobalId> {
     }
 }
 
+fn term_mentions(term: &ken_kernel::Term, target: GlobalId) -> bool {
+    match term {
+        ken_kernel::Term::Const { id, .. }
+        | ken_kernel::Term::IndFormer { id, .. }
+        | ken_kernel::Term::Constructor { id, .. }
+            if *id == target =>
+        {
+            true
+        }
+        ken_kernel::Term::Elim { fam, .. } if *fam == target => true,
+        _ => term
+            .children()
+            .into_iter()
+            .any(|child| term_mentions(child, target)),
+    }
+}
+
 #[test]
 fn cat5_d1_source_span_package_elaborates_zero_delta() {
     let mut env = dependency_env();
@@ -225,7 +242,6 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "byte_cursor_advance",
         "byte_cursor_locate",
         "byte_cursor_ops",
-        "nat_leq_bool",
         "LessEqNat",
         "LessEqNat::refl",
         "LessEqNat::zero_left",
@@ -315,6 +331,43 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
             "{name}'s type id must never enter trusted_base()"
         );
     }
+}
+
+/// Durable invariant: the roots-loaded Parsing package references the
+/// canonical lawful owner directly, without minting a local relation or adding
+/// trust.
+#[test]
+fn parsing_reuses_the_canonical_lawful_classes_relation() {
+    let mut env = dependency_env();
+    let before: HashSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
+        .expect("Capability.Parsing.Parsing must roots-load over its dependency fixture");
+    let after: HashSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Parsing reuse must add zero trust");
+
+    let provider = env.globals["Core.Classes.LawfulClasses.leq_nat"];
+    assert!(env.env.transparent_body(provider).is_some());
+    assert!(
+        !env.globals
+            .contains_key("Capability.Parsing.Parsing.nat_leq_bool"),
+        "Parsing must not mint a local Nat relation"
+    );
+    assert!(
+        !env.globals
+            .keys()
+            .any(|name| name.starts_with("Data.Numeric.Nat.Order.")),
+        "Parsing must import the canonical owner without loading the Order facade"
+    );
+
+    let less_eq = env.globals["Capability.Parsing.Parsing.LessEqNat"];
+    let body = match env.env.lookup(less_eq) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("LessEqNat must be transparent, got {other:?}"),
+    };
+    assert!(
+        term_mentions(body, provider),
+        "LessEqNat must retain the canonical provider GlobalId"
+    );
 }
 
 #[test]
