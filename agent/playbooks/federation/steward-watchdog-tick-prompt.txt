@@ -8,13 +8,13 @@ ARMING SOURCE. UNDER 4096 CHARS -- set_interval rejects more. `wc -c` before arm
 
 0b. DISK. `df -h /workspaces/ken /` -- BOTH, different filesystems. Either below 5G: `.moot/truncate-logs.sh`; aged `tmp/ken-*`; `git gc`; a RETIRED seat's `target/`. Verify dead 3 ways; NEVER touch a live ring's target.
 
-0c. INTEGRATOR RETIRED (operator, permanent) -- NEVER rouse/reseat/route. Its offline last-seen + stale PR #365 post are EXPECTED, not a stall.
+0c. INTEGRATOR RETIRED (operator, permanent) -- NEVER rouse/reseat/route. Its offline last-seen + stale PR #365 post are EXPECTED.
 
 1. LANE ROSTER IS `steward/lanes.md` -- read it; time-varying operator direction, NOT baked here. THREE lanes (runtime/language/foundation), never collapse to one. Sweep EACH lane's ring for its next deliverable; as a node lands flip the next depends_on draft->ready and release it. No measurement re-scopes a lane -- surface to operator.
 
-2. PER-LANE LANDING COUNT, NEVER AN AGGREGATE. All with `--since='12 hours ago' origin/main`: runtime `-- ':/crates/ken-runtime/' ':/crates/ken-cli/'`; language `-- ':/crates/ken-elaborator/' ':/crates/ken-kernel/'`; foundation `-- ':/catalog/'`. A bare `-- crates/` is cwd-relative and the persisted Bash cwd silently reports 0.
+2. PER-LANE LANDING COUNT, NEVER AN AGGREGATE. All with `--since='12 hours ago' origin/main`: runtime `-- ':/crates/ken-runtime/' ':/crates/ken-cli/'`; language `-- ':/crates/ken-elaborator/' ':/crates/ken-kernel/'`; foundation `-- ':/catalog/'`. A bare `-- crates/` is cwd-relative and the persisted Bash cwd silently reports 0. ATTRIBUTE EVERY HIT TO A LANE BY SUBJECT -- the lane-2 path catches lane-3 CAT fixture repairs; it read 5, true count 2.
 
-2a. WORKING IS NOT LANDING -- cost 16h unseen; the operator caught it, not me. The aggregate read 5 while runtime landed ZERO, and my follow-up only confirmed a seat was `Working`, which it always was inside a frame-recut loop. ANY lane at 0 for 12h is a FINDING: read that node's hard-stop count and `wp/` tips, and tell the operator.
+2a. WORKING IS NOT LANDING -- cost 16h unseen; the operator caught it. A seat reads `Working` all through a frame-recut loop. ANY lane at 0 for 12h is a FINDING: read its hard-stop count and `wp/` tips, and tell the operator.
 
 2b. Per `status: active` node: is its ring on its NEXT deliverable? Read the NODE, not a status line. Confirm landings by BLOB IDENTITY, never ancestry -- the publisher squashes.
 

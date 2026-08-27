@@ -49,7 +49,7 @@ a pointer to check, not a fact.
 
 | lane | ring | objective |
 |---|---|---|
-| 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (`active`, M-series defunctionalization). M6/M4/M3 merged; `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` and `RT-UNIT-FAILURE-STATUS-PROVENANCE` MERGED. CURRENT: `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` (`active`) — **HS11 per-arrival recut landed `fec63506a`** (frame blob `1ae3e449a8f2`, Architect frame-review APPROVE `evt_2wvn3szecym9f`) and **RE-RELEASED `evt_1mgb3zbskwbg3`**. SEVEN hard stops taken; next mandatory §1a/§1b advisory trigger is **stop 12, NOT 10** (Architect `evt_2s144kdddyckn`). It blocks `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` (`active`), whose D3A+D3B stays FROZEN pending its own separate release. `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` still `draft`. |
+| 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (`active`, M-series defunctionalization). M6/M4/M3 merged; `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` and `RT-UNIT-FAILURE-STATUS-PROVENANCE` MERGED. CURRENT: `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` (`active`) — **HS11 per-arrival recut landed `fec63506a`** (frame blob `1ae3e449a8f2`, Architect frame-review APPROVE `evt_2wvn3szecym9f`) and **RE-RELEASED `evt_1mgb3zbskwbg3`**. SEVEN hard stops taken; next mandatory §1a/§1b advisory trigger is **stop 12, NOT 10** (Architect `evt_2s144kdddyckn`). **LANDED `00e66312b` (2026-08-27), all 15 paths blob-verified by the Steward, zero mismatches.** The chain closed at SEVEN hard stops, never reaching the stop-12 advisory trigger. CURRENT: `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` (`active`) — its **D3A+D3B is now UNFROZEN and RELEASED `evt_6pecj1epnd9pe`**, all four `depends_on` merged. Its operative contract is **HS7 (`evt_1z1p9t4tdyd2v`) + the incorporation ruling `evt_2prk31prke9cc`**, NOT the four superseded banners stacked above them in the same file. `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` still `draft`. |
 | 2 | language | `LANG-INDEX-REFINEMENT-OMEGA-ARM` **MERGED** — both deliverables landed (D1 `e13df606a`, D2 `ef91b8225`, blob-verified); no D3. `LANG-MOD-CANONICAL-PAIR-PACKAGE` **MERGED `40e7f1199`** (blob-verified; its surviving `wp/` branch is the pre-squash remnant, NOT an unlanded candidate). **FO IS RECUT INTO A THREE-NODE REPAIR SEQUENCE (2026-08-27).** The landed D1 statement `fok_embedding_adequacy_statement` is REFUTED by an accepted capture-exploiting certificate (`evt_2yh515wg0mczy`); Architect `evt_6hx31xvw9tqs2` REJECTED the whole checker/derivation/adequacy interface as a semantic soundness gate, not repairable by finishing the proof. Sequence: `CORE-FO-CHECK-TREE-SORT-VALIDATION` (`ready`, predecessor) → `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` (`draft`, NEW, the ATOMIC lockstep increment — never split it) → `V3-FO-EMBEDDING-ADEQUACY` D2a/D2b. `V3-FO-CHECKER-SOUNDNESS` and `V3-FO-SUBST-DEPTH-CONTROL` stay `merged` with superseded-banners. Route FO is fail-safe meanwhile (`prover.rs:562-604` withholds `Unknown`, never `Proved`) — the rejection invalidates the proposed THEOREM GATE, not the production verdict boundary. Only remaining candidate active: `LANG-MOD-CATALOG-COMPLETENESS` — its operative contract is **RECUT #3 (`4ffa8562c`, AC-CENSUS), NOT the "authorized partial / remainder held on Nat Decision" banner**, which is a lower, historical banner in the same file. The Nat hold is DISCHARGED: `dec_1kqwn6hdvn7d2` resolved and BOTH halves merged (`LANG-MOD-NAT-PROVIDER-INTERFACE`, `LANG-MOD-NAT-FLOOR-REALIZATION` at `d5c41ec1`). RELEASED `evt_7zr9t5k9d0ry8`, scope CORRECTED `evt_65h1skh3ryeae`: a 1106-line census artifact ALREADY LANDED at `027f6bf26` (2026-08-27 state `40e7f1199`, path `crates/ken-elaborator/tests/lang_mod_catalog_evidence_frontier.rs`), so the live deliverable is a DELTA MEASUREMENT against AC-C1..C6, not a fresh census. QUEUED behind FO node 1 under the one-WP rule (implementer's call, endorsed). The `wp/` branch is a landed remnant — retire, do not publish. HAZARD for any Omega-elimination work: the omega arm retains a bounded TWO-INDEX limitation as UNSUPPORTED (Architect `evt_7wbrfyvwv5517`) — single-index only; a multi-index need HARD-STOPS to Steward + Architect. NEXT: the z3 integration campaign (operator 2026-08-26). `LANG-MODULE-IMPORT-SYSTEM` COMPLETE. |
 | 3 | foundation | Catalog-reuse modernization. Expressibility trial COMPLETE (3-lane feasibility PROVEN, operator 2026-08-26). Pilot chain DONE: `CAT-ORDER-PUB-EXPORT`, `CAT-GCD-REFACTOR`, `CAT-REUSE-CENSUS` all MERGED. CURRENT: `CAT-NAT-REUSE-CONSUMERS` (`active`) — six per-package increments. D1 `6ba6f6bef`, D2 `428ea1188`, D3 `9de02daff` MERGED. **D4 released `evt_5smy0nbdt3qcy`**, in build. D5/D6 held, each needs its own explicit release, D6 (`Derived.ken.md`) LAST as the risk increment. **A consuming TEST FIXTURE's root set is part of an increment's path set here** — established by D1 (cc6a/cc7/cc8) and D2 (cc2/cc3/cc4/ds9/d0), ruled for D4 at `evt_1b31assx1ktg8`/`evt_6snwh0xy60jh8`/`evt_2r8cavz7b1bms`. Carry that authorization INTO the D5 release so it does not hard-stop for it again. |
 
@@ -227,12 +227,32 @@ re-measure before acting):
   half went through the pilot prerequisite.)
 - CURRENT BATCH: `CAT-NAT-REUSE-CONSUMERS` (`active`) — the census's first scoped
   rework batch, six independently-releasable per-package increments. D1
-  `6ba6f6bef` (`Arguments.ken.md`), D2 `428ea1188` (`Diagnostics/Core.ken.md`)
-  and D3 `9de02daff` (`Parsing.ken.md`) all MERGED. **D4
-  (`Formatting/Doc.ken.md`) RELEASED `evt_5smy0nbdt3qcy`** and in build. D5/D6
-  are HELD and each needs its own explicit release; D6 (`Derived.ken.md`) is the
-  risk increment and goes LAST — its `AC-PROP` can hard-stop to spec/Architect,
-  and that is a payoff, not a setback.
+  `6ba6f6bef` (`Arguments.ken.md`), D2 `428ea1188` (`Diagnostics/Core.ken.md`),
+  D3 `9de02daff` (`Parsing.ken.md`), D4 `100dd6afa` (`Formatting/Doc.ken.md`)
+  and D5 `aa0e5cc44` (`Parsing/Cursor.ken.md`, nine paths blob-verified) are all
+  MERGED. **D6 (`Derived.ken.md`) RELEASED `evt_6yetvf5fvv6nm`** and in build —
+  the risk increment, LAST by design: its `AC-PROP` can hard-stop to
+  spec/Architect, and that is a payoff, not a setback. D6 closes the batch.
+- **NEXT RELEASE AFTER D6 IS A PROVIDER PREREQUISITE, NOT ANOTHER CONSUMER
+  BATCH** (Steward determination 2026-08-27, measured against census §4.2/§4.3).
+  The census proposed seven low-risk groups; `CAT-NAT-REUSE-CONSUMERS` drained
+  groups 2 and 3. **Every one of the five remaining groups is blocked on a
+  provider that is not yet public, a module that fails standalone elaboration,
+  or both.** Groups 1 and 7 sit behind modules in the §4.3 standalone-failure
+  set (`LawfulFunctors`, `BytesKeys`, `Cursor`); group 5 sits behind the
+  `Nat.Order` atomic owner-migration wall. **Group 4 (derived-list reuse) is the
+  only one whose provider — `Data.Collections.Derived` — is NOT in that failure
+  set**, so the next node is a `CAT-ORDER-PUB-EXPORT`-shaped pub-export
+  prerequisite over exactly `list_append`, `length`, `reverse`, `concat_map`.
+  Measured on `origin/main` `00e66312b`: `Derived.ken.md` has **zero** `pub`
+  declarations and all four exist as bare `fn` (`:73`, `:161`, `:246`, `:350`).
+  The landed spelling to copy is `pub fn <name>` (`Nat/Order.ken.md:49,59,69,79`;
+  `Nat/Arithmetic.ken.md:18,24`) — copy the landed precedent, not spec prose.
+  **Do NOT frame it yet, and do NOT pin fixed inputs at `00e66312b`: D6 is
+  editing `Derived.ken.md` right now and will move that file.** Frame it after
+  D6 resolves, measuring inputs at the post-D6 SHA. Exclude `insert`, `sort`,
+  `Perm` — census §4.3 tags them higher-risk (attached law ownership), so they
+  are ungrouped and are not this node's to take.
 - **A CONSUMING TEST FIXTURE'S ROOT SET IS PART OF AN INCREMENT'S PATH SET here,
   and the frames do not say so.** D1 landed four paths (`Arguments.ken.md` +
   cc6a/cc7/cc8) and D2 landed seven (incl. cc2/cc3/cc4/ds9/d0), so this is
@@ -270,6 +290,25 @@ not `crates/`) — it is the standing exception, not a lane (`CLAUDE.md`).
 
 ## Roster history
 
+- 2026-08-27 (fifth refresh, at `00e66312b`): **no roster change.** Lane 1's
+  `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` LANDED (15/15 paths blob-verified by
+  me, not taken on the lieutenant's report), which discharged the last of the
+  four `depends_on` on `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` and let me
+  make the owed explicit D3A+D3B re-release. Lane 3 D5 landed and D6 went out.
+  Recorded the post-D6 provider-prerequisite determination above.
+  > **LESSON — I found the SAME defect in my own repaired instrument, one level
+  > down.** Yesterday I rewrote watchdog step 2 because an AGGREGATE landing
+  > count read 5 while runtime landed ZERO, hiding a dead lane for 16 hours.
+  > The replacement was per-lane paths — and its lane-2 path
+  > `':/crates/ken-elaborator/'` **catches lane-3 CAT work**, because the
+  > foundation increments repair elaborator test fixtures. It read 5 for lane 2
+  > when the true lane-2 count was 2. **A narrower instrument is not thereby a
+  > correct one**: I fixed the granularity and never asked whether the new
+  > buckets were disjoint. Repaired by requiring every hit be ATTRIBUTED to a
+  > lane by subject before counting — not by widening, which is what caused it.
+  > The general form: when you repair an over-broad measurement by subdividing
+  > it, the subdivision inherits the original's blind spot unless you prove the
+  > new partition is actually disjoint over the population you are counting.
 - 2026-08-27 (fourth refresh, at `ad36b0fcd`): **no roster change — citation
   re-measurement, plus one release it produced.** The Nat chain this file called
   `ready, release FIRST` was in fact merged on BOTH halves, two days stale. That
