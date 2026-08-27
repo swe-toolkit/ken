@@ -8,7 +8,7 @@ gate: none
 depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS]
 blocks: []
 github: null
-origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2."
+origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
 > # FRAMED 2026-08-22 — the second route-FO `proved` theorem, on the structural arm
@@ -130,21 +130,42 @@ forces no kernel `size_rel` change. Under the arm-(a) ruling
 structural elaboration — so this node does NOT depend on the SCT rotation fix
 and does not gate on a kernel arm.
 
-## Fixed inputs, measured at origin/main `6842689b`
+## Fixed inputs, RE-MEASURED at origin/main `b76943684` (2026-08-27)
+
+> **The 2026-08-22 coordinates were measured at `6842689b` and are SUPERSEDED.**
+> Every Ken-side line number had moved, and the absence claim below had been
+> falsified by this node's own D1 landing. Re-measured by the Steward before
+> release. Do not read the `6842689b` figures out of the `origin:` line.
 
 **Reuse (already merged — do not re-author):**
 
 | artifact | location | role |
 |---|---|---|
-| `FokIForm` | `FoKripke.ken:26` | the source slice (Bottom/atom/or/imp/forall) |
-| `fok_embed` | `FoKripke.ken:198` | the embedding `K(Sigma) => forall w. w \|= f` |
-| `fok_w_forces` | `FoKripke.ken:165` | per-world classical forcing translation |
-| `FokDerivation`, `fok_derives`, `fok_classically_valid` | `FoKripke.ken` (D1) | the reflected proof-tree family + `classically_valid` |
-| `fok_checker_soundness` | `FoKripke.ken:2093` | the FIRST theorem — the discharge composes with it |
+| `FokIForm` | `FoKripke.ken:28` | the source slice (Bottom/atom/or/imp/forall) |
+| `fok_embed` | `FoKripke.ken:300` | the embedding `K(Sigma) => forall w. w \|= f` |
+| `fok_w_forces` | `FoKripke.ken:267` | per-world classical forcing translation |
+| `FokDerivation` `:825`, `fok_derives`, `fok_classically_valid` `:877` | `FoKripke.ken` | the reflected proof-tree family + `classically_valid` |
+| `fok_checker_soundness` | `FoKripke.ken:2268` | the FIRST theorem — the discharge composes with it |
 | `TruncBar` (`‖…‖` / `\|\|…\|\|`) | lexer `:112`, parser `:2636` | truncation surface token — usable; `classically_valid` uses it |
 
-**Author here (confirmed ABSENT from `FoKripke.ken` at `6842689b`):**
-`denote`, `Carriers`, `AtomEnv`, `embedding_adequacy` — zero occurrences.
+**ALSO ALREADY LANDED — this node's own `D1`, merged 2026-08-23. DO NOT
+RE-AUTHOR ANY OF IT:**
+
+| artifact | location |
+|---|---|
+| `FokCarriers` | `FoKripke.ken:44` |
+| `fok_sort_a` | `FoKripke.ken:48` |
+| `FokAtomEnv` | `FoKripke.ken:59` |
+| `fok_denote_at` | `FoKripke.ken:306` |
+| `fok_denote` | `FoKripke.ken:332` |
+| `fok_embedding_adequacy_statement` | `FoKripke.ken:881` |
+| the D1 differential | `crates/ken-elaborator/tests/v3_fo_embedding_adequacy_d1.rs` |
+
+**Still ABSENT, and the only thing this node has left to author:** the
+kernel-checked PROOF `fok_embedding_adequacy`. Zero occurrences outside
+`fok_embedding_adequacy_statement`. `FoKripke.ken:879-880` says so in its own
+words — "The D1 adequacy statement. Its kernel-checked proof is the following
+increment; this proposition adds no assumption or trusted declaration."
 
 **The Rust reference to mirror (NOT to invent a semantics):**
 `crates/ken-elaborator/src/fo_kripke.rs:517`
@@ -155,8 +176,9 @@ Rust structs at `:500`/`:508`. The module doc (`:16-19`, `:514-516`) names
 `embedding_adequacy` as "the reserved boundary, not built here" — this node
 crosses it. **A differential harness exists** for the executable mirrors
 (`tests/v3_fo_ken_level_checker_authoring.rs`: Ken `fok_embed`/`fok_check_cert`
-vs the Rust `embed`/`check_cert`); **there is no `denote` differential yet** —
-adding one is D1's control.
+vs the Rust `embed`/`check_cert`). The `denote` differential that D1 owed now
+EXISTS, at `tests/v3_fo_embedding_adequacy_d1.rs`; it is the landed `AC-2`
+control and it is an input to D2, not work to redo.
 
 **`attempt_fo` gating** (`crates/ken-elaborator/src/prover.rs`): the `proved`
 verdict is withheld UNCONDITIONALLY (`attempt_fo_with_signature:574-604`) — even
@@ -169,7 +191,17 @@ theorems having an approved kernel-checked home.
 
 ## Deliverables
 
-**`D0` — the buildability probe. A HARD STOP HERE IS A COMPLETE RESULT.**
+> **THE RELEASABLE REMAINDER IS `D2` + `D3`. `D0` AND `D1` HAVE BOTH LANDED.**
+> Start at `D2`. `D0` landed as the representability hard stop (probe
+> `4d5fd8cee`), already folded into the component design above. `D1` landed
+> 2026-08-23 across `771eec449`, `87f26d0d2`, `215b88071`, `1308e9ea0`,
+> `5ef0f0983` — Architect-approved, Decision `dec_7f4k3whvy9n8` resolved. Their
+> text is retained below as the record of what was built and on what terms; it
+> is NOT an assignment. Re-authoring any of it is a scope defect, and the
+> "confirmed ABSENT" claim it was written against is now false — see the
+> re-measured fixed inputs.
+
+**`D0` (LANDED) — the buildability probe. A HARD STOP HERE IS A COMPLETE RESULT.**
 Elaborate a minimal file establishing, independently and reported separately:
 
 1. `Carriers Sigma` and `AtomEnv Sigma C` are writable as Ken data (the
@@ -185,16 +217,29 @@ Elaborate a minimal file establishing, independently and reported separately:
 condition below — a complete result, returned to the enclave + Architect, never a
 silent kernel measure change.
 
-**`D1` — author `Carriers`, `AtomEnv`, `denote`, and the `denote` differential.**
-Mirror the Rust `fo_kripke.rs:517` five arms exactly. Extend
-`tests/v3_fo_ken_level_checker_authoring.rs` with a `denote` differential row
-(render Rust `denote` results to Ken source, convert, compare) — this is the
-`AC-2` control for the interpretation.
+**`D1` (LANDED) — author `Carriers`, `AtomEnv`, `denote`, and the `denote`
+differential.** Mirror the Rust `fo_kripke.rs:517` five arms exactly. Extend the
+differential harness with a `denote` differential row (render Rust `denote`
+results to Ken source, convert, compare) — this is the `AC-2` control for the
+interpretation. Delivered as `FokCarriers`/`FokAtomEnv`/`fok_denote_at`/
+`fok_denote` plus `fok_embedding_adequacy_statement`, with the differential at
+`tests/v3_fo_embedding_adequacy_d1.rs`. Consume these; do not rebuild them.
 
-**`D2` — prove `embedding_adequacy` by structural induction on `FokIForm`.**
-`classically_valid (fok_embed f) -> denote C rho f`, reusing `fok_embed` and
-`fok_classically_valid`. The `Imp` and `Forall` arms are the non-trivial cases
-(as `ForallRight` was for checker-soundness).
+**`D2` (THE WORK) — prove `embedding_adequacy` by structural induction on
+`FokIForm`.** Prove the ALREADY-LANDED proposition `fok_embedding_adequacy_statement`
+(`FoKripke.ken:881`) as written — do NOT restate it. It reads
+
+```
+fok_classically_valid (fok_scoped_embed sigma f) -> fok_denote sigma c rho f
+```
+
+over `(sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+(f : FokScopedIForm sigma Zero)`. If the proof needs the proposition restated,
+that is a hard stop to the Architect, not a licence to edit the landed
+statement: D1's approval bound that exact form and `AC-1` still forbids adding
+an assumption or trusted declaration to it. The `Imp` and `Forall` arms are the
+non-trivial cases (as `ForallRight` was for checker-soundness), and the proof
+composes with `fok_checker_soundness` (`:2268`).
 
 > **D2 partition — Architect interface ruling requested at the D2 candidate.**
 > If D2 splits into a propositional fragment (Bottom/Atom/Or/Imp) plus the
