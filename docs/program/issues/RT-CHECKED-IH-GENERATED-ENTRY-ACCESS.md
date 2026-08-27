@@ -8,12 +8,12 @@ gate: none
 depends_on: [RT-CHECKED-IH-K-AVAILABILITY-LOCATOR]
 blocks: [RT-RESULT-CONTINUATION-BINDING-PROVENANCE]
 github: null
-origin: "Runtime hard stop 7 on RT-RESULT-CONTINUATION-BINDING-PROVENANCE (runtime-implementer evt_dqa3989tfmm2; leader routing evt_7fhdmyaqk4371). Architect HS7 component ruling evt_1z1p9t4tdyd2v ruled the repeated last-gap decomposition itself the design defect and forbade a fourth narrow predecessor. The first cut of this node carried a static context-split contract; Runtime hard-stopped on it (HS8, runtime-implementer evt_799ckhz4kgtcd, leader evt_27rha2k9cyv2v) and Architect evt_14hwxs5q2j087 independently reproduced the refutation at exact 1403722a2e70d192a6c4d283ca4dd2e6345c3c55. The Steward then triggered one bounded Research graph advisory (trigger evt_1cr1trmmzpr54, advisory evt_2ffs47ax5gbnn), which measured the closed six-row relation and found the sole destination-coordinate collision agrees on the consumer projection — selecting the confluence/quotient branch by the ruling's own stated condition. Architect evt_3myrd8sp2tp8n supplied the mechanism this recut is written to. Steward-owned frame. D3A stays frozen and non-landable; after this predecessor lands through ordinary gates the Steward must EXPLICITLY re-release the same atomic D3A+D3B consumer — landing alone authorizes nothing. THIRD RECUT 2026-08-27 on Architect HS10 evt_2s144kdddyckn (hard stop runtime-implementer evt_635f5fhpjmhpr, leader evt_4zzcmfktgxkz4): the frame made ONE partial governed-only map answer TWO questions — whether the current pre-dispatch call is governed, and what projection authorizes it — so None conflated a lawful non-governed call with a missing certificate, and both dispositions of None were wrong. The APPLICABILITY premise is falsified; pre-dispatch placement, the seat, the single lookup and sections 1-3's quotient are all confirmed. Sections 1, 2b, 4 and 5 are recut to ONE TOTAL sanitized admission map. Blocked object 35df0de8acca69d198f51751fb7377ac273188d6 is EVIDENCE ONLY, not a candidate; do not resume from the experiment; QA excluded."
+origin: "Runtime hard stop 7 on RT-RESULT-CONTINUATION-BINDING-PROVENANCE (runtime-implementer evt_dqa3989tfmm2; leader routing evt_7fhdmyaqk4371). Architect HS7 component ruling evt_1z1p9t4tdyd2v ruled the repeated last-gap decomposition itself the design defect and forbade a fourth narrow predecessor. The first cut of this node carried a static context-split contract; Runtime hard-stopped on it (HS8, runtime-implementer evt_799ckhz4kgtcd, leader evt_27rha2k9cyv2v) and Architect evt_14hwxs5q2j087 independently reproduced the refutation at exact 1403722a2e70d192a6c4d283ca4dd2e6345c3c55. The Steward then triggered one bounded Research graph advisory (trigger evt_1cr1trmmzpr54, advisory evt_2ffs47ax5gbnn), which measured the closed six-row relation and found the sole destination-coordinate collision agrees on the consumer projection — selecting the confluence/quotient branch by the ruling's own stated condition. Architect evt_3myrd8sp2tp8n supplied the mechanism this recut is written to. Steward-owned frame. D3A stays frozen and non-landable; after this predecessor lands through ordinary gates the Steward must EXPLICITLY re-release the same atomic D3A+D3B consumer — landing alone authorizes nothing. THIRD RECUT 2026-08-27 on Architect HS10 evt_2s144kdddyckn (hard stop runtime-implementer evt_635f5fhpjmhpr, leader evt_4zzcmfktgxkz4): the frame made ONE partial governed-only map answer TWO questions — whether the current pre-dispatch call is governed, and what projection authorizes it — so None conflated a lawful non-governed call with a missing certificate, and both dispositions of None were wrong. The APPLICABILITY premise is falsified; pre-dispatch placement, the seat, the single lookup and sections 1-3's quotient are all confirmed. Sections 1, 2b, 4 and 5 are recut to ONE TOTAL sanitized admission map. Blocked object 35df0de8acca69d198f51751fb7377ac273188d6 is EVIDENCE ONLY, not a candidate; do not resume from the experiment; QA excluded. FOURTH RECUT 2026-08-27 on Architect HS11 evt_3n6naa1ktj0h1 (hard stop runtime-implementer evt_2xcfd235ptf0g, leader evt_4bvhjm970e5nh): the frame converted ONE quotient certificate/member set into ONE execution visit per installation, carrying planner membership cardinality into the source-machine execution frame. Repeated governed visits are LAWFUL source-machine arrival multiplicity, not duplicate certificate authority - a call coordinate is a static program coordinate, not a unique machine arrival; NonGoverned rows repeat with identical multiplicities and authorize nothing; and the landed successor contract applies K at each exact recursive arrival. AC-ADMIT-VISIT-ONCE is RETIRED for AC-ADMIT-PER-ARRIVAL plus AC-ADMIT-ARRIVAL-MUTATIONS; everything HS10 repaired remains required. Its experiment is evidence only, no candidate, QA excluded."
 ---
 
-> # SYMPTOM INVENTORY — SIX HARD STOPS ON ONE ACCESSOR. READ THIS FIRST.
+> # SYMPTOM INVENTORY — SEVEN HARD STOPS ON ONE ACCESSOR. READ THIS FIRST.
 >
-> This node exists because the same accessor produced six consecutive stops,
+> This node exists because the same accessor produced seven consecutive stops,
 > each of which looked like a missing field and was not. Seeded per Architect
 > `evt_3myrd8sp2tp8n`; it is the frame's memory, not decoration.
 >
@@ -56,6 +56,16 @@ origin: "Runtime hard stop 7 on RT-RESULT-CONTINUATION-BINDING-PROVENANCE (runti
 >   dispositions of `None` are wrong**: `None => ordinary` is the fail-open the
 >   guard exists to prevent, and `None => error` rejects a measured lawful call.
 >   Runtime-implementer `evt_635f5fhpjmhpr`, leader `evt_4zzcmfktgxkz4`.
+> - **HS11 — arrival-multiplicity premise.** THIS NODE'S OWN FOURTH CUT.
+>   **One quotient certificate / member set was converted into one execution
+>   visit per installation — keyed on carrying planner membership cardinality
+>   into the source-machine execution frame.** A true per-installation counter
+>   measured governed rows reached 29, 16, 3 and 2 times with
+>   `installation_count=1` on every row, against a frame premise of exactly one.
+>   Runtime refused to weaken the counter to a membership-style `= 1`, which
+>   would have masked the multiplicity and recreated a previously blocked masked
+>   counter. Runtime-implementer `evt_2xcfd235ptf0g`, leader
+>   `evt_4bvhjm970e5nh`.
 >
 > **HS9 falsifies section 5's representation premise and NOTHING ELSE — the rest
 > of this recut was confirmed by reaching the stop.** The planner-owned
@@ -130,9 +140,53 @@ origin: "Runtime hard stop 7 on RT-RESULT-CONTINUATION-BINDING-PROVENANCE (runti
 > absence conflates ordinary with missing certificate — keyed on membership in a
 > partial governed-only map.`
 >
-> **Steward note on escalation: the next `§1a`/`§1b` mandatory-advisory trigger
-> is stop 12, NOT stop 10.** HS9 consumed the ninth-stop advisory. Do not fire a
-> Research advisory on this stop; the Architect ruled it directly.
+> **HS11 IS NOW RULED — the once-only premise is REPLACED below, not held**
+> (Architect `evt_3n6naa1ktj0h1`). **Repeated governed visits are LAWFUL
+> source-machine arrival multiplicity.** They are not duplicate certificate
+> authority and do not establish a duplicate application path. Grounded at base
+> `61c2fefa0` / tree `663436f7f`, with all four experiment artifact SHA-256s
+> reproduced exactly by the Architect.
+>
+> Three independent facts resolve it. **(1)** `source_call_state` is entered once
+> per completed source-machine call transition, and the machine loop may evaluate
+> the same static call occurrence repeatedly during recursive execution — **a
+> call coordinate is a static program coordinate, not a unique machine
+> arrival.** **(2)** The repetition occurs where no authority exists: explicit
+> `NonGoverned` rows repeat with the SAME multiplicities as adjacent governed
+> rows (read G `301/…` and N `470/…` both 29; write G `525/…` and N `696/…`
+> both 16; context-1 G `314/…` and N `483/…` both 2), and `NonGoverned` authorizes
+> nothing — so the repetition is execution multiplicity, not something minted by
+> the governed certificate. **(3)** The already-landed successor contract says
+> the atomic consumer applies inherited `K` **"at each exact recursive arrival"**
+> (current blob `54fcf2045cbe24a94b7e9aa6aa6d7c9c63b60c38`). **This frame's
+> once-per-compile conversion contradicted the successor it precedes.**
+>
+> ### THE THREE CARDINALITIES — keep them apart, this is the whole lesson
+>
+> - **Certificate cardinality.** ONE installed governed key/projection per
+>   **static call coordinate**. W0/W1 is one quotient class and one certificate
+>   whose member set is exactly `{A, B}`. No source-identity split, no duplicate
+>   certificate. (Unchanged — sections 1-3 were always right about this.)
+> - **Arrival multiplicity.** ZERO OR MORE source-machine arrivals may reuse an
+>   installed admission. The bounded product witnesses require every governed key
+>   to be reached **at least once**. **29/16/3/2 are OBSERVATIONS, not normative
+>   literals, and must never be snapshot-pinned.**
+> - **Per-arrival action cardinality.** Each pending call-state arrival performs
+>   exactly ONE total-map lookup. `NonGoverned` continues ordinary dispatch once
+>   without authority; `Governed` performs the full exact-capsule/projection
+>   validation once before dispatch. **"Once" is PER ARRIVAL — never per compile,
+>   installation, key, certificate, or source member.**
+>
+> Re-reading one immutable compile-time certificate on distinct arrivals is
+> **not consuming it**. No new identity or semantic axis follows: the call
+> activation / local Rust control flow is the pairing scope. **Do not mint a
+> visit id, runtime carrier, ABI lane, source identity, context split, or second
+> lookup.** This predecessor still neither applies `K` nor binds `R2`.
+>
+> **Steward note on escalation: this is stop 11, and the next `§1a`/`§1b`
+> mandatory-advisory trigger REMAINS stop 12.** HS9 consumed the ninth-stop
+> advisory; HS10 and HS11 were both ruled directly. Do not fire a Research
+> advisory on either.
 
 > # WHAT IS WITHDRAWN — do not resurrect it from an older revision
 >
@@ -264,7 +318,12 @@ substitute for either.
 **What HS10 changed, in one line:** sections 1-3's quotient, projection and five
 set closures are UNCHANGED and confirmed; what is replaced is the *lowering*
 side — the partial governed-only projection map of section 4 becomes ONE TOTAL
-admission map, and section 5's guard consults it once.
+admission map, and section 5's guard consults it once **per arrival**.
+
+**What HS11 changed, in one line:** everything HS10 repaired stays required; what
+is replaced is the *counting* — the once-per-compile visit premise becomes
+`AC-ADMIT-PER-ARRIVAL`'s three-bag pointwise equality, because repeated governed
+visits are lawful source-machine arrival multiplicity.
 
 ### 1. The planner certificate
 
@@ -567,9 +626,11 @@ the predecessor instrument uses the returned projection to require **all** of:
 
 The exact compiler enum match is **compile-time representation refinement at an
 already-authorized seat**, not runtime discrimination. It neither applies `K`
-nor binds `R2`. The W0/W1 seat is visited ONCE with one certificate whose
-membership is `{A, B}`; **membership closure, not duplicated execution, proves
-both sources authorize it.**
+nor binds `R2`. **One installed certificate/key has member set `{A, B}`, and ALL
+arrivals at that static key consult that same certificate.** Membership closure,
+not duplicated execution, proves both sources authorize it — and membership
+closure says nothing about how many times lowering arrives there. Re-reading one
+immutable compile-time certificate on distinct arrivals is not consuming it.
 
 > **DO NOT turn Research's diagnostic `capsule_equal` into authority.** It
 > compares a *rendered projection* — residual kind and some ids and counts — not
@@ -598,6 +659,15 @@ deriving `NonGoverned` from absence, a default, or a fallback arm rather than
 from planner-derived membership in `N`; and using any capsule fact (pending
 kind, arity, args, phase, slot, frame, residual, binding) as an applicability
 prefilter.
+
+**Added by the HS11 ruling:** minting a **visit id** or any per-arrival identity;
+pinning arrival multiplicity to a literal (29/16/3/2 or any other); collapsing
+the per-arrival bags into set membership; dividing a count by installation count;
+and asserting any once-only property **per compile, installation, key,
+certificate, or source member** rather than per arrival. The call activation /
+local Rust control flow is the pairing scope — no new identity or semantic axis
+follows from arrival multiplicity, and no runtime carrier, ABI lane, source
+identity, or context split may be introduced to carry one.
 
 ## Prior-art hazards — status after the recut
 
@@ -643,6 +713,11 @@ guarded is withdrawn**, and saying so explicitly is part of the recut:
   dispatch and authorizing nothing (mechanism 5).
 - The consumer-adjacent completeness instrument at the real D3A call seat, which
   neither applies `K` nor binds `R2` (mechanism 5).
+- The **per-arrival count instrumentation**: three independently incremented
+  bags / count maps per installation and per call key (raw arrivals, admission
+  outcomes, governed six-conjunct validations), supporting
+  `AC-ADMIT-PER-ARRIVAL`'s pointwise `raw = admitted = validated > 0`. **This
+  replaces the falsified once-per-compile counter and is HS11's repair.**
 - The controls below. **No D3A application, no `R2` binding, no fresh-result
   destination change, no fourth axis.** D3A remains ABSENT on `main`.
 
@@ -734,10 +809,13 @@ guarded is withdrawn**, and saying so explicitly is part of the recut:
   a binding of exactly
   `Value(Specialized(ComputationalRecursorClosure { .. }))`, capsule
   coordinate/frame/slot/call-template agreement with a `Carried` residual, and
-  the fresh-result destination observed only. **The W0/W1 seat
-  is visited ONCE with membership `{A, B}` — per-identity arrival is NOT the
-  shape here and must not be asserted.** The instrument does NOT apply `K` and
-  does NOT bind `R2`. Read and write are derived independently from their own
+  the fresh-result destination observed only. **One installed certificate/key
+  has member set `{A, B}`, and ALL arrivals at that static key consult that same
+  certificate — per-identity arrival is NOT the shape here and must not be
+  asserted, and neither is one-arrival-per-compile.** How many arrivals occur is
+  `AC-ADMIT-PER-ARRIVAL`'s question, not this one's; here require only that every
+  governed key is reached **at least once**. The instrument does NOT apply `K`
+  and does NOT bind `R2`. Read and write are derived independently from their own
   planner facts and never cross-used.
 - **AC-CAPSULE-NEGATIVES** (HS9 ruling controls — INDEPENDENTLY reject) — each
   of these must reject on its own: an outer `Carried`; **every non-recursor
@@ -768,7 +846,15 @@ guarded is withdrawn**, and saying so explicitly is part of the recut:
   intact is fail-closed rejection OUTSIDE the ruled admissible arm.
 - **AC-CONSUMER-ADJACENT-CLOSURE** — consumer-adjacent read and write
   observations independently close raw `(coordinate, source identity)` pairs,
-  class members, installed keys, and reached keys, as sets.
+  class members, installed keys, and reached keys, **as sets**. Those set
+  equalities are RETAINED unchanged: they are the right instrument for
+  **population membership**.
+  **ADD, separately, the bag / count-map equality of `AC-ADMIT-PER-ARRIVAL`
+  for execution multiplicity.** The two are not substitutes and neither
+  subsumes the other: **a set cannot prove per-arrival cardinality, and a scalar
+  total cannot prove it per key.** Keep both, and keep them distinct — collapsing
+  the bag into the set is precisely the membership-into-execution conversion that
+  produced HS11.
 - **AC-KEY-NEGATIVES** (wrong facts reject) — INDEPENDENTLY: a **missing call
   key** (which with a total map means the population is wrong, and must FAIL
   CLOSED rather than fall through to ordinary dispatch); a wrong context id; a
@@ -808,11 +894,38 @@ same defect with two variants.
   **This must never be reached by a post-dispatch second read** — a control
   proves the check sits on the pre-dispatch path with the operand actually being
   forwarded.
-- **AC-ADMIT-VISIT-ONCE** (a true per-compile count, and it counts the right
-  thing) — a true per-compile **governed**-visit count rejects visit two, and
-  **`NonGoverned` does not increment it**. A counter that also counts
-  `NonGoverned` admissions is not this control; it would go green while the
-  governed seat was visited twice.
+- **AC-ADMIT-PER-ARRIVAL** (REPLACES the falsified `AC-ADMIT-VISIT-ONCE`;
+  Architect `evt_3n6naa1ktj0h1`) — observe, **per installation and per call
+  key**, three INDEPENDENTLY incremented bags / count maps:
+  1. raw pending `source_call_state` **arrivals**;
+  2. completed **admission outcomes**;
+  3. for `Governed` only, completed **six-conjunct validations**.
+
+  Require **pointwise equality `raw = admitted = validated > 0` for every
+  governed key**. For `NonGoverned`, require `raw = admitted =
+  ordinary-continuation`, with the governed-validation count **exactly zero**.
+
+  **Preserve the ACTUAL counts.** Never assign `= 1`, never collapse to set
+  membership, never divide by installation count, and **never hard-code today's
+  multiplicities** — 29/16/3/2 are observations of two bounded witnesses, not
+  normative literals. A control that pins them is as wrong as the once-only
+  premise it replaces, in the opposite direction.
+
+  **Why the shape is three bags and not one number:** the falsified control
+  asked "how many times was the seat visited?" and treated any answer above one
+  as a defect. The lawful property is not a magnitude at all — it is an
+  **equality between counts that must move together**. Arrivals may be 1 or 29;
+  what must never happen is an arrival that skips its lookup, or a lookup that
+  happens twice within one arrival.
+- **AC-ADMIT-ARRIVAL-MUTATIONS** (prove that equality at the PRODUCTION seam) —
+  INDEPENDENTLY: **duplicating** the actual map `get`, or the full governed
+  validation, within one call-state arrival must make the operation count
+  **exceed** raw-arrival count; **skipping** the actual `get` or validation must
+  make it **fall short**; and **routing either sealed variant through the
+  other's continuation** must make the variant-specific equality fail. **Mutate
+  the operation / control path, never the observation detector**, and restore
+  BYTE-IDENTICALLY. A mutation applied to the counter instead of the operation
+  discharges nothing.
 - **AC-ADMIT-NON-DISCHARGES** (bounds what may be offered as evidence) — each of
   these is an EXPLICIT NON-DISCHARGE and may not be cited whatever the suite
   reports: **deleting the guard**; **`None => ordinary`**; **a bare
@@ -830,6 +943,15 @@ same defect with two variants.
   `AC-NO-TRANSFER`, `AC-GUARD-DISABLED-IS-NOT-EVIDENCE`,
   `AC-CONSUMER-ADJACENT-CLOSURE`, `AC-INERT`, `AC-NO-RUNTIME-CARRIER`.
   **The admission recut adds an arm; it retires no control.**
+  **HS11 retires exactly ONE control — `AC-ADMIT-VISIT-ONCE`, replaced by
+  `AC-ADMIT-PER-ARRIVAL` plus `AC-ADMIT-ARRIVAL-MUTATIONS`.** Every HS10
+  admission control above it stands unchanged: `AC-ADMIT-TOTAL-POSITIVE`,
+  `AC-ADMIT-NONGOVERNED-LAWFUL`, `AC-ADMIT-POPULATION-MUTATIONS`,
+  `AC-ADMIT-GOVERNED-CAPSULE-NEGATIVES`, `AC-ADMIT-NON-DISCHARGES`. Closed typed
+  `P`, functional `G`, explicit `N = P \ G`, the total sanitized map, the one
+  fail-closed pre-dispatch get, positive `NonGoverned` classification, the exact
+  capsule guard, and no prefilter/accessor/second lookup are **all still
+  required**.
 - **AC-BLAST-RADIUS** (name the outward surface, gate on it) — this node adds a
   plan-owned map and a `FunctionLocalRefs` field. Enumerate every consumer of
   `StaticTransitionPlan` and of `FunctionLocalRefs`, name the suites that cover
@@ -877,12 +999,24 @@ an applicability prefilter (`AC-ADMIT-TOTAL-POSITIVE`,
 `AC-ADMIT-NONGOVERNED-LAWFUL`, `AC-ADMIT-POPULATION-MUTATIONS`,
 `AC-ADMIT-NON-DISCHARGES`).
 
+**Added by HS11, and it is the axis this node has now failed on twice in one
+day:** the three cardinalities stay SEPARATE. Certificate cardinality is one key
+per static call coordinate; arrival multiplicity is zero-or-more and is never
+pinned to a literal; per-arrival action cardinality is one lookup and one
+validation **per arrival**. `AC-ADMIT-PER-ARRIVAL` must prove an EQUALITY
+BETWEEN COUNTS, not a magnitude, and `AC-CONSUMER-ADJACENT-CLOSURE` must keep
+its set equalities beside — not merged into — the new bag equalities. Any AC that
+answers an execution-frame question with a planner-frame instrument is the HS11
+defect returning.
+
 runtime-qa. The review turns on: `AC-CONF-MEMBER-DISAGREE` mutates every
 projection component INDEPENDENTLY with byte-clean restore and each rejects
 before publication; `AC-CONF-SET-CLOSURE`'s three set mutations each bite;
 `AC-CONF-PERMUTE` proves association stability rather than a fixed numeric id;
-`AC-ENTRY-COMPLETE` observes the W0/W1 seat ONCE with membership `{A, B}` and
-does NOT assert per-identity arrival; `AC-CONF-SANITIZED` is proved by type and
+`AC-ENTRY-COMPLETE` observes that one installed certificate/key has member set
+`{A, B}` and that all arrivals at that static key consult it, asserting neither
+per-identity arrival nor one-arrival-per-compile; `AC-CONF-SANITIZED` is proved
+by type and
 privacy boundaries, not by grepping source text; `AC-BLAST-RADIUS` enumerates
 outward consumers and gates on their suites; `AC-INERT` and
 `AC-INTERNER-UNCHANGED` hold at the product.
@@ -891,8 +1025,13 @@ outward consumers and gates on their suites; `AC-INERT` and
 sets — governed coordinates **and** explicit `NonGoverned` rows — not a governed
 sample; `AC-ADMIT-POPULATION-MUTATIONS` runs drop/duplicate/reclassify/collision
 **for both variants** and **names the exact validator arm that bit** for each;
-`AC-ADMIT-VISIT-ONCE` counts governed visits only and rejects visit two, with
-`NonGoverned` proved not to increment it; `AC-ADMIT-GOVERNED-CAPSULE-NEGATIVES`
+`AC-ADMIT-PER-ARRIVAL` keeps THREE independently incremented bags per
+installation and per call key and proves `raw = admitted = validated > 0`
+pointwise — with the actual counts preserved, never `= 1`, never collapsed to set
+membership, never divided by installation count, and never pinned to today's
+29/16/3/2; `AC-ADMIT-ARRIVAL-MUTATIONS` proves that equality by mutating the
+OPERATION path (duplicate the get/validation, skip it, cross the variants'
+continuations), never the detector; `AC-ADMIT-GOVERNED-CAPSULE-NEGATIVES`
 mutates the REAL forwarded capsule on the pre-dispatch path and never a
 post-dispatch second read; and `AC-CAPSULE-NEGATIVES`'s mutants are injected
 **before the certified `Var`'s real `value_at` / dispatch**.
@@ -930,13 +1069,24 @@ and the THREE independent suppression axes (inheritance, application,
 fresh-result binding) are UNCHANGED and are not reopened here.
 
 **What the HS9 ruling fixes about the eventual successor, so it is not
-re-litigated later** (Architect `evt_2kgb55azx3ej3`): this predecessor validates
-that the existing exact callee IS the lawful capsule before the ordinary
-consumer proceeds. When D3A+D3B is later released, **D3A authorizes exactly ONE
-application of this exact capsule to produce fresh `R2`, and D3B binds that
-fresh result at the already-proved destination. The existing call, continuation
-and result are NOT duplicated.** That is a constraint on the successor, not an
-authorization of it — nothing here releases D3A.
+re-litigated later** (Architect `evt_2kgb55azx3ej3`, as corrected by HS11
+`evt_3n6naa1ktj0h1`): this predecessor validates that the existing exact callee
+IS the lawful capsule before the ordinary consumer proceeds. When D3A+D3B is
+later released, **D3A authorizes exactly ONE application of this exact capsule
+PER GOVERNED ARRIVAL, producing that arrival's fresh `R2`, and D3B binds that
+`R2` once on the same local flow. The existing call, continuation and result are
+NOT duplicated.**
+
+**Read "exactly once" as PER ARRIVAL — never per compile, installation, key,
+certificate, or source member.** The already-landed successor contract says the
+atomic consumer applies inherited `K` **"at each exact recursive arrival"** in
+both its operative introduction and its sequencing (current blob
+`54fcf2045cbe24a94b7e9aa6aa6d7c9c63b60c38`), and HS11 exists because this frame
+had converted that into one arrival per compile and so contradicted the successor
+it precedes. D3A/D3B additionally owe **suppression on every `NonGoverned`
+arrival**. **No aggregate compile-total can substitute for a per-arrival
+property**, and no `K`/`R2` work enters this predecessor. That is a constraint on
+the successor, not an authorization of it — nothing here releases D3A.
 
 After this predecessor passes Architect review, QA, its merge Decision, and
 publisher CI,
