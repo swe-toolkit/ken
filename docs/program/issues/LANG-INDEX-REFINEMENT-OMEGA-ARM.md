@@ -1,7 +1,7 @@
 ---
 id: LANG-INDEX-REFINEMENT-OMEGA-ARM
 title: "Make dependent-match index refinement sort-general: of five classifier decisions in elab.rs, widen the re-indexed-position helper, the branch goal, and the hidden-result outer-binding prefilter to Type union Omega, transporting Omega-classified types by a direct J arm alongside the existing Type-plus-Cast arm, while both index-type classifiers stay Type-only"
-status: ready
+status: active
 owner: language
 size: M
 gate: none
