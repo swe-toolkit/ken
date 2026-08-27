@@ -268,6 +268,40 @@ re-measure before acting):
   D3 precedent). Weakening an assertion that tests preserved behaviour remains a
   hard stop; removing an inventory entry naming a definition the increment
   deletes does not.
+- **AFFECTED-TARGET CLOSURE, NOT THE DIFF-TOUCHED SET — a Steward frame defect,
+  corrected 2026-08-27 (`evt_4apxf4vgbmb1e`).** D6 respin `dd595213` passed 28
+  diff-touched Rust targets 170/170 and CV still found a candidate-caused red:
+  `lang_mod_catalog_completeness.rs:97`, a pre-existing consumer-closure oracle
+  in a file the increment never touches. **A diff-touched target set is blind to
+  exactly the consumers an increment breaks by changing a CLOSURE rather than a
+  file.** Every remaining increment must re-run the COMPLETE AFFECTED-TARGET
+  CLOSURE: every target that loads any module whose closure the increment
+  changes, diff-touched or not. QA applied the criterion my frames gave it; the
+  criterion was wrong. Write the closure rule into every remaining frame.
+- **NAMED IMPORT DOES NOT BOUND THE CLOSURE.** D6 imports
+  `Data.Numeric.Nat.Order (min, sub)` — arithmetic only — but root-loading is
+  MODULE-granular, so `Nat.Order`'s package-local `data OrdResult = Lt | Eq | Gt`
+  (`Order.ken.md:47`; its own §1 says "`OrdResult` remains package-local") lands
+  in `env.globals` anyway. It is genuinely DISTINCT from
+  `Core.Logic.OrdResult.OrdResult`, never an alias — asserting those IDs equal is
+  FALSE. Any consumer importing from a package with package-local datatypes
+  inherits them. **Groups 4 and 5 will hit this.** Filed as a campaign
+  observation, NOT a blocker.
+- **PROXY vs PROPERTY — the reusable form of the D6 ruling.** The failing
+  assertion `!globals.contains_key("Data.Numeric.Nat.Order.OrdResult")` was never
+  the property; it was a PROXY that tracked "Derived's compare uses the canonical
+  OrdResult" only while Order sat outside the closure. Once Order is legitimately
+  in the closure the proxy measures NOTHING, and keeping it blocks a correct
+  increment without preserving anything. **Replacing a dead proxy with a direct
+  pin of the property is a STRENGTHENING, and is authorizable; bare deletion is
+  not.** Authorized WITH conditions on the D3 precedent (`evt_2r8cavz7b1bms`):
+  pin the real types/bodies to the canonical ID, assert the Order-local ID PRESENT
+  and DISTINCT, keep every `Data.Collections.Derived.*` absence and Core.Compare
+  ownership check intact, and **prove the new control discriminates BY MUTATION**
+  (compare-uses-Order-local must red; identity-collapse must red). The mutation
+  condition is load-bearing: QA blocked the prior respin for a control that could
+  not fail, and a replacement oracle shipped on its own say-so repeats that defect
+  one level up.
 - MEASURED CARRY-FORWARD for every remaining increment (Adversary
   `evt_5sw5w9w4jj35z`, M8 on D2): importing direct from a canonical owner makes
   the consumer transitively inherit that provider's OWN un-migrated ambient
