@@ -417,10 +417,20 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Capability.Diagnostics.Core".to_string(),
-            ["Bottom", "Equal", "Prop", "Top"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
         ),
         (
             "Capability.Filesystem.Authority".to_string(),
