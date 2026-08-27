@@ -24,6 +24,10 @@ fn dependency_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
+        .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
+        .expect("Data.Numeric.Nat.Order must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
     let lawful_prefix = "Core.Classes.LawfulClasses.";
@@ -334,10 +338,10 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
 }
 
 /// Durable invariant: the roots-loaded Parsing package references the
-/// canonical lawful owner directly, without minting a local relation or adding
+/// canonical Nat providers directly, without minting local operations or adding
 /// trust.
 #[test]
-fn parsing_reuses_the_canonical_lawful_classes_relation() {
+fn parsing_reuses_the_canonical_nat_providers() {
     let mut env = dependency_env();
     let before: HashSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
@@ -354,9 +358,8 @@ fn parsing_reuses_the_canonical_lawful_classes_relation() {
     );
     assert!(
         !env.globals
-            .keys()
-            .any(|name| name.starts_with("Data.Numeric.Nat.Order.")),
-        "Parsing must import the canonical owner without loading the Order facade"
+            .contains_key("Capability.Parsing.Parsing.cursor_nat_sub"),
+        "Parsing must not mint a local Nat subtraction"
     );
 
     let less_eq = env.globals["Capability.Parsing.Parsing.LessEqNat"];
@@ -367,6 +370,18 @@ fn parsing_reuses_the_canonical_lawful_classes_relation() {
     assert!(
         term_mentions(body, provider),
         "LessEqNat must retain the canonical provider GlobalId"
+    );
+
+    let sub = env.globals["Data.Numeric.Nat.Order.sub"];
+    assert!(env.env.transparent_body(sub).is_some());
+    let remaining = env.globals["Capability.Parsing.Parsing.byte_cursor_remaining"];
+    let remaining_body = match env.env.lookup(remaining) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("byte_cursor_remaining must be transparent, got {other:?}"),
+    };
+    assert!(
+        term_mentions(remaining_body, sub),
+        "byte_cursor_remaining must retain the canonical sub GlobalId"
     );
 }
 

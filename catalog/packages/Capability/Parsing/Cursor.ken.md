@@ -18,6 +18,10 @@ coordinate must use an explicit instance-specific conversion, such as
 `arg_location_origin` or `span_origin`, rather than infer one from `CursorOps`.
 
 ```ken
+import Data.Numeric.Nat.Arithmetic (add)
+
+import Data.Numeric.Nat.Order (sub)
+
 data CursorOps c el loc = MkCursorOps (c → Nat) (c → Option el) (c → c) (c → loc)
 
 fn cursor_remaining
@@ -111,22 +115,6 @@ fn arg_cursor_offset (cur : ArgCursor) : Nat =
     MkArgCursor args index offset ↦ offset
   }
 
-fn cursor_nat_add (a : Nat) (b : Nat) : Nat =
-  match b {
-    Zero ↦ a;
-    Suc b2 ↦ Suc (cursor_nat_add a b2)
-  }
-
-fn cursor_nat_sub (a : Nat) (b : Nat) : Nat =
-  match b {
-    Zero ↦ a;
-    Suc b2 ↦
-      match a {
-        Zero ↦ Zero;
-        Suc a2 ↦ cursor_nat_sub a2 b2
-      }
-  }
-
 fn cursor_nat_lt (a : Nat) (b : Nat) : Bool =
   match b {
     Zero ↦ False;
@@ -146,7 +134,7 @@ fn cursor_list_length (a : Type) (xs : List a) : Nat =
 fn arg_lengths_sum (args : List Bytes) : Nat =
   match args {
     Nil ↦ Zero;
-    Cons arg rest ↦ cursor_nat_add (arg_length arg) (arg_lengths_sum rest)
+    Cons arg rest ↦ add (arg_length arg) (arg_lengths_sum rest)
   }
 
 fn arg_remaining_from (args : List Bytes) (index : Nat) (offset : Nat) : Nat =
@@ -154,8 +142,7 @@ fn arg_remaining_from (args : List Bytes) (index : Nat) (offset : Nat) : Nat =
     Zero ↦
       match args {
         Nil ↦ Zero;
-        Cons arg rest ↦
-          cursor_nat_add (cursor_nat_sub (arg_length arg) offset) (arg_lengths_sum rest)
+        Cons arg rest ↦ add (sub (arg_length arg) offset) (arg_lengths_sum rest)
       };
     Suc index2 ↦
       match args {
