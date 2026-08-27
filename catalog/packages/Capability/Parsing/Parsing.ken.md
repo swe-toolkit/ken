@@ -39,6 +39,8 @@ they must.
 ```ken
 import Core.Classes.LawfulClasses (leq_nat)
 
+import Data.Numeric.Nat.Order (sub)
+
 fn IsUtf8 (bs : Bytes) : Prop =
   match bytes_decode bs {
     Err _ ↦ Bottom;
@@ -139,7 +141,7 @@ fn byte_cursor_position (cur : ByteCursor) : Nat =
   }
 
 fn byte_cursor_remaining (cur : ByteCursor) : Nat =
-  cursor_nat_sub (source_length (byte_cursor_source cur)) (byte_cursor_position cur)
+  sub (source_length (byte_cursor_source cur)) (byte_cursor_position cur)
 
 fn byte_cursor_peek (cur : ByteCursor) : Option UInt8 =
   nth UInt8 (byte_cursor_position cur) (bytes_to_list (source_bytes (byte_cursor_source cur)))

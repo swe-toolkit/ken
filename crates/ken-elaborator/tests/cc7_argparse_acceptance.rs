@@ -60,11 +60,18 @@ fn dependency_env() -> ElabEnv {
         (NONEMPTY_KEN_MD, "Data.Collections.NonEmpty"),
         (VALIDATION_KEN_MD, "Data.Sums.Validation"),
         (DIAGNOSTIC_KEN_MD, "Capability.Diagnostics.Core"),
-        (CURSOR_KEN_MD, "Capability.Parsing.Cursor"),
-        (DECODER_KEN_MD, "Capability.Parsing.Decoder"),
         (STRING_BIJECTION_KEN_MD, "Data.Text.StringBijection"),
         (STRING_KEYS_KEN_MD, "Data.Text.StringKeys"),
         (CODEC_KEN_MD, "Data.Text.Codec"),
+    ] {
+        env.elaborate_ken_md_file(source)
+            .unwrap_or_else(|err| panic!("{label} must elaborate in dependency order: {err:?}"));
+    }
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
+        .expect("Data.Numeric.Nat.Order must load before its Cursor consumer");
+    for (source, label) in [
+        (CURSOR_KEN_MD, "Capability.Parsing.Cursor"),
+        (DECODER_KEN_MD, "Capability.Parsing.Decoder"),
         (NUMERIC_KEN_MD, "Capability.Parsing.Numeric"),
         (PRETTY_KEN_MD, "Capability.Formatting.Doc"),
         (ARGUMENTS_KEN_MD, "Capability.Process.Arguments"),

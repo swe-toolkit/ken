@@ -23,6 +23,10 @@ fn dependency_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
+    env.elaborate_module_from_roots(&[catalog_root()], "Data.Numeric.Nat.Arithmetic")
+        .expect("canonical Nat arithmetic provider must elaborate third");
+    env.elaborate_module_from_roots(&[catalog_root()], "Data.Numeric.Nat.Order")
+        .expect("canonical Nat subtraction provider must elaborate third");
     env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("canonical Nat relation provider must elaborate third");
     env.elaborate_ken_md_file(DIAGNOSTIC_KEN_MD)
@@ -246,10 +250,6 @@ fn arguments_reuses_the_canonical_lawful_classes_relation() {
 
     let provider = env.globals["Core.Classes.LawfulClasses.leq_nat"];
     assert!(env.env.transparent_body(provider).is_some());
-    assert!(
-        !env.globals.contains_key("Data.Numeric.Nat.Order.sub"),
-        "Arguments must import the canonical owner without loading the Order facade"
-    );
     assert!(
         !env.globals
             .contains_key("Capability.Process.Arguments.argument_nat_leq"),

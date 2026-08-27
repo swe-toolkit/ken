@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{Decl, GlobalId};
+use ken_kernel::{Decl, GlobalId, Term};
 
 const DIAGNOSTIC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const CURSOR_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
@@ -20,6 +20,10 @@ fn dependency_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
+        .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
+        .expect("Data.Numeric.Nat.Order must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
     let lawful_prefix = "Core.Classes.LawfulClasses.";
@@ -48,6 +52,22 @@ fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
             "`{name}` must be a real transparent, kernel-checked term"
         );
     }
+}
+
+fn term_reference_count(term: &Term, target: GlobalId) -> usize {
+    usize::from(
+        matches!(
+            term,
+            Term::Const { id, .. }
+                | Term::IndFormer { id, .. }
+                | Term::Constructor { id, .. }
+                if *id == target
+        ) || matches!(term, Term::Elim { fam, .. } if *fam == target),
+    ) + term
+        .children()
+        .into_iter()
+        .map(|child| term_reference_count(child, target))
+        .sum::<usize>()
 }
 
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
@@ -251,6 +271,48 @@ fn cc3_checked_code_has_zero_axiom_and_zero_trusted_base_delta() {
         .expect("Capability.Parsing must elaborate");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "CC3 must add zero trusted-base entries");
+}
+
+/// Durable invariant: Cursor's checked operational bodies call the canonical
+/// Nat providers directly and add no trust or local replacement operation.
+#[test]
+fn cursor_reuses_canonical_nat_operations_with_zero_trust_delta() {
+    let mut env = dependency_env();
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_ken_md_file(CURSOR_KEN_MD)
+        .expect("Capability.Parsing.Cursor must elaborate");
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Cursor reuse must add zero trust");
+
+    for local in ["cursor_nat_add", "cursor_nat_sub"] {
+        assert!(
+            !env.globals.contains_key(local),
+            "Cursor must not mint local operation `{local}`"
+        );
+    }
+
+    let add = env.globals["Data.Numeric.Nat.Arithmetic.add"];
+    let sub = env.globals["Data.Numeric.Nat.Order.sub"];
+    assert!(env.env.transparent_body(add).is_some());
+    assert!(env.env.transparent_body(sub).is_some());
+
+    for (name, add_count, sub_count) in [("arg_lengths_sum", 1, 0), ("arg_remaining_from", 1, 1)] {
+        let id = env.globals[name];
+        let body = match env.env.lookup(id) {
+            Some(Decl::Transparent { body, .. }) => body,
+            other => panic!("{name} must be transparent, got {other:?}"),
+        };
+        assert_eq!(
+            term_reference_count(body, add),
+            add_count,
+            "{name} must call canonical add directly"
+        );
+        assert_eq!(
+            term_reference_count(body, sub),
+            sub_count,
+            "{name} must call canonical sub directly"
+        );
+    }
 }
 
 #[test]
