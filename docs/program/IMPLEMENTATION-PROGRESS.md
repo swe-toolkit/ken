@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-27 03:53:49Z — from 463 issue file(s) in `docs/program/issues/`.
+2026-08-27 04:23:01Z — from 463 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -154,7 +154,7 @@ the committed file matches the generator's output.
 | `LANG-FOREIGN-NAME-CONTROL-CHARS` | Escape decoding made `foreign` symbol and library names able to carry an embedded NUL, where the source text `\\0` previously reached the compiler as two harmless characters -- a NUL in a name that will cross a C-ABI boundary is the classic truncation vector, the declared and effective names silently differ, and there is no consumer today only because the loader path has not landed yet | merged | language | XS | none | 2128 |
 | `LANG-FOREIGN-NAME-FORMAT-CHARS` | Unicode Cf format characters -- bidi overrides, zero-width joiners, U+FEFF -- are a visual-spoofing vector at the same `foreign`-name trust boundary the Cc control-character check just closed, and they are a DIFFERENT vector: not truncation but two distinct declarations rendering identically to the reviewer doing the check | draft | language | XS | operator | — |
 | `LANG-GADT-SEQUENCE-TRACKER-GAP` | `34 §8` names four `SURF-gadt-*` build WPs and all four have frames in `docs/program/wp/` -- none has a tracker node, so `gen-progress.sh` shows the whole dependent-constructor area as absent, while the code has in fact moved past every one of the four frames' stated baselines | merged | language | S | none | — |
-| `LANG-INDEX-REFINEMENT-OMEGA-ARM` | Make dependent-match index refinement sort-general: of five classifier decisions in elab.rs, widen the re-indexed-position helper, the branch goal, and the hidden-result outer-binding prefilter to Type union Omega, transporting Omega-classified types by a direct J arm alongside the existing Type-plus-Cast arm, while both index-type classifiers stay Type-only | ready | language | M | none | — |
+| `LANG-INDEX-REFINEMENT-OMEGA-ARM` | Make dependent-match index refinement sort-general: of five classifier decisions in elab.rs, widen the re-indexed-position helper, the branch goal, and the hidden-result outer-binding prefilter to Type union Omega, transporting Omega-classified types by a direct J arm alongside the existing Type-plus-Cast arm, while both index-type classifiers stay Type-only | active | language | M | none | — |
 | `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` | Transport the mutual-recursion sibling-call result along the dependent-match refinement equality at the elaboration boundary, so the source branch reconciles a recursive-group call's concrete indexed result with the refined motive index -- route (c) genuine J/cast transport over a PROPOSITIONAL equality via c-elab roster-aware auto-transport (the c-proof/c-elab fork RESOLVED to c-elab: D0 measured no lawful existing source carrier), surfacing the recursive-group roster into ElabCtx and inserting the transport at the equality-holding seam, NOT the reflexive same-owner discharge and NOT a new source-language carrier; the elaborator prerequisite V3-FO-CHECKER-SOUNDNESS D3 is blocked on | closed | language | M | none | — |
 | `LANG-INFIX-APPLICATION-DEFAULT` | with symbolic operator names defined, `a <+> b` must parse as application of `<+>` at the normative default `infixl 9` -- one precedence level in the existing cascade, and it needs no fixity table | draft | language | S | none | — |
 | `LANG-INTERVENING-LET-FRAME-WEAKENING` | An intervening let between an outer match's premise and a nested match reaches install_index_refinements and dies in refine_branch_goal with 'could not classify the branch goal: TypeMismatch' -- and the Architect refused 'orthogonal', because the reported found term carries LANG-CONVOY's own D1 signature and there is an influence path through RVar resolution | active | language | S | none | — |
@@ -510,7 +510,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `ABI-M1` — manifest v2 — family-scoped, versioned, generated from family schemas
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
-- `LANG-INDEX-REFINEMENT-OMEGA-ARM` — Make dependent-match index refinement sort-general: of five classifier decisions in elab.rs, widen the re-indexed-position helper, the branch goal, and the hidden-result outer-binding prefilter to Type union Omega, transporting Omega-classified types by a direct J arm alongside the existing Type-plus-Cast arm, while both index-type classifiers stay Type-only
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
 - `LANG-SYMBOLIC-OPERATOR-NAMES` — `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined
@@ -567,7 +566,7 @@ is itself not yet `merged`/`closed`:
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` blocked by `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
-- `V3-FO-EMBEDDING-ADEQUACY` blocked by `LANG-INDEX-REFINEMENT-OMEGA-ARM` (status: ready)
+- `V3-FO-EMBEDDING-ADEQUACY` blocked by `LANG-INDEX-REFINEMENT-OMEGA-ARM` (status: active)
 
 ## Gate progress
 
