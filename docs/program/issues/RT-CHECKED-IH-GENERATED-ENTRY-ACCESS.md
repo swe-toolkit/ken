@@ -11,9 +11,9 @@ github: null
 origin: "Runtime hard stop 7 on RT-RESULT-CONTINUATION-BINDING-PROVENANCE (runtime-implementer evt_dqa3989tfmm2; leader routing evt_7fhdmyaqk4371). Architect HS7 component ruling evt_1z1p9t4tdyd2v ruled the repeated last-gap decomposition itself the design defect and forbade a fourth narrow predecessor. The first cut of this node carried a static context-split contract; Runtime hard-stopped on it (HS8, runtime-implementer evt_799ckhz4kgtcd, leader evt_27rha2k9cyv2v) and Architect evt_14hwxs5q2j087 independently reproduced the refutation at exact 1403722a2e70d192a6c4d283ca4dd2e6345c3c55. The Steward then triggered one bounded Research graph advisory (trigger evt_1cr1trmmzpr54, advisory evt_2ffs47ax5gbnn), which measured the closed six-row relation and found the sole destination-coordinate collision agrees on the consumer projection — selecting the confluence/quotient branch by the ruling's own stated condition. Architect evt_3myrd8sp2tp8n supplied the mechanism this recut is written to. Steward-owned frame. D3A stays frozen and non-landable; after this predecessor lands through ordinary gates the Steward must EXPLICITLY re-release the same atomic D3A+D3B consumer — landing alone authorizes nothing."
 ---
 
-> # SYMPTOM INVENTORY — FOUR HARD STOPS ON ONE ACCESSOR. READ THIS FIRST.
+> # SYMPTOM INVENTORY — FIVE HARD STOPS ON ONE ACCESSOR. READ THIS FIRST.
 >
-> This node exists because the same accessor produced four consecutive stops,
+> This node exists because the same accessor produced five consecutive stops,
 > each of which looked like a missing field and was not. Seeded per Architect
 > `evt_3myrd8sp2tp8n`; it is the frame's memory, not decoration.
 >
@@ -37,6 +37,45 @@ origin: "Runtime hard stop 7 on RT-RESULT-CONTINUATION-BINDING-PROVENANCE (runti
 >   4}`, not `{A, B}`**. A census proving non-functionality in the
 >   destination-inheritance frame does not license a remedy that must execute in
 >   the caller frame. The two frames share no discriminator.
+> - **HS9 — consumer-adjacent representation premise.** THIS NODE'S OWN SECOND
+>   CUT, and the reason section 5 is currently unsatisfiable as written. Section
+>   5 requires an in-range `Value(Carried(_))` at the exact immediate locator.
+>   On exact `56c51fe315ba9ac4d8c020f20b40e2631d6018b4` / tree
+>   `6401ac7df7b370de1c5162e5d4286f15e5e31216`, the binding at that locator is
+>   `Value(Specialized(_))`, so the governed command fails closed before
+>   emission (runtime-implementer `evt_24fwbvyh76hr3`, leader
+>   `evt_7fegbj3w2gj6h`).
+>
+> **HS9 falsifies section 5's representation premise and NOTHING ELSE — the rest
+> of this recut was confirmed by reaching the stop.** The planner-owned
+> seven-field quotient, the typed confluence projection, exact source-specific
+> reopening, the audited retarget caller, the five set closures, sanitized
+> per-context access, the three-field install, and the single exact
+> `BTreeMap::get` all compiled, and that sanitized route selected the seat and
+> indexed the named environment with the exact governed facts: context 0;
+> binding `(frame 301, position 1)`; invocation/call/callee `305/304/303`;
+> locator domain `ImmediateInvocationEnvironment`, index 0; environment length
+> 13. **Confluence, source identity, lookup, and seat selection all held.** This
+> is a positive result for the mechanism, reported as a stop.
+>
+> **The stop is clean and Runtime was right to take it.** No candidate, no `K`
+> application, no `R2` binding, branch restored. Accepting `Specialized`,
+> converting it to `Carried`, moving environments, or choosing another seat
+> would each change or weaken the frame, and Runtime refused all four rather
+> than closing the gap by weakening its own acceptance condition.
+>
+> **HELD — do not recut section 5 yet.** HS9 triggers the mandatory ninth-stop
+> Research advisory, and the Architect is holding the `Specialized`-versus-
+> `Carried` ruling rather than grinding a mechanism in parallel
+> (`evt_18e2zbvbsanty`).
+> Advisory reach is this predecessor and the two unchanged witnesses; it is
+> advisory only and does not select the design. Evidence preserved outside the
+> worktree: note SHA-256
+> `e55a964c1e24bb6b7c9fa7b1e8b3b13623c9d93da8a54328e603afefbbc2ea00`, 1,142-line
+> implementation/probe diff
+> `a504efc558a87e1fd2921f29e7e019b361ba27de53ce389f3241c6c302a96bc4`, run log
+> `932b08b730c64b27e2877d11513ede7a923de25eee7e9dd33af4bff4a03db950`.
+> D3A+D3B remain frozen.
 >
 > **The HS8 defect was the Steward's, not the measurement's.** Research answered
 > the destination-frame question it was asked, inside a stated boundary, and
@@ -303,6 +342,13 @@ construction and validation, but **cannot be lowering authority, because HS8
 proved source identity absent there.**
 
 ### 5. The consumer-adjacent seat
+
+> **HS9 STOPPED HERE — this section's `Value(Carried(_))` requirement is
+> unsatisfiable as written at exact `56c51fe31`; the binding is
+> `Value(Specialized(_))`. HELD pending the ninth-stop Research advisory and
+> the Architect's ruling (`evt_18e2zbvbsanty`). Everything in sections 1-4 was
+> confirmed by reaching this stop. Do not recut this section, and do not accept
+> or convert `Specialized`, before the ruling. See the symptom inventory.**
 
 At the real D3A seat, the predecessor instrument uses the returned projection to
 require `ImmediateInvocationEnvironment`, an in-range `Value(Carried(_))`, and

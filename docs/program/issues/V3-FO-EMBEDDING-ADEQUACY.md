@@ -5,11 +5,48 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
+
+> # D2 HELD 2026-08-27 behind an elaborator predecessor — Architect evt_pw69nxgxn99j
+>
+> D1 has landed. **D2 hard-stopped immediately on release** and the Language
+> ring is held. Eliminating the proof-indexed `FokDerivation` with
+> index-dependent Omega evidence fails elaboration:
+> `index refinement: ... not classified by a Type universe, found Ω0`
+> (language-implementer `evt_74q124wnb3zaf`, leader `evt_5fxgv9eeqm68f`; the
+> minimal `Probe` reproduces, ordinary indexed-family and unindexed `FokCert`
+> controls pass). The Steward routed it without diagnosing it
+> (`evt_nrvb2atg0xay`).
+>
+> **The Architect ruled the route VIABLE** (`evt_pw69nxgxn99j`, superseding
+> `evt_1wnk1ek4s8sgj`). The defect is in the elaborator, not here:
+>
+> - It is **not** prohibited elimination out of Omega. D2 eliminates
+>   `‖FokDerivation s‖` into the Omega-valued denotation, and its method
+>   eliminates the Type-inductive `FokDerivation s` into an Omega motive. Both
+>   permitted.
+> - It is **not** a re-representation fork and **not** a TCB question. Kernel
+>   `J` already transports index-dependent Omega evidence and kernel-checks the
+>   result.
+> - No additional discriminator is needed.
+>
+> **Nothing in this node is re-cut.** The premise, the validity statement,
+> `fok_classically_valid`, `FokDerivation`, and D1 are all unchanged and
+> explicitly not authorized to change. What changed is that D2 now has a
+> `depends_on` predecessor: [[LANG-INDEX-REFINEMENT-OMEGA-ARM]].
+>
+> Evidence commit `3f687a460f4399bd1204a03ca8cbb57cad75eb92` (tree
+> `15f2d977e`, `+126`, blob `c9eefe4e5`, 2/2 passing; independently reproduced
+> by the Architect) is **held transition evidence, not a D2 candidate**. Do not
+> advance it toward one.
+>
+> **The ring resumes only on an explicit Steward re-release** after the
+> predecessor lands through publisher CI. The predecessor landing does not by
+> itself release D2.
 
 > # FRAMED 2026-08-22 — the second route-FO `proved` theorem, on the structural arm
 >
