@@ -947,11 +947,14 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
 /// this witness while preserving quotient membership and exact-capsule reach.
 ///
 /// **MEASURED:** the two fixed products' complete governed certificate classes,
-/// installation state, and successful six-conjunct validation observations.
+/// installation state, typed direct/loop producer projections, and successful
+/// terminal validation observations.
 /// **CLAIMED:** W0/W1 share one typed projection while context-sharing siblings
-/// remain separate, and every governed key is reached at least once.
+/// remain separate, every governed key is reached, and both producer variants
+/// retain their exact typed edge coordinates.
 /// **THE GAP:** the fixed coordinate table is independent of the certificate
-/// builder and is paired with population-side disagreement mutations below.
+/// builder and is paired with population-side disagreement mutations below;
+/// numeric origins remain transition witnesses rather than durable authority.
 #[test]
 fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
     in_generated_entry_stack_thread("rt-parity-generated-entry-confluence", || {
@@ -989,6 +992,23 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
         assert_eq!(collision.locator_index, 0);
         assert_eq!(collision.locator_domain, "ImmediateInvocationEnvironment");
         assert!(
+            collision
+                .fresh_result_producer
+                .starts_with("DirectInvocationResult"),
+            "the exact governed invocation-return edge is the direct producer: {collision:?}"
+        );
+        for coordinate in [
+            "invocation_origin: StaticOriginId(741)",
+            "call_origin: StaticOriginId(740)",
+            "callee_origin: StaticOriginId(739)",
+            "binding: CheckedIhBinding { frame_origin: StaticOriginId(737), recursive_position: 1 }",
+        ] {
+            assert!(
+                collision.fresh_result_producer.contains(coordinate),
+                "the direct producer must retain {coordinate}: {collision:?}"
+            );
+        }
+        assert!(
             collision.reached_count > 0,
             "the real collision certificate is reused by at least one arrival"
         );
@@ -999,6 +1019,24 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
             .expect("W2 stays separate despite sharing the context");
         assert_eq!(write_singleton.members.len(), 1);
         assert_ne!(write_singleton.callee_origin, collision.callee_origin);
+        assert!(
+            write_singleton
+                .fresh_result_producer
+                .starts_with("CarriedLoopExitResult"),
+            "the active self-resumption must name the carried-loop producer: {write_singleton:?}"
+        );
+        for coordinate in [
+            "invocation_origin: StaticOriginId(529)",
+            "call_origin: StaticOriginId(528)",
+            "callee_origin: StaticOriginId(527)",
+            "active_frame_origin: StaticOriginId(525)",
+            "ret_case_body_origin: StaticOriginId(691)",
+        ] {
+            assert!(
+                write_singleton.fresh_result_producer.contains(coordinate),
+                "the loop producer must retain {coordinate}: {write_singleton:?}"
+            );
+        }
         for row in read.iter().chain(&write) {
             assert!(row.installed, "every certificate key is installed: {row:?}");
             assert!(
@@ -1356,6 +1394,14 @@ fn assert_generated_entry_mutation_child() {
         "fresh-capture-ordinal" => Mutation::FreshCaptureOrdinal,
         "fresh-capture-occurrence" => Mutation::FreshCaptureOccurrence,
         "fresh-body-reads" => Mutation::FreshBodyReadMembership,
+        "producer-removal" => Mutation::ProducerRemoval,
+        "producer-duplication" => Mutation::ProducerDuplication,
+        "producer-cross-variant" => Mutation::ProducerCrossVariant,
+        "producer-wrong-active-frame" => Mutation::ProducerWrongActiveFrame,
+        "producer-wrong-direct-edge" => Mutation::ProducerWrongDirectEdge,
+        "producer-wrong-loop-edge" => Mutation::ProducerWrongLoopEdge,
+        "producer-wrong-governed-key" => Mutation::ProducerWrongGovernedKey,
+        "producer-disagreement" => Mutation::ProducerDisagreement,
         "remove-member" => Mutation::RemoveFirstMember,
         "duplicate-member" => Mutation::DuplicateFirstMember,
         "filter-member" => Mutation::FilterCollidingMember,
@@ -1374,10 +1420,18 @@ fn assert_generated_entry_mutation_child() {
 }
 
 /// **Promise class: durable invariant.** Every quotient-key weakening,
-/// projection disagreement, and set-membership corruption must reject before a
-/// certificate can be published.
+/// projection disagreement, producer corruption, and set-membership corruption
+/// must reject before a certificate can be published.
+///
+/// **MEASURED:** each population-side mutation changes one real relation field
+/// or membership operation and reaches its named planner refusal.
+/// **CLAIMED:** the governed projection carries exactly one typed producer, and
+/// quotient members agree on that producer before publication.
+/// **THE GAP:** the direct and loop same-shape positives live in
+/// `checked_ih_generated_entry_confluence_reaches_exact_capsules`; these
+/// mutation children establish rejection, not positive producer reach.
 #[test]
-fn checked_ih_generated_entry_confluence_mutations_reject() {
+fn checked_ih_generated_entry_confluence_and_producer_mutations_reject() {
     if std::env::var_os(GENERATED_ENTRY_MUTATION_CHILD).is_some() {
         in_generated_entry_stack_thread(
             "rt-parity-generated-entry-mutation-child",
@@ -1409,6 +1463,35 @@ fn checked_ih_generated_entry_confluence_mutations_reject() {
         ("fresh-capture-ordinal", projection_disagreement),
         ("fresh-capture-occurrence", projection_disagreement),
         ("fresh-body-reads", projection_disagreement),
+        (
+            "producer-removal",
+            "governed fresh-result producer population is absent",
+        ),
+        (
+            "producer-duplication",
+            "governed fresh-result producer population is ambiguous",
+        ),
+        (
+            "producer-cross-variant",
+            "producer variant contradicts its exact direct-transport partition",
+        ),
+        (
+            "producer-wrong-active-frame",
+            "producer active frame/eliminator is not the exact governed frame",
+        ),
+        (
+            "producer-wrong-direct-edge",
+            "direct fresh-result producer does not name the exact governed CheckedComputationalIHInvocationReturn edge",
+        ),
+        (
+            "producer-wrong-loop-edge",
+            "producer does not name the exact merge/result edge",
+        ),
+        (
+            "producer-wrong-governed-key",
+            "producer does not name its governed call key",
+        ),
+        ("producer-disagreement", projection_disagreement),
         ("remove-member", "not equal as sets"),
         ("duplicate-member", "inserted twice"),
         ("filter-member", "not equal as sets"),
@@ -1416,7 +1499,7 @@ fn checked_ih_generated_entry_confluence_mutations_reject() {
     for (mode, expected) in cases {
         let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
             .arg("--exact")
-            .arg("checked_ih_generated_entry_confluence_mutations_reject")
+            .arg("checked_ih_generated_entry_confluence_and_producer_mutations_reject")
             .arg("--nocapture")
             .env(GENERATED_ENTRY_MUTATION_CHILD, mode)
             .env_remove("RUST_MIN_STACK")
@@ -1618,8 +1701,18 @@ fn checked_ih_generated_entry_confluence_is_interning_and_inheritance_order_inde
     });
 }
 
+/// **Promise class: durable invariant.**
+///
+/// **MEASURED:** the exact inheritance-to-producer planner chain and the
+/// upstream-suppressed chain emit identical semantic hashes, executable hashes,
+/// and executable bytes.
+/// **CLAIMED:** adding the fresh-result producer proof changes no ABI, call, or
+/// emitted behavior.
+/// **THE GAP:** suppression removes the producer with its upstream inheritance;
+/// the production-use review separately establishes that the producer's only
+/// consumer is the pre-dispatch validation guard.
 #[test]
-fn checked_ih_continuation_inheritance_is_byte_inert() {
+fn checked_ih_inheritance_and_fresh_result_producer_are_byte_inert() {
     in_large_stack_thread("rt-parity-continuation-inheritance-inert", || {
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
         let exact_root = output_dir("continuation-inheritance-inert-exact");
@@ -1661,7 +1754,7 @@ fn checked_ih_continuation_inheritance_is_byte_inert() {
             std::fs::read(&exact.artifact.executable_path).expect("exact executable bytes"),
             std::fs::read(&suppressed.artifact.executable_path)
                 .expect("suppressed executable bytes"),
-            "planner-only continuation inheritance must change no emitted ABI, call, or artifact byte"
+            "planner-only inheritance and fresh-result producer proofs must change no emitted ABI, call, or artifact byte"
         );
         assert!(ken_runtime::checked_ih_continuation_inheritance_mutation_is_exact());
     });

@@ -4094,6 +4094,16 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 "the governed recursor capsule disagrees with the checked frame, slot, call template, or residual phase",
             ));
         }
+        if !projection.fresh_result_producer.matches_governed_arrival(
+            pending.invocation_origin,
+            pending.application_origin,
+            callee_origin,
+        ) {
+            return Err(unsupported(
+                "CheckedIhFreshResultProducer",
+                "the governed fresh-result producer does not match the exact invocation/result edge",
+            ));
+        }
 
         let _fresh_result_destination = projection.fresh_result_destination();
         Ok(binding)

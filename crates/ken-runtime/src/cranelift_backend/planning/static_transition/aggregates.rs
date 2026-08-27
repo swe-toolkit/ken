@@ -320,6 +320,30 @@ pub(in crate::cranelift_backend) struct CheckedIhFreshResultDestination {
     body_capture_reads: Vec<StaticOriginId>,
 }
 
+/// The exact emitted control edge that produces one governed K application's
+/// fresh dynamic result. This is a sibling of K inheritance and the result
+/// destination: neither variant contains a result value or capture coordinate.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum CheckedIhFreshResultProducer {
+    /// The governed checked invocation's own typed return edge produces the
+    /// result through an existing planner-authorized environment transport.
+    DirectInvocationResult {
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+        binding: CheckedIhBinding,
+    },
+    /// Tail self-resumption enters the already-emitted carried header and the
+    /// active frame's ordinary Ret body supplies the unique merge result.
+    CarriedLoopExitResult {
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+        active_frame_origin: StaticOriginId,
+        ret_case_body_origin: StaticOriginId,
+    },
+}
+
 /// One planner-only continuation-inheritance projection of an existing
 /// checked-IH environment transport.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -356,6 +380,7 @@ pub(in crate::cranelift_backend) struct CheckedIhGeneratedEntryProjection {
     destination_body_origin: StaticOriginId,
     binding: CheckedIhBinding,
     immediate_k_locator: CheckedIhImmediateKBindingLocator,
+    pub(in crate::cranelift_backend) fresh_result_producer: CheckedIhFreshResultProducer,
     fresh_result_destination: CheckedIhFreshResultDestination,
 }
 
@@ -499,6 +524,36 @@ impl CheckedIhGeneratedEntryProjection {
         &self,
     ) -> &CheckedIhFreshResultDestination {
         &self.fresh_result_destination
+    }
+}
+
+impl CheckedIhFreshResultProducer {
+    pub(in crate::cranelift_backend) fn matches_governed_arrival(
+        &self,
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+    ) -> bool {
+        match self {
+            Self::DirectInvocationResult {
+                invocation_origin: expected_invocation,
+                call_origin: expected_call,
+                callee_origin: expected_callee,
+                ..
+            } => {
+                (*expected_invocation, *expected_call, *expected_callee)
+                    == (invocation_origin, call_origin, callee_origin)
+            }
+            Self::CarriedLoopExitResult {
+                invocation_origin: expected_invocation,
+                call_origin: expected_call,
+                callee_origin: expected_callee,
+                ..
+            } => {
+                (*expected_invocation, *expected_call, *expected_callee)
+                    == (invocation_origin, call_origin, callee_origin)
+            }
+        }
     }
 }
 
@@ -772,6 +827,7 @@ pub struct CheckedIhGeneratedEntryObservation {
     pub locator_callee_origin: u32,
     pub locator_domain: String,
     pub locator_index: u32,
+    pub fresh_result_producer: String,
     pub fresh_result_destination: String,
     pub installed: bool,
     pub reached_count: usize,
@@ -862,6 +918,14 @@ pub enum CheckedIhGeneratedEntryConfluenceMutation {
     FreshCaptureOrdinal,
     FreshCaptureOccurrence,
     FreshBodyReadMembership,
+    ProducerRemoval,
+    ProducerDuplication,
+    ProducerCrossVariant,
+    ProducerWrongActiveFrame,
+    ProducerWrongDirectEdge,
+    ProducerWrongLoopEdge,
+    ProducerWrongGovernedKey,
+    ProducerDisagreement,
     RemoveFirstMember,
     DuplicateFirstMember,
     FilterCollidingMember,
@@ -1020,6 +1084,7 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                 locator_callee_origin: confluence.projection.immediate_k_locator.callee_origin.0,
                 locator_domain: format!("{:?}", confluence.projection.immediate_k_locator.environment_domain),
                 locator_index: confluence.projection.immediate_k_locator.environment_index,
+                fresh_result_producer: format!("{:?}", confluence.projection.fresh_result_producer),
                 fresh_result_destination: format!("{:?}", confluence.projection.fresh_result_destination),
                 installed: false,
                 reached_count: 0,
@@ -4955,6 +5020,250 @@ fn generated_entry_retarget_caller(
     })
 }
 
+fn checked_ih_fresh_result_producer(
+    plan: &StaticTransitionPlan<'_>,
+    inheritance: &CheckedIhContinuationInheritance,
+    final_step: &CheckedIhSelfResumptionStep,
+) -> Result<CheckedIhFreshResultProducer, CraneliftBackendError> {
+    let RuntimeExpr::CheckedComputationalIHInvocation { .. } =
+        plan.planned_occurrence_expr(final_step.invocation_origin)?
+    else {
+        return Err(planner_error(
+            "a fresh-result producer invocation is not a checked computational-IH invocation",
+        ));
+    };
+    let invocation_body = plan
+        .semantic
+        .child_origin(final_step.invocation_origin, 0)?;
+    if invocation_body != final_step.call_origin {
+        return Err(planner_error(
+            "a fresh-result producer invocation does not contain its exact governed call",
+        ));
+    }
+    let RuntimeExpr::Call { args, .. } = plan.planned_occurrence_expr(final_step.call_origin)?
+    else {
+        return Err(planner_error(
+            "a fresh-result producer governed call is not a source Call",
+        ));
+    };
+    if !args.is_empty()
+        || plan.semantic.child_origin(final_step.call_origin, 0)? != final_step.callee_origin
+    {
+        return Err(planner_error(
+            "a fresh-result producer governed call disagrees with its exact zero-argument callee edge",
+        ));
+    }
+
+    let direct_transport = plan.checked_ih_environment_transport_for_invocation(
+        inheritance.capability.destination_owner,
+        None,
+        final_step.callee_binding.frame_origin,
+        final_step.callee_binding.recursive_position,
+    )?;
+    let exact = if let Some(_transport) = direct_transport {
+        CheckedIhFreshResultProducer::DirectInvocationResult {
+            invocation_origin: final_step.invocation_origin,
+            call_origin: final_step.call_origin,
+            callee_origin: final_step.callee_origin,
+            binding: final_step.callee_binding,
+        }
+    } else {
+        if inheritance.fresh_result_destination.active_frame_origin
+            != final_step.callee_binding.frame_origin
+            || !checked_ih_escape_subtree_contains(
+                plan,
+                final_step.selected_case_body_origin,
+                final_step.invocation_origin,
+            )?
+        {
+            return Err(planner_error(
+                "a carried-loop fresh-result producer has no exact typed self-resumption frame",
+            ));
+        }
+        CheckedIhFreshResultProducer::CarriedLoopExitResult {
+            invocation_origin: final_step.invocation_origin,
+            call_origin: final_step.call_origin,
+            callee_origin: final_step.callee_origin,
+            active_frame_origin: final_step.callee_binding.frame_origin,
+            ret_case_body_origin: inheritance.fresh_result_destination.ret_case_body_origin,
+        }
+    };
+
+    #[allow(unused_mut)]
+    let mut candidates = vec![exact];
+    #[cfg(feature = "px8-ds-test-support")]
+    {
+        use CheckedIhGeneratedEntryConfluenceMutation as Mutation;
+        let mutation = GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get);
+        match mutation {
+            Mutation::ProducerRemoval => candidates.clear(),
+            Mutation::ProducerDuplication => candidates.push(candidates[0].clone()),
+            Mutation::ProducerCrossVariant => {
+                if matches!(
+                    candidates.first(),
+                    Some(CheckedIhFreshResultProducer::DirectInvocationResult { .. })
+                ) {
+                    candidates[0] = CheckedIhFreshResultProducer::CarriedLoopExitResult {
+                        invocation_origin: final_step.invocation_origin,
+                        call_origin: final_step.call_origin,
+                        callee_origin: final_step.callee_origin,
+                        active_frame_origin: final_step.callee_binding.frame_origin,
+                        ret_case_body_origin: inheritance
+                            .fresh_result_destination
+                            .ret_case_body_origin,
+                    };
+                }
+            }
+            Mutation::ProducerWrongActiveFrame => {
+                if let Some(CheckedIhFreshResultProducer::CarriedLoopExitResult {
+                    active_frame_origin,
+                    ..
+                }) = candidates.first_mut()
+                {
+                    active_frame_origin.0 = active_frame_origin.0.wrapping_add(1);
+                }
+            }
+            Mutation::ProducerWrongDirectEdge => {
+                if let Some(CheckedIhFreshResultProducer::DirectInvocationResult {
+                    binding,
+                    ..
+                }) = candidates.first_mut()
+                {
+                    binding.frame_origin.0 = binding.frame_origin.0.wrapping_add(1);
+                }
+            }
+            Mutation::ProducerWrongLoopEdge => {
+                if let Some(CheckedIhFreshResultProducer::CarriedLoopExitResult {
+                    ret_case_body_origin,
+                    ..
+                }) = candidates.first_mut()
+                {
+                    ret_case_body_origin.0 = ret_case_body_origin.0.wrapping_add(1);
+                }
+            }
+            Mutation::ProducerWrongGovernedKey => match candidates.first_mut() {
+                Some(CheckedIhFreshResultProducer::DirectInvocationResult {
+                    call_origin, ..
+                })
+                | Some(CheckedIhFreshResultProducer::CarriedLoopExitResult {
+                    call_origin, ..
+                }) => call_origin.0 = call_origin.0.wrapping_add(1),
+                None => {}
+            },
+            _ => {}
+        }
+    }
+    let producer = match candidates.as_slice() {
+        [] => {
+            return Err(planner_error(
+                "the governed fresh-result producer population is absent",
+            ))
+        }
+        [producer] => producer.clone(),
+        _ => {
+            return Err(planner_error(
+                "the governed fresh-result producer population is ambiguous",
+            ))
+        }
+    };
+
+    match &producer {
+        CheckedIhFreshResultProducer::DirectInvocationResult {
+            invocation_origin,
+            call_origin,
+            callee_origin,
+            binding,
+        } => {
+            if (*invocation_origin, *call_origin, *callee_origin)
+                != (
+                    final_step.invocation_origin,
+                    final_step.call_origin,
+                    final_step.callee_origin,
+                )
+            {
+                return Err(planner_error(
+                    "the fresh-result producer does not name its governed call key",
+                ));
+            }
+            if *binding != final_step.callee_binding {
+                return Err(planner_error(
+                    "the direct fresh-result producer does not name the exact governed CheckedComputationalIHInvocationReturn edge",
+                ));
+            }
+            if direct_transport.is_none() {
+                return Err(planner_error(
+                    "the direct fresh-result producer has no exact typed invocation transport",
+                ));
+            }
+        }
+        CheckedIhFreshResultProducer::CarriedLoopExitResult {
+            invocation_origin,
+            call_origin,
+            callee_origin,
+            active_frame_origin,
+            ret_case_body_origin,
+        } => {
+            if (*invocation_origin, *call_origin, *callee_origin)
+                != (
+                    final_step.invocation_origin,
+                    final_step.call_origin,
+                    final_step.callee_origin,
+                )
+            {
+                return Err(planner_error(
+                    "the carried-loop fresh-result producer does not name its governed call key",
+                ));
+            }
+            if direct_transport.is_some() {
+                return Err(planner_error(
+                    "the fresh-result producer variant contradicts its exact direct-transport partition",
+                ));
+            }
+            if *active_frame_origin != final_step.callee_binding.frame_origin
+                || !matches!(
+                    plan.planned_occurrence_expr(*active_frame_origin)?,
+                    RuntimeExpr::ComputationalMatch { .. }
+                )
+            {
+                return Err(planner_error(
+                    "the carried-loop fresh-result producer active frame/eliminator is not the exact governed frame",
+                ));
+            }
+            if *ret_case_body_origin != inheritance.fresh_result_destination.ret_case_body_origin {
+                return Err(planner_error(
+                    "the carried-loop fresh-result producer does not name the exact merge/result edge",
+                ));
+            }
+            let RuntimeExpr::ComputationalMatch { cases, .. } =
+                plan.planned_occurrence_expr(*active_frame_origin)?
+            else {
+                unreachable!("the exact active-frame check matched above")
+            };
+            let mut matching_ret_bodies = 0usize;
+            for (alternative, case) in cases.iter().enumerate() {
+                if case.recursive_positions.is_empty()
+                    && plan
+                        .semantic
+                        .child_origin(*active_frame_origin, 1 + alternative)?
+                        == *ret_case_body_origin
+                {
+                    matching_ret_bodies = matching_ret_bodies.checked_add(1).ok_or_else(|| {
+                        planner_capacity_error(
+                            "carried-loop fresh-result producer result-edge count exhausted",
+                        )
+                    })?;
+                }
+            }
+            if matching_ret_bodies != 1 {
+                return Err(planner_error(
+                    "the carried-loop fresh-result producer merge/result edge is not one exact ordinary case body",
+                ));
+            }
+        }
+    }
+    Ok(producer)
+}
+
 fn checked_ih_generated_entry_row(
     plan: &StaticTransitionPlan<'_>,
     inheritance: &CheckedIhContinuationInheritance,
@@ -5016,6 +5325,8 @@ fn checked_ih_generated_entry_row(
             planner_error("a reopened generated-entry view has no unique immediate K locator")
         })?
         .clone();
+    let fresh_result_producer =
+        checked_ih_fresh_result_producer(plan, inheritance, final_step)?;
     let coordinate = CheckedIhGeneratedEntryCoordinate {
         context: context.id(),
         enclosing_specialization,
@@ -5030,6 +5341,7 @@ fn checked_ih_generated_entry_row(
         destination_body_origin: view.capability().destination_body_origin(),
         binding: final_step.callee_binding,
         immediate_k_locator,
+        fresh_result_producer,
         fresh_result_destination: view.fresh_result_destination().clone(),
     };
     let retarget_caller = generated_entry_retarget_caller(plan, enclosing_specialization)?;
@@ -5162,6 +5474,14 @@ fn mutate_checked_ih_generated_entry_projection(
         | Mutation::ContextOnlyKey
         | Mutation::SourceIdentityInKey
         | Mutation::ProjectionInKey
+        | Mutation::ProducerRemoval
+        | Mutation::ProducerDuplication
+        | Mutation::ProducerCrossVariant
+        | Mutation::ProducerWrongActiveFrame
+        | Mutation::ProducerWrongDirectEdge
+        | Mutation::ProducerWrongLoopEdge
+        | Mutation::ProducerWrongGovernedKey
+        | Mutation::ProducerDisagreement
         | Mutation::RemoveFirstMember
         | Mutation::DuplicateFirstMember
         | Mutation::FilterCollidingMember
@@ -5239,6 +5559,23 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                             .clone();
                     }
                     Mutation::FilterCollidingMember => continue,
+                    Mutation::ProducerDisagreement => {
+                        match &mut projection.fresh_result_producer {
+                            CheckedIhFreshResultProducer::DirectInvocationResult {
+                                invocation_origin,
+                                ..
+                            } => {
+                                invocation_origin.0 = invocation_origin.0.wrapping_add(1)
+                            }
+                            CheckedIhFreshResultProducer::CarriedLoopExitResult {
+                                ret_case_body_origin,
+                                ..
+                            } => {
+                                ret_case_body_origin.0 =
+                                    ret_case_body_origin.0.wrapping_add(1)
+                            }
+                        }
+                    }
                     _ => mutate_checked_ih_generated_entry_projection(
                         &mut projection,
                         mutation,
@@ -5258,7 +5595,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
             Some(confluence) => {
                 if confluence.projection != projection {
                     return Err(planner_error(
-                        "source-specific inheritances at one generated entry disagree on their typed consumer projection",
+                        "source-specific inheritances at one generated entry disagree on their typed consumer projection, including the fresh-result producer",
                     ));
                 }
                 if confluence.retarget_caller != retarget_caller {
