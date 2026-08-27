@@ -655,6 +655,9 @@ fn interleaved_let_alias_of_enclosing_field_rejects_differently_under_region_set
 /// shape, but any Omega-classified field depending on the refined index must
 /// remain structurally eliminable through the direct-J position arm. The base
 /// blob rejects this exact program with the former Type-only diagnostic.
+/// MEASURED: the held source accepts and its transparent body kernel-checks.
+/// CLAIMED: decision 1 admits Omega re-indexed positions. THE GAP: the field is
+/// unused here; the used-evidence direction control below closes that gap.
 #[test]
 fn omega_classified_reindexed_position_uses_kernel_checked_transport() {
     let mut env = mk_env();
@@ -678,6 +681,10 @@ fn omega_classified_reindexed_position_uses_kernel_checked_transport() {
 /// on the refined index, and the branch applies the consumer to that evidence.
 /// Reversing old/new generalization in the direct-J constructor must reject
 /// this used-evidence path rather than merely change an unobserved proof term.
+/// Promise class: durable invariant.
+/// MEASURED: refined evidence reaches a consumer keyed to the outer index.
+/// CLAIMED: direct J transports old to new. THE GAP: the mutation campaign
+/// independently reverses the production constructor and requires this red.
 #[test]
 fn omega_reindexed_evidence_is_consumed_in_the_ruled_direction() {
     let mut env = mk_env();
@@ -708,6 +715,10 @@ fn omega_reindexed_evidence_is_consumed_in_the_ruled_direction() {
 /// are byte-for-byte the two `FokDerivation` programs in evidence `3f687a460`:
 /// all four constructors under Type and Omega motives. The ordinary indexed,
 /// unindexed `FokCert`, and truncation-into-Omega controls remain positive too.
+/// Promise class: durable invariant.
+/// MEASURED: both exact four-arm programs accept and kernel-check.
+/// CLAIMED: the real derivation family reaches the new arm under both motives.
+/// THE GAP: child use is discharged separately by the recursive control.
 #[test]
 fn real_fok_derivation_structural_consumers_cover_type_and_omega_motives() {
     let mut env = env_with_fok();
@@ -766,6 +777,10 @@ fn real_fok_derivation_structural_consumers_cover_type_and_omega_motives() {
 /// path rather than discarding the IH. This is distinct from the four-arm
 /// structural consumer above: mutating any child argument to its parent must
 /// red SCT or typing.
+/// Promise class: durable invariant.
+/// MEASURED: all three exact child-index terms are passed to recursive calls.
+/// CLAIMED: recursive Omega consumption preserves the real child paths.
+/// THE GAP: SCT and the final kernel check jointly reject parent substitution.
 #[test]
 fn real_fok_recursive_omega_consumer_uses_all_three_child_paths() {
     let mut env = env_with_fok();

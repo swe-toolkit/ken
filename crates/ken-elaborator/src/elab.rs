@@ -9551,6 +9551,9 @@ mod omega_index_refinement_tests {
         // context supplies an Omega-classified outer binding that depends on
         // the refined index. The prefilter must delegate it to decision 1 and
         // install the direct-J refinement, rather than silently skipping it.
+        // MEASURED: the returned installed position and its stored J term.
+        // CLAIMED: decision 3 delegates lawful Omega bindings. THE GAP: the
+        // position is private state; real matches exercise decision 1 itself.
         let mut env = ElabEnv::new().expect("base environment");
         let nat = Term::IndFormer {
             id: env.globals["Nat"],
@@ -9592,6 +9595,11 @@ mod omega_index_refinement_tests {
 
     #[test]
     fn hidden_result_prefilter_preserves_reachable_non_sort_skip() {
+        // Promise class: durable invariant. A future earlier formation check
+        // may make this sentinel unreachable; widening decision 3 may not.
+        // MEASURED: no refinement is installed and the call does not error.
+        // CLAIMED: decision 3 preserves its reachable non-sort skip. THE GAP:
+        // the malformed context is constructed at the private production seam.
         // `n : Nat, x : n` is malformed context formation, but inference of
         // `x`'s as-yet-unchecked annotation succeeds at classifier `Nat`.
         // Decision 3's old defensive behavior is reachable and remains a
@@ -9628,6 +9636,9 @@ mod omega_index_refinement_tests {
         // Promise class: durable invariant. Decision 4 classifies the matched
         // type itself, not a re-indexed position, and must reject an Omega-
         // classified proposition before installing any outer refinement.
+        // MEASURED: the exact decision-4 Internal diagnostic. CLAIMED: the
+        // matched-type classifier stays Type-only. THE GAP: none; the test
+        // invokes the production decision before later refinement work.
         let mut env = ElabEnv::new().expect("base environment");
         let top = Term::const_(env.env.top_id(), vec![]);
         let proved = Term::const_(env.globals["Proved"], vec![]);
@@ -9659,6 +9670,9 @@ mod omega_index_refinement_tests {
         // Promise class: durable invariant. Decision 5 classifies an index
         // type, so even though proposition domains are legal binder types, it
         // must reject an Omega-classified index before convoying any sibling.
+        // MEASURED: the exact decision-5 Internal diagnostic. CLAIMED: the
+        // convoy index classifier stays Type-only. THE GAP: the fake family is
+        // required because admitted surface family indices are already Type.
         let mut env = ElabEnv::new().expect("base environment");
         let top = Term::const_(env.env.top_id(), vec![]);
         let proved = Term::const_(env.globals["Proved"], vec![]);
@@ -9706,6 +9720,9 @@ mod omega_index_refinement_tests {
         // Promise class: durable invariant. A malformed intermediate may infer
         // successfully while its classifier is a non-sort; decision 1 must
         // reject it and report that actual classifier.
+        // MEASURED: the error names the independently inferred classifier.
+        // CLAIMED: decision 1 fails closed outside Type | Omega. THE GAP: the
+        // malformed `cur_ty` is injected at the private production seam.
         let env = ElabEnv::new().expect("base environment");
         let idx_ty = Term::IndFormer {
             id: env.globals["Nat"],
