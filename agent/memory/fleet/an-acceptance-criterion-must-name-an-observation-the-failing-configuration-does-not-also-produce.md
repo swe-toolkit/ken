@@ -2,11 +2,12 @@
 scope: fleet
 audience: (see scope README) — anyone AUTHORING an acceptance criterion
   (frames, WP ACs, QA gates, review conditions) and anyone DISCHARGING one
-source: 2026-08-27, Steward — four instances in a single session across two
+source: 2026-08-27, Steward — five instances in a single session across two
   frames: RT-CHECKED-IH-GENERATED-ENTRY-ACCESS section 5 (HS9) and
   LANG-INDEX-REFINEMENT-OMEGA-ARM (Architect frame block evt_367papv4k57kk).
   Two were caught by the Architect, one by Research, one by me. The fourth
-  occurred INSIDE the message flagging the pattern.
+  occurred INSIDE the message flagging the pattern. A fifth, found while
+  amending the same frame, is the carrier failure kept separate below.
 ---
 
 # An acceptance criterion must name an observation the failing configuration does not also produce
@@ -76,7 +77,22 @@ clause is appended as bookkeeping — so the claim gets the scrutiny and the
 observation gets none. **The discharge is the half that executes.** Give it the
 same scrutiny, and expect to catch this in your own text, not someone else's.
 
+## The nearby failure this is NOT
+
+A fifth instance in the same session looked like a fourth shape and is not one:
+the omega-arm frame stated its decision-3 `continue` default **only in the
+mechanism prose**, with no AC measuring it. That is not a bad discharge — it is
+**no criterion at all**, the carrier failure already filed as
+[[a-requirement-in-an-advisory-section-is-never-discharged]]. Keep the two
+apart, because the repairs differ: a bad discharge is **rewritten**, a
+mis-carried requirement is **moved** into an AC and given a control. The two
+compose — moving prose into an AC without asking what its failing appearance
+looks like just relocates the defect into a carrier that now claims to gate.
+
 Related: [[a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control]]
-(the negative-assertion case), [[an-acceptance-property-listing-forbidden-verbs-permits-losing-the-thing]]
+(the negative-assertion case),
+[[an-acceptance-property-listing-forbidden-verbs-permits-losing-the-thing]]
 (the enumeration case), [[a-probe-truncated-before-the-grep-is-not-a-measurement]]
-(an instrument yielding a non-discriminating reading).
+(an instrument yielding a non-discriminating reading),
+[[a-requirement-in-an-advisory-section-is-never-discharged]] (the carrier case,
+above).
