@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-GENERATED-ENTRY-ACCESS
 title: "RT checked-IH generated-descendant-entry access — the ONE complete planner-owned predecessor that replaces the repeated last-gap decomposition (Architect HS7 evt_1z1p9t4tdyd2v). Derive one closed CheckedIhGeneratedEntryAccess relation joining the already-validated emitted generated-context population to the already-validated continuation-inheritance population, each row carrying the exact ContinuationContextId and its context key, the existing full ContinuationCallIdentity, and the existing final descendant coordinate (binding, invocation, call, callee) — the COMPLETE key needed to call checked_ih_continuation_inheritance_for_invocation, minting no K, locator, transport, or fresh-result destination. Re-derive and validate for totality and exact bijection over every governed final arrival hosted by an emitted generated context. Install the validated row in define_continuation_context_bodies as COMPILE-TIME function-definition authority beside the exact ContinuationContextView from which OwnedContext is built — NEVER a runtime parameter (not ABI, frame header, environment binding, carried value, RoutedAnswer, SourceControl member, runtime tag, or new continuation identity). Research census evt_4chbyacb0vyzp settled ruling item 5: the join is NON-FUNCTIONAL on the governed write witness, so the SPLIT arm is the required positive path — refine the EXISTING intern_generated_contexts key by the existing source-call identity and statically retarget callers into distinct generated contexts. Completeness is consumer-adjacent: an instrument at the real D3A call seat that neither applies K nor binds R2."
-status: active
+status: draft
 owner: runtime
 size: L
 gate: none
@@ -10,6 +10,63 @@ blocks: [RT-RESULT-CONTINUATION-BINDING-PROVENANCE]
 github: null
 origin: "Runtime hard stop 7 on RT-RESULT-CONTINUATION-BINDING-PROVENANCE (runtime-implementer evt_dqa3989tfmm2; leader routing evt_7fhdmyaqk4371), on the landed locator base b76943684. Architect HS7 component ruling evt_1z1p9t4tdyd2v, 2026-08-27, grounded on exact origin/main@b76943684d1dc04aa837e1693ccbc924d6216a07 / tree 62a8da47ab2b91198d1fc52d8c6d6e23184f728b: the reported key absence is real AND the repeated last-gap decomposition is ITSELF the design defect — three consecutive planner-owned predecessors (HS5 result-successor, HS6 K-availability locator, and the proposed source-call half) are all components of ONE accessor, each scoped to the last observed gap, each landing and revealing the next. A fourth narrow predecessor is FORBIDDEN; this node is the ONE complete generated-descendant-entry access predecessor specified from the CONSUMER'S ACTUAL ENTRY CONDITIONS. Per the hard-stop-chain rule the Steward triggered one bounded Research advisory before freezing (trigger evt_6ysq39xjpbjk4, advisory evt_4chbyacb0vyzp), which answered ruling item 5's census NON-FUNCTIONAL with an exact A/B counterexample and supplied prior-art hazards plus control sharpening; all of it is folded into the shape and ACs below. Steward-owned frame. D3A stays frozen and non-landable; after this predecessor lands through ordinary gates the Steward must EXPLICITLY re-release the same atomic D3A+D3B consumer — landing alone authorizes nothing."
 ---
+
+> # HARD STOP 8 — ITEM 5 IS FALSIFIED. THIS NODE IS FRAME EVIDENCE, NOT BUILDABLE.
+>
+> **Do not implement anything below until this node is recut.** Architect HS8
+> ruling `evt_14hwxs5q2j087`, grounded on exact `1403722a2` / tree `79bac0874`,
+> independently reproduced: **the item-5 static context-split contract is
+> falsified on its own A/B witness.**
+>
+> `intern_generated_contexts` mints ctx0 from the call whose emission owner is
+> specialization 3 and whose producer result is body 1238.
+> `continuation_context_for` is keyed by `(enclosing specialization, worker
+> body)`; `define_continuation_bodies` asks with `(unit.id,
+> unit.worker_body_origin)` and requires the returned context to carry that exact
+> pair before retargeting. Call-target injectivity makes call 4 the ONE incoming
+> identity for specialization 3. **So ctx0's incoming set is `{call 4}`, not
+> `{A, B}`.** Refining ctx0 by A/B creates two definitions behind one caller that
+> owns neither key; retargeting A/B violates target/body/descriptor identity;
+> duplicating call 4 duplicates execution; choosing one violates the ruled
+> relation. Every exit is closed.
+>
+> **The defect is a CROSS-FRAME premise, and it is the Steward's.** Research's
+> census (`evt_4chbyacb0vyzp`) correctly proved non-functionality in the
+> destination-inheritance frame, inside a boundary it stated, and explicitly
+> disclaimed the selection-strategy question. Non-functionality THERE does not
+> imply the source identities are available in the generated-context CALLER
+> frame, where the retarget must execute. The frame carried the ruling's item-5
+> instruction across that boundary without checking the two frames share a
+> discriminator. `AC-SPLIT-DESCRIPTOR` — folded in from Research's LLVM #55000
+> prior-art hazard — exposed the false implication before implementation. The
+> control worked; the deliverable it guards is unsatisfiable as framed.
+>
+> **A broader specialization/control-region clone is ONLY A HYPOTHESIS and is NOT
+> authorized.** Cloning specialization 3 plus call 4 without a proved static
+> discriminator reproduces the same two-definitions/one-caller defect one layer
+> up. No region cloning, tail duplication, new occurrence identity, source
+> rewrite, or runtime selection may be attempted on that hypothesis.
+>
+> **Gate on the Steward before any recut:** one bounded Research graph advisory,
+> scope fixed by the ruling's four numbered items (triggered `evt_1cr1trmmzpr54`)
+> — the closed six-row join from inheritance row to emitted context to the exact
+> retargetable caller; the consumer-relevant projection comparison of colliding
+> views (final destination owner/body/binding, exact
+> `CheckedIhImmediateKBindingLocator`, exact `CheckedIhFreshResultDestination`),
+> comparing typed records rather than inferring equality from shared numeric
+> coordinates; and only if those projections differ, whether an existing
+> planner-owned control partition distinguishes A from B and survives to the
+> seat. "Static cloning unavailable" is a first-class answer, not a failure.
+>
+> **The three live branches, chosen only AFTER that measurement:** a
+> planner-validated confluence/quotient certificate if all incoming identities
+> agree on the consumer projection; a separately framed exact control-region
+> specialization if and only if a static partition is proved; or a contract-level
+> stop if neither exists.
+>
+> D3A+D3B remains frozen and clean. No narrower predecessor and no consumer work
+> is authorized. Everything below this banner is the FALSIFIED frame, retained as
+> evidence for the recut.
 
 > # THE DECOMPOSITION WAS THE DEFECT — this node replaces the fourth narrow slice
 >
