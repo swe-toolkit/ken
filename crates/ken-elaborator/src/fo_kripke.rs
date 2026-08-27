@@ -32,6 +32,8 @@
 //! own `Or` for arbitrary real obligations is later integration work, not
 //! this slice's.
 
+use std::collections::HashMap;
+
 use ken_kernel::{
     check::{declare_inductive, CtorSpec, InductiveSpec},
     declare_postulate,
@@ -863,7 +865,106 @@ pub fn check_cert(q: &Form, pi: &Cert) -> bool {
     check_tree(&root, pi)
 }
 
+/// The target syntax remains untagged; its sort is derived from each
+/// occurrence's position while validating a complete certificate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DerivedSort {
+    World,
+    Object,
+}
+
+fn validate_qterm(
+    term: &QTerm,
+    expected: DerivedSort,
+    binders: &[DerivedSort],
+    parameters: &mut HashMap<usize, DerivedSort>,
+) -> bool {
+    match term {
+        QTerm::Bound(index) => binders.iter().rev().nth(*index) == Some(&expected),
+        QTerm::Parameter(parameter) => match parameters.get(parameter) {
+            Some(actual) => *actual == expected,
+            None => {
+                parameters.insert(*parameter, expected);
+                true
+            }
+        },
+    }
+}
+
+fn validate_form(
+    form: &Form,
+    binders: &mut Vec<DerivedSort>,
+    parameters: &mut HashMap<usize, DerivedSort>,
+) -> bool {
+    match form {
+        Form::Bottom => true,
+        Form::Access(a, b) => {
+            validate_qterm(a, DerivedSort::World, binders, parameters)
+                && validate_qterm(b, DerivedSort::World, binders, parameters)
+        }
+        Form::DomainA(world, object) | Form::ForcingP(world, object) => {
+            validate_qterm(world, DerivedSort::World, binders, parameters)
+                && validate_qterm(object, DerivedSort::Object, binders, parameters)
+        }
+        Form::And(p, q) | Form::Or(p, q) | Form::Imp(p, q) => {
+            validate_form(p, binders, parameters) && validate_form(q, binders, parameters)
+        }
+        Form::ForallWorld(body) | Form::ForallObj(body) => {
+            let sort = match form {
+                Form::ForallWorld(_) => DerivedSort::World,
+                Form::ForallObj(_) => DerivedSort::Object,
+                _ => unreachable!(),
+            };
+            binders.push(sort);
+            let valid = validate_form(body, binders, parameters);
+            binders.pop();
+            valid
+        }
+    }
+}
+
+fn validate_sequent(
+    sequent: &Sequent,
+    parameters: &mut HashMap<usize, DerivedSort>,
+) -> bool {
+    sequent.gamma.iter().chain(&sequent.delta).all(|form| {
+        validate_form(form, &mut Vec::new(), parameters)
+    })
+}
+
+fn validate_certificate(
+    node: &Cert,
+    parameters: &mut HashMap<usize, DerivedSort>,
+) -> bool {
+    if !validate_sequent(&node.conclusion, parameters) {
+        return false;
+    }
+
+    if let Rule::ForallRight { right, eigen } = &node.rule {
+        let expected = match node.conclusion.delta.get(*right) {
+            Some(Form::ForallWorld(_)) => DerivedSort::World,
+            Some(Form::ForallObj(_)) => DerivedSort::Object,
+            _ => return false,
+        };
+        // Rule-side eigenterms live at sequent scope. A bound reference has
+        // no binder here, while a parameter is unified with the principal
+        // quantifier's derived sort across this entire certificate.
+        if !validate_qterm(eigen, expected, &[], parameters) {
+            return false;
+        }
+    }
+
+    node.children
+        .iter()
+        .all(|child| validate_certificate(child, parameters))
+}
+
 fn check_tree(expected_conclusion: &Sequent, node: &Cert) -> bool {
+    let mut parameters = HashMap::new();
+    validate_certificate(node, &mut parameters) && check_tree_structural(expected_conclusion, node)
+}
+
+fn check_tree_structural(expected_conclusion: &Sequent, node: &Cert) -> bool {
     if &node.conclusion != expected_conclusion {
         return false;
     }
@@ -886,7 +987,7 @@ fn check_tree(expected_conclusion: &Sequent, node: &Cert) -> bool {
             expected_gamma.push((**p).clone());
             let mut expected_delta = node.conclusion.delta.clone();
             expected_delta[*right] = (**q).clone();
-            check_tree(&Sequent { gamma: expected_gamma, delta: expected_delta }, child)
+            check_tree_structural(&Sequent { gamma: expected_gamma, delta: expected_delta }, child)
         }
         Rule::ForallRight { right, eigen } => {
             let Some(quantified) = node.conclusion.delta.get(*right) else {
@@ -910,7 +1011,7 @@ fn check_tree(expected_conclusion: &Sequent, node: &Cert) -> bool {
             let instantiated = subst0_form(body, eigen);
             let mut expected_delta = node.conclusion.delta.clone();
             expected_delta[*right] = instantiated;
-            check_tree(
+            check_tree_structural(
                 &Sequent { gamma: node.conclusion.gamma.clone(), delta: expected_delta },
                 child,
             )

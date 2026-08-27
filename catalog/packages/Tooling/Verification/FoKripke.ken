@@ -707,6 +707,261 @@ fn fok_subst_form_at (form : FokForm) (depth : Nat) (replacement : FokQTerm) : F
 fn fok_subst0_form (form : FokForm) (replacement : FokQTerm) : FokForm =
   fok_subst_form_at form Zero replacement
 
+-- Derived only while validating a complete certificate. The target syntax
+-- stays untagged; positions and binders determine these two sorts.
+data FokDerivedSort = FokWorldSort | FokObjectSort
+
+data FokParameterSort = FokMkParameterSort Nat FokDerivedSort
+
+fn fok_derived_sort_eq (a : FokDerivedSort) (b : FokDerivedSort) : Bool =
+  match a {
+    FokWorldSort ↦ match b { FokWorldSort ↦ True; FokObjectSort ↦ False };
+    FokObjectSort ↦ match b { FokWorldSort ↦ False; FokObjectSort ↦ True }
+  }
+
+fn fok_nth_derived_sort (xs : List FokDerivedSort) (index : Nat) : Option FokDerivedSort =
+  match xs {
+    Nil ↦ None FokDerivedSort;
+    Cons x rest ↦
+      match index {
+        Zero ↦ Some FokDerivedSort x;
+        Suc previous ↦ fok_nth_derived_sort rest previous
+      }
+  }
+
+fn fok_parameter_sort_prepend
+      (head : FokParameterSort)
+      (result : Option (List FokParameterSort))
+    : Option (List FokParameterSort) =
+  match result {
+    None ↦ None (List FokParameterSort);
+    Some rest ↦ Some (List FokParameterSort) (Cons FokParameterSort head rest)
+  }
+
+fn fok_constrain_parameter_sort
+      (parameter : Nat)
+      (expected : FokDerivedSort)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match constraints {
+    Nil ↦
+      Some (List FokParameterSort)
+        (Cons FokParameterSort
+          (FokMkParameterSort parameter expected)
+          (Nil FokParameterSort));
+    Cons constraint rest ↦
+      match constraint {
+        FokMkParameterSort existing actual ↦
+          match fok_nat_eq parameter existing {
+            True ↦
+              match fok_derived_sort_eq expected actual {
+                True ↦ Some (List FokParameterSort) constraints;
+                False ↦ None (List FokParameterSort)
+              };
+            False ↦
+              fok_parameter_sort_prepend constraint
+                (fok_constrain_parameter_sort parameter expected rest)
+          }
+      }
+  }
+
+fn fok_validate_qterm_sort
+      (term : FokQTerm)
+      (expected : FokDerivedSort)
+      (binders : List FokDerivedSort)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match term {
+    FokQBound index ↦
+      match fok_nth_derived_sort binders index {
+        None ↦ None (List FokParameterSort);
+        Some actual ↦
+          match fok_derived_sort_eq expected actual {
+            True ↦ Some (List FokParameterSort) constraints;
+            False ↦ None (List FokParameterSort)
+          }
+      };
+    FokQParameter parameter ↦
+      fok_constrain_parameter_sort parameter expected constraints
+  }
+
+fn fok_validate_second_qterm
+      (first : Option (List FokParameterSort))
+      (second : FokQTerm)
+      (second_sort : FokDerivedSort)
+      (binders : List FokDerivedSort)
+    : Option (List FokParameterSort) =
+  match first {
+    None ↦ None (List FokParameterSort);
+    Some constraints ↦
+      fok_validate_qterm_sort second second_sort binders constraints
+  }
+
+fn fok_validate_qterm_pair
+      (first : FokQTerm)
+      (first_sort : FokDerivedSort)
+      (second : FokQTerm)
+      (second_sort : FokDerivedSort)
+      (binders : List FokDerivedSort)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  fok_validate_second_qterm
+    (fok_validate_qterm_sort first first_sort binders constraints)
+    second second_sort binders
+
+fn fok_validate_second_form
+      (first : Option (List FokParameterSort))
+      (second : FokForm)
+      (binders : List FokDerivedSort)
+    : Option (List FokParameterSort) =
+  match first {
+    None ↦ None (List FokParameterSort);
+    Some constraints ↦ fok_validate_form second binders constraints
+  }
+
+fn fok_validate_form_pair
+      (first : FokForm)
+      (second : FokForm)
+      (binders : List FokDerivedSort)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  fok_validate_second_form
+    (fok_validate_form first binders constraints)
+    second binders
+
+fn fok_validate_form
+      (form : FokForm)
+      (binders : List FokDerivedSort)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match form {
+    FokBottom ↦ Some (List FokParameterSort) constraints;
+    FokAccess first second ↦
+      fok_validate_qterm_pair first FokWorldSort second FokWorldSort
+        binders constraints;
+    FokDomainA world object ↦
+      fok_validate_qterm_pair world FokWorldSort object FokObjectSort
+        binders constraints;
+    FokForcingP world object ↦
+      fok_validate_qterm_pair world FokWorldSort object FokObjectSort
+        binders constraints;
+    FokAnd first second ↦
+      fok_validate_form_pair first second binders constraints;
+    FokOr first second ↦
+      fok_validate_form_pair first second binders constraints;
+    FokImp first second ↦
+      fok_validate_form_pair first second binders constraints;
+    FokForallWorld body ↦
+      fok_validate_form body
+        (Cons FokDerivedSort FokWorldSort binders) constraints;
+    FokForallObj body ↦
+      fok_validate_form body
+        (Cons FokDerivedSort FokObjectSort binders) constraints
+  }
+
+fn fok_validate_form_list
+      (forms : List FokForm)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match forms {
+    Nil ↦ Some (List FokParameterSort) constraints;
+    Cons form rest ↦
+      match fok_validate_form form (Nil FokDerivedSort) constraints {
+        None ↦ None (List FokParameterSort);
+        Some next ↦ fok_validate_form_list rest next
+      }
+  }
+
+fn fok_validate_sequent
+      (sequent : FokSequent)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match sequent {
+    FokMkSequent gamma delta ↦
+      match fok_validate_form_list gamma constraints {
+        None ↦ None (List FokParameterSort);
+        Some next ↦ fok_validate_form_list delta next
+      }
+  }
+
+fn fok_validate_forall_eigen
+      (delta : List FokForm)
+      (right : Nat)
+      (eigen : FokQTerm)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match fok_nth_form delta right {
+    None ↦ None (List FokParameterSort);
+    Some target ↦
+      match target {
+        FokForallWorld body ↦
+          fok_validate_qterm_sort eigen FokWorldSort
+            (Nil FokDerivedSort) constraints;
+        FokForallObj body ↦
+          fok_validate_qterm_sort eigen FokObjectSort
+            (Nil FokDerivedSort) constraints;
+        FokBottom ↦ None (List FokParameterSort);
+        FokAccess a b ↦ None (List FokParameterSort);
+        FokDomainA a b ↦ None (List FokParameterSort);
+        FokForcingP a b ↦ None (List FokParameterSort);
+        FokAnd p q ↦ None (List FokParameterSort);
+        FokOr p q ↦ None (List FokParameterSort);
+        FokImp p q ↦ None (List FokParameterSort)
+      }
+  }
+
+fn fok_validate_rule_side
+      (conclusion : FokSequent)
+      (rule : FokRule)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match rule {
+    FokInit left right ↦ Some (List FokParameterSort) constraints;
+    FokImpRight right ↦ Some (List FokParameterSort) constraints;
+    FokForallRight right eigen ↦
+      match conclusion {
+        FokMkSequent gamma delta ↦
+          fok_validate_forall_eigen delta right eigen constraints
+      }
+  }
+
+fn fok_validate_certificate_after_children
+      (node_result : Option (List FokParameterSort))
+      (children : List FokCert)
+    : Option (List FokParameterSort) =
+  match node_result {
+    None ↦ None (List FokParameterSort);
+    Some constraints ↦ fok_validate_certificate_list children constraints
+  }
+
+fn fok_validate_certificate_list
+      (certificates : List FokCert)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match certificates {
+    Nil ↦ Some (List FokParameterSort) constraints;
+    Cons certificate rest ↦
+      match fok_validate_certificate certificate constraints {
+        None ↦ None (List FokParameterSort);
+        Some next ↦ fok_validate_certificate_list rest next
+      }
+  }
+
+fn fok_validate_certificate
+      (node : FokCert)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match node {
+    FokMkCert conclusion rule children ↦
+      match fok_validate_sequent conclusion constraints {
+        None ↦ None (List FokParameterSort);
+        Some after_conclusion ↦
+          fok_validate_certificate_after_children
+            (fok_validate_rule_side conclusion rule after_conclusion)
+            children
+      }
+  }
+
 -- The `ForallRight` guard: shared by both `FokForallWorld`/`FokForallObj`
 -- targets (Rust's single `Form::ForallWorld(b) | Form::ForallObj(b) => b`
 -- arm) -- freshness, then exactly-one-child, then recurse on the
