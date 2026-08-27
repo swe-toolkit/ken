@@ -51,16 +51,34 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > context splitting. The advisory may sharpen the row/key controls; it may not
 > reopen the authority boundary or propose a runtime carrier.
 >
-> **The replacement predecessor is FROZEN as
-> [[RT-CHECKED-IH-GENERATED-ENTRY-ACCESS]]** (this node now `depends_on` it),
-> owner runtime, tier T1, size L. The Research advisory came back
-> **Q1 = NON-FUNCTIONAL** with an exact A/B counterexample on the governed write
-> witness — two distinct source-call identities joining to one destination triple
-> at `ContinuationContextId(0)` / invocation 741 / callee 739. So ruling item 5's
-> SPLIT arm is the required positive path: refine the existing
-> `intern_generated_contexts` key by the existing source-call identity and
-> statically retarget callers into distinct generated contexts. The "attach one
-> validated row to the current context" arm is WITHDRAWN as the positive path.
+> **The replacement predecessor is [[RT-CHECKED-IH-GENERATED-ENTRY-ACCESS]]**
+> (this node now `depends_on` it), owner runtime, tier T1, size L.
+>
+> **HS8 SUPERSEDED WHAT THIS BANNER USED TO SAY — do not act on an older
+> revision of it.** It recorded Q1 = NON-FUNCTIONAL and named ruling item 5's
+> SPLIT arm as the required positive path: refine the `intern_generated_contexts`
+> key by source-call identity and statically retarget callers. **That contract is
+> FALSIFIED** (runtime-implementer `evt_799ckhz4kgtcd`; Architect
+> `evt_14hwxs5q2j087`, independently reproduced at exact `1403722a2`). The Q1
+> census was correct in the destination-inheritance frame, but the retarget must
+> execute in the CALLER frame, and `ContinuationContextId(0)`'s incoming set
+> there is `{call 4}` — not `{A, B}`. The two frames share no discriminator.
+>
+> **The predecessor is RECUT onto the confluence/quotient branch** (Architect
+> mechanism ruling `evt_3myrd8sp2tp8n`, on Research graph advisory
+> `evt_2ffs47ax5gbnn`). The sole colliding pair W0/W1 AGREES on the
+> consumer-relevant projection by full typed `Eq` — same destination owner/body,
+> binding, `CheckedIhImmediateKBindingLocator`, and
+> `CheckedIhFreshResultDestination` — so a planner-validated confluence
+> certificate proves common typed consumer authority at one seat, and lowering
+> receives a SANITIZED projection carrying no source identity at all. **Static
+> splitting and region cloning are WITHDRAWN.** `intern_generated_contexts` and
+> its callers are UNCHANGED.
+>
+> **Nobody has measured whether static cloning is available** — the advisory's
+> item 3 had a false precondition and correctly declined to classify it. Do not
+> record it as ruled out.
+>
 > The advisory's reach boundary is carried verbatim in that frame and must not be
 > rounded into a global claim.
 >
