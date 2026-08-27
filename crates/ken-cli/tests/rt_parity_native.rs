@@ -726,6 +726,16 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
             ken_runtime::with_checked_ih_continuation_inheritance_observations(|| {
                 differential("fs-write-at-offset-single", "rt_write_writable_stage")
             });
+        let (shifted_read_result, shifted_read) =
+            ken_runtime::with_checked_ih_continuation_inheritance_mutation(
+                ken_runtime::CheckedIhContinuationInheritanceMutation::InsertInterveningBinder,
+                || {
+                    ken_runtime::with_checked_ih_continuation_inheritance_observations(|| {
+                        differential("fs-read-at-offset-single", "rt_read_offset_stage")
+                    })
+                },
+            );
+        assert!(ken_runtime::checked_ih_continuation_inheritance_mutation_is_exact());
 
         let select = |rows: &[ken_runtime::CheckedIhContinuationInheritanceObservation],
                       source_specialization,
@@ -755,6 +765,16 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
         assert_eq!(read_target.invocation_origin, 305);
         assert_eq!(read_target.call_origin, 304);
         assert_eq!(read_target.callee_origin, 303);
+        assert_eq!(read_target.immediate_k_locator_count, 1);
+        assert_eq!(read_target.immediate_k_locator_invocation_origin, 305);
+        assert_eq!(read_target.immediate_k_locator_callee_origin, 303);
+        assert_eq!(
+            read_target.immediate_k_locator_domain,
+            "ImmediateInvocationEnvironment"
+        );
+        assert_eq!(read_target.immediate_k_environment_index, 0);
+        assert_eq!(read_target.immediate_k_preceding_environment_provenance, None);
+        assert_eq!(read_target.immediate_k_lineage_environment_indices, vec![0, 0]);
         assert_eq!(read_target.ret_case_body_origin, 465);
         assert_eq!(read_target.closure_origin, 460);
         assert_eq!(read_target.capture_ordinal, 0);
@@ -773,6 +793,16 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
         assert_eq!(write_target.invocation_origin, 318);
         assert_eq!(write_target.call_origin, 317);
         assert_eq!(write_target.callee_origin, 316);
+        assert_eq!(write_target.immediate_k_locator_count, 1);
+        assert_eq!(write_target.immediate_k_locator_invocation_origin, 318);
+        assert_eq!(write_target.immediate_k_locator_callee_origin, 316);
+        assert_eq!(
+            write_target.immediate_k_locator_domain,
+            "ImmediateInvocationEnvironment"
+        );
+        assert_eq!(write_target.immediate_k_environment_index, 0);
+        assert_eq!(write_target.immediate_k_preceding_environment_provenance, None);
+        assert_eq!(write_target.immediate_k_lineage_environment_indices, vec![0, 0]);
         assert_eq!(write_target.ret_case_body_origin, 478);
         assert_eq!(write_target.closure_origin, 473);
         assert_eq!(write_target.capture_ordinal, 0);
@@ -783,6 +813,62 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
         assert!(!write_target.fresh_destination_mentions_source_result);
         assert!(write_target.ordinary_non_governed_exclusion_count > 0);
         assert!(write_target.descriptor_only_exclusion_count > 0);
+
+        let shifted_read_target = select(&shifted_read, 1, 2, 301);
+        assert_eq!(
+            shifted_read_target.source_call_identity,
+            read_target.source_call_identity,
+            "inserting a binder must not change transport or call identity"
+        );
+        assert_eq!(
+            (
+                shifted_read_target.destination_specialization,
+                shifted_read_target.destination_body_origin,
+                shifted_read_target.active_frame_origin,
+                shifted_read_target.recursive_position,
+                shifted_read_target.selected_case_body_origin,
+                shifted_read_target.invocation_origin,
+                shifted_read_target.call_origin,
+                shifted_read_target.callee_origin,
+                shifted_read_target.immediate_k_locator_invocation_origin,
+                shifted_read_target.immediate_k_locator_callee_origin,
+                shifted_read_target.immediate_k_locator_domain.as_str(),
+            ),
+            (
+                read_target.destination_specialization,
+                read_target.destination_body_origin,
+                read_target.active_frame_origin,
+                read_target.recursive_position,
+                read_target.selected_case_body_origin,
+                read_target.invocation_origin,
+                read_target.call_origin,
+                read_target.callee_origin,
+                read_target.immediate_k_locator_invocation_origin,
+                read_target.immediate_k_locator_callee_origin,
+                read_target.immediate_k_locator_domain.as_str(),
+            ),
+            "inserting a binder must preserve semantic K identity and consumer identity"
+        );
+        assert_eq!(
+            shifted_read_target.immediate_k_environment_index,
+            read_target.immediate_k_environment_index + 1,
+            "the immediate locator must re-derive past the inserted binder"
+        );
+        assert_eq!(
+            shifted_read_target.immediate_k_preceding_environment_provenance.as_deref(),
+            Some("Ordinary"),
+            "the pre-shift slot must be the inserted ordinary binder, not K"
+        );
+        let mut expected_shifted_lineage =
+            read_target.immediate_k_lineage_environment_indices.clone();
+        *expected_shifted_lineage
+            .last_mut()
+            .expect("the governed inheritance has a final arrival") += 1;
+        assert_eq!(
+            shifted_read_target.immediate_k_lineage_environment_indices,
+            expected_shifted_lineage,
+            "only the arrival below the inserted binder may shift"
+        );
 
         assert_ne!(
             read_target.source_call_identity, write_target.source_call_identity,
@@ -813,6 +899,11 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
 
         for (label, result, forbidden_operation) in [
             ("read", read_result, ken_runtime::HostOpV1::FsReadAt),
+            (
+                "shifted read",
+                shifted_read_result,
+                ken_runtime::HostOpV1::FsReadAt,
+            ),
             ("write", write_result, ken_runtime::HostOpV1::FsWriteAt),
         ] {
             let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
@@ -892,6 +983,13 @@ fn assert_continuation_inheritance_mutation_child() {
         "duplicate" => Mutation::DuplicateInheritedCapability,
         "swap" => Mutation::SwapInheritedEndpoints,
         "break-step" => Mutation::BreakSelfResumptionStep,
+        "remove-k-locator" => Mutation::RemoveImmediateKLocator,
+        "duplicate-k-locator" => Mutation::DuplicateImmediateKLocator,
+        "wrong-k-domain" => Mutation::SubstituteWrongKLocatorDomain,
+        "wrong-k-consumer" => Mutation::SubstituteWrongKLocatorConsumer,
+        "wrong-k-index" => Mutation::SubstituteWrongKLocatorIndex,
+        "source-slot-k-locator" => Mutation::SubstituteSourceRecursiveSlotLocator,
+        "final-residual-k-locator" => Mutation::SubstituteFinalRecursorResidualLocator,
         "reclassify-ret" => Mutation::ReclassifyRetChildAsIh,
         "descriptor-only" => Mutation::SubstituteDescriptorOnlyAuthority,
         "earlier-result" => Mutation::SubstituteEarlierResult,
@@ -941,6 +1039,25 @@ fn checked_ih_continuation_inheritance_mutations_bite_their_own_arms() {
             "does not reference one exact existing transport endpoint",
         ),
         ("break-step", "self-resumption step is disconnected"),
+        (
+            "remove-k-locator",
+            "does not have exactly one immediate K locator",
+        ),
+        (
+            "duplicate-k-locator",
+            "does not have exactly one immediate K locator",
+        ),
+        ("wrong-k-domain", "wrong runtime environment domain"),
+        (
+            "wrong-k-consumer",
+            "different descendant invocation or callee",
+        ),
+        ("wrong-k-index", "does not equal its forward binder re-derivation"),
+        ("source-slot-k-locator", "wrong runtime environment domain"),
+        (
+            "final-residual-k-locator",
+            "wrong runtime environment domain",
+        ),
         ("reclassify-ret", "reclassified as an induction hypothesis"),
         ("descriptor-only", "descriptor-only closure was substituted"),
         (

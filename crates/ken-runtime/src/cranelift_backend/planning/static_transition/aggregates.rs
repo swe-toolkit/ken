@@ -20,11 +20,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::cell::{Cell, RefCell};
 
 use super::continuations::{
-    build_checked_binder_provenance, CheckedBinderProvenance, CheckedCaseBinderLayout,
-    CheckedCaseBinderRole, CheckedIhBinding, ContinuationOrdinaryEnvelopeRole,
-    ContinuationWorkerCaptureSource,
+    build_checked_binder_provenance, CheckedBinderProvenance, CheckedBinderResolution,
+    CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhBinding,
+    ContinuationOrdinaryEnvelopeRole, ContinuationWorkerCaptureSource,
 };
-
 use super::{
     inline_synthesized_seat_emission_owners, occurrence_authority,
     planner_capacity_error, planner_error, AbiCaptureProvenance, AbiUnitDefinition,
@@ -221,6 +220,58 @@ pub(in crate::cranelift_backend) enum CheckedIhTransportInputDestination {
     EntryFrame(u32),
 }
 
+/// Which runtime environment owns an immediate checked-IH K binding.
+///
+/// Only `ImmediateInvocationEnvironment` is derivable in production. The other
+/// closed arms exist under test support so compile-preserving mutations can
+/// prove that the domain tag, source-slot substitution, and final-residual
+/// substitution are independently rejected rather than accepted by integer
+/// coincidence.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum CheckedIhKAvailabilityDomain {
+    ImmediateInvocationEnvironment,
+    #[cfg(feature = "px8-ds-test-support")]
+    ForeignRuntimeEnvironment,
+    #[cfg(feature = "px8-ds-test-support")]
+    SourceRecursiveSlot,
+    #[cfg(feature = "px8-ds-test-support")]
+    FinalRecursorResidual,
+}
+
+/// The exact immediate runtime coordinate at which one governed descendant
+/// invocation reads inherited continuation capability K.
+///
+/// Consumer and environment identity travel with the number. This is neither a
+/// semantic [`CheckedIhBinding`] nor any existing source/transport locator.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct CheckedIhImmediateKBindingLocator {
+    invocation_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+    environment_domain: CheckedIhKAvailabilityDomain,
+    environment_index: u32,
+}
+
+#[allow(dead_code)]
+impl CheckedIhImmediateKBindingLocator {
+    pub(in crate::cranelift_backend) fn invocation_origin(&self) -> StaticOriginId {
+        self.invocation_origin
+    }
+
+    pub(in crate::cranelift_backend) fn callee_origin(&self) -> StaticOriginId {
+        self.callee_origin
+    }
+
+    pub(in crate::cranelift_backend) fn environment_domain(
+        &self,
+    ) -> CheckedIhKAvailabilityDomain {
+        self.environment_domain
+    }
+
+    pub(in crate::cranelift_backend) fn environment_index(&self) -> u32 {
+        self.environment_index
+    }
+}
+
 /// The forward proof that one already-issued captured continuation capability
 /// remains in scope at one recursively exposed checked invocation.
 ///
@@ -237,6 +288,10 @@ pub(in crate::cranelift_backend) struct CheckedIhSelfResumptionStep {
     call_origin: StaticOriginId,
     callee_origin: StaticOriginId,
     callee_binding: CheckedIhBinding,
+    /// The closed locator population for this step. Production derives one;
+    /// retaining the population lets validation reject absence or ambiguity
+    /// rather than making either state unrepresentable to mutation controls.
+    immediate_k_locators: Vec<CheckedIhImmediateKBindingLocator>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -321,6 +376,16 @@ impl CheckedIhCapabilityInheritance {
             .expect("a validated inheritance has at least one self-resumption step")
             .callee_binding
             .recursive_position
+    }
+
+    pub(in crate::cranelift_backend) fn immediate_k_locator(
+        &self,
+    ) -> Option<&CheckedIhImmediateKBindingLocator> {
+        let final_step = self.self_resumption_steps.last()?;
+        let [locator] = final_step.immediate_k_locators.as_slice() else {
+            return None;
+        };
+        Some(locator)
     }
 }
 
@@ -474,6 +539,13 @@ pub struct CheckedIhContinuationInheritanceObservation {
     pub invocation_origin: u32,
     pub call_origin: u32,
     pub callee_origin: u32,
+    pub immediate_k_locator_count: usize,
+    pub immediate_k_locator_invocation_origin: u32,
+    pub immediate_k_locator_callee_origin: u32,
+    pub immediate_k_locator_domain: String,
+    pub immediate_k_environment_index: u32,
+    pub immediate_k_preceding_environment_provenance: Option<String>,
+    pub immediate_k_lineage_environment_indices: Vec<u32>,
     pub ret_case_body_origin: u32,
     pub closure_origin: u32,
     pub capture_ordinal: u32,
@@ -522,6 +594,8 @@ pub(super) fn record_checked_ih_continuation_inheritances(
     let calls = plan
         .continuation_calls()
         .expect("validated plan exposes continuation calls");
+    let binder_resolutions = build_checked_binder_provenance(plan)
+        .expect("validated plan exposes its forward binder resolutions");
     for inheritance in inheritances {
         let final_step = inheritance
             .capability
@@ -571,6 +645,21 @@ pub(super) fn record_checked_ih_continuation_inheritances(
                 .self_resumption_steps
                 .last()
                 .expect("validated continuation inheritance has a final step");
+            let final_locator = inheritance
+                .capability
+                .immediate_k_locator()
+                .expect("validated continuation inheritance has exactly one final K locator");
+            let immediate_k_lineage_environment_indices = inheritance
+                .capability
+                .self_resumption_steps
+                .iter()
+                .map(|step| {
+                    let [locator] = step.immediate_k_locators.as_slice() else {
+                        panic!("validated continuation inheritance step has exactly one K locator");
+                    };
+                    locator.environment_index
+                })
+                .collect();
             let mut destination_origins = vec![
                 destination.active_frame_origin.0,
                 destination.ret_case_body_origin.0,
@@ -600,6 +689,16 @@ pub(super) fn record_checked_ih_continuation_inheritances(
                 invocation_origin: final_step.invocation_origin.0,
                 call_origin: final_step.call_origin.0,
                 callee_origin: final_step.callee_origin.0,
+                immediate_k_locator_count: final_step.immediate_k_locators.len(),
+                immediate_k_locator_invocation_origin: final_locator.invocation_origin.0,
+                immediate_k_locator_callee_origin: final_locator.callee_origin.0,
+                immediate_k_locator_domain: format!("{:?}", final_locator.environment_domain),
+                immediate_k_environment_index: final_locator.environment_index,
+                immediate_k_preceding_environment_provenance: binder_resolutions
+                    .get(&final_step.callee_origin)
+                    .and_then(|resolution| resolution.preceding_environment_provenance)
+                    .map(|provenance| format!("{provenance:?}")),
+                immediate_k_lineage_environment_indices,
                 ret_case_body_origin: destination.ret_case_body_origin.0,
                 closure_origin: destination.closure_origin.0,
                 capture_ordinal: destination.capture_ordinal,
@@ -629,6 +728,16 @@ pub enum CheckedIhContinuationInheritanceMutation {
     DuplicateInheritedCapability,
     SwapInheritedEndpoints,
     BreakSelfResumptionStep,
+    RemoveImmediateKLocator,
+    DuplicateImmediateKLocator,
+    SubstituteWrongKLocatorDomain,
+    SubstituteWrongKLocatorConsumer,
+    SubstituteWrongKLocatorIndex,
+    SubstituteSourceRecursiveSlotLocator,
+    SubstituteFinalRecursorResidualLocator,
+    /// Clone a real validated plan, insert a `Let` binder on its governed
+    /// occurrence path, and rerun the unchanged forward derivation/validator.
+    InsertInterveningBinder,
     ReclassifyRetChildAsIh,
     SubstituteDescriptorOnlyAuthority,
     SubstituteEarlierResult,
@@ -677,12 +786,175 @@ pub fn checked_ih_continuation_inheritance_mutation_is_exact() -> bool {
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+pub(super) fn checked_ih_intervening_binder_population_control_is_active() -> bool {
+    CONTINUATION_INHERITANCE_MUTATION.with(Cell::get)
+        == CheckedIhContinuationInheritanceMutation::InsertInterveningBinder
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn replace_scratch_occurrence_expr<'src>(
+    plan: &mut StaticTransitionPlan<'src>,
+    origin: StaticOriginId,
+    replacement: RuntimeExpr,
+) -> Result<(), CraneliftBackendError> {
+    let occurrence = plan
+        .source_occurrences
+        .get_mut(origin.0 as usize)
+        .and_then(Option::as_mut)
+        .ok_or_else(|| planner_error("intervening-binder control names no source occurrence"))?;
+    if occurrence.static_origin != origin {
+        return Err(planner_error(
+            "intervening-binder control occurrence disagrees with its table position",
+        ));
+    }
+    occurrence.expr = Box::leak(Box::new(replacement));
+    Ok(())
+}
+
+/// Clone one validated real plan, insert a `Let` binder into the occurrence
+/// population on its exact deepest governed path, capture-shift that exact
+/// callee `Var`, then run the unchanged production inheritance derivation and
+/// validator. The scratch plan never reaches lowering.
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn run_checked_ih_intervening_binder_population_control(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<(), CraneliftBackendError> {
+    if !checked_ih_intervening_binder_population_control_is_active() {
+        return Ok(());
+    }
+
+    let mut candidates = Vec::new();
+    for inheritance in &plan.checked_ih_continuation_inheritances {
+        let Some(final_step) = inheritance.capability.self_resumption_steps.last() else {
+            continue;
+        };
+        let [locator] = final_step.immediate_k_locators.as_slice() else {
+            continue;
+        };
+        candidates.push((
+            inheritance.capability.self_resumption_steps.len(),
+            inheritance.transport.source_call_identity.clone(),
+            inheritance.capability.destination_owner,
+            inheritance.capability.destination_body_origin,
+            final_step.callee_binding,
+            final_step.selected_case_body_origin,
+            final_step.callee_origin,
+            locator.environment_index,
+        ));
+    }
+    let Some(max_depth) = candidates.iter().map(|candidate| candidate.0).max() else {
+        return Err(planner_error(
+            "the intervening-binder control found no governed K arrival",
+        ));
+    };
+    let deepest = candidates
+        .into_iter()
+        .filter(|candidate| candidate.0 == max_depth)
+        .collect::<Vec<_>>();
+
+    for (
+        _,
+        source_call_identity,
+        destination_owner,
+        destination_body_origin,
+        callee_binding,
+        insertion_origin,
+        callee_origin,
+        locator_index,
+    ) in deepest
+    {
+        let mut scratch = plan.clone();
+        let body_origin = scratch.semantic.child_origin(insertion_origin, 0)?;
+        let value_origin = scratch
+            .source_occurrences
+            .iter()
+            .flatten()
+            .find_map(|occurrence| {
+                matches!(occurrence.expr, RuntimeExpr::Value(_))
+                    .then_some(occurrence.static_origin)
+            })
+            .ok_or_else(|| planner_error("the binder-bearing plan fixture has no closed value"))?;
+        let value_expr = scratch.planned_occurrence_expr(value_origin)?.clone();
+        let body_expr = scratch.planned_occurrence_expr(body_origin)?.clone();
+        replace_scratch_occurrence_expr(
+            &mut scratch,
+            insertion_origin,
+            RuntimeExpr::Let {
+                value: Box::new(value_expr),
+                body: Box::new(body_expr),
+            },
+        )?;
+
+        let child_start = u32::try_from(scratch.semantic.child_origins.len())
+            .map_err(|_| planner_capacity_error("intervening-binder child range exhausted"))?;
+        scratch.semantic.child_origins.push(value_origin);
+        scratch.semantic.child_origins.push(body_origin);
+        let record = scratch
+            .semantic
+            .records
+            .iter_mut()
+            .find(|record| record.origin == insertion_origin)
+            .ok_or_else(|| planner_error("the binder insertion origin has no semantic record"))?;
+        record.child_origins = super::semantic_ir::DenseRange {
+            start: child_start,
+            len: 2,
+        };
+
+        let mut callee_expr = scratch.planned_occurrence_expr(callee_origin)?.clone();
+        let RuntimeExpr::Var(index) = &mut callee_expr else {
+            return Err(planner_error(
+                "the governed self-resumption callee is not the exact Var resolved by the binder walk",
+            ));
+        };
+        if *index != locator_index {
+            return Err(planner_error(
+                "the governed self-resumption callee Var disagrees with its immediate K locator",
+            ));
+        }
+        *index = index
+            .checked_add(1)
+            .ok_or_else(|| planner_capacity_error("capture-shifted callee index exhausted"))?;
+        replace_scratch_occurrence_expr(&mut scratch, callee_origin, callee_expr)?;
+
+        let mutated = build_checked_ih_continuation_inheritances(&scratch)?;
+        scratch.checked_ih_continuation_inheritances = mutated;
+        validate_checked_ih_continuation_inheritances(
+            &scratch,
+            &scratch.checked_ih_continuation_inheritances,
+        )?;
+        let targets = scratch
+            .checked_ih_continuation_inheritances
+            .iter()
+            .enumerate()
+            .filter_map(|(index, inheritance)| {
+                let final_step = inheritance.capability.self_resumption_steps.last()?;
+                (&inheritance.transport.source_call_identity == &source_call_identity
+                    && inheritance.capability.destination_owner == destination_owner
+                    && inheritance.capability.destination_body_origin == destination_body_origin
+                    && final_step.callee_binding == callee_binding)
+                    .then_some(index)
+            })
+            .collect::<Vec<_>>();
+        let [target] = targets.as_slice() else {
+            return Err(planner_error(
+                "the binder-bearing plan fixture does not retain one exact governed identity",
+            ));
+        };
+        record_checked_ih_continuation_inheritances(
+            &scratch,
+            std::slice::from_ref(&scratch.checked_ih_continuation_inheritances[*target]),
+        );
+    }
+    Ok(())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
 pub(super) fn apply_checked_ih_continuation_inheritance_mutation(
     inheritances: &mut Vec<CheckedIhContinuationInheritance>,
 ) {
     use CheckedIhContinuationInheritanceMutation as Mutation;
     match CONTINUATION_INHERITANCE_MUTATION.with(Cell::get) {
-        Mutation::Exact => {}
+        Mutation::Exact | Mutation::InsertInterveningBinder => {}
         Mutation::RemoveInheritedCapability => {
             inheritances.pop();
         }
@@ -709,6 +981,78 @@ pub(super) fn apply_checked_ih_continuation_inheritance_mutation(
             {
                 let first = inheritance.capability.self_resumption_steps[0].recursive_child_origin;
                 inheritance.capability.self_resumption_steps[1].recursive_child_origin = first;
+            }
+        }
+        Mutation::RemoveImmediateKLocator => {
+            if let Some(step) = inheritances
+                .last_mut()
+                .and_then(|inheritance| inheritance.capability.self_resumption_steps.last_mut())
+            {
+                step.immediate_k_locators.clear();
+            }
+        }
+        Mutation::DuplicateImmediateKLocator => {
+            if let Some(step) = inheritances
+                .last_mut()
+                .and_then(|inheritance| inheritance.capability.self_resumption_steps.last_mut())
+            {
+                if let Some(locator) = step.immediate_k_locators.last().cloned() {
+                    step.immediate_k_locators.push(locator);
+                }
+            }
+        }
+        Mutation::SubstituteWrongKLocatorDomain => {
+            if let Some(locator) = inheritances
+                .last_mut()
+                .and_then(|inheritance| inheritance.capability.self_resumption_steps.last_mut())
+                .and_then(|step| step.immediate_k_locators.last_mut())
+            {
+                locator.environment_domain =
+                    CheckedIhKAvailabilityDomain::ForeignRuntimeEnvironment;
+            }
+        }
+        Mutation::SubstituteWrongKLocatorConsumer => {
+            if let Some(step) = inheritances
+                .last_mut()
+                .and_then(|inheritance| inheritance.capability.self_resumption_steps.last_mut())
+            {
+                if let Some(locator) = step.immediate_k_locators.last_mut() {
+                    locator.invocation_origin = step.call_origin;
+                    locator.callee_origin = step.call_origin;
+                }
+            }
+        }
+        Mutation::SubstituteWrongKLocatorIndex => {
+            if let Some(locator) = inheritances
+                .last_mut()
+                .and_then(|inheritance| inheritance.capability.self_resumption_steps.last_mut())
+                .and_then(|step| step.immediate_k_locators.last_mut())
+            {
+                locator.environment_index = locator.environment_index.wrapping_add(1);
+            }
+        }
+        Mutation::SubstituteSourceRecursiveSlotLocator => {
+            if let Some(inheritance) = inheritances.last_mut() {
+                let source_slot = inheritance.transport.source_recursive_position;
+                if let Some(locator) = inheritance
+                    .capability
+                    .self_resumption_steps
+                    .last_mut()
+                    .and_then(|step| step.immediate_k_locators.last_mut())
+                {
+                    locator.environment_domain = CheckedIhKAvailabilityDomain::SourceRecursiveSlot;
+                    locator.environment_index = source_slot;
+                }
+            }
+        }
+        Mutation::SubstituteFinalRecursorResidualLocator => {
+            if let Some(locator) = inheritances
+                .last_mut()
+                .and_then(|inheritance| inheritance.capability.self_resumption_steps.last_mut())
+                .and_then(|step| step.immediate_k_locators.last_mut())
+            {
+                locator.environment_domain = CheckedIhKAvailabilityDomain::FinalRecursorResidual;
+                locator.environment_index = 0;
             }
         }
         Mutation::ReclassifyRetChildAsIh => {
@@ -3215,8 +3559,16 @@ fn exact_zero_argument_self_resumption(
     plan: &StaticTransitionPlan<'_>,
     case_body: StaticOriginId,
     binding: CheckedIhBinding,
-    binder_provenance: &BTreeMap<StaticOriginId, CheckedBinderProvenance>,
-) -> Result<Option<(StaticOriginId, StaticOriginId, StaticOriginId)>, CraneliftBackendError> {
+    binder_provenance: &BTreeMap<StaticOriginId, CheckedBinderResolution>,
+) -> Result<
+    Option<(
+        StaticOriginId,
+        StaticOriginId,
+        StaticOriginId,
+        CheckedIhImmediateKBindingLocator,
+    )>,
+    CraneliftBackendError,
+> {
     let mut pending = vec![case_body];
     let mut found = Vec::new();
     while let Some(origin) = pending.pop() {
@@ -3228,10 +3580,23 @@ fn exact_zero_argument_self_resumption(
             if let RuntimeExpr::Call { args, .. } = plan.planned_occurrence_expr(call_origin)? {
                 if args.is_empty() {
                     let callee_origin = plan.semantic.child_origin(call_origin, 0)?;
-                    if binder_provenance.get(&callee_origin)
-                        == Some(&CheckedBinderProvenance::InductionHypothesis(binding))
-                    {
-                        found.push((origin, call_origin, callee_origin));
+                    if let Some(resolution) = binder_provenance.get(&callee_origin).copied() {
+                        if resolution.provenance
+                            == CheckedBinderProvenance::InductionHypothesis(binding)
+                        {
+                            found.push((
+                                origin,
+                                call_origin,
+                                callee_origin,
+                                CheckedIhImmediateKBindingLocator {
+                                    invocation_origin: origin,
+                                    callee_origin,
+                                    environment_domain:
+                                        CheckedIhKAvailabilityDomain::ImmediateInvocationEnvironment,
+                                    environment_index: resolution.immediate_environment_index,
+                                },
+                            ));
+                        }
                     }
                 }
             }
@@ -3240,7 +3605,7 @@ fn exact_zero_argument_self_resumption(
     }
     match found.as_slice() {
         [] => Ok(None),
-        [one] => Ok(Some(*one)),
+        [one] => Ok(Some(one.clone())),
         _ => Err(planner_error(
             "one checked recursive case exposes the same zero-argument self-resumption more than once",
         )),
@@ -3302,7 +3667,7 @@ fn next_self_resumption_construct(
 fn fresh_result_destination(
     plan: &StaticTransitionPlan<'_>,
     active_frame: StaticOriginId,
-    binder_provenance: &BTreeMap<StaticOriginId, CheckedBinderProvenance>,
+    binder_provenance: &BTreeMap<StaticOriginId, CheckedBinderResolution>,
 ) -> Result<Option<CheckedIhFreshResultDestination>, CraneliftBackendError> {
     let RuntimeExpr::ComputationalMatch { cases, .. } =
         plan.planned_occurrence_expr(active_frame)?
@@ -3342,7 +3707,9 @@ fn fresh_result_destination(
                                 frame_origin,
                                 field_position,
                             },
-                        ) = binder_provenance.get(&capture_occurrence).copied()
+                        ) = binder_provenance
+                            .get(&capture_occurrence)
+                            .map(|resolution| resolution.provenance)
                         else {
                             continue;
                         };
@@ -3371,7 +3738,7 @@ fn fresh_result_destination(
                         let mut body_capture_reads = binder_provenance
                             .iter()
                             .filter_map(|(read_origin, held)| {
-                                (*held
+                                (held.provenance
                                     == CheckedBinderProvenance::LexicalClosureCapture {
                                         closure_origin: origin,
                                         capture_ordinal,
@@ -3448,7 +3815,7 @@ fn validate_fresh_result_disjointness(
 fn derive_checked_ih_continuation_inheritance(
     plan: &StaticTransitionPlan<'_>,
     transport: &CheckedIhEnvironmentTransport,
-    binder_provenance: &BTreeMap<StaticOriginId, CheckedBinderProvenance>,
+    binder_provenance: &BTreeMap<StaticOriginId, CheckedBinderResolution>,
 ) -> Result<Option<CheckedIhContinuationInheritance>, CraneliftBackendError> {
     let ContinuationEmissionOwner::Specialization(destination_specialization) =
         transport.destination_owner
@@ -3552,7 +3919,7 @@ fn derive_checked_ih_continuation_inheritance(
             frame_origin: active_frame,
             recursive_position: transport.recursive_position,
         };
-        let Some((invocation_origin, call_origin, callee_origin)) =
+        let Some((invocation_origin, call_origin, callee_origin, immediate_k_locator)) =
             exact_zero_argument_self_resumption(
                 plan,
                 selected_case_body_origin,
@@ -3571,6 +3938,7 @@ fn derive_checked_ih_continuation_inheritance(
             call_origin,
             callee_origin,
             callee_binding: binding,
+            immediate_k_locators: vec![immediate_k_locator],
         });
 
         if let Some(fresh_result_destination) =
@@ -3630,6 +3998,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
             .ok_or_else(|| {
                 planner_error("an inherited continuation capability has no self-resumption step")
             })?;
+        let [_final_locator] = final_step.immediate_k_locators.as_slice() else {
+            return Err(planner_error(
+                "one inherited continuation step does not have exactly one immediate K locator",
+            ));
+        };
         let key = (
             inheritance.transport.source_call_identity.clone(),
             inheritance.capability.destination_owner,
@@ -3656,8 +4029,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
     {
         return Ok(());
     }
+    let binder_provenance = build_checked_binder_provenance(plan)?;
     let mut keys = BTreeSet::new();
     for inheritance in inheritances {
+        let mut locator_keys = BTreeSet::new();
         if !plan
             .checked_ih_environment_transports
             .contains(&inheritance.transport)
@@ -3698,12 +4073,66 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
                     "one continuation-inheritance step disagrees with its exact checked invocation binding",
                 ));
             }
+            let [locator] = step.immediate_k_locators.as_slice() else {
+                return Err(planner_error(
+                    "one inherited continuation step does not have exactly one immediate K locator",
+                ));
+            };
+            if locator.environment_domain
+                != CheckedIhKAvailabilityDomain::ImmediateInvocationEnvironment
+            {
+                return Err(planner_error(
+                    "an immediate K locator names the wrong runtime environment domain",
+                ));
+            }
+            if locator.invocation_origin != step.invocation_origin
+                || locator.callee_origin != step.callee_origin
+            {
+                return Err(planner_error(
+                    "an immediate K locator names a different descendant invocation or callee",
+                ));
+            }
+            let Some((derived_invocation, derived_call, derived_callee, derived_locator)) =
+                exact_zero_argument_self_resumption(
+                    plan,
+                    step.selected_case_body_origin,
+                    step.callee_binding,
+                    &binder_provenance,
+                )?
+            else {
+                return Err(planner_error(
+                    "an inherited continuation step has no forward-derived immediate K locator",
+                ));
+            };
+            if (step.invocation_origin, step.call_origin, step.callee_origin)
+                != (derived_invocation, derived_call, derived_callee)
+                || locator != &derived_locator
+            {
+                return Err(planner_error(
+                    "an immediate K locator does not equal its forward binder re-derivation",
+                ));
+            }
+            if !locator_keys.insert(locator.clone()) {
+                return Err(planner_error(
+                    "one immediate K locator was issued more than once",
+                ));
+            }
         }
         let Some(final_step) = inheritance.capability.self_resumption_steps.last() else {
             return Err(planner_error(
                 "an inherited continuation capability has no self-resumption step",
             ));
         };
+        let [final_locator] = final_step.immediate_k_locators.as_slice() else {
+            return Err(planner_error(
+                "one inherited continuation step does not have exactly one immediate K locator",
+            ));
+        };
+        if inheritance.capability.immediate_k_locator() != Some(final_locator) {
+            return Err(planner_error(
+                "the final inherited capability view does not expose its exact immediate K locator",
+            ));
+        }
         let key = (
             inheritance.transport.source_call_identity.clone(),
             inheritance.capability.destination_owner,
