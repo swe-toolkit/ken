@@ -18,6 +18,16 @@ fn dependency_env() -> ElabEnv {
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Data.Numeric.Nat.Arithmetic",
+    )
+    .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Core.Classes.LawfulClasses",
+    )
+    .expect("Core.Classes.LawfulClasses must load as a qualified module");
     env
 }
 
