@@ -11,6 +11,38 @@ github: null
 origin: "Steward, 2026-08-16, discharging section 4e on the merge of V3-FO-KEN-LEVEL-CHECKER-AUTHORING (D4+D5, PR #2421). That node's own banned scope names this work: 'Proving embedding_adequacy or checker_soundness. Unfiled successors.' Every coordinate below re-verified against origin/main 5aae7a454 before filing. Steward-filed per COORDINATION section 2."
 ---
 
+> # 2026-08-27 — THE RELATION THIS NODE REFLECTS HAS BEEN REJECTED
+>
+> **Still `merged`; successor cut.**
+>
+> **This node stays `merged` and that is correct — its deliverables landed.**
+> What it proved is being restated elsewhere, and anyone reading it as a
+> discharged FO soundness gate is reading it wrong.
+>
+> **Architect ruling `evt_6hx31xvw9tqs2` REJECTED the current FO
+> checker/derivation/adequacy interface as a semantic soundness gate**, and ruled
+> it **not repairable by finishing the current proof** (base `ef91b8225`, tree
+> `19e0543a4ac006b24b256a038e25e83f29894162`).
+>
+> **`fok_checker_soundness` is a STRUCTURAL REFLECTION theorem for the relation
+> it is given — NOT independent semantic validation.** Its own `FokDerivation`
+> `ForallRight` constructors carry the same permissive arbitrary eigenterm as the
+> Rust checker: freshness is checked only as non-occurrence in the conclusion, so
+> a fresh `Bound(k)` is admitted where a parameter is meant, and the shared
+> untyped de Bruijn substitution installs it across world **and** object binders.
+> **Freshness is not eigenparameter provenance.** Patching the `Refl` step, or
+> adding a Rust-side guard alone, does **not** close the class.
+>
+> **The successor is [[V3-FO-SORTED-EIGENPARAMETER-DERIVATION]]**, the atomic
+> lockstep increment that restates `FokDerivation` and re-proves reflection
+> against a parameter-only sorted rule. Its predecessor is
+> [[CORE-FO-CHECK-TREE-SORT-VALIDATION]].
+>
+> **Production is unaffected.** The rejection invalidates the proposed theorem
+> gate, not the production verdict boundary: route FO still returns the audited
+> `Unknown` via `emit_unknown_hole_fo_withheld` (`prover.rs:562-604`), never
+> `Proved`.
+
 > ## MERGED 2026-08-22 — D4 landed; FO checker-soundness theorem complete
 >
 > **D4 (quantifier rules) landed** as origin/main `ba20b4810` (PR #2805, base

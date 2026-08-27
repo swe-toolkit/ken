@@ -5,13 +5,69 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
-> # D2 HELD 2026-08-27 behind an elaborator predecessor — Architect evt_pw69nxgxn99j
+> # D2 RECUT 2026-08-27 — THE LANDED D1 STATEMENT IS REFUTED
+>
+> **This banner supersedes the two below.**
+>
+> **`fok_embedding_adequacy_statement` (`FoKripke.ken:881`), landed by D1, is
+> REFUTED under the relation it is stated over.** The language-implementer built
+> an accepted certificate that exploits eigenparameter capture and derived
+> `Bottom` from the statement in a kernel-checked Ken theorem, zero new trust
+> (`evt_2yh515wg0mczy`, exact base `ef91b8225`). **No D2 proof and no D2
+> fragment can be authored against the current relation, because the proposition
+> is false.**
+>
+> **Architect ruling `evt_6hx31xvw9tqs2` REJECTED the current FO
+> checker/derivation/adequacy interface as a semantic soundness gate**, and ruled
+> it **not repairable by finishing the current proof** (base `ef91b8225`, tree
+> `19e0543a4ac006b24b256a038e25e83f29894162`). D2 is item 6 of that ruling's
+> six-item repair envelope: **re-establish adequacy ONLY over the corrected
+> sorted/scoped relation.**
+>
+> **PRODUCTION IS UNAFFECTED AND NEEDS NO EMERGENCY CHANGE.** The rejection
+> invalidates the proposed **theorem gate**, not the production verdict
+> boundary. `attempt_fo_with_signature` (`prover.rs:562-604`) still returns
+> `emit_unknown_hole_fo_withheld` — an audited `Unknown`, **never `Proved`** —
+> when `quote_fo` + `find_certificate` + `check_cert` all accept. **The defect is
+> real but LATENT, and the gate that contained it is the very theorem now
+> rejected.** Say this whenever quoting "REJECT".
+>
+> **This node is now THIRD in a three-node repair sequence**, and its predecessor
+> did not exist when the sections below were written:
+> [[CORE-FO-CHECK-TREE-SORT-VALIDATION]] (sorted/scoped validation, both
+> boundaries) → [[V3-FO-SORTED-EIGENPARAMETER-DERIVATION]] (the atomic lockstep
+> increment: parameter-only sorted `ForallRight`, typed instantiation,
+> `FokDerivation` and its reflection proofs) → this node.
+>
+> **Reflection of checker acceptance is not evidence that the reflected rule is
+> semantically lawful.** That is why adequacy is last and why it cannot be
+> attempted early: it is the only node in the sequence that makes a semantic
+> claim.
+>
+> **WHAT IS OPEN, AND DO NOT PRE-DECIDE IT.** `fok_classically_valid q` is
+> `fok_derives (⊢ q)` (`FoKripke.ken:876`), so the statement's **text** quantifies
+> over the derivation relation without naming its constructors. Correcting
+> `FokDerivation` in the predecessor changes what the statement **means** without
+> necessarily changing what it **says**. **Whether the landed statement text
+> survives verbatim is a measurement for `D2a` below, not an assumption in either
+> direction** — the old instruction "prove it as written, do NOT restate it" is
+> withdrawn as an unconditional rule, and a licence to freely rewrite it is not
+> granted in its place.
+>
+> **The Omega/index hold recorded in the next banner is NOT the live blocker and
+> was never the cause.** The ring ruled that out before this was found. That
+> predecessor is discharged; this one is not.
+
+> # D2 HELD 2026-08-27 behind an elaborator predecessor
+>
+> Architect `evt_pw69nxgxn99j`. **SUPERSEDED by the banner above; retained as
+> record.**
 >
 > D1 has landed. **D2 hard-stopped immediately on release** and the Language
 > ring is held. Eliminating the proof-indexed `FokDerivation` with
@@ -264,6 +320,33 @@ interpretation. Delivered as `FokCarriers`/`FokAtomEnv`/`fok_denote_at`/
 `fok_denote` plus `fok_embedding_adequacy_statement`, with the differential at
 `tests/v3_fo_embedding_adequacy_d1.rs`. Consume these; do not rebuild them.
 
+> **`D2` WAS RECUT 2026-08-27 on Architect ruling `evt_6hx31xvw9tqs2`.** The
+> version below is superseded by `D2a` + `D2b`; its text is retained because the
+> proof shape (structural induction on `FokIForm`, `Imp` and `Forall` the
+> non-trivial arms) still applies once the relation is corrected. **The
+> instruction "prove it as written, do NOT restate it" is withdrawn** — that
+> instruction is what the refutation falsifies.
+
+**`D2a` (FIRST, AND IT MAY HARD-STOP) — re-measure the landed statement against
+the corrected relation.** After [[V3-FO-SORTED-EIGENPARAMETER-DERIVATION]]
+lands, determine whether `fok_embedding_adequacy_statement` (`FoKripke.ken:881`)
+is **true as written** over the corrected `FokDerivation`, or whether its text
+must change. **Report which, with the reason.** Re-run the refuting certificate
+from `evt_2yh515wg0mczy` against the corrected relation and show it no longer
+witnesses `fok_classically_valid` for that form — that is the concrete evidence
+the refutation is closed, and a `D2a` that reports "the text survives" without
+it is incomplete. **If the statement must be restated, that is a complete
+result** returned to the Steward and Architect, not a licence to edit it inside
+this deliverable: D1's approval bound that exact form.
+
+**`D2b` (THE WORK) — prove adequacy over the corrected relation.** Structural
+induction on `FokIForm`, on the statement `D2a` established. **Adequacy may be
+proved ONLY over the corrected sorted/scoped relation** (repair-envelope item
+6). A proof that composes with a `fok_checker_soundness` still reflecting the
+old permissive rule is the rejected gate rebuilt, not the repair.
+
+<details><summary>Superseded D2 text, retained as record</summary>
+
 **`D2` (THE WORK) — prove `embedding_adequacy` by structural induction on
 `FokIForm`.** Prove the ALREADY-LANDED proposition `fok_embedding_adequacy_statement`
 (`FoKripke.ken:881`) as written — do NOT restate it. It reads
@@ -279,6 +362,8 @@ statement: D1's approval bound that exact form and `AC-1` still forbids adding
 an assumption or trusted declaration to it. The `Imp` and `Forall` arms are the
 non-trivial cases (as `ForallRight` was for checker-soundness), and the proof
 composes with `fok_checker_soundness` (`:2268`).
+
+</details>
 
 > **D2 partition — Architect interface ruling requested at the D2 candidate.**
 > If D2 splits into a propositional fragment (Bottom/Atom/Or/Imp) plus the

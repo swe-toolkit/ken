@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-27 09:17:28Z — from 463 issue file(s) in `docs/program/issues/`.
+2026-08-27 09:59:39Z — from 464 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -88,7 +88,7 @@ the committed file matches the generator's output.
 | `CONF-VERIFY-OLD-ROW-UNSATISFIABLE` | The seed's only unclaimed row states expect: accepts against a landed elaborator that rejects unconditionally, and the Coverage map rolls it up as a satisfied family | merged | spec-enclave | S | none | — |
 | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS` | Four v1_acceptance tests claim verify/spec-syntax conformance rows that were never authored -- invisible until the row-claim checker's namespace widening, and now a mechanical merge blocker for CI-ROW-CLAIM-NAMESPACE | merged | spec-enclave | S | none | — |
 | `CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY` | Every postulate audit label is a canonical artifact-identity input: decide whether a semantic hash should encode label prose, and if not, migrate | draft | language | L | none | — |
-| `CORE-FO-CHECK-TREE-SORT-VALIDATION` | Make check_cert's own domain honest: validate sorts in check_tree instead of relying on every caller to pass embed's image | draft | language | M | none | — |
+| `CORE-FO-CHECK-TREE-SORT-VALIDATION` | Make both checker surfaces' own domain honest: derive and validate world/object sorts and binder scope in check_tree and in the Ken checker, fail-closed, instead of relying on every caller to pass embed's image | ready | language | M | none | — |
 | `DOC-AGENT-CITE` | agent core modules name normative authorities as a reading list rather than binding them to claim classes, so seven of seven cold runs made material claims without citing the sources D2 requires | merged | doc | M | none | — |
 | `DOC-ASBUILT-AGENTS` | As-built slice 6 — reconcile the thirteen-page agents corpus against its 7 shared drifted sources; it is instructions machines follow, not prose people skim | merged | doc | M | none | — |
 | `DOC-ASBUILT-AUDIT` | As-built reconciliation — 28 cited sources have drifted from their attestations, so the library's currency claim is unbacked corpus-wide | merged | doc | L | none | — |
@@ -490,6 +490,7 @@ the committed file matches the generator's output.
 | `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` | Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all | merged | language | L | none | 2353 |
 | `V3-FO-QUOTE-GUARD-FAIL-CLOSED` | Make quote_fo's pre-quotation guards fail closed: Pair is not a binder, and a proof-variable-occurrence test must default to true | merged | language | S | none | 2346 |
 | `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` | Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report | merged | language | S | none | — |
+| `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` | Make ForallRight parameter-only and sorted on BOTH checker surfaces, replace arbitrary-term subst0 with typed instantiation, and restate FokDerivation and its reflection proofs in lockstep -- the atomic middle of the FO soundness repair | draft | language | L | none | — |
 | `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` | The FoKripke checker_soundness mutual-recursion clique's real termination is not a single structural size-change thread on its declared parameters under the current size_rel abstraction -- it fails by ROTATION (the bare-Var matched-field descent arrives in one slot while the outgoing edge decreases from another) -- so full SCT admission of the real consumer needs an UPSTREAM resolution (re-elaborate the soundness recursion to one structural thread; preferred, no TCB), with a narrow size_rel completeness fix or a richer measure as operator-gated conditional arms; this is the real AC-CONSUMER home V3-FO-CHECKER-SOUNDNESS D3 waits on, distinct from the arity fix (KERNEL-SCT-TELESCOPE-CANON) and from any Cast/J or lexicographic-SCT node | active | language | L | none | — |
 | `V3-FO-SUBST-DEPTH-CONTROL` | Give subst_form_at a control that can see its binder-depth discipline, and state the two premises fo_kripke.rs relies on without naming where the next editor will look -- the shift call-site correspondence and the bottom_id exclusion criterion | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2382 |
 | `V3-FO-TOP-REFUSAL-ENFORCEMENT` | Give the sort-candidate criterion an enforcement: a test asserting quote_iform refuses top_id with UnsupportedTermShape, so an IForm::Top arm reds at the same moment the collector needs updating -- and soften the D2 claim that the criterion forces that update | merged | language | XS | none | https://github.com/swe-toolkit/ken/pull/2388 |
@@ -509,6 +510,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `ABI-M1` — manifest v2 — family-scoped, versioned, generated from family schemas
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
+- `CORE-FO-CHECK-TREE-SORT-VALIDATION` — Make both checker surfaces' own domain honest: derive and validate world/object sorts and binder scope in check_tree and in the Ken checker, fail-closed, instead of relying on every caller to pass embed's image
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
@@ -566,6 +568,8 @@ is itself not yet `merged`/`closed`:
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` blocked by `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
+- `V3-FO-EMBEDDING-ADEQUACY` blocked by `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` (status: draft)
+- `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` blocked by `CORE-FO-CHECK-TREE-SORT-VALIDATION` (status: ready)
 
 ## Gate progress
 
