@@ -113,10 +113,31 @@ use continuations::ContinuationProductionMutation;
 #[cfg(feature = "px8-ds-test-support")]
 pub use aggregates::{
     checked_ih_continuation_inheritance_mutation_is_exact,
+    checked_ih_generated_entry_admission_mutation_is_exact,
+    checked_ih_generated_entry_arrival_mutation_is_exact,
+    checked_ih_generated_entry_confluence_mutation_is_exact,
     with_checked_ih_continuation_inheritance_mutation,
     with_checked_ih_continuation_inheritance_observations,
+    with_checked_ih_generated_entry_admission_mutation,
+    with_checked_ih_generated_entry_admission_observations,
+    with_checked_ih_generated_entry_arrival_mutation,
+    with_checked_ih_generated_entry_confluence_mutation,
+    with_checked_ih_generated_entry_observations,
     CheckedIhContinuationInheritanceMutation,
     CheckedIhContinuationInheritanceObservation,
+    CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
+    CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
+    CheckedIhGeneratedEntryObservation,
+};
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) use aggregates::{
+    checked_ih_generated_entry_arrival_mutation,
+    record_checked_ih_generated_entry_governed_validation,
+    record_checked_ih_generated_entry_installed,
+    record_checked_ih_generated_entry_ordinary_continuation,
+    record_checked_ih_generated_entry_raw_arrival,
+    record_checked_ih_generated_entry_reached,
 };
 
 // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — the aggregates domain's cross-boundary
@@ -127,13 +148,19 @@ pub(in crate::cranelift_backend) use aggregates::{
     AggregateOccurrenceId, AggregateOccurrenceProducer, BoundaryClosureEnvironment,
     CheckedIhCapabilityInheritance, CheckedIhContinuationInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
-    CheckedIhFreshResultDestination, CheckedIhImmediateKBindingLocator,
+    CheckedIhFreshResultDestination, CheckedIhGeneratedEntryAccess,
+    CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryCallCoordinate,
+    CheckedIhGeneratedEntryProjection,
+    CheckedIhImmediateKBindingLocator,
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
     PlannedAggregateAllocation, PlannedAggregateOwnership,
     PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
     SynthesizedAggregateRole, SynthesizedAggregateRoot, SynthesizedDynamicSet,
 };
-use aggregates::lifetime_referent_affinity;
+use aggregates::{
+    lifetime_referent_affinity, CheckedIhGeneratedEntryConfluence,
+    CheckedIhGeneratedEntryCoordinate,
+};
 #[cfg(test)]
 use aggregates::{
     aggregate_child_referent_owners, fixed_node_selected_owner,
@@ -566,6 +593,17 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// one ordinary Ret/capture destination. This plane is inert: lowering has
     /// no consumer in this predecessor.
     checked_ih_continuation_inheritances: Vec<CheckedIhContinuationInheritance>,
+    /// Planner-owned confluence certificates proving that all source-specific
+    /// inheritances at one generated entry agree on one typed consumer
+    /// projection. Source identities remain class members and never cross into
+    /// lowering authority.
+    checked_ih_generated_entry_confluences:
+        BTreeMap<CheckedIhGeneratedEntryCoordinate, CheckedIhGeneratedEntryConfluence>,
+    /// Total sanitized admission maps, one per generated context carrying a
+    /// governed confluence. Built and validated in the planner before lowering
+    /// can clone one into function-local compile-time state.
+    checked_ih_generated_entry_accesses:
+        BTreeMap<ContinuationContextId, CheckedIhGeneratedEntryAccess>,
     /// `RT-DECL-CLOSURE-PORT` `D7`. One record per capability/argument seat of
     /// every admitted host effect occurrence. Read by lowering, which claims
     /// exactly one of these per seat it consumes.

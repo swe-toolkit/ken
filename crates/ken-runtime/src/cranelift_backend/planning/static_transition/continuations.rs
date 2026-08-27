@@ -14,6 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::cell::Cell;
 
 use super::abi;
+#[cfg(feature = "px8-ds-test-support")]
+use super::aggregates::checked_ih_generated_entry_context_permutation_is_active;
 use super::abi::{
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiSlot, AbiSlotKind,
     AbiStorageOwner, AbiUnitDefinition,
@@ -4971,6 +4973,26 @@ pub(in crate::cranelift_backend) struct CheckedIhBinding {
     pub(super) recursive_position: u32,
 }
 
+impl CheckedIhBinding {
+    pub(in crate::cranelift_backend) fn new(
+        frame_origin: StaticOriginId,
+        recursive_position: u32,
+    ) -> Self {
+        Self {
+            frame_origin,
+            recursive_position,
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn frame_origin(self) -> StaticOriginId {
+        self.frame_origin
+    }
+
+    pub(in crate::cranelift_backend) fn recursive_position(self) -> u32 {
+        self.recursive_position
+    }
+}
+
 /// What one binder in scope is, threaded down the occurrence tree.
 ///
 /// This is the environment element [`derive_case_producer_fact`] never had. It
@@ -6317,6 +6339,15 @@ pub(super) fn build_continuation_specialization_plan(
         &calls,
         &required_consumer_projections,
     )?;
+    #[cfg(feature = "px8-ds-test-support")]
+    let contexts = if checked_ih_generated_entry_context_permutation_is_active() {
+        let mut context_calls = calls.clone();
+        context_calls.reverse();
+        intern_generated_contexts(&units, &context_calls)?
+    } else {
+        intern_generated_contexts(&units, &calls)?
+    };
+    #[cfg(not(feature = "px8-ds-test-support"))]
     let contexts = intern_generated_contexts(&units, &calls)?;
     Ok((
         units,

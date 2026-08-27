@@ -438,6 +438,162 @@ fn d8f_declined_call_claims() -> bool {
     D8F_DECLINED_CALL_CLAIMS.with(std::cell::Cell::get)
 }
 
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckedIhGeneratedEntryCapsuleMutation {
+    Exact,
+    OuterCarried,
+    SpecializedSibling,
+    StaticWorker,
+    WrongFrame,
+    WrongSlot,
+    WrongInvocation,
+    NonCarriedResidual,
+    ProvenanceIndex,
+    WrongDestinationOwner,
+    WrongDestinationBody,
+    WrongBinding,
+    WrongLocatorInvocation,
+    WrongLocatorCallee,
+    WrongLocatorDomain,
+    WrongLocatorIndex,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static GENERATED_ENTRY_CAPSULE_MUTATION:
+        std::cell::Cell<CheckedIhGeneratedEntryCapsuleMutation> =
+            const { std::cell::Cell::new(CheckedIhGeneratedEntryCapsuleMutation::Exact) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_generated_entry_capsule_mutation<T>(
+    mutation: CheckedIhGeneratedEntryCapsuleMutation,
+    f: impl FnOnce() -> T,
+) -> T {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            GENERATED_ENTRY_CAPSULE_MUTATION.with(|active| {
+                active.set(CheckedIhGeneratedEntryCapsuleMutation::Exact)
+            });
+        }
+    }
+    GENERATED_ENTRY_CAPSULE_MUTATION.with(|active| active.set(mutation));
+    let _restore = Restore;
+    f()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn checked_ih_generated_entry_capsule_mutation_is_exact() -> bool {
+    GENERATED_ENTRY_CAPSULE_MUTATION.with(std::cell::Cell::get)
+        == CheckedIhGeneratedEntryCapsuleMutation::Exact
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn checked_ih_generated_entry_capsule_mutation() -> CheckedIhGeneratedEntryCapsuleMutation {
+    GENERATED_ENTRY_CAPSULE_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn mutate_checked_ih_generated_entry_capsule_binding(
+    binding: &LoweringEnvironmentBinding,
+    pending: PendingCheckedIhCall,
+    call: &crate::CheckedComputationalIHCallTemplateV1,
+) -> LoweringEnvironmentBinding {
+    use CheckedIhGeneratedEntryCapsuleMutation as Mutation;
+    let mutation = GENERATED_ENTRY_CAPSULE_MUTATION.with(std::cell::Cell::get);
+    // The fixed read witness reaches NonGoverned template 2 before governed
+    // template 3. Mutating both would exercise ordinary dispatch first and say
+    // nothing about the governed guard. This test-only transition coordinate is
+    // the capsule control's injection point, never applicability authority.
+    if !matches!(mutation, CheckedIhGeneratedEntryCapsuleMutation::Exact
+        | CheckedIhGeneratedEntryCapsuleMutation::ProvenanceIndex)
+        && pending.call_template_id != 3
+    {
+        return binding.clone();
+    }
+    let mut binding = binding.clone();
+    match mutation {
+        Mutation::Exact
+        | Mutation::ProvenanceIndex
+        | Mutation::WrongDestinationOwner
+        | Mutation::WrongDestinationBody
+        | Mutation::WrongBinding
+        | Mutation::WrongLocatorInvocation
+        | Mutation::WrongLocatorCallee
+        | Mutation::WrongLocatorDomain
+        | Mutation::WrongLocatorIndex => {}
+        Mutation::OuterCarried => {
+            if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
+                Lowered::ComputationalRecursorClosure { residual, .. },
+            )) = &binding
+            {
+                binding = LoweringEnvironmentBinding::Value(residual.as_ref().clone());
+            }
+        }
+        Mutation::SpecializedSibling => {
+            binding = LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
+                Lowered::Closure {
+                    captures: Vec::new(),
+                    params: Vec::new(),
+                    body: pending.application_origin,
+                    boundary_environment: None,
+                },
+            ));
+        }
+        Mutation::StaticWorker => {
+            binding = LoweringEnvironmentBinding::StaticWorker(StaticWorkerBinding {
+                closure_origin: pending.invocation_origin,
+                body_origin: pending.application_origin,
+                declared_arity: 0,
+                captures: Vec::new(),
+                route: StaticWorkerCallRoute::RawWorker,
+                discharge: ContinuationDischarge::DirectSpecializationCall,
+                transport: None,
+            });
+        }
+        Mutation::WrongFrame | Mutation::WrongSlot | Mutation::WrongInvocation
+        | Mutation::NonCarriedResidual => {
+            if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
+                Lowered::ComputationalRecursorClosure {
+                    residual,
+                    invocation,
+                    ..
+                },
+            )) = &mut binding
+            {
+                match mutation {
+                    Mutation::WrongFrame => {
+                        invocation.selection.checked_frame_id =
+                            Some(call.parent_frame_template_id.unwrap_or(0).wrapping_add(1));
+                    }
+                    Mutation::WrongSlot => {
+                        invocation.computational_ih_slot_template_id =
+                            Some(call.slot_template_id.wrapping_add(1));
+                    }
+                    Mutation::WrongInvocation => {
+                        invocation.selection.static_origin = pending.invocation_origin;
+                    }
+                    Mutation::NonCarriedResidual => {
+                        *residual = Box::new(LoweringOperand::Specialized(
+                            Lowered::RecursiveBackedge,
+                        ));
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+    }
+    binding
+}
+
+/// Closed inner-variant whitelist for the generated-entry K capsule. This is
+/// part of the production guard, so exhaustive sibling tests mutate the value
+/// consumed by the guard rather than a parallel detector.
+fn generated_entry_capsule_variant_is_admitted(variant: LoweredVariant) -> bool {
+    matches!(variant, LoweredVariant::ComputationalRecursorClosure)
+}
 
 impl<'a> Lowering<'a> {
     /// Record a specialized/default selection made after the source-machine
@@ -659,6 +815,7 @@ impl<'a> Lowering<'a> {
                             kind,
                             binder_morphism,
                             &body.expr,
+                            static_origin,
                             body.static_origin,
                         )?;
                         control.continuation =
@@ -681,26 +838,65 @@ impl<'a> Lowering<'a> {
                     // Same value-producing rule as the direct descent's `Var`:
                     // only `Value` yields a machine value, and a static worker
                     // binding fails closed here rather than entering one.
-                    RuntimeExpr::Var(index) => SourceMachineState::Value {
-                        value: RoutedAnswer::direct(
-                            env.get(index as usize)
-                                .ok_or_else(|| {
-                                    unsupported(
-                                        "Var",
-                                        format!("no runtime binding for index {index}"),
-                                    )
-                                })?
-                                .value_at({
-                                    #[cfg(test)]
-                                    crate::cranelift_backend::lowering::record_d2k_owner_event(
-                                        crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller { site: "core.rs source-machine Var" },
-                                    );
-                                    "a source-machine Var in value position"
-                                })?
-                                .clone(),
-                        ),
-                        control,
-                    },
+                    RuntimeExpr::Var(index) => {
+                        let binding = env.get(index as usize).ok_or_else(|| {
+                            unsupported("Var", format!("no runtime binding for index {index}"))
+                        })?;
+                        // Capsule mutants are injected on the real forwarding
+                        // path, before this `value_at` and before dispatch. The
+                        // generated call key is capsule-independent.
+                        #[cfg(feature = "px8-ds-test-support")]
+                        let mutated_binding = if let (Some(_), Some(pending)) = (
+                            self.function_local.checked_ih_generated_entry_access.as_ref(),
+                            self.pending_computational_ih_call,
+                        ) {
+                            let callee_origin = self.static_transition_plan.child_static_origin(
+                                pending.application_origin,
+                                0,
+                            )?;
+                            if callee_origin == static_origin {
+                                let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(
+                                    || {
+                                        unsupported(
+                                            "CheckedIhGeneratedEntryAccess",
+                                            "a generated-entry invocation has no oriented call plan",
+                                        )
+                                    },
+                                )?;
+                                let call = plan
+                                    .computational_ih_call(pending.call_template_id)
+                                    .ok_or_else(|| {
+                                        unsupported(
+                                            "CheckedIhGeneratedEntryAccess",
+                                            "a generated-entry invocation has no exact call template",
+                                        )
+                                    })?;
+                                Some(mutate_checked_ih_generated_entry_capsule_binding(
+                                    binding, pending, call,
+                                ))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+                        #[cfg(feature = "px8-ds-test-support")]
+                        let binding = mutated_binding.as_ref().unwrap_or(binding);
+                        SourceMachineState::Value {
+                            value: RoutedAnswer::direct(
+                                binding
+                                    .value_at({
+                                        #[cfg(test)]
+                                        crate::cranelift_backend::lowering::record_d2k_owner_event(
+                                            crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller { site: "core.rs source-machine Var" },
+                                        );
+                                        "a source-machine Var in value position"
+                                    })?
+                                    .clone(),
+                            ),
+                            control,
+                        }
+                    }
                     RuntimeExpr::Let { value, body } => {
                         control.continuation = SourceContinuation::LetBody {
                             body: self.owned_child_occurrence(static_origin, 1, *body)?,
@@ -3772,6 +3968,137 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         self.resume_active_continuation(builder, merged?, suffix_active)
     }
 
+    fn validate_checked_ih_generated_entry_governed_arrival(
+        &self,
+        callee: &LoweringOperand,
+        args: &[LoweringOperand],
+        env: &[LoweringEnvironmentBinding],
+        access: &CheckedIhGeneratedEntryAccess,
+        pending: PendingCheckedIhCall,
+        callee_origin: StaticOriginId,
+        projection: &CheckedIhGeneratedEntryProjection,
+    ) -> Result<CheckedIhBinding, CraneliftBackendError> {
+        let LoweringOperand::Specialized(callee_value) = callee else {
+            return Err(unsupported(
+                "CheckedIhGeneratedEntryAccess",
+                "the governed generated-entry callee does not name a specialized computational-recursor capsule",
+            ));
+        };
+        if !generated_entry_capsule_variant_is_admitted(callee_value.variant()) {
+            return Err(unsupported(
+                "CheckedIhGeneratedEntryAccess",
+                "the governed generated-entry callee is not a computational-recursor capsule",
+            ));
+        }
+        let Lowered::ComputationalRecursorClosure {
+            residual,
+            invocation,
+            ..
+        } = callee_value
+        else {
+            unreachable!("the exact variant whitelist admits only the recursor arm")
+        };
+        let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(|| {
+            unsupported(
+                "CheckedIhGeneratedEntryAccess",
+                "a governed generated-entry invocation has no oriented call plan",
+            )
+        })?;
+        let call = plan
+            .computational_ih_call(pending.call_template_id)
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhGeneratedEntryAccess",
+                    "a governed generated-entry invocation has no exact call template",
+                )
+            })?;
+        if !matches!(
+            pending.kind,
+            crate::CheckedComputationalIHInvocationKind::OrdinaryApplication
+                | crate::CheckedComputationalIHInvocationKind::CheckedHostComputationTail
+        ) || call.arity != 0
+            || !args.is_empty()
+        {
+            return Err(unsupported(
+                "CheckedIhGeneratedEntryAccess",
+                "the governed generated-entry call disagrees with its bounded invocation kind, arity, or argument run",
+            ));
+        }
+        let coordinates = CarriedInvocationCoordinates::of(invocation)?;
+        let binding = CheckedIhBinding::new(
+            coordinates.continuation_origin,
+            coordinates.recursive_position,
+        );
+        let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "CheckedIhGeneratedEntryAccess",
+                "a governed generated-entry projection has no destination owner",
+            )
+        })?;
+        let locator = projection.immediate_k_locator();
+        if projection.destination_owner() != destination_owner
+            || projection.destination_body_origin() != access.worker_body_origin()
+            || projection.binding() != binding
+            || locator.invocation_origin() != pending.invocation_origin
+            || locator.callee_origin() != callee_origin
+        {
+            return Err(unsupported(
+                "CheckedIhGeneratedEntryAccess",
+                "a governed generated-entry projection disagrees with its current function, binding, or call coordinate",
+            ));
+        }
+        if locator.environment_domain()
+            != CheckedIhKAvailabilityDomain::ImmediateInvocationEnvironment
+            || usize::try_from(locator.environment_index())
+                .ok()
+                .filter(|index| *index < env.len())
+                .is_none()
+        {
+            return Err(unsupported(
+                "CheckedIhGeneratedEntryAccess",
+                "the governed immediate K locator has the wrong domain or is outside the current environment",
+            ));
+        }
+        let RuntimeExpr::Var(callee_index) = self
+            .static_transition_plan
+            .source_occurrence(callee_origin)?
+        else {
+            return Err(unsupported(
+                "CheckedIhGeneratedEntryAccess",
+                "the governed generated-entry callee is not a source Var",
+            ));
+        };
+        #[cfg(feature = "px8-ds-test-support")]
+        let callee_index = if GENERATED_ENTRY_CAPSULE_MUTATION
+            .with(std::cell::Cell::get)
+            == CheckedIhGeneratedEntryCapsuleMutation::ProvenanceIndex
+        {
+            callee_index.wrapping_add(1)
+        } else {
+            *callee_index
+        };
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let callee_index = *callee_index;
+        if callee_index != locator.environment_index() {
+            return Err(unsupported(
+                "CheckedIhGeneratedEntryAccess",
+                "the governed callee Var disagrees with the immediate K locator index",
+            ));
+        }
+        if invocation.selection.checked_frame_id != call.parent_frame_template_id
+            || invocation.computational_ih_slot_template_id != Some(call.slot_template_id)
+            || !matches!(residual.as_ref(), LoweringOperand::Carried(_))
+        {
+            return Err(unsupported(
+                "CheckedIhGeneratedEntryAccess",
+                "the governed recursor capsule disagrees with the checked frame, slot, call template, or residual phase",
+            ));
+        }
+
+        let _fresh_result_destination = projection.fresh_result_destination();
+        Ok(binding)
+    }
+
     fn source_call_state<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -3780,6 +4107,125 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         env: Vec<LoweringEnvironmentBinding>,
         control: SourceControl<'b>,
     ) -> Result<SourceCallOutcome<'b>, CraneliftBackendError> {
+        // Total generated-entry admission, before `specialized_at` and every
+        // callable arm. The one map read answers both applicability and typed
+        // authority: positive `NonGoverned` membership continues unchanged;
+        // absence is a broken closed population and fails closed.
+        if let (Some(access), Some(pending)) = (
+            self.function_local.checked_ih_generated_entry_access.clone(),
+            self.pending_computational_ih_call,
+        ) {
+            let callee_origin = self
+                .static_transition_plan
+                .child_static_origin(pending.application_origin, 0)?;
+            #[cfg(feature = "px8-ds-test-support")]
+            record_checked_ih_generated_entry_raw_arrival(
+                &access,
+                pending.invocation_origin,
+                pending.application_origin,
+                callee_origin,
+            );
+            let admission = access
+                .admission_for(
+                    pending.invocation_origin,
+                    pending.application_origin,
+                    callee_origin,
+                )
+                .cloned()
+                .ok_or_else(|| {
+                    unsupported(
+                        "CheckedIhGeneratedEntryAccess",
+                        "the total generated-entry admission map has no current call key",
+                    )
+                })?;
+            match admission {
+                CheckedIhGeneratedEntryAdmission::NonGoverned => {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if checked_ih_generated_entry_arrival_mutation()
+                        == CheckedIhGeneratedEntryArrivalMutation::NonGovernedThroughGoverned
+                    {
+                        return Err(unsupported(
+                            "CheckedIhGeneratedEntryAccess",
+                            "a NonGoverned admission was routed through the governed continuation without a projection",
+                        ));
+                    }
+                    // Positive membership in P \\ G authorizes nothing. The
+                    // existing call dispatch below remains solely responsible.
+                    #[cfg(feature = "px8-ds-test-support")]
+                    record_checked_ih_generated_entry_ordinary_continuation(
+                        &access,
+                        pending.invocation_origin,
+                        pending.application_origin,
+                        callee_origin,
+                        false,
+                    );
+                }
+                CheckedIhGeneratedEntryAdmission::Governed(projection) => {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    let mutation = checked_ih_generated_entry_arrival_mutation();
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if mutation == CheckedIhGeneratedEntryArrivalMutation::GovernedThroughNonGoverned
+                    {
+                        record_checked_ih_generated_entry_ordinary_continuation(
+                            &access,
+                            pending.invocation_origin,
+                            pending.application_origin,
+                            callee_origin,
+                            true,
+                        );
+                    } else {
+                        let validation_count = match mutation {
+                            CheckedIhGeneratedEntryArrivalMutation::DuplicateGovernedValidation => 2,
+                            CheckedIhGeneratedEntryArrivalMutation::SkipGovernedValidation => 0,
+                            _ => 1,
+                        };
+                        if validation_count == 0 {
+                            return Err(unsupported(
+                                "CheckedIhGeneratedEntryAccess",
+                                "the governed generated-entry validation operation was skipped",
+                            ));
+                        }
+                        for _ in 0..validation_count {
+                            let binding = self
+                                .validate_checked_ih_generated_entry_governed_arrival(
+                                    &callee,
+                                    &args,
+                                    &env,
+                                    &access,
+                                    pending,
+                                    callee_origin,
+                                    &projection,
+                                )?;
+                            record_checked_ih_generated_entry_governed_validation(
+                                &access,
+                                pending.invocation_origin,
+                                pending.application_origin,
+                                callee_origin,
+                            );
+                            record_checked_ih_generated_entry_reached(
+                                &access,
+                                binding,
+                                pending.invocation_origin,
+                                pending.application_origin,
+                                callee_origin,
+                                &projection,
+                            );
+                        }
+                    }
+                    #[cfg(not(feature = "px8-ds-test-support"))]
+                    self.validate_checked_ih_generated_entry_governed_arrival(
+                        &callee,
+                        &args,
+                        &env,
+                        &access,
+                        pending,
+                        callee_origin,
+                        &projection,
+                    )?;
+                }
+            }
+        }
+
         // ⭐ A call needs a **callable template** — `params`, `captures`, a body
         // occurrence. A carried boundary word carries none of those and cannot
         // acquire them (`§2g`: the carrier holds the SSA word and nothing else),
@@ -5049,6 +5495,17 @@ mod tests {
     use crate::cranelift_backend::lowering::core::tests::source_frame_bridge::{
         d8f_compile, d8n_compile,
     };
+
+    #[test]
+    fn generated_entry_capsule_guard_rejects_every_specialized_sibling() {
+        for variant in LoweredVariant::ALL {
+            assert_eq!(
+                generated_entry_capsule_variant_is_admitted(variant),
+                variant == LoweredVariant::ComputationalRecursorClosure,
+                "the generated-entry guard must admit exactly the recursor capsule: {variant:?}"
+            );
+        }
+    }
 
     #[derive(Clone, Copy)]
     enum Px8jInstallMalformation {

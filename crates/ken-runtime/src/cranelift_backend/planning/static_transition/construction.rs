@@ -34,6 +34,8 @@ use super::aggregates::{
     apply_checked_ih_continuation_inheritance_mutation,
     checked_ih_intervening_binder_population_control_is_active,
     record_checked_ih_continuation_inheritances,
+    record_checked_ih_generated_entry_admissions,
+    record_checked_ih_generated_entry_confluences,
     run_checked_ih_intervening_binder_population_control,
 };
 #[cfg(test)]
@@ -46,9 +48,13 @@ use super::aggregates::{
 #[allow(unused_imports)]
 use super::aggregates::{
     build_aggregate_ownership_plan, build_checked_ih_continuation_inheritances,
-    build_checked_ih_environment_transports, lifetime_referent_affinity,
-    validate_aggregate_ownership_plan, validate_checked_ih_continuation_inheritances,
-    validate_checked_ih_environment_transports, AggregateOccurrenceId, AggregateOccurrenceProducer,
+    build_checked_ih_environment_transports, build_checked_ih_generated_entry_accesses,
+    build_checked_ih_generated_entry_confluences,
+    lifetime_referent_affinity, validate_aggregate_ownership_plan,
+    validate_checked_ih_continuation_inheritances, validate_checked_ih_environment_transports,
+    validate_checked_ih_generated_entry_accesses,
+    validate_checked_ih_generated_entry_confluences, AggregateOccurrenceId,
+    AggregateOccurrenceProducer,
     PlannedAggregateAllocation, PlannedAggregateOwnership, PlannedAggregateShape,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,
     SynthesizedAggregateRoot, SynthesizedDynamicSet,
@@ -280,6 +286,8 @@ impl<'src> Planner<'src> {
                 aggregate_ownership: Vec::new(),
                 checked_ih_environment_transports: Vec::new(),
                 checked_ih_continuation_inheritances: Vec::new(),
+                checked_ih_generated_entry_confluences: BTreeMap::new(),
+                checked_ih_generated_entry_accesses: BTreeMap::new(),
                 host_effect_seats: Vec::new(),
                 occurrence_authorities: Vec::new(),
                 continuation_specializations: Vec::new(),
@@ -1240,6 +1248,31 @@ impl<'src> Planner<'src> {
         validate_checked_ih_continuation_inheritances(
             &self.plan,
             &self.plan.checked_ih_continuation_inheritances,
+        )?;
+        self.plan.checked_ih_generated_entry_confluences =
+            build_checked_ih_generated_entry_confluences(&self.plan)?;
+        validate_checked_ih_generated_entry_confluences(
+            &self.plan,
+            &self.plan.checked_ih_generated_entry_confluences,
+        )?;
+        self.plan.checked_ih_generated_entry_accesses =
+            build_checked_ih_generated_entry_accesses(
+                &self.plan,
+                &self.plan.checked_ih_generated_entry_confluences,
+            )?;
+        validate_checked_ih_generated_entry_accesses(
+            &self.plan,
+            &self.plan.checked_ih_generated_entry_confluences,
+            &self.plan.checked_ih_generated_entry_accesses,
+        )?;
+        #[cfg(feature = "px8-ds-test-support")]
+        record_checked_ih_generated_entry_confluences(
+            &self.plan.checked_ih_generated_entry_confluences,
+        );
+        #[cfg(feature = "px8-ds-test-support")]
+        record_checked_ih_generated_entry_admissions(
+            &self.plan,
+            &self.plan.checked_ih_generated_entry_accesses,
         )?;
         #[cfg(feature = "px8-ds-test-support")]
         if !checked_ih_intervening_binder_population_control_is_active() {

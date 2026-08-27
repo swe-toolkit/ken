@@ -80,6 +80,12 @@ pub(crate) use artifact::api::{
 // `-p ken-runtime` build config can observe the break — only the consumer can.
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::with_px8ds_retired_flat_order;
+#[cfg(feature = "px8-ds-test-support")]
+pub use lowering::source::{
+    checked_ih_generated_entry_capsule_mutation_is_exact,
+    with_checked_ih_generated_entry_capsule_mutation,
+    CheckedIhGeneratedEntryCapsuleMutation,
+};
 
 // `RT-MATCH-RECURSOR-CONSUMERS` 4a: the cross-crate census surface, reached as
 // `ken_runtime::{with_match_recursor_census, MatchRecursorCensusRow}` through
@@ -90,9 +96,20 @@ pub use lowering::with_px8ds_retired_flat_order;
 #[cfg(feature = "px8-ds-test-support")]
 pub use planning::{
     checked_ih_continuation_inheritance_mutation_is_exact,
+    checked_ih_generated_entry_admission_mutation_is_exact,
+    checked_ih_generated_entry_arrival_mutation_is_exact,
+    checked_ih_generated_entry_confluence_mutation_is_exact,
     with_checked_ih_continuation_inheritance_mutation,
-    with_checked_ih_continuation_inheritance_observations, with_worker_prefix_deferrals,
+    with_checked_ih_continuation_inheritance_observations,
+    with_checked_ih_generated_entry_admission_mutation,
+    with_checked_ih_generated_entry_admission_observations,
+    with_checked_ih_generated_entry_arrival_mutation,
+    with_checked_ih_generated_entry_confluence_mutation,
+    with_checked_ih_generated_entry_observations, with_worker_prefix_deferrals,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
+    CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
+    CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
+    CheckedIhGeneratedEntryObservation,
     WorkerPrefixDeferral,
 };
 
