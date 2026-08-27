@@ -37,6 +37,8 @@ the total `List UInt8` view. `String` is deliberately not the offset basis;
 they must.
 
 ```ken
+import Core.Classes.LawfulClasses (leq_nat)
+
 fn IsUtf8 (bs : Bytes) : Prop =
   match bytes_decode bs {
     Err _ ↦ Bottom;
@@ -77,10 +79,10 @@ a demo.
 identifies a source artifact by itself. `ValidSpan s sp` requires
 `span_start sp <= span_end sp <= source_length s`, stated through
 `LessEqNat`, the same `Bool`-bridged pattern the lawful-classes packages use
-(`Equal Bool (nat_leq_bool m n) True`), here without a named `IsTrue` alias
+(`Equal Bool (leq_nat m n) True`), here without a named `IsTrue` alias
 since this package has no `Eq`/`Ord`-style class to hang one on.
 `LessEqNat::refl` is a genuine proof by induction on `n`; `LessEqNat::zero_left`
-is definitional (`nat_leq_bool Zero n` reduces to `True` on its very first
+is definitional (`leq_nat Zero n` reduces to `True` on its very first
 match arm, for any `n`). `valid_zero_width_span` is the one composite proof
 in this package: given a valid offset (`LessEqNat offset (source_length s)`),
 a zero-width span at that offset is valid, by pairing `LessEqNat::refl`
@@ -158,17 +160,7 @@ const byte_cursor_ops : CursorOps ByteCursor UInt8 Span =
     byte_cursor_advance
     byte_cursor_locate
 
-fn nat_leq_bool (m : Nat) (n : Nat) : Bool =
-  match m {
-    Zero ↦ True;
-    Suc m2 ↦
-      match n {
-        Zero ↦ False;
-        Suc n2 ↦ nat_leq_bool m2 n2
-      }
-  }
-
-fn LessEqNat (m : Nat) (n : Nat) : Prop = Equal Bool (nat_leq_bool m n) True
+fn LessEqNat (m : Nat) (n : Nat) : Prop = Equal Bool (leq_nat m n) True
 
 proof refl for LessEqNat (n : Nat) : LessEqNat n n =
   match n {
