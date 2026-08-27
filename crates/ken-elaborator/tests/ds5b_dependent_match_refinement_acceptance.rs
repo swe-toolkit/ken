@@ -674,6 +674,36 @@ fn omega_classified_reindexed_position_uses_kernel_checked_transport() {
     assert_transparent_body_kernel_checks(&env, id);
 }
 
+/// `AC-DIRECTION`: both the constructor evidence and an outer consumer depend
+/// on the refined index, and the branch applies the consumer to that evidence.
+/// Reversing old/new generalization in the direct-J constructor must reject
+/// this used-evidence path rather than merely change an unobserved proof term.
+#[test]
+fn omega_reindexed_evidence_is_consumed_in_the_ruled_direction() {
+    let mut env = mk_env();
+    elab_ok(
+        &mut env,
+        "data OmegaUsedEvidence : Nat -> Type where { \
+         OmegaUsedEvidenceMk : (n : Nat) -> Equal Nat n n \
+           -> OmegaUsedEvidence n }",
+    );
+    elab_ok(
+        &mut env,
+        "theorem omega_evidence_consumer \
+         (n : Nat) (h : Equal Nat n n) : Top = Proved",
+    );
+    let id = env
+        .elaborate_decl(
+            "theorem omega_consume_reindexed_evidence \
+             (n : Nat) (d : OmegaUsedEvidence n) : Top = \
+             match d { \
+               OmegaUsedEvidenceMk m h |-> omega_evidence_consumer n h \
+             }",
+        )
+        .expect("the re-indexed Omega evidence must reach its outer consumer");
+    assert_transparent_body_kernel_checks(&env, id);
+}
+
 /// `AC-REAL-CONSUMER` and held-Probe transition. Both source programs below
 /// are byte-for-byte the two `FokDerivation` programs in evidence `3f687a460`:
 /// all four constructors under Type and Omega motives. The ordinary indexed,
