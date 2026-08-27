@@ -1,30 +1,32 @@
 STEWARD WATCHDOG TICK. Run in order; stop as soon as one produces an action.
 
-ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` before arming; never grow a step without trimming another.
+ARMING SOURCE. UNDER 4096 CHARS -- set_interval rejects more. `wc -c` before arming; never grow a step without trimming another.
 
-0. CREDIT: operator RESET the OpenAI quota 2026-08-27 and re-logged Anthropic. The 2026-08-18 burn-down directive still stands for the NEXT exhaustion: when ACTUALLY empty, let the fleet idle, do NOT fail over to Anthropic, clear_interval. Exhaustion is ACCOUNT-WIDE, not tier-scoped -- terra hits it too, so reseating sol->terra is NOT a lever. Tell: "usage limit (pro plan)". That is QUOTA, not the 503 class ("servers are currently overloaded"), and nudging does nothing.
+0. CREDIT. On the NEXT exhaustion (operator): when ACTUALLY empty let the fleet idle, do NOT fail over to Anthropic, clear_interval. Exhaustion is ACCOUNT-WIDE -- terra hits it too, so sol->terra is NOT a lever. "usage limit (pro plan)" = QUOTA, nudging does nothing. NOT the 503 "servers are currently overloaded".
 
 0a. CONTEXT GATE. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At/near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then `moot compact steward`. Announcing is not doing.
 
-0b. DISK. `df -h /workspaces/ken /` -- BOTH, different filesystems. Either below 5G: `.moot/truncate-logs.sh`; aged `tmp/ken-*`; `git gc` if garbage; a RETIRED seat's `target/`. Verify a seat dead 3 ways; NEVER touch a live ring's target.
+0b. DISK. `df -h /workspaces/ken /` -- BOTH, different filesystems. Either below 5G: `.moot/truncate-logs.sh`; aged `tmp/ken-*`; `git gc`; a RETIRED seat's `target/`. Verify dead 3 ways; NEVER touch a live ring's target.
 
-0c. INTEGRATOR seat is RETIRED (operator 2026-08-26, permanent) -- NEVER rouse/reseat/route it. Its offline last-seen and stale PR #365 post are EXPECTED, not a stall.
+0c. INTEGRATOR RETIRED (operator, permanent) -- NEVER rouse/reseat/route. Its offline last-seen + stale PR #365 post are EXPECTED, not a stall.
 
-1. LANE ROSTER LIVES IN `steward/lanes.md` -- read it; time-varying operator direction, NOT baked here. THREE lanes (1 runtime / 2 language / 3 foundation), never collapse to one. Sweep EACH active lane's ring for its next deliverable; as a node lands flip the next depends_on draft->ready and release it. No measurement re-scopes a lane -- surface to operator.
+1. LANE ROSTER IS `steward/lanes.md` -- read it; time-varying operator direction, NOT baked here. THREE lanes (runtime/language/foundation), never collapse to one. Sweep EACH lane's ring for its next deliverable; as a node lands flip the next depends_on draft->ready and release it. No measurement re-scopes a lane -- surface to operator.
 
-2. ARE THE LANE'S CRATES MOVING? `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so it silently reports 0.
+2. PER-LANE LANDING COUNT, NEVER AN AGGREGATE. All with `--since='12 hours ago' origin/main`: runtime `-- ':/crates/ken-runtime/' ':/crates/ken-cli/'`; language `-- ':/crates/ken-elaborator/' ':/crates/ken-kernel/'`; foundation `-- ':/catalog/'`. A bare `-- crates/` is cwd-relative and the persisted Bash cwd silently reports 0.
 
-2b. STEP 2 IS AN AGGREGATE -- A MOVING LANE MASKS A DEAD ONE. Per `status: active` node: is its ring on its next deliverable? Read the NODE, not a status line. Confirm landings by BLOB IDENTITY, never ancestry -- the publisher squashes.
+2a. WORKING IS NOT LANDING -- cost 16h unseen; the operator caught it, not me. The aggregate read 5 while runtime landed ZERO, and my follow-up only confirmed a seat was `Working`, which it always was inside a frame-recut loop. ANY lane at 0 for 12h is a FINDING: read that node's hard-stop count and `wp/` tips, and tell the operator.
+
+2b. Per `status: active` node: is its ring on its NEXT deliverable? Read the NODE, not a status line. Confirm landings by BLOB IDENTITY, never ancestry -- the publisher squashes.
 
 2c. A DISPATCHED NODE LEFT AT `ready` IS INVISIBLE TO 2b. On release flip it `active`.
 
-2d. READ A PANE AT `-S -25` MINIMUM, NEVER `-S -6`, and grep for `Working|Worked for`. The finished-turn line sits ABOVE the placeholder, so a shallow window reports FALSE IDLE. A blank sweep row is an unmatched capture, not idle -- open that pane.
+2d. READ A PANE AT `-S -25` MIN, NEVER `-S -6`, grep `Working|Worked for`. The finished-turn line sits ABOVE the placeholder, so a shallow window is FALSE IDLE. A blank row is an unmatched capture -- open that pane. Read the ERROR CLASS, not the count.
 
-2e. COMPOSER STRANDS RECUR ON EVERY SEAT. Tell: a `[Pasted Content ...]` block with no Working footer. Repair: send `zz` (it appends = live composer, real strand), check the tail for a numbered modal (a bare Enter there silently downgrades the model), BSpace the probe, then a BARE `Enter` AS ITS OWN send-keys call. Never combine text and Enter. A leader reporting a downstream handoff does NOT mean the downstream seat woke -- verify Working yourself.
+2e. COMPOSER STRANDS. Tell: `[Pasted Content ...]` with no Working footer. Repair: send `zz` (appends = real strand), check tail for a numbered modal (bare Enter downgrades the model), BSpace, then a BARE `Enter` as its OWN send-keys call. Never combine text and Enter. A leader's handoff report is not a woken seat -- verify yourself.
 
-3. HELD FINISHED WORK IS TOP OF QUEUE. Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file. Check none runs first: `ps -eo pid,ppid,etime,args | grep '[s]cripted-pr-automerge.sh'` and READ THE LISTING -- `grep -c` counts your own wrapper. Never fetch or commit while one holds its window. M1 needs a RESOLVED Decision read fresh from the object. M8a: COMPACT ADVERSARY before any code-merge notify.
+3. HELD FINISHED WORK IS TOP OF QUEUE. Publish via M1-M9 in `steward/merge-procedure.md`. Check none runs first: `ps -eo pid,ppid,etime,args | grep '[s]cripted-pr-automerge.sh'` and READ THE LISTING -- `grep -c` counts your own wrapper. Never fetch/commit while one holds its window. M1 needs a RESOLVED Decision read fresh from the object. M8a: COMPACT ADVERSARY before any code-merge notify.
 
-4. WIP AUDIT, 60 MIN -- VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: ruling, QA verdict, handoff, routing, my own kick.
+4. WIP AUDIT, 60 MIN -- VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: ruling, QA verdict, handoff, routing, own kick.
 
 5. ONE RELEASE AHEAD. Grep other nodes' `depends_on` (not `blocks`; gen-progress.sh reads depends_on). A gate that exists only in prose gates NOTHING.
 
