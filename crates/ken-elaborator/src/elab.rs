@@ -885,13 +885,12 @@ fn check_record(
         span: span.clone(),
         reason: "record literal is unavailable in this elaboration context".into(),
     })?;
-    let projection =
-        class_env
-            .projection_by_type_id(owner_id)
-            .ok_or_else(|| ElabError::TypeMismatch {
-                span: span.clone(),
-                reason: "record literal expected type is not a known named-field owner".into(),
-            })?;
+    let projection = class_env
+        .projection_by_type_id(owner_id)
+        .ok_or_else(|| ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "record literal expected type is not a known named-field owner".into(),
+        })?;
     let owner_name = projection.owner_name.to_string();
     let field_names = projection.field_names.to_vec();
     let field_types = projection.field_types.to_vec();
@@ -1617,9 +1616,9 @@ fn term_mentions_family_indexed_by(
 }
 
 fn expression_mentions_recursive_group(cx: &ElabCtx, expr: &RExpr) -> bool {
-    cx.globals
-        .iter()
-        .any(|(name, id)| cx.recursive_group.contains(id) && rexpr_mentions_name(expr, name))
+    cx.globals.iter().any(|(name, id)| {
+        cx.recursive_group.contains(id) && rexpr_mentions_name(expr, name)
+    })
 }
 
 fn recursive_group_call_id(cx: &ElabCtx, expr: &RExpr) -> Option<GlobalId> {
@@ -1657,20 +1656,17 @@ fn transport_recursive_group_call_result(
     let mut transported_ty = inferred_ty;
     let mut changed = false;
     for refinement in cx.result_refinements.iter().rev() {
-        let growth = cx
-            .ctx
-            .len()
-            .checked_sub(refinement.install_depth)
-            .ok_or_else(|| {
-                ElabError::Internal("result refinement escaped its branch context".into())
-            })? as i64;
+        let growth = cx.ctx.len().checked_sub(refinement.install_depth).ok_or_else(|| {
+            ElabError::Internal("result refinement escaped its branch context".into())
+        })? as i64;
         let index_ty = weaken(&refinement.index_ty, growth);
         let concrete_index = weaken(&refinement.concrete_index, growth);
         let refined_index = weaken(&refinement.refined_index, growth);
         // The placeholder is embedded at the current source-binder depth so
         // `finalize_refined_body` can recover its canonical premise slot.
-        let proof =
-            Term::var(INDEX_REFINEMENT_SENTINEL_BASE + refinement.premise_slot + growth as usize);
+        let proof = Term::var(
+            INDEX_REFINEMENT_SENTINEL_BASE + refinement.premise_slot + growth as usize,
+        );
         if let Some((cast, cast_ty)) = try_reindex_cast(
             cx.env,
             &cx.ctx,
@@ -1710,7 +1706,8 @@ fn infer_reflexive_recursive_self_call(
         head = function.as_ref();
     }
     arguments.reverse();
-    let (RExpr::RCon(name, _), Some(RExpr::RVar(index, _, _))) = (head, arguments.first().copied())
+    let (RExpr::RCon(name, _), Some(RExpr::RVar(index, _, _))) =
+        (head, arguments.first().copied())
     else {
         return Ok(None);
     };
@@ -1729,14 +1726,12 @@ fn infer_reflexive_recursive_self_call(
     let Some((evidence, evidence_ty)) = cx.binding_term(binding.evidence_position) else {
         return Ok(None);
     };
-    let owner_id = cx
-        .globals
-        .get(name)
-        .copied()
-        .ok_or_else(|| ElabError::UnresolvedCon {
+    let owner_id = cx.globals.get(name).copied().ok_or_else(|| {
+        ElabError::UnresolvedCon {
             name: name.clone(),
             span: span.clone(),
-        })?;
+        }
+    })?;
     let (_, owner_ty) = cx
         .env
         .const_type(owner_id)
@@ -2263,12 +2258,7 @@ fn check_match_dependent_refined_fallback(
     let body_core_checked = check(cx, &arm.body, &expected_here_refined, &arm.span)?;
     let mut body_core = body_core_checked;
     for (src, tgt, e) in goal_casts.into_iter().rev() {
-        body_core = Term::Cast(
-            Box::new(src),
-            Box::new(tgt),
-            Box::new(e),
-            Box::new(body_core),
-        );
+        body_core = Term::Cast(Box::new(src), Box::new(tgt), Box::new(e), Box::new(body_core));
     }
     Ok(body_core)
 }
@@ -2367,7 +2357,8 @@ fn finish_dependent_elim(
     add_hidden_equation: bool,
     span: &Span,
 ) -> Result<Term, ElabError> {
-    let top_premises = method_index_premises(ind, &params_terms, scrut_indices, scrut_indices, 0);
+    let top_premises =
+        method_index_premises(ind, &params_terms, scrut_indices, scrut_indices, 0);
     let mut elim = Term::Elim {
         fam: d_id,
         level_args: vec![],
@@ -3425,19 +3416,14 @@ fn install_hidden_result_variable_refinements(
     );
     let mut installed = Vec::new();
     for position in 0..outer_scope_depth {
-        if cx
-            .match_field_regions
-            .iter()
-            .any(|region| region.contains(&position))
+        if cx.match_field_regions.iter().any(|region| region.contains(&position))
             || cx.var_refinements.contains_key(&position)
         {
             continue;
         }
         let index = cx.ctx.len() - 1 - position;
         let outer_ty = cx.metas.zonk_term(&weaken(
-            cx.ctx
-                .lookup(index)
-                .expect("outer result-refinement position in range"),
+            cx.ctx.lookup(index).expect("outer result-refinement position in range"),
             (index + 1) as i64,
         ));
         let outer_classifier = whnf(
@@ -4863,10 +4849,8 @@ fn elab_char_lit(cx: &mut ElabCtx, c: char, span: &Span) -> Result<(Term, Term),
             error: e,
             span: span.clone(),
         })?;
-    cx.num_values.insert(
-        lit_id,
-        NumericLitVal::Int(num_bigint::BigInt::from(c as u32)),
-    );
+    cx.num_values
+        .insert(lit_id, NumericLitVal::Int(num_bigint::BigInt::from(c as u32)));
     Ok((Term::const_(lit_id, vec![]), char_ty))
 }
 
@@ -6733,12 +6717,12 @@ fn elab_instance_decl(
         constraints
             .iter()
             .map(|constraint| {
-                let class = class_env.class(&constraint.class_name).ok_or_else(|| {
-                    ElabError::UnresolvedCon {
+                let class = class_env
+                    .class(&constraint.class_name)
+                    .ok_or_else(|| ElabError::UnresolvedCon {
                         name: constraint.class_name.clone(),
                         span: span.clone(),
-                    }
-                })?;
+                    })?;
                 let head = elab_type(&mut cx, &constraint.head_type)?;
                 Ok(if class.projection.head_param.is_some() {
                     Term::app(Term::const_(class.projection.type_id, vec![]), head)
