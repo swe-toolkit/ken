@@ -1,6 +1,6 @@
 ---
 id: LANG-INDEX-REFINEMENT-OMEGA-ARM
-title: "Make dependent-match index refinement sort-general: classify re-indexed positions and branch goals over Type union Omega, transporting Omega-classified types by a direct J arm alongside the existing Type-plus-Cast arm"
+title: "Make dependent-match index refinement sort-general: of five classifier decisions in elab.rs, widen the re-indexed-position helper, the branch goal, and the hidden-result outer-binding prefilter to Type union Omega, transporting Omega-classified types by a direct J arm alongside the existing Type-plus-Cast arm, while both index-type classifiers stay Type-only"
 status: ready
 owner: language
 size: M
@@ -8,13 +8,19 @@ gate: none
 depends_on: []
 blocks: [V3-FO-EMBEDDING-ADEQUACY]
 github: null
-origin: "Steward, 2026-08-27, discharging the predecessor the Architect assigned in evt_pw69nxgxn99j (thread thr_1czkntcjrvvz9), which supersedes the earlier evt_1wnk1ek4s8sgj framing. V3-FO-EMBEDDING-ADEQUACY D2 hard-stopped immediately on release (language-implementer evt_74q124wnb3zaf, leader evt_5fxgv9eeqm68f): eliminating the proof-indexed FokDerivation with index-dependent Omega evidence fails elaboration with ElabError::Internal(\"index refinement: ... not classified by a Type universe, found Omega0\"). The Steward routed it to the Architect (evt_nrvb2atg0xay) without diagnosing it. The Architect ruled the route VIABLE and located the defect in the elaborator, not the kernel and not the premise. All fixed inputs below measured at origin/main 6a37b92c7ce02edf0e73be7306776253ca68e8c4."
+origin: "Steward, 2026-08-27, discharging the predecessor the Architect assigned across TWO CUMULATIVE rulings: the detailed mechanism ruling evt_1wnk1ek4s8sgj and the concise status clarification evt_pw69nxgxn99j (thread thr_1czkntcjrvvz9). The first is why the outer prefilter, the real-consumer controls, and the direction mutation exist; the second confirms the route is viable and no additional discriminator is needed. NEITHER SUPERSEDES THE OTHER. V3-FO-EMBEDDING-ADEQUACY D2 hard-stopped immediately on release (implementer hard stop evt_5fxgv9eeqm68f, leader route evt_74q124wnb3zaf): eliminating the proof-indexed FokDerivation with index-dependent Omega evidence fails elaboration with ElabError::Internal(\"index refinement: ... not classified by a Type universe, found Omega0\"). The Steward routed it to the Architect (evt_nrvb2atg0xay) without diagnosing it. The first cut of this frame was BLOCKED by the Architect (evt_367papv4k57kk) for a three-decision census that missed the hidden-result outer-binding prefilter, for citing the two rulings as replacement rather than cumulative provenance, for swapped hard-stop authorship, for dropping the ruled real-consumer and direction controls, and for discharging a byte-identity claim with suite greenness. This is the recut. All fixed inputs measured at origin/main 6a37b92c7ce02edf0e73be7306776253ca68e8c4."
 ---
 
-> # WHAT THE ARCHITECT RULED — evt_pw69nxgxn99j, authoritative
+> # WHAT THE ARCHITECT RULED — evt_1wnk1ek4s8sgj + evt_pw69nxgxn99j, CUMULATIVE
 >
-> Three arms were on the table when the hard stop was routed. The ruling
-> **rejects two and does not need the third**:
+> **Read both. Neither replaces the other.** `evt_1wnk1ek4s8sgj` is the detailed
+> mechanism ruling and is the source of the outer-prefilter requirement, the
+> real-consumer controls, and the direction mutation. `evt_pw69nxgxn99j` is a
+> concise status clarification confirming the route. A frame citing only the
+> second loses three requirements — that is what got the first cut blocked.
+>
+> Three arms were on the table when the hard stop was routed. The rulings
+> **reject two and do not need the third**:
 >
 > - **Not prohibited elimination out of Omega.** D2 first eliminates
 >   `‖FokDerivation s‖` into the Omega-valued denotation; its method receives
@@ -31,26 +37,28 @@ origin: "Steward, 2026-08-27, discharging the predecessor the Architect assigned
 >
 > **The defect is the elaborator's repeated Type-only assumption in index
 > refinement.** Both re-indexed constructor positions and branch-goal
-> restoration must classify over `Type ∪ Ω`.
+> restoration must classify over `Type ∪ Ω` — and so must the hidden-result
+> outer-binding prefilter that decides which positions ever reach them.
 >
 > **Explicitly NOT authorized by this node:** any kernel change, any trust
 > change, any `FokDerivation` change, any change to V3-FO D1, and any change to
 > the released structural premise or to `fok_classically_valid`'s validity
-> statement. This node is elaborator-only and sort-general — it is not about
-> FO. FO is only the consumer that exposed it.
+> statement. `FoKripke.ken` stays byte-untouched. This node is elaborator-only
+> and sort-general — it is not about FO. FO is only the consumer that exposed
+> it.
 
 > # WHAT IS HELD BEHIND THIS NODE
 >
-> The Language ring stays held on `V3-FO-EMBEDDING-ADEQUACY` D2 until this
-> predecessor is framed, implemented, reviewed, landed through publisher CI,
-> **and explicitly re-released**. Landing this node authorizes nothing
-> downstream on its own.
+> The Language ring stays held on `V3-FO-EMBEDDING-ADEQUACY` D2 until **both**
+> increments of this predecessor land through publisher CI **and the Steward
+> explicitly re-releases FO**. Landing this node authorizes nothing downstream
+> on its own.
 >
 > Evidence commit `3f687a460f4399bd1204a03ca8cbb57cad75eb92` (tree
 > `15f2d977e`, one test path, `+126`, blob `c9eefe4e5`, 2/2 passing;
 > independently reproduced by the Architect) remains **held transition
-> evidence, not a D2 candidate**. Its minimal `Probe` is a fixed input to this
-> node (AC-PROBE), not a deliverable of it.
+> evidence, not a D2 candidate**. Its `Probe` is a fixed input to this node
+> (AC-PROBE), not a deliverable of it.
 
 ## Fixed inputs
 
@@ -62,27 +70,43 @@ tree `27ba416f97336f302be67930a9241526d2992f96`.
 | `crates/ken-elaborator/src/elab.rs` | `e43be39f51ede05335170e934009aa74d196600e` | the whole change surface (10079 lines) |
 | `crates/ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs` | `db992f637717d9e65f5a5830c5a5730f5cbe06e8` | the owning acceptance suite (622 lines) |
 
-The three Type-only classification sites in `elab.rs`, and their disposition:
+### The census is FIVE classifier decisions, not three
 
-| site | lines | classifies | disposition |
-|---|---|---|---|
-| `try_reindex_cast` | 3234-3245 | a re-indexed position's type `cur_ty` | **WIDEN (D1)** |
-| `refine_branch_goal` | 3304-3315 | the refined branch goal `candidate` | **WIDEN (D2)** |
-| capability-2 sibling convoy | 3504-3515 | the *index* type `peel_ty` | **OUT OF SCOPE — stays Type-only** |
+| # | decision | lines | classifies | disposition |
+|---|---|---|---|---|
+| 1 | `try_reindex_cast` | 3234-3245 | a re-indexed position's type `cur_ty` | **WIDENS** |
+| 2 | `refine_branch_goal` | 3304-3315 | the refined branch goal `candidate` | **WIDENS** |
+| 3 | hidden-result outer-binding **prefilter** | 3392-3405 | each outer binding's type, before `try_reindex_cast` at 3406 | **WIDENS, and delegates** |
+| 4 | hidden-result matched/index type | 3360-3372 | `index_ty` in `install_hidden_result_variable_refinements` | **stays Type-only** |
+| 5 | capability-2 sibling-convoy index type | 3504-3515 | the index type `peel_ty` | **stays Type-only** |
 
-The third site is **not** named by the ruling and is not widened here. An
-index inhabits a Type; an Omega-classified index type is a different question
-that no evidence has raised. It keeps failing closed, and AC-NO-INDEX-WIDENING
-pins that it still does.
+**Decision 3 is why "all four `try_reindex_cast` call sites route through the
+one function" is behaviorally FALSE**, and the first cut of this frame asserted
+exactly that. `install_hidden_result_variable_refinements` runs
+
+```rust
+if !matches!(whnf(/* classifier of outer_ty */), Term::Type(_)) {
+    continue;
+}
+```
+
+at `elab.rs:3392-3405`, immediately before the `try_reindex_cast` call at 3406.
+A lawful Omega-classified outer binding is **silently skipped** there, so
+widening the central helper alone leaves this caller's positions unrefined with
+no error and no diagnostic. Widen the prefilter to an explicit `Type | Omega`
+admission and let the central helper make the arm choice; do not duplicate the
+arm logic in the caller.
+
+**Neither index-type check widens.** Decisions 4 and 5 classify an *index*
+type, and an index inhabits a Type. They keep failing closed, and
+`AC-NO-INDEX-WIDENING` pins that both still fire.
 
 Supporting coordinates, all unchanged by this node unless stated:
 
 - `build_index_type_cong` (`elab.rs:3171`) — builds
   `e : Eq (Type l) cur_ty new_ty` by `J` and returns `(e, new_ty)`. It is the
   **Type arm** and stays exactly as it is.
-- `try_reindex_cast` call sites: `elab.rs:1670`, `3408`, `3482`, `3542`. All
-  four route through the one function, so D1 is a single-point widening that
-  covers every caller.
+- `try_reindex_cast` call sites: `elab.rs:1670`, `3406`, `3482`, `3542`.
 - `refine_branch_goal` call site: `elab.rs:2244`; its restoration loop is
   `elab.rs:2260-2262`, which currently applies each `(src, tgt, e)` triple in
   reverse as `Term::Cast`.
@@ -95,12 +119,13 @@ Supporting coordinates, all unchanged by this node unless stated:
 Dependent-match index refinement currently assumes every type it re-indexes is
 classified by a `Type` universe. Where that assumption holds it builds a type
 equation `e : Eq (Type l) cur_ty cur_ty[new/old]` and wraps the value in a
-`Cast`. Where the type is Omega-classified it does not fall back — it raises
-`ElabError::Internal` and elaboration stops.
+`Cast`. Where the type is Omega-classified it either raises
+`ElabError::Internal` (decisions 1 and 2) or silently skips the position
+(decision 3).
 
-Make the refinement **sort-general**: classify over `Type ∪ Ω`, keep the
-existing Type-plus-`Cast` arm byte-identical, and add a direct-`J` arm for
-Omega. Any other classifier still fails closed.
+Make the refinement **sort-general**: classify over `Type ∪ Ω` at decisions 1,
+2 and 3, keep the existing Type-plus-`Cast` arm byte-identical, and add a
+direct-`J` arm for Omega. Any other classifier still fails closed.
 
 ## Authorized mechanism
 
@@ -128,7 +153,12 @@ The motive is a bare `Lam` and `infer_j` calls `infer` on it directly, so the
 ascription is mandatory, exactly as `build_index_type_cong` and `build_sym`
 already document.
 
-### 2. D1 — re-indexed positions (`try_reindex_cast`)
+**Orientation is load-bearing and is not proved by arm selection.** The
+old/new generalization direction must be the one the ruling states; the
+direct-`J` prototype's reversed direction already reddened the used-evidence
+positive. AC-DIRECTION is the control.
+
+### 2. Decision 1 — re-indexed positions (`try_reindex_cast`)
 
 Replace the `match whnf(...) { Term::Type(level) => level, other => Err }` with
 a three-way classification:
@@ -142,7 +172,19 @@ a three-way classification:
 Return type is unchanged (`Option<(Term, Term)>`): the pair is still
 (refined value, refined type). Only how the value is built differs.
 
-### 3. D2 — branch-goal restoration (`refine_branch_goal`)
+### 3. Decision 3 — the hidden-result outer-binding prefilter
+
+Widen `elab.rs:3392-3405` from `matches!(..., Term::Type(_))` to an explicit
+`Term::Type(_) | Term::Omega(_)` admission, then delegate to `try_reindex_cast`
+as it already does. A classifier outside that pair keeps `continue`ing only if
+that is what it does today for a non-`Type`; do not convert the existing skip
+into a new error, and do not inline the arm choice here.
+
+**The requirement is that a lawful Omega position stops being silently
+skipped.** AC-PREFILTER measures that with a witness, not by reading the
+widened `matches!`.
+
+### 4. Decision 2 — branch-goal restoration (`refine_branch_goal`)
 
 Same three-way classification on `candidate`'s classifier. The consequence is
 larger here because the restoration is deferred: `refine_branch_goal` returns
@@ -150,21 +192,20 @@ larger here because the restoration is deferred: `refine_branch_goal` returns
 `Term::Cast` at `elab.rs:2260-2262`. An untagged triple cannot express which
 arm restored it.
 
-**Replace the untagged triple with a typed restoration plan** — one entry per
-refinement step, tagged Type-Cast or Omega-J, carrying exactly the ingredients
-its own arm needs. The caller dispatches on the tag and applies the matching
-form, still innermost-first. This is the ruling's "the corresponding typed
-Type-Cast/Omega-J plan"; an untagged vector that the caller re-classifies at
-application time does not satisfy it, because it re-derives at the consumer
-what the producer already knew.
+**Producer-time classification must survive to the consumer as a private
+Type-Cast/Omega-J restoration variant** — one entry per refinement step,
+tagged, carrying exactly the ingredients its own arm needs. The caller
+dispatches on the tag and applies the matching form, still innermost-first.
+Re-classifying an untagged triple at replay time duplicates authority and is
+explicitly not intended (Architect, call 2).
 
-### 4. Fail-closed discipline
+### 5. Fail-closed discipline
 
 Every classifier that is neither `Type` nor `Omega` continues to raise
-`ElabError::Internal`. Do not widen to a `_ =>` accept, and do not widen the
-capability-2 index-type site (fixed inputs, third row).
+`ElabError::Internal` at decisions 1 and 2. Do not widen to a `_ =>` accept,
+and do not widen decisions 4 or 5.
 
-### 5. What produces the soundness
+### 6. What produces the soundness
 
 Nothing here is postulated. The Omega arm's result is an ordinary kernel `J`
 application, so the branch's core term is kernel-checkable exactly as the Type
@@ -173,18 +214,25 @@ than merely elaborating.
 
 ## Deliverables
 
-**D1 and D2 are each independently landable.** Sequence them as two increments
-so each reaches a releasable state or a genuine hard stop inside about an hour.
+**Two independently landable increments. Each lands with its OWN evidence —
+D1's controls may NOT be deferred to a later shared test deliverable**
+(Architect, call 3). Size each for the one-hour turn target.
 
-- **D1.** `try_reindex_cast` classifies over `Type ∪ Ω`; Omega takes the
-  direct-`J` arm. Covers all four call sites at once.
-- **D2.** `refine_branch_goal` classifies over `Type ∪ Ω`; the returned
-  restoration becomes a typed Type-Cast/Omega-J plan and `elab.rs:2244`'s
-  caller dispatches on it.
-- **D3.** Tests for both, in
-  `crates/ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs`
-  (the owning suite), plus the negative and mutation evidence the ACs below
-  require.
+- **D1 — decisions 1 and 3.** `try_reindex_cast` classifies over `Type ∪ Ω`
+  with the direct-`J` Omega arm; the hidden-result outer-binding prefilter
+  admits `Type | Omega` and delegates. **Lands with** AC-OMEGA-REINDEX-POSITION,
+  AC-PREFILTER, AC-J-MOTIVE-EXACT, AC-CORE-KERNEL-CHECKS, AC-TYPE-ARM-UNCHANGED,
+  AC-DIRECTION, AC-FAIL-CLOSED, AC-NO-INDEX-WIDENING, AC-REAL-CONSUMER,
+  AC-KERNEL-UNCHANGED, AC-BLAST-RADIUS, AC-NO-REGRESSION.
+- **D2 — decision 2.** `refine_branch_goal` classifies over `Type ∪ Ω`; the
+  returned restoration becomes a tagged Type-Cast/Omega-J plan and
+  `elab.rs:2244`'s caller dispatches on it. **Lands with** AC-OMEGA-BRANCH-GOAL,
+  AC-PLAN-TYPED, AC-PROBE, and its own re-run of AC-CORE-KERNEL-CHECKS,
+  AC-TYPE-ARM-UNCHANGED, AC-DIRECTION and AC-NO-REGRESSION.
+
+Tests land in
+`crates/ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs`
+(the owning suite) unless an AC names another home.
 
 ## Acceptance criteria
 
@@ -196,16 +244,37 @@ The control is that the same fixture on the base blob
 Cite both outcomes; a passing test alone does not show the arm is what made it
 pass.
 
+**AC-PREFILTER.** A lawful Omega-classified **outer binding** reached through
+`install_hidden_result_variable_refinements` is refined rather than skipped.
+The two-sided control is the distinguishing one for this decision: on the base
+blob the fixture must show the position **silently unrefined with no error**,
+not an `ElabError`. A witness is required — reading the widened `matches!` does
+not satisfy this, because the defect it guards is a silent skip.
+
 **AC-OMEGA-BRANCH-GOAL.** A branch whose own checking goal is Omega-classified
 and mentions the un-refined outer index elaborates, and its result is restored
 to the original `expected_here`. Same two-sided control, against
 `index refinement: branch goal is not classified by a Type universe`.
 
-**AC-PROBE.** The minimal `Probe` from held evidence `3f687a460` elaborates
-under this node's change, unmodified. This is a fixed input, so reproduce it
-rather than re-inventing it. **It does not require D2 of
-V3-FO-EMBEDDING-ADEQUACY, and no FO-side artifact may be touched to satisfy
-it.** If the probe needs editing to pass, that is a finding to report, not a
+**AC-REAL-CONSUMER.** The minimal `Probe` does not establish the real family's
+recursive path, so it is not sufficient on its own. Required, per
+`evt_1wnk1ek4s8sgj`:
+
+- real `FokDerivation` matches over **all four constructors**, under **both**
+  Type and Omega motives;
+- a **recursive Omega theorem** that consumes the exact recursive child paths;
+- the existing ordinary indexed-Type, unindexed `FokCert`, and
+  truncation-into-Omega positives preserved.
+
+These are **test consumers**. `FoKripke.ken` stays byte-untouched, and no
+FO-side production artifact may be edited to satisfy this.
+
+**AC-PROBE.** The `Probe` from held evidence `3f687a460` is a fixed input: its
+**source program stays unmodified**, while its transition expectation flips
+from rejection to acceptance. The held expect-error harness cannot itself pass
+unmodified once the capability lands — that flip is the expected result, not a
+violation. **It does not require D2 of V3-FO-EMBEDDING-ADEQUACY.** If the
+source program itself needs editing to pass, that is a finding to report, not a
 licence to edit it.
 
 **AC-J-MOTIVE-EXACT.** Assert the Omega arm's constructed motive against the
@@ -215,24 +284,39 @@ built `Term`, not against source text: body
 value, scrutinee `h`. A test that only checks the arm was reached does not
 satisfy this.
 
+**AC-DIRECTION.** A mutation that **reverses the old/new generalization
+direction** must red. This is a distinct control from arm selection and from
+inferability: collapsing Omega to Type proves only that the arm is selected,
+and dropping the ascription proves only that the motive is inferable. Neither
+proves transport orientation. The direct-`J` prototype's reversed direction
+already reddened the used-evidence positive, so this control is known to
+discriminate.
+
 **AC-CORE-KERNEL-CHECKS.** The core term produced through the Omega arm passes
 kernel checking. This is the soundness gate; elaboration succeeding is not it.
 
 **AC-TYPE-ARM-UNCHANGED.** Every existing Type-classified refinement produces a
-**byte-identical** core term to the base blob. The control is the full
-`ds5b_dependent_match_refinement_acceptance` suite green with **no edits to any
-expected output**. An expected-output edit in that file is a failure of this
-AC, not a test update — say so if one seems needed.
+**byte-identical** core term to the base blob, discharged by an **actual
+exact-base-versus-candidate `Term` / transparent-body differential** over the
+existing Type fixtures, in matching deterministic environments.
 
-**AC-NO-INDEX-WIDENING.** The capability-2 index-type site (`elab.rs:3504-3515`)
-is unchanged and still Type-only. Pin it with a witness whose *index type* is
-Omega-classified: it must still fail closed with
-`index refinement: index type is not classified by a Type universe`. A read of
-the unchanged source does not satisfy this — the site has to be shown still
-firing.
+**Suite greenness does not discharge this.** The `ds5b` suite asserts
+elaboration, evaluation and error classes; it never compares emitted core
+bytes, so reading it as byte-identity evidence measures something the AC does
+not claim. Keep the unchanged suite as **regression** evidence and do not
+promote it. An expected-output edit in that file remains a failure of this AC
+rather than a test update.
+
+**AC-NO-INDEX-WIDENING.** Decisions 4 (`elab.rs:3360-3372`) and 5
+(`elab.rs:3504-3515`) are unchanged and still Type-only. Pin **both** with
+witnesses whose *index type* is Omega-classified: they must still fail closed
+with `result refinement: matched type is not classified by Type` and
+`index refinement: index type is not classified by a Type universe`
+respectively. A read of the unchanged source does not satisfy this — each site
+has to be shown still firing.
 
 **AC-FAIL-CLOSED.** A classifier that is neither `Type` nor `Omega` still
-raises `ElabError::Internal` at both widened sites, and the message names the
+raises `ElabError::Internal` at decisions 1 and 2, and the message names the
 actual classifier found. Needs a real witness, not an inspection of the
 fallthrough arm.
 
@@ -241,20 +325,23 @@ Type-Cast restoration to an Omega-tagged plan entry must be **caught by the
 suite**, not merely produce a different term. Report the mutation by its
 injection point, not by its effect.
 
-**AC-MUTATION.** Two mutation classes, hashed logs, each named by injection
-point: (a) collapse the Omega arm to the Type arm at `try_reindex_cast`;
-(b) drop the ascription from the Omega motive. Both must red. A mutation that
-stays green is a gap in the suite and is reportable as a finding.
+**AC-MUTATION.** Three mutation classes minimum, hashed logs, each named by
+injection point: (a) collapse the Omega arm to the Type arm at
+`try_reindex_cast`; (b) drop the ascription from the Omega motive; (c) restore
+the prefilter at `elab.rs:3392-3405` to `Term::Type(_)` only. AC-DIRECTION and
+AC-PLAN-TYPED supply two more. All must red. A mutation that stays green is a
+gap in the suite and is reportable as a finding.
 
 **AC-KERNEL-UNCHANGED.** Zero diff under `crates/ken-kernel/`. No new kernel
 capability, no trust delta, no `FokDerivation` change, no V3-FO D1 change, no
-change to the released structural premise.
+change to the released structural premise, `FoKripke.ken` byte-untouched.
 
-**AC-BLAST-RADIUS.** `try_reindex_cast` and `refine_branch_goal` are shared
-surfaces reached by every dependent match, not only by FO. Name the suites the
-change can reach and gate on them, `ds5b_dependent_match_refinement_acceptance`
-and `surface_def_refinement` at minimum. If the census finds a third, gate on
-it too and say so.
+**AC-BLAST-RADIUS.** `try_reindex_cast`, `refine_branch_goal` and
+`install_hidden_result_variable_refinements` are shared surfaces reached by
+every dependent match, not only by FO. Name the suites the change can reach and
+gate on them, `ds5b_dependent_match_refinement_acceptance` and
+`surface_def_refinement` at minimum. If the census finds a third, gate on it too
+and say so.
 
 **AC-NO-REGRESSION.** Green in **CI** — the full-workspace build, the `--locked`
 gate, and the conformance suite run on GitHub, never on the box. Local work is
@@ -263,19 +350,23 @@ Never `--workspace` locally.
 
 ## Reviewers
 
-- **Architect** — required. It ruled the mechanism (evt_pw69nxgxn99j); the
-  motive, the typed plan, and the fail-closed boundary are its call.
-- **language-qa** — the mutation evidence and the two-sided controls.
+- **Architect** — required. It ruled the mechanism (`evt_1wnk1ek4s8sgj` +
+  `evt_pw69nxgxn99j`) and blocked the first cut of this frame
+  (`evt_367papv4k57kk`); the motive, the orientation, the five-decision census
+  and the fail-closed boundary are its call.
+- **language-qa** — the mutation evidence and the two-sided controls,
+  particularly AC-PREFILTER's silent-skip base outcome and
+  AC-TYPE-ARM-UNCHANGED's differential.
 - **Adversary** — after landing, on the merged SHA.
 
 ## Capability tier
 
-**T1.** The mechanism is handed down precisely, but the typed restoration plan
+**T1.** The mechanism is handed down precisely, but the tagged restoration plan
 is a design call, and the soundness turns on an argument about which motive is
-admissible at which sort — not on a mechanical diff.
+admissible at which sort and in which direction — not on a mechanical diff.
 
 ## Sequencing
 
-Predecessor to `V3-FO-EMBEDDING-ADEQUACY` D2, which is held. When this lands,
-the Steward owes an **explicit** re-release of the FO node; landing does not
-release it.
+Predecessor to `V3-FO-EMBEDDING-ADEQUACY` D2, which is held. When **both**
+increments land, the Steward owes an **explicit** re-release of the FO node;
+landing does not release it.
