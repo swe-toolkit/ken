@@ -50,7 +50,7 @@ a pointer to check, not a fact.
 | lane | ring | objective |
 |---|---|---|
 | 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (`active`, M-series defunctionalization). M6/M4/M3 merged; `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` and `RT-UNIT-FAILURE-STATUS-PROVENANCE` MERGED. CURRENT: `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` (`active`) — **HS11 per-arrival recut landed `fec63506a`** (frame blob `1ae3e449a8f2`, Architect frame-review APPROVE `evt_2wvn3szecym9f`) and **RE-RELEASED `evt_1mgb3zbskwbg3`**. SEVEN hard stops taken; next mandatory §1a/§1b advisory trigger is **stop 12, NOT 10** (Architect `evt_2s144kdddyckn`). It blocks `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` (`active`), whose D3A+D3B stays FROZEN pending its own separate release. `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` still `draft`. |
-| 2 | language | `LANG-INDEX-REFINEMENT-OMEGA-ARM` **MERGED** — both deliverables landed (D1 `e13df606a`, D2 `ef91b8225`, blob-verified); no D3. `LANG-MOD-CANONICAL-PAIR-PACKAGE` **MERGED `40e7f1199`** (blob-verified; its surviving `wp/` branch is the pre-squash remnant, NOT an unlanded candidate). **FO IS RECUT INTO A THREE-NODE REPAIR SEQUENCE (2026-08-27).** The landed D1 statement `fok_embedding_adequacy_statement` is REFUTED by an accepted capture-exploiting certificate (`evt_2yh515wg0mczy`); Architect `evt_6hx31xvw9tqs2` REJECTED the whole checker/derivation/adequacy interface as a semantic soundness gate, not repairable by finishing the proof. Sequence: `CORE-FO-CHECK-TREE-SORT-VALIDATION` (`ready`, predecessor) → `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` (`draft`, NEW, the ATOMIC lockstep increment — never split it) → `V3-FO-EMBEDDING-ADEQUACY` D2a/D2b. `V3-FO-CHECKER-SOUNDNESS` and `V3-FO-SUBST-DEPTH-CONTROL` stay `merged` with superseded-banners. Route FO is fail-safe meanwhile (`prover.rs:562-604` withholds `Unknown`, never `Proved`) — the rejection invalidates the proposed THEOREM GATE, not the production verdict boundary. Only remaining candidate active: `LANG-MOD-CATALOG-COMPLETENESS` (authorized partial; remainder held on Nat Decision `dec_1kqwn6hdvn7d2`). HAZARD for any Omega-elimination work: the omega arm retains a bounded TWO-INDEX limitation as UNSUPPORTED (Architect `evt_7wbrfyvwv5517`) — single-index only; a multi-index need HARD-STOPS to Steward + Architect. NEXT: the z3 integration campaign (operator 2026-08-26). `LANG-MODULE-IMPORT-SYSTEM` COMPLETE. |
+| 2 | language | `LANG-INDEX-REFINEMENT-OMEGA-ARM` **MERGED** — both deliverables landed (D1 `e13df606a`, D2 `ef91b8225`, blob-verified); no D3. `LANG-MOD-CANONICAL-PAIR-PACKAGE` **MERGED `40e7f1199`** (blob-verified; its surviving `wp/` branch is the pre-squash remnant, NOT an unlanded candidate). **FO IS RECUT INTO A THREE-NODE REPAIR SEQUENCE (2026-08-27).** The landed D1 statement `fok_embedding_adequacy_statement` is REFUTED by an accepted capture-exploiting certificate (`evt_2yh515wg0mczy`); Architect `evt_6hx31xvw9tqs2` REJECTED the whole checker/derivation/adequacy interface as a semantic soundness gate, not repairable by finishing the proof. Sequence: `CORE-FO-CHECK-TREE-SORT-VALIDATION` (`ready`, predecessor) → `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` (`draft`, NEW, the ATOMIC lockstep increment — never split it) → `V3-FO-EMBEDDING-ADEQUACY` D2a/D2b. `V3-FO-CHECKER-SOUNDNESS` and `V3-FO-SUBST-DEPTH-CONTROL` stay `merged` with superseded-banners. Route FO is fail-safe meanwhile (`prover.rs:562-604` withholds `Unknown`, never `Proved`) — the rejection invalidates the proposed THEOREM GATE, not the production verdict boundary. Only remaining candidate active: `LANG-MOD-CATALOG-COMPLETENESS` — its operative contract is **RECUT #3 (`4ffa8562c`, AC-CENSUS), NOT the "authorized partial / remainder held on Nat Decision" banner**, which is a lower, historical banner in the same file. The Nat hold is DISCHARGED: `dec_1kqwn6hdvn7d2` resolved and BOTH halves merged (`LANG-MOD-NAT-PROVIDER-INTERFACE`, `LANG-MOD-NAT-FLOOR-REALIZATION` at `d5c41ec1`). RELEASED `evt_7zr9t5k9d0ry8`, scope CORRECTED `evt_65h1skh3ryeae`: a 1106-line census artifact ALREADY LANDED at `027f6bf26` (2026-08-27 state `40e7f1199`, path `crates/ken-elaborator/tests/lang_mod_catalog_evidence_frontier.rs`), so the live deliverable is a DELTA MEASUREMENT against AC-C1..C6, not a fresh census. QUEUED behind FO node 1 under the one-WP rule (implementer's call, endorsed). The `wp/` branch is a landed remnant — retire, do not publish. HAZARD for any Omega-elimination work: the omega arm retains a bounded TWO-INDEX limitation as UNSUPPORTED (Architect `evt_7wbrfyvwv5517`) — single-index only; a multi-index need HARD-STOPS to Steward + Architect. NEXT: the z3 integration campaign (operator 2026-08-26). `LANG-MODULE-IMPORT-SYSTEM` COMPLETE. |
 | 3 | foundation | Catalog-reuse modernization. Expressibility trial COMPLETE (3-lane feasibility PROVEN, operator 2026-08-26). Pilot chain DONE: `CAT-ORDER-PUB-EXPORT`, `CAT-GCD-REFACTOR`, `CAT-REUSE-CENSUS` all MERGED. CURRENT: `CAT-NAT-REUSE-CONSUMERS` (`active`) — six per-package increments. D1 `6ba6f6bef`, D2 `428ea1188`, D3 `9de02daff` MERGED. **D4 released `evt_5smy0nbdt3qcy`**, in build. D5/D6 held, each needs its own explicit release, D6 (`Derived.ken.md`) LAST as the risk increment. **A consuming TEST FIXTURE's root set is part of an increment's path set here** — established by D1 (cc6a/cc7/cc8) and D2 (cc2/cc3/cc4/ds9/d0), ruled for D4 at `evt_1b31assx1ktg8`/`evt_6snwh0xy60jh8`/`evt_2r8cavz7b1bms`. Carry that authorization INTO the D5 release so it does not hard-stop for it again. |
 
 **Lane 1 — runtime (priority).** The native carried-value program
@@ -188,9 +188,11 @@ membership rule (`30-taxonomy §4`) itself the defect and superseded the
 provider-registry mechanism — Nat's home is PRELUDE-FLOOR MEMBERSHIP (amend the
 general rule to a bootstrapping arm; admit the existing kernel {Nat,Zero,Suc}
 into the strict floor, reuse identity). Reframed into a spec WP
-(`LANG-MOD-NAT-PROVIDER-INTERFACE`, `ready`, release FIRST) + a build WP
-(`LANG-MOD-NAT-FLOOR-REALIZATION`, held on the spec WP). Releasing the spec WP to
-the enclave unblocks the chain; do NOT re-release WP-2 off its node — re-measure
+(`LANG-MOD-NAT-PROVIDER-INTERFACE`) + a build WP
+(`LANG-MOD-NAT-FLOOR-REALIZATION`). **BOTH ARE NOW `merged`** (the build half at
+squash `d5c41ec1`, blob-audited), measured 2026-08-27 — this row previously said
+`ready, release FIRST` and that was two days stale. The chain is UNBLOCKED and
+there is nothing here to release. Do NOT re-release WP-2 off its node — re-measure
 the tree.
 
 The earlier lane-2 objectives are DONE and are history, not current work:
@@ -268,6 +270,35 @@ not `crates/`) — it is the standing exception, not a lane (`CLAUDE.md`).
 
 ## Roster history
 
+- 2026-08-27 (fourth refresh, at `ad36b0fcd`): **no roster change — citation
+  re-measurement, plus one release it produced.** The Nat chain this file called
+  `ready, release FIRST` was in fact merged on BOTH halves, two days stale. That
+  correction discharged the stale Nat hold on `LANG-MOD-CATALOG-COMPLETENESS`.
+  Released `evt_7zr9t5k9d0ry8`, then CORRECTED at `evt_65h1skh3ryeae` — see the
+  second lesson below, which is the more important of the two.
+  > **LESSON 1 — the row cited the WRONG BANNER, which is not the stale-row shape
+  > two entries down.** This node carries four stacked banners, and the one my row
+  > quoted ("authorized partial; remainder held on the Nat Decision") is a
+  > HISTORICAL banner sitting BELOW the operative RECUT #3 in the same file. **A
+  > node with stacked recut banners has no single "the frame" to read** — reading
+  > top-down and stopping at the first authoritative-sounding block gets you a
+  > superseded contract that still reads perfectly. Find the banner that names
+  > itself OPERATIVE and says what it supersedes, then check nothing below it is
+  > newer.
+  > **LESSON 2 — I released it as unstarted, and it was not.** I checked for prior
+  > work with `git log --grep=<node-id>`, got two hits (neither the census), and
+  > concluded the ring had produced nothing. In fact `027f6bf26` landed a
+  > 1106-line evidence-frontier artifact on 2026-08-25, advanced since at
+  > `40e7f1199`. **Its commit subject — "LANG-MOD Component B evidence frontier
+  > partial" — does not contain the node id**, so the grep could not see it. This
+  > is the `ZERO = NAME` lesson firing on my own instrument: a zero-hit census is
+  > evidence about a NAME, never about a mechanism. **When checking whether a
+  > deliverable exists, grep the DELIVERABLE'S PATH in the tree, not the node id
+  > in commit subjects** — `git log -- <path>` would have shown it instantly, and
+  > the artifact was sitting in `crates/ken-elaborator/tests/` the whole time.
+  > The surviving `wp/LANG-MOD-CATALOG-COMPLETENESS` branch is a landed pre-squash
+  > remnant (blob `541ff8e7d` identical to what `027f6bf26` landed) and is now
+  > STALE against main; retire it, never publish it.
 - 2026-08-27 (third refresh, at `bd68352bb`): **no roster change.** Corrected two
   nodes still reading `active` that had in fact MERGED —
   `LANG-MOD-CANONICAL-PAIR-PACKAGE` (`40e7f1199`) and

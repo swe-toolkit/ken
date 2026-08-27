@@ -2,7 +2,7 @@ STEWARD WATCHDOG TICK. Run in order; stop as soon as one produces an action.
 
 ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` before arming; never grow a step without trimming another.
 
-0. CREDIT BURN-DOWN (operator, 2026-08-18). OpenAI nearly exhausted; the operator wants it SPENT. Keep runtime, Architect and research on real work. When ACTUALLY empty: let the fleet idle, do NOT fail over to Anthropic, clear_interval. Idle terra/sol seats then are expected, not stalls -- do not rouse or reseat. My seat and the ADVERSARY are Anthropic and outlive the rest; staying quiet then is correct.
+0. CREDIT: operator RESET the OpenAI quota 2026-08-27 and re-logged Anthropic. The 2026-08-18 burn-down directive still stands for the NEXT exhaustion: when ACTUALLY empty, let the fleet idle, do NOT fail over to Anthropic, clear_interval. Exhaustion is ACCOUNT-WIDE, not tier-scoped -- terra hits it too, so reseating sol->terra is NOT a lever. Tell: "usage limit (pro plan)". That is QUOTA, not the 503 class ("servers are currently overloaded"), and nudging does nothing.
 
 0a. CONTEXT GATE. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At/near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then `moot compact steward`. Announcing is not doing.
 
@@ -10,7 +10,7 @@ ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` befor
 
 0c. INTEGRATOR seat is RETIRED (operator 2026-08-26, permanent) -- NEVER rouse/reseat/route it. Its offline last-seen and stale PR #365 post are EXPECTED, not a stall.
 
-1. LANE ROSTER LIVES IN `steward/lanes.md` -- read it; time-varying operator direction, NOT baked here. As of 2026-08-25: THREE lanes (1 runtime / 2 language / 3 foundation), never collapse to one. Sweep EACH active lane's ring for its next deliverable; as a node lands flip the next depends_on draft->ready and release it. No measurement re-scopes a lane -- surface to operator.
+1. LANE ROSTER LIVES IN `steward/lanes.md` -- read it; time-varying operator direction, NOT baked here. THREE lanes (1 runtime / 2 language / 3 foundation), never collapse to one. Sweep EACH active lane's ring for its next deliverable; as a node lands flip the next depends_on draft->ready and release it. No measurement re-scopes a lane -- surface to operator.
 
 2. ARE THE LANE'S CRATES MOVING? `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so it silently reports 0.
 
