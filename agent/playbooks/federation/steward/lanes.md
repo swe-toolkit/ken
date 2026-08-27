@@ -38,15 +38,19 @@ lanes overburden the Architect (see lane 3).
 > Foundation is NOT idle-by-design: it has ready CAT WPs to author now, and its
 > reuse-remediation node waits on module/import. Do not collapse to one lane.
 
-The objectives below were refreshed 2026-08-25 to current node reality (the
-2026-08-22 citations — NHC chain, Z3/FO, "5 CAT WPs" — had advanced). Re-measure
-each node (`git fetch`; read status) before acting; a node id decays.
+The objectives below were re-measured **2026-08-27 against `origin/main`
+`61c2fefa0`** (previous refresh 2026-08-25). **The roster STRUCTURE — three
+lanes, runtime / language / foundation — is operator-owned and UNCHANGED; only
+the node citations were re-measured.** Re-measure each node (`git fetch`; read
+status) before acting; a node id decays, and at the 2026-08-27 measurement
+**seven of the cited nodes had advanced past the state this table claimed** —
+five to `merged`. Treat every id below as a pointer to check, not a fact.
 
 | lane | ring | objective |
 |---|---|---|
-| 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (M-series defunctionalization). M6/M4/M3 merged. Active successor: `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` (`ready`, the ExitCode recut). `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` + `RT-UNIT-FAILURE-STATUS-PROVENANCE` `draft`. |
-| 2 | language | CURRENT: the internal-provision prelude recut `LANG-MOD-PAIR-FLOOR-PROVIDER` (spec WP, LAUNCHED 2026-08-26 — spec ring authoring; admits Pair to the prelude floor by one general internal-provision arm, reusing the four compiler-installed Pair GlobalIds). NEXT after it lands: the z3 integration campaign (operator 2026-08-26). Module/import umbrella `LANG-MODULE-IMPORT-SYSTEM` is essentially COMPLETE (WP-1/2/3/4A merged incl. strict resolution). |
-| 3 | foundation | Catalog-reuse modernization. Expressibility trial COMPLETE (all CAT algos merged; Architect not overloaded = 3-lane feasibility PROVEN, operator 2026-08-26). Lane now: pilot `CAT-ORDER-PUB-EXPORT` (released 2afacd0c0) then `CAT-GCD-REFACTOR`; a catalog-wide census/campaign is PROPOSED, pending operator scope. |
+| 1 | runtime | The native carried-value program `RT-NATIVE-CARRIED-VALUE` (`active`, M-series defunctionalization). M6/M4/M3 merged; `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` and `RT-UNIT-FAILURE-STATUS-PROVENANCE` now MERGED. CURRENT: `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` (`active`) — the HS10 total-admission-map predecessor, re-released 2026-08-27 `evt_7qh4fnzcg9t2c`; it blocks `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` (`active`), whose D3A+D3B stays FROZEN pending its own separate release. `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` still `draft`. |
+| 2 | language | CURRENT: `LANG-INDEX-REFINEMENT-OMEGA-ARM` (`active`) — D1 MERGED 2026-08-27 as `e13df606a` (both blobs blob-verified); D2 excluded and needs its own release. Also `active`: `V3-FO-EMBEDDING-ADEQUACY` (D2 needs a SECOND separate re-release after D1 and D2 both land) and `LANG-MOD-CATALOG-COMPLETENESS`. The Pair recut `LANG-MOD-PAIR-FLOOR-PROVIDER` is MERGED, and its successor `LANG-MOD-CANONICAL-PAIR-PACKAGE` is `active`. Both Nat nodes MERGED. NEXT after the current actives drain: the z3 integration campaign (operator 2026-08-26). Module/import umbrella `LANG-MODULE-IMPORT-SYSTEM` COMPLETE. |
+| 3 | foundation | Catalog-reuse modernization. Expressibility trial COMPLETE (3-lane feasibility PROVEN, operator 2026-08-26). The pilot chain is DONE: `CAT-ORDER-PUB-EXPORT`, `CAT-GCD-REFACTOR` and `CAT-REUSE-CENSUS` are all MERGED. CURRENT: `CAT-NAT-REUSE-CONSUMERS` (`active`) — six per-package increments, D1/D2 merged, **D3 `Parsing.ken.md` released 2026-08-27 `evt_49h0h5hffm9yy`**; D4/D5/D6 held, D6 last as the risk increment. Each increment needs its own explicit release. |
 
 **Lane 1 — runtime (priority).** The native carried-value program
 `RT-NATIVE-CARRIED-VALUE` (Architect frame `evt_9kat78d438cb`): a finite
@@ -58,19 +62,39 @@ consecutive Architect hard stops on a shared predicate (a downstream semantic
 classification used as upstream producer/provenance authority): the ExitCode WP
 `RT-EXITCODE-FAILURE-PAYLOAD-TRANSPORT` is `closed`/falsified (Architect
 evt_1vhmndq7fscd1) and REPLACED by `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE`
-(`ready`) — an owner-bound probe of the causal dynamic-constructor dispatch
-residual, no production mechanism authorized before D0 selects a class. The `-3`
-reporter alias is split out as `RT-UNIT-FAILURE-STATUS-PROVENANCE` (`draft`,
-sequenced after; not folded). `RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` (`draft`)
-stays distinct. The NHC chain + `RT-BACKEND-MODULE-SPLIT` are drained/merged.
+— an owner-bound probe of the causal dynamic-constructor dispatch
+residual — which is now **MERGED**. The `-3` reporter alias, split out as
+`RT-UNIT-FAILURE-STATUS-PROVENANCE`, is **MERGED** too.
+`RT-RETAINED-UNIT-CALL-TARGET-DERIVATION` (`draft`) stays distinct. The NHC chain
++ `RT-BACKEND-MODULE-SPLIT` are drained/merged.
 Architect is required reviewer on the M-series — the Architect-heavy lane.
 
-**Lane 2 — language. CURRENT (2026-08-26): the internal-provision prelude recut
-`LANG-MOD-PAIR-FLOOR-PROVIDER`, then the z3 integration campaign.** Operator
-2026-08-26: "first launch the internal-provision prelude recut and finish that
-effort, then return to the z3 integration campaign." The recut is a Steward-owned
-spec WP (Architect shaping `evt_7d0ecgkd8ate3`) — LAUNCHED: frame landed
-`c1945c6fb`, spec ring authoring on anchor `evt_6yc0k921tf3j`. It generalizes
+**CURRENT lane-1 work (measured 2026-08-27):**
+`RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` (`active`), the complete planner-owned
+predecessor that replaced the repeated last-gap decomposition. It has taken
+**six** Architect hard stops (HS5-HS10); the last four share one root — a partial
+instrument asked a question it structurally cannot answer — and the frame defects
+were the Steward's. HS10 replaced the partial governed-only projection map with
+ONE TOTAL `Governed`/`NonGoverned` admission map; recut landed `61c2fefa0` and
+was re-released `evt_7qh4fnzcg9t2c`. It blocks
+`RT-RESULT-CONTINUATION-BINDING-PROVENANCE` (`active`), whose **D3A+D3B stays
+FROZEN and needs its own separate explicit release** — neither the frame landing
+nor the predecessor landing authorizes the consumer. Next mandatory §1a/§1b
+research-advisory trigger on this node is **stop 12, NOT 10** (Architect
+`evt_2s144kdddyckn`, verbatim — HS9 consumed the ninth-stop advisory).
+
+**Lane 2 — language. CURRENT (measured 2026-08-27):**
+`LANG-INDEX-REFINEMENT-OMEGA-ARM`
+D1, routed; `V3-FO-EMBEDDING-ADEQUACY` and `LANG-MOD-CATALOG-COMPLETENESS` also
+`active`. The z3 integration campaign is NEXT, once these drain.** The prelude
+recut below is DONE and is history, not current work.
+
+Operator 2026-08-26 (direction, unchanged): "first launch the internal-provision
+prelude recut and finish that effort, then return to the z3 integration
+campaign." That recut — `LANG-MOD-PAIR-FLOOR-PROVIDER`, a Steward-owned spec WP
+(Architect shaping `evt_7d0ecgkd8ate3`), frame landed `c1945c6fb`, spec ring
+anchor `evt_6yc0k921tf3j` — **is MERGED as `8f3b6fd2`**, so the operator's "then"
+clause is the live half. It generalizes
 prelude membership to ONE internal-provision arm (kernel or compiler origin),
 admits Pair as the first compiler-provided member reusing the four existing
 compiler-installed Pair `GlobalId`s, and supersedes the exact-nine boundary of
@@ -127,15 +151,29 @@ along three axes — (a) remove defs redundant with the prelude, (b) import cano
 tools from sibling modules instead of reimplementing, (c) restructure files
 top-down. Census-first, conservative/risk-tagged depth, lane-3 priority.
 
-Current state (re-measure before acting):
-- PILOT (proves the per-package recipe): `CAT-ORDER-PUB-EXPORT` (`ready`, RELEASED
-  2afacd0c0 — the Order pub-export prerequisite) then `CAT-GCD-REFACTOR` (`draft`,
-  Gcd-only import+dedup+top-down, `depends_on CAT-ORDER-PUB-EXPORT`). Note the CAT
-  reuse-remediation is NO LONGER blocked on the `LANG-MODULE-IMPORT-SYSTEM`
-  umbrella — the import + pub-export capability it needs is LANDED; only the Order
-  half remained, now extracted to the pilot prerequisite.
-- CAMPAIGN SCOPING: `CAT-REUSE-CENSUS` (`ready`) — the catalog-wide inventory that
-  sizes the rework. Runs on the single foundation ring AFTER/beside the pilot.
+Current state (measured 2026-08-27 against `origin/main` `61c2fefa0`;
+re-measure before acting):
+- PILOT CHAIN: **DONE.** `CAT-ORDER-PUB-EXPORT`, `CAT-GCD-REFACTOR` and
+  `CAT-REUSE-CENSUS` are all **MERGED**. The per-package recipe is proved and the
+  catalog-wide inventory that sizes the rework is landed. (The CAT
+  reuse-remediation was never blocked on the `LANG-MODULE-IMPORT-SYSTEM` umbrella
+  in the end — the import + pub-export capability it needed landed, and the Order
+  half went through the pilot prerequisite.)
+- CURRENT BATCH: `CAT-NAT-REUSE-CONSUMERS` (`active`) — the census's first scoped
+  rework batch, six independently-releasable per-package increments. D1
+  (`Arguments.ken.md`) and D2 (`Diagnostics/Core.ken.md`) MERGED; **D3
+  (`Parsing.ken.md`) RELEASED 2026-08-27 `evt_49h0h5hffm9yy`**. D4/D5/D6 are
+  HELD and each needs its own explicit release; D6 (`Derived.ken.md`) is the risk
+  increment and goes LAST — its `AC-PROP` can hard-stop to spec/Architect, and
+  that is a payoff, not a setback.
+- MEASURED CARRY-FORWARD for every remaining increment (Adversary
+  `evt_5sw5w9w4jj35z`, M8 on D2): importing direct from a canonical owner makes
+  the consumer transitively inherit that provider's OWN un-migrated ambient
+  surface. `AC-AMBIENT-DELTA` asks for a measurement and a report, **not a
+  shrink** — census growth there is inherited debt, not a defect in the
+  increment. Note also that a package sitting in the RESIDUAL bucket (e.g.
+  `Parsing` at `UnresolvedCon(SourceId)`) has that inheritance MASKED rather than
+  absent, so report the exact post-edit residual rather than an expected vector.
 
 Reviewers: foundation-qa + conformance-validator (catalog implementation
 standard); a genuine design/spec gap (eligibility, attached-proof ownership)
@@ -150,6 +188,18 @@ not `crates/`) — it is the standing exception, not a lane (`CLAUDE.md`).
 
 ## Roster history
 
+- 2026-08-27: **no roster change — citation re-measurement only.** A watchdog
+  step-5 sweep against `origin/main` `61c2fefa0` found SEVEN cited nodes had
+  advanced past what this table claimed, five of them to `merged`: lane 1's named
+  active successor and its `-3` alias, and lane 3's entire pilot chain
+  (`CAT-ORDER-PUB-EXPORT`, `CAT-GCD-REFACTOR`, `CAT-REUSE-CENSUS`). Lane 2's
+  "CURRENT" still named a merged spec WP. None of the three lanes' actual current
+  work appeared in the table at all. Structure untouched — three lanes,
+  runtime / language / foundation, operator 2026-08-22 and 2026-08-25. **This is
+  the decay the file's own header warns about, and it is worth re-running that
+  sweep at any tick where a lane looks unexpectedly quiet**: a stale objective row
+  is what produced the documented single-lane relapse, and it fails silently
+  because every individual row still reads plausibly.
 - 2026-08-25: operator REAFFIRMED the three-lane trial after a Steward single-lane
   relapse (I had collapsed to runtime-only post-compaction and left WP-2 + three
   ready CAT WPs unreleased). Lane objectives refreshed to current node reality
