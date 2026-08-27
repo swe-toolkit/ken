@@ -3211,11 +3211,41 @@ fn build_index_type_cong(
     (e, new_ty)
 }
 
+/// Transport `value : cur_ty` directly to `cur_ty[new_idx/old_idx]` when
+/// `cur_ty : Ω level`, using `h : Eq idx_ty old_idx new_idx`. The motive is
+/// `λ y (_ : Eq idx_ty old_idx y). cur_ty[y/old_idx]`; unlike the Type arm,
+/// this transports the inhabitant itself and emits no `Cast`.
+fn build_index_omega_transport(
+    idx_ty: &Term,
+    old_idx: &Term,
+    new_idx: &Term,
+    cur_ty: &Term,
+    omega_level: Level,
+    value: Term,
+    h: Term,
+) -> (Term, Term) {
+    let new_ty = subst_term_generalize(cur_ty, old_idx, new_idx);
+    let cur_ty_at_y = subst_term_generalize(&weaken(cur_ty, 2), &weaken(old_idx, 2), &Term::var(1));
+    let dom2 = Term::Eq(
+        Box::new(weaken(idx_ty, 1)),
+        Box::new(weaken(old_idx, 1)),
+        Box::new(Term::var(0)),
+    );
+    let motive_body = Term::lam(idx_ty.clone(), Term::lam(dom2.clone(), cur_ty_at_y));
+    // `infer_j` infers its motive directly, so the bare lambda needs the
+    // ruled explicit sort ascription.
+    let motive_ty = Term::pi(idx_ty.clone(), Term::pi(dom2, Term::omega(omega_level)));
+    let motive = Term::Ascript(Box::new(motive_body), Box::new(motive_ty));
+    let transported = Term::J(Box::new(motive), Box::new(value), Box::new(h));
+    (transported, new_ty)
+}
+
 /// If `cur_ty` (a type at the branch's current context depth) literally
-/// mentions `old_idx`, build a `Cast` re-typing `value : cur_ty` to
-/// `cur_ty[new_idx/old_idx]` using `h : Eq idx_ty old_idx new_idx`. Returns
-/// `None` — never a spurious refinement (AC8) — if `cur_ty` does not depend
-/// on `old_idx` at all.
+/// mentions `old_idx`, re-type `value : cur_ty` at
+/// `cur_ty[new_idx/old_idx]` using `h : Eq idx_ty old_idx new_idx`. Type-
+/// classified positions retain the existing equality-of-types plus `Cast`;
+/// Ω-classified positions use direct `J` transport. Returns `None` — never a
+/// spurious refinement (AC8) — if `cur_ty` does not depend on `old_idx` at all.
 fn try_reindex_cast(
     env: &GlobalEnv,
     ctx: &Context,
@@ -3235,23 +3265,28 @@ fn try_reindex_cast(
             "index refinement: could not classify a re-indexed position's type: {e:?}"
         ))
     })?;
-    let level = match whnf(env, ctx, &level_ty) {
-        Term::Type(level) => level,
-        other => {
-            return Err(ElabError::Internal(format!(
-                "index refinement: re-indexed position is not classified by a Type universe, found {other:?}"
-            )))
+    match whnf(env, ctx, &level_ty) {
+        Term::Type(level) => {
+            let (e, new_ty) =
+                build_index_type_cong(env, ctx, idx_ty, old_idx, new_idx, cur_ty, level, h);
+            let cast = Term::Cast(
+                Box::new(cur_ty.clone()),
+                Box::new(new_ty.clone()),
+                Box::new(e),
+                Box::new(value),
+            );
+            Ok(Some((cast, new_ty)))
         }
-    };
-    let (e, new_ty) =
-        build_index_type_cong(env, ctx, idx_ty, old_idx, new_idx, cur_ty, level, h);
-    let cast = Term::Cast(
-        Box::new(cur_ty.clone()),
-        Box::new(new_ty.clone()),
-        Box::new(e),
-        Box::new(value),
-    );
-    Ok(Some((cast, new_ty)))
+        Term::Omega(level) => {
+            let (transported, new_ty) = build_index_omega_transport(
+                idx_ty, old_idx, new_idx, cur_ty, level, value, h,
+            );
+            Ok(Some((transported, new_ty)))
+        }
+        other => Err(ElabError::Internal(format!(
+            "index refinement: re-indexed position is classified by neither Type nor Omega, found {other:?}"
+        ))),
+    }
 }
 
 /// Capability 3: does the branch's own CHECKING GOAL (not a context
@@ -3391,19 +3426,27 @@ fn install_hidden_result_variable_refinements(
             cx.ctx.lookup(index).expect("outer result-refinement position in range"),
             (index + 1) as i64,
         ));
-        if !matches!(
-            whnf(
-                cx.env,
-                &zonked_ctx,
-                &kernel_infer(cx.env, &zonked_ctx, &outer_ty).map_err(|error| {
-                    ElabError::Internal(format!(
-                        "result refinement: could not classify an outer binding: {error:?}"
-                    ))
-                })?
-            ),
-            Term::Type(_)
-        ) {
-            continue;
+        let outer_classifier = whnf(
+            cx.env,
+            &zonked_ctx,
+            &kernel_infer(cx.env, &zonked_ctx, &outer_ty).map_err(|error| {
+                ElabError::Internal(format!(
+                    "result refinement: could not classify an outer binding: {error:?}"
+                ))
+            })?,
+        );
+        match outer_classifier {
+            Term::Type(_) | Term::Omega(_) => {}
+            // Admitted declaration binders are classified by Type or Omega,
+            // but an expression-position dependent Pi temporarily extends the
+            // context before kernel inference validates the completed Pi. A
+            // dependent match nested there can therefore observe an inferable
+            // non-sort domain. Preserve the existing silent skip; final Pi
+            // admission rejects the malformed domain.
+            other => {
+                let _defensive_non_sort = other;
+                continue;
+            }
         }
         if let Some((cast, cast_ty)) = try_reindex_cast(
             cx.env,
@@ -9429,6 +9472,265 @@ pub fn elaborate_rexpr(
         span: expr_span,
     })?;
     Ok((core, ty))
+}
+
+#[cfg(test)]
+mod omega_index_refinement_tests {
+    use crate::{ElabEnv, ElabError};
+    use ken_kernel::{
+        infer as kernel_infer, whnf, ConstructorDecl, Context, GlobalId, InductiveDecl, Level, Term,
+    };
+
+    use super::{
+        build_index_omega_transport, install_hidden_result_variable_refinements,
+        install_index_refinements, subst_term_generalize, try_reindex_cast, weaken, ElabCtx,
+    };
+
+    #[test]
+    fn direct_omega_transport_builds_the_ruled_j_motive_exactly() {
+        // Promise class: durable invariant. Intended extensions may add more
+        // refinement callers or sorts; changing the ruled J motive, base,
+        // scrutinee, or old-to-new orientation must make this control red.
+        // MEASURED: the private production constructor's complete Term tree.
+        // CLAIMED: decision 1 emits the ruled direct-J transport. THE GAP:
+        // arm reachability and kernel admission are exercised by integration
+        // tests over real dependent matches.
+        let idx_ty = Term::ty(Level::Zero);
+        let old_idx = Term::var(3);
+        let new_idx = Term::var(4);
+        let cur_ty = Term::Eq(
+            Box::new(idx_ty.clone()),
+            Box::new(old_idx.clone()),
+            Box::new(old_idx.clone()),
+        );
+        let value = Term::var(5);
+        let h = Term::var(6);
+
+        let (transported, new_ty) = build_index_omega_transport(
+            &idx_ty,
+            &old_idx,
+            &new_idx,
+            &cur_ty,
+            Level::Zero,
+            value.clone(),
+            h.clone(),
+        );
+
+        let expected_new_ty = subst_term_generalize(&cur_ty, &old_idx, &new_idx);
+        let expected_at_y =
+            subst_term_generalize(&weaken(&cur_ty, 2), &weaken(&old_idx, 2), &Term::var(1));
+        let expected_eq_domain = Term::Eq(
+            Box::new(weaken(&idx_ty, 1)),
+            Box::new(weaken(&old_idx, 1)),
+            Box::new(Term::var(0)),
+        );
+        let expected_motive_body = Term::lam(
+            idx_ty.clone(),
+            Term::lam(expected_eq_domain.clone(), expected_at_y),
+        );
+        let expected_motive_type = Term::pi(
+            idx_ty,
+            Term::pi(expected_eq_domain, Term::omega(Level::Zero)),
+        );
+        let expected = Term::J(
+            Box::new(Term::Ascript(
+                Box::new(expected_motive_body),
+                Box::new(expected_motive_type),
+            )),
+            Box::new(value),
+            Box::new(h),
+        );
+
+        assert_eq!(new_ty, expected_new_ty);
+        assert_eq!(transported, expected);
+    }
+
+    #[test]
+    fn hidden_result_prefilter_delegates_a_lawful_omega_outer_binding() {
+        // Promise class: durable invariant. This is the private production
+        // seam for decision 3: a well-formed `n : Nat, h : Eq Nat n n`
+        // context supplies an Omega-classified outer binding that depends on
+        // the refined index. The prefilter must delegate it to decision 1 and
+        // install the direct-J refinement, rather than silently skipping it.
+        // MEASURED: the returned installed position and its stored J term.
+        // CLAIMED: decision 3 delegates lawful Omega bindings. THE GAP: the
+        // position is private state; real matches exercise decision 1 itself.
+        let mut env = ElabEnv::new().expect("base environment");
+        let nat = Term::IndFormer {
+            id: env.globals["Nat"],
+            level_args: vec![],
+        };
+        let zero = Term::Constructor {
+            id: env.globals["Zero"],
+            level_args: vec![],
+        };
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "omega-prefilter-control",
+        );
+        cx.ctx.push(nat.clone());
+        cx.ctx.push(Term::Eq(
+            Box::new(nat.clone()),
+            Box::new(Term::var(0)),
+            Box::new(Term::var(0)),
+        ));
+
+        let installed =
+            install_hidden_result_variable_refinements(&mut cx, &nat, &zero, &Term::var(1), 0, 2)
+                .expect("the lawful Omega outer binding must be delegated");
+        assert_eq!(installed, vec![1]);
+        let (refined, refined_ty, install_depth) = cx
+            .var_refinements
+            .get(&1)
+            .expect("the Omega binding's bottom-relative position must be installed");
+        assert!(matches!(refined, Term::J(_, _, _)));
+        assert_eq!(
+            refined_ty,
+            &Term::Eq(Box::new(nat), Box::new(zero.clone()), Box::new(zero),)
+        );
+        assert_eq!(*install_depth, 2);
+    }
+
+    #[test]
+    fn hidden_result_matched_type_classifier_remains_type_only() {
+        // Promise class: durable invariant. Decision 4 classifies the matched
+        // type itself, not a re-indexed position, and must reject an Omega-
+        // classified proposition before installing any outer refinement.
+        // MEASURED: the exact decision-4 Internal diagnostic. CLAIMED: the
+        // matched-type classifier stays Type-only. THE GAP: none; the test
+        // invokes the production decision before later refinement work.
+        let mut env = ElabEnv::new().expect("base environment");
+        let top = Term::const_(env.env.top_id(), vec![]);
+        let proved = Term::const_(env.globals["Proved"], vec![]);
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "omega-index-type-control",
+        );
+        cx.ctx.push(Term::ty(Level::Zero));
+
+        let error =
+            install_hidden_result_variable_refinements(&mut cx, &top, &proved, &proved, 0, 1)
+                .expect_err("decision 4 must remain Type-only");
+        match error {
+            ElabError::Internal(message) => assert!(
+                message.contains(
+                    "result refinement: matched type is not classified by Type, found Ω0"
+                ),
+                "the decision-4 Type-only classifier moved: {message:?}"
+            ),
+            other => panic!("expected the decision-4 Internal error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sibling_convoy_index_type_classifier_remains_type_only() {
+        // Promise class: durable invariant. Decision 5 classifies an index
+        // type, so even though proposition domains are legal binder types, it
+        // must reject an Omega-classified index before convoying any sibling.
+        // MEASURED: the exact decision-5 Internal diagnostic. CLAIMED: the
+        // convoy index classifier stays Type-only. THE GAP: the fake family is
+        // required because admitted surface family indices are already Type.
+        let mut env = ElabEnv::new().expect("base environment");
+        let top = Term::const_(env.env.top_id(), vec![]);
+        let proved = Term::const_(env.globals["Proved"], vec![]);
+        let fake_family = InductiveDecl {
+            id: GlobalId(u32::MAX - 1),
+            level_params: vec![],
+            params: vec![],
+            parameter_polarities: vec![],
+            indices: vec![top],
+            level: Level::Zero,
+            constructors: vec![ConstructorDecl {
+                id: GlobalId(u32::MAX),
+                args: vec![],
+                target_indices: vec![proved.clone()],
+                type_: Term::ty(Level::Zero),
+                recursive_positions: vec![],
+            }],
+            former_type: Term::ty(Level::Zero),
+        };
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "omega-convoy-index-control",
+        );
+        cx.ctx.push(Term::ty(Level::Zero));
+
+        let error =
+            install_index_refinements(&mut cx, &fake_family, &[], &[proved], &[Term::var(0)], 0, 1)
+                .expect_err("decision 5 must remain Type-only");
+        match error {
+            ElabError::Internal(message) => assert!(
+                message.contains(
+                    "index refinement: index type is not classified by a Type universe, found Ω0"
+                ),
+                "the decision-5 Type-only classifier moved: {message:?}"
+            ),
+            other => panic!("expected the decision-5 Internal error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn reindex_classifier_outside_type_or_omega_fails_closed() {
+        // Promise class: durable invariant. A malformed intermediate may infer
+        // successfully while its classifier is a non-sort; decision 1 must
+        // reject it and report that actual classifier.
+        // MEASURED: the error names the independently inferred classifier.
+        // CLAIMED: decision 1 fails closed outside Type | Omega. THE GAP: the
+        // malformed `cur_ty` is injected at the private production seam.
+        let env = ElabEnv::new().expect("base environment");
+        let idx_ty = Term::IndFormer {
+            id: env.globals["Nat"],
+            level_args: vec![],
+        };
+        let old_idx = Term::Constructor {
+            id: env.globals["Zero"],
+            level_args: vec![],
+        };
+        let new_idx = Term::app(
+            Term::Constructor {
+                id: env.globals["Suc"],
+                level_args: vec![],
+            },
+            old_idx.clone(),
+        );
+        // Deliberately malformed as a type: `Zero` infers successfully, but
+        // its classifier is `Nat`, neither Type nor Omega.
+        let cur_ty = old_idx.clone();
+        let ctx = Context::new();
+        let actual_classifier = whnf(
+            &env.env,
+            &ctx,
+            &kernel_infer(&env.env, &ctx, &cur_ty).expect("Zero infers at Nat"),
+        );
+        let error = try_reindex_cast(
+            &env.env,
+            &ctx,
+            &idx_ty,
+            &old_idx,
+            &new_idx,
+            &cur_ty,
+            old_idx.clone(),
+            Term::Refl(Box::new(old_idx.clone())),
+        )
+        .expect_err("a non-sort classifier must fail closed");
+
+        match error {
+            ElabError::Internal(message) => {
+                assert!(message.contains("classified by neither Type nor Omega"));
+                assert!(message.contains(&format!("found {actual_classifier:?}")));
+            }
+            other => panic!("expected the decision-1 Internal error, got {other:?}"),
+        }
+    }
 }
 
 #[cfg(test)]
