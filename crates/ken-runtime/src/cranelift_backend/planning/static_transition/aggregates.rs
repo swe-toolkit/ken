@@ -283,6 +283,7 @@ pub(in crate::cranelift_backend) struct CheckedIhSelfResumptionStep {
     construct_origin: StaticOriginId,
     active_frame_origin: StaticOriginId,
     recursive_child_origin: StaticOriginId,
+    selected_alternative: u32,
     selected_case_body_origin: StaticOriginId,
     invocation_origin: StaticOriginId,
     call_origin: StaticOriginId,
@@ -4694,6 +4695,9 @@ fn derive_checked_ih_continuation_inheritance(
             construct_origin,
             active_frame_origin: active_frame,
             recursive_child_origin,
+            selected_alternative: u32::try_from(*alternative).map_err(|_| {
+                planner_capacity_error("checked-IH selected alternative exhausted")
+            })?,
             selected_case_body_origin,
             invocation_origin,
             call_origin,
@@ -5020,6 +5024,134 @@ fn generated_entry_retarget_caller(
     })
 }
 
+/// The declared recursive-unit body that lowering carries on this governed
+/// invocation segment.
+///
+/// This reads the closed typed continuation-unit population. It does not walk a
+/// source body or recover an identity from a numeric origin: the active frame,
+/// its already-selected alternative, and the recursive position are the same
+/// planner facts that created the unit. Multiple producer constructs are legal
+/// only when their declared worker bodies agree, matching lowering's existing
+/// branch-local agreement rule.
+fn checked_ih_invocation_recursive_unit_body(
+    plan: &StaticTransitionPlan<'_>,
+    final_step: &CheckedIhSelfResumptionStep,
+) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+    if final_step.active_frame_origin != final_step.callee_binding.frame_origin {
+        return Err(planner_error(
+            "a governed invocation's selected frame disagrees with its checked-IH binding",
+        ));
+    }
+    let alternative = usize::try_from(final_step.selected_alternative).map_err(|_| {
+        planner_capacity_error("checked-IH selected alternative exceeds host indexing")
+    })?;
+    let RuntimeExpr::ComputationalMatch { cases, .. } =
+        plan.planned_occurrence_expr(final_step.active_frame_origin)?
+    else {
+        return Err(planner_error(
+            "a governed invocation's declared recursive unit belongs to a non-computational frame",
+        ));
+    };
+    let case = cases.get(alternative).ok_or_else(|| {
+        planner_error(
+            "a governed invocation's selected alternative is outside its computational frame",
+        )
+    })?;
+    let recursive_position = usize::try_from(final_step.callee_binding.recursive_position)
+        .map_err(|_| {
+            planner_capacity_error("checked-IH recursive position exceeds host indexing")
+        })?;
+    if !case.recursive_positions.contains(&recursive_position)
+        || plan.semantic.child_origin(
+            final_step.active_frame_origin,
+            1usize.checked_add(alternative).ok_or_else(|| {
+                planner_capacity_error("checked-IH selected case position exhausted")
+            })?,
+        )? != final_step.selected_case_body_origin
+    {
+        return Err(planner_error(
+            "a governed invocation's selected case body/recursive position is not its typed frame edge",
+        ));
+    }
+
+    let mut declared = None;
+    for unit in plan.continuation_units()? {
+        if unit.continuation_origin() != final_step.active_frame_origin
+            || unit.producer_alternative() != final_step.selected_alternative
+            || unit.recursive_position() != final_step.callee_binding.recursive_position
+        {
+            continue;
+        }
+        let body = unit.worker_body_origin();
+        match declared {
+            None => declared = Some(body),
+            Some(expected) if expected == body => {}
+            Some(expected) => {
+                return Err(planner_error(format!(
+                    "one governed invocation's typed continuation units disagree on their declared recursive body: {expected:?} versus {body:?}",
+                )))
+            }
+        }
+    }
+    Ok(declared)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn checked_ih_neighboring_direct_body(
+    plan: &StaticTransitionPlan<'_>,
+    inheritance: &CheckedIhContinuationInheritance,
+    final_step: &CheckedIhSelfResumptionStep,
+    exact_body: StaticOriginId,
+) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+    let mut neighbors = BTreeSet::new();
+    for candidate in &plan.checked_ih_continuation_inheritances {
+        let Some(candidate_step) = candidate.capability.self_resumption_steps.last() else {
+            continue;
+        };
+        if candidate.capability.destination_owner == inheritance.capability.destination_owner
+            && candidate.capability.destination_body_origin
+                == inheritance.capability.destination_body_origin
+            && candidate_step.invocation_origin == final_step.invocation_origin
+            && candidate_step.call_origin == final_step.call_origin
+            && candidate_step.callee_origin == final_step.callee_origin
+            && candidate_step.callee_binding == final_step.callee_binding
+            && candidate.transport.source_worker_body_origin != exact_body
+        {
+            neighbors.insert(candidate.transport.source_worker_body_origin);
+        }
+    }
+    match neighbors.len() {
+        0 => Ok(None),
+        1 => Ok(neighbors.first().copied()),
+        _ => Err(planner_error(
+            "the Direct population control has more than one neighboring declared body edge",
+        )),
+    }
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn checked_ih_neighboring_loop_result_body(
+    plan: &StaticTransitionPlan<'_>,
+    inheritance: &CheckedIhContinuationInheritance,
+) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+    let mut neighbors = BTreeSet::new();
+    for candidate in &plan.checked_ih_continuation_inheritances {
+        if candidate.capability.destination_owner == inheritance.capability.destination_owner
+            && candidate.fresh_result_destination.ret_case_body_origin
+                != inheritance.fresh_result_destination.ret_case_body_origin
+        {
+            neighbors.insert(candidate.fresh_result_destination.ret_case_body_origin);
+        }
+    }
+    match neighbors.len() {
+        0 => Ok(None),
+        1 => Ok(neighbors.first().copied()),
+        _ => Err(planner_error(
+            "the loop-result population control has more than one neighboring ordinary Ret edge",
+        )),
+    }
+}
+
 fn checked_ih_fresh_result_producer(
     plan: &StaticTransitionPlan<'_>,
     inheritance: &CheckedIhContinuationInheritance,
@@ -5054,13 +5186,53 @@ fn checked_ih_fresh_result_producer(
         ));
     }
 
+    let invocation_recursive_unit_body =
+        checked_ih_invocation_recursive_unit_body(plan, final_step)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    let direct_neighbor_body = {
+        use CheckedIhGeneratedEntryConfluenceMutation as Mutation;
+        let current_transport_is_direct = invocation_recursive_unit_body.is_some_and(|body| {
+            inheritance.transport.source_worker_body_origin == body
+                && inheritance.transport.source_continuation_origin
+                    == final_step.callee_binding.frame_origin
+                && inheritance.transport.source_recursive_position
+                    == final_step.callee_binding.recursive_position
+                && inheritance.transport.destination_owner
+                    == inheritance.capability.destination_owner
+        });
+        if GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get)
+            == Mutation::ProducerWrongDirectEdge
+            && current_transport_is_direct
+        {
+            checked_ih_neighboring_direct_body(
+                plan,
+                inheritance,
+                final_step,
+                invocation_recursive_unit_body.expect("the exact Direct relation has one body"),
+            )?
+        } else {
+            None
+        }
+    };
+    #[cfg(feature = "px8-ds-test-support")]
+    let direct_query_body = direct_neighbor_body.or(invocation_recursive_unit_body);
+    #[cfg(not(feature = "px8-ds-test-support"))]
+    let direct_query_body = invocation_recursive_unit_body;
+
+    // The same body-refined predicate lowering consumes at the direct return
+    // edge. No body in the typed unit population means the same unrefined
+    // `None` query lowering makes; a declared body is never dropped here.
     let direct_transport = plan.checked_ih_environment_transport_for_invocation(
         inheritance.capability.destination_owner,
-        None,
+        direct_query_body,
         final_step.callee_binding.frame_origin,
         final_step.callee_binding.recursive_position,
     )?;
-    let exact = if let Some(_transport) = direct_transport {
+    #[cfg(feature = "px8-ds-test-support")]
+    let direct_control_requires_direct_arm = direct_neighbor_body.is_some();
+    #[cfg(not(feature = "px8-ds-test-support"))]
+    let direct_control_requires_direct_arm = false;
+    let exact = if direct_transport.is_some() || direct_control_requires_direct_arm {
         CheckedIhFreshResultProducer::DirectInvocationResult {
             invocation_origin: final_step.invocation_origin,
             call_origin: final_step.call_origin,
@@ -5124,13 +5296,11 @@ fn checked_ih_fresh_result_producer(
                 }
             }
             Mutation::ProducerWrongDirectEdge => {
-                if let Some(CheckedIhFreshResultProducer::DirectInvocationResult {
-                    binding,
-                    ..
-                }) = candidates.first_mut()
-                {
-                    binding.frame_origin.0 = binding.frame_origin.0.wrapping_add(1);
-                }
+                // Population-side above: replace the invocation's exact body
+                // selector with this inheritance's different, already-validated
+                // transport-source body. Owner, frame, position, and governed
+                // call stay fixed. The unchanged Direct arm below must reject
+                // unless the selector illicitly ignores its body operand.
             }
             Mutation::ProducerWrongLoopEdge => {
                 if let Some(CheckedIhFreshResultProducer::CarriedLoopExitResult {
@@ -5138,7 +5308,14 @@ fn checked_ih_fresh_result_producer(
                     ..
                 }) = candidates.first_mut()
                 {
-                    ret_case_body_origin.0 = ret_case_body_origin.0.wrapping_add(1);
+                    if let Some(neighbor) =
+                        checked_ih_neighboring_loop_result_body(plan, inheritance)?
+                    {
+                        // A real planner-certified ordinary Ret/capture result
+                        // edge from the same destination owner, not an invented
+                        // dense successor coordinate.
+                        *ret_case_body_origin = neighbor;
+                    }
                 }
             }
             Mutation::ProducerWrongGovernedKey => match candidates.first_mut() {
@@ -5192,7 +5369,7 @@ fn checked_ih_fresh_result_producer(
             }
             if direct_transport.is_none() {
                 return Err(planner_error(
-                    "the direct fresh-result producer has no exact typed invocation transport",
+                    "the direct fresh-result producer's declared recursive-unit body has no exact typed invocation transport",
                 ));
             }
         }

@@ -1423,13 +1423,19 @@ fn assert_generated_entry_mutation_child() {
 /// projection disagreement, producer corruption, and set-membership corruption
 /// must reject before a certificate can be published.
 ///
-/// **MEASURED:** each population-side mutation changes one real relation field
-/// or membership operation and reaches its named planner refusal.
-/// **CLAIMED:** the governed projection carries exactly one typed producer, and
-/// quotient members agree on that producer before publication.
-/// **THE GAP:** the direct and loop same-shape positives live in
+/// **MEASURED:** each population-side mutation changes one real relation field,
+/// membership operation, declared-body transport selector, or ordinary-Ret
+/// result edge and reaches its named planner refusal.
+/// **CLAIMED:** the governed projection carries exactly one typed producer, the
+/// Direct arm uses lowering's body-refined transport predicate, the loop arm
+/// uses its exact ordinary-Ret edge, and quotient members agree before
+/// publication.
+/// **THE GAP:** the direct and loop same-variant positives live in
 /// `checked_ih_generated_entry_confluence_reaches_exact_capsules`; these
-/// mutation children establish rejection, not positive producer reach.
+/// mutation children establish rejection, not positive producer reach. The
+/// Direct neighbor is a different validated transport-source unit body; the
+/// loop neighbor is a different certified Ret/capture edge from the same
+/// destination owner. Neither is an invented dense origin.
 #[test]
 fn checked_ih_generated_entry_confluence_and_producer_mutations_reject() {
     if std::env::var_os(GENERATED_ENTRY_MUTATION_CHILD).is_some() {
@@ -1481,7 +1487,7 @@ fn checked_ih_generated_entry_confluence_and_producer_mutations_reject() {
         ),
         (
             "producer-wrong-direct-edge",
-            "direct fresh-result producer does not name the exact governed CheckedComputationalIHInvocationReturn edge",
+            "direct fresh-result producer's declared recursive-unit body has no exact typed invocation transport",
         ),
         (
             "producer-wrong-loop-edge",
