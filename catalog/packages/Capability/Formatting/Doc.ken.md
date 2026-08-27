@@ -20,7 +20,11 @@ The algebra is closed at six constructors. `Text` stores characters directly;
 content.
 
 ```ken
+import Core.Classes.LawfulClasses (leq_nat)
+
 import Core.Logic.Or (Or, Inl, Inr)
+
+import Data.Numeric.Nat.Arithmetic (add)
 
 data Doc : Type where {
   Text : List Char → Doc;
@@ -70,22 +74,6 @@ not flat width. A layout fits when `flat_width ≤ width`, including equality.
 flat exactly when that layout fits, otherwise its second layout broken.
 
 ```ken
-fn pretty_nat_add (a : Nat) (b : Nat) : Nat =
-  match b {
-    Zero ↦ a;
-    Suc rest ↦ Suc (pretty_nat_add a rest)
-  }
-
-fn pretty_nat_leq (a : Nat) (b : Nat) : Bool =
-  match a {
-    Zero ↦ True;
-    Suc a2 ↦
-      match b {
-        Zero ↦ False;
-        Suc b2 ↦ pretty_nat_leq a2 b2
-      }
-  }
-
 fn pretty_repeat_char (char : Char) (count : Nat) : List Char =
   match count {
     Zero ↦ Nil Char;
@@ -96,13 +84,13 @@ fn doc_flat_width (doc : Doc) : Nat =
   match doc {
     Text chars ↦ length Char chars;
     Line ↦ Suc Zero;
-    Concat left right ↦ pretty_nat_add (doc_flat_width left) (doc_flat_width right);
+    Concat left right ↦ add (doc_flat_width left) (doc_flat_width right);
     Nest amount body ↦ doc_flat_width body;
     Group body ↦ doc_flat_width body;
     Alt first second ↦ doc_flat_width first
   }
 
-fn doc_fits (width : Nat) (doc : Doc) : Bool = pretty_nat_leq (doc_flat_width doc) width
+fn doc_fits (width : Nat) (doc : Doc) : Bool = leq_nat (doc_flat_width doc) width
 
 fn render_mode (flat : Bool) (width : Nat) (indent : Nat) (doc : Doc) : List Char =
   match doc {
@@ -117,7 +105,7 @@ fn render_mode (flat : Bool) (width : Nat) (indent : Nat) (doc : Doc) : List Cha
         Char
         (render_mode flat width indent left)
         (render_mode flat width indent right);
-    Nest amount body ↦ render_mode flat width (pretty_nat_add indent amount) body;
+    Nest amount body ↦ render_mode flat width (add indent amount) body;
     Group body ↦
       match doc_fits width body {
         True ↦ render_mode True width indent body;

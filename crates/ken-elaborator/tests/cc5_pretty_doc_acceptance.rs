@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{Decl, GlobalId};
+use ken_kernel::{Decl, GlobalId, Term};
 
 const PRETTY_DOC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
 
@@ -18,6 +18,10 @@ fn dependency_env() -> ElabEnv {
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
+        .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("Core.Classes.LawfulClasses must load as a qualified module");
     env
 }
 
@@ -39,6 +43,21 @@ fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
             env.env.transparent_body(id).is_some(),
             "`{name}` must be a real transparent, kernel-checked term"
         );
+    }
+}
+
+fn term_mentions(term: &Term, target: GlobalId) -> bool {
+    match term {
+        Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. }
+            if *id == target =>
+        {
+            true
+        }
+        Term::Elim { fam, .. } if *fam == target => true,
+        _ => term
+            .children()
+            .into_iter()
+            .any(|child| term_mentions(child, target)),
     }
 }
 
@@ -212,8 +231,6 @@ fn ordered_dependency_closure_elaborates_transparent_pretty_doc() {
         &[
             "doc_content",
             "DocContentInvariant",
-            "pretty_nat_add",
-            "pretty_nat_leq",
             "pretty_repeat_char",
             "doc_flat_width",
             "doc_fits",
@@ -277,7 +294,7 @@ fn all_three_laws_are_checked_and_consumable_as_proofs() {
 }
 
 #[test]
-fn cc5_has_zero_trust_delta_and_keeps_string_at_the_boundary() {
+fn cc5_reuses_canonical_nat_operations_with_zero_trust_delta() {
     let extracted = ken_elaborator::literate::extract_ken_md(PRETTY_DOC_KEN_MD)
         .expect("Capability.Formatting.Doc must extract");
     assert!(!extracted.source.contains("Axiom"));
@@ -291,10 +308,51 @@ fn cc5_has_zero_trust_delta_and_keeps_string_at_the_boundary() {
         "verified CC5 laws must not cross the opaque String boundary"
     );
 
+    // Durable invariant.
+    // MEASURED: the roots-loaded Doc bodies retain the canonical provider ids,
+    // retain neither retired local helper, load no Order facade, and add no trust.
+    // CLAIMED: Doc reuses both canonical Nat operations directly.
+    // THE GAP: the existing boundary and proof tests separately establish that
+    // those compiled references preserve Doc's behavior and laws.
     let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(PRETTY_DOC_KEN_MD)
-        .expect("Capability.Formatting.Doc must elaborate after its Core/Data closure");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
+        .expect("Capability.Formatting.Doc must roots-load over its dependency fixture");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "CC5 must add zero trusted-base entries");
+
+    let add = env.globals["Data.Numeric.Nat.Arithmetic.add"];
+    let leq_nat = env.globals["Core.Classes.LawfulClasses.leq_nat"];
+    assert!(env.env.transparent_body(add).is_some());
+    assert!(env.env.transparent_body(leq_nat).is_some());
+    for local in ["pretty_nat_add", "pretty_nat_leq"] {
+        assert!(
+            !env.globals
+                .contains_key(&format!("Capability.Formatting.Doc.{local}")),
+            "Doc must not mint local Nat operation `{local}`"
+        );
+    }
+    assert!(
+        !env.globals
+            .keys()
+            .any(|name| name.starts_with("Data.Numeric.Nat.Order.")),
+        "Doc must import canonical owners without loading the Order facade"
+    );
+
+    for (name, provider) in [
+        ("doc_flat_width", add),
+        ("render_mode", add),
+        ("doc_fits", leq_nat),
+    ] {
+        let qualified = format!("Capability.Formatting.Doc.{name}");
+        let id = env.globals[&qualified];
+        let body = match env.env.lookup(id) {
+            Some(Decl::Transparent { body, .. }) => body,
+            other => panic!("{qualified} must be transparent, got {other:?}"),
+        };
+        assert!(
+            term_mentions(body, provider),
+            "{qualified} must retain its canonical provider GlobalId"
+        );
+    }
 }
