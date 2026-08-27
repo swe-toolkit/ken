@@ -27,7 +27,7 @@ mod catalog_or;
 
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::EvalVal;
-use ken_kernel::{check as kernel_check, Context, KernelError};
+use ken_kernel::{check as kernel_check, Context, KernelError, Term};
 use std::collections::BTreeSet;
 
 const FOK_SOURCE: &str =
@@ -709,6 +709,71 @@ fn omega_reindexed_evidence_is_consumed_in_the_ruled_direction() {
         )
         .expect("the re-indexed Omega evidence must reach its outer consumer");
     assert_transparent_body_kernel_checks(&env, id);
+}
+
+/// `AC-DECISION-3-DEFAULT`: a real mutual-recursive source reaches the hidden
+/// result prefilter while an expression-position dependent Pi has temporarily
+/// extended the context with an inferable non-sort domain. The prefilter must
+/// silently skip that domain; kernel admission of the completed Pi then rejects
+/// it as malformed. Admitting bare `_` instead makes decision 1 reject first.
+/// Promise class: durable invariant. An earlier Pi-domain formation check may
+/// retire this sentinel, but widening decision 3 beyond `Type | Omega` may not.
+/// MEASURED: the source reaches final Pi admission and reports its TypeMismatch.
+/// CLAIMED: decision 3 preserves the reachable non-sort silent default.
+/// THE GAP: reachability is independently mutation-proved by admitting bare `_`
+/// at the production prefilter and requiring this control to red.
+#[test]
+fn production_source_preserves_reachable_non_sort_prefilter_skip() {
+    let mut env = mk_env();
+    elab_ok(
+        &mut env,
+        "data D3Flag : Type where { D3A : D3Flag; D3B : D3Flag }",
+    );
+    elab_ok(
+        &mut env,
+        "data D3Fam : D3Flag -> Type where { \
+           D3MkA : D3Fam D3A; D3MkB : D3Fam D3B \
+         }",
+    );
+
+    let error = env
+        .elaborate_file(
+            "fn d3_recur_a (n : Nat) (f : D3Flag) : D3Fam f = \
+             let bad = ((x : f) -> (match f { \
+               D3A |-> d3_recur_b n D3A; \
+               D3B |-> d3_recur_b n D3B \
+             } : D3Fam f)) in \
+             match f { \
+               D3A |-> d3_recur_b n D3A; \
+               D3B |-> d3_recur_b n D3B \
+             }\n\
+             fn d3_recur_b (n : Nat) (f : D3Flag) : D3Fam f = \
+             match f { \
+               D3A |-> d3_recur_a n D3A; \
+               D3B |-> d3_recur_a n D3B \
+             }",
+        )
+        .expect_err("the malformed expression Pi must fail final kernel admission");
+
+    match error {
+        ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { expected, found },
+            ..
+        } => {
+            assert!(matches!(*expected, Term::Type(_)));
+            assert_eq!(
+                *found,
+                Term::IndFormer {
+                    id: env.globals["D3Flag"],
+                    level_args: vec![],
+                },
+                "final Pi admission must name the malformed D3Flag domain",
+            );
+        }
+        other => panic!(
+            "the non-sort must be silently skipped until final Pi admission: {other:?}"
+        ),
+    }
 }
 
 /// `AC-REAL-CONSUMER` and held-Probe transition. Both source programs below

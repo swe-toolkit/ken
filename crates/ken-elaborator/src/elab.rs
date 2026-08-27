@@ -3437,11 +3437,12 @@ fn install_hidden_result_variable_refinements(
         );
         match outer_classifier {
             Term::Type(_) | Term::Omega(_) => {}
-            // A well-formed context binding is classified by exactly Type or
-            // Omega. During elaboration, however, an as-yet-unchecked malformed
-            // binder can infer successfully at a non-sort (for example a Nat-
-            // valued term used as a type). Preserve the existing defensive,
-            // silent skip; final kernel admission rejects that malformed binder.
+            // Admitted declaration binders are classified by Type or Omega,
+            // but an expression-position dependent Pi temporarily extends the
+            // context before kernel inference validates the completed Pi. A
+            // dependent match nested there can therefore observe an inferable
+            // non-sort domain. Preserve the existing silent skip; final Pi
+            // admission rejects the malformed domain.
             other => {
                 let _defensive_non_sort = other;
                 continue;
@@ -9591,44 +9592,6 @@ mod omega_index_refinement_tests {
             &Term::Eq(Box::new(nat), Box::new(zero.clone()), Box::new(zero),)
         );
         assert_eq!(*install_depth, 2);
-    }
-
-    #[test]
-    fn hidden_result_prefilter_preserves_reachable_non_sort_skip() {
-        // Promise class: durable invariant. A future earlier formation check
-        // may make this sentinel unreachable; widening decision 3 may not.
-        // MEASURED: no refinement is installed and the call does not error.
-        // CLAIMED: decision 3 preserves its reachable non-sort skip. THE GAP:
-        // the malformed context is constructed at the private production seam.
-        // `n : Nat, x : n` is malformed context formation, but inference of
-        // `x`'s as-yet-unchecked annotation succeeds at classifier `Nat`.
-        // Decision 3's old defensive behavior is reachable and remains a
-        // silent skip; widening the admission beyond Type | Omega makes this
-        // witness reach decision 1 and fail with its non-sort Internal error.
-        let mut env = ElabEnv::new().expect("base environment");
-        let nat = Term::IndFormer {
-            id: env.globals["Nat"],
-            level_args: vec![],
-        };
-        let zero = Term::Constructor {
-            id: env.globals["Zero"],
-            level_args: vec![],
-        };
-        let mut cx = ElabCtx::new(
-            &mut env.env,
-            &env.globals,
-            &mut env.num_values,
-            &env.numeric_env,
-            "non-sort-prefilter-control",
-        );
-        cx.ctx.push(nat.clone());
-        cx.ctx.push(Term::var(0));
-
-        let installed =
-            install_hidden_result_variable_refinements(&mut cx, &nat, &zero, &Term::var(1), 0, 2)
-                .expect("the defensive non-sort default must preserve its silent skip");
-        assert!(installed.is_empty());
-        assert!(cx.var_refinements.is_empty());
     }
 
     #[test]
