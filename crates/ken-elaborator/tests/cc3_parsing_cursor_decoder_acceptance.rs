@@ -20,6 +20,7 @@ fn dependency_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
+    catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
@@ -39,6 +40,11 @@ fn dependency_env() -> ElabEnv {
     env.elaborate_ken_md_file(DIAGNOSTIC_KEN_MD)
         .expect("Capability.Diagnostics.Core must elaborate fourth");
     env
+}
+
+#[test]
+fn derived_fixture_retains_lawfulclasses_for_cc3_dependency_closure() {
+    let _ = dependency_env();
 }
 
 fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {

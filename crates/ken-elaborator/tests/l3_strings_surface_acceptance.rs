@@ -32,6 +32,9 @@ fn mk_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
+    let canonical_sub = env.globals["Data.Numeric.Nat.Order.sub"];
+    env.globals
+        .insert("l3_canonical_nat_sub".to_owned(), canonical_sub);
     env
 }
 
@@ -126,7 +129,7 @@ fn list_combinator_floor_derived_over_real_elim() {
     let list_id = env.globals["List"];
     let nat_id = env.globals["Nat"];
     let list_recursors = ["list_append", "nth", "list_eq", "list_compare"];
-    let nat_recursors = ["nat_sub"];
+    let nat_recursors = ["Data.Numeric.Nat.Order.sub"];
     // `take`/`drop` match on `Nat` outermost (the fuel), `List` innermost.
     let nat_outer = ["take", "drop"];
 
@@ -201,7 +204,16 @@ fn list_combinator_floor_derived_over_real_elim() {
 
     // Zero-TCB-delta: none of the floor combinators or OrdResult contribute
     // any new trusted_base() member (they are all declare_def/data, checked).
-    for name in ["list_append", "nth", "take", "drop", "nat_sub", "list_eq", "list_compare", "compare_char"] {
+    for name in [
+        "list_append",
+        "nth",
+        "take",
+        "drop",
+        "Data.Numeric.Nat.Order.sub",
+        "list_eq",
+        "list_compare",
+        "compare_char",
+    ] {
         let id = env.globals[name];
         let delta = trusted_base_delta(&env.env, id);
         assert!(
@@ -289,7 +301,7 @@ fn derived_string_ops_reduce_over_real_roundtrip() {
         assert_eq!(
             v,
             EvalVal::Str("".into()),
-            "slice 2 1 \"abc\" must be \"\" (nat_sub saturates, no underflow)"
+            "slice 2 1 \"abc\" must be \"\" (canonical sub saturates, no underflow)"
         );
 
         // char_at: Option Char, honest absence.
@@ -450,12 +462,21 @@ fn concat_slice_compose_and_floor_totality() {
             "list_append must not get stuck on well-typed input"
         );
 
-        // Totality: nat_sub saturates, nth/take/drop totalize out-of-range —
+        // Totality: canonical sub saturates, nth/take/drop totalize out-of-range —
         // none reduce to Neutral/stuck. Re-check the already-asserted DS-AC3
         // corpus values are all non-Neutral (they were asserted to concrete
         // values above; this call re-confirms the out-of-range/underflow
         // faces specifically).
-        let v = eval_view(&mut env, &mut store, "t_natsub_sat", "Nat", &format!("nat_sub ({}) ({})", nat(1), nat(2)));
-        assert!(!matches!(v, EvalVal::Neutral), "nat_sub 1 2 must not be stuck");
+        let v = eval_view(
+            &mut env,
+            &mut store,
+            "t_natsub_sat",
+            "Nat",
+            &format!("l3_canonical_nat_sub ({}) ({})", nat(1), nat(2)),
+        );
+        assert!(
+            !matches!(v, EvalVal::Neutral),
+            "canonical sub 1 2 must not be stuck"
+        );
     });
 }

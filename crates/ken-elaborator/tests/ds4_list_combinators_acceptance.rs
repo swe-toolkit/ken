@@ -11,9 +11,6 @@
 mod catalog_or;
 
 use ken_elaborator::ElabEnv;
-
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const COLLECTIONS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 
@@ -21,8 +18,9 @@ fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
+        .expect("canonical Nat order provider must elaborate");
     catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD).expect("Core/Classes/LawfulClasses.ken must elaborate");
     env
 }
 
@@ -70,6 +68,8 @@ fn trusted_base_delta_is_empty_across_the_file() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
+        .expect("canonical Nat order provider must elaborate");
     let before: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     catalog_or::load_derived_fixture(&mut env);
     let after: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();

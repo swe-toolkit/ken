@@ -26,9 +26,6 @@
 mod catalog_or;
 
 use ken_elaborator::ElabEnv;
-
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const LAWFUL_FUNCTORS_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
 const EFFECTFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
@@ -38,7 +35,6 @@ fn base_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD).expect("Core/Classes/LawfulClasses.ken must elaborate");
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD).expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
     env
 }

@@ -17,16 +17,11 @@ use ken_kernel::env::{Context, Decl as KernelDecl};
 use ken_kernel::term::Term;
 use ken_kernel::{check, whnf, KernelError};
 
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
-
 fn mk_env_with_package() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD)
-        .expect("catalog/packages/Core/Classes/LawfulClasses.ken must elaborate");
     env
 }
 

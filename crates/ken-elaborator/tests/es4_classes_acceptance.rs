@@ -94,7 +94,6 @@ fn mk_env_with_package() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD).expect("catalog/packages/Core/Classes/LawfulClasses.ken must elaborate");
     env
 }
 

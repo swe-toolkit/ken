@@ -39,29 +39,26 @@ fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    let lawful_prefix = "Core.Classes.LawfulClasses.";
-    let lawful_aliases: Vec<_> = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(lawful_prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect();
-    env.globals.extend(lawful_aliases);
+    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
+    for (source, label) in [
+        (STRING_BIJECTION_KEN_MD, "Data.Text.StringBijection"),
+        (STRING_KEYS_KEN_MD, "Data.Text.StringKeys"),
+    ] {
+        env.elaborate_ken_md_file(source).unwrap_or_else(|err| {
+            panic!("{label} must elaborate before the Nat-order closure: {err:?}")
+        });
+    }
+    catalog_or::load_derived_fixture(&mut env);
     for (source, label) in [
         (LAWFUL_FUNCTORS_KEN_MD, "Core.Classes.LawfulFunctors"),
         (EFFECTFUL_CLASSES_KEN_MD, "Core.Classes.EffectfulClasses"),
         (NONEMPTY_KEN_MD, "Data.Collections.NonEmpty"),
         (VALIDATION_KEN_MD, "Data.Sums.Validation"),
         (DIAGNOSTIC_KEN_MD, "Capability.Diagnostics.Core"),
-        (STRING_BIJECTION_KEN_MD, "Data.Text.StringBijection"),
-        (STRING_KEYS_KEN_MD, "Data.Text.StringKeys"),
         (CODEC_KEN_MD, "Data.Text.Codec"),
     ] {
         env.elaborate_ken_md_file(source)
