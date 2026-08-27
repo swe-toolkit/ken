@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-GENERATED-ENTRY-ACCESS
 title: "RT checked-IH generated-descendant-entry access — the ONE complete planner-owned predecessor that replaces the repeated last-gap decomposition (Architect HS7 evt_1z1p9t4tdyd2v), RECUT onto the confluence/quotient branch (Architect HS8 evt_14hwxs5q2j087 + mechanism ruling evt_3myrd8sp2tp8n, on Research graph advisory evt_2ffs47ax5gbnn). Build a planner-owned CheckedIhGeneratedEntryConfluence certificate quotienting the governed continuation-inheritance population by CheckedIhGeneratedEntryCoordinate — context id, enclosing specialization, worker body, binding, invocation, call, callee — where every member of a class must agree by full typed Eq on one CheckedIhGeneratedEntryProjection (destination owner/body, binding, exact CheckedIhImmediateKBindingLocator, exact CheckedIhFreshResultDestination). Source identity and projection are NOT key members. Validate by SET equality over five explicit closures, never counts. Install a SANITIZED CheckedIhGeneratedEntryAccess — projections only, no member identities, no retarget caller, no transport, no ancestry — in define_continuation_context_bodies as COMPILE-TIME function-definition authority beside the exact ContinuationContextView, NEVER a runtime parameter. Lowering reads it through ONE exact BTreeMap::get that fails closed. intern_generated_contexts, its key, context counts and existing retarget callers are UNCHANGED: read one context, write two. Static splitting and region cloning are WITHDRAWN."
-status: ready
+status: active
 owner: runtime
 size: L
 gate: none
