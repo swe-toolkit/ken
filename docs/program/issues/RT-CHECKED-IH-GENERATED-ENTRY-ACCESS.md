@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-GENERATED-ENTRY-ACCESS
 title: "RT checked-IH generated-descendant-entry access — the ONE complete planner-owned predecessor that replaces the repeated last-gap decomposition (Architect HS7 evt_1z1p9t4tdyd2v). Derive one closed CheckedIhGeneratedEntryAccess relation joining the already-validated emitted generated-context population to the already-validated continuation-inheritance population, each row carrying the exact ContinuationContextId and its context key, the existing full ContinuationCallIdentity, and the existing final descendant coordinate (binding, invocation, call, callee) — the COMPLETE key needed to call checked_ih_continuation_inheritance_for_invocation, minting no K, locator, transport, or fresh-result destination. Re-derive and validate for totality and exact bijection over every governed final arrival hosted by an emitted generated context. Install the validated row in define_continuation_context_bodies as COMPILE-TIME function-definition authority beside the exact ContinuationContextView from which OwnedContext is built — NEVER a runtime parameter (not ABI, frame header, environment binding, carried value, RoutedAnswer, SourceControl member, runtime tag, or new continuation identity). Research census evt_4chbyacb0vyzp settled ruling item 5: the join is NON-FUNCTIONAL on the governed write witness, so the SPLIT arm is the required positive path — refine the EXISTING intern_generated_contexts key by the existing source-call identity and statically retarget callers into distinct generated contexts. Completeness is consumer-adjacent: an instrument at the real D3A call seat that neither applies K nor binds R2."
-status: ready
+status: active
 owner: runtime
 size: L
 gate: none
