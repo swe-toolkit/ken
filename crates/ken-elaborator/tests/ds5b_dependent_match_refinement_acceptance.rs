@@ -716,10 +716,15 @@ fn omega_reindexed_evidence_is_consumed_in_the_ruled_direction() {
 /// extended the context with an inferable non-sort domain. The prefilter must
 /// silently skip that domain; kernel admission of the completed Pi then rejects
 /// it as malformed. Admitting bare `_` instead makes decision 1 reject first.
-/// Promise class: durable invariant. An earlier Pi-domain formation check may
-/// retire this sentinel, but widening decision 3 beyond `Type | Omega` may not.
+/// Promise class: transition sentinel. It retires only when a reviewed change
+/// validates expression-position dependent-Pi domains before `infer_pi`
+/// temporarily extends `cx.ctx`. The affected boundary is `infer_pi` ->
+/// `install_hidden_result_variable_refinements` plus this ds5b control.
+/// Retirement must replace or remove this exact-final-error witness while
+/// preserving decision 3's explicit `Type | Omega` admission and re-evaluating
+/// the bare-admission control; it must not snapshot-update this assertion.
 /// MEASURED: the source reaches final Pi admission and reports its TypeMismatch.
-/// CLAIMED: decision 3 preserves the reachable non-sort silent default.
+/// CLAIMED: decision 3 preserves the currently reachable non-sort silent default.
 /// THE GAP: reachability is independently mutation-proved by admitting bare `_`
 /// at the production prefilter and requiring this control to red.
 #[test]
