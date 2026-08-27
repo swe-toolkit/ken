@@ -450,6 +450,13 @@ pub enum CheckedIhGeneratedEntryCapsuleMutation {
     WrongInvocation,
     NonCarriedResidual,
     ProvenanceIndex,
+    WrongDestinationOwner,
+    WrongDestinationBody,
+    WrongBinding,
+    WrongLocatorInvocation,
+    WrongLocatorCallee,
+    WrongLocatorDomain,
+    WrongLocatorIndex,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -484,6 +491,11 @@ pub fn checked_ih_generated_entry_capsule_mutation_is_exact() -> bool {
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+pub(super) fn checked_ih_generated_entry_capsule_mutation() -> CheckedIhGeneratedEntryCapsuleMutation {
+    GENERATED_ENTRY_CAPSULE_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
 fn mutate_checked_ih_generated_entry_capsule_binding(
     binding: &LoweringEnvironmentBinding,
     pending: PendingCheckedIhCall,
@@ -503,7 +515,15 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
     }
     let mut binding = binding.clone();
     match mutation {
-        Mutation::Exact | Mutation::ProvenanceIndex => {}
+        Mutation::Exact
+        | Mutation::ProvenanceIndex
+        | Mutation::WrongDestinationOwner
+        | Mutation::WrongDestinationBody
+        | Mutation::WrongBinding
+        | Mutation::WrongLocatorInvocation
+        | Mutation::WrongLocatorCallee
+        | Mutation::WrongLocatorDomain
+        | Mutation::WrongLocatorIndex => {}
         Mutation::OuterCarried => {
             if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
                 Lowered::ComputationalRecursorClosure { residual, .. },

@@ -600,6 +600,27 @@ fn in_large_stack_thread(name: &'static str, body: fn()) {
         .expect("RT-PARITY fixture thread");
 }
 
+// Measured on the complete seven-test generated-entry suite at exact blocked
+// candidate 85b0d624: 2 MiB passes every row, while the total-population row
+// aborts from stack overflow at 1 MiB. The conservative measured peak is
+// therefore 2 MiB. Retaining this file's pre-existing 256 MiB provision applies
+// 254 MiB of explicit headroom; this respin states the budget and does not raise
+// it. Builder::stack_size makes the provision local rather than ambient.
+const GENERATED_ENTRY_STACK_MEASURED_PEAK_BYTES: usize = 2 * 1024 * 1024;
+const GENERATED_ENTRY_STACK_HEADROOM_BYTES: usize = 254 * 1024 * 1024;
+const GENERATED_ENTRY_STACK_BYTES: usize =
+    GENERATED_ENTRY_STACK_MEASURED_PEAK_BYTES + GENERATED_ENTRY_STACK_HEADROOM_BYTES;
+
+fn in_generated_entry_stack_thread(name: &'static str, body: fn()) {
+    std::thread::Builder::new()
+        .name(name.to_string())
+        .stack_size(GENERATED_ENTRY_STACK_BYTES)
+        .spawn(body)
+        .expect("spawn stated-stack generated-entry fixture")
+        .join()
+        .expect("generated-entry fixture thread");
+}
+
 #[test]
 fn uint64_checked_wrapper_admits_max_and_rejects_both_neighbors() {
     in_large_stack_thread("uint64-checked-bounds", || {
@@ -933,7 +954,7 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
 /// builder and is paired with population-side disagreement mutations below.
 #[test]
 fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
-    in_large_stack_thread("rt-parity-generated-entry-confluence", || {
+    in_generated_entry_stack_thread("rt-parity-generated-entry-confluence", || {
         let (read_result, read) = ken_runtime::with_checked_ih_generated_entry_observations(|| {
             differential("fs-read-at-offset-single", "rt_read_offset_stage")
         });
@@ -1013,7 +1034,7 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
 /// not from re-projecting the map under test.
 #[test]
 fn checked_ih_generated_entry_admission_population_is_total() {
-    in_large_stack_thread("rt-parity-generated-entry-admissions", || {
+    in_generated_entry_stack_thread("rt-parity-generated-entry-admissions", || {
         let (read_result, read) =
             ken_runtime::with_checked_ih_generated_entry_admission_observations(|| {
                 differential("fs-read-at-offset-single", "rt_read_offset_stage")
@@ -1166,7 +1187,7 @@ fn assert_generated_entry_arrival_mutation_child() {
 #[test]
 fn checked_ih_generated_entry_per_arrival_operation_mutations_break_equality() {
     if std::env::var_os(GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD).is_some() {
-        in_large_stack_thread(
+        in_generated_entry_stack_thread(
             "rt-parity-generated-entry-arrival-mutation-child",
             assert_generated_entry_arrival_mutation_child,
         );
@@ -1241,7 +1262,7 @@ fn assert_generated_entry_admission_mutation_child() {
 #[test]
 fn checked_ih_generated_entry_admission_population_mutations_reject() {
     if std::env::var_os(GENERATED_ENTRY_ADMISSION_MUTATION_CHILD).is_some() {
-        in_large_stack_thread(
+        in_generated_entry_stack_thread(
             "rt-parity-generated-entry-admission-mutation-child",
             assert_generated_entry_admission_mutation_child,
         );
@@ -1358,7 +1379,7 @@ fn assert_generated_entry_mutation_child() {
 #[test]
 fn checked_ih_generated_entry_confluence_mutations_reject() {
     if std::env::var_os(GENERATED_ENTRY_MUTATION_CHILD).is_some() {
-        in_large_stack_thread(
+        in_generated_entry_stack_thread(
             "rt-parity-generated-entry-mutation-child",
             assert_generated_entry_mutation_child,
         );
@@ -1431,6 +1452,13 @@ fn assert_generated_entry_capsule_mutation_child() {
         "wrong-invocation" => Mutation::WrongInvocation,
         "non-carried-residual" => Mutation::NonCarriedResidual,
         "provenance-index" => Mutation::ProvenanceIndex,
+        "wrong-destination-owner" => Mutation::WrongDestinationOwner,
+        "wrong-destination-body" => Mutation::WrongDestinationBody,
+        "wrong-binding" => Mutation::WrongBinding,
+        "wrong-locator-invocation" => Mutation::WrongLocatorInvocation,
+        "wrong-locator-callee" => Mutation::WrongLocatorCallee,
+        "wrong-locator-domain" => Mutation::WrongLocatorDomain,
+        "wrong-locator-index" => Mutation::WrongLocatorIndex,
         other => panic!("unknown generated-entry capsule mutation: {other}"),
     };
     let red = ken_runtime::with_checked_ih_generated_entry_capsule_mutation(mutation, || {
@@ -1448,10 +1476,18 @@ fn assert_generated_entry_capsule_mutation_child() {
 /// **Promise class: durable invariant.** Only the exact computational-recursor
 /// capsule satisfying every governed fact may pass the pre-dispatch guard; each
 /// independently varied sibling/fact must reject at its named arm.
+///
+/// **MEASURED:** projection controls mutate each terminal projection fact after
+/// planner validation and before generated-function forwarding, then assert the
+/// consumer guard's exact refusal text.
+/// **CLAIMED:** every terminal projection conjunct, including locator domain
+/// and index, is independently load-bearing at the consumer seat.
+/// **THE GAP:** upstream confluence disagreements remain separate population
+/// controls and cannot discharge either consumer-side claim.
 #[test]
 fn checked_ih_generated_entry_capsule_mutations_reject() {
     if std::env::var_os(GENERATED_ENTRY_CAPSULE_MUTATION_CHILD).is_some() {
-        in_large_stack_thread(
+        in_generated_entry_stack_thread(
             "rt-parity-generated-entry-capsule-mutation-child",
             assert_generated_entry_capsule_mutation_child,
         );
@@ -1472,6 +1508,34 @@ fn checked_ih_generated_entry_capsule_mutations_reject() {
         ),
         ("non-carried-residual", "checked frame, slot, call template, or residual phase"),
         ("provenance-index", "callee Var disagrees with the immediate K locator index"),
+        (
+            "wrong-destination-owner",
+            "projection disagrees with its current function, binding, or call coordinate",
+        ),
+        (
+            "wrong-destination-body",
+            "projection disagrees with its current function, binding, or call coordinate",
+        ),
+        (
+            "wrong-binding",
+            "projection disagrees with its current function, binding, or call coordinate",
+        ),
+        (
+            "wrong-locator-invocation",
+            "projection disagrees with its current function, binding, or call coordinate",
+        ),
+        (
+            "wrong-locator-callee",
+            "projection disagrees with its current function, binding, or call coordinate",
+        ),
+        (
+            "wrong-locator-domain",
+            "immediate K locator has the wrong domain or is outside the current environment",
+        ),
+        (
+            "wrong-locator-index",
+            "immediate K locator has the wrong domain or is outside the current environment",
+        ),
     ];
     for (mode, expected) in cases {
         let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
@@ -1501,7 +1565,7 @@ fn checked_ih_generated_entry_capsule_mutations_reject() {
 /// association or the product observation.
 #[test]
 fn checked_ih_generated_entry_confluence_is_interning_and_inheritance_order_independent() {
-    in_large_stack_thread("rt-parity-generated-entry-permute", || {
+    in_generated_entry_stack_thread("rt-parity-generated-entry-permute", || {
         let (exact_result, exact) =
             ken_runtime::with_checked_ih_generated_entry_observations(|| {
                 differential("fs-write-at-offset-single", "rt_write_writable_stage")

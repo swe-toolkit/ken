@@ -415,6 +415,26 @@ impl CheckedIhGeneratedEntryAccess {
         self.worker_body_origin
     }
 
+    /// Test-only consumer mutation after planner validation and before any
+    /// generated-function `Var` forwarding. It changes only the published
+    /// sanitized projection; call keys and admission variants remain exact, so
+    /// this cannot substitute an upstream confluence disagreement.
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn mutate_published_governed_projection_for_control(
+        &mut self,
+        mutation: CheckedIhGeneratedEntryConfluenceMutation,
+    ) {
+        for admission in self.admissions.values_mut() {
+            if let CheckedIhGeneratedEntryAdmission::Governed(projection) = admission {
+                if mutation == CheckedIhGeneratedEntryConfluenceMutation::LocatorIndex {
+                    projection.immediate_k_locator.environment_index = u32::MAX;
+                } else {
+                    mutate_checked_ih_generated_entry_projection(projection, mutation);
+                }
+            }
+        }
+    }
+
     /// The sole generated-entry lookup. The map is total over the closed
     /// planner-derived call population, so absence is always a planner error.
     pub(in crate::cranelift_backend) fn admission_for(

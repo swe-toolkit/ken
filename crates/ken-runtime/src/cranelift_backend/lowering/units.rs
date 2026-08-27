@@ -2855,6 +2855,42 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                     context.enclosing_specialization(),
                     context.worker_body_origin(),
                 )?;
+            // Consumer controls perturb only the sanitized clone after the
+            // planner has validated and published it. The malformed projection
+            // therefore reaches the real terminal guard through the ordinary
+            // generated-function installation and forwarding path.
+            #[cfg(feature = "px8-ds-test-support")]
+            let checked_ih_generated_entry_access = {
+                let mut access = checked_ih_generated_entry_access;
+                if let Some(access) = access.as_mut() {
+                    use super::source::CheckedIhGeneratedEntryCapsuleMutation as Mutation;
+                    use crate::CheckedIhGeneratedEntryConfluenceMutation as ProjectionMutation;
+                    let mutation = match super::source::checked_ih_generated_entry_capsule_mutation() {
+                        Mutation::WrongDestinationOwner => {
+                            Some(ProjectionMutation::DestinationOwner)
+                        }
+                        Mutation::WrongDestinationBody => {
+                            Some(ProjectionMutation::DestinationBody)
+                        }
+                        Mutation::WrongBinding => Some(ProjectionMutation::BindingFrame),
+                        Mutation::WrongLocatorInvocation => {
+                            Some(ProjectionMutation::LocatorInvocation)
+                        }
+                        Mutation::WrongLocatorCallee => {
+                            Some(ProjectionMutation::LocatorCallee)
+                        }
+                        Mutation::WrongLocatorDomain => {
+                            Some(ProjectionMutation::LocatorDomain)
+                        }
+                        Mutation::WrongLocatorIndex => Some(ProjectionMutation::LocatorIndex),
+                        _ => None,
+                    };
+                    if let Some(mutation) = mutation {
+                        access.mutate_published_governed_projection_for_control(mutation);
+                    }
+                }
+                access
+            };
             Ok(OwnedContext {
                 id: context.id(),
                 enclosing: context.enclosing_specialization(),
