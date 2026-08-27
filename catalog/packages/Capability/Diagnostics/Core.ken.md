@@ -11,6 +11,8 @@ committed location families: source artifacts, command-line arguments,
 environment variables, and configuration key paths.
 
 ```ken
+import Core.Classes.LawfulClasses (leq_nat)
+
 data SourceId = MkSourceId Nat
 
 data ByteRange = MkByteRange Nat Nat
@@ -104,18 +106,8 @@ ranges, environment names are accepted as opaque names, and configuration key
 paths must contain at least one segment.
 
 ```ken
-fn diagnostic_nat_leq (a : Nat) (b : Nat) : Bool =
-  match a {
-    Zero ↦ True;
-    Suc a2 ↦
-      match b {
-        Zero ↦ False;
-        Suc b2 ↦ diagnostic_nat_leq a2 b2
-      }
-  }
-
 fn ValidByteRange (range : ByteRange) : Prop =
-  Equal Bool (diagnostic_nat_leq (byte_range_start range) (byte_range_end range)) True
+  Equal Bool (leq_nat (byte_range_start range) (byte_range_end range)) True
 
 fn ValidConfigKeyPath (path : List String) : Prop =
   match path {

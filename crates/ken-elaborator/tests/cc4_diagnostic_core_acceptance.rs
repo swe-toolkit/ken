@@ -7,10 +7,8 @@ use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{Decl, GlobalId};
+use ken_kernel::{Decl, GlobalId, Term};
 
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const DIAGNOSTIC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const CURSOR_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
 const DECODER_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
@@ -23,8 +21,18 @@ fn dependency_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD)
-        .expect("LawfulClasses must elaborate third");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("Core.Classes.LawfulClasses must load as a qualified module");
+    let lawful_prefix = "Core.Classes.LawfulClasses.";
+    let lawful_aliases: Vec<_> = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            name.strip_prefix(lawful_prefix)
+                .map(|suffix| (suffix.to_owned(), *id))
+        })
+        .collect();
+    env.globals.extend(lawful_aliases);
     env
 }
 
@@ -53,6 +61,21 @@ fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
             env.env.transparent_body(id).is_some(),
             "`{name}` must be a real transparent, kernel-checked term"
         );
+    }
+}
+
+fn term_mentions(term: &Term, target: GlobalId) -> bool {
+    match term {
+        Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. }
+            if *id == target =>
+        {
+            true
+        }
+        Term::Elim { fam, .. } if *fam == target => true,
+        _ => term
+            .children()
+            .into_iter()
+            .any(|child| term_mentions(child, target)),
     }
 }
 
@@ -170,6 +193,45 @@ fn ordered_dependency_closure_elaborates_all_cc4_clients() {
     assert!(
         !DECODER_KEN_MD.contains("Diagnostic") && !DECODER_KEN_MD.contains("Origin"),
         "the location-generic Decoder must remain independent of Capability.Diagnostics.Core"
+    );
+}
+
+/// Durable invariant: the roots-loaded Diagnostics package references the
+/// canonical lawful owner directly, without minting a local relation or adding
+/// trust.
+#[test]
+fn diagnostics_reuses_the_canonical_lawful_classes_relation() {
+    let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("canonical Nat relation provider must roots-load");
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+        .expect("Capability.Diagnostics.Core must roots-load with its import closure");
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Diagnostics reuse must add zero trust");
+
+    let provider = env.globals["Core.Classes.LawfulClasses.leq_nat"];
+    assert!(env.env.transparent_body(provider).is_some());
+    assert!(
+        !env.globals
+            .contains_key("Capability.Diagnostics.Core.diagnostic_nat_leq"),
+        "Diagnostics must not mint a local Nat relation"
+    );
+    assert!(
+        !env.globals
+            .keys()
+            .any(|name| name.starts_with("Data.Numeric.Nat.Order.")),
+        "Diagnostics must import the canonical owner without loading the Order facade"
+    );
+
+    let valid_range = env.globals["Capability.Diagnostics.Core.ValidByteRange"];
+    let body = match env.env.lookup(valid_range) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("ValidByteRange must be transparent, got {other:?}"),
+    };
+    assert!(
+        term_mentions(body, provider),
+        "ValidByteRange must retain the canonical provider GlobalId"
     );
 }
 
