@@ -2241,7 +2241,7 @@ fn check_match_dependent_refined_fallback(
     n: usize,
     expected_here: &Term,
 ) -> Result<Term, ElabError> {
-    let (goal_refined, goal_casts) = refine_branch_goal(
+    let (goal_refined, goal_restorations) = refine_branch_goal(
         cx,
         ind,
         params_terms,
@@ -2257,10 +2257,107 @@ fn check_match_dependent_refined_fallback(
     };
     let body_core_checked = check(cx, &arm.body, &expected_here_refined, &arm.span)?;
     let mut body_core = body_core_checked;
-    for (src, tgt, e) in goal_casts.into_iter().rev() {
-        body_core = Term::Cast(Box::new(src), Box::new(tgt), Box::new(e), Box::new(body_core));
+    for restoration in goal_restorations.into_iter().rev() {
+        body_core = restoration.apply(body_core);
     }
     Ok(body_core)
+}
+
+/// A branch-goal restoration is classified once, where the refined goal is
+/// produced. Replay consumes this tag without re-classifying the goal.
+enum BranchGoalRestoration {
+    TypeCast {
+        source_type: Term,
+        target_type: Term,
+        equality: Term,
+    },
+    OmegaJ {
+        index_type: Term,
+        old_index: Term,
+        new_index: Term,
+        source_type: Term,
+        omega_level: Level,
+        equality: Term,
+    },
+}
+
+impl BranchGoalRestoration {
+    fn apply(self, value: Term) -> Term {
+        match self {
+            Self::TypeCast {
+                source_type,
+                target_type,
+                equality,
+            } => Term::Cast(
+                Box::new(source_type),
+                Box::new(target_type),
+                Box::new(equality),
+                Box::new(value),
+            ),
+            Self::OmegaJ {
+                index_type,
+                old_index,
+                new_index,
+                source_type,
+                omega_level,
+                equality,
+            } => {
+                let (transported, _) = build_index_omega_transport(
+                    &index_type,
+                    &old_index,
+                    &new_index,
+                    &source_type,
+                    omega_level,
+                    value,
+                    equality,
+                );
+                transported
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn classify_branch_goal_restoration(
+    env: &GlobalEnv,
+    ctx: &Context,
+    index_type: &Term,
+    old_index: &Term,
+    new_index: &Term,
+    source_type: &Term,
+    classifier: Term,
+    equality: Term,
+) -> Result<BranchGoalRestoration, ElabError> {
+    match classifier {
+        Term::Type(level) => {
+            let (type_equality, target_type) = build_index_type_cong(
+                env,
+                ctx,
+                index_type,
+                old_index,
+                new_index,
+                source_type,
+                level,
+                equality,
+            );
+            Ok(BranchGoalRestoration::TypeCast {
+                source_type: source_type.clone(),
+                target_type,
+                equality: type_equality,
+            })
+        }
+        Term::Omega(omega_level) => Ok(BranchGoalRestoration::OmegaJ {
+            index_type: index_type.clone(),
+            old_index: old_index.clone(),
+            new_index: new_index.clone(),
+            source_type: source_type.clone(),
+            omega_level,
+            equality,
+        }),
+        other => Err(ElabError::Internal(format!(
+            "index refinement: branch goal is classified by neither Type nor Omega, found {other:?}"
+        ))),
+    }
 }
 
 /// Finish a dependent method after its branch body has returned. This owns the
@@ -3298,10 +3395,10 @@ fn try_reindex_cast(
 /// context variables, never the goal `check` runs against, so a branch
 /// whose body never re-uses an existing field/sibling (like `tail`'s or
 /// `firstIsSecond`'s) never exercises this gap. Returns the (possibly
-/// more-refined) goal to check the body against, plus the `Cast`
-/// ingredients — `(source_ty, target_ty, proof)` — needed to bring the
-/// CHECKED result back up to the original `expected_here`, to be applied
-/// in REVERSE order (innermost/most-refined first).
+/// more-refined) goal to check the body against, plus a producer-classified
+/// restoration plan needed to bring the CHECKED result back up to the original
+/// `expected_here`, to be applied in REVERSE order (innermost/most-refined
+/// first). Replay dispatches on the tag and never re-classifies a goal.
 fn refine_branch_goal(
     cx: &ElabCtx,
     ind: &InductiveDecl,
@@ -3310,13 +3407,13 @@ fn refine_branch_goal(
     scrut_indices: &[Term],
     n: usize,
     expected_here: &Term,
-) -> Result<(Term, Vec<(Term, Term, Term)>), ElabError> {
+) -> Result<(Term, Vec<BranchGoalRestoration>), ElabError> {
     let zonked_ctx = Context {
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let pairs = method_index_premise_pairs(ind, params, target_indices, scrut_indices, n);
     let mut goal = expected_here.clone();
-    let mut casts = Vec::new();
+    let mut restorations = Vec::new();
     for (slot, (idx_ty, target, scrut)) in pairs.iter().enumerate() {
         let idx_ty = cx.metas.zonk_term(idx_ty);
         let target = cx.metas.zonk_term(target);
@@ -3340,29 +3437,21 @@ fn refine_branch_goal(
                 "index refinement: could not classify the branch goal: {e:?}"
             ))
         })?;
-        let level = match whnf(cx.env, &zonked_ctx, &level_ty) {
-            Term::Type(l) => l,
-            other => {
-                return Err(ElabError::Internal(format!(
-                    "index refinement: branch goal is not classified by a Type universe, found {other:?}"
-                )))
-            }
-        };
         let h_sentinel = Term::var(INDEX_REFINEMENT_SENTINEL_BASE + slot);
-        let (e, restored) = build_index_type_cong(
+        let restoration = classify_branch_goal_restoration(
             cx.env,
             &zonked_ctx,
             &peel_ty,
             &a2,
             &b2,
             &candidate,
-            level,
+            whnf(cx.env, &zonked_ctx, &level_ty),
             h_sentinel,
-        );
-        casts.push((candidate.clone(), restored, e));
+        )?;
+        restorations.push(restoration);
         goal = candidate;
     }
-    Ok((goal, casts))
+    Ok((goal, restorations))
 }
 
 /// Install `var_refinements` for one branch of a dependent match —
@@ -9482,8 +9571,9 @@ mod omega_index_refinement_tests {
     };
 
     use super::{
-        build_index_omega_transport, install_hidden_result_variable_refinements,
-        install_index_refinements, subst_term_generalize, try_reindex_cast, weaken, ElabCtx,
+        build_index_omega_transport, classify_branch_goal_restoration,
+        install_hidden_result_variable_refinements, install_index_refinements,
+        subst_term_generalize, try_reindex_cast, weaken, ElabCtx,
     };
 
     #[test]
@@ -9543,6 +9633,94 @@ mod omega_index_refinement_tests {
 
         assert_eq!(new_ty, expected_new_ty);
         assert_eq!(transported, expected);
+    }
+
+    #[test]
+    fn omega_branch_goal_plan_reuses_the_pinned_direct_j_constructor() {
+        // Promise class: durable invariant. Producer classification may gain
+        // more sorts, but an Omega-tagged branch-goal plan must replay through
+        // the same exact direct-J result D1 pins above, never a separate motive.
+        // MEASURED: applying the D2 plan is Term-identical to the independently
+        // pinned D1 constructor on the same complete input tuple. CLAIMED: D2
+        // reuses that constructor. THE GAP: the real producer and kernel
+        // admission are exercised by the D2 integration fixture.
+        let index_type = Term::ty(Level::Zero);
+        let old_index = Term::var(3);
+        let new_index = Term::var(4);
+        let source_type = Term::Eq(
+            Box::new(index_type.clone()),
+            Box::new(old_index.clone()),
+            Box::new(old_index.clone()),
+        );
+        let value = Term::var(5);
+        let equality = Term::var(6);
+        let env = ElabEnv::new().expect("base environment");
+        let plan = classify_branch_goal_restoration(
+            &env.env,
+            &Context::new(),
+            &index_type,
+            &old_index,
+            &new_index,
+            &source_type,
+            Term::omega(Level::Zero),
+            equality.clone(),
+        )
+        .expect("decision 2 must produce the Omega-J plan");
+        let (pinned, _) = build_index_omega_transport(
+            &index_type,
+            &old_index,
+            &new_index,
+            &source_type,
+            Level::Zero,
+            value.clone(),
+            equality,
+        );
+
+        assert_eq!(plan.apply(value), pinned);
+    }
+
+    #[test]
+    fn branch_goal_classifier_outside_type_or_omega_fails_closed() {
+        // Promise class: durable invariant. Decision 2 may gain explicitly
+        // ruled sorts only; an inferred non-sort classifier must be rejected
+        // with its actual identity rather than admitted by a catch-all.
+        // MEASURED: the production classifier seam's exact error. CLAIMED:
+        // decision 2 fails closed outside Type | Omega. THE GAP: integration
+        // independently reaches both admitted tags through dependent matches.
+        let env = ElabEnv::new().expect("base environment");
+        let nat = Term::IndFormer {
+            id: env.globals["Nat"],
+            level_args: vec![],
+        };
+        let index_type = Term::ty(Level::Zero);
+        let old_index = Term::var(1);
+        let new_index = Term::var(2);
+        let source_type = Term::Eq(
+            Box::new(index_type.clone()),
+            Box::new(old_index.clone()),
+            Box::new(old_index.clone()),
+        );
+        let error = match classify_branch_goal_restoration(
+            &env.env,
+            &Context::new(),
+            &index_type,
+            &old_index,
+            &new_index,
+            &source_type,
+            nat.clone(),
+            Term::var(3),
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("a non-sort branch-goal classifier must fail closed"),
+        };
+
+        match error {
+            ElabError::Internal(message) => {
+                assert!(message.contains("classified by neither Type nor Omega"));
+                assert!(message.contains(&format!("found {nat:?}")));
+            }
+            other => panic!("expected the decision-2 Internal error, got {other:?}"),
+        }
     }
 
     #[test]

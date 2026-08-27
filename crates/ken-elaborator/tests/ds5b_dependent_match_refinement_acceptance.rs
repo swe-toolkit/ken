@@ -882,3 +882,47 @@ fn real_fok_recursive_omega_consumer_uses_all_three_child_paths() {
         .expect("the recursive Omega theorem must consume every exact child path");
     assert_transparent_body_kernel_checks(&env, id);
 }
+
+/// `LANG-INDEX-REFINEMENT-OMEGA-ARM` D2 decision 2.
+///
+/// Promise class: durable invariant. A fresh branch body checked against an
+/// index-refined Omega goal must be restored to the outer goal by the tagged
+/// direct-J plan, independently kernel-check, and add no trust.
+/// MEASURED: the real dependent match accepts, its transparent body passes an
+/// independent kernel check, and `trusted_base()` is set-identical before and
+/// after. CLAIMED: decision 2 supports Omega branch-goal restoration.
+/// THE GAP: exact producer tag and constructor reuse are pinned at the private
+/// production seam; compile-preserving consumer mutations prove this fixture
+/// distinguishes Omega-J from Type-Cast replay.
+#[test]
+fn omega_branch_goal_uses_tagged_direct_j_restoration() {
+    let mut env = mk_env();
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    elab_ok(
+        &mut env,
+        "data D2GoalVec (a : Type) : Nat -> Type where { \
+           D2GoalNil : D2GoalVec a Zero; \
+           D2GoalCons : (n : Nat) -> a -> D2GoalVec a n \
+             -> D2GoalVec a (Suc n) \
+         }",
+    );
+    elab_ok(
+        &mut env,
+        "fn d2_goal (n : Nat) : Omega = \
+         match n { Zero |-> Top; Suc m |-> Top }",
+    );
+    let id = env
+        .elaborate_decl(
+            "theorem d2_omega_goal \
+             (n : Nat) (v : D2GoalVec Nat n) : d2_goal n = \
+             match v { \
+               D2GoalNil |-> Proved; \
+               D2GoalCons m a xs |-> Proved \
+             }",
+        )
+        .expect("the Omega branch goal must restore through direct J");
+    assert_transparent_body_kernel_checks(&env, id);
+
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "D2 branch-goal restoration must add no trust");
+}
