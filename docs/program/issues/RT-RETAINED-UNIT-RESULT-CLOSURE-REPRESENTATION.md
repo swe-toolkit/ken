@@ -274,6 +274,37 @@ decl:px8f_write_all_native::ResourceBodyResult`, exit 1, before `FsReadAt` /
 - **AC-GATE-INTACT.** `boundary_transfer_admissibility` still refuses everything
   it refused before, for every root that is not this authorized occurrence.
   Control: the shared refusal arm still fires for a neighbouring production root.
+- **AC-AFFECTED-CLOSURE (ADDED 2026-08-28 AFTER THE CI RED ON `e0ec51c52` —
+  Steward framing debt, and this is a validation-SCOPE criterion, not a
+  behaviour one).** Candidate validation must cover the **complete affected-
+  target closure: every target that loads any module whose closure this
+  increment changes, whether or not the increment touches that target's file.**
+  A diff-touched target set does not satisfy this AC.
+  **This does NOT relax the targeted-build hard rule and must never be read as
+  authorizing `--workspace`.** Local runs stay scoped (`scripts/ken-cargo -p
+  <crate>` / `--test <name>`); what changes is which targets count as affected,
+  not how many crates get built at once. Workspace-green remains CI's job.
+  Control: name the closure the increment changes, enumerate the targets that
+  load it, and show each was run.
+  > **WHY, and it is a repeat I had already fixed one lane over.** Approved
+  > candidate `e0ec51c52` passed the Architect, passed Runtime QA, and went CI-RED
+  > on `test shard 3/4`: `contspec_ordinary_prefix_uses_the_ordered_worker_envelope`
+  > panicked at `continuations.rs:8977` with `PlannerInvariant("a continuation
+  > declares fewer ordinary parameters than its selected worker has captures, so
+  > the ruled envelope has no nonrecursive prefix")`. **`continuations.rs` is not
+  > one of the five changed paths.** Main was green on the exact base
+  > `4d3d4d848`, so it was candidate-caused, not pre-existing.
+  > **Neither gate was negligent — both ran the targets this frame told them to
+  > run, and the criterion was wrong.** An increment that changes a CLOSURE
+  > rather than a FILE breaks consumers that no diff-touched set can see, and
+  > the nine-capture environment is exactly such a change: capture counts are
+  > read by a planner invariant living in another file.
+  > **The same defect was diagnosed and fixed in the lane-3 foundation frames on
+  > 2026-08-27** (CV found a candidate passing 170/170 diff-touched targets while
+  > reddening a consumer-closure oracle in an untouched file). I did not carry it
+  > into the runtime frames. **A criterion repaired in one lane is not thereby
+  > repaired in the fleet** — that is the reusable half, and it is why this AC is
+  > written here rather than left as a lesson.
 - **AC-IGNORE-REPOINTED (ADDED AT RECUT 2026-08-28 — Architect item 3).** The
   `#[ignore]` on the trigger row **STAYS**, and its reason text is re-pointed to
   [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] — **the existing owner of the
