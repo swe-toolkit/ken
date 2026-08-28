@@ -1,6 +1,6 @@
 ---
 id: RT-RESULT-CONTINUATION-BINDING-PROVENANCE
-title: "RT-ITREE D2/D3A/D3B — repair the checked ITree Ret fresh-result binding, ROUTE-SPECIFICALLY. CURRENT AUTHORITY IS HS13 (evt_59t7b49m41z8m); route-specificity is inherited from HS12 (evt_7a6pp8n24r1ms), whose MECHANISM LOCUS is refuted. The two arms fail DIFFERENTLY and a uniform diagnosis is withdrawn. DirectInvocationReturn: the carried CFG arm of call_checked_ih_transport_from_case_environment (core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word with NO Direct declared-call application on that arm, so D3A ADDS the ruled declared call and its local return is fresh R2. TailProducerToBackedge: the governed application ALREADY EXISTS and a real declared-call producer ALREADY emits fresh R2 (calls.rs:2022, Result-slot load :2120, RoutedAnswer::checked(returned) source.rs:4369-4374) — nothing is unapplied; the bodyless recursor arm (source.rs:4478-4515) DISCARDS that result and substitutes the initial carried seed, so the missing work is exact produced-result TRANSFER. HS13 (evt_59t7b49m41z8m) REFUTED HS12's MECHANISM LOCUS while its semantic property stands: the Tail route does not exist at the producer (cursor N vs a freshly minted selected continuation at N+2) and composed lowering reduces RoutedAnswer to a bare LoweringOperand in between, so no value/route pair exists there to couple and ownership cannot carry an already-erased value. THIS NODE IS THEREFORE D0-ONLY: enumerate every natural-path seam where the Rust type shrinks to LoweringOperand plus the complete caller closure, and determine whether that closure admits ONE compile-time affine return typestate (Produced owns operand and ContinuationCallIdentity; Routed forms only by consuming Produced when the exact Tail route arrives with agreeing producer identity; the active jump consumes Routed once; ordinary/direct is a distinct exhaustive variant). A compiler-control return value, never a runtime carrier. D0 lands no production and routes no QA; an unboundable closure is HS14. D3B binds the DELIVERED fresh R2 to the ordinary Ret-case capture on both arms (301/460/459/452 are READ-side evidence coordinates only; the write analogue is derived independently). D2 localization ACCEPTED as evidence (ac1ebdacb; no merge, no QA) and is DIRECT-SCOPED. The merge is ATOMIC (D3A + graph-authorized result flow + product) — no application-only checkpoint. The landed fresh-result route contributes retained topology/identity facts only; NO predecessor supplies Tail value authority and none is authorized."
+title: "RT-ITREE D2/D3A/D3B — repair the checked ITree Ret fresh-result binding, ROUTE-SPECIFICALLY. CURRENT AUTHORITY IS HS13 (evt_59t7b49m41z8m); route-specificity is inherited from HS12 (evt_7a6pp8n24r1ms), whose MECHANISM LOCUS is refuted. The two arms fail DIFFERENTLY and a uniform diagnosis is withdrawn. DirectInvocationReturn: the carried CFG arm of call_checked_ih_transport_from_case_environment (core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word with NO Direct declared-call application on that arm, so D3A ADDS the ruled declared call and its local return is fresh R2. TailProducerToBackedge: the governed application ALREADY EXISTS and a real declared-call producer ALREADY emits fresh R2 (calls.rs:2022, Result-slot load :2120, RoutedAnswer::checked(returned) source.rs:4369-4374) — nothing is unapplied; the bodyless recursor arm (source.rs:4478-4515) DISCARDS that result and substitutes the initial carried seed, so the missing work is exact produced-result TRANSFER. HS13 (evt_59t7b49m41z8m) REFUTED HS12's MECHANISM LOCUS while its semantic property stands: the Tail route does not exist at the producer (cursor N vs a freshly minted selected continuation at N+2) and composed lowering reduces RoutedAnswer to a bare LoweringOperand in between, so no value/route pair exists there to couple and ownership cannot carry an already-erased value. THIS NODE IS THEREFORE D0-ONLY: enumerate every natural-path seam where the Rust type shrinks to LoweringOperand plus the complete caller closure, and determine whether that closure admits ONE compile-time affine return typestate (Produced owns operand and ContinuationCallIdentity; Routed forms only by consuming Produced when the exact Tail route arrives with agreeing producer identity; the active jump consumes Routed once; ordinary/direct is a distinct exhaustive variant). A compiler-control return value, never a runtime carrier. D0 lands no production and routes no QA; an unboundable closure is HS14. D0 ATTEMPT 1 IS NOT ACCEPTED (Architect evt_7tsep4b5sdqew): its instrument and restoration were sound but it rooted the ledger at the WRONG one of the exactly TWO RoutedAnswer::checked callers (core.rs:7622-7626 via ClaimedContinuationResult) instead of Tail's own producer at source.rs:4369-4374, so its NO describes a different producer; both D0 ACs now name the start and require type/identity correlation rather than a shared route/role tag. D3B binds the DELIVERED fresh R2 to the ordinary Ret-case capture on both arms (301/460/459/452 are READ-side evidence coordinates only; the write analogue is derived independently). D2 localization ACCEPTED as evidence (ac1ebdacb; no merge, no QA) and is DIRECT-SCOPED. The merge is ATOMIC (D3A + graph-authorized result flow + product) — no application-only checkpoint. The landed fresh-result route contributes retained topology/identity facts only; NO predecessor supplies Tail value authority and none is authorized."
 status: active
 owner: runtime
 size: M
@@ -64,6 +64,61 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > mechanical Research trigger.** Runtime is HELD until the Steward issues a NEW
 > EXPLICIT release against the recut frame blob: **landing a frame releases
 > nothing**, and all prior releases are SPENT.
+
+> # D0 ATTEMPT 1 IS NOT ACCEPTED — IT STARTED AT THE WRONG CHECKED PRODUCER
+> # (Architect `evt_7tsep4b5sdqew`, 2026-08-28). A CORRECTED D0 IS AUTHORIZED.
+>
+> Attempt 1 (`evt_385bg72pmnghg`; exact object
+> `1acfeccf2fb2b52a7803f742c3fb7fe6e2fd8fc4`, tree
+> `82c8352460d72c7eb360b0af639d6d54613a9603`) reported NO / HS14. **The
+> instrument and the byte restoration are SOUND and are not re-litigated:** the
+> required nominal caller token caught two omitted same-shaped callers at
+> `core.rs:5326` and `:5349` with E0061, then compiled at 30 callers — a hand or
+> grep roster could have looked complete with both absent. What is NOT
+> established is that the closure it measured lies on the path D0 asked about.
+>
+> **`RoutedAnswer::checked` has EXACTLY TWO callers.** The D0 phase locks the
+> start to Tail's own producer: `call_checked_ih_transport_from_case_environment`
+> at `source.rs:4369-4374`, where `transport.source_call_identity()` is still
+> locally available. Attempt 1 instrumented the OTHER one — the core
+> `ClaimedContinuationResult` branch, whose `RoutedAnswer::checked` is minted by
+> `call_checked_ih_environment_transport` at `core.rs:7622-7626`. The 28/15
+> identity-bearing claims and the clone-while-pending counts are therefore facts
+> about a different checked producer.
+>
+> **A shared `route`/`role` tag cannot close that gap**, because both callers
+> mint checked route; aggregate product reach of both sites is not the exact
+> directed edge. The outcome-changing question stays open in BOTH directions: the
+> exact source path may force a source-machine typestate redesign at S4/S5, or it
+> may join the general S1/S2/S3 protocol later. **HS14 is licensed only if the
+> EXACT SOURCE-PRODUCER closure cannot stay bounded without redesigning general
+> composed lowering. Another general producer being broad does not establish
+> that predicate.**
+>
+> **THE AC ASYMMETRY IS THE STEWARD'S DEFECT AND IS FIXED IN THE ACs, NOT ARGUED
+> AWAY.** The phase text names the start producer; `AC-HS13-D0-CLOSURE` said only
+> "on the natural path" and named no start. **A ring gates on the AC.** When
+> exactly two callers mint the same wrapper and the criterion says "the natural
+> path", the criterion does not distinguish them — and the reusable form is that
+> a start point stated only in phase prose is not a criterion. Both D0 ACs now
+> carry the start producer and the correlation standard explicitly.
+>
+> **Carry forward the Architect's own build-closure finding** (not the blocking
+> issue, and independently closed at review): the instrument ledger counted
+> `core/tests/constructors.rs:6591`, which the recorded `ken-runtime --lib` checks
+> never compile. `test -p ken-runtime --lib --no-run` is green at log SHA-256
+> `d00f81893923325878c295202086a4850acd19207d2dafc1c748bff4fda42099`; removing
+> only that caller token gives E0061 at log SHA-256
+> `00cd42f5b3a12300197da397305944a64f62ae90e78c8dce7897014df33cc40e`; the
+> instrument diff is restored at
+> `5ee33605e5f9ea566a989c33a14c6cb951bb0cd6c3c2525a578fd44b82f4aea7`.
+>
+> **The corrected turn's scope is UNCHANGED and still D0-ONLY:** no production,
+> no commit, no candidate, Runtime QA stays UNROUTED, D3A/D3B stay FROZEN. A NO
+> is still HS14 and still a SUCCESS. A YES still authorizes nothing without an
+> Architect review and a SEPARATE later release. **HS15 remains the next
+> mechanical Research trigger; HS14 does not trigger it.** Runtime is HELD until
+> the Steward releases against the amended frame blob.
 
 > # SUPERSEDED — HARD STOP 12, `evt_7a6pp8n24r1ms` (2026-08-28)
 >
@@ -1391,7 +1446,21 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   unchanged admitted products, deliver a ledger naming every exact
   `RoutedAnswer` -> `LoweringOperand` shrink seam on the natural path, that
   seam's input and output types, EVERY caller of it, and each caller's
-  disposition. **A name list is not a closure proof.** The instrument must be
+  disposition. **A name list is not a closure proof.**
+
+  > **THE NATURAL PATH STARTS AT TAIL'S OWN PRODUCER, AND THE START IS PART OF
+  > THIS CRITERION** (Architect `evt_7tsep4b5sdqew`). Root the ledger at
+  > `call_checked_ih_transport_from_case_environment` — the bare
+  > `LoweringOperand` it returns, which source wraps as
+  > `RoutedAnswer::checked(returned)` at `source.rs:4369-4374` with
+  > `transport.source_call_identity()` still locally available. **NOT at the
+  > other `RoutedAnswer::checked` caller**, `call_checked_ih_environment_transport`
+  > at `core.rs:7622-7626`, reached through `ClaimedContinuationResult`. **There
+  > are exactly two, and a ledger rooted at the wrong one measures a different
+  > producer** however closed it is. This is stated here because attempt 1 read
+  > "the natural path" and took the core branch.
+
+ The instrument must be
   compiler-backed, so that an OMITTED caller is a build ERROR rather than a
   silent absence — the observation has to differ when the claim is false. One
   acceptable instrument: a disposable private result wrapper that is neither
@@ -1399,7 +1468,12 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   extraction site must be named to compile. **An equivalent instrument is
   acceptable only if the report NAMES the false appearance it rules out.** The
   completed measured closure must build green under the TARGETED affected builds
-  only (`scripts/ken-cargo -p <crate>` / `--test <name>`; never `--workspace`).
+  only (`scripts/ken-cargo -p <crate>` / `--test <name>`; never `--workspace`),
+  **and that build set must COMPILE EVERY CALLER THE LEDGER NAMES.** A
+  `-p <crate> --lib` build does not compile a `cfg(test)` caller, so a ledger row
+  in a test target needs `--lib --no-run` or `--test <name>` coverage or it is a
+  counted-but-unchecked row — the compiler-backed property is exactly what a row
+  outside the build set does not have.
   Record the diff and log hashes, then byte-restore: the wrapper is measurement
   scaffolding and lands nothing.
 - **`AC-HS13-D0-AFFINE` (HS13, `evt_59t7b49m41z8m`) — the affine feasibility
@@ -1413,7 +1487,22 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   any mechanism on the rejection list in Phase structure. Report **NO** with the
   FIRST exact seam and caller that forces a general composed-lowering redesign.
   **A NO is HS14 — a clean stop routed to the Architect, and a successful D0
-  outcome rather than a failed turn.** Reporting YES on a closure that was not
+  outcome rather than a failed turn.**
+
+  > **THE REPORTED SEAM MUST LIE ON THE TRACED VALUE'S OWN PATH, PROVED BY TYPE
+  > OR IDENTITY CORRELATION — never by a shared `route`/`role` tag, and never by
+  > aggregate product reach** (Architect `evt_7tsep4b5sdqew`). Both
+  > `RoutedAnswer::checked` callers mint checked route, so a tag match is
+  > consistent with the traced value never reaching the seam at all. Use a
+  > compiler-backed non-`Copy`/non-`Clone` `Produced` value, or a genuinely
+  > equivalent identity-bearing type, so a bare extraction cannot hide; then walk
+  > THAT value to the later Tail route or to the first unavoidable general
+  > boundary. If it enters the general S1/S2/S3 protocol, prove the entry by
+  > correlation and report it; if it stays bounded to source-machine returns, say
+  > so and name the boundary. **A NO grounded in a DIFFERENT producer's breadth
+  > is not HS14.** That is precisely the attempt-1 defect, and it is
+  > outcome-changing: the exact source path may instead force a source-machine
+  > typestate redesign at S4/S5, which is a different answer. Reporting YES on a closure that was not
   measured closed under `AC-HS13-D0-CLOSURE` is the failure this pair exists to
   prevent.
 - **`AC-TAIL-TRANSFER-CONTROLS` (HS12, `evt_7a6pp8n24r1ms`) — the controls must
