@@ -11,10 +11,52 @@ github: null
 origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision). Hard-stop-5 ruling evt_494k61s04fnv9, 2026-08-26: D3B localization is VALID and lowering has reached the end of its authority — the missing component is an UPSTREAM planner-owned checked-IH result-successor relation, framed as the independently-landable predecessor RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR (which this node now depends_on); D3A stays frozen/non-landable until it lands, then the atomic D3A+D3B consumer builds and D3B consumes ONLY that successor projection. Inventory fold 244b2468afd4f0cd06837fd3079f291d7d330af5 (entry 5). Architect INCORPORATION ruling evt_2prk31prke9cc, 2026-08-26 (accepting Research advisory evt_261gm8y54xttt), grounded on origin/main@a09878026: the predecessor and this consumer conflated two semantic edges by pairing the D3A application result R1 forward to the later capture. Reconciled to the continuation-inheritance reading — D3A applies the inherited continuation capability K at each exact recursive arrival to yield the FRESH result R2, and D3B binds that R2 through ordinary Ret-case/capture semantics; the transitive R1 -> capture requirement is deleted from the operative Objective/Deliverables/ACs/pairing/suppressions/reviewers/Sequencing. Suppression and at-most-once controls are now THREE independent axes (inheritance, application, fresh-result binding). The advisory is incorporated and is NOT hard stop 6 (count remains five). Runtime stays HELD until the predecessor recut lands and the D3A+D3B work is explicitly re-released. Architect hard-stop-8 ruling evt_54efxydhb3n6w, 2026-08-27 (thr_2g0w05my2d5ym), verified on exact base 00e66312b4ef617eb658a2e75db9f99ff2c56492 / tree e286949f8fe5053e4719e54d0cc66adbe073dcdf: on four of five governed coordinates the exact governed K application exposes NO LOCAL LoweringOperand result at CheckedComputationalIHInvocationReturn, because the active self-resumption arm returns Lowered::RecursiveBackedge, a protocol marker and not a value (lowering/source.rs:1969). That is an absence of a LOCAL result and NOT a proof that no fresh dynamic result is eventually produced — the owning carried merge may still produce it, which is precisely D0's question. The landed architecture's two sibling proofs (K authority plus governed application coordinate; fresh-result destination) lack a THIRD — which emitted control edge PRODUCES the fresh dynamic result. That producer relation is a component boundary, not a D3B field, and is framed as the behaviorally-inert predecessor RT-CHECKED-IH-SELF-RESUMPTION-RESULT-PROVENANCE, which this node now depends_on. No mechanism is authorized: spec/40-runtime/42-evaluation.md section 6.2 makes the tail-resumptive loop realization normative, so a mandatory D0 measures the existing carried-loop exit first and a D0 answering NO stops and returns coordinates to the Architect rather than selecting a recursive call, frame morphism, or explicit continuation. The atomic D3A+D3B contract, the three independent suppression axes, and the deletion of the transitive R1 -> capture requirement are all UNCHANGED; the producer proof does not become a fourth axis. D3A+D3B stays frozen with no candidate and no QA until the predecessor lands and the Steward issues a SECOND explicit release. The next hard stop is 9 and mechanically triggers the mandatory Research advisory before any Architect ruling, including during the predecessor's D0."
 ---
 
-> # OPERATIVE BANNER — HARD STOP 8, `evt_54efxydhb3n6w` (2026-08-27)
+> # CURRENT STATE — HARD STOP 9 TAKEN, `evt_5p5mknw26g4qq` (2026-08-28). NO RULING YET.
 >
-> **This is the operative banner. Every banner BELOW it is history.** Read it,
-> then read below only for lineage. Nothing below is newer than this.
+> **This block is the newest thing in this file. It records a hard stop, NOT a
+> ruling — do not read it as authorizing or forbidding a mechanism.** The
+> hard-stop-8 banner below remains the operative RULING until an Architect
+> ruling on HS9 supersedes it.
+>
+> **HS9 fired on the atomic D3A+D3B consumer and was taken cleanly.** The
+> implementer stopped on `830aa0952` with no commit, candidate, fallback, marker
+> relabeling, capture write, or ABI/control repair; branch
+> `wp/RT-RESULT-CONTINUATION-BINDING-PROVENANCE-d3a-d3b-r2` clean at that exact
+> base, tree `41193dd086e780d5311668f30703c41f8f1c4815`.
+>
+> **The measured gap:** the Direct write coordinate `741/740/739` has the exact
+> body-refined inherited transport and can enter the existing declared-call lane.
+> All four loop producers (read `305/304/303`, `515/514/513`; write `529/528/527`
+> and independently-derived `318/317/316`) have `recursive_unit_body=None` and no
+> direct inherited transport at that identical lookup, so they apply only through
+> active carried self-resumption — locally `RecursiveBackedge`. The only typed
+> fresh producer is the eventual merge named by `CarriedLoopExitResult`, and by
+> the time that merge parameter is available the governed source-call
+> continuation has already unwound through the protocol marker. **The missing
+> piece is a typed morphism from that eventual merge result back to the exact
+> ordinary Ret/capture continuation abandoned at governed self-resumption.**
+> Arrival magnitudes are diagnostics, never pins.
+>
+> **THE MANDATORY RESEARCH ADVISORY IS ROUTED AND IN FLIGHT** (`runtime-leader`
+> `evt_1g79zjszzvbx7`; Research picked it up `evt_1jk0rrqf5xtmd`), exactly as the
+> HS8 banner required — the advisory precedes any Architect ruling, and that was
+> a frame-level obligation, not a judgment call. **No candidate, no QA, and no
+> Architect ruling may be routed until it returns.** Research is advisory only
+> and does not select a repair.
+>
+> **Every apparent repair the implementer enumerated selects a forbidden or new
+> mechanism** — marker/residual/earlier `R1` as `R2`; recovering a source
+> transport or call identity for loop rows; relowering or cloning the Ret
+> destination after merge; retaining the source continuation until merge (an
+> explicit suspended-continuation stack); carrying through an
+> ABI/frame/environment/runtime lane; a direct capture write or invented
+> environment-index/frame-slot morphism. **That enumeration is evidence for the
+> Architect, not an authorization to pick the least-bad item on it.**
+>
+> # OPERATIVE RULING — HARD STOP 8, `evt_54efxydhb3n6w` (2026-08-27)
+>
+> **This is the operative RULING. Every banner BELOW it is history.** Read it,
+> then read below only for lineage. Only the HS9 state block ABOVE is newer.
 >
 > **Disambiguation, because this file contains an earlier in-line mention of
 > "HS8" inside the HS7 banner.** That older mention is NOT this ruling. The

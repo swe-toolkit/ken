@@ -1,7 +1,7 @@
 ---
 id: RT-RETAINED-UNIT-CALL-TARGET-DERIVATION
 title: "Call-target-resolution successor — a retained body (StaticOriginId) has no graph-derived call target in its unit, so object emission refuses at calls.rs:1638 (call_declared_unit / unit_calls map) after M3's effect-seat crossing succeeds"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
