@@ -165,9 +165,67 @@ defect.
 
 ## Acceptance criteria
 
-**`AC-1`. The reproduced false embedded certificate is REJECTED by BOTH checker
-surfaces.** This is the refuting certificate from `evt_2yh515wg0mczy`, reaching
-the checker through `fok_embed`'s image — not a hand-built term in the excess.
+**`AC-1` — RECONCILED 2026-08-28 to the parameter-only representation
+(language-leader `evt_k7x6nmxy4ydy` / `evt_6t3hrfekx34dw`, Steward-owned
+reconciliation). The literal prior wording is SUPERSEDED and is quoted below so
+the change is auditable.**
+
+> Prior wording: *"The reproduced false embedded certificate is REJECTED by BOTH
+> checker surfaces. This is the refuting certificate from `evt_2yh515wg0mczy`,
+> reaching the checker through `fok_embed`'s image — not a hand-built term in the
+> excess."*
+
+**WHY IT COULD NOT BE MET AS WRITTEN, and this is not the ring falling short.**
+The prior wording demands a **checker verdict** on the historical exploit. That
+exploit's two object eigen steps (`Bound5`/`Bound3`) are **unrepresentable in the
+released parameter-only representation**, and the historical certificate hash
+mechanism is not in-tree. So the certificate cannot be constructed to be judged,
+and the demanded verdict is unreachable — **not because the repair is weak, but
+because the repair is STRONGER than the criterion anticipated.** The exploit is
+now refused at CONSTRUCTION rather than by a checker verdict. **An AC that
+requires a rejection verdict is not satisfied by unrepresentability, and would
+have forced reintroducing legacy representation solely to feed a dead exploit
+back in.** The language-leader ruled against that and the ruling stands.
+
+**The criterion is therefore stated as a PREDICATE over the exploit's
+nonexistence, at both levels. All three parts are required:**
+
+1. **Constructor-level unrepresentability.** Exhibit that the two historical
+   `Bound`-eigen object steps have **no constructor encoding** in the released
+   representation. This is a statement about the datatype, not about a search
+   outcome.
+2. **Embed-image and search nonexistence on BOTH surfaces.** No term in
+   `fok_embed`'s image, and no term the corrected search reaches, derives the
+   false conclusion — measured on the Rust surface and the Ken surface
+   separately, never one standing in for the other.
+3. **The recorded historical hash is retained as PROVENANCE ONLY.** It records
+   which artifact the refutation came from. **It is explicitly NOT a
+   reproducibility claim**, and nothing may be asserted to follow from
+   recomputing it.
+
+**`AC-1-POWER` — the nonexistence claims must be shown to have power, and this
+is the load-bearing half.** Parts 1 and 2 are both NEGATIVE claims, and a
+misconfigured search or an over-broad unrepresentability argument satisfies them
+vacuously while proving nothing. **A control that cannot fail is not weaker
+evidence; it is none.** Required, by measurement rather than by argument:
+
+- The corrected search MUST FIND a planted, genuinely representable witness of
+  comparable shape. A search that returns nothing on every input has not shown
+  the exploit is absent — it has shown the search is inert.
+- The unrepresentability argument MUST be specific to the historical eigen
+  steps: exhibit a near-miss that IS representable and IS refused downstream.
+  **An argument that would equally prove some lawful certificate unrepresentable
+  is refuting itself, not the exploit.**
+
+> **This amendment does NOT reopen the "released node" banner elsewhere in this
+> file, and the distinction matters.** That banner forbids FOLDING IN A NEW
+> CRITERION after release — new obligations belong to a successor. This is not a
+> new obligation: it is the reconciliation of an EXISTING criterion that this
+> node's own representation change made unsatisfiable. **A frame that asks for
+> something its own increment made impossible is a frame defect, and repairing it
+> is the Steward's job at any point in the lifecycle.** The obligation is not
+> widened — parts 1-3 are what the prior wording was reaching for, stated so they
+> can actually be met.
 
 **`AC-2`. Lawful parameter certificates are still accepted AND still reflect.**
 Both halves, pinned per quantifier rule. Acceptance without reflection, or
@@ -193,7 +251,8 @@ injection point: removing parameter-only admission; collapsing the sort check;
 corrupting mixed-binder depth.
 
 **`AC-6`. Positive controls show refusal is not caused by an unrelated malformed
-tree.** For each refusal in `AC-1`/`AC-3`, a near-identical tree differing only
+tree.** For each refusal in `AC-3`, and for the representable near-miss required
+by `AC-1-POWER`, a near-identical tree differing only
 in the mutated coordinate is accepted. Without this, the refusal ACs are
 satisfied by a checker that rejects everything.
 
