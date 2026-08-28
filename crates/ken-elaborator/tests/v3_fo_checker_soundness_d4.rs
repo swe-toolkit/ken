@@ -93,7 +93,7 @@ fn assert_forall_right_reaches_full_soundness(name: &str, quantifier: &str) {
            (FokMkSequent \
              (Nil FokForm) \
              (Cons FokForm {target} (Nil FokForm))) \
-           (FokForallRight Zero (FokQParameter Zero)) \
+           (FokForallRight Zero Zero) \
            (Cons FokCert {child} (Nil FokCert))"
     ))
     .expect("ForallRight root");
@@ -179,7 +179,7 @@ fn eigenparameter_in_conclusion_rejects_an_otherwise_valid_child() {
            (FokMkSequent \
              (Nil FokForm) \
              (Cons FokForm d4_fresh_target (Nil FokForm))) \
-           (FokForallRight Zero (FokQParameter Zero)) \
+           (FokForallRight Zero Zero) \
            (Cons FokCert d4_fresh_child (Nil FokCert))",
     )
     .expect("freshness-violating ForallRight root");

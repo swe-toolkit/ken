@@ -603,7 +603,7 @@ fn fok_check_cert_accepts_genuine_derivations() {
     let cert2 = format!(
         "(FokMkCert \
             (FokMkSequent (Nil FokForm) (Cons FokForm {q2} (Nil FokForm))) \
-            (FokForallRight Zero (FokQParameter Zero)) \
+            (FokForallRight Zero Zero) \
             (Cons FokCert {cert1} (Nil FokCert)))"
     );
     assert!(
@@ -729,7 +729,7 @@ fn fok_check_cert_totally_rejects_malformed_certificates() {
                    (FokMkSequent (Nil FokForm) (Cons FokForm FokBottom (Nil FokForm))) \
                    (FokMkCert \
                      (FokMkSequent (Nil FokForm) (Cons FokForm FokBottom (Nil FokForm))) \
-                     (FokForallRight Zero (FokQParameter Zero)) (Cons FokCert {rejecting_child_never_reached} (Nil FokCert)))"
+                     (FokForallRight Zero Zero) (Cons FokCert {rejecting_child_never_reached} (Nil FokCert)))"
             ),
         ),
         (
@@ -742,7 +742,7 @@ fn fok_check_cert_totally_rejects_malformed_certificates() {
                  (FokMkSequent \
                    (Cons FokForm (FokForcingP (FokQParameter Zero) (FokQParameter Zero)) (Nil FokForm)) \
                    (Cons FokForm (FokForallWorld FokBottom) (Nil FokForm))) \
-                 (FokForallRight Zero (FokQParameter Zero)) \
+                 (FokForallRight Zero Zero) \
                  (Cons FokCert \
                    (FokMkCert \
                      (FokMkSequent \
@@ -758,7 +758,7 @@ fn fok_check_cert_totally_rejects_malformed_certificates() {
                (FokMkSequent (Nil FokForm) (Cons FokForm (FokForallWorld FokBottom) (Nil FokForm))) \
                (FokMkCert \
                  (FokMkSequent (Nil FokForm) (Cons FokForm (FokForallWorld FokBottom) (Nil FokForm))) \
-                 (FokForallRight Zero (FokQParameter Zero)) (Nil FokCert))"
+                 (FokForallRight Zero Zero) (Nil FokCert))"
                 .to_string(),
         ),
     ];

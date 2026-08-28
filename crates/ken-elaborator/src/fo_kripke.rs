@@ -1644,6 +1644,23 @@ mod tests {
             Form::ForallWorld(Box::new(Form::ForallObj(Box::new(Form::DomainA(p, p))))),
         );
 
+        // Discriminating: the OTHER mixed order (ForallObj outer, ForallWorld
+        // inner). `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` `AC-4` asks for both
+        // mixed orders explicitly, so the depth composition is pinned
+        // independently of which binder kind sits outermost -- the sorted rule
+        // now instantiates a world eigen under `ForallWorld` and an object eigen
+        // under `ForallObj`, and the substitution must cross either nesting
+        // identically.
+        check(
+            "ForallObj/ForallWorld(Bound(2)), mixed (other order) -- discriminates",
+            subst_form_at(
+                &Form::ForallObj(Box::new(Form::ForallWorld(Box::new(leaf(2))))),
+                0,
+                &p,
+            ),
+            Form::ForallObj(Box::new(Form::ForallWorld(Box::new(Form::DomainA(p, p))))),
+        );
+
         // `D3`, INDEX axis: pins `i > depth => Bound(i - 1)`, the decrement
         // arm. One binder (depth 1 inside), leaf index 3 (> 1): correct
         // decrements to Bound(2). If this arm silently stopped
