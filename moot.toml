@@ -288,10 +288,35 @@ display_name = "Language implementer"
 # env, model tier only. REVERT to terra when this seat next takes mechanical
 # (T2) work. The stack-depth OpenAI-policy caveat above still applies (sol is
 # also `openai-codex/`), but checker_soundness is not a stack-depth subject.
-model = "openai-codex/gpt-5.6-sol"
-harness = "pi"
-effort = "medium"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
+# 2026-08-28 RESEAT, OpenAI -> Anthropic (Steward-executed under a STANDING
+# operator authority: "you may reseat between providers as you need to handle
+# refusals of this sort. It does not need my approval.").
+#
+# TRIGGER: an OpenAI POLICY-LAYER refusal, the same class the block above already
+# names a reseat trigger. Exact text: "Codex error: This content was flagged for
+# possible cybersecurity risk ... join the Trusted Access for Cyber program."
+# It fires on the SUBJECT, so it re-trips rather than clearing on retry.
+#
+# WHY NOT sol -> terra: a classifier sits at the PLATFORM layer, so the same
+# filter applies to every `openai-codex/` model. Swapping tier within a provider
+# is NOT a lever against a provider-layer block — structurally identical to
+# account-wide credit exhaustion. Terra is also T2 while the blocked node
+# `CORE-FO-CHECK-TREE-SORT-VALIDATION` is tier T1, so it would downgrade the seat.
+#
+# WHY OPUS AND NOT THE 2026-08-13 SONNET SEATING: that earlier Anthropic seating
+# was Sonnet 5. The blocked node is T1 soundness repair (items 1-2 of the
+# Architect's envelope), and MODELS.md holds that soundness gates cast on a
+# weaker backend are PROVISIONAL. So Opus here conforms to the T1 rule rather
+# than consuming the enclave pool for ordinary build work. REVERT to an
+# `openai-codex/` seat when this seat next takes non-refused T2 work.
+#
+# ⇒ HARNESS BEHAVIOUR CHANGES WITH THIS EDIT. This is now a Claude Code seat: no
+# `harness` key, effort key is `effort`, and the PI_* env is gone. The pi-harness
+# note above ("wakes on mention, moot compact works here") NO LONGER APPLIES — a
+# convo mention does NOT resume a freshly-compacted Claude Code seat; use
+# tmux send-keys, text and a BARE Enter as separate calls.
+model = "claude-opus-4-8[1m]"
+effort = "high"
 startup_prompt = "You are the Language team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/language/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.language-qa]

@@ -152,8 +152,75 @@ package waiting for the rest.
   Apply the same check to any other package whose prose justifies a def being
   removed.
 - **AC-ORACLE.** Each touched package's existing acceptance oracle and attached
-  proofs stay green, with `trusted_base` delta zero and no new `Axiom`. This is
-  a behavior-preserving refactor; the review is differential.
+  proofs stay green, and the increment declares **no new `Axiom` of its own**.
+  This is a behavior-preserving refactor; the review is differential.
+
+  > ### OPERATOR RULING 2026-08-28 — ARM A. This supersedes the flat
+  > ### "`trusted_base` delta zero" criterion, which is RETIRED as an oracle.
+  >
+  > **Zero-delta was a PROXY, and reuse is what kills it.** It tracked "this
+  > package has not pulled in a provider" — true only while the package
+  > reimplemented what it needed. Since importing from the canonical owner is the
+  > campaign's entire objective, the proxy now measures nothing and would block
+  > every remaining group. **Retiring it is authorized ONLY as a replacement by a
+  > stronger direct pin, never as a deletion** — the same proxy-vs-property shape
+  > already ruled for the `OrdResult` assertion at `evt_2r8cavz7b1bms`.
+  >
+  > **The replacement, stated as a predicate — do NOT re-express it as a per-file
+  > roster.** For an increment that imports from a canonical provider, the
+  > inherited axiom set must be **exactly equal, BY QUALIFIED NAME, to an
+  > independently computed canonical-provider delta.** Independently computed
+  > means derived from the provider itself, not read back off the increment —
+  > deriving the expected set from the observed set makes the check vacuous.
+  >
+  > **Compare qualified names, never counts.** A count-equality passes on a
+  > substitution that swaps one axiom for another.
+  >
+  > **The new assertion must be proven to DISCRIMINATE BY MUTATION**: an
+  > inherited set differing from canonical must RED. QA blocked a prior respin
+  > for a control that could not fail; a replacement oracle shipped on its own
+  > say-so repeats that defect one level up. A control that cannot fail is not
+  > weaker evidence — it is none.
+  >
+  > **THE BOUNDARY IS MEASURED — the growth is REAL, and a Steward hypothesis
+  > that it might be illusory was REFUTED.** Measured `evt_11z9chtz3p9jj` at the
+  > whole-catalog roots-loader boundary
+  > (`elaborate_module_from_roots(..., Data.Collections.Derived)`), toggling only
+  > the D6 Derived product blob and byte-restoring:
+  >
+  > - WITHOUT the import (base blob `1003406a`): Derived delta `{}`.
+  > - WITH the import (candidate blob `c288e556`): Derived delta
+  >   `{Ord.Int.antisym, Ord.Int.refl, Ord.Int.total, Ord.Int.trans}` — exactly
+  >   equal by qualified name to the independently roots-loaded canonical `Order`
+  >   delta, with **zero Derived-local addition**.
+  >
+  > **The Steward had hypothesized that `Nat.Order` was already inside the
+  > accepted closure, which would have made the boundary delta zero and the
+  > per-package number a measurement artifact. It is not, and it does not.** The
+  > accepted boundary delta is genuinely non-zero. **This is why the fork was the
+  > operator's to rule and not the Steward's** — it is real trusted-base growth
+  > at the boundary the frame accepts against, not a bookkeeping shadow.
+  >
+  > **This is the campaign's standing rule for inherited provider axioms, BOUNDED
+  > as follows.** Groups 4 and 5 hit the same inheritance and do NOT re-escalate
+  > **while the measured inherited set is exactly the canonical provider's own
+  > footprint with zero consumer-local addition** — that is the shape ruled
+  > acceptable here. **An import whose boundary delta exceeds its provider's own
+  > footprint, or adds any consumer-local axiom, is NOT covered and escalates
+  > fresh.** The ruling authorized a shape, not an unbounded licence: the reason
+  > this instance is acceptable is that the consumer pays exactly the provider's
+  > published price and nothing more, and that is a measured property of each
+  > import rather than a property of the campaign. A genuine mechanism gap still
+  > hard-stops to spec/Architect.
+  >
+  > **Why this was the operator's call and not the Steward's:** a surface `Axiom`
+  > is `declare_postulate` -> `Decl::Opaque` -> a real `trusted_base()` entry
+  > (`docs/PRINCIPLES.md` principle 5, "postulating does not avoid TCB growth"),
+  > and `trusted_base()` is a kernel function (`crates/ken-kernel/src/env.rs`).
+  > Ken-source axioms are therefore NOT a weaker category than kernel trust.
+  > **But note the open question the boundary measurement settles:** inheriting an
+  > axiom already present in the accepted closure may grow nothing at all, in
+  > which case this class of increment needs no escalation at all in future.
 - **AC-SCOPE.** Only the six packages listed are edited. No provider module is
   edited — this WP adds no `pub`, closes no missing-export prerequisite, and
   touches none of the 27 `higher`-risk items or the 12 `BU` arrangement entries.
