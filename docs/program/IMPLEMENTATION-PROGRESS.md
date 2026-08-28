@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-28 14:27:59Z — from 471 issue file(s) in `docs/program/issues/`.
+2026-08-28 16:35:04Z — from 471 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -89,7 +89,7 @@ the committed file matches the generator's output.
 | `CONF-VERIFY-OLD-ROW-UNSATISFIABLE` | The seed's only unclaimed row states expect: accepts against a landed elaborator that rejects unconditionally, and the Coverage map rolls it up as a satisfied family | merged | spec-enclave | S | none | — |
 | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS` | Four v1_acceptance tests claim verify/spec-syntax conformance rows that were never authored -- invisible until the row-claim checker's namespace widening, and now a mechanical merge blocker for CI-ROW-CLAIM-NAMESPACE | merged | spec-enclave | S | none | — |
 | `CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY` | Every postulate audit label is a canonical artifact-identity input: decide whether a semantic hash should encode label prose, and if not, migrate | draft | language | L | none | — |
-| `CORE-FO-CHECK-TREE-SORT-VALIDATION` | Make both checker surfaces' own domain honest: derive and validate world/object sorts and binder scope in check_tree and in the Ken checker, fail-closed, instead of relying on every caller to pass embed's image | active | language | M | none | — |
+| `CORE-FO-CHECK-TREE-SORT-VALIDATION` | Make both checker surfaces' own domain honest: derive and validate world/object sorts and binder scope in check_tree and in the Ken checker, fail-closed, instead of relying on every caller to pass embed's image | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/3041 |
 | `DOC-AGENT-CITE` | agent core modules name normative authorities as a reading list rather than binding them to claim classes, so seven of seven cold runs made material claims without citing the sources D2 requires | merged | doc | M | none | — |
 | `DOC-ASBUILT-AGENTS` | As-built slice 6 — reconcile the thirteen-page agents corpus against its 7 shared drifted sources; it is instructions machines follow, not prose people skim | merged | doc | M | none | — |
 | `DOC-ASBUILT-AUDIT` | As-built reconciliation — 28 cited sources have drifted from their attestations, so the library's currency claim is unbacked corpus-wide | merged | doc | L | none | — |
@@ -575,7 +575,6 @@ is itself not yet `merged`/`closed`:
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 - `V3-FO-EMBEDDING-ADEQUACY` blocked by `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` (status: draft)
-- `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` blocked by `CORE-FO-CHECK-TREE-SORT-VALIDATION` (status: active)
 
 ## Gate progress
 
