@@ -210,6 +210,54 @@ relation looks sufficient.
 
 **`AC-10`.** No-regression, in CI (`COORDINATION §12`).
 
+**`AC-FRESHNESS-ISOLATED` — the D1a obj-case freshness control is currently
+MASKED, and this node owns the surface that masks it.** From Adversary advisory
+hunt `evt_e9106h8ysr47` on respin `99a0b548`, **re-verified by the Steward
+against that exact object before folding**:
+
+- The WORLD control (`:226`) uses body `FokAccess (FokQParameter Zero)
+  (FokQBound Zero)`. `Access` is World/World, so the stale eigen `Param0` is
+  well-sorted for a `ForallWorld` eigen, sort-validation PASSES, and the `False`
+  verdict comes from **freshness alone**. Break freshness and this reddens. It is
+  a genuine pin.
+- The OBJ control (`:236`) uses body `FokForcingP (FokQParameter Zero)
+  (FokQBound Zero)`. **`ForcingP` is World/Object, so `Param0` sits in its WORLD
+  slot while `ForallObj` requires an OBJECT eigen.** The shared parameter
+  environment therefore rejects on a World-vs-Object conflict, and
+  `validate(False) && structural` is `False` **independent of freshness**.
+  ⇒ **Delete or break the structural freshness check and the obj test STAYS
+  GREEN.** It does not test what its name says.
+
+**Required:** after the relation is corrected, the obj-case freshness assertion
+must be ISOLATED — inject the stale-eigen fault on a WELL-SORTED **Object**
+non-fresh parameter, mirroring the clean world case, so that only freshness can
+reject. **Prove it by mutation: break the freshness check and the obj control
+must RED.**
+
+> **THE HAZARD THIS NODE SPECIFICALLY CREATES, and why the obligation lives here
+> rather than in its own node.** This increment makes `ForallRight`
+> **parameter-only AND SORTED on both surfaces**. Once eigenparameters are sorted
+> by construction, the ill-sorted shape the obj control currently relies on may
+> become **unconstructible** — at which point the control does not merely stay
+> masked, it can become VACUOUS while still compiling and passing. **A control
+> that cannot fail is not weaker evidence; it is none.** Face this deliberately
+> while restating the fixtures in lockstep; do not discover it afterwards.
+>
+> **Not filed as a separate node deliberately.** This node rewrites the checker,
+> `FokDerivation`, and the reflection proofs — and therefore these fixtures — in
+> one atomic increment. A competing node over the same file would contend with
+> it and be superseded before it ran (`docs/PRINCIPLES.md`: subsume, do not
+> proliferate). **This is safe to fold ONLY because this node is `draft` and
+> unreleased**; the same fold into a frozen, mid-flight node is the defect
+> `AC-DERIVE` was recut to remove.
+>
+> **LATENT, not a live defect, and not a reason to hold anything.** Freshness IS
+> still pinned today by the world case. The Adversary classed it minor,
+> non-blocking, with no action strictly required, and its verdict on the
+> `99a0b548` repair was that the repair is CORRECT — a legitimate well-sorted
+> rewrite of a fixture that was only accidentally valid before validation
+> existed, **not** a dodge of an over-rejection bug.
+
 ## Banned scope
 
 - **Re-establishing `embedding_adequacy`.** Item 6 of the envelope, and it is
