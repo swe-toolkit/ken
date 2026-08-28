@@ -1,7 +1,7 @@
 ---
 id: RT-RETAINED-UNIT-CALL-TARGET-DERIVATION
 title: "Call-target-resolution successor — a retained body (StaticOriginId) has no graph-derived call target in its unit, so object emission refuses at calls.rs:1638 (call_declared_unit / unit_calls map) after M3's effect-seat crossing succeeds"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,29 @@ blocks: []
 github: null
 origin: "Steward, 2026-08-25, from the Architect object-distinctness ruling (evt_317adj9ebfw86) on M3 WIP 3e9821c5d. M3's effect-seat crossing succeeds; px8f then stops at object emission because a retained body's call target is not derived in the unit call graph. DISTINCT call-graph-derivation object — NOT M3's effect-seat object, NOT the worker_calls finite-static-apply facet (calls.rs:1605), NOT reject_carried_residual_arguments (core.rs:2935). New node, Steward framing call per COORDINATION section 2."
 ---
+
+> # MERGED as accepted partial work (2026-08-28)
+>
+> Squash on `main`: `e03b4d500df422ed2fd7a14569279f1a48be64cd`.
+>
+> Candidate `a5d21de81415453c8230b6f65227a21857155ce4` (tree
+> `1263ab5e405d8d67a333c167176f78c408acbec4`, parent `35b9d3fa1`, three paths,
+> `+363/-12`) merged at `e03b4d500`; **all three paths blob-verified on `main` by
+> the Steward**, not taken on report. Gates: Architect `evt_6h4c1b3r1pfxb`,
+> Runtime QA `evt_19jczj3cfhxpx`, Decision `dec_4tzkskdqy30m4` resolved, routed
+> `evt_jpd8qqxm1vd1`. Status flipped by hand — **`ken-ci` auto-close did NOT fire
+> (`github: null`)**, which is the shape that leaves a landed node reading
+> `active` and invisible to the watchdog's per-node sweep.
+>
+> **ACCEPTED PARTIAL. The trigger row still does not run end-to-end and its
+> `#[ignore]` REMAINS at `px8f_buffer_native.rs:250`, re-pointed to
+> [[RT-RETAINED-UNIT-RESULT-CLOSURE-REPRESENTATION]].** That is the recut
+> `AC-DERIVE` being satisfied, not an outstanding defect. Removing the ignore is
+> required only when the successor lands and the row runs end-to-end.
+>
+> **This landing does NOT unfreeze D3A+D3B** and does not alter closure transport.
+> It DOES discharge the successor's `depends_on`, which the Steward released
+> separately — the landing alone never authorizes a start.
 
 > # Call-target-resolution successor — SECOND of M3's two successors (DRAFT stub)
 >
@@ -124,12 +147,33 @@ preference.
   > on every refusal behind it — unbounded, and not what the node is for. **An AC
   > for a node that unblocks ONE refusal must be keyed to THAT refusal ceasing,
   > not to the whole path succeeding.** Steward-owned defect, corrected here.
-- **AC-NO-SYNTHESIS.** A compile-preserving mutation that derives the target from
-  the lookup miss, from numeric-origin coincidence, or from retained-body shape
-  must REDDEN a control. **Two-sided, as the corpus requires: apply the evasion,
-  show the build still succeeds, and show the corrected control reddens.** A
-  control that cannot fail under this mutation has not been demonstrated to
-  discriminate and does not satisfy this AC.
+- **AC-NO-SYNTHESIS (AMENDED AT CLOSEOUT 2026-08-28 — roster replaced by a
+  predicate; see the box below for why).** The derivation must read only authority
+  that was ALREADY PRESENT and that is ROOTED AT THE CHECKED OWNER. **Any**
+  compile-preserving mutation substituting a different or a WIDER authority source
+  must REDDEN a named control. The forbidden sources below are INSTANCES, not the
+  definition, and the list is explicitly non-exhaustive: the lookup miss, numeric-
+  origin coincidence, retained-body shape, and **a widened traversal root/owner
+  seed**. **Two-sided, as the corpus requires: apply the evasion, show the build
+  still succeeds, and show the corrected control reddens.** A control that cannot
+  fail under a given mutation has not been demonstrated to discriminate against it.
+  > **WHY THIS WAS AMENDED, kept because the shape recurs and this node is the
+  > worked example.** The original enumerated a THREE-ITEM ROSTER — lookup miss,
+  > numeric origin, retained-body shape. The candidate satisfied it exactly, and
+  > the Architect gate (`evt_3fhn3jqyvqcd4`) still found the authority boundary
+  > unpinned: every submitted mutation acted only AFTER the rooted traversal had
+  > populated `claims`, so none varied the root. The Architect applied the evasion
+  > itself — seed `pending` from every graph owner instead of `vec![root]` — and
+  > **the build compiled and the control stayed GREEN.** The traversal root was a
+  > fourth axis the roster never named. **An enumerated forbidden-set is
+  > unfalsifiable in the direction that matters: it can only be extended after
+  > something slips through it. Freeze the PREDICATE — "only pre-existing
+  > authority, rooted at the checked owner" — and the roster becomes illustration
+  > rather than definition.** Steward-owned frame defect, corrected here after the
+  > node merged so that copiers inherit the predicate form. **This amendment does
+  > NOT reopen the node**: the landed candidate does satisfy the predicate, and the
+  > Architect and Runtime QA both mutation-proved the root/owner axis independently
+  > before approving.
 - **AC-FAIL-CLOSED.** The `calls.rs:1638` refusal still fires, unwidened, for a
   body whose target genuinely is not derivable. Control: a witness that still
   reaches the refusal after D1.
