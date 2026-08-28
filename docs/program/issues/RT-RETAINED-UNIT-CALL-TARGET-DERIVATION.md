@@ -108,8 +108,22 @@ preference.
 
 ## Acceptance criteria, each with its control
 
-- **AC-DERIVE.** The trigger row runs end-to-end and its `#[ignore]` is removed.
-  Control: the row must FAIL before D1 and pass after, on the same base.
+- **AC-DERIVE (RECUT 2026-08-28 — Architect `evt_2jdfsv6w8nh19` confirmed this
+  is the correct criterion; the original is superseded and must not be used).**
+  Before D1 the trigger row reaches the `calls.rs:1638` target-miss refusal.
+  After D1 it **must not reach that miss**, and must advance either to completion
+  or to the separately named post-call closure-representation refusal. Control:
+  the row fails at `calls.rs:1638` before D1 and does not reach that refusal
+  after.
+  **While [[RT-RETAINED-UNIT-RESULT-CLOSURE-REPRESENTATION]] blocks end-to-end
+  execution, the `#[ignore]` REMAINS and is RE-POINTED to that successor**, named
+  explicitly. Removing it is required only when the row runs end-to-end.
+  > **Why the original was wrong, kept because the shape recurs.** It read "the
+  > trigger row runs end-to-end and its `#[ignore]` is removed." That bundles two
+  > component objects into one criterion and makes this node's acceptance depend
+  > on every refusal behind it — unbounded, and not what the node is for. **An AC
+  > for a node that unblocks ONE refusal must be keyed to THAT refusal ceasing,
+  > not to the whole path succeeding.** Steward-owned defect, corrected here.
 - **AC-NO-SYNTHESIS.** A compile-preserving mutation that derives the target from
   the lookup miss, from numeric-origin coincidence, or from retained-body shape
   must REDDEN a control. **Two-sided, as the corpus requires: apply the evasion,
