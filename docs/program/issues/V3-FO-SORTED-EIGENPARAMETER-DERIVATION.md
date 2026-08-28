@@ -1,14 +1,14 @@
 ---
 id: V3-FO-SORTED-EIGENPARAMETER-DERIVATION
 title: "Make ForallRight parameter-only and sorted on BOTH checker surfaces, replace arbitrary-term subst0 with typed instantiation, and restate FokDerivation and its reflection proofs in lockstep -- the atomic middle of the FO soundness repair"
-status: active
+status: merged
 owner: language
 size: L
 tier: T1
 gate: none
 depends_on: [CORE-FO-CHECK-TREE-SORT-VALIDATION]
 blocks: [V3-FO-EMBEDDING-ADEQUACY]
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3057
 origin: "Steward, 2026-08-27, cutting items 3, 4 and 5 of the repair envelope in Architect ruling evt_6hx31xvw9tqs2, which REJECTED the current FO checker/derivation/adequacy interface as a semantic soundness gate and ruled it not repairable by finishing the current proof. This node SUPERSEDES the relation that V3-FO-CHECKER-SOUNDNESS proved (that node stays merged -- its deliverables did land -- and carries a banner pointing here) and SUBSUMES the control obligation of V3-FO-SUBST-DEPTH-CONTROL, whose shallow oracle the ruling names as insufficient. It is ONE atomic increment because item 5 of the envelope requires the Rust checker/search, the Ken checker, the FokDerivation constructors and the reflection proofs to change TOGETHER. Steward-filed per COORDINATION section 2."
 ---
 
