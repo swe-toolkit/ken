@@ -1,6 +1,6 @@
 ---
 id: CI-NATIVE-PARITY-DURATION
-title: "Rework the CI test suite to run faster, under the operator's 20-minute ceiling and toward the 10-minute target, by removing three measured serial floors: split checked_ih_generated_entry_confluence_and_route_mutations_reject (39 sequential subprocess mutations, 1299.983s in ONE scheduling unit) and its five siblings into per-case tests so nextest can schedule them; then partition native-rt-parity across runners; then rebalance the workspace shards. Splitting alone is necessary but NOT sufficient -- it takes the job from 25m to about 18m, because 4171.65 CPU-seconds on a 4-vCPU runner floors at 17.4m -- and partitioning is INERT until the split lands, because --partition cannot subdivide a single 1300s test. Separately, the ignored-row sweep EXECUTES 33 ignored rows for 10m and treats their failures as non-blocking findings, so rows blocked on a named unbuilt capability get a registered short-circuit that the sweep enforces rather than silently passes. Behaviour-preserving throughout: the same 90 mutation cases with the same assertions and outcomes."
+title: "Rework the CI test suite to run faster, under the operator's 20-minute ceiling and toward the 10-minute target, by removing three measured serial floors: split checked_ih_generated_entry_confluence_and_route_mutations_reject (39 sequential subprocess mutations, 1299.983s in ONE scheduling unit) and its five siblings into per-case tests so nextest can schedule them; then partition native-rt-parity across runners; then rebalance the workspace shards. Splitting alone is necessary but NOT sufficient -- it takes the job from 25m to about 18m, because 4171.65 CPU-seconds on a 4-vCPU runner floors at 17.4m -- and partitioning is INERT until the split lands, because --partition cannot subdivide a single 1300s test. Separately, the ignored-row sweep EXECUTES 33 ignored rows for 10m and treats their failures as non-blocking findings. D1-D3 LANDED at c555f843a. D4 was RE-SCOPED 2026-08-28 after the verify ring measured its original short-circuit population EMPTY: no ignored row names an unbuilt capability, so the short-circuit half is INAPPLICABLE, and D4 instead builds a STALE-READMISSION DETECTOR -- the sweep fails when an ignored row names a condition whose tracker node reads merged while the row stays ignored, which is the operator's own re-enablement concern already realized twice in this file. Behaviour-preserving throughout: the same 90 mutation cases with the same assertions and outcomes."
 status: active
 owner: verify
 size: M
@@ -11,6 +11,84 @@ blocks: []
 github: null
 origin: "Operator request 2026-08-28: 'diagnose the native-slow test and brief me on what we can do about it? ideally CI should be less than 10 minutes, but less than 20 is acceptable.' Then the operator's directing message the same day: 'split up checked_ih_generated_entry_confluence_and_route_mutations_reject so that it can be parallelized and/or sharded into separate jobs. Are ignored tests run, but not considered failures if they do fail? If so, add a short circuit quick end to the tests with a comment so that they are properly re-enabled when they are rearmed. let lane 2 finish its current wp, then bring up verify on lane 2 to rework CI tests to make them run faster.' That last clause is a ROSTER RULING and is recorded in steward/lanes.md. Steward diagnosis measured against completed main run 33192361977 at bb33dfb71e302a68377ffde8038f7dc8bd2c82ac -- the first fully completed main run since 31258f403. Steward-filed per COORDINATION section 2."
 ---
+
+> # OPERATIVE — D1-D3 LANDED; D4 IS RE-SCOPED TO A STALE-READMISSION DETECTOR
+>
+> **Steward ruling, 2026-08-28, on the verify ring's D4 hard stop
+> `evt_7qmmeqkd21c6y`. This banner governs the remaining work. Every passage
+> below describing D4 as a short-circuit states the ORIGINAL design, not the
+> authorized one.**
+>
+> **D1+D2+D3 MERGED at `c555f843a686ae30ddadc160e52bbed8de381d87`** — both
+> candidate paths blob-verified, Adversary M8 hunt CLEAN (`evt_7q9kmjszk8naz`,
+> the mutation-mode census byte-identical at 96 tokens). Measured wall clock
+> `28m55s` -> `18m51s` on run `33215344963`.
+>
+> **`AC-DURATION-MEASURED` IS NOT DISCHARGED BY THAT PAIR.** The two runs sat on
+> different runner hardware, so `28m55s` -> `18m51s` is an INFERENCE about the
+> increment, not the comparable-hardware measurement the criterion asks for.
+> Report it from comparable hardware, and state the caveat rather than dropping
+> it.
+>
+> ## D4's ORIGINAL POPULATION IS EMPTY, AND THE RING PROVED IT
+>
+> The verify ring re-grounded the population, found it empty, reset
+> `wp/CI-NATIVE-PARITY-DURATION-D4` byte-clean, and cut no candidate. It
+> declined to invent a capability or preserve a stale one. That was correct and
+> is the reason this node advances instead of shipping a control that cannot
+> fail.
+>
+> Six `#[ignore]` rows exist in `crates/ken-cli/tests/rt_parity_native.rs`. Four
+> name only "post-M6 runtime parity debt" — an unfalsifiable condition D4
+> forbids short-circuiting. The two that name a real condition name one that is
+> already **built**. **So the short-circuit half of D4 is INAPPLICABLE**, and
+> that is a measured outcome recorded with its evidence, not a failed
+> deliverable.
+>
+> ## THE EMPTY POPULATION IS THE OPERATOR'S STATED FAILURE, ALREADY REALIZED TWICE
+>
+> The operator asked that rows be *"properly re-enabled when they are rearmed"*.
+> Two rows name conditions that ARE rearmed and were never re-enabled or
+> re-pointed: `:675` names `RT-SITEOP-CARRIED-WITNESS`, `:2039` names
+> `RT-CLOSURE-BOUNDARY-LANE`, and every tracker node either row cites reads
+> `status: merged` (`RT-SITEOP-CARRIED-WITNESS`,
+> `RT-CARRIED-IH-DISPATCH-SITEOP`, `RT-CLOSURE-BOUNDARY-LANE`,
+> `RT-CLOSURE-BOUNDARY-RESIDUAL` — verified by the Steward on `origin/main`,
+> independently of the ring's census).
+>
+> **A row whose blocker landed and whose ignore stayed is exactly the drift the
+> short-circuit existed to prevent. It is not hypothetical in this file; it is
+> the file's measured state, twice.**
+>
+> ⇒ **D4 becomes a STALE-READMISSION DETECTOR.** The sweep FAILS when an ignored
+> row names a condition whose tracker node reads `merged` while the row remains
+> ignored. The population is non-empty, which is what makes the mutation
+> criterion truthfully exercisable — the ring's blocking objection to the
+> original framing, and it was right.
+>
+> ## CORRECTION TO MY OWN RULING: THE POPULATION IS NOT "EXACTLY TWO"
+>
+> **I ruled the population was exactly the two `rt_parity_native.rs` rows. Then I
+> opened `.github/ignored-test-exemptions.toml` and found a THIRD instance
+> sitting in the registry itself:** the entry for
+> `ken-elaborator::compiler_driver::tests::gate_4a_preparation_and_full_build_are_one_transaction`
+> carries `readmission = "RT-CLOSURE-BOUNDARY-LANE"`, and that node is `merged`.
+>
+> **So the drift is not confined to the file the ring was looking at, and my
+> count came from the same narrow view.** Two consequences, and the second is the
+> one that shapes the deliverable:
+>
+> 1. **The condition is recorded in TWO places** — the registry's `readmission`
+>    field and the row's own comment / `#[ignore = "..."]` reason. A detector
+>    reading one source under-covers. Enumerating the true population is D4's
+>    FIRST measurement, not a number this frame hands down.
+> 2. **The `readmission` field is POLYMORPHIC and most of it is not a node id.**
+>    Of the six registry entries, one names a tracker node, one names a relation
+>    symbol (`TermJReduction`), and four are free prose ("not applicable: …",
+>    "after L-classes expose Int.toInt64, …"). **A rule that fails on any
+>    unresolvable string reds the whole existing registry on day one; a rule that
+>    silently passes them can be disabled by a typo.** That fork is real, it is
+>    not pre-decided here, and it is `AC-STALE-READMISSION`'s first obligation.
 
 ## Lane and release condition
 
@@ -45,8 +123,9 @@ it accompanies this flip.
 
 The diagnosis is settled below and the arithmetic is measured, not argued. What
 remains is a behaviour-preserving restructure of a test file, two workflow matrix
-edits, and a registry-driven short-circuit. The review turns on differential
-faithfulness — same cases, same assertions, same outcomes — not on an argument.
+edits, and — after the D4 re-scope — a status-keyed stale-readmission check in
+the existing sweep script. The review turns on differential faithfulness — same
+cases, same assertions, same outcomes — not on an argument.
 
 ## Fixed inputs — measured at `bb33dfb71`, run `33192361977`
 
@@ -166,18 +245,34 @@ They do, and they are not.** Measured, not inferred:
 - On run `33192361977` that sweep ran **33 rows**, most of which FAILED, at
   roughly 40-75s each. That is the 10m job.
 
-So the operator's premise holds and the remedy applies. **One consequence has to
-be stated before it is built:** a bare short-circuit makes the sweep report a
-row as passing, and the sweep's whole purpose is to notice when an ignored row
-*starts* passing so it can be re-armed. Short-circuiting rows without telling the
-sweep would convert a live instrument into one that always reads green — the
-failure mode this program keeps paying for.
+So the operator's premise holds — and this half of the section is measurement
+that survives the re-scope unchanged.
 
-**So the short-circuit is registered, not silent.** The mechanism already
+> **THE REMEDY BELOW IS THE ORIGINAL D4 DESIGN AND IS NOT WHAT IS AUTHORIZED.**
+> Its population was measured EMPTY; see the operative banner at the top. Read
+> the next two paragraphs as the reasoning that produced the registry mechanism,
+> which the re-scoped D4 still builds ON — not as a live instruction to
+> short-circuit anything.
+
+**One consequence had to be stated before it was built:** a bare short-circuit
+makes the sweep report a row as passing, and the sweep's whole purpose is to
+notice when an ignored row *starts* passing so it can be re-armed.
+Short-circuiting rows without telling the sweep would convert a live instrument
+into one that always reads green — the failure mode this program keeps paying
+for.
+
+**So the short-circuit was to be registered, not silent.** The mechanism already
 exists: `.github/ignored-test-exemptions.toml` carries a `class` and a
 `readmission` field per row, and `ci-ignored-sweep.py verify-row-claims` already
 enforces the registry against the tree. That `readmission` string is exactly the
 "properly re-enabled when they are rearmed" hook the operator asked for.
+
+**THAT MECHANISM IS WHERE THE RE-SCOPED D4 BUILDS.** The stale-readmission
+detector is a check inside the SAME `verify-row-claims` path, reading the same
+`readmission` field, and failing the sweep when the condition that field names
+resolves to a tracker node whose `status:` is `merged`. **The operator's hook is
+delivered — it just fires on the drift that actually exists in this tree rather
+than on a population that does not.**
 
 ## Deliverables
 
@@ -199,14 +294,57 @@ advance.
 `.github/workflows/ci.yml:46` so no shard's Test step exceeds the target. Keep
 the `Doctests` step conditional on a single shard.
 
-**D4 — registered short-circuit for permanently-blocked ignored rows.** For each
-ignored row whose readmission condition is a NAMED unbuilt capability, return
-early at the top of the test body with a comment naming that condition, and
-carry a registry entry whose `readmission` field names the same condition. The
-sweep must **enforce** the pairing — a short-circuited row without a registry
-entry, or a registry entry whose named condition has since been built, is a
-sweep FAILURE, not a pass. Rows that are plausibly close to passing keep running:
-those are the ones the sweep exists to catch.
+**D4 — stale-readmission detector for ignored rows whose blocker has landed.**
+RE-SCOPED 2026-08-28; see the operative banner at the top of this node.
+
+The sweep gains a check that FAILS when an ignored row names a condition whose
+tracker node reads `status: merged` while the row remains ignored.
+
+**D4a — enumerate the population first, across BOTH sources.** A readmission
+condition is recorded in two places and they do not agree on shape: the
+`readmission` field in `.github/ignored-test-exemptions.toml`, and the row's own
+`#[ignore = "..."]` reason / adjacent comment. Deliver a table of every ignored
+row, both recorded conditions, whether each resolves to a
+`docs/program/issues/<ID>.md` file, and that node's `status:` when it does.
+**Three instances are known to the Steward and the enumeration must find at
+least these three, or it is under-covering:**
+`crates/ken-cli/tests/rt_parity_native.rs:675` (`RT-SITEOP-CARRIED-WITNESS`),
+`:2039` (`RT-CLOSURE-BOUNDARY-LANE`), and the registry entry for
+`ken-elaborator::compiler_driver::tests::gate_4a_preparation_and_full_build_are_one_transaction`
+(`readmission = "RT-CLOSURE-BOUNDARY-LANE"`). **This is a floor, not the
+roster** — I found the third by opening the registry after ruling there were
+two, so treat my list as a control on your census rather than as its answer.
+
+**D4b — build the check, keyed on TRACKER NODE STATUS, never on matching label
+text.** The verify ring raised this and it is adopted: a string match over
+comment prose fires on any sentence mentioning a node id, including one that
+denies the row is blocked on it, and it stops working the moment someone rewords
+a comment. Resolve the cited id to `docs/program/issues/<ID>.md` and read its
+`status:` field.
+
+**THE UNRESOLVABLE-CONDITION RULE IS A FORK, AND D4a's TABLE DECIDES IT — do not
+pick one here.** Four of the six registry entries are free prose and one names a
+relation symbol rather than a node, so **failing on every non-resolving string
+reds the existing registry immediately**, while **passing them silently lets a
+typo disable the detector**. Bring the measured table and a recommendation to
+the Steward; a third option (for example, a per-entry declaration of which kind
+of condition the field holds) is admissible if the table supports it. **Choosing
+one arm without exhibiting the table is the defect, not choosing the arm I would
+not have chosen.**
+
+**THE REMEDY IS RE-POINTING OR RE-ENABLING, CHOSEN BY A HUMAN OR THE OWNING
+RING. THE SWEEP NEVER RE-ENABLES A ROW ITSELF.** Automatic readmission is
+FORBIDDEN and the reason is concrete: `:675`'s comment documents that the row
+refuses NEXT for a different reason (a carried recursive hypothesis is an
+eliminated value, not a callable), so un-ignoring it would simply red. **A
+landed blocker means the comment is stale, not that the row passes.** The
+detector's output is a named, actionable failure; the repair is a human edit.
+
+**The four generic rows stay UNTOUCHED and are out of D4's scope.** "post-M6
+runtime parity debt" names no node, so the detector cannot evaluate it and must
+not guess. Determining what actually blocks those four is runtime's knowledge,
+not verify's, and inventing a plausible node id for them would manufacture
+exactly the false pairing this node already rejected once.
 
 **PACKAGING (superseding the earlier "D1 may land alone" split, and stated here
 because this is where the packaging instruction actually lives): D1 and D2 are
@@ -235,11 +373,46 @@ to D1-D3; it is the ignored-row sweep work and shares no file with them.
 - **`AC-NO-NEW-SKIPS`.** The `6 tests skipped` population in `rt_parity_native`
   is unchanged by D1-D3. A test that stops running also stops failing, so a
   faster job with more skips is a regression measured as an improvement.
-- **`AC-SHORTCIRCUIT-ENFORCED`.** For D4: prove BY MUTATION that the sweep fails
-  on (a) a short-circuited row with no registry entry, and (b) a registry entry
-  whose named readmission condition is satisfied. **A short-circuit the sweep
-  cannot catch is not a cheaper instrument; it is no instrument** — and a control
-  that cannot fail is the defect this program has paid for repeatedly.
+- **`AC-SHORTCIRCUIT-ENFORCED` — INAPPLICABLE, and that is a measured result.**
+
+  > **RETIRED 2026-08-28 with evidence, not dropped.** Its population is empty:
+  > no `#[ignore]` row in `rt_parity_native.rs` names an unbuilt capability. Four
+  > name only unfalsifiable "post-M6 debt"; the other two name conditions that
+  > are built. **Retiring it is what the measurement licenses. Satisfying it
+  > would have required inventing a capability**, which the verify ring refused
+  > and was right to refuse. Recorded here rather than deleted so that a later
+  > reader can see the criterion was answered rather than skipped.
+
+- **`AC-STALE-READMISSION` — the detector fires on the real population, and its
+  power is proved BY MUTATION on BOTH sides.** For D4:
+  - **Positive.** Against the tree as it stands, the sweep FAILS and names both
+    rows — `rt_parity_native.rs:675` / `RT-SITEOP-CARRIED-WITNESS` and `:2039` /
+    `RT-CLOSURE-BOUNDARY-LANE` — with the node status it read for each. A
+    detector that reports a count without naming the rows is not actionable.
+  - **Negative, and this is the arm that has to be exhibited.** Mutate the
+    STATUS OPERAND, not the row: point a row's comment at a node whose `status:`
+    is not `merged`, and the sweep must PASS for that row. **This is the arm the
+    original framing could not exercise, which is precisely why it was
+    re-scoped** — over an empty population `AC-B` could only have been satisfied
+    by a control that cannot fail.
+  - **Both sources covered.** The detector must evaluate conditions recorded in
+    the registry's `readmission` field AND in the row's own comment. Prove it by
+    mutation on EACH source independently — the known registry instance
+    (`gate_4a_preparation_and_full_build_are_one_transaction`) and a
+    comment-only instance must each be able to fire ALONE. A detector that
+    passes because the other source happened to catch the same node is not
+    covering both.
+  - **Unresolvable condition.** Whichever arm of the D4a fork is ruled, exhibit
+    the behaviour by mutation and show it does not silently disable the
+    detector. If the ruling is that non-resolving strings pass, then a
+    node-id-shaped condition that resolves to NOTHING must still be
+    distinguishable from deliberate free prose, or a typo is an off switch.
+  - **The four generic rows must NOT fire** — proved, not assumed. They name no
+    node, and a detector that reaches for them is guessing.
+
+  **Do not satisfy this AC by matching label text.** A control keyed on prose
+  passes for a reason unrelated to the property, and this program has twice paid
+  for a control that could not fail.
 - **`AC-DURATION-MEASURED`.** Report the post-increment `native-slow
   (rt_parity_native)` Test-step duration, the `ignored-row sweep` duration, and
   the run wall-clock **from a completed CI run**, against the 24m / 10m / 28m55s
@@ -247,6 +420,13 @@ to D1-D3; it is the ignored-row sweep work and shares no file with them.
   the CI runner. **Report the number you get, including if it misses the
   target**; the arithmetic predicts about 18m after D1 alone, and that prediction
   being met is the deliverable, not a shortfall.
+
+  > **NOT DISCHARGED BY D1-D3's LANDING.** The measured pair — `28m55s` on run
+  > `33192361977`, `18m51s` on run `33215344963` — sat on DIFFERENT runner
+  > hardware, so it supports an inference about the increment and is not the
+  > comparable-hardware measurement this criterion asks for. Report from
+  > comparable hardware and state the caveat; a number reported without it
+  > overclaims.
 - **`AC-AFFECTED-CLOSURE`.** Cover every target that loads any module whose
   CLOSURE this increment changes, diff-touched or not. This is not a relaxation
   of the targeted-build rule: what changes is which targets count as affected,
@@ -261,8 +441,18 @@ to D1-D3; it is the ignored-row sweep work and shares no file with them.
 - **Do not restructure the child-side dispatch**, and do not replace the
   subprocess isolation with in-process execution. That isolation is why these
   mutations are observable at all.
-- **Do not short-circuit an ignored row whose readmission condition is
-  unnamed**, and do not short-circuit one merely because it currently fails.
+- **Do not re-enable, un-`#[ignore]`, or edit any mutation row's body under D4.**
+  The detector REPORTS; a human or the owning ring repairs. `:675` refuses next
+  for an unrelated reason and would red if simply re-enabled.
+- **Do not key the detector on comment TEXT.** Resolve the cited node id and read
+  its `status:` field. A prose match is not the property.
+- **Do not assign a node id to the four generic "post-M6 runtime parity debt"
+  rows.** Their real blockers are runtime's to name. Guessing one manufactures
+  the false pairing this node already rejected.
+- **Do not short-circuit an ignored row whose readmission condition is unnamed**,
+  and do not short-circuit one merely because it currently fails. (Retained from
+  the original D4; the short-circuit half is now INAPPLICABLE, but the ban still
+  binds anyone who revives it.)
 - **Do not touch `concurrency:` / `cancel-in-progress`** at
   `.github/workflows/ci.yml:17-19`. Separate operator decision (below), not in
   scope.
