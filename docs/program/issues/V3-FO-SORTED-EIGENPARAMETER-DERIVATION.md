@@ -1,7 +1,7 @@
 ---
 id: V3-FO-SORTED-EIGENPARAMETER-DERIVATION
 title: "Make ForallRight parameter-only and sorted on BOTH checker surfaces, replace arbitrary-term subst0 with typed instantiation, and restate FokDerivation and its reflection proofs in lockstep -- the atomic middle of the FO soundness repair"
-status: draft
+status: active
 owner: language
 size: L
 tier: T1
@@ -247,9 +247,11 @@ must RED.**
 > `FokDerivation`, and the reflection proofs — and therefore these fixtures — in
 > one atomic increment. A competing node over the same file would contend with
 > it and be superseded before it ran (`docs/PRINCIPLES.md`: subsume, do not
-> proliferate). **This is safe to fold ONLY because this node is `draft` and
-> unreleased**; the same fold into a frozen, mid-flight node is the defect
-> `AC-DERIVE` was recut to remove.
+> proliferate). **The fold was safe because this node was still `draft` and
+> unreleased when it was made** (2026-08-28, before this node was released); the
+> same fold into a frozen, mid-flight node is the defect `AC-DERIVE` was recut to
+> remove. **That window is now closed — this node is released, so any further
+> criterion belongs to its successor or to a fresh node, not folded in here.**
 >
 > **LATENT, not a live defect, and not a reason to hold anything.** Freshness IS
 > still pinned today by the world case. The Adversary classed it minor,
