@@ -1393,11 +1393,28 @@ evidence.
 ## Capability tier
 
 T1 — a graph/claim continuation-binding repair reviewed on the provenance
-argument (which transport, which projected capture ordinals, one application per
-arrival, and the FIRST graph-authorized result-flow edge from the application
-result to the eventual Ret payload / closure capture), not a differential diff;
-the pre-repair localization and D3A application feasibility are already accepted
-objects. Size M.
+argument, not a differential diff. **The review union is ROUTE-SPECIFIC, and
+stating it globally is what made the earlier text read Direct-shaped:**
+
+- **`DirectInvocationReturn`** — which body-refined
+  `CheckedIhEnvironmentTransport`, which projected capture ordinals, and the ONE
+  declared call.
+- **`TailProducerToBackedge`** — exact producer-to-backedge OWNERSHIP and a
+  ONE-SHOT transfer: that the operand carried forward is the declared
+  continuation-specialization call's result and not a neighbouring live word,
+  and that it is consumed exactly once at the active jump. **Transport and
+  capture projection are NOT part of this argument** — Tail's discriminator is
+  `direct_transport=None`.
+- **Shared by both** — one application per arrival, and the exact result-flow
+  edge from the application result to the eventual Ret payload / closure
+  capture.
+
+The pre-repair localization is an accepted object. **Feasibility is accepted
+ROUTE-SPECIFICALLY, never globally:** `719933055` proves the DIRECT call recipe
+only; Tail's application, producer and bridge are grounded by HS11
+(`evt_79trx05xee0dj`) and HS12 (`evt_7a6pp8n24r1ms`) instead. An unqualified
+"D3A application feasibility is accepted" credits Tail with a proof that was
+never performed on it. Size M.
 
 ## Sequencing
 
@@ -1436,8 +1453,12 @@ nothing**, and the previous releases are SPENT.
 Then the Runtime ring rebases the D3 branch and builds the ATOMIC D3A+D3B
 consumer candidate (D3A application of inherited `K` **per route variant**
 yielding fresh `R2` + D3B fresh-`R2` binding to the ordinary Ret capture +
-product) — no application-only checkpoint; D3A and D3B consume ONLY the landed
-route relation, never re-deriving it in lowering, never tracing `R1` into the
+product) — no application-only checkpoint. **D3A and D3B consume THE
+CANDIDATE'S SINGLE RELATION AFTER REPLACEMENT: the landed Direct arm is
+retained and consumed as-is; Tail consumes the REPLACEMENT Tail relation and
+the delivered bridge operand; the landed Tail variant contributes
+topology/identity facts ONLY, never value authority (HS12).** Never re-deriving
+the relation in lowering, never tracing `R1` into the
 capture, and never binding the initial carried environment word. After this node greens `InvalidOffset`,
 [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] (ReadSome/Wrote) and the final
 four-value closure fold follow; the D1 follow-up
