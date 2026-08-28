@@ -37,16 +37,25 @@ fn assert_forall_right_reaches_full_soundness(name: &str, quantifier: &str) {
     let child = format!("{name}_child");
     let root = format!("{name}_root");
 
+    let (bound_atom_source, instantiated_atom_source) = match quantifier {
+        "FokForallWorld" => (
+            "FokAccess (FokQBound Zero) (FokQBound Zero)",
+            "FokAccess (FokQParameter Zero) (FokQParameter Zero)",
+        ),
+        "FokForallObj" => (
+            "FokDomainA (FokQParameter (Suc Zero)) (FokQBound Zero)",
+            "FokDomainA (FokQParameter (Suc Zero)) (FokQParameter Zero)",
+        ),
+        other => panic!("unsupported quantifier fixture: {other}"),
+    };
     env.elaborate_decl(&format!(
-        "const {bound_atom} : FokForm = \
-         FokAccess (FokQBound Zero) (FokQBound Zero)"
+        "const {bound_atom} : FokForm = {bound_atom_source}"
     ))
-    .expect("bound atom in the quantified body");
+    .expect("well-sorted bound atom in the quantified body");
     env.elaborate_decl(&format!(
-        "const {instantiated_atom} : FokForm = \
-         FokAccess (FokQParameter Zero) (FokQParameter Zero)"
+        "const {instantiated_atom} : FokForm = {instantiated_atom_source}"
     ))
-    .expect("atom after eigenparameter substitution");
+    .expect("well-sorted atom after eigenparameter substitution");
     env.elaborate_decl(&format!(
         "const {body} : FokForm = FokImp {bound_atom} {bound_atom}"
     ))

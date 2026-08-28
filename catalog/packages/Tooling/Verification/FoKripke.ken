@@ -8,9 +8,10 @@
 -- functions out of the shared catalog namespace, following the `nc9_`
 -- convention in `ProofErasureBoundaryChecker.ken`.
 --
--- Deliberately NOT in this file: `check_cert` (a separate, later increment),
--- any FO `Proved` verdict, any new kernel primitive or trusted axiom, and any
--- widening of the five-constructor / three-rule slice below.
+-- This file now includes the later `fok_check_cert` increment and its
+-- fail-closed derived sort/scope validation. Still deliberately absent: any
+-- FO `Proved` verdict, new kernel primitive or trusted axiom, or widening of
+-- the five-constructor / three-rule slice below.
 
 import Core.Logic.Or (Or, Inl, Inr)
 
@@ -372,11 +373,10 @@ fn fok_scoped_embed
 -- BEHAVIOUR, not merely `-> bool` in signature. Every lookup below returns
 -- `Option` LOCALLY and every `None` maps to `False`, exactly what Rust's
 -- `let Some(x) = ... else { return false }` does; the `Option` never
--- surfaces as the verdict's own shape. `Form`/`QTerm` stay untyped and no
--- arm here performs sort validation -- an ill-sorted hand-built target still
--- closes on syntactic `FokForm` equality alone, exactly as the Rust
--- reference does (`Form`-excess property, preserved by construction: this
--- checker introduces no rejection the Rust reference does not already make).
+-- surfaces as the verdict's own shape. `Form`/`QTerm` stay untagged, while
+-- the derived validation pass below rejects wrong-sort and out-of-scope
+-- occurrences before this structural checker runs. The Rust boundary applies
+-- the same monotonic restriction over its unchanged calculus checker.
 
 -- `Nat` equality, structural.
 fn fok_nat_eq (a : Nat) (b : Nat) : Bool =
@@ -731,9 +731,9 @@ fn fok_nth_derived_sort (xs : List FokDerivedSort) (index : Nat) : Option FokDer
 
 fn fok_parameter_sort_prepend
       (head : FokParameterSort)
-      (result : Option (List FokParameterSort))
+      (outcome : Option (List FokParameterSort))
     : Option (List FokParameterSort) =
-  match result {
+  match outcome {
     None ↦ None (List FokParameterSort);
     Some rest ↦ Some (List FokParameterSort) (Cons FokParameterSort head rest)
   }
@@ -979,7 +979,7 @@ fn fok_check_forall_right
           match rest {
             Cons c2 rest2 ↦ False;
             Nil ↦
-              fok_check_tree
+              fok_check_tree_structural
                 (FokMkSequent gamma (fok_list_form_set_nth delta right (fok_subst0_form body eigen)))
                 child
           }
@@ -1021,7 +1021,7 @@ fn fok_check_rule (gamma : List FokForm) (delta : List FokForm) (rule : FokRule)
                   match rest {
                     Cons c2 rest2 ↦ False;
                     Nil ↦
-                      fok_check_tree
+                      fok_check_tree_structural
                         (FokMkSequent (fok_list_form_append_one gamma p) (fok_list_form_set_nth delta right q))
                         child
                   }
@@ -1050,7 +1050,10 @@ fn fok_check_rule (gamma : List FokForm) (delta : List FokForm) (rule : FokRule)
       }
   }
 
-fn fok_check_tree (expected_conclusion : FokSequent) (node : FokCert) : Bool =
+fn fok_check_tree_structural
+      (expected_conclusion : FokSequent)
+      (node : FokCert)
+    : Bool =
   match node {
     FokMkCert conclusion rule children ↦
       match fok_sequent_eq conclusion expected_conclusion {
@@ -1061,6 +1064,19 @@ fn fok_check_tree (expected_conclusion : FokSequent) (node : FokCert) : Bool =
           }
       }
   }
+
+fn fok_validate_certificate_bool (node : FokCert) : Bool =
+  match fok_validate_certificate node (Nil FokParameterSort) {
+    None ↦ False;
+    Some constraints ↦ True
+  }
+
+-- Validation is a monotonic adapter around the unchanged calculus checker.
+-- One constraint environment covers the complete stored certificate tree.
+fn fok_check_tree (expected_conclusion : FokSequent) (node : FokCert) : Bool =
+  fok_and
+    (fok_validate_certificate_bool node)
+    (fok_check_tree_structural expected_conclusion node)
 
 -- `check_cert : FokForm -> FokCert -> Bool` (23 section 4.3), restricted to
 -- the slice's three rules -- an ordinary kernel-checked total function,
@@ -1753,7 +1769,7 @@ fn fok_imp_rest_check
   match rest {
     Cons child2 rest2 ↦ False;
     Nil ↦
-      fok_check_tree
+      fok_check_tree_structural
         (FokMkSequent
           (fok_list_form_append_one gamma p)
           (fok_list_form_set_nth delta right q))
@@ -1807,7 +1823,8 @@ fn fok_imp_lookup_check
 
 fn fok_prop_check_tree_sound_type (pi : FokCert) : Type =
   (expected : FokSequent) →
-  Equal Bool (fok_check_tree expected pi) True → FokDerivation expected
+  Equal Bool (fok_check_tree_structural expected pi) True →
+  FokDerivation expected
 
 -- The recursion result for a child list is the head certificate's soundness
 -- proof. Empty lists carry an inert Nat because no checker rule recurs there.
@@ -1844,7 +1861,7 @@ fn fok_prop_imp_build_from_sound
       (child : FokCert)
       (child_sound : fok_prop_check_tree_sound_type child)
     : Equal Bool
-        (fok_check_tree
+        (fok_check_tree_structural
           (FokMkSequent
             (fok_list_form_append_one gamma p)
             (fok_list_form_set_nth delta right q))
@@ -2014,7 +2031,7 @@ fn fok_forall_children_check
       match rest {
         Cons child2 rest2 ↦ False;
         Nil ↦
-          fok_check_tree
+          fok_check_tree_structural
             (FokMkSequent gamma
               (fok_list_form_set_nth delta right
                 (fok_subst0_form body eigen)))
@@ -2401,7 +2418,8 @@ theorem fok_check_tree_view_eq
       (children : List FokCert)
     : Equal Bool
         (fok_check_tree_view expected conclusion rule children)
-        (fok_check_tree expected (FokMkCert conclusion rule children)) = Refl
+        (fok_check_tree_structural
+          expected (FokMkCert conclusion rule children)) = Refl
 
 fn fok_check_tree_result
       (conclusion : FokSequent)
@@ -2515,15 +2533,30 @@ fn fok_prop_check_tree_sound_by_children
   }
 
 fn fok_prop_check_tree_sound (expected : FokSequent) (pi : FokCert)
-    : Equal Bool (fok_check_tree expected pi) True → FokDerivation expected =
+    : Equal Bool (fok_check_tree_structural expected pi) True →
+      FokDerivation expected =
   fok_prop_check_tree_sound_by_cert pi expected
+
+theorem fok_check_tree_validation_monotonic
+      (expected : FokSequent)
+      (pi : FokCert)
+    : Equal Bool (fok_check_tree expected pi) True →
+      Equal Bool (fok_check_tree_structural expected pi) True =
+  fok_and_right
+    (fok_validate_certificate_bool pi)
+    (fok_check_tree_structural expected pi)
 
 -- D4 closes both ForallRight target shapes and their shared freshness guard,
 -- so every accepted certificate is reflected into the indexed derivation.
+-- The validation adapter is monotonic: validated acceptance first yields the
+-- unchanged calculus checker's acceptance, then the existing reflection proof.
 theorem fok_checker_soundness (q : FokForm) (pi : FokCert)
     : Equal Bool (fok_check_cert q pi) True → fok_classically_valid q =
   λaccepted.
     trunc_intro
       (fok_prop_check_tree_sound
         (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm)))
-        pi accepted)
+        pi
+        (fok_check_tree_validation_monotonic
+          (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm)))
+          pi accepted))

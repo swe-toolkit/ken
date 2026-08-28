@@ -398,39 +398,15 @@ pub enum IForm {
 /// object) into which `Form`/`Rule` variant is used rather than carrying it
 /// on `QTerm` itself.
 ///
-/// **`V3-FO-QUOTE-GUARD-FAIL-CLOSED` `D3`, recut.** `Form`/`QTerm` are
-/// UNTYPED and `check_tree` performs no sort validation: `check_cert` is
-/// total over `Form`, and a hand-constructed ill-sorted target -- e.g. a
-/// world eigenparameter substituted into an object slot of `ForcingP` --
-/// closes and returns `true` (`Init` needs only syntactic `Form` equality,
-/// which the malformed formula still has once instantiated). Neither
-/// eigenparameter freshness nor `Init`'s equality check sort at all, so an
-/// earlier version of this comment attributing safety to them named a
-/// mechanism that does not do the work.
-///
-/// **The real mechanism is at the CALLER, not in `check_cert` itself.**
-/// `quote_iform` admits only an in-scope object `Var` of the declared sort
-/// as an atom's argument, refusing everything else as
-/// `FoBoundary::IllScopedOrIllSorted` -- so the `IForm` it produces carries
-/// ONLY object-sort de Bruijn indices; there is no world variable anywhere
-/// in `IForm`, because worlds do not exist until [`embed`] introduces them.
-/// `Form` is therefore STRICTLY LARGER than `embed`'s image on `IForm
-/// Sigma`: the probe's malformed formula is real, but it lives entirely in
-/// that excess and no `IForm` maps to it. The route's discharge composition
-/// only ever calls `check_cert(embed(f), pi)` for `f : IForm Sigma` --
-/// never on an arbitrary hand-built `Form` -- so the accepted-but-ill-sorted
-/// certificates the probe found exist in `check_cert`'s domain and are
-/// unreachable from that composition.
-///
-/// **This guarantee belongs to the CALLER, not to `check_cert`.** Any future
-/// caller that hands `check_cert` a `Form` obtained some way other than
-/// `embed Sigma f` loses this property entirely, with NO diagnostic --
-/// `check_cert` will accept and say nothing. A sort-validating `check_tree`
-/// would make the checker's own domain honest instead of relying on its
-/// caller; that is legitimate future hardening, not required for this
-/// route's soundness, and it is its own scoped item (widening `D3` here is
-/// explicitly out of scope). A general multi-sort `QSort` tag remains
-/// unneeded generality for this one-object-sort slice, for this reason.
+/// **`CORE-FO-CHECK-TREE-SORT-VALIDATION`.** The carrier stays untagged,
+/// but `check_tree` derives world/object roles from atom positions and
+/// quantifier binders before running the unchanged structural calculus
+/// checker. It shares parameter constraints across the complete certificate
+/// and rejects wrong-sort or out-of-scope occurrences fail-closed. The route
+/// still calls `check_cert(embed(f), pi)`, and `quote_iform` still refuses an
+/// ill-scoped source atom, but checker honesty no longer depends on either
+/// caller property. A general carried `QSort` remains unnecessary for this
+/// one-object-sort slice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QTerm {
     Bound(usize),

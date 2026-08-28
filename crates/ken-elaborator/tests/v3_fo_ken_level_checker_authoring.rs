@@ -1291,10 +1291,10 @@ fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
     // gamma ends up [p1, p2] with p2 == target; delta ends up [target].
     // Init { left: 1, right: 0 } checks gamma[1] == delta[0], i.e. p2 ==
     // target -- true by construction.
-    let p1 = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
+    let p1 = Form::Bottom;
     let target = Form::Bottom;
     let q = Form::Imp(
-        Box::new(p1),
+        Box::new(p1.clone()),
         Box::new(Form::Imp(
             Box::new(target.clone()),
             Box::new(target.clone()),
@@ -1303,10 +1303,7 @@ fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
 
     let init_node = Cert {
         conclusion: Sequent {
-            gamma: vec![
-                Form::Access(QTerm::Bound(0), QTerm::Bound(0)),
-                target.clone(),
-            ],
+            gamma: vec![p1.clone(), target.clone()],
             delta: vec![target.clone()],
         },
         rule: Rule::Init { left: 1, right: 0 },
@@ -1314,7 +1311,7 @@ fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
     };
     let inner_imp = Cert {
         conclusion: Sequent {
-            gamma: vec![Form::Access(QTerm::Bound(0), QTerm::Bound(0))],
+            gamma: vec![p1],
             delta: vec![Form::Imp(
                 Box::new(target.clone()),
                 Box::new(target.clone()),
@@ -1366,8 +1363,8 @@ fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
 /// body (harmless: it is bound BY that very quantifier, and the freshness
 /// check inspects the OUTER sequent before substitution, where `Bound(0)`
 /// and `Parameter(0)` are different constructors and do not collide) --
-/// and the certificate is otherwise a real, valid derivation (`forall w.
-/// Force_P w w -> Force_P w w`, closed by `forall-right` + `imp-right` +
+/// and the certificate is otherwise a real, well-sorted derivation (`forall
+/// w. Access w w -> Access w w`, closed by `forall-right` + `imp-right` +
 /// `init`). Under the single-arm `Bound -> FokQParameter` serializer bug,
 /// this `Bound(0)` becomes `FokQParameter 0` on the Ken side -- the exact
 /// number of the real eigenparameter -- and `fok_sequent_mentions_parameter`
@@ -1381,16 +1378,16 @@ fn fok_check_cert_serializer_discriminates_qterm_bound_parameter_collision() {
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ids = FokIds::resolve(&env);
 
-    // body = Force_P(Bound 0, Bound 0) -> Force_P(Bound 0, Bound 0), a
-    // trivial self-implication whose antecedent/consequent both mention
+    // body = Access(Bound 0, Bound 0) -> Access(Bound 0, Bound 0), a
+    // well-sorted self-implication whose antecedent/consequent both mention
     // Bound(0) -- the world the ForallWorld itself binds.
-    let atom = Form::ForcingP(QTerm::Bound(0), QTerm::Bound(0));
+    let atom = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
     let body = Form::Imp(Box::new(atom.clone()), Box::new(atom.clone()));
     let q = Form::ForallWorld(Box::new(body));
 
-    // After ForallRight (eigen = Parameter(0)): instantiated = Force_P(Param
-    // 0, Param 0) -> Force_P(Param 0, Param 0).
-    let instantiated_atom = Form::ForcingP(QTerm::Parameter(0), QTerm::Parameter(0));
+    // After ForallRight (eigen = Parameter(0)): instantiated = Access(Param
+    // 0, Param 0) -> Access(Param 0, Param 0).
+    let instantiated_atom = Form::Access(QTerm::Parameter(0), QTerm::Parameter(0));
     let instantiated = Form::Imp(
         Box::new(instantiated_atom.clone()),
         Box::new(instantiated_atom.clone()),
@@ -1440,4 +1437,165 @@ fn fok_check_cert_serializer_discriminates_qterm_bound_parameter_collision() {
         ken_verdict, rust_verdict,
         "Ken fok_check_cert disagrees with Rust check_cert on the QTerm Bound/Parameter collision pin"
     );
+}
+
+fn self_imp_certificate(atom: Form) -> (Form, Cert) {
+    let target = Form::Imp(Box::new(atom.clone()), Box::new(atom.clone()));
+    let leaf = Cert {
+        conclusion: Sequent {
+            gamma: vec![atom.clone()],
+            delta: vec![atom],
+        },
+        rule: Rule::Init { left: 0, right: 0 },
+        children: vec![],
+    };
+    let root = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![target.clone()],
+        },
+        rule: Rule::ImpRight { right: 0 },
+        children: vec![leaf],
+    };
+    (target, root)
+}
+
+fn forall_self_imp_certificate(
+    world: bool,
+    bound_atom: Form,
+    instantiated_atom: Form,
+    eigen: usize,
+) -> (Form, Cert) {
+    let body = Form::Imp(Box::new(bound_atom.clone()), Box::new(bound_atom));
+    let target = if world {
+        Form::ForallWorld(Box::new(body))
+    } else {
+        Form::ForallObj(Box::new(body))
+    };
+    let (_, child) = self_imp_certificate(instantiated_atom);
+    let root = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![target.clone()],
+        },
+        rule: Rule::ForallRight {
+            right: 0,
+            eigen: QTerm::Parameter(eigen),
+        },
+        children: vec![child],
+    };
+    (target, root)
+}
+
+fn nested_reused_eigen_certificate(inner_eigen: usize) -> (Form, Cert) {
+    let inner_bound_atom = Form::DomainA(QTerm::Parameter(9), QTerm::Bound(0));
+    let inner_body = Form::Imp(
+        Box::new(inner_bound_atom.clone()),
+        Box::new(inner_bound_atom),
+    );
+    let inner_target = Form::ForallObj(Box::new(inner_body));
+    let instantiated_atom = Form::DomainA(QTerm::Parameter(9), QTerm::Parameter(inner_eigen));
+    let (_, inner_child) = self_imp_certificate(instantiated_atom);
+    let inner_root = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![inner_target.clone()],
+        },
+        rule: Rule::ForallRight {
+            right: 0,
+            eigen: QTerm::Parameter(inner_eigen),
+        },
+        children: vec![inner_child],
+    };
+    let target = Form::ForallWorld(Box::new(inner_target));
+    let root = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![target.clone()],
+        },
+        rule: Rule::ForallRight {
+            right: 0,
+            eigen: QTerm::Parameter(0),
+        },
+        children: vec![inner_root],
+    };
+    (target, root)
+}
+
+/// Promise class: durable invariant. Both certificate checkers derive the
+/// world/object sort of every occurrence, reject an unscoped bound reference,
+/// and share one parameter constraint environment across the complete tree.
+#[test]
+fn certificate_sort_validation_is_fail_closed_on_both_boundaries() {
+    let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
+    env.elaborate_file(FOK_SOURCE)
+        .expect("FoKripke.ken failed to elaborate/kernel-check");
+    let ids = FokIds::resolve(&env);
+
+    let world_atom = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
+    let world_instantiated = Form::Access(QTerm::Parameter(0), QTerm::Parameter(0));
+    let lawful_world = forall_self_imp_certificate(true, world_atom.clone(), world_instantiated, 0);
+
+    let object_atom = Form::DomainA(QTerm::Parameter(9), QTerm::Bound(0));
+    let object_instantiated = Form::DomainA(QTerm::Parameter(9), QTerm::Parameter(0));
+    let lawful_object = forall_self_imp_certificate(false, object_atom, object_instantiated, 0);
+
+    // The original QA counterexample: a world binder occupies ForcingP's
+    // object slot. The structurally valid ForallRight/ImpRight/Init tree must
+    // now reject at the derived-sort boundary.
+    let qa_wrong_atom = Form::ForcingP(QTerm::Bound(0), QTerm::Bound(0));
+    let qa_wrong_instantiated = Form::ForcingP(QTerm::Parameter(0), QTerm::Parameter(0));
+    let wrong_world_in_object =
+        forall_self_imp_certificate(true, qa_wrong_atom, qa_wrong_instantiated, 0);
+
+    // The opposite direction: an object binder occupies both world slots.
+    let wrong_object_atom = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
+    let wrong_object_instantiated = Form::Access(QTerm::Parameter(0), QTerm::Parameter(0));
+    let wrong_object_in_world =
+        forall_self_imp_certificate(false, wrong_object_atom, wrong_object_instantiated, 0);
+
+    let role_conflict_atom = Form::DomainA(QTerm::Parameter(0), QTerm::Parameter(0));
+    let role_conflict = self_imp_certificate(role_conflict_atom);
+
+    let out_of_scope_atom = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
+    let out_of_scope = self_imp_certificate(out_of_scope_atom);
+
+    // Parameter 0 is the outer world eigen and then the inner object eigen.
+    // Each rule is locally consistent; only a certificate-wide environment
+    // distinguishes this from the lawful parameter-1 inner eigen.
+    let reused_parameter_conflict = nested_reused_eigen_certificate(0);
+    let distinct_parameters = nested_reused_eigen_certificate(1);
+
+    let cases = [
+        ("lawful_world_quantifier", lawful_world, true),
+        ("lawful_object_quantifier", lawful_object, true),
+        ("world_binder_in_object_role", wrong_world_in_object, false),
+        ("object_binder_in_world_role", wrong_object_in_world, false),
+        ("atomic_parameter_role_conflict", role_conflict, false),
+        ("out_of_scope_bound", out_of_scope, false),
+        (
+            "certificate_wide_parameter_conflict",
+            reused_parameter_conflict,
+            false,
+        ),
+        (
+            "certificate_wide_distinct_parameters",
+            distinct_parameters,
+            true,
+        ),
+    ];
+
+    for (name, (q, pi), expected) in cases {
+        let (rust_verdict, ken_verdict) =
+            differential_check_cert(&mut env, &ids, &format!("core_fo_sort_{name}"), &q, &pi);
+        assert_eq!(
+            rust_verdict, expected,
+            "case {name}: Rust check_cert returned the wrong sort-validation verdict"
+        );
+        assert_eq!(
+            ken_verdict, expected,
+            "case {name}: Ken fok_check_cert returned the wrong sort-validation verdict"
+        );
+    }
 }
