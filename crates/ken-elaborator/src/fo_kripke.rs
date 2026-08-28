@@ -456,10 +456,20 @@ pub enum Rule {
     /// with `q` at `right`'s old position.
     ImpRight { right: usize },
     /// For right `forall S p` at `right`, the sole child instantiates `p`
-    /// with a fresh eigenparameter, never a witness drawn from context --
-    /// this is what stops the calculus inventing an object-sort inhabitant
-    /// (`23 §4.3`).
-    ForallRight { right: usize, eigen: QTerm },
+    /// with a fresh SAME-SORTED eigenPARAMETER (`23 §4.3`: "a fresh same-sorted
+    /// eigenparameter"), never a witness drawn from context -- this is what
+    /// stops the calculus inventing an object-sort inhabitant.
+    ///
+    /// **`V3-FO-SORTED-EIGENPARAMETER-DERIVATION` `D1`.** `eigen` is the
+    /// parameter's INDEX, not a general [`QTerm`]. A bound variable is therefore
+    /// UNREPRESENTABLE in the eigen slot (the frame's preferred form over an
+    /// explicit reject): the rule always denotes `QTerm::Parameter(eigen)`, so
+    /// freshness-as-provenance ("a fresh `Bound(k)` passing as if it were a
+    /// parameter") cannot arise. The binder's sort (world under `ForallWorld`,
+    /// object under `ForallObj`) is demanded per binder kind by the split arms
+    /// in `check_tree_structural` and the derived-sort validation in
+    /// `validate_certificate`; the slice's `QTerm` stays untagged (CORE-FO).
+    ForallRight { right: usize, eigen: usize },
 }
 
 /// A certificate proof-tree node (`23 §4.3` `Cert`).
@@ -922,10 +932,12 @@ fn validate_certificate(
             Some(Form::ForallObj(_)) => DerivedSort::Object,
             _ => return false,
         };
-        // Rule-side eigenterms live at sequent scope. A bound reference has
-        // no binder here, while a parameter is unified with the principal
-        // quantifier's derived sort across this entire certificate.
-        if !validate_qterm(eigen, expected, &[], parameters) {
+        // The eigen is a fresh PARAMETER by construction (`D1`: bound eigens
+        // are unrepresentable). It is unified with the principal quantifier's
+        // derived sort across this entire certificate; a re-use of the same
+        // parameter index at a conflicting sort anywhere in the tree is
+        // rejected fail-closed.
+        if !validate_qterm(&QTerm::Parameter(*eigen), expected, &[], parameters) {
             return false;
         }
     }
@@ -966,11 +978,19 @@ fn check_tree_structural(expected_conclusion: &Sequent, node: &Cert) -> bool {
             check_tree_structural(&Sequent { gamma: expected_gamma, delta: expected_delta }, child)
         }
         Rule::ForallRight { right, eigen } => {
-            let Some(quantified) = node.conclusion.delta.get(*right) else {
-                return false;
-            };
-            let body = match quantified {
-                Form::ForallWorld(b) | Form::ForallObj(b) => b,
+            // The eigen is a fresh parameter (`D1`: parameter-only, bound
+            // eigens unrepresentable).
+            let param = QTerm::Parameter(*eigen);
+            // Split by binder kind (frame item 3): a world binder instantiates
+            // with a world eigenparameter, an object binder with an object one.
+            // The two arms are structurally identical HERE because sortedness
+            // is demanded by `validate_certificate`'s derived-sort pass over
+            // `param`; keeping them separate is the honest statement that the
+            // rule distinguishes the binder kinds it instantiates, rather than
+            // discarding that distinction through one shared arm.
+            let body = match node.conclusion.delta.get(*right) {
+                Some(Form::ForallWorld(b)) => b,
+                Some(Form::ForallObj(b)) => b,
                 _ => return false,
             };
             let [child] = node.children.as_slice() else {
@@ -981,10 +1001,10 @@ fn check_tree_structural(expected_conclusion: &Sequent, node: &Cert) -> bool {
             // (`23 §4.3`). The slice's linear (non-branching) derivations
             // only ever introduce parameters in increasing order, so
             // freshness reduces to "not already present in the conclusion".
-            if sequent_mentions_parameter(&node.conclusion, eigen) {
+            if sequent_mentions_parameter(&node.conclusion, &param) {
                 return false;
             }
-            let instantiated = subst0_form(body, eigen);
+            let instantiated = subst0_form(body, &param);
             let mut expected_delta = node.conclusion.delta.clone();
             expected_delta[*right] = instantiated;
             check_tree_structural(
@@ -1146,8 +1166,12 @@ fn search(sequent: &Sequent, next_param: &mut usize, fuel: usize) -> Option<Cert
         };
         let param = *next_param;
         *next_param += 1;
-        let eigen = QTerm::Parameter(param);
-        let instantiated = subst0_form(body, &eigen);
+        // Producer and checker share `subst0_form`, so the certificate the
+        // search builds is instantiated by exactly the substitution the checker
+        // re-runs (`D2`). The eigen is stored as its parameter INDEX; the rule
+        // denotes `QTerm::Parameter(param)`, so a bound eigen can never be
+        // produced here.
+        let instantiated = subst0_form(body, &QTerm::Parameter(param));
         let mut delta = sequent.delta.clone();
         delta[j] = instantiated;
         if let Some(child) = search(
@@ -1157,7 +1181,7 @@ fn search(sequent: &Sequent, next_param: &mut usize, fuel: usize) -> Option<Cert
         ) {
             return Some(Cert {
                 conclusion: sequent.clone(),
-                rule: Rule::ForallRight { right: j, eigen },
+                rule: Rule::ForallRight { right: j, eigen: param },
                 children: vec![child],
             });
         }

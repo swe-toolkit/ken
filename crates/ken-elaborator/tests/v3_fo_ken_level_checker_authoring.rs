@@ -308,10 +308,12 @@ fn rule_source(r: &Rule) -> String {
         }
         Rule::ImpRight { right } => format!("(FokImpRight {})", nat_source(*right)),
         Rule::ForallRight { right, eigen } => {
+            // `D1`: the eigen is a parameter INDEX; `FokForallRight` now takes
+            // `Nat Nat`, so render the index directly, not a `FokQTerm`.
             format!(
                 "(FokForallRight {} {})",
                 nat_source(*right),
-                qterm_source(eigen)
+                nat_source(*eigen)
             )
         }
     }
@@ -837,7 +839,7 @@ fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
         },
         rule: Rule::ForallRight {
             right: 0,
-            eigen: QTerm::Parameter(0),
+            eigen: 0,
         },
         children: vec![imp_accept.clone()],
     };
@@ -995,7 +997,7 @@ fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
         },
         rule: Rule::ForallRight {
             right: 0,
-            eigen: QTerm::Parameter(0),
+            eigen: 0,
         },
         children: vec![],
     };
@@ -1006,7 +1008,7 @@ fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
         },
         rule: Rule::ForallRight {
             right: 0,
-            eigen: QTerm::Parameter(0),
+            eigen: 0,
         },
         children: vec![imp_accept.clone(), imp_accept.clone()],
     };
@@ -1038,7 +1040,7 @@ fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
         },
         rule: Rule::ForallRight {
             right: 0,
-            eigen: QTerm::Parameter(0),
+            eigen: 0,
         },
         children: vec![imp_accept.clone()],
     };
@@ -1069,7 +1071,7 @@ fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
         },
         rule: Rule::ForallRight {
             right: 0,
-            eigen: QTerm::Parameter(0),
+            eigen: 0,
         },
         children: vec![imp_accept.clone()],
     };
@@ -1416,7 +1418,7 @@ fn fok_check_cert_serializer_discriminates_qterm_bound_parameter_collision() {
         },
         rule: Rule::ForallRight {
             right: 0,
-            eigen: QTerm::Parameter(0),
+            eigen: 0,
         },
         children: vec![imp_right_node],
     };
@@ -1485,7 +1487,7 @@ fn forall_probe_certificate(
         },
         rule: Rule::ForallRight {
             right: 0,
-            eigen: QTerm::Parameter(eigen),
+            eigen,
         },
         children: vec![child],
     };
@@ -1508,7 +1510,7 @@ fn nested_reused_eigen_certificate(inner_eigen: usize) -> (Form, Cert) {
         },
         rule: Rule::ForallRight {
             right: 0,
-            eigen: QTerm::Parameter(inner_eigen),
+            eigen: inner_eigen,
         },
         children: vec![inner_child],
     };
@@ -1520,7 +1522,7 @@ fn nested_reused_eigen_certificate(inner_eigen: usize) -> (Form, Cert) {
         },
         rule: Rule::ForallRight {
             right: 0,
-            eigen: QTerm::Parameter(0),
+            eigen: 0,
         },
         children: vec![inner_root],
     };

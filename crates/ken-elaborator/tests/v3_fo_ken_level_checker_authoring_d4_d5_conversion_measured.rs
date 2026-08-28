@@ -256,9 +256,10 @@ fn rule_source(r: &Rule) -> String {
         }
         Rule::ImpRight { right } => format!("(FokImpRight {})", nat_source(*right)),
         Rule::ForallRight { right, eigen } => format!(
+            // `D1`: eigen is a parameter INDEX; `FokForallRight` takes `Nat Nat`.
             "(FokForallRight {} {})",
             nat_source(*right),
-            qterm_source(eigen)
+            nat_source(*eigen)
         ),
     }
 }
