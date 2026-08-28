@@ -401,6 +401,53 @@ pub(in crate::cranelift_backend) struct CallEdgeTargets {
     edges: Vec<(PredeclaredFunctionId, ResolvedUnitTarget)>,
 }
 
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RetainedUnitCallTargetMutation {
+    Exact,
+    SubstituteUnrelatedOwnerRoot,
+    SuppressGraphClaims,
+    SubstituteWrongTarget,
+    DuplicateTargetClaim,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static RETAINED_UNIT_CALL_TARGET_MUTATION:
+        std::cell::Cell<RetainedUnitCallTargetMutation> =
+            const { std::cell::Cell::new(RetainedUnitCallTargetMutation::Exact) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_retained_unit_call_target_mutation<T>(
+    mutation: RetainedUnitCallTargetMutation,
+    f: impl FnOnce() -> T,
+) -> T {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            RETAINED_UNIT_CALL_TARGET_MUTATION
+                .with(|active| active.set(RetainedUnitCallTargetMutation::Exact));
+        }
+    }
+
+    RETAINED_UNIT_CALL_TARGET_MUTATION.with(|active| active.set(mutation));
+    let _restore = Restore;
+    f()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn retained_unit_call_target_mutation_is_exact() -> bool {
+    RETAINED_UNIT_CALL_TARGET_MUTATION.with(std::cell::Cell::get)
+        == RetainedUnitCallTargetMutation::Exact
+}
+
+#[derive(Clone)]
+struct RetainedBodyTargetClaim {
+    body: StaticOriginId,
+    target: ResolvedUnitTarget,
+}
+
 impl CallEdgeTargets {
     /// The resolved targets of every call emitted **into** `caller`.
     ///
@@ -426,6 +473,10 @@ impl CallEdgeTargets {
 #[derive(Clone)]
 pub(in crate::cranelift_backend) struct ResolvedUnitTarget {
     function: FuncId,
+    /// The planner's typed callee identity. Retained so a generated context can
+    /// follow the resolved call graph without recovering ownership from an
+    /// origin or a declared function number.
+    callee: PredeclaredFunctionId,
     origin: StaticOriginId,
     call_site_origin: StaticOriginId,
     kind: EmittableCallKind,
@@ -492,6 +543,169 @@ impl CallEdgeTargets {
             static_bodies,
             declarations,
         })
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    fn sole_unrelated_static_body_owner(
+        &self,
+        root: PredeclaredFunctionId,
+    ) -> Result<PredeclaredFunctionId, CraneliftBackendError> {
+        let mut pending = vec![root];
+        let mut reachable = BTreeSet::new();
+        while let Some(owner) = pending.pop() {
+            if !reachable.insert(owner) {
+                continue;
+            }
+            pending.extend(
+                self.targets_in(owner)
+                    .filter(|target| target.kind == EmittableCallKind::StaticBody)
+                    .map(|target| target.callee),
+            );
+        }
+
+        // Select by the typed graph relation, never by an id, iteration order,
+        // retained-body shape, or a later lookup miss. Requiring exactly one
+        // candidate makes ambiguity a refusal rather than a preference.
+        let candidates = self
+            .edges
+            .iter()
+            .filter_map(|(owner, target)| {
+                (target.kind == EmittableCallKind::StaticBody && !reachable.contains(owner))
+                    .then_some(*owner)
+            })
+            .collect::<BTreeSet<_>>();
+        if candidates.len() != 1 {
+            return Err(backend_module(format!(
+                "retained-unit root control requires exactly one unrelated legal static-body \
+                 owner, found {}",
+                candidates.len()
+            )));
+        }
+        let unrelated = candidates
+            .into_iter()
+            .next()
+            .expect("the singleton unrelated-owner set is nonempty");
+        eprintln!(
+            "retained-unit root control replaced checked root {root:?} with unrelated legal \
+             static-body owner {unrelated:?}"
+        );
+        Ok(unrelated)
+    }
+
+    /// Declare the exact static-body graph targets transitively reachable from
+    /// a generated context's checked raw owner into its specialization-owned
+    /// function.
+    ///
+    /// The source-body binding on each resolved graph edge is the authority for
+    /// the map key, and the graph edge's typed callee is the only way the walk
+    /// advances. The retained closure's body origin is not consulted here, so a
+    /// later lookup miss cannot create a target. Multiple graph claims for one
+    /// body, or a target that disagrees with its claim's body, reject before any
+    /// body emission starts.
+    fn declare_retained_body_targets_in_func<M: Module>(
+        &self,
+        root: PredeclaredFunctionId,
+        module: &mut M,
+        func: &mut Function,
+        declared: &mut BTreeMap<StaticOriginId, DeclaredUnitCall>,
+    ) -> Result<(), CraneliftBackendError> {
+        // The generated context's checked raw owner is the root. Follow only
+        // StaticBody edges transitively reachable from it, using the typed
+        // callee carried by graph resolution. This is not a global body lookup:
+        // an edge owned by an unrelated source subtree never enters the set.
+        #[cfg(feature = "px8-ds-test-support")]
+        let traversal_roots = match RETAINED_UNIT_CALL_TARGET_MUTATION.with(std::cell::Cell::get) {
+            RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot => {
+                vec![self.sole_unrelated_static_body_owner(root)?]
+            }
+            _ => vec![root],
+        };
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let traversal_roots = vec![root];
+        let mut pending = traversal_roots;
+        let mut visited = BTreeSet::new();
+        #[cfg_attr(
+            not(feature = "px8-ds-test-support"),
+            expect(unused_mut, reason = "test-support controls mutate resolved claims")
+        )]
+        let mut claims = Vec::new();
+        while let Some(owner) = pending.pop() {
+            if !visited.insert(owner) {
+                continue;
+            }
+            for target in self.targets_in(owner) {
+                if target.kind != EmittableCallKind::StaticBody {
+                    continue;
+                }
+                claims.push(RetainedBodyTargetClaim {
+                    body: target.call_site_origin,
+                    target: target.clone(),
+                });
+                pending.push(target.callee);
+            }
+        }
+
+        // Controls perturb the already-resolved graph claims, before they are
+        // declared into the generated function. They never inspect a lookup
+        // miss and never alter the source plan.
+        #[cfg(feature = "px8-ds-test-support")]
+        match RETAINED_UNIT_CALL_TARGET_MUTATION.with(std::cell::Cell::get) {
+            RetainedUnitCallTargetMutation::Exact
+            | RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot => {}
+            RetainedUnitCallTargetMutation::SuppressGraphClaims => claims.clear(),
+            RetainedUnitCallTargetMutation::SubstituteWrongTarget => {
+                if claims.len() >= 2 {
+                    let substitute = claims[1].target.clone();
+                    claims[0].target = substitute;
+                }
+            }
+            RetainedUnitCallTargetMutation::DuplicateTargetClaim => {
+                if claims.len() >= 2 {
+                    let mut duplicate = claims[1].target.clone();
+                    duplicate.call_site_origin = claims[0].body;
+                    claims.push(RetainedBodyTargetClaim {
+                        body: claims[0].body,
+                        target: duplicate,
+                    });
+                }
+            }
+        }
+
+        let mut unique = BTreeMap::new();
+        for claim in claims {
+            if claim.body != claim.target.call_site_origin {
+                return Err(backend_module(format!(
+                    "a retained-body graph claim for {:?} resolved to a target bound to {:?}; a \
+                     target for another body cannot satisfy this claim",
+                    claim.body, claim.target.call_site_origin
+                )));
+            }
+            if unique.insert(claim.body, claim.target).is_some() {
+                return Err(backend_module(format!(
+                    "retained body {:?} has more than one graph-derived call target; choosing one \
+                     by preference or iteration order is forbidden",
+                    claim.body
+                )));
+            }
+        }
+
+        for (body, target) in unique {
+            if declared.contains_key(&body) {
+                continue;
+            }
+            declared.insert(
+                body,
+                DeclaredUnitCall {
+                    function: module.declare_func_in_func(target.function, func),
+                    origin: target.origin,
+                    call_site_origin: target.call_site_origin,
+                    header: target.header,
+                    slots: target.slots,
+                    offsets: target.offsets,
+                },
+            );
+        }
+        Ok(())
     }
 }
 
@@ -695,6 +909,7 @@ pub(in crate::cranelift_backend) fn resolve_worker_targets(
         let origin = unit.body_occurrence();
         let target = ResolvedUnitTarget {
             function,
+            callee: unit.function(),
             origin,
             call_site_origin: origin,
             kind: EmittableCallKind::StaticBody,
@@ -875,6 +1090,7 @@ pub(in crate::cranelift_backend) fn resolve_call_edges(
             edge.caller(),
             ResolvedUnitTarget {
                 function: target,
+                callee: edge.callee(),
                 origin: edge.callee_origin(),
                 call_site_origin: match edge.kind() {
                     EmittableCallKind::StaticBody => *source_bindings
@@ -2968,6 +3184,18 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
         // source names.
         let declared_calls = call_edges.declare_in_func(context.raw_owner, module, &mut func)?;
         function_local.unit_calls = declared_calls.static_bodies;
+        // This generated Function is owned by the enclosing specialization even
+        // though it lowers the raw owner's body. Retained closures reaching that
+        // body can therefore name static-body graph edges owned outside the raw
+        // source subtree. Declare those targets from the already-resolved graph
+        // claims before body emission; the later call lookup remains unchanged
+        // and fail-closed.
+        call_edges.declare_retained_body_targets_in_func(
+            context.raw_owner,
+            module,
+            &mut func,
+            &mut function_local.unit_calls,
+        )?;
         function_local.declaration_calls = declared_calls.declarations;
         function_local.worker_calls = worker_targets.declare_in_func(module, &mut func);
         // `D6b` -- no retarget happens in a generated context body, so the two

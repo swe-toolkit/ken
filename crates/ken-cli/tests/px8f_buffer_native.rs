@@ -185,19 +185,69 @@ ssize_t pwrite64(int fd, const void *buf, size_t count, off64_t offset) {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CARRIED-IH-DISPATCH-SITEOP.
-//
-// Observed signature, exactly:
-//   Effect: seat Argument(1) of FsOpen needs ConstructorTag, which it cannot
-//     observe in CarriedWord
-//
-// Owner node: RT-CARRIED-IH-DISPATCH-SITEOP.
-// M4's positional captured-environment representation retires the prior
-// closure-boundary refusal. The row now reaches this distinct object-emission
-// successor, so it remains ignored rather than being silenced as green.
-// Annotation only -- test body and expectations are unchanged.
+const RETAINED_UNIT_CALL_TARGET_MUTATION_CHILD: &str =
+    "KEN_RT_RETAINED_UNIT_CALL_TARGET_MUTATION_CHILD";
+
+#[cfg(target_os = "linux")]
+fn assert_retained_unit_call_target_mutation_child() {
+    use ken_runtime::RetainedUnitCallTargetMutation as Mutation;
+
+    let mode = std::env::var(RETAINED_UNIT_CALL_TARGET_MUTATION_CHILD)
+        .expect("retained-unit call-target mutation child mode");
+    let (mutation, expected) = match mode.as_str() {
+        "unrelated-owner-root" => (
+            Mutation::SubstituteUnrelatedOwnerRoot,
+            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+        ),
+        "suppress-graph-claims" => (
+            Mutation::SuppressGraphClaims,
+            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+        ),
+        "wrong-target" => (
+            Mutation::SubstituteWrongTarget,
+            "a retained-body graph claim for",
+        ),
+        "ambiguous-target" => (
+            Mutation::DuplicateTargetClaim,
+            "has more than one graph-derived call target",
+        ),
+        other => panic!("unknown retained-unit call-target mutation: {other}"),
+    };
+    let dir = tempfile::Builder::new()
+        .prefix("ken-px8f-retained-target-control-")
+        .tempdir()
+        .unwrap();
+    let result = ken_runtime::with_retained_unit_call_target_mutation(mutation, || {
+        ken_cli::build_native_program(
+            WRITE_ALL,
+            ken_cli::SourceFormat::Ken,
+            "px8f_write_all_retained_target_control",
+            dir.path(),
+        )
+    });
+    let error = match result {
+        Ok(_) => panic!("{mode}: malformed retained-unit target derivation compiled"),
+        Err(error) => error,
+    };
+    let rendered = format!("{error:?}");
+    assert!(
+        rendered.contains(expected),
+        "{mode}: mutation missed intended refusal; error:\n{rendered}"
+    );
+    eprintln!("{mode}: {rendered}");
+    assert!(
+        ken_runtime::retained_unit_call_target_mutation_is_exact(),
+        "{mode}: scoped retained-unit target mutation did not restore"
+    );
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. The native run and interpreter must agree
+/// on the ordered short-write observations required by runtime evaluation
+/// (`spec/40-runtime/42-evaluation.md` section 6.2 and
+/// `spec/40-runtime/45-native-backend.md` section 4).
 #[test]
-#[ignore = "RT-RETAINED-UNIT-CALL-TARGET-DERIVATION: the carried constructor dispatch succeeds; object emission next refuses because retained body StaticOriginId(1236) has no graph-derived call target in this unit"]
+#[ignore = "RT-RETAINED-UNIT-RESULT-CLOSURE-REPRESENTATION: retained-unit target derivation succeeds; post-call constructor composition next refuses the result closure representation"]
 fn linked_checked_write_all_observes_short_progress_and_matches_interpreter() {
     std::thread::Builder::new()
         .name("px8f-write-all".to_string())
@@ -209,8 +259,75 @@ fn linked_checked_write_all_observes_short_progress_and_matches_interpreter() {
 }
 
 #[cfg(target_os = "linux")]
+/// Promise class: durable invariant. A specialization-owned retained call is
+/// admitted only from its checked raw owner's exact graph subtree; an unrelated
+/// root, missing claim, wrong target, or ambiguous target reaches a production
+/// refusal.
+///
+/// MEASURED: each child moves the traversal root or mutates resolved graph
+/// claims before function-local declaration and asserts the exact downstream
+/// refusal family.
+/// CLAIMED: an unrelated owner, lookup failure, target disagreement, and
+/// candidate ambiguity cannot synthesize or select a retained-body target.
+/// THE GAP: the child reuses the real checked `writeAll` compile, so a green row
+/// depends on the production context-definition and call-emission path.
+#[test]
+fn retained_unit_call_target_controls_reject_malformed_derivations() {
+    let cases = [
+        (
+            "unrelated-owner-root",
+            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+        ),
+        (
+            "suppress-graph-claims",
+            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+        ),
+        ("wrong-target", "a retained-body graph claim for"),
+        (
+            "ambiguous-target",
+            "has more than one graph-derived call target",
+        ),
+    ];
+    for (mode, expected) in cases {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "linked_checked_write_all_observes_short_progress_and_matches_interpreter",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env(RETAINED_UNIT_CALL_TARGET_MUTATION_CHILD, mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated retained-unit call-target mutation child");
+        assert!(
+            output.status.success(),
+            "{mode}: mutation child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(expected),
+            "{mode}: child did not publish intended refusal; stderr:\n{stderr}"
+        );
+        if mode == "unrelated-owner-root" {
+            assert!(
+                stderr.contains("retained-unit root control replaced checked root"),
+                "{mode}: child did not traverse from a real unrelated owner; stderr:\n{stderr}"
+            );
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn run_linked_checked_write_all() {
     use std::os::unix::ffi::OsStrExt as _;
+
+    if std::env::var_os(RETAINED_UNIT_CALL_TARGET_MUTATION_CHILD).is_some() {
+        assert_retained_unit_call_target_mutation_child();
+        return;
+    }
 
     let dir = tempfile::Builder::new()
         .prefix("ken-px8f-write-all-")
