@@ -1,14 +1,14 @@
 ---
 id: CORE-FO-CHECK-TREE-SORT-VALIDATION
 title: "Make both checker surfaces' own domain honest: derive and validate world/object sorts and binder scope in check_tree and in the Ken checker, fail-closed, instead of relying on every caller to pass embed's image"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
 gate: none
 depends_on: [V3-FO-QUOTE-GUARD-FAIL-CLOSED]
 blocks: [V3-FO-SORTED-EIGENPARAMETER-DERIVATION]
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3041
 origin: "Steward, 2026-08-15, filing the future-hardening item the Architect separated out in evt_71g1xf5vkf1ek while dispositioning a V3-FO-QUOTE-GUARD-FAIL-CLOSED QA block. RECUT AND PROMOTED by the Steward 2026-08-27 on Architect ruling evt_6hx31xvw9tqs2, which REJECTED the current FO checker/derivation/adequacy interface as a semantic soundness gate. This node is no longer optional hardening: it is items 1 and 2 of that ruling's six-item repair envelope and the PREDECESSOR of the sequence. Its former 'Why this is hardening and NOT a soundness fix' section is FALSIFIED and has been removed -- see 'What changed, and what falsified the old framing'. Steward-filed per COORDINATION section 2."
 ---
 
