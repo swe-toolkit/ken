@@ -208,8 +208,17 @@ entry, or a registry entry whose named condition has since been built, is a
 sweep FAILURE, not a pass. Rows that are plausibly close to passing keep running:
 those are the ones the sweep exists to catch.
 
-D1 may land alone. **D2 must not land before D1.** D4 is independent of D1-D3
-and may land in either order.
+**PACKAGING (superseding the earlier "D1 may land alone" split, and stated here
+because this is where the packaging instruction actually lives): D1 and D2 are
+ONE candidate, and D3 joins them when it is clean.** See the packaging ruling
+under "The diagnosis" for the reasoning — each publish costs a full CI run, and
+D1 alone leaves only a one-minute margin under the 20m ceiling.
+
+**D2 must still never be MEASURED before D1** — that constraint is about
+measurement order inside the turn and is untouched by the packaging change.
+
+**D4 remains independently packageable** and may land in either order relative
+to D1-D3; it is the ignored-row sweep work and shares no file with them.
 
 ## Acceptance criteria
 
@@ -267,11 +276,16 @@ and may land in either order.
 observations to, and `RT-FRESH-RESULT-ROUTE-PAIRING-LEG-CONTROLS` (`draft`)
 cites `rt_parity_native.rs:1149` directly.
 
-At filing time lane 1 is stopped at HARD STOP 12 with the Architect holding for a
-Research advisory, and `runtime-implementer` reported the branch free and the
-tree unchanged at `bb33dfb71` with no commit, candidate, or QA — so the file is
-uncontended **right now**. That window is not guaranteed to survive until this
-node is released.
+At filing time lane 1 was stopped at HARD STOP 12 with the Architect holding for
+a Research advisory, and `runtime-implementer` reported the branch free and the
+tree unchanged at `bb33dfb71` with no commit, candidate, or QA — so the file was
+uncontended then. That window was not guaranteed to survive to release.
+
+**MEASURED AT RELEASE (2026-08-28): still uncontended, and the stop count has
+moved on — lane 1 is now at HARD STOP 13** (`evt_59t7b49m41z8m`), which froze
+D3 to a D0-only return-boundary measurement that lands NO production. The
+release-condition block at the top of this node carries the live statement; the
+paragraph above is filing-time history.
 
 **Re-measure the contention at release time, not from this paragraph.** If the D3
 chain has resumed and is editing this file, hard-stop to the Steward rather than
@@ -279,11 +293,24 @@ resolving a merge across the two; the sequencing call is the Steward's.
 
 ## Reviewers
 
-verify-qa on the exact candidate SHA. The Architect is NOT a required reviewer:
-this is not the M-series, and nothing in it bears on the carried-value program's
-design. A finding that a mutation case cannot be split without changing what it
-observes is a HARD STOP to the Steward, not something to resolve by weakening the
-case.
+**Verify QA AND the Architect, both on the exact implementation candidate SHA.**
+
+**The Architect IS a required reviewer.** An earlier version of this section said
+otherwise on the grounds that "this is not the M-series" — that is not the gate
+predicate, and the claim conflicted with federation law: **a merge Decision
+requires the Architect always.** The `docs/program/` editorial exception covers
+this Steward-owned FRAME route; it does not cover the implementation candidate,
+which touches `crates/` and `.github/workflows/`. Corrected at the Architect's
+block `evt_60hd0s0sn3kxw`; the defect was the Steward's.
+
+The review turns on **differential faithfulness** — the same 90 mutation cases,
+the same assertions, the same outcomes — and on the workflow changes not
+weakening what `main` is gated on.
+
+A finding that a mutation case cannot be split without changing what it observes
+is a **HARD STOP to the Steward**, never something to resolve by weakening the
+case. Larger packaging does not relax this: one candidate makes the differential
+review bigger, not looser.
 
 ## Out of scope, and recorded here anyway
 
