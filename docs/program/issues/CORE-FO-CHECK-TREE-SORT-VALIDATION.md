@@ -221,6 +221,46 @@ moved, this reddens.**
 
 **`AC-10`.** No-regression, in CI (`COORDINATION §12`).
 
+**`AC-AFFECTED-CLOSURE` — FOLDED IN 2026-08-28 AFTER IT COST THIS NODE A RED CI
+MERGE. It was missing, and that was a Steward framing defect.** Cover every
+target that loads any module whose closure this increment changes, **diff-touched
+or not**. In particular, a change to
+`catalog/packages/Tooling/Verification/FoKripke.ken` is a change to the closure of
+every Rust test that `include_str!`s or roots-loads that file, and those tests do
+NOT appear in the candidate's changed-path set.
+
+**This is not a relaxation of the targeted-build hard rule** (`COORDINATION §12`,
+never `--workspace` locally). What changes is which targets count as AFFECTED,
+not how many crates build at once.
+
+> **THE MEASURED FAILURE THIS ENCODES.** Candidate `57d209fca` passed its
+> diff-touched targets — checker soundness D4 `3/3`, Ken-level authoring `16/16`
+> — cleared Architect, Language QA and a clean Adversary hunt on the exact SHA,
+> and then reddened CI at
+> `crates/ken-elaborator/tests/v3_fo_checker_soundness_d1a_rule_correspondence.rs:40`.
+> That file is UNTOUCHED by the candidate and `include_str!`s the exact
+> `FoKripke.ken` it edited (`:24`), so `d1a_world_checker_accepts` failed to
+> kernel-check against the amended derivation relation.
+>
+> **Neither gate was negligent. Both ran the targets this frame named, and the
+> frame named the wrong set.**
+>
+> **THE DEFECT IS A CROSS-LANE REPEAT, AND IT IS THE STEWARD'S — THIRD LANE
+> NOW.** The identical shape was diagnosed in FOUNDATION on 2026-08-27 (a
+> candidate passing 170/170 diff-touched targets while reddening a
+> consumer-closure oracle in an untouched file), carried into the foundation
+> frames, then carried into the RUNTIME frames on 2026-08-28 after it cost that
+> lane a red CI merge — and **never carried to LANGUAGE.** At the moment this
+> node's candidate went red, `AC-AFFECTED-CLOSURE` appeared in three runtime
+> frames and zero language frames.
+>
+> ⇒ **A criterion repaired in one lane is not thereby repaired in the fleet.**
+> Repairing the lane where it bit is the *easy* half and it feels complete,
+> because the evidence that motivated it is all in that lane. The general form:
+> when a framing defect is found, the question is never "which frame do I fix"
+> but "which frames share the premise that was wrong" — and that set is almost
+> never confined to the lane that surfaced it.
+
 ## Banned scope
 
 - **The eigenparameter rule itself.** `ForallRight` accepting only a fresh

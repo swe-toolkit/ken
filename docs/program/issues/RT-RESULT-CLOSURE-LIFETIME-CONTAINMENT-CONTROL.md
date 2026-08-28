@@ -12,17 +12,30 @@ github: null
 origin: "Adversary M8 hunt evt_2kdx72vs884zp (thr_3q2mw0qb0xcq8), 2026-08-28, on squash bd4ddf2138362bd1ac7066c39161602fdc9dddc2 (range 4d3d4d848..6ce003a26, six paths). The hunt's verdict on that candidate was CLEAN core, strongly fail-closed, controls non-vacuous; this is its ONE grounded finding, classed leak/gap and explicitly LATENT. Routed to the Steward for disposition rather than reopening the merged node. Steward framing per COORDINATION section 2."
 ---
 
-> # NOT AN AMENDMENT TO THE MERGED NODE, AND NOT WORK FOR THE IN-FLIGHT NODE
+> # NOT AN AMENDMENT TO THE MERGED NODE, AND NOT D3 WORK
 >
 > [[RT-RETAINED-UNIT-RESULT-CLOSURE-REPRESENTATION]] merged at `bd4ddf213`.
 > **This finding does NOT reopen it.** The check is CORRECT and it PASSES; what
 > is missing is any control proving it load-bearing. The landing stands and its
 > gates stand.
 >
-> **The runtime ring is on [[RT-CHECKED-IH-FRESH-RESULT-ROUTE]] and must not
-> pick this up.** That node is a typed forward-route derivation under an HS10
-> stop rule; this is control authoring over an already-landed guard. Different
-> object, different turn.
+> **STALE-BANNER CORRECTION, 2026-08-28, applied at release review.** This block
+> previously read *"the runtime ring is on [[RT-CHECKED-IH-FRESH-RESULT-ROUTE]]
+> and must not pick this up."* **That node MERGED at `7d36d24f0`** and the
+> prohibition is void. It is corrected here rather than waived in a convo post,
+> because a frame passage that outlives the condition it was written under does
+> not read as stale — it reads as authoritative, and a ring reading this node
+> cold would have refused a node the Steward had just released.
+>
+> **This node REMAINS QUEUED (`draft`), and the reason is a priority call, not a
+> dependency.** It was briefly flipped `active` on 2026-08-28 while
+> [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] sat blocked at HS10 with the
+> runtime seat idle. The Architect then ruled that stop (`evt_1ckwtvwe23e3e`):
+> D3A+D3B is NOT blocked on a new predecessor, the landed fused route is
+> sufficient authority, and it resumes as soon as the Steward amends the frame
+> and re-releases. **D3 is lane 1's main line and the seat holds one WP, so this
+> node returns to the queue.** The flip was reverted before any release was
+> posted; nothing was ever handed to the ring.
 
 ## Objective
 
@@ -82,8 +95,11 @@ the D3 frontier with D3A+D3B frozen. Nothing miscompiles today. **It bites when
 result-closure environments** — at which point a memory-safety-relevant check
 would go live having never once been shown to fire.
 
-That is why this node is `draft` and queued: an unpinned guard on a staged path,
-not a blocker on any lane.
+That is what this node is: an unpinned guard on a staged path, not a blocker on
+any lane. It is `draft` and queued for that reason. **Nothing here is a
+regression, nothing is on fire, and the finding has not become more urgent since
+it was filed.** When it is released it will be because a seat came free, never
+because the risk changed.
 
 ## Deliverables
 
@@ -166,17 +182,40 @@ later reader does not re-derive them:
 
 Touches
 `crates/ken-runtime/src/cranelift_backend/planning/static_transition/aggregates.rs`.
-[[RT-CHECKED-IH-FRESH-RESULT-ROUTE]] is in flight over the fresh-result route
-and its own surface is the producer enum plus `lowering/source.rs`, so they are
-expected disjoint — **but `aggregates.rs` is large and shared. Re-check at
-release**, and do not release while that ring holds an open candidate over this
-file.
+[[RT-CHECKED-IH-FRESH-RESULT-ROUTE]] MERGED at `7d36d24f0`, so the in-flight
+concern this section was written against is discharged. **Re-checked at release,
+2026-08-28, and this is a measurement rather than an inheritance:** no runtime
+node holds an open candidate over `aggregates.rs`.
+[[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] stopped cleanly at HS10 with no
+commit and no candidate, and freed its branch at `da95daadf`.
+
+**The standing criterion is unchanged and still binds: do not release, or
+continue, while another ring holds an open candidate over this file.** The route
+node's own landing touched `aggregates.rs`, so the disjointness once expected
+here was not real — it was the merge that removed the conflict, not the
+separation of surfaces. Treat a re-released D3 over this file as live
+contention.
 
 ## Sequencing
 
-`draft`, QUEUED behind [[RT-CHECKED-IH-FRESH-RESULT-ROUTE]]. It does not block
-the lane. [[RT-RETAINED-TARGET-IDEMPOTENT-REDERIVATION]] is also queued; both
-are Adversary M8 findings on landed nodes and neither is urgent.
+**`draft`, QUEUED. Dependencies are clear; the queue is a PRIORITY call.** Both
+`depends_on` are `merged` (re-measured 2026-08-28), and
+[[RT-CHECKED-IH-FRESH-RESULT-ROUTE]] — which this node was originally queued
+behind — has landed. **Nothing blocks it technically.** It waits because
+[[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] is lane 1's main line and the
+runtime seat holds one WP at a time.
+
+**When it does go, it goes ahead of the two S/T2 siblings**
+([[RT-RETAINED-TARGET-IDEMPOTENT-REDERIVATION]],
+[[RT-FRESH-RESULT-ROUTE-PAIRING-LEG-CONTROLS]]) on a capability match, not on
+urgency: all three are Adversary M8 findings on landed nodes and none is a live
+defect, but this one is T1 and the runtime implementer seat is T1-provisioned,
+while putting a T2 node on that seat spends a reasoning tier the work would
+never exercise (`steward.md` §4h).
+
+**Release trigger:** the next time the runtime seat frees with D3 not holding it
+— and re-check `aggregates.rs` contention at that moment rather than trusting
+this paragraph, because D3's own surface is still being amended.
 
 **Tier T1, though the node is small.** Size and capability are independent axes
 (`steward.md` §4h). Nothing here is mechanical: the whole deliverable is an
