@@ -85,7 +85,7 @@ fn assert_nested_forall_is_excluded(name: &str, quantified: &str) {
            (FokMkSequent \
              (Nil FokForm) \
              (Cons FokForm {quantified} (Nil FokForm))) \
-           (FokForallRight Zero (FokQParameter Zero)) \
+           (FokForallRight Zero Zero) \
            (Nil FokCert)"
     ))
     .expect("nested ForallRight child");

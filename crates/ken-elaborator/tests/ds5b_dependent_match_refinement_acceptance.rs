@@ -847,6 +847,11 @@ fn real_fok_derivation_structural_consumers_cover_type_and_omega_motives() {
 /// path rather than discarding the IH. This is distinct from the four-arm
 /// structural consumer above: mutating any child argument to its parent must
 /// red SCT or typing.
+///
+/// The ForallWorld/ForallObj child indices instantiate the body with
+/// `FokQParameter eigen`: under `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` the
+/// derivation's eigen is a parameter INDEX (`Nat`), so the exact child sequent
+/// substitutes the parameter `FokQParameter eigen`, matching the constructor.
 /// Promise class: durable invariant.
 /// MEASURED: all three exact child-index terms are passed to recursive calls.
 /// CLAIMED: recursive Omega consumption preserves the real child paths.
@@ -870,13 +875,13 @@ fn real_fok_recursive_omega_consumer_uses_all_three_child_paths() {
                  fok_recursive_omega_consumer \
                    (FokMkSequent gamma \
                      (fok_list_form_set_nth delta right \
-                       (fok_subst0_form body eigen))) child; \
+                       (fok_subst0_form body (FokQParameter eigen)))) child; \
                FokDerivForallObjRight \
                    gamma delta right eigen body selected fresh child ↦ \
                  fok_recursive_omega_consumer \
                    (FokMkSequent gamma \
                      (fok_list_form_set_nth delta right \
-                       (fok_subst0_form body eigen))) child \
+                       (fok_subst0_form body (FokQParameter eigen)))) child \
              }",
         )
         .expect("the recursive Omega theorem must consume every exact child path");
