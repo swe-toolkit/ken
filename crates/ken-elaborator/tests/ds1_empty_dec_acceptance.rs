@@ -20,9 +20,6 @@ use ken_kernel::conv::whnf;
 use ken_kernel::env::Context;
 use ken_kernel::term::{Level, Term};
 use ken_kernel::{declare_inductive, infer, CtorSpec, GlobalEnv, InductiveSpec};
-
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const EMPTY_DEC_KEN_MD: &str = include_str!("../../../catalog/packages/Core/Logic/EmptyDec.ken.md");
 
 fn lv0() -> Level {
@@ -309,8 +306,6 @@ fn landed_lawful_classes_package_still_elaborates_with_dependencies() {
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD)
-        .expect("catalog/packages/Core/Classes/LawfulClasses.ken must elaborate");
     catalog_or::assert_transparent_result_uses_core_logic_or(&env, "compare_bool_cases");
     assert!(
         env.globals.contains_key("DecEq_instance_Bool"),

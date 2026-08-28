@@ -574,11 +574,13 @@ fn catalog_ambient_passthrough_migration_census() {
             "Data.Collections.Derived".to_string(),
             [
                 "And",
+                "Bottom",
                 "Equal",
                 "Prop",
                 "Proved",
                 "Top",
                 "Unit",
+                "and_fst",
                 "and_intro",
                 "and_snd",
                 "eqChar",

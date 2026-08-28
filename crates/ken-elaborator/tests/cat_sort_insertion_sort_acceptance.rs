@@ -12,9 +12,6 @@ use std::collections::BTreeSet;
 use ken_elaborator::ElabEnv;
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::Decl;
-
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 const INSERTION_SORT_KEN_MD: &str =
     include_str!("../../../catalog/packages/Algorithm/Sorting/InsertionSort.ken.md");
 
@@ -23,8 +20,6 @@ fn base_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_CLASSES_KEN_MD)
-        .expect("Core/Classes/LawfulClasses.ken.md must elaborate");
     // The current sequential package harness has no module namespace. Hide the
     // earlier generic operations so this package can own its public `insert`
     // and `sort` names, as a real module import would.

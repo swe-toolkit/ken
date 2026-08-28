@@ -55,23 +55,55 @@ pub fn load_core_logic_compare(env: &mut ElabEnv) {
     }
 }
 
+pub fn expose_module(env: &mut ElabEnv, module: &str) {
+    let prefix = format!("{module}.");
+    let aliases: Vec<_> = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            name.strip_prefix(&prefix)
+                .map(|suffix| (suffix.to_owned(), *id))
+        })
+        .collect();
+    env.globals.extend(aliases);
+}
+
 pub fn load_derived_fixture(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("Derived's canonical Nat-order dependency must roots-load");
+    let provider_state = env.module_state.clone();
     env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
         .expect("Data.Collections.Derived must load through its real provider closure");
 
     // These legacy fixture suites append declarations in a synthetic flat
     // scope. Bind each real module declaration's exact GlobalId under its old
-    // fixture spelling; no duplicate catalog declaration is elaborated.
-    let prefix = "Data.Collections.Derived.";
-    let aliases: Vec<_> = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect();
-    env.globals.extend(aliases);
+    // fixture spelling; no duplicate catalog declaration is elaborated. The
+    // provider state preserves the pre-D6 class-owner context for later raw
+    // instance fixtures while Derived itself imports the exact same identities.
+    expose_module(env, "Core.Classes.LawfulClasses");
+    expose_module(env, "Data.Collections.Derived");
+    env.module_state = provider_state;
+}
+
+/// Assert at a measured legacy-fixture boundary that the shared Derived loader
+/// retained its canonical class owner. Re-loading the provider must be a no-op:
+/// if `load_derived_fixture` restores a state from before LawfulClasses, the
+/// attempted reload reaches the duplicate-instance failure this control guards.
+pub fn assert_derived_fixture_retains_lawfulclasses(env: &mut ElabEnv) {
+    let loaded_before = env.loaded_module_count();
+    env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("the shared Derived fixture must retain its canonical class owner");
+    assert_eq!(
+        env.loaded_module_count(),
+        loaded_before,
+        "LawfulClasses must already be loaded at the legacy-fixture boundary"
+    );
+
+    let provider = env.globals["Core.Classes.LawfulClasses.leq_nat"];
+    assert_eq!(
+        env.globals["leq_nat"], provider,
+        "the retained class owner must preserve the canonical provider identity"
+    );
 }
 
 pub fn expose_core_logic_transport(env: &mut ElabEnv) {

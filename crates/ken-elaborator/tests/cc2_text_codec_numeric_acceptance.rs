@@ -27,7 +27,6 @@ fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
     let lawful_prefix = "Core.Classes.LawfulClasses.";
@@ -40,9 +39,13 @@ fn dependency_env() -> ElabEnv {
         })
         .collect();
     env.globals.extend(lawful_aliases);
-    env.elaborate_ken_md_file(DIAGNOSTIC_KEN_MD)
-        .expect("Capability/Diagnostics/Core.ken.md must elaborate fourth");
     env
+}
+
+fn load_derived_dependencies(env: &mut ElabEnv) {
+    catalog_or::load_derived_fixture(env);
+    env.elaborate_ken_md_file(DIAGNOSTIC_KEN_MD)
+        .expect("Capability/Diagnostics/Core.ken.md must elaborate after Derived");
 }
 
 fn full_env() -> ElabEnv {
@@ -51,6 +54,7 @@ fn full_env() -> ElabEnv {
         .expect("StringBijection prerequisite must elaborate");
     env.elaborate_ken_md_file(STRING_KEYS_KEN_MD)
         .expect("StringKeys must elaborate");
+    load_derived_dependencies(&mut env);
     env.elaborate_ken_md_file(CODEC_KEN_MD)
         .expect("Codec must elaborate");
     env.elaborate_ken_md_file(NUMERIC_KEN_MD)
@@ -165,6 +169,7 @@ fn ordered_dependency_closure_elaborates_codec_then_numeric() {
             "Ord_instance_String",
         ],
     );
+    load_derived_dependencies(&mut env);
 
     env.elaborate_ken_md_file(CODEC_KEN_MD)
         .expect("Data/Text/Codec.ken.md and every checked fence must elaborate sixth");
@@ -251,6 +256,7 @@ fn cc2_checked_code_has_zero_axiom_and_zero_trusted_base_delta() {
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_ken_md_file(STRING_KEYS_KEN_MD)
         .expect("StringKeys.ken.md must elaborate");
+    load_derived_dependencies(&mut env);
     env.elaborate_ken_md_file(CODEC_KEN_MD)
         .expect("Codec.ken.md must elaborate");
     env.elaborate_ken_md_file(NUMERIC_KEN_MD)

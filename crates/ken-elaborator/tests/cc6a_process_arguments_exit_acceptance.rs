@@ -23,6 +23,7 @@ fn dependency_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
+    catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
     env.elaborate_module_from_roots(&[catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("canonical Nat arithmetic provider must elaborate third");
     env.elaborate_module_from_roots(&[catalog_root()], "Data.Numeric.Nat.Order")
@@ -34,6 +35,11 @@ fn dependency_env() -> ElabEnv {
     env.elaborate_ken_md_file(CURSOR_KEN_MD)
         .expect("Capability.Parsing.Cursor must elaborate fourth");
     env
+}
+
+#[test]
+fn derived_fixture_retains_lawfulclasses_for_cc6a_dependency_closure() {
+    let _ = dependency_env();
 }
 
 fn catalog_root() -> PathBuf {
