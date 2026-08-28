@@ -23,11 +23,46 @@ const FOK_SOURCE: &str =
     include_str!("../../../catalog/packages/Tooling/Verification/FoKripke.ken");
 
 fn mk_env() -> ElabEnv {
+    env_for(FOK_SOURCE)
+}
+
+fn env_for(source: &str) -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_or(&mut env);
-    env.elaborate_file(FOK_SOURCE)
-        .expect("FoKripke.ken must elaborate");
+    env.elaborate_file(source)
+        .expect("FoKripke.ken (possibly with a collapsed sort check) must elaborate");
     env
+}
+
+/// `AC-5` mutation: collapse the sort check by making `fok_derived_sort_eq`
+/// declare every pair of sorts equal. World-vs-Object conflicts then compare
+/// as agreement, so `fok_validate_qterm_sort` never rejects. The mutation
+/// touches only the validation path; the structural checker and the reflection
+/// theorems do not call it, so the file still elaborates.
+const SORT_EQ_ORIG: &str = "\
+fn fok_derived_sort_eq (a : FokDerivedSort) (b : FokDerivedSort) : Bool =
+  match a {
+    FokWorldSort ↦
+      match b {
+        FokWorldSort ↦ True;
+        FokObjectSort ↦ False
+      };
+    FokObjectSort ↦
+      match b {
+        FokWorldSort ↦ False;
+        FokObjectSort ↦ True
+      }
+  }";
+const SORT_EQ_COLLAPSED: &str =
+    "fn fok_derived_sort_eq (a : FokDerivedSort) (b : FokDerivedSort) : Bool = True";
+
+fn sort_collapsed_source() -> String {
+    assert_eq!(
+        FOK_SOURCE.matches(SORT_EQ_ORIG).count(),
+        1,
+        "fok_derived_sort_eq anchor must occur exactly once -- re-measure if the source moved"
+    );
+    FOK_SOURCE.replace(SORT_EQ_ORIG, SORT_EQ_COLLAPSED)
 }
 
 /// True iff the checker verdict `Equal Bool (fok_check_tree sequent cert)
@@ -166,4 +201,37 @@ fn out_of_scope_bound_reference_is_refused() {
         &bad_seq,
         &bad_cert,
     );
+}
+
+#[test]
+fn collapsing_the_sort_check_reddens_the_wrong_sort_controls() {
+    // AC-5: the sort refusals above are CAUSED by the sort check. Collapse it
+    // and the malformed-atom certificate (which fails only on sort -- its Init
+    // closes structurally) must flip from refused to accepted.
+    let bad_atom = "FokForcingP (FokQParameter Zero) (FokQParameter Zero)";
+    let bad_forms = format!("Cons FokForm ({bad_atom}) (Nil FokForm)");
+    let bad_seq = format!("FokMkSequent ({bad_forms}) ({bad_forms})");
+    let bad_cert = format!("FokMkCert ({bad_seq}) (FokInit Zero Zero) (Nil FokCert)");
+
+    let mut base = mk_env();
+    assert!(
+        verdict_is(&mut base, "collapse_base_reject", &bad_seq, &bad_cert, "False"),
+        "unmutated: the malformed-atom certificate is refused on sort"
+    );
+
+    let collapsed = sort_collapsed_source();
+    let mut mutated = env_for(&collapsed);
+    assert!(
+        verdict_is(&mut mutated, "collapse_mut_accept", &bad_seq, &bad_cert, "True"),
+        "with the sort check collapsed the same certificate must be ACCEPTED -- \
+         proving the refusal was caused by the sort check"
+    );
+
+    // The malformed-atom certificate is the clean target here: its `Init` closes
+    // structurally, so the ONLY reason the checker refuses it is the sort clash.
+    // The wrong-sort EIGEN controls are deliberately NOT reused for this
+    // mutation -- reusing a parameter as an eigen makes it non-fresh as well as
+    // wrong-sorted, so the freshness guard still refuses them after the sort
+    // check is collapsed (that entanglement is exactly why AC-FRESHNESS-ISOLATED
+    // uses a Bound-0-free, well-sorted body instead).
 }
