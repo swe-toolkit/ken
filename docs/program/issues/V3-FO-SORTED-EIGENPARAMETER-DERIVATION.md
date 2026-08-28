@@ -208,12 +208,35 @@ nonexistence, at both levels. All three parts are required:**
    Ken surface this is pinned BEHAVIOURALLY: a `FokQTerm` eigen is a **type
    error, not a checker `False`.** This is a statement about the datatype, not
    about a search outcome.
-2. **Embed-image and search nonexistence on BOTH surfaces.** No term in
-   `fok_embed`'s image, and no term the corrected search reaches, derives the
-   false conclusion — measured on the Rust surface and the Ken surface
-   separately, never one standing in for the other. **Demonstrated by RUNNING
-   the decision procedure on the exact source form's genuine `fok_embed` image,
-   not argued.**
+2. **Embed-image and search nonexistence on BOTH surfaces, BY THE INSTRUMENT
+   EACH SURFACE ACTUALLY HAS.** No term in `fok_embed`'s image, and no term the
+   corrected search reaches, derives the false conclusion — established on the
+   Rust surface and the Ken surface SEPARATELY, never one standing in for the
+   other. **The two surfaces do not carry the same instrument, and requiring
+   them to is what made the prior wording unsatisfiable:**
+
+   - **Rust — by RUNNING the decision procedure**, not argued: `find_certificate`
+     returns `None` on the exploit's genuine `fok_embed` image and `Some` on a
+     planted, genuinely representable comparable valid form.
+   - **Ken — there is NO Ken-level search function, and none is requested.** The
+     Ken surface is the checker `fok_check_tree`. Nonexistence is established by
+     the part-1 constructor unrepresentability argued INDEPENDENTLY on the Ken
+     side (never by citing the Rust result), and its POWER by `fok_check_tree`
+     ACCEPTING a planted representable comparable certificate and REFUSING a
+     representable near-miss.
+
+   **Adding a Ken search function to satisfy this part is OUT OF SCOPE** — it is
+   surface growth inside an increment the frame requires to stay atomic. A
+   candidate that adds one has widened the node, not met the criterion.
+
+   > **This part supersedes the earlier single sentence "Demonstrated by RUNNING
+   > the decision procedure on the exact source form's genuine `fok_embed` image,
+   > not argued," which globalized a Rust-only instrument across both surfaces.**
+   > There is no Ken search to run, so as written the Ken half was unreachable.
+   > Ruled at `evt_kt1aq0bgjxqx` (Steward) on the language-implementer's
+   > measurement; **that ruling lived only in a thread, and a threaded
+   > clarification does not override an operative criterion — this is where it
+   > becomes durable** (Architect `evt_45s0fredzhskf`).
 3. **The recorded historical hash is retained as PROVENANCE ONLY**, per the block
    above.
 

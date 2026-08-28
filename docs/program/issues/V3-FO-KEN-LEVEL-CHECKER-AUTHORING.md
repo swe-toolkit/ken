@@ -186,7 +186,7 @@ call.**
 > |---|---|---|
 > | `FokMkSequent (List FokForm) (List FokForm)` | two same-typed | **NO** |
 > | `FokInit Nat Nat` | two same-typed | **NO** |
-> | `FokForallRight Nat FokQTerm` | different types | yes — will not type-check |
+> | `FokForallRight Nat FokQTerm` | different types | yes — will not type-check **(SUPERSEDED — see below)** |
 > | `FokMkCert FokSequent FokRule (List FokCert)` | all distinct | yes |
 > | `FokAccess` / `FokDomainA` / `FokForcingP` | two same-typed | yes — **`embed` constructs them**, so `D1` already compares them positionally |
 >
@@ -195,6 +195,20 @@ call.**
 > kernel-checks, passes both arity tests, and is invisible to the differential**
 > — because the differential only ever sees what `embed` produces, and `embed`
 > produces neither.
+>
+> ### SUPERSEDED FOR `FokForallRight` — its shape changed
+>
+> **The table row above is HISTORY.** `V3-FO-SORTED-EIGENPARAMETER-DERIVATION`
+> replaced the eigenterm with a parameter INDEX, so the constructor is now
+> **`FokForallRight Nat Nat` — two same-typed fields, and a `right`/`eigen` swap
+> TYPE-CHECKS.** The "different types, will not type-check" consequence no longer
+> holds, and the count above is a count under the old shape.
+>
+> **This is stale prose, NOT a missing control.** The order is pinned
+> BEHAVIOURALLY instead: the existing differential lawful rows carry `right=0`
+> with `eigen=2`, so a swap changes the derived verdict rather than passing
+> silently. **Do not open a control-gap node from this row** — check the
+> behavioural pin first, and only if it is absent is there work here.
 >
 > **The mechanism is the positional mirror of a named Rust struct.** Rust's
 > `{ gamma, delta }` and `{ left, right }` make a swap a **compile error**;
