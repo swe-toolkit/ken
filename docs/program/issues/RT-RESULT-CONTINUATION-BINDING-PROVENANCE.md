@@ -5,16 +5,105 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE, RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR, RT-CHECKED-IH-K-AVAILABILITY-LOCATOR, RT-CHECKED-IH-GENERATED-ENTRY-ACCESS, RT-CHECKED-IH-SELF-RESUMPTION-RESULT-PROVENANCE, RT-CHECKED-IH-FRESH-RESULT-ROUTE]
+depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE, RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR, RT-CHECKED-IH-K-AVAILABILITY-LOCATOR, RT-CHECKED-IH-GENERATED-ENTRY-ACCESS, RT-CHECKED-IH-SELF-RESUMPTION-RESULT-PROVENANCE, RT-CHECKED-IH-FRESH-RESULT-ROUTE, RT-CHECKED-IH-TAIL-RESULT-PRODUCER-ROUTE]
 blocks: []
 github: null
 origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision). Hard-stop-5 ruling evt_494k61s04fnv9, 2026-08-26: D3B localization is VALID and lowering has reached the end of its authority — the missing component is an UPSTREAM planner-owned checked-IH result-successor relation, framed as the independently-landable predecessor RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR (which this node now depends_on); D3A stays frozen/non-landable until it lands, then the atomic D3A+D3B consumer builds and D3B consumes ONLY that successor projection. Inventory fold 244b2468afd4f0cd06837fd3079f291d7d330af5 (entry 5). Architect INCORPORATION ruling evt_2prk31prke9cc, 2026-08-26 (accepting Research advisory evt_261gm8y54xttt), grounded on origin/main@a09878026: the predecessor and this consumer conflated two semantic edges by pairing the D3A application result R1 forward to the later capture. Reconciled to the continuation-inheritance reading — D3A applies the inherited continuation capability K at each exact recursive arrival to yield the FRESH result R2, and D3B binds that R2 through ordinary Ret-case/capture semantics; the transitive R1 -> capture requirement is deleted from the operative Objective/Deliverables/ACs/pairing/suppressions/reviewers/Sequencing. Suppression and at-most-once controls are now THREE independent axes (inheritance, application, fresh-result binding). The advisory is incorporated and is NOT hard stop 6 (count remains five). Runtime stays HELD until the predecessor recut lands and the D3A+D3B work is explicitly re-released. Architect hard-stop-8 ruling evt_54efxydhb3n6w, 2026-08-27 (thr_2g0w05my2d5ym), verified on exact base 00e66312b4ef617eb658a2e75db9f99ff2c56492 / tree e286949f8fe5053e4719e54d0cc66adbe073dcdf: on four of five governed coordinates the exact governed K application exposes NO LOCAL LoweringOperand result at CheckedComputationalIHInvocationReturn, because the active self-resumption arm returns Lowered::RecursiveBackedge, a protocol marker and not a value (lowering/source.rs:1969). That is an absence of a LOCAL result and NOT a proof that no fresh dynamic result is eventually produced — the owning carried merge may still produce it, which is precisely D0's question. The landed architecture's two sibling proofs (K authority plus governed application coordinate; fresh-result destination) lack a THIRD — which emitted control edge PRODUCES the fresh dynamic result. That producer relation is a component boundary, not a D3B field, and is framed as the behaviorally-inert predecessor RT-CHECKED-IH-SELF-RESUMPTION-RESULT-PROVENANCE, which this node now depends_on. No mechanism is authorized: spec/40-runtime/42-evaluation.md section 6.2 makes the tail-resumptive loop realization normative, so a mandatory D0 measures the existing carried-loop exit first and a D0 answering NO stops and returns coordinates to the Architect rather than selecting a recursive call, frame morphism, or explicit continuation. The atomic D3A+D3B contract, the three independent suppression axes, and the deletion of the transitive R1 -> capture requirement are all UNCHANGED; the producer proof does not become a fourth axis. D3A+D3B stays frozen with no candidate and no QA until the predecessor lands and the Steward issues a SECOND explicit release. The next hard stop is 9 and mechanically triggers the mandatory Research advisory before any Architect ruling, including during the predecessor's D0."
 ---
 
-> # OPERATIVE RULING — HARD STOP 10, `evt_1ckwtvwe23e3e` (2026-08-28)
+> # OPERATIVE RULING — HARD STOP 11, `evt_79trx05xee0dj` (2026-08-28)
 >
-> **THIS IS THE OPERATIVE RULING. It supersedes the HS9 banner below and every
+> **THIS IS THE OPERATIVE RULING. It supersedes the HS10 banner below and every
 > banner under it, all of which are history.** Cite by event id, never by number.
+> Bound object `24c14f4dacbcdf6789952f7a9d3f75155b310e64`, tree
+> `36abd930d5acd2a8ab84141f422bd7bc795a5074`, frame blob
+> `492235777030f4f12083f0de883efe008e1aa0af`, spec-42 blob
+> `69b9d6d267ba20235f42972865c2b20504531d62`. Exact relevant blobs: `source.rs`
+> `88fcc401b0e078f78298a0998d09364b22e64a27`, `core.rs`
+> `68f9394ce4d75f68bcfbaaeff7b294040a4fd50b`, `lowering/mod.rs`
+> `2ee945bc07c2facbbe016b505f8a8ab449862c44`, route planner `aggregates.rs`
+> `9eb2c118e227c3a7db2849e03046db02d93a48eb`. No candidate; QA unrouted.
+>
+> **HS11 IS A VALID CLEAN STOP, AND THE SHARP CONCLUSION IS NOT THE ONE THE STOP
+> REACHED FOR. The landed Tail route CERTIFIES THE CARRIED SEED AS THOUGH IT WERE
+> FRESH `R2`. Its endpoint pairing is real; it is a pairing of the WRONG VALUE.**
+>
+> **The code makes the causal error exact — read it, do not re-argue it.**
+>
+> 1. Tail application installs the invocation but returns the initial carried
+>    residual UNCHANGED at `source.rs:4512-4515`:
+>    `RoutedAnswer::direct(LoweringOperand::Carried(word))`. **That word is the
+>    seed, not a completed result.**
+> 2. The supposed Tail SOURCE-RESULT observation is recorded later at
+>    `source.rs:2148-2150` from that SAME `word.word`, immediately before
+>    `lower_carried_computational_match`. **Nothing at that site produced a fresh
+>    result; the observer renamed its input.**
+> 3. Active self-resumption records and jumps that same `scrutinee.word` into the
+>    header at `core.rs:12218-12233`.
+> 4. The checked-answer fallback binds the SAME scrutinee directly into the Ret
+>    case environment at `core.rs:12615-12621` and records it as the Ret input at
+>    `:12636-12640`.
+>
+> **⇒ The HS9 causal control proved exact SSA identity from seed to sink.**
+> `CoEmissionOnly` correctly showed this was not mere co-emission — **but exact
+> identity does not turn a seed into a result.** The route type states the
+> boundary itself at `aggregates.rs:373-375`: it contains no result value, no
+> emission-local value number, and no runtime carrier. The LLDB `0x0e09`
+> observation on the final unit frame is the DYNAMIC confirmation of that STATIC
+> read.
+>
+> **`0x1109` and `0x1209` are separately live and are NOT authorized candidates.**
+> Shape and liveness do not establish which word is `R2`; selecting either is the
+> forbidden result search. Do not consume them by observation.
+>
+> **The compiler-only `answer_route` preservation experiment CANNOT repair this.**
+> It propagates control metadata through `resume_active_continuation` and reaches
+> frame 301, but it carries NO value provenance and leaves the same seed in the
+> Ret input and the final capture. **Promoting it would create an unframed receipt
+> while preserving the defect.**
+>
+> **DISPOSITION.**
+>
+> 1. **Atomic D3A+D3B is FROZEN AGAIN.** The fresh release `evt_98vzwa6e9qv1` is
+>    SPENT by this clean stop. No code candidate and no QA from HS11.
+> 2. **`TailResumedRetInput` is WITHDRAWN as fresh-result VALUE authority.** Its
+>    destination topology, active-header identity, and Ret binder identity remain
+>    useful FACTS; its current SOURCE-VALUE claim does not. `DirectInvocationReturn`
+>    remains valid for its one-row population. **The HS10 statement that no
+>    corrected predecessor is needed is FALSIFIED for Tail** by the exact producer
+>    read above.
+> 3. **Do NOT add a sibling authority.** The existing fresh-result-route
+>    predecessor is recut by **REPLACEMENT**: preserve the Direct variant; a Tail
+>    variant may exist ONLY if its source endpoint is the actual result-producing
+>    operation AFTER the checked computation returns. **The initial
+>    `CheckedIhCapturedEnvironment` word must be an explicit NEGATIVE CONTROL,
+>    never the source.**
+> 4. **The corrective predecessor starts with D0 ONLY** — see
+>    [[RT-CHECKED-IH-TAIL-RESULT-PRODUCER-ROUTE]].
+> 5. **HS12 is the stop if that D0 cannot name an existing compiler-visible
+>    producer/value edge** without a persistent receipt, runtime lane, direct
+>    capture write, second lookup, result search, clone/stack, ABI carrier, or
+>    target synthesis. **Before any Architect ruling on HS12 the Architect will
+>    mechanically hold and call Research with the exact new fork. NO RESEARCH CALL
+>    IS DUE AT HS11** — do not manufacture one, and do not carry this sentence
+>    forward as though it applied to the next stop.
+> 6. **D3 stays frozen until the corrected predecessor lands through fresh
+>    exact-object gates AND the Steward issues ANOTHER explicit release.** Add no
+>    fallback. Landing alone releases nothing; this ruling alone releases nothing.
+>
+> **The shared predicate is UNCHANGED from HS9: a static or local endpoint treated
+> as a complete directed dynamic value edge.** Eleven stops, one predicate.
+>
+> No Decision object is required; this follows deductively from the exact source
+> path and the runtime value observation.
+
+> # SUPERSEDED — HARD STOP 10, `evt_1ckwtvwe23e3e` (2026-08-28)
+>
+> **HISTORY. Superseded by the HS11 banner above**, which falsifies its claim that
+> no corrected predecessor is needed for Tail. Its route-variant partition (Direct
+> vs Tail) and its correction of the uniform-D3A-recipe defect both STAND; what
+> does not stand is treating the Tail route's certified source endpoint as a fresh
+> result value. Cite by event id, never by number.
 > Bound object `da95daadf`, tree `94d9177eee14`, frame blob `531039677cb9`,
 > spec-42 blob `69b9d6d267ba`.
 >
@@ -584,6 +673,29 @@ Append one line per hard stop; never rewrite history.
    successor or turn the zero-argument invocation into the later one-parameter
    closure call — keyed on asking lowering to consume a result-flow edge the
    planner never issued.
+6. A result-successor identity existed without an immediate `K` environment
+   locator.
+7. The locator required a source-call identity that is absent at generated entry.
+8. The local Tail return was `RecursiveBackedge`, a protocol marker, not a value.
+9. `CarriedLoopExitResult` named the Ret-body OUTPUT rather than the Ret INPUT.
+10. One Direct declared-call recipe was incorrectly imposed on Tail.
+11. The fused Tail route paired the INITIAL SEED to the Ret input and named that
+    pair fresh-result flow — keyed on `source.rs:4512-4515` returning the carried
+    residual unchanged while `source.rs:2148-2150` records that same `word.word`
+    as a source result, so the observer renamed its input and the certified
+    pairing is exact SSA identity from seed to sink rather than a value edge.
+
+> **ENTRIES 5 AND 11 ARE THE STALE-ENTRY LESSON, NOT JUST TWO STOPS.** The
+> inventory was left stale at entry 5 while stops 6-10 accumulated, so the frame
+> read as though the chain had stopped growing. **An inventory that lags is worse
+> than an absent one: it dates itself and therefore reads as current.** Append at
+> the stop, not at the ruling.
+>
+> **THE ELEVEN ENTRIES SHARE ONE PREDICATE** (HS9, restated at HS11): a static or
+> local endpoint treated as a complete directed dynamic value edge. Each stop
+> added one more endpoint — availability, access, a producer, a destination, a
+> route — and none of them added a VALUE. Reading the list as eleven separate
+> gaps is what keeps producing the twelfth.
 
 ## Objective
 
