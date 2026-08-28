@@ -1,7 +1,7 @@
 ---
 id: CI-NATIVE-PARITY-DURATION
 title: "Rework the CI test suite to run faster, under the operator's 20-minute ceiling and toward the 10-minute target, by removing three measured serial floors: split checked_ih_generated_entry_confluence_and_route_mutations_reject (39 sequential subprocess mutations, 1299.983s in ONE scheduling unit) and its five siblings into per-case tests so nextest can schedule them; then partition native-rt-parity across runners; then rebalance the workspace shards. Splitting alone is necessary but NOT sufficient -- it takes the job from 25m to about 18m, because 4171.65 CPU-seconds on a 4-vCPU runner floors at 17.4m -- and partitioning is INERT until the split lands, because --partition cannot subdivide a single 1300s test. Separately, the ignored-row sweep EXECUTES 33 ignored rows for 10m and treats their failures as non-blocking findings, so rows blocked on a named unbuilt capability get a registered short-circuit that the sweep enforces rather than silently passes. Behaviour-preserving throughout: the same 90 mutation cases with the same assertions and outcomes."
-status: draft
+status: active
 owner: verify
 size: M
 gate: none
@@ -14,14 +14,32 @@ origin: "Operator request 2026-08-28: 'diagnose the native-slow test and brief m
 
 ## Lane and release condition
 
-**This node is lane 2, owned by verify, and it is NOT released yet.** The
-operator ruled: *"let lane 2 finish its current wp, then bring up verify on lane
-2 to rework CI tests to make them run faster."*
+**This node is lane 2, owned by verify.** The operator ruled: *"let lane 2
+finish its current wp, then bring up verify on lane 2 to rework CI tests to make
+them run faster."*
 
-Lane 2's current WP is `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` (language,
-`active`, in build). **It stays `draft` until that lands**, and the Steward
-flips it `ready` and releases it to the verify ring then. Landing alone releases
-nothing; the release does.
+**THE RELEASE CONDITION IS MET (2026-08-28).**
+`V3-FO-SORTED-EIGENPARAMETER-DERIVATION` LANDED at `114a6c105` — all eleven
+candidate paths blob-verified against `origin/main` by the Steward, CI run
+`33207199378` green, tracker closeout at `5fe12514b`. Lane 2's ring therefore
+changes from language to **verify**, and this node is flipped `active` and
+RELEASED.
+
+**This is a ring change WITHIN lane 2, not a fourth lane.** The three-lane
+roster — runtime / language(->verify) / foundation — is unchanged, and the z3
+integration campaign queues behind this node.
+
+Landing alone still releases nothing; the Steward's explicit release does, and
+it accompanies this flip.
+
+> **CONTENTION RE-MEASURED AT RELEASE, not trusted from this frame's earlier
+> reading.** This node edits `crates/ken-cli/tests/rt_parity_native.rs`. Lane
+> 1's D3 node (`RT-RESULT-CONTINUATION-BINDING-PROVENANCE`) adds observations to
+> the SAME file — but D3 is FROZEN at HS13, and its only authorized next turn is
+> a D0 measurement that lands NO production. **There is no live writer on that
+> file today.** If D0 returns YES and a later D3 release issues while this node
+> is still in flight, re-measure and hard-stop rather than merging across the
+> two.
 
 ## Model-capability estimate (steward.md §4h): T2 — mechanical
 
@@ -101,6 +119,32 @@ insufficient on its own.** 4171.65s of work on 4 vCPUs floors at **1042.9s =
 **⇒ D1 is the enabler and D2 is the payoff. Neither delivers the target alone,
 and D2 measured before D1 reads as no improvement.** Do not conclude from a flat
 D2 measurement that partitioning does not work.
+
+> ## PACKAGING: D1 + D2 (+ D3 if clean) LAND AS **ONE** CANDIDATE
+>
+> **Steward sequencing ruling, 2026-08-28, after the operator made this node the
+> fleet's first priority.** The split-before-partition constraint above is a
+> **MEASUREMENT** ordering and it is unchanged: perform the split, measure it,
+> then apply the partition and measure again, and report BOTH numbers.
+>
+> **It is not a packaging instruction, and reading it as one is expensive.**
+> Every publish cycle costs a full CI run — about 29 minutes today — so shipping
+> D1 and D2 as separate candidates spends roughly an hour of pure latency to
+> honour an ordering that is already satisfied inside a single turn. The
+> measurement discipline lives in the turn; the packaging does not have to.
+>
+> **D3 belongs in the same candidate when it is clean, and it is not optional
+> polish.** `native-slow` is 24m and `test shard 1/4` is 18m, so **D1 alone
+> lands the run at roughly 19m — inside the operator's 20m ceiling by about one
+> minute, with no margin**, because shard 1/4 simply becomes the new critical
+> path. D1+D2+D3 is what reaches the 10m target.
+>
+> **This does NOT relax the behaviour-preserving requirement, which is the whole
+> review.** Same 90 mutation cases, same assertions, same outcomes. A larger
+> candidate makes that review bigger, not weaker. **A split that turns out not
+> to be behaviour-preserving is a HARD STOP to the Steward, never a scope
+> widening**, and a candidate that cannot show differential faithfulness does
+> not land regardless of what it does to the clock.
 
 **Floor 3 — shard imbalance, independent of the above.** `test shard 1/4` is 18m
 against 11m for shard 3/4. `--partition count:N/4` assigns by test, not by
