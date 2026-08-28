@@ -1,30 +1,30 @@
 STEWARD WATCHDOG TICK. Run in order; stop as soon as one produces an action.
 
-ARMING SOURCE. UNDER 4096 CHARS -- set_interval rejects more. `wc -c` before arming; never grow a step without trimming another.
+ARMING SOURCE. UNDER 4096 CHARS. `wc -c` before arming; never grow a step without trimming another.
 
-0. CREDIT. On the NEXT exhaustion (operator): when ACTUALLY empty let the fleet idle, do NOT fail over to Anthropic, clear_interval. Exhaustion is ACCOUNT-WIDE -- terra hits it too, so sol->terra is NOT a lever. "usage limit (pro plan)" = QUOTA, nudging does nothing. NOT the 503 "servers are currently overloaded".
+0. CREDIT. On NEXT exhaustion (operator): when ACTUALLY empty let the fleet idle, do NOT fail over to Anthropic, clear_interval. Exhaustion is ACCOUNT-WIDE -- terra too, so sol->terra is NOT a lever. "usage limit (pro plan)" = QUOTA, nudging does nothing; NOT the 503 overload.
 
-0a. CONTEXT GATE. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At/near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then `moot compact steward`. Announcing is not doing.
+0a. CONTEXT GATE. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At/near 33%: commit durable state, update `local/steward-resume-checkpoint.md`, `moot compact steward`. Announcing is not doing.
 
-0b. DISK. `df -h /workspaces/ken /` -- BOTH, different filesystems. Either below 5G: `.moot/truncate-logs.sh`; aged `tmp/ken-*`; `git gc`; a RETIRED seat's `target/`. Verify dead 3 ways; NEVER touch a live ring's target.
+0b. RAM+DISK. `free -h` AND `df -h /workspaces/ken / /tmp`. **`/tmp` IS TMPFS = RAM**: disk reads GREEN while rustc is OOM-SIGKILLed at ~1.3G available -- a disk instrument is blind to a tmpfs. Available <2G or a fs <5G: aged `/tmp` scratch FIRST, `.moot/truncate-logs.sh`, `git gc`, RETIRED seat's `target/`. Verify dead 3 ways; NEVER touch a live seat's scratch -- surface to its owner.
 
-0c. INTEGRATOR RETIRED (operator, permanent) -- NEVER rouse/reseat/route. Its offline last-seen + stale PR #365 post are EXPECTED.
+0c. INTEGRATOR RETIRED (operator, permanent) -- NEVER rouse/reseat/route; its offline last-seen + stale PR #365 are EXPECTED.
 
-1. LANE ROSTER IS `steward/lanes.md` -- read it; time-varying operator direction, NOT baked here. THREE lanes (runtime/language/foundation), never collapse to one. Sweep EACH lane's ring for its next deliverable; as a node lands flip the next depends_on draft->ready and release it. No measurement re-scopes a lane -- surface to operator.
+1. LANE ROSTER IS `steward/lanes.md` -- read it; time-varying operator direction, NOT baked here. THREE lanes (runtime/language/foundation), never collapse to one. Sweep EACH lane's ring for its next deliverable; as a node lands flip the next depends_on draft->ready and release it. No measurement re-scopes a lane -- surface it.
 
-2. PER-LANE LANDING COUNT, NEVER AN AGGREGATE. All with `--since='12 hours ago' origin/main`: runtime `-- ':/crates/ken-runtime/' ':/crates/ken-cli/'`; language `-- ':/crates/ken-elaborator/' ':/crates/ken-kernel/'`; foundation `-- ':/catalog/'`. A bare `-- crates/` is cwd-relative and the persisted Bash cwd silently reports 0. ATTRIBUTE EVERY HIT TO A LANE BY SUBJECT -- the lane-2 path catches lane-3 CAT fixture repairs; it read 5, true count 2.
+2. PER-LANE LANDING COUNT, NEVER AN AGGREGATE. All with `--since='12 hours ago' origin/main`: runtime `-- ':/crates/ken-runtime/' ':/crates/ken-cli/'`; language `-- ':/crates/ken-elaborator/' ':/crates/ken-kernel/'`; foundation `-- ':/catalog/'`. A bare `-- crates/` is cwd-relative; the persisted Bash cwd reports 0. ATTRIBUTE EVERY HIT BY SUBJECT -- the lane-2 path catches lane-3 CAT fixture repairs; it read 5, true 2.
 
-2a. WORKING IS NOT LANDING -- cost 16h unseen; the operator caught it. A seat reads `Working` all through a frame-recut loop. ANY lane at 0 for 12h is a FINDING: read its hard-stop count and `wp/` tips, and tell the operator.
+2a. WORKING IS NOT LANDING -- cost 16h unseen. A seat reads `Working` all through a frame-recut loop. ANY lane at 0 for 12h is a FINDING: read its hard-stop count and `wp/` tips, tell the operator.
 
 2b. Per `status: active` node: is its ring on its NEXT deliverable? Read the NODE, not a status line. Confirm landings by BLOB IDENTITY, never ancestry -- the publisher squashes.
 
 2c. A DISPATCHED NODE LEFT AT `ready` IS INVISIBLE TO 2b. On release flip it `active`.
 
-2d. READ A PANE AT `-S -25` MIN, NEVER `-S -6`, grep `Working|Worked for`. The finished-turn line sits ABOVE the placeholder, so a shallow window is FALSE IDLE. A blank row is an unmatched capture -- open that pane. Read the ERROR CLASS, not the count.
+2d. READ A PANE AT `-S -25` MIN, grep `Working|Worked for`. The finished-turn line sits ABOVE the placeholder, so a shallow window is FALSE IDLE. A blank row is an unmatched capture -- OPEN that pane. Read the ERROR CLASS, not the count.
 
-2e. COMPOSER STRANDS. Tell: `[Pasted Content ...]` with no Working footer. Repair: send `zz` (appends = real strand), check tail for a numbered modal (bare Enter downgrades the model), BSpace, then a BARE `Enter` as its OWN send-keys call. Never combine text and Enter. A leader's handoff report is not a woken seat -- verify yourself.
+2e. COMPOSER STRANDS. Tell: `[Pasted Content ...]`, no Working footer. Repair: send `zz` (appends = real strand), check tail for a numbered modal (bare Enter downgrades the model), BSpace, then a BARE `Enter` as its OWN call. Never combine text and Enter. A leader's report is not a woken seat -- verify yourself.
 
-3. HELD FINISHED WORK IS TOP OF QUEUE. Publish via M1-M9 in `steward/merge-procedure.md`. Check none runs first: `ps -eo pid,ppid,etime,args | grep '[s]cripted-pr-automerge.sh'` and READ THE LISTING -- `grep -c` counts your own wrapper. Never fetch/commit while one holds its window. M1 needs a RESOLVED Decision read fresh from the object. M8a: COMPACT ADVERSARY before any code-merge notify.
+3. HELD FINISHED WORK IS TOP OF QUEUE. Route M1-M4 (`steward/merge-procedure.md`); lieutenant runs M5-M9. Check no publisher first: `ps -eo pid,ppid,etime,args | grep '[s]cripted-pr-automerge.sh'` and READ THE LISTING -- `grep -c` counts your own wrapper. Never fetch/commit while one holds its window. M1 needs a RESOLVED Decision read fresh from the object. M8a: COMPACT ADVERSARY before code-merge notify.
 
 4. WIP AUDIT, 60 MIN -- VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: ruling, QA verdict, handoff, routing, own kick.
 
