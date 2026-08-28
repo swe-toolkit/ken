@@ -319,6 +319,38 @@ relation looks sufficient.
 
 **`AC-10`.** No-regression, in CI (`COORDINATION §12`).
 
+**`AC-AFFECTED-CLOSURE` — cover every target that loads any module whose CLOSURE
+this increment changes, diff-touched or not.** State it as a PREDICATE, never as
+a file list: **an enumerated roster is what let this criterion be missed here.**
+
+This is NOT a relaxation of the targeted-build hard rule. What changes is which
+targets count as affected, never how many crates build at once — resolve the
+closure, then run those targets with `scripts/ken-cargo -p <crate>` /
+`--test <name>`, never `--workspace`.
+
+> **THIS AC EXISTS BECAUSE ITS ABSENCE COST THIS EXACT NODE A RED MERGE
+> (2026-08-28).** Candidate `0bed4da3` passed both exact-SHA gates and reddened
+> CI at `test shard 4/4` (run `33203245269`):
+> `real_fok_recursive_omega_consumer_uses_all_three_child_paths` panicked at
+> `crates/ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs:882`
+> with `KernelRejected TypeMismatch` (expected `Dg612`, found `Dg67`).
+> **That file is NOT one of the ten paths** — it `include_str!`s the edited
+> `catalog/packages/Tooling/Verification/FoKripke.ken` at its line 34.
+> Candidate-caused is MEASURED, not assumed: main is GREEN at the candidate's
+> exact base `1e7988a1e`.
+>
+> **An increment that changes a CLOSURE rather than a FILE breaks consumers no
+> diff-touched target set can see.** Neither gate was negligent — both ran the
+> targets this frame named, and the frame named the wrong set.
+>
+> **The Steward's defect, and it is the FOURTH instance:** foundation
+> (2026-08-27), runtime (2026-08-28), `CORE-FO-CHECK-TREE-SORT-VALIDATION`
+> (2026-08-28), and now here. After the third I folded the criterion into node 1
+> of this very sequence and did not carry it to node 2. **A criterion repaired in
+> one NODE is not thereby repaired in its SEQUENCE** — the fix is to sweep every
+> sibling and successor sharing the changed closure, not the node the failure
+> landed on.
+
 **`AC-FRESHNESS-ISOLATED` — the D1a obj-case freshness control is currently
 MASKED, and this node owns the surface that masks it.** From Adversary advisory
 hunt `evt_e9106h8ysr47` on respin `99a0b548`, **re-verified by the Steward

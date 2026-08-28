@@ -1,6 +1,6 @@
 ---
 id: RT-RESULT-CONTINUATION-BINDING-PROVENANCE
-title: "RT-ITREE D2/D3A/D3B — repair the checked ITree Ret fresh-result binding, ROUTE-SPECIFICALLY (HS12, evt_7a6pp8n24r1ms). The two arms fail DIFFERENTLY and a uniform diagnosis is withdrawn. DirectInvocationReturn: the carried CFG arm of call_checked_ih_transport_from_case_environment (core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word with NO Direct declared-call application on that arm, so D3A ADDS the ruled declared call and its local return is fresh R2. TailProducerToBackedge: the governed application ALREADY EXISTS and a real declared-call producer ALREADY emits fresh R2 (calls.rs:2022, Result-slot load :2120, RoutedAnswer::checked(returned) source.rs:4369-4374) — nothing is unapplied; the bodyless recursor arm (source.rs:4478-4515) DISCARDS that result and substitutes the initial carried seed, so D3A adds ONE typed producer-to-backedge value transfer consumed exactly once at the existing active jump. D3B binds the DELIVERED fresh R2 to the ordinary Ret-case capture on both arms (301/460/459/452 are READ-side evidence coordinates only; the write analogue is derived independently). D2 localization ACCEPTED as evidence (ac1ebdacb; no merge, no QA) and is DIRECT-SCOPED. The merge is ATOMIC (D3A + graph-authorized result flow + product) — no application-only checkpoint. The landed fresh-result route contributes retained topology/identity facts only; NO predecessor supplies Tail value authority and none is authorized."
+title: "RT-ITREE D2/D3A/D3B — repair the checked ITree Ret fresh-result binding, ROUTE-SPECIFICALLY (HS12, evt_7a6pp8n24r1ms). The two arms fail DIFFERENTLY and a uniform diagnosis is withdrawn. DirectInvocationReturn: the carried CFG arm of call_checked_ih_transport_from_case_environment (core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word with NO Direct declared-call application on that arm, so D3A ADDS the ruled declared call and its local return is fresh R2. TailProducerToBackedge: the governed application ALREADY EXISTS and a real declared-call producer ALREADY emits fresh R2 (calls.rs:2022, Result-slot load :2120, RoutedAnswer::checked(returned) source.rs:4369-4374) — nothing is unapplied; the bodyless recursor arm (source.rs:4478-4515) DISCARDS that result and substitutes the initial carried seed, so the missing work is exact produced-result TRANSFER. HS13 (evt_59t7b49m41z8m) REFUTED HS12's MECHANISM LOCUS while its semantic property stands: the Tail route does not exist at the producer (cursor N vs a freshly minted selected continuation at N+2) and composed lowering reduces RoutedAnswer to a bare LoweringOperand in between, so no value/route pair exists there to couple and ownership cannot carry an already-erased value. THIS NODE IS THEREFORE D0-ONLY: enumerate every natural-path seam where the Rust type shrinks to LoweringOperand plus the complete caller closure, and determine whether that closure admits ONE compile-time affine return typestate (Produced owns operand and ContinuationCallIdentity; Routed forms only by consuming Produced when the exact Tail route arrives with agreeing producer identity; the active jump consumes Routed once; ordinary/direct is a distinct exhaustive variant). A compiler-control return value, never a runtime carrier. D0 lands no production and routes no QA; an unboundable closure is HS14. D3B binds the DELIVERED fresh R2 to the ordinary Ret-case capture on both arms (301/460/459/452 are READ-side evidence coordinates only; the write analogue is derived independently). D2 localization ACCEPTED as evidence (ac1ebdacb; no merge, no QA) and is DIRECT-SCOPED. The merge is ATOMIC (D3A + graph-authorized result flow + product) — no application-only checkpoint. The landed fresh-result route contributes retained topology/identity facts only; NO predecessor supplies Tail value authority and none is authorized."
 status: active
 owner: runtime
 size: M
@@ -60,7 +60,15 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > [[RT-CHECKED-IH-TAIL-RESULT-PRODUCER-ROUTE]]. **Do not add a sibling
 > authority.**
 >
-> ## THE PERMITTED TAIL DESIGN — ONE TYPED NEXT-STATE TRANSFER, NOT A LANE
+> ## THE PERMITTED TAIL DESIGN — REFUTED AT HS13. HISTORY, NOT A RECIPE.
+>
+> **DO NOT BUILD WHAT THIS SECTION DESCRIBES.** HS13 (`evt_59t7b49m41z8m`)
+> refuted this MECHANISM LOCUS — the ring implemented it exactly and it cannot
+> work, because the Tail route does not exist at the producer and composed
+> lowering erases `RoutedAnswer` to a bare `LoweringOperand` before it does.
+> **The semantic property below still stands; only the recipe for reaching it is
+> withdrawn.** The authorized work is the D0 return-boundary closure in Phase
+> structure. Retained so the refuted design is auditable.
 >
 > At the exact governed producer, **couple the exact `RoutedAnswer::checked(
 > returned)` operand with the existing Tail route in the source-machine
@@ -819,12 +827,37 @@ Deliver, as ONE atomic increment, the route-specific repair UPSTREAM of ordinary
 - **`DirectInvocationReturn`** — add its ruled declared call; its local return IS
   fresh `R2`.
 - **Tail (`TailProducerToBackedge`)** — its governed application ALREADY EXISTS
-  and is preserved. **The missing work is exact produced-result TRANSFER: the
-  producer-to-backedge value bridge** carrying `RoutedAnswer::checked(returned)`
-  to the existing active jump and header.
+  and is preserved. **The missing work is exact produced-result TRANSFER.**
 - **D3B** — bind the delivered operand to the exact ordinary Ret closure capture
   and body read, then repair the FIRST graph-authorized edge where it fails to
   arrive, so both admitted programs green the exact `InvalidOffset`.
+
+> ## HS13 (`evt_59t7b49m41z8m`) — **D0-ONLY**. D3A/D3B NOT AUTHORIZED.
+>
+> **Everything below describing D3A/D3B as the deliverable states the TARGET, not
+> the authorized work.** The only authorized phase is the D0 return-boundary
+> closure in Phase structure. **D0 lands no production and routes no QA.**
+>
+> **HS12's MECHANISM LOCUS IS REFUTED; its SEMANTIC PROPERTY STANDS.** The
+> required directed edge is still producer result -> active jump -> Ret input,
+> the seed is still the negative control, and `RecursiveBackedge` remains
+> marker-only. **But "couple the operand with the existing Tail route AT THE
+> EXACT PRODUCER" is IMPOSSIBLE AS WRITTEN, because the route does not exist
+> there:** the declared-call result is produced in selected continuation cursor
+> N, the governed Tail route becomes available only in a freshly minted selected
+> continuation at N+2, and in between
+> `lower_computational_match_value_composed` and the adjacent source/active
+> return seams reduce `RoutedAnswer` to a plain `LoweringOperand`. No value/route
+> pair exists at the producer locus, so every later bind observes `Unavailable`.
+>
+> **Cursor N/N+2 is DIAGNOSTIC EVIDENCE ONLY. It is never an identity key and it
+> authorizes no proximity match.** Permitting `Unavailable` merely preserves the
+> exact `ResourceBodyResult` default — it is not partial progress and stays
+> discarded.
+>
+> **Appending another carrier field to `SourceSelectedContinuation` cannot repair
+> a value already erased by a Rust return type.** That is why this is a return
+> BOUNDARY question and not a carrier question.
 
 > **Do NOT restate this as "the carried arm fails to apply `K` and returns the
 > transported word unapplied."** That was the pre-HS12 diagnosis and it is
@@ -857,7 +890,10 @@ The landed `CheckedIhFreshResultRoute` (`7d36d24f0`) contributes **retained
 topology and identity facts — destination topology, active-header identity, Ret
 binder identity. Its Tail VALUE authority is WITHDRAWN.** This atomic candidate
 REPLACES the Tail variant and supplies the one missing producer-to-backedge value
-edge via the new typed source-machine transition. **No new predecessor.** Bind
+edge. **The MECHANISM for that edge is UNDETERMINED and is D0's question (HS13)
+— it is NOT "a new typed source-machine transition", which HS13 refuted: the
+value is erased by a Rust return type before the Tail route exists.** **No new
+predecessor.** Bind
 that FRESH `R2` — NOT the earlier D3A result `R1` traced forward — through
 ordinary Ret-case / closure-capture semantics to the exact capture the Ret-case
 closure consumes. Then repair the
@@ -930,12 +966,48 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   Every governed arrival is paired to its exact identity for its own variant.
   Makes NO claim about the final capture or `InvalidOffset`, and asserts NO
   identity between `R1` and `R2`.
-- **THE D3A→D3B TAIL VALUE BRIDGE — the one typed next-state transfer, and its
-  ATOMICITY SPANS BOTH PHASES.** It is written under D3A because that is where
-  the producer sits, **but it is NOT a D3A-only obligation: it spans result
-  PRODUCTION and Ret-input DELIVERY.** Do not read its placement as licence for
-  D3B to consume the old certified edge — **that edge does not exist.** D3B
-  consumes the bridge's delivered operand or it consumes nothing.
+- **D0 — RETURN-BOUNDARY CLOSURE. THIS IS THE ONLY AUTHORIZED PHASE (HS13,
+  `evt_59t7b49m41z8m`). It lands NO production and routes NO QA.**
+
+  On both unchanged admitted products, **enumerate every natural-path seam** from
+  `RoutedAnswer::checked(returned)` (`source.rs:4369-4374`) to the later Tail
+  route **where the Rust type shrinks to `LoweringOperand`** — including
+  `lower_computational_match_value_composed` and the adjacent source/active
+  return seams — **plus the COMPLETE CALLER CLOSURE of those seams.**
+
+  Then determine whether that closure admits ONE **compile-time affine return
+  typestate**:
+  - **`Produced`** owns the exact operand and the exact `ContinuationCallIdentity`
+    BEFORE the Tail route exists;
+  - **`Routed`** can be formed ONLY by consuming `Produced`, when the exact later
+    Tail route arrives AND its producer identity AGREES;
+  - the active jump consumes `Routed` **ONCE**;
+  - an ordinary/direct result is a **DISTINCT EXHAUSTIVE VARIANT, not an empty
+    Tail state**;
+  - **NO function in the measured return closure may silently extract a bare
+    operand while `Produced` or `Routed` is pending.**
+
+  **This is a Rust COMPILER-CONTROL RETURN VALUE, not a runtime carrier.** D0
+  must REJECT: `Option`, `RefCell`, long-lived control/frame storage, cloning the
+  operand, cursor matching, a persistent receipt, a side table, a lookup/search,
+  post-emission rewrite, a runtime word, a header/ABI field, a capture write, a
+  fallback, and `answer_route` promotion.
+
+  **FAIL-CLOSED:** a Tail route receiving an ordinary result FAILS CLOSED. **No
+  `Unavailable` default is accepted as Tail evidence** — it preserves the exact
+  `ResourceBodyResult` default and proves nothing.
+
+  **HS14 STOP RULE.** If the complete signature/caller closure CANNOT be bounded
+  without redesigning general composed lowering outside this exact return path,
+  **that is HARD STOP 14: stop cleanly and route the SCOPE BOUNDARY back to the
+  Architect BEFORE selecting any mechanism.** Do not select the least-bad
+  mechanism, and do not widen the closure to make an answer reachable.
+
+- **THE TAIL VALUE TRANSFER — TARGET ONLY, MECHANISM UNDETERMINED, NOT
+  AUTHORIZED UNTIL D0 ANSWERS.** Its atomicity spans result PRODUCTION and
+  Ret-input DELIVERY, so it was never a D3A-only obligation. Do not read its
+  placement as licence for D3B to consume the old certified edge — **that edge
+  does not exist.** D3B consumes the delivered operand or it consumes nothing.
 - **D3B — fresh-result binding then single-edge repair.** On both
   unchanged admitted programs, take D3A's FRESH `R2` as delivered by the bridge
   and bind it, via the Ret case's
@@ -1092,29 +1164,32 @@ transitively into the capture, or re-derive the inheritance relation in lowering
       `ApplyRecursorSelection` raises the route from the exact checked selecting
       layer (`source.rs:1528-1567`, `mod.rs:10015+`). Pair every governed arrival
       to its exact invocation/call/callee triple and active governed frame.
-    - **THE TAIL VALUE TRANSFER — folded in at HS12 (`evt_7a6pp8n24r1ms`), and it
-      is the whole of what twelve stops were missing.** The application protocol
-      above is real and it stays; what it does NOT do is carry a value. Add
-      exactly ONE typed next-state transfer, and nothing else:
-      1. **At the exact governed producer**, couple the exact
-         `RoutedAnswer::checked(returned)` operand (`calls.rs:2022` call,
-         `:2120` Result-slot load, `source.rs:4369-4374` return) with the
-         existing Tail route in the source-machine state/control path. The source
-         machine already pairs operand and route in `SourceMachineState::Value` —
-         **use that structure; do not build a parallel one.**
-      2. **Carry the pair forward BY OWNERSHIP** to the exact bodyless Tail
-         predecessor at `source.rs:4478-4515` — the arm that today constructs a
-         new `RoutedAnswer::direct(Carried(word))` from the seed and thereby
-         discards the producer.
-      3. **Consume it ONCE when emitting the existing active jump**
-         (`core.rs:12218-12233`) and **emit `returned` as that jump's first
-         argument.** Reuse the existing header block parameter; the Ret input
-         follows from it unchanged.
-      **The transfer is STRUCTURAL, not an optional compiler receipt.** Encode it
-      in the typed source-machine transition/continuation path so the value and
-      the route CANNOT SEPARATE, and so one-shot consumption follows from MOVING
-      the state. **Do NOT** store a `Cranelift Value` in function-local optional
-      state, recover it later by liveness/number/proximity, or promote the
+    - **THE TAIL VALUE TRANSFER — TARGET ONLY. ITS MECHANISM IS WITHDRAWN AND
+      UNDETERMINED (HS13, `evt_59t7b49m41z8m`); D0 ABOVE IS WHAT IS AUTHORIZED.**
+      The application protocol above is real and it stays; what it does NOT do is
+      carry a value. **The semantic target is unchanged:** the exact
+      `RoutedAnswer::checked(returned)` operand (`calls.rs:2022` call, `:2120`
+      Result-slot load, `source.rs:4369-4374` return) must reach the existing
+      active jump (`core.rs:12218-12233`) as its first argument, reusing the
+      existing header block parameter, with the Ret input following unchanged —
+      and the bodyless Tail predecessor at `source.rs:4478-4515` must stop
+      substituting the seed.
+
+      > **THE HS12 RECIPE FOR REACHING IT IS REFUTED — DO NOT BUILD IT.** It said:
+      > couple the operand with the existing Tail route in the source-machine
+      > state/control path AT THE EXACT PRODUCER, reusing
+      > `SourceMachineState::Value`, then carry the pair forward BY OWNERSHIP and
+      > consume it once. **The ring built exactly that and it cannot work:** the
+      > Tail route does not exist at the producer (cursor N vs a freshly minted
+      > selected continuation at N+2), and the composed lowering seams reduce
+      > `RoutedAnswer` to a bare `LoweringOperand` in between. **Ownership cannot
+      > carry a value that a Rust return type has already erased, and appending a
+      > carrier field to `SourceSelectedContinuation` does not change that.**
+      > **Whether ANY mechanism exists is D0's question. Do not select one.**
+
+      Whatever D0 finds, these remain prohibited: storing a `Cranelift Value` in
+      function-local optional state, recovering it later by
+      liveness/number/proximity, matching on cursor position, or promoting the
       control-only `answer_route` — the planner route authorizes identities, it
       does not manufacture the runtime value.
       **Add no runtime word, header parameter, ABI field, heap/stack receipt,
@@ -1210,7 +1285,17 @@ transitively into the capture, or re-derive the inheritance relation in lowering
 ## Acceptance criteria
 
 - **`AC-TAIL-TRANSFER-CONTROLS` (HS12, `evt_7a6pp8n24r1ms`) — the controls must
-  discriminate the NEW EDGE, not the endpoints it connects.** Twelve stops
+  discriminate the NEW EDGE, not the endpoints it connects.**
+
+  > **NOT YET IN SCOPE (HS13).** This AC governs the eventual transfer
+  > implementation. **D0 is a measurement and lands no production, so this AC is
+  > not satisfiable at D0 and must not be attempted there.** It is retained
+  > unchanged because the semantic property survived HS13 — only the mechanism
+  > locus was refuted. **Re-read it against whatever mechanism D0 finds before
+  > treating any arm below as still applicable**; arms naming a producer-locus
+  > pairing or an ownership carry describe a recipe that no longer exists.
+
+  Twelve stops
   produced controls that passed on endpoint facts; this one is about a directed
   value transition, so every arm below must be exhibited. **Each arm must
   preserve compilation far enough to OBSERVE the claimed failure** — an arm that
@@ -1468,10 +1553,14 @@ stating it globally is what made the earlier text read Direct-shaped:**
 - **`DirectInvocationReturn`** — which body-refined
   `CheckedIhEnvironmentTransport`, which projected capture ordinals, and the ONE
   declared call.
-- **`TailProducerToBackedge`** — exact producer-to-backedge OWNERSHIP and a
-  ONE-SHOT transfer: that the operand carried forward is the declared
-  continuation-specialization call's result and not a neighbouring live word,
-  and that it is consumed exactly once at the active jump. **Transport and
+- **`TailProducerToBackedge`** — **at D0 (HS13) the argument is a RETURN-BOUNDARY
+  CLOSURE argument:** whether the enumerated seam set and its complete caller
+  closure admit ONE compile-time affine return typestate, and whether that
+  closure can be BOUNDED without redesigning general composed lowering. **It is
+  no longer an ownership-carry argument — HS13 refuted that locus.** The property
+  it must eventually establish is unchanged: that the operand delivered is the
+  declared continuation-specialization call's result and not a neighbouring live
+  word, and that it is consumed exactly once at the active jump. **Transport and
   capture projection are NOT part of this argument** — Tail's discriminator is
   `direct_transport=None`.
 - **Shared by both** — one application per arrival, and the exact result-flow
@@ -1514,12 +1603,26 @@ inert proof — a node that lands first would either be behaviourally inert (and
 therefore not the repair) or would break the products it landed ahead of.** The
 Tail value transfer is now a D3A bullet, inside the atomic increment.
 
-Runtime is HELD until the Steward issues a **NEW EXPLICIT RELEASE against the
-RECUT frame blob** — neither the HS12 ruling, nor this recut landing, nor any
-predecessor landing authorizes a code turn. **Landing a frame alone releases
-nothing**, and the previous releases are SPENT.
+**HS13 (`evt_59t7b49m41z8m`) — THE NEXT AUTHORIZED TURN IS D0 ONLY, NOT THE
+ATOMIC CONSUMER.** The third release is SPENT. The ring attempted the accepted
+Direct recipe plus the HS12 Tail transfer and hard-stopped cleanly: no commit, no
+candidate, no QA, baseline restored. **HS12's mechanism locus is refuted, its
+semantic property stands.** No new predecessor is authorized — the return
+boundary is inside the same semantic repair. No Decision and no Research advisory
+follow from HS13; **HS15 remains the next mechanical Research trigger.**
 
-Then the Runtime ring rebases the D3 branch and builds the ATOMIC D3A+D3B
+Runtime is HELD until the Steward issues a **NEW EXPLICIT RELEASE against the
+RECUT frame blob** — neither the HS12 ruling, nor the HS13 ruling, nor this recut
+landing, nor any predecessor landing authorizes a code turn. **Landing a frame
+alone releases nothing**, and the previous releases are SPENT.
+
+**The next turn delivers the D0 return-boundary closure in Phase structure. It
+lands NO production and routes NO QA, and it may end at HS14** — an unboundable
+signature/caller closure is a clean stop routed to the Architect, never a
+mechanism selected under pressure.
+
+ONLY AFTER D0 ANSWERS AND THE STEWARD RELEASES AGAIN does the Runtime ring
+rebase the D3 branch and build the ATOMIC D3A+D3B
 consumer candidate (D3A application of inherited `K` **per route variant**
 yielding fresh `R2` + D3B fresh-`R2` binding to the ordinary Ret capture +
 product) — no application-only checkpoint. **D3A and D3B consume THE
