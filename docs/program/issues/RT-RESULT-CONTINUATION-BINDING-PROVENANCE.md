@@ -444,10 +444,12 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > environment-index/frame-slot morphism. **That enumeration is evidence for the
 > Architect, not an authorization to pick the least-bad item on it.**
 >
-> # OPERATIVE RULING — HARD STOP 8, `evt_54efxydhb3n6w` (2026-08-27)
+> # SUPERSEDED — HARD STOP 8, `evt_54efxydhb3n6w` (2026-08-27)
 >
-> **This is the operative RULING. Every banner BELOW it is history.** Read it,
-> then read below only for lineage. Only the HS9 state block ABOVE is newer.
+> **HISTORY, NOT THE OPERATIVE RULING.** The operative ruling is **HS13
+> (`evt_59t7b49m41z8m`), in the banner at the TOP of this file**; HS9, HS10,
+> HS11 and HS12 are all newer than this one. Read this banner only for lineage,
+> and cite nothing from it as current authority.
 >
 > **Disambiguation, because this file contains an earlier in-line mention of
 > "HS8" inside the HS7 banner.** That older mention is NOT this ruling. The
@@ -746,7 +748,10 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > it is NOT a live instruction.** The landed successor contributes retained
 > topology/identity facts only; no predecessor owns the Tail relation, this
 > candidate supplies it, and no further predecessor or predecessor-node hard stop
-> is authorized. The live contract is the HS12 UPDATE in Deliverables (D3B).
+> is authorized. **The live contract is HS13 (`evt_59t7b49m41z8m`) — this node
+> is D0-ONLY and D3A/D3B are NOT authorized.** The HS12 UPDATE in Deliverables
+> (D3B) survives only as SEMANTIC PROPERTY and history: its mechanism locus is
+> refuted and it is not a recipe to build.
 >
 > **Lowering has reached the end of its authority.** The next component is an
 > UPSTREAM planner-owned checked-IH result-successor relation — a genuine
@@ -1103,11 +1108,17 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   **It must NOT consume `CarriedLoopExitResult`** — that arm is latent false
   authority (HS9), and it names the Ret body's OUTPUT where this consumer needs
   its INPUT.
-- **The MERGE is ATOMIC:** D3A application of inherited `K` + D3B fresh-`R2`
-  destination binding + the D3A→D3B bridge + the product controls, landed
-  together — no application-only checkpoint. **Runtime builds this after THIS
-  FRAME ERRATUM LANDS and the Steward SEPARATELY RELEASES D3.** No predecessor
-  recut is outstanding; HS12 subsumed the last one.
+- **The MERGE is ATOMIC — and this bullet states the TARGET, not authorized
+  work (HS13, `evt_59t7b49m41z8m`).** D3A application of inherited `K` + D3B
+  fresh-`R2` destination binding + the D3A→D3B bridge + the product controls,
+  landed together — no application-only checkpoint. **Runtime does NOT build
+  this after a frame erratum lands.** The sequence is: (1) the D0
+  return-boundary closure answer is completed against `AC-HS13-D0-CLOSURE` and
+  `AC-HS13-D0-AFFINE`, (2) the **Architect reviews that D0 answer**, and (3) the
+  Steward issues a SUBSEQUENT fresh explicit D3 release. **The immediate
+  authorized release is D0-ONLY, and a frame landing authorizes nothing.** A D0
+  answering NO is HS14 and no D3 release follows at all. No predecessor recut is
+  outstanding; HS12 subsumed the last one.
 
 ## Evidence objects (Architect probe-verified; evidence ONLY, not candidates)
 
