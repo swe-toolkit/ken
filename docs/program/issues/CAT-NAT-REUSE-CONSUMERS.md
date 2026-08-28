@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-REUSE-CONSUMERS
 title: "Catalog-reuse rework, first scoped batch: the nine unblocked low-risk Nat arithmetic/order consumer duplicates from the census (groups 2 and 3), across six packages — each package imports add/leq_nat/sub/min from its canonical owner and drops the local reimplementation, one independently-releasable increment per package"
-status: active
+status: merged
 owner: foundation
 size: M
 gate: none

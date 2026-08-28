@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-PUB-EXPORT
 title: "Bring catalog Data/Collections/Derived.ken.md to the pub-export standard — mark its census-recorded exported operations pub so consuming packages can selectively import them instead of reimplementing. The provider prerequisite that unblocks census group 4 (derived-list reuse) and is a necessary half of the LawfulFunctors standalone repair."
-status: draft
+status: ready
 owner: foundation
 size: S
 gate: none
