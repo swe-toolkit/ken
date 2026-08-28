@@ -811,16 +811,31 @@ returning the transported captured-environment word unapplied.
 **THE APPLICATION IS ROUTE-VARIANT-SPECIFIC (HS10, `evt_1ckwtvwe23e3e`). There is
 no single uniform D3A mechanism, and assuming one is what produced HS10.**
 For `DirectInvocationReturn` the application is the existing body-refined
-transport plus ONE declared call, whose local return IS fresh `R2`. For
-`TailResumedRetInput` the application is the EXISTING exact zero-argument
-governed recursor call — consume the checked marker once, install the invocation
-segment once, run the existing active self-resumption — and it has NO declared
-target by construction. Consuming the
-predecessor's **single typed fresh-result ROUTE relation**
-(`CheckedIhFreshResultRoute`, landed `7d36d24f0`), bind that FRESH `R2` — NOT the
-earlier D3A result `R1` traced forward — ALONG THAT CERTIFIED FORWARD ROUTE
-through ordinary Ret-case / closure-capture semantics to the exact capture the
-Ret-case closure consumes. Then repair the
+transport plus ONE declared call, whose local return IS fresh `R2`.
+
+**FOR TAIL, THE VARIANT IS `TailProducerToBackedge` — a REPLACEMENT, and
+`TailResumedRetInput` IS ABSENT (HS12, `evt_7a6pp8n24r1ms`).** The old name
+survives only in the historical banners above. The conceptual name here is the
+frame's; the exact spelling of the landed arm is the increment's to choose.
+
+**State the Tail split precisely, because the imprecise version is what HS12
+corrected.** The existing governed recursor application REMAINS — consume the
+checked marker once, install the invocation segment once, run the existing active
+self-resumption. What Tail does NOT use is Direct's
+`continuation_calls[...]` lookup and Direct's extra declared call. **That is NOT
+the same as "no declared call produces the value."** D0 established the actual
+fresh-result producer AS a declared call: the continuation-specialization call at
+`calls.rs:2022`, its Result-slot load at `:2120`, yielding
+`RoutedAnswer::checked(returned)` at `source.rs:4369-4374`.
+
+The landed `CheckedIhFreshResultRoute` (`7d36d24f0`) contributes **retained
+topology and identity facts — destination topology, active-header identity, Ret
+binder identity. Its Tail VALUE authority is WITHDRAWN.** This atomic candidate
+REPLACES the Tail variant and supplies the one missing producer-to-backedge value
+edge via the new typed source-machine transition. **No new predecessor.** Bind
+that FRESH `R2` — NOT the earlier D3A result `R1` traced forward — through
+ordinary Ret-case / closure-capture semantics to the exact capture the Ret-case
+closure consumes. Then repair the
 FIRST graph-authorized edge where the fresh `R2` fails to reach that ordinary
 capture, so the admitted read-offset and write-offset full programs green the
 exact `InvalidOffset` observation. Runtime must NOT repair the default, write
@@ -842,36 +857,54 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   - **`DirectInvocationReturn`** — retain the existing body-refined
     `CheckedIhEnvironmentTransport` plus ONE declared call (the shape proven
     feasible by WIP `719933055`). **Its local return IS fresh `R2`.**
-  - **`TailResumedRetInput`** — the application is the EXISTING exact
-    zero-argument governed recursor call. Consume the checked marker ONCE,
-    install the invocation segment ONCE, run the existing active self-resumption.
-    **`recursive_unit_body=None` and `direct_transport=None` are REQUIRED
-    DISCRIMINATORS, not obstacles.** There is no declared target and none may be
-    selected or invented. **The initial `CheckedIhCapturedEnvironment` residual
-    is NEVER `R2`** — fresh `R2` is named only when the installed checked
-    computation returns on the existing `CheckedSelectedRecursor` answer route
-    and flows forward through the certified active-header / Ret-input edge.
+  - **`TailProducerToBackedge`** (the REPLACEMENT variant; `TailResumedRetInput`
+    is ABSENT — HS12 `evt_7a6pp8n24r1ms`) — the governed recursor application is
+    the EXISTING exact zero-argument governed recursor call. Consume the checked
+    marker ONCE, install the invocation segment ONCE, run the existing active
+    self-resumption. **`recursive_unit_body=None` and `direct_transport=None` are
+    REQUIRED DISCRIMINATORS, not obstacles.**
+    **What Tail does NOT use is Direct's `continuation_calls[...]` lookup and
+    Direct's extra declared call — that is NOT "no declared call produces the
+    value".** The actual fresh-result producer IS a declared call: the
+    continuation-specialization call at `calls.rs:2022` with its Result-slot load
+    at `:2120`, yielding `RoutedAnswer::checked(returned)` at
+    `source.rs:4369-4374`.
+    **The initial `CheckedIhCapturedEnvironment` residual is NEVER `R2`.** Fresh
+    `R2` is that produced operand, and it reaches the active header ONLY via the
+    D3A→D3B Tail value bridge below. **There is no pre-existing certified
+    active-header / Ret-input VALUE edge to flow along — HS12 proved that edge
+    absent, and the bridge is what supplies it.**
 
   Every governed arrival is paired to its exact identity for its own variant.
   Makes NO claim about the final capture or `InvalidOffset`, and asserts NO
   identity between `R1` and `R2`.
-- **D3B — fresh-result route binding then single-edge repair.** On both
-  unchanged admitted programs, take D3A's FRESH `R2` and bind it, through the
-  predecessor's certified fresh-result ROUTE relation, via the Ret case's
+- **THE D3A→D3B TAIL VALUE BRIDGE — the one typed next-state transfer, and its
+  ATOMICITY SPANS BOTH PHASES.** It is written under D3A because that is where
+  the producer sits, **but it is NOT a D3A-only obligation: it spans result
+  PRODUCTION and Ret-input DELIVERY.** Do not read its placement as licence for
+  D3B to consume the old certified edge — **that edge does not exist.** D3B
+  consumes the bridge's delivered operand or it consumes nothing.
+- **D3B — fresh-result binding then single-edge repair.** On both
+  unchanged admitted programs, take D3A's FRESH `R2` as delivered by the bridge
+  and bind it, via the Ret case's
   `CheckedCaseBinderLayout` to the exact ordinary closure-capture occurrence and
   body read (read: closure 460 / capture 459 / body 452; write: its independently
   derived analogue closure 473 / capture 472 / body 465). Identify the FIRST
   graph-authorized edge where the fresh `R2` fails to reach that ordinary capture.
   ONLY that edge may be repaired. D3B does NOT trace `R1` forward through the
   source-control chain, does NOT re-derive the inheritance relation in lowering,
-  and consumes ONLY the predecessor's certified fresh-result ROUTE relation.
+  and consumes ONLY the operand the D3A→D3B bridge delivers. **The landed
+  `CheckedIhFreshResultRoute` contributes RETAINED TOPOLOGY AND IDENTITY FACTS —
+  destination topology, active-header identity, Ret binder identity. Its Tail
+  VALUE authority is WITHDRAWN (HS12) and may not be consumed as one.**
   **It must NOT consume `CarriedLoopExitResult`** — that arm is latent false
   authority (HS9), and it names the Ret body's OUTPUT where this consumer needs
   its INPUT.
 - **The MERGE is ATOMIC:** D3A application of inherited `K` + D3B fresh-`R2`
-  destination binding + the product controls, landed together — no
-  application-only checkpoint. Runtime builds this after the predecessor recut
-  lands and a fresh release.
+  destination binding + the D3A→D3B bridge + the product controls, landed
+  together — no application-only checkpoint. **Runtime builds this after THIS
+  FRAME ERRATUM LANDS and the Steward SEPARATELY RELEASES D3.** No predecessor
+  recut is outstanding; HS12 subsumed the last one.
 
 ## Evidence objects (Architect probe-verified; evidence ONLY, not candidates)
 
@@ -970,8 +1003,12 @@ transitively into the capture, or re-derive the inheritance relation in lowering
       transport/call identity. Factor the `StaticWorker` and carried-capture
       sources into one downstream envelope/call path rather than duplicating the
       continuation body or creating a second call lane.
-    - **`TailResumedRetInput` ONLY** — do NOT resolve a source call identity, do
-      NOT consult `continuation_calls`, and do NOT emit a declared call. The
+    - **`TailProducerToBackedge` ONLY** (`TailResumedRetInput` is ABSENT) — do
+      NOT resolve a source call identity, do NOT consult `continuation_calls`,
+      and do NOT emit Direct's extra declared call. **That is a prohibition on
+      DIRECT'S lookup and DIRECT'S extra call, NOT a claim that no declared call
+      produces the value — the fresh-result producer IS the declared
+      continuation-specialization call at `calls.rs:2022` (HS12).** The
       application is the EXISTING governed recursor call path already in
       lowering: the governed call reaches the exact `ComputationalRecursorClosure`
       (`source.rs:4424-4469`), `mint_checked_computational_ih_instance` consumes
@@ -1030,8 +1067,10 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   half; Architect evt_6mnawfvm8fc4j):**
   - On both unchanged admitted programs, take D3A's FRESH `R2` (the result of
     applying inherited `K` at the exact recursively-exposed invocation) and,
-    through the predecessor's single certified fresh-result ROUTE relation
-    (`CheckedIhFreshResultRoute`), carry it to the
+    for Tail via the D3A→D3B value bridge (Direct via its own declared-call
+    return), and using the landed `CheckedIhFreshResultRoute` ONLY for its
+    RETAINED topology/identity facts and NEVER as Tail value authority (HS12),
+    carry it to the
     eventual ordinary `ITree::Ret` payload the Ret-case closure consumes.
     **Bind ONLY that later `R2`. NEVER the initial carried environment word, and
     never `R1`** (HS10). Do NOT
@@ -1079,7 +1118,15 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   value transition, so every arm below must be exhibited. **Each arm must
   preserve compilation far enough to OBSERVE the claimed failure** — an arm that
   fails to build proves nothing, and this chain has twice shipped a control that
-  could not fail. At minimum:
+  could not fail.
+
+  **This is a PER-COORDINATE MUTATION FAMILY, and it has NO fixed count. Do not
+  restate it as a numbered list of arms** — the axes below vary the producer, the
+  two neighbours, the route coordinates, the consumption directions, the
+  marker/header, and the Direct substitution INDEPENDENTLY, so any stated total
+  is both wrong and narrowing: it converts an open family into a checklist
+  somebody can finish. **The Steward wrote a "nine arms" gloss into the tracker
+  and the Architect struck it (`evt_2mkjv4g5ss9pp`).** The axes, non-exhaustively:
   - delete the producer-to-transition capture;
   - substitute the SEED for `returned`;
   - substitute either neighbouring live word;
@@ -1145,13 +1192,18 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   - **`DirectInvocationReturn`** — through the ruled
     transport/projection/envelope/single-declared-call shape; the call result is
     fresh `R2`.
-  - **`TailResumedRetInput`** — through the existing zero-argument governed
-    recursor call: checked marker consumed once, invocation segment installed
-    once, existing active self-resumption run. **Fresh `R2` is the value returned
-    on the existing `CheckedSelectedRecursor` answer route and carried forward
-    through the certified active-header / Ret-input edge — NEVER the initial
-    `CheckedIhCapturedEnvironment` residual word, and never a declared-call
-    return, because there is no declared call on this variant.**
+  - **`TailProducerToBackedge`** (`TailResumedRetInput` is ABSENT) — through the
+    existing zero-argument governed recursor call: checked marker consumed once,
+    invocation segment installed once, existing active self-resumption run.
+    **Fresh `R2` IS a declared-call return** — the continuation-specialization
+    call at `calls.rs:2022`, its Result-slot load at `:2120`, returned as
+    `RoutedAnswer::checked(returned)` at `source.rs:4369-4374`. **What Tail
+    lacks is Direct's `continuation_calls[...]` lookup and Direct's extra call,
+    NOT declared-call production; the prior wording said otherwise and HS12
+    corrected it.** `R2` reaches the active header ONLY through the D3A→D3B
+    value bridge — **there is no pre-existing certified active-header /
+    Ret-input VALUE edge to carry it, and it is NEVER the initial
+    `CheckedIhCapturedEnvironment` residual word.**
 
   **A candidate that satisfies this AC by making Tail rows take the Direct path
   FAILS it**, however green the suite: that is the HS10 defect restated, not the
@@ -1169,8 +1221,9 @@ transitively into the capture, or re-derive the inheritance relation in lowering
 - AC-D3B-RESULTFLOW (fresh-result-delivery positive — D3B; TWO separately paired
   paths) — the atomic (D3A+D3B) candidate applies inherited `K` at each exact
   recursively-exposed invocation, yields the FRESH result `R2`, and binds THAT
-  `R2` — through the predecessor's single certified fresh-result ROUTE relation
-  (`CheckedIhFreshResultRoute`) and the
+  `R2` — for Tail through the D3A→D3B value bridge this candidate supplies, with
+  the landed `CheckedIhFreshResultRoute` contributing RETAINED topology/identity
+  facts and NOT Tail value authority (HS12), and the
   Ret-case `CheckedCaseBinderLayout` — to THAT program's own exact closure-capture
   occurrence and body read, then proceeds through exact `ResourceBodyOk` /
   `ResourceBodyErr` selection to the independently specified `InvalidOffset`
@@ -1264,16 +1317,19 @@ spelling/ABI/family/trap/field-count/index authority; D3A applies the inherited
 authorizes and not a uniform one (HS10)** — for `DirectInvocationReturn` the
 body-refined `CheckedIhEnvironmentTransport` plus ONE declared call, projected
 capture ordinals, single envelope/call path, no `StaticWorkerBinding` synthesis,
-no second identity catalog/ABI lane; for `TailResumedRetInput` the EXISTING
+no second identity catalog/ABI lane; for `TailProducerToBackedge` the EXISTING
 zero-argument governed recursor call with checked marker consumed once and
-invocation segment installed once, **no declared call, no source call identity,
-no target selection, and the initial carried environment word never treated as
-`R2`** — yields fresh `R2`, and does NOT land alone. **Reject any candidate that
+invocation segment installed once, **no `continuation_calls` lookup and no extra
+Direct declared call, no target selection, and the initial carried environment
+word never treated as `R2`** — with fresh `R2` produced by the declared
+continuation-specialization call and delivered by the D3A→D3B value bridge, and
+does NOT land alone. **Reject any candidate that
 routes Tail rows through the Direct recipe, and check the pairing population PER
 VARIANT so a one-row Direct proof cannot pass as a five-row one.** D3B binds that
 FRESH `R2` (never `R1` traced transitively, never the initial environment word)
-through the predecessor's single certified fresh-result ROUTE relation
-(`CheckedIhFreshResultRoute`) and the Ret-case binder to the exact ordinary
+through the D3A→D3B value bridge for Tail — the landed
+`CheckedIhFreshResultRoute` supplying RETAINED topology/identity facts only, never
+Tail value authority (HS12) — and the Ret-case binder to the exact ordinary
 closure capture, repairing the FIRST graph-authorized edge where `R2` fails to
 reach it, with authority from EXISTING planner relations only, no lowering-side
 reverse search, no second binder catalog, no direct capture-0 write, the
@@ -1310,8 +1366,11 @@ no merge, no QA); D3B localization is ACCEPTED (evidence `4e516e54`, HS5). The
 HARDENED at HS12 (`evt_7a6pp8n24r1ms`), previously HS10
 (`evt_1ckwtvwe23e3e`).** Every node in `depends_on` is `merged`, including
 [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]] and the corrected
-[[RT-CHECKED-IH-FRESH-RESULT-ROUTE]] (`7d36d24f0`). **The landed fused route is
-sufficient authority; adding a predecessor is explicitly forbidden.** What
+[[RT-CHECKED-IH-FRESH-RESULT-ROUTE]] (`7d36d24f0`). **The landed fused route
+contributes RETAINED TOPOLOGY AND IDENTITY FACTS; its Tail VALUE authority is
+WITHDRAWN (HS12). This atomic candidate replaces the Tail variant and supplies
+the one missing producer-to-backedge value edge itself. Adding a predecessor is
+explicitly forbidden.** What
 blocked HS10 was this frame's uniform D3A recipe, since amended to be
 route-variant-specific.
 
