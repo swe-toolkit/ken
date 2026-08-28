@@ -71,6 +71,28 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > consumer only AFTER the corrected predecessor passes fresh Architect and
 > Runtime QA gates and LANDS.** Landing authorizes nothing by itself.
 >
+> **THE PREDECESSOR HAS NOW LANDED** — `RT-CHECKED-IH-FRESH-RESULT-ROUTE` at
+> `7d36d24f04678d3c9a2636fb06fd8c7aaf5dfb89`, eight paths blob-verified. The
+> release itself is still owed and is NOT granted by this note.
+>
+> **STEWARD FRAME CORRECTION, 2026-08-28 — applied before that release, not
+> after.** The Objective and the D3B phase text described the predecessor as
+> supplying **TWO separable proofs** — a `K`-inheritance proof and a separate
+> fresh-`R2`-destination proof. **That is the exact architecture HS9 falsified.**
+> What landed is ONE fused `CheckedIhFreshResultRoute` whose source, intermediate
+> tail edge, and sink COMPOSE; composition is the whole point of the replacement
+> and is what the two-proof object lacked. Both passages now name the single
+> route relation.
+>
+> **Why this mattered enough to fix before releasing.** Left uncorrected, the
+> operative contract would have sent the ring looking for a projection that no
+> longer exists, and the nearest thing answering to "the fresh-`R2`-destination
+> proof" is `CheckedIhFreshResultDestination` — which names a DESTINATION, never
+> a producer. Consuming it alone is precisely the latent false authority this
+> node is forbidden to touch. **A frame that survives the ruling which
+> invalidated it does not read as stale; it reads as authoritative**, which is
+> what makes this class of defect expensive. The defect was the Steward's.
+>
 > # HARD STOP 9 TAKEN — `evt_5p5mknw26g4qq` (2026-08-28), the measurement behind the ruling
 >
 > **This block records the hard stop itself. The ruling above is what governs.**
@@ -504,10 +526,11 @@ Localize the first unresolved authority, which is UPSTREAM of ordinary
 apply the inherited continuation capability `K` at the exact recursively-exposed
 checked invocation and yield the FRESH result `R2`, instead of the carried arm
 returning the transported captured-environment word unapplied. Consuming the
-predecessor's continuation-inheritance projection (the `K`-inheritance proof and
-the fresh-`R2`-destination proof), bind that FRESH `R2` — NOT the earlier D3A
-result `R1` traced forward — through ordinary Ret-case / closure-capture
-semantics to the exact capture the Ret-case closure consumes. Then repair the
+predecessor's **single typed fresh-result ROUTE relation**
+(`CheckedIhFreshResultRoute`, landed `7d36d24f0`), bind that FRESH `R2` — NOT the
+earlier D3A result `R1` traced forward — ALONG THAT CERTIFIED FORWARD ROUTE
+through ordinary Ret-case / closure-capture semantics to the exact capture the
+Ret-case closure consumes. Then repair the
 FIRST graph-authorized edge where the fresh `R2` fails to reach that ordinary
 capture, so the admitted read-offset and write-offset full programs green the
 exact `InvalidOffset` observation. Runtime must NOT repair the default, write
@@ -528,16 +551,19 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   `K`-inheritance proof — and yields the FRESH result `R2`. Every governed arrival
   is paired to its exact transport/call identity. Makes NO claim about the final
   capture or `InvalidOffset`, and asserts NO identity between `R1` and `R2`.
-- **D3B — fresh-result destination binding then single-edge repair.** On both
+- **D3B — fresh-result route binding then single-edge repair.** On both
   unchanged admitted programs, take D3A's FRESH `R2` and bind it, through the
-  predecessor's fresh-`R2`-destination projection, via the Ret case's
+  predecessor's certified fresh-result ROUTE relation, via the Ret case's
   `CheckedCaseBinderLayout` to the exact ordinary closure-capture occurrence and
   body read (read: closure 460 / capture 459 / body 452; write: its independently
   derived analogue closure 473 / capture 472 / body 465). Identify the FIRST
   graph-authorized edge where the fresh `R2` fails to reach that ordinary capture.
   ONLY that edge may be repaired. D3B does NOT trace `R1` forward through the
   source-control chain, does NOT re-derive the inheritance relation in lowering,
-  and consumes ONLY the predecessor's continuation-inheritance projection.
+  and consumes ONLY the predecessor's certified fresh-result ROUTE relation.
+  **It must NOT consume `CarriedLoopExitResult`** — that arm is latent false
+  authority (HS9), and it names the Ret body's OUTPUT where this consumer needs
+  its INPUT.
 - **The MERGE is ATOMIC:** D3A application of inherited `K` + D3B fresh-`R2`
   destination binding + the product controls, landed together — no
   application-only checkpoint. Runtime builds this after the predecessor recut
