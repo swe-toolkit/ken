@@ -8,9 +8,10 @@
 -- functions out of the shared catalog namespace, following the `nc9_`
 -- convention in `ProofErasureBoundaryChecker.ken`.
 --
--- Deliberately NOT in this file: `check_cert` (a separate, later increment),
--- any FO `Proved` verdict, any new kernel primitive or trusted axiom, and any
--- widening of the five-constructor / three-rule slice below.
+-- This file now includes the later `fok_check_cert` increment and its
+-- fail-closed derived sort/scope validation. Still deliberately absent: any
+-- FO `Proved` verdict, new kernel primitive or trusted axiom, or widening of
+-- the five-constructor / three-rule slice below.
 
 import Core.Logic.Or (Or, Inl, Inr)
 
@@ -372,11 +373,10 @@ fn fok_scoped_embed
 -- BEHAVIOUR, not merely `-> bool` in signature. Every lookup below returns
 -- `Option` LOCALLY and every `None` maps to `False`, exactly what Rust's
 -- `let Some(x) = ... else { return false }` does; the `Option` never
--- surfaces as the verdict's own shape. `Form`/`QTerm` stay untyped and no
--- arm here performs sort validation -- an ill-sorted hand-built target still
--- closes on syntactic `FokForm` equality alone, exactly as the Rust
--- reference does (`Form`-excess property, preserved by construction: this
--- checker introduces no rejection the Rust reference does not already make).
+-- surfaces as the verdict's own shape. `Form`/`QTerm` stay untagged, while
+-- the derived validation pass below rejects wrong-sort and out-of-scope
+-- occurrences before this structural checker runs. The Rust boundary applies
+-- the same monotonic restriction over its unchanged calculus checker.
 
 -- `Nat` equality, structural.
 fn fok_nat_eq (a : Nat) (b : Nat) : Bool =
@@ -707,6 +707,244 @@ fn fok_subst_form_at (form : FokForm) (depth : Nat) (replacement : FokQTerm) : F
 fn fok_subst0_form (form : FokForm) (replacement : FokQTerm) : FokForm =
   fok_subst_form_at form Zero replacement
 
+-- Derived only while validating a complete certificate. The target syntax
+-- stays untagged; positions and binders determine these two sorts.
+data FokDerivedSort = FokWorldSort | FokObjectSort
+
+data FokParameterSort = FokMkParameterSort Nat FokDerivedSort
+
+fn fok_derived_sort_eq (a : FokDerivedSort) (b : FokDerivedSort) : Bool =
+  match a {
+    FokWorldSort ↦
+      match b {
+        FokWorldSort ↦ True;
+        FokObjectSort ↦ False
+      };
+    FokObjectSort ↦
+      match b {
+        FokWorldSort ↦ False;
+        FokObjectSort ↦ True
+      }
+  }
+
+fn fok_nth_derived_sort (xs : List FokDerivedSort) (index : Nat) : Option FokDerivedSort =
+  match xs {
+    Nil ↦ None FokDerivedSort;
+    Cons x rest ↦
+      match index {
+        Zero ↦ Some FokDerivedSort x;
+        Suc previous ↦ fok_nth_derived_sort rest previous
+      }
+  }
+
+fn fok_parameter_sort_prepend
+      (head : FokParameterSort) (outcome : Option (List FokParameterSort))
+    : Option (List FokParameterSort) =
+  match outcome {
+    None ↦ None (List FokParameterSort);
+    Some rest ↦ Some (List FokParameterSort) (Cons FokParameterSort head rest)
+  }
+
+fn fok_constrain_parameter_sort
+      (parameter : Nat) (expected : FokDerivedSort) (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match constraints {
+    Nil ↦
+      Some
+        (List FokParameterSort)
+        (Cons FokParameterSort (FokMkParameterSort parameter expected) (Nil FokParameterSort));
+    Cons constraint rest ↦
+      match constraint {
+        FokMkParameterSort existing actual ↦
+          match fok_nat_eq parameter existing {
+            True ↦
+              match fok_derived_sort_eq expected actual {
+                True ↦ Some (List FokParameterSort) constraints;
+                False ↦ None (List FokParameterSort)
+              };
+            False ↦
+              fok_parameter_sort_prepend
+                constraint
+                (fok_constrain_parameter_sort parameter expected rest)
+          }
+      }
+  }
+
+fn fok_validate_qterm_sort
+      (term : FokQTerm)
+      (expected : FokDerivedSort)
+      (binders : List FokDerivedSort)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match term {
+    FokQBound index ↦
+      match fok_nth_derived_sort binders index {
+        None ↦ None (List FokParameterSort);
+        Some actual ↦
+          match fok_derived_sort_eq expected actual {
+            True ↦ Some (List FokParameterSort) constraints;
+            False ↦ None (List FokParameterSort)
+          }
+      };
+    FokQParameter parameter ↦ fok_constrain_parameter_sort parameter expected constraints
+  }
+
+fn fok_validate_second_qterm
+      (first : Option (List FokParameterSort))
+      (second : FokQTerm)
+      (second_sort : FokDerivedSort)
+      (binders : List FokDerivedSort)
+    : Option (List FokParameterSort) =
+  match first {
+    None ↦ None (List FokParameterSort);
+    Some constraints ↦ fok_validate_qterm_sort second second_sort binders constraints
+  }
+
+fn fok_validate_qterm_pair
+      (first : FokQTerm)
+      (first_sort : FokDerivedSort)
+      (second : FokQTerm)
+      (second_sort : FokDerivedSort)
+      (binders : List FokDerivedSort)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  fok_validate_second_qterm
+    (fok_validate_qterm_sort first first_sort binders constraints)
+    second
+    second_sort
+    binders
+
+fn fok_validate_second_form
+      (first : Option (List FokParameterSort))
+      (second : FokForm)
+      (binders : List FokDerivedSort)
+    : Option (List FokParameterSort) =
+  match first {
+    None ↦ None (List FokParameterSort);
+    Some constraints ↦ fok_validate_form second binders constraints
+  }
+
+fn fok_validate_form_pair
+      (first : FokForm)
+      (second : FokForm)
+      (binders : List FokDerivedSort)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  fok_validate_second_form (fok_validate_form first binders constraints) second binders
+
+fn fok_validate_form
+      (form : FokForm) (binders : List FokDerivedSort) (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match form {
+    FokBottom ↦ Some (List FokParameterSort) constraints;
+    FokAccess first second ↦
+      fok_validate_qterm_pair first FokWorldSort second FokWorldSort binders constraints;
+    FokDomainA world object ↦
+      fok_validate_qterm_pair world FokWorldSort object FokObjectSort binders constraints;
+    FokForcingP world object ↦
+      fok_validate_qterm_pair world FokWorldSort object FokObjectSort binders constraints;
+    FokAnd first second ↦ fok_validate_form_pair first second binders constraints;
+    FokOr first second ↦ fok_validate_form_pair first second binders constraints;
+    FokImp first second ↦ fok_validate_form_pair first second binders constraints;
+    FokForallWorld body ↦
+      fok_validate_form body (Cons FokDerivedSort FokWorldSort binders) constraints;
+    FokForallObj body ↦
+      fok_validate_form body (Cons FokDerivedSort FokObjectSort binders) constraints
+  }
+
+fn fok_validate_form_list
+      (forms : List FokForm) (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match forms {
+    Nil ↦ Some (List FokParameterSort) constraints;
+    Cons form rest ↦
+      match fok_validate_form form (Nil FokDerivedSort) constraints {
+        None ↦ None (List FokParameterSort);
+        Some next ↦ fok_validate_form_list rest next
+      }
+  }
+
+fn fok_validate_sequent
+      (sequent : FokSequent) (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match sequent {
+    FokMkSequent gamma delta ↦
+      match fok_validate_form_list gamma constraints {
+        None ↦ None (List FokParameterSort);
+        Some next ↦ fok_validate_form_list delta next
+      }
+  }
+
+fn fok_validate_forall_eigen
+      (delta : List FokForm)
+      (right : Nat)
+      (eigen : FokQTerm)
+      (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match fok_nth_form delta right {
+    None ↦ None (List FokParameterSort);
+    Some target ↦
+      match target {
+        FokForallWorld body ↦
+          fok_validate_qterm_sort eigen FokWorldSort (Nil FokDerivedSort) constraints;
+        FokForallObj body ↦
+          fok_validate_qterm_sort eigen FokObjectSort (Nil FokDerivedSort) constraints;
+        FokBottom ↦ None (List FokParameterSort);
+        FokAccess a b ↦ None (List FokParameterSort);
+        FokDomainA a b ↦ None (List FokParameterSort);
+        FokForcingP a b ↦ None (List FokParameterSort);
+        FokAnd p q ↦ None (List FokParameterSort);
+        FokOr p q ↦ None (List FokParameterSort);
+        FokImp p q ↦ None (List FokParameterSort)
+      }
+  }
+
+fn fok_validate_rule_side
+      (conclusion : FokSequent) (rule : FokRule) (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match rule {
+    FokInit left right ↦ Some (List FokParameterSort) constraints;
+    FokImpRight right ↦ Some (List FokParameterSort) constraints;
+    FokForallRight right eigen ↦
+      match conclusion {
+        FokMkSequent gamma delta ↦ fok_validate_forall_eigen delta right eigen constraints
+      }
+  }
+
+fn fok_validate_certificate_after_children
+      (node_result : Option (List FokParameterSort)) (children : List FokCert)
+    : Option (List FokParameterSort) =
+  match node_result {
+    None ↦ None (List FokParameterSort);
+    Some constraints ↦ fok_validate_certificate_list children constraints
+  }
+
+fn fok_validate_certificate_list
+      (certificates : List FokCert) (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match certificates {
+    Nil ↦ Some (List FokParameterSort) constraints;
+    Cons certificate rest ↦
+      match fok_validate_certificate certificate constraints {
+        None ↦ None (List FokParameterSort);
+        Some next ↦ fok_validate_certificate_list rest next
+      }
+  }
+
+fn fok_validate_certificate
+      (node : FokCert) (constraints : List FokParameterSort)
+    : Option (List FokParameterSort) =
+  match node {
+    FokMkCert conclusion rule children ↦
+      match fok_validate_sequent conclusion constraints {
+        None ↦ None (List FokParameterSort);
+        Some after_conclusion ↦
+          fok_validate_certificate_after_children
+            (fok_validate_rule_side conclusion rule after_conclusion)
+            children
+      }
+  }
+
 -- The `ForallRight` guard: shared by both `FokForallWorld`/`FokForallObj`
 -- targets (Rust's single `Form::ForallWorld(b) | Form::ForallObj(b) => b`
 -- arm) -- freshness, then exactly-one-child, then recurse on the
@@ -724,7 +962,7 @@ fn fok_check_forall_right
           match rest {
             Cons c2 rest2 ↦ False;
             Nil ↦
-              fok_check_tree
+              fok_check_tree_structural
                 (FokMkSequent gamma (fok_list_form_set_nth delta right (fok_subst0_form body eigen)))
                 child
           }
@@ -766,7 +1004,7 @@ fn fok_check_rule (gamma : List FokForm) (delta : List FokForm) (rule : FokRule)
                   match rest {
                     Cons c2 rest2 ↦ False;
                     Nil ↦
-                      fok_check_tree
+                      fok_check_tree_structural
                         (FokMkSequent (fok_list_form_append_one gamma p) (fok_list_form_set_nth delta right q))
                         child
                   }
@@ -795,7 +1033,7 @@ fn fok_check_rule (gamma : List FokForm) (delta : List FokForm) (rule : FokRule)
       }
   }
 
-fn fok_check_tree (expected_conclusion : FokSequent) (node : FokCert) : Bool =
+fn fok_check_tree_structural (expected_conclusion : FokSequent) (node : FokCert) : Bool =
   match node {
     FokMkCert conclusion rule children ↦
       match fok_sequent_eq conclusion expected_conclusion {
@@ -806,6 +1044,19 @@ fn fok_check_tree (expected_conclusion : FokSequent) (node : FokCert) : Bool =
           }
       }
   }
+
+fn fok_validate_certificate_bool (node : FokCert) : Bool =
+  match fok_validate_certificate node (Nil FokParameterSort) {
+    None ↦ False;
+    Some constraints ↦ True
+  }
+
+-- Validation is a monotonic adapter around the unchanged calculus checker.
+-- One constraint environment covers the complete stored certificate tree.
+fn fok_check_tree (expected_conclusion : FokSequent) (node : FokCert) : Bool =
+  fok_and
+    (fok_validate_certificate_bool node)
+    (fok_check_tree_structural expected_conclusion node)
 
 -- `check_cert : FokForm -> FokCert -> Bool` (23 section 4.3), restricted to
 -- the slice's three rules -- an ordinary kernel-checked total function,
@@ -1498,7 +1749,7 @@ fn fok_imp_rest_check
   match rest {
     Cons child2 rest2 ↦ False;
     Nil ↦
-      fok_check_tree
+      fok_check_tree_structural
         (FokMkSequent
           (fok_list_form_append_one gamma p)
           (fok_list_form_set_nth delta right q))
@@ -1551,8 +1802,10 @@ fn fok_imp_lookup_check
   }
 
 fn fok_prop_check_tree_sound_type (pi : FokCert) : Type =
-  (expected : FokSequent) →
-  Equal Bool (fok_check_tree expected pi) True → FokDerivation expected
+  (expected : FokSequent)
+    → Equal Bool
+    (fok_check_tree_structural expected pi)
+    True → FokDerivation expected
 
 -- The recursion result for a child list is the head certificate's soundness
 -- proof. Empty lists carry an inert Nat because no checker rule recurs there.
@@ -1589,7 +1842,7 @@ fn fok_prop_imp_build_from_sound
       (child : FokCert)
       (child_sound : fok_prop_check_tree_sound_type child)
     : Equal Bool
-        (fok_check_tree
+        (fok_check_tree_structural
           (FokMkSequent
             (fok_list_form_append_one gamma p)
             (fok_list_form_set_nth delta right q))
@@ -1759,7 +2012,7 @@ fn fok_forall_children_check
       match rest {
         Cons child2 rest2 ↦ False;
         Nil ↦
-          fok_check_tree
+          fok_check_tree_structural
             (FokMkSequent gamma
               (fok_list_form_set_nth delta right
                 (fok_subst0_form body eigen)))
@@ -2146,7 +2399,8 @@ theorem fok_check_tree_view_eq
       (children : List FokCert)
     : Equal Bool
         (fok_check_tree_view expected conclusion rule children)
-        (fok_check_tree expected (FokMkCert conclusion rule children)) = Refl
+        (fok_check_tree_structural expected (FokMkCert conclusion rule children)) =
+  Refl
 
 fn fok_check_tree_result
       (conclusion : FokSequent)
@@ -2259,16 +2513,29 @@ fn fok_prop_check_tree_sound_by_children
             rule (Cons FokCert child rest))
   }
 
-fn fok_prop_check_tree_sound (expected : FokSequent) (pi : FokCert)
-    : Equal Bool (fok_check_tree expected pi) True → FokDerivation expected =
+fn fok_prop_check_tree_sound
+      (expected : FokSequent) (pi : FokCert)
+    : Equal Bool (fok_check_tree_structural expected pi) True → FokDerivation expected =
   fok_prop_check_tree_sound_by_cert pi expected
+
+theorem fok_check_tree_validation_monotonic
+      (expected : FokSequent) (pi : FokCert)
+    : Equal Bool (fok_check_tree expected pi) True
+      → Equal Bool (fok_check_tree_structural expected pi) True =
+  fok_and_right (fok_validate_certificate_bool pi) (fok_check_tree_structural expected pi)
 
 -- D4 closes both ForallRight target shapes and their shared freshness guard,
 -- so every accepted certificate is reflected into the indexed derivation.
+-- The validation adapter is monotonic: validated acceptance first yields the
+-- unchanged calculus checker's acceptance, then the existing reflection proof.
 theorem fok_checker_soundness (q : FokForm) (pi : FokCert)
     : Equal Bool (fok_check_cert q pi) True → fok_classically_valid q =
   λaccepted.
     trunc_intro
       (fok_prop_check_tree_sound
         (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm)))
-        pi accepted)
+        pi
+        (fok_check_tree_validation_monotonic
+          (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm)))
+          pi
+          accepted))

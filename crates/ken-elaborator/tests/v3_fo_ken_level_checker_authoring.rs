@@ -1291,10 +1291,10 @@ fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
     // gamma ends up [p1, p2] with p2 == target; delta ends up [target].
     // Init { left: 1, right: 0 } checks gamma[1] == delta[0], i.e. p2 ==
     // target -- true by construction.
-    let p1 = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
+    let p1 = Form::Bottom;
     let target = Form::Bottom;
     let q = Form::Imp(
-        Box::new(p1),
+        Box::new(p1.clone()),
         Box::new(Form::Imp(
             Box::new(target.clone()),
             Box::new(target.clone()),
@@ -1303,10 +1303,7 @@ fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
 
     let init_node = Cert {
         conclusion: Sequent {
-            gamma: vec![
-                Form::Access(QTerm::Bound(0), QTerm::Bound(0)),
-                target.clone(),
-            ],
+            gamma: vec![p1.clone(), target.clone()],
             delta: vec![target.clone()],
         },
         rule: Rule::Init { left: 1, right: 0 },
@@ -1314,7 +1311,7 @@ fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
     };
     let inner_imp = Cert {
         conclusion: Sequent {
-            gamma: vec![Form::Access(QTerm::Bound(0), QTerm::Bound(0))],
+            gamma: vec![p1],
             delta: vec![Form::Imp(
                 Box::new(target.clone()),
                 Box::new(target.clone()),
@@ -1366,8 +1363,8 @@ fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
 /// body (harmless: it is bound BY that very quantifier, and the freshness
 /// check inspects the OUTER sequent before substitution, where `Bound(0)`
 /// and `Parameter(0)` are different constructors and do not collide) --
-/// and the certificate is otherwise a real, valid derivation (`forall w.
-/// Force_P w w -> Force_P w w`, closed by `forall-right` + `imp-right` +
+/// and the certificate is otherwise a real, well-sorted derivation (`forall
+/// w. Access w w -> Access w w`, closed by `forall-right` + `imp-right` +
 /// `init`). Under the single-arm `Bound -> FokQParameter` serializer bug,
 /// this `Bound(0)` becomes `FokQParameter 0` on the Ken side -- the exact
 /// number of the real eigenparameter -- and `fok_sequent_mentions_parameter`
@@ -1381,16 +1378,16 @@ fn fok_check_cert_serializer_discriminates_qterm_bound_parameter_collision() {
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ids = FokIds::resolve(&env);
 
-    // body = Force_P(Bound 0, Bound 0) -> Force_P(Bound 0, Bound 0), a
-    // trivial self-implication whose antecedent/consequent both mention
+    // body = Access(Bound 0, Bound 0) -> Access(Bound 0, Bound 0), a
+    // well-sorted self-implication whose antecedent/consequent both mention
     // Bound(0) -- the world the ForallWorld itself binds.
-    let atom = Form::ForcingP(QTerm::Bound(0), QTerm::Bound(0));
+    let atom = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
     let body = Form::Imp(Box::new(atom.clone()), Box::new(atom.clone()));
     let q = Form::ForallWorld(Box::new(body));
 
-    // After ForallRight (eigen = Parameter(0)): instantiated = Force_P(Param
-    // 0, Param 0) -> Force_P(Param 0, Param 0).
-    let instantiated_atom = Form::ForcingP(QTerm::Parameter(0), QTerm::Parameter(0));
+    // After ForallRight (eigen = Parameter(0)): instantiated = Access(Param
+    // 0, Param 0) -> Access(Param 0, Param 0).
+    let instantiated_atom = Form::Access(QTerm::Parameter(0), QTerm::Parameter(0));
     let instantiated = Form::Imp(
         Box::new(instantiated_atom.clone()),
         Box::new(instantiated_atom.clone()),
@@ -1440,4 +1437,193 @@ fn fok_check_cert_serializer_discriminates_qterm_bound_parameter_collision() {
         ken_verdict, rust_verdict,
         "Ken fok_check_cert disagrees with Rust check_cert on the QTerm Bound/Parameter collision pin"
     );
+}
+
+fn self_imp_certificate(atom: Form) -> (Form, Cert) {
+    let target = Form::Imp(Box::new(atom.clone()), Box::new(atom.clone()));
+    let leaf = Cert {
+        conclusion: Sequent {
+            gamma: vec![atom.clone()],
+            delta: vec![atom],
+        },
+        rule: Rule::Init { left: 0, right: 0 },
+        children: vec![],
+    };
+    let root = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![target.clone()],
+        },
+        rule: Rule::ImpRight { right: 0 },
+        children: vec![leaf],
+    };
+    (target, root)
+}
+
+fn probe_then_self_imp_certificate(probe: Form) -> (Form, Cert) {
+    self_imp_certificate(probe)
+}
+
+fn forall_probe_certificate(
+    world: bool,
+    bound_probe: Form,
+    instantiated_probe: Form,
+    eigen: usize,
+) -> (Form, Cert) {
+    let (instantiated_body, child) = self_imp_certificate(instantiated_probe);
+    let body = Form::Imp(Box::new(bound_probe.clone()), Box::new(bound_probe));
+    let target = if world {
+        Form::ForallWorld(Box::new(body))
+    } else {
+        Form::ForallObj(Box::new(body))
+    };
+    debug_assert_eq!(child.conclusion.delta, vec![instantiated_body]);
+    let root = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![target.clone()],
+        },
+        rule: Rule::ForallRight {
+            right: 0,
+            eigen: QTerm::Parameter(eigen),
+        },
+        children: vec![child],
+    };
+    (target, root)
+}
+
+fn nested_reused_eigen_certificate(inner_eigen: usize) -> (Form, Cert) {
+    let inner_bound_atom = Form::DomainA(QTerm::Parameter(9), QTerm::Bound(0));
+    let inner_body = Form::Imp(
+        Box::new(inner_bound_atom.clone()),
+        Box::new(inner_bound_atom),
+    );
+    let inner_target = Form::ForallObj(Box::new(inner_body));
+    let instantiated_atom = Form::DomainA(QTerm::Parameter(9), QTerm::Parameter(inner_eigen));
+    let (_, inner_child) = self_imp_certificate(instantiated_atom);
+    let inner_root = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![inner_target.clone()],
+        },
+        rule: Rule::ForallRight {
+            right: 0,
+            eigen: QTerm::Parameter(inner_eigen),
+        },
+        children: vec![inner_child],
+    };
+    let target = Form::ForallWorld(Box::new(inner_target));
+    let root = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![target.clone()],
+        },
+        rule: Rule::ForallRight {
+            right: 0,
+            eigen: QTerm::Parameter(0),
+        },
+        children: vec![inner_root],
+    };
+    (target, root)
+}
+
+/// Promise class: durable invariant. Both certificate checkers derive the
+/// world/object sort of every occurrence, reject an unscoped bound reference,
+/// and share one parameter constraint environment across the complete tree.
+/// Each local pair keeps one complete structural certificate shape and changes
+/// exactly one qterm coordinate between its literal accept and reject member.
+fn assert_sort_validation_pair(name: &str, lawful: (Form, Cert), rejected: (Form, Cert)) {
+    let mut env = ElabEnv::new().expect("prelude construction");
+    catalog_or::load_core_logic_or(&mut env);
+    env.elaborate_file(FOK_SOURCE)
+        .expect("FoKripke.ken failed to elaborate/kernel-check");
+    let ids = FokIds::resolve(&env);
+
+    for (member, (q, pi), expected) in [("lawful", lawful, true), ("rejected", rejected, false)] {
+        let (rust_verdict, ken_verdict) = differential_check_cert(
+            &mut env,
+            &ids,
+            &format!("core_fo_sort_{name}_{member}"),
+            &q,
+            &pi,
+        );
+        assert_eq!(
+            rust_verdict, expected,
+            "pair {name} {member}: Rust check_cert returned the wrong literal verdict"
+        );
+        assert_eq!(
+            ken_verdict, expected,
+            "pair {name} {member}: Ken fok_check_cert returned the wrong literal verdict"
+        );
+    }
+}
+
+#[test]
+fn certificate_sort_validation_world_in_object_pair() {
+    // The World binder remains in ForcingP's World slot; only its Object-slot
+    // neighbour changes from an Object parameter to the same World binder.
+    let lawful = forall_probe_certificate(
+        true,
+        Form::ForcingP(QTerm::Bound(0), QTerm::Parameter(1)),
+        Form::ForcingP(QTerm::Parameter(0), QTerm::Parameter(1)),
+        0,
+    );
+    let rejected = forall_probe_certificate(
+        true,
+        Form::ForcingP(QTerm::Bound(0), QTerm::Bound(0)),
+        Form::ForcingP(QTerm::Parameter(0), QTerm::Parameter(0)),
+        0,
+    );
+    assert_sort_validation_pair("world_in_object", lawful, rejected);
+}
+
+#[test]
+fn certificate_sort_validation_object_in_world_pair() {
+    // The Object binder remains in DomainA's Object slot; only its World-slot
+    // neighbour changes from a World parameter to the same Object binder.
+    let lawful = forall_probe_certificate(
+        false,
+        Form::DomainA(QTerm::Parameter(1), QTerm::Bound(0)),
+        Form::DomainA(QTerm::Parameter(1), QTerm::Parameter(0)),
+        0,
+    );
+    let rejected = forall_probe_certificate(
+        false,
+        Form::DomainA(QTerm::Bound(0), QTerm::Bound(0)),
+        Form::DomainA(QTerm::Parameter(0), QTerm::Parameter(0)),
+        0,
+    );
+    assert_sort_validation_pair("object_in_world", lawful, rejected);
+}
+
+#[test]
+fn certificate_sort_validation_parameter_world_object_role_pair() {
+    // Only DomainA's Object coordinate changes, from a distinct Object
+    // parameter to the World parameter next to it.
+    let lawful =
+        probe_then_self_imp_certificate(Form::DomainA(QTerm::Parameter(0), QTerm::Parameter(1)));
+    let rejected =
+        probe_then_self_imp_certificate(Form::DomainA(QTerm::Parameter(0), QTerm::Parameter(0)));
+    assert_sort_validation_pair("parameter_world_object_role", lawful, rejected);
+}
+
+#[test]
+fn certificate_sort_validation_bound_scope_pair() {
+    // Only Access's first coordinate changes from a scoped World parameter to
+    // unscoped Bound(0); the World-parameter neighbour is unchanged.
+    let lawful =
+        probe_then_self_imp_certificate(Form::Access(QTerm::Parameter(1), QTerm::Parameter(2)));
+    let rejected =
+        probe_then_self_imp_certificate(Form::Access(QTerm::Bound(0), QTerm::Parameter(2)));
+    assert_sort_validation_pair("bound_scope", lawful, rejected);
+}
+
+#[test]
+fn certificate_sort_validation_certificate_wide_parameter_pair() {
+    // Parameter 0 is the outer World eigen and then the inner Object eigen.
+    // Each rule is locally consistent; only a certificate-wide environment
+    // distinguishes this from the lawful parameter-1 inner eigen.
+    let lawful = nested_reused_eigen_certificate(1);
+    let rejected = nested_reused_eigen_certificate(0);
+    assert_sort_validation_pair("certificate_wide_parameter", lawful, rejected);
 }

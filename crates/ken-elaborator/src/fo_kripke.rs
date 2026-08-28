@@ -32,6 +32,8 @@
 //! own `Or` for arbitrary real obligations is later integration work, not
 //! this slice's.
 
+use std::collections::HashMap;
+
 use ken_kernel::{
     check::{declare_inductive, CtorSpec, InductiveSpec},
     declare_postulate,
@@ -396,39 +398,15 @@ pub enum IForm {
 /// object) into which `Form`/`Rule` variant is used rather than carrying it
 /// on `QTerm` itself.
 ///
-/// **`V3-FO-QUOTE-GUARD-FAIL-CLOSED` `D3`, recut.** `Form`/`QTerm` are
-/// UNTYPED and `check_tree` performs no sort validation: `check_cert` is
-/// total over `Form`, and a hand-constructed ill-sorted target -- e.g. a
-/// world eigenparameter substituted into an object slot of `ForcingP` --
-/// closes and returns `true` (`Init` needs only syntactic `Form` equality,
-/// which the malformed formula still has once instantiated). Neither
-/// eigenparameter freshness nor `Init`'s equality check sort at all, so an
-/// earlier version of this comment attributing safety to them named a
-/// mechanism that does not do the work.
-///
-/// **The real mechanism is at the CALLER, not in `check_cert` itself.**
-/// `quote_iform` admits only an in-scope object `Var` of the declared sort
-/// as an atom's argument, refusing everything else as
-/// `FoBoundary::IllScopedOrIllSorted` -- so the `IForm` it produces carries
-/// ONLY object-sort de Bruijn indices; there is no world variable anywhere
-/// in `IForm`, because worlds do not exist until [`embed`] introduces them.
-/// `Form` is therefore STRICTLY LARGER than `embed`'s image on `IForm
-/// Sigma`: the probe's malformed formula is real, but it lives entirely in
-/// that excess and no `IForm` maps to it. The route's discharge composition
-/// only ever calls `check_cert(embed(f), pi)` for `f : IForm Sigma` --
-/// never on an arbitrary hand-built `Form` -- so the accepted-but-ill-sorted
-/// certificates the probe found exist in `check_cert`'s domain and are
-/// unreachable from that composition.
-///
-/// **This guarantee belongs to the CALLER, not to `check_cert`.** Any future
-/// caller that hands `check_cert` a `Form` obtained some way other than
-/// `embed Sigma f` loses this property entirely, with NO diagnostic --
-/// `check_cert` will accept and say nothing. A sort-validating `check_tree`
-/// would make the checker's own domain honest instead of relying on its
-/// caller; that is legitimate future hardening, not required for this
-/// route's soundness, and it is its own scoped item (widening `D3` here is
-/// explicitly out of scope). A general multi-sort `QSort` tag remains
-/// unneeded generality for this one-object-sort slice, for this reason.
+/// **`CORE-FO-CHECK-TREE-SORT-VALIDATION`.** The carrier stays untagged,
+/// but `check_tree` derives world/object roles from atom positions and
+/// quantifier binders before running the unchanged structural calculus
+/// checker. It shares parameter constraints across the complete certificate
+/// and rejects wrong-sort or out-of-scope occurrences fail-closed. The route
+/// still calls `check_cert(embed(f), pi)`, and `quote_iform` still refuses an
+/// ill-scoped source atom, but checker honesty no longer depends on either
+/// caller property. A general carried `QSort` remains unnecessary for this
+/// one-object-sort slice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QTerm {
     Bound(usize),
@@ -863,7 +841,106 @@ pub fn check_cert(q: &Form, pi: &Cert) -> bool {
     check_tree(&root, pi)
 }
 
+/// The target syntax remains untagged; its sort is derived from each
+/// occurrence's position while validating a complete certificate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DerivedSort {
+    World,
+    Object,
+}
+
+fn validate_qterm(
+    term: &QTerm,
+    expected: DerivedSort,
+    binders: &[DerivedSort],
+    parameters: &mut HashMap<usize, DerivedSort>,
+) -> bool {
+    match term {
+        QTerm::Bound(index) => binders.iter().rev().nth(*index) == Some(&expected),
+        QTerm::Parameter(parameter) => match parameters.get(parameter) {
+            Some(actual) => *actual == expected,
+            None => {
+                parameters.insert(*parameter, expected);
+                true
+            }
+        },
+    }
+}
+
+fn validate_form(
+    form: &Form,
+    binders: &mut Vec<DerivedSort>,
+    parameters: &mut HashMap<usize, DerivedSort>,
+) -> bool {
+    match form {
+        Form::Bottom => true,
+        Form::Access(a, b) => {
+            validate_qterm(a, DerivedSort::World, binders, parameters)
+                && validate_qterm(b, DerivedSort::World, binders, parameters)
+        }
+        Form::DomainA(world, object) | Form::ForcingP(world, object) => {
+            validate_qterm(world, DerivedSort::World, binders, parameters)
+                && validate_qterm(object, DerivedSort::Object, binders, parameters)
+        }
+        Form::And(p, q) | Form::Or(p, q) | Form::Imp(p, q) => {
+            validate_form(p, binders, parameters) && validate_form(q, binders, parameters)
+        }
+        Form::ForallWorld(body) | Form::ForallObj(body) => {
+            let sort = match form {
+                Form::ForallWorld(_) => DerivedSort::World,
+                Form::ForallObj(_) => DerivedSort::Object,
+                _ => unreachable!(),
+            };
+            binders.push(sort);
+            let valid = validate_form(body, binders, parameters);
+            binders.pop();
+            valid
+        }
+    }
+}
+
+fn validate_sequent(
+    sequent: &Sequent,
+    parameters: &mut HashMap<usize, DerivedSort>,
+) -> bool {
+    sequent.gamma.iter().chain(&sequent.delta).all(|form| {
+        validate_form(form, &mut Vec::new(), parameters)
+    })
+}
+
+fn validate_certificate(
+    node: &Cert,
+    parameters: &mut HashMap<usize, DerivedSort>,
+) -> bool {
+    if !validate_sequent(&node.conclusion, parameters) {
+        return false;
+    }
+
+    if let Rule::ForallRight { right, eigen } = &node.rule {
+        let expected = match node.conclusion.delta.get(*right) {
+            Some(Form::ForallWorld(_)) => DerivedSort::World,
+            Some(Form::ForallObj(_)) => DerivedSort::Object,
+            _ => return false,
+        };
+        // Rule-side eigenterms live at sequent scope. A bound reference has
+        // no binder here, while a parameter is unified with the principal
+        // quantifier's derived sort across this entire certificate.
+        if !validate_qterm(eigen, expected, &[], parameters) {
+            return false;
+        }
+    }
+
+    node.children
+        .iter()
+        .all(|child| validate_certificate(child, parameters))
+}
+
 fn check_tree(expected_conclusion: &Sequent, node: &Cert) -> bool {
+    let mut parameters = HashMap::new();
+    validate_certificate(node, &mut parameters) && check_tree_structural(expected_conclusion, node)
+}
+
+fn check_tree_structural(expected_conclusion: &Sequent, node: &Cert) -> bool {
     if &node.conclusion != expected_conclusion {
         return false;
     }
@@ -886,7 +963,7 @@ fn check_tree(expected_conclusion: &Sequent, node: &Cert) -> bool {
             expected_gamma.push((**p).clone());
             let mut expected_delta = node.conclusion.delta.clone();
             expected_delta[*right] = (**q).clone();
-            check_tree(&Sequent { gamma: expected_gamma, delta: expected_delta }, child)
+            check_tree_structural(&Sequent { gamma: expected_gamma, delta: expected_delta }, child)
         }
         Rule::ForallRight { right, eigen } => {
             let Some(quantified) = node.conclusion.delta.get(*right) else {
@@ -910,7 +987,7 @@ fn check_tree(expected_conclusion: &Sequent, node: &Cert) -> bool {
             let instantiated = subst0_form(body, eigen);
             let mut expected_delta = node.conclusion.delta.clone();
             expected_delta[*right] = instantiated;
-            check_tree(
+            check_tree_structural(
                 &Sequent { gamma: node.conclusion.gamma.clone(), delta: expected_delta },
                 child,
             )

@@ -157,14 +157,11 @@ fn imp_right_constructor_and_checker_reject_a_missing_recursive_premise() {
     );
 }
 
-fn check_forall_right_shape(prefix: &str, forall_ctor: &str, deriv_ctor: &str) {
+fn check_forall_right_shape(prefix: &str, forall_ctor: &str, deriv_ctor: &str, body: &str) {
     let mut env = mk_env();
     let declarations = [
         format!("const {prefix}_gamma : List FokForm = Cons FokForm FokBottom (Nil FokForm)"),
-        format!(
-            "const {prefix}_body : FokForm = \
-             FokForcingP (FokQParameter Zero) (FokQBound Zero)"
-        ),
+        format!("const {prefix}_body : FokForm = {body}"),
         format!(
             "const {prefix}_delta : List FokForm = \
              Cons FokForm ({forall_ctor} {prefix}_body) \
@@ -227,10 +224,20 @@ fn check_forall_right_shape(prefix: &str, forall_ctor: &str, deriv_ctor: &str) {
 
 #[test]
 fn forall_world_right_constructor_and_checker_reject_a_nonfresh_eigenparameter() {
-    check_forall_right_shape("d1a_world", "FokForallWorld", "FokDerivForallWorldRight");
+    check_forall_right_shape(
+        "d1a_world",
+        "FokForallWorld",
+        "FokDerivForallWorldRight",
+        "FokAccess (FokQParameter Zero) (FokQBound Zero)",
+    );
 }
 
 #[test]
 fn forall_obj_right_constructor_and_checker_reject_a_nonfresh_eigenparameter() {
-    check_forall_right_shape("d1a_obj", "FokForallObj", "FokDerivForallObjRight");
+    check_forall_right_shape(
+        "d1a_obj",
+        "FokForallObj",
+        "FokDerivForallObjRight",
+        "FokForcingP (FokQParameter Zero) (FokQBound Zero)",
+    );
 }
