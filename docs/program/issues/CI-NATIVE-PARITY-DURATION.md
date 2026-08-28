@@ -1,6 +1,6 @@
 ---
 id: CI-NATIVE-PARITY-DURATION
-title: "Rework the CI test suite to run faster, under the operator's 20-minute ceiling and toward the 10-minute target, by removing three measured serial floors: split checked_ih_generated_entry_confluence_and_route_mutations_reject (39 sequential subprocess mutations, 1299.983s in ONE scheduling unit) and its five siblings into per-case tests so nextest can schedule them; then partition native-rt-parity across runners; then rebalance the workspace shards. Splitting alone is necessary but NOT sufficient -- it takes the job from 25m to about 18m, because 4171.65 CPU-seconds on a 4-vCPU runner floors at 17.4m -- and partitioning is INERT until the split lands, because --partition cannot subdivide a single 1300s test. Separately, the ignored-row sweep EXECUTES 33 ignored rows for 10m and treats their failures as non-blocking findings. D1-D3 LANDED at c555f843a. D4 was RE-SCOPED 2026-08-28 after the verify ring measured its original short-circuit population EMPTY: no ignored row names an unbuilt capability, so the short-circuit half is INAPPLICABLE, and D4 instead builds a STALE-READMISSION DETECTOR -- the sweep fails when an ignored row names a condition whose tracker node reads merged while the row stays ignored, which is the operator's own re-enablement concern already realized twice in this file. Behaviour-preserving throughout: the same 90 mutation cases with the same assertions and outcomes."
+title: "Rework the CI test suite to run faster, under the operator's 20-minute ceiling and toward the 10-minute target, by removing three measured serial floors: split checked_ih_generated_entry_confluence_and_route_mutations_reject (39 sequential subprocess mutations, 1299.983s in ONE scheduling unit) and its five siblings into per-case tests so nextest can schedule them; then partition native-rt-parity across runners; then rebalance the workspace shards. Splitting alone is necessary but NOT sufficient -- it takes the job from 25m to about 18m, because 4171.65 CPU-seconds on a 4-vCPU runner floors at 17.4m -- and partitioning is INERT until the split lands, because --partition cannot subdivide a single 1300s test. Separately, the ignored-row sweep EXECUTES 33 ignored rows for 10m and treats their failures as non-blocking findings. D1-D3 LANDED at c555f843a. D4 was RE-SCOPED 2026-08-28 after the verify ring measured its original short-circuit population EMPTY: no ignored row names an unbuilt capability, so the short-circuit half is INAPPLICABLE, and D4 instead builds a STALE-READMISSION DETECTOR -- the sweep reports a FINDING when an ignored row names a condition whose tracker node reads merged while the row stays ignored, which is the operator's own re-enablement concern already realized twice in this file. CHANNEL SEMANTICS RULED 2026-08-29 after the Architect rejected 7c607486: a stale row is an EXIT-ZERO routed finding naming every stale row, never a red gate (D4a measured 16 against the tree, so an enforced gate would red main on arrival); the instrument's OWN failures -- malformed, missing, invalid, census/registry mismatch -- exit nonzero and block. The flip to enforcement at zero population is a separate later increment needing its own release. The contradiction was the Steward's: that ruling was made in a convo thread and never landed here, so four operative passages still said FAIL. D4c released to repair source discovery, which parsed 35 of 39 ignore reasons and read historical/denied ids in prose as current conditions. Behaviour-preserving throughout: the same 90 mutation cases with the same assertions and outcomes."
 status: active
 owner: verify
 size: M
@@ -60,9 +60,12 @@ origin: "Operator request 2026-08-28: 'diagnose the native-slow test and brief m
 > short-circuit existed to prevent. It is not hypothetical in this file; it is
 > the file's measured state, twice.**
 >
-> ⇒ **D4 becomes a STALE-READMISSION DETECTOR.** The sweep FAILS when an ignored
-> row names a condition whose tracker node reads `merged` while the row remains
-> ignored. The population is non-empty, which is what makes the mutation
+> ⇒ **D4 becomes a STALE-READMISSION DETECTOR.** The sweep REPORTS A FINDING when
+> an ignored row names a condition whose tracker node reads `merged` while the
+> row remains ignored. (**"FAILS" here was superseded** by the channel-semantics
+> ruling in the OPERATIVE banner below: a stale row is an exit-zero finding; only
+> the instrument's own failures are enforced.) The population is non-empty, which
+> is what makes the mutation
 > criterion truthfully exercisable — the ring's blocking objection to the
 > original framing, and it was right.
 >
@@ -90,7 +93,54 @@ origin: "Operator request 2026-08-28: 'diagnose the native-slow test and brief m
 >    silently passes them can be disabled by a typo.** That fork is real, it is
 >    not pre-decided here, and it is `AC-STALE-READMISSION`'s first obligation.
 
-## Lane and release condition
+> # OPERATIVE — CHANNEL SEMANTICS RULED. A STALE ROW IS A FINDING, NOT A RED
+> # GATE. THE INSTRUMENT'S OWN FAILURES STAY ENFORCED.
+>
+> **Steward ruling, 2026-08-29, after the Architect rejected `7c607486` at
+> `evt_bfg568nhmpth` and verify-leader correctly held rather than choosing the
+> semantics itself (`evt_1cd8x1dmhrv8q`).**
+>
+> **THE CONTRADICTION WAS MINE AND IT WAS IN THE FRAME, NOT IN THE RING'S
+> READING.** I ruled the non-blocking channel IN A CONVO THREAD and never landed
+> it here, so this file went on saying "the sweep FAILS" in four operative
+> places — the `title:`, the D4 re-scope banner, the D4 deliverable, and
+> `AC-STALE-READMISSION`'s positive arm — while the ring built the channel I had
+> described in the thread. **A thread ruling cannot override an operative frame,
+> and the ring was right to refuse to choose.** This is the same defect already
+> recorded on the runtime node: a frame passage that survives the ruling
+> invalidating it does not read as stale, it reads as authoritative. Landing it
+> here is the correction; the thread post is not.
+>
+> **THE RULING — two channels, and the split is the existing one at
+> `.github/workflows/ci.yml:130-132`, not a new mechanism:**
+>
+> 1. **A STALE ROW IS A FINDING.** The sweep exits ZERO, routes the finding, and
+>    NAMES every stale row with the node status it read for each. It does not
+>    red the gate. A count without the row names is not actionable and does not
+>    satisfy this.
+> 2. **AN INSTRUMENT FAILURE IS ENFORCED.** Malformed, missing, invalid,
+>    unresolvable-where-resolution-was-claimed, and census/registry mismatch exit
+>    NONZERO and block. **The detector must not be able to fail silently** — a
+>    broken instrument that passes is worse than no instrument, because it reads
+>    as coverage.
+>
+> **WHY FINDINGS AND NOT ENFORCEMENT, stated so nobody has to re-derive it:**
+> D4a measured **16 stale rows** against the tree as it stands. Landing an
+> enforced gate would red `main` on its first run over a population that
+> predates the instrument, halting all three lanes to report a backlog the
+> instrument was built to make visible. **That is the gate being wrong on
+> arrival, not uptime being protected.** The correct shape is to measure first
+> and enforce once the population is drained.
+>
+> **THE RATCHET IS PART OF THIS RULING, NOT A LATER NICETY.** "Non-blocking" is
+> a starting position with a stated end, or the detector never bites. When the
+> stale population reaches ZERO, the finding channel flips to enforced. That
+> flip is its own increment and needs its own release from me — it is NOT
+> authorized here, and it must not be pre-wired behind a flag or a threshold
+> that trips on its own.
+>
+> **`AC-SHORTCIRCUIT-ENFORCED` is unaffected** — it is retired as INAPPLICABLE
+> with evidence, and this ruling does not revive it.
 
 **This node is lane 2, owned by verify.** The operator ruled: *"let lane 2
 finish its current wp, then bring up verify on lane 2 to rework CI tests to make
@@ -297,8 +347,12 @@ the `Doctests` step conditional on a single shard.
 **D4 — stale-readmission detector for ignored rows whose blocker has landed.**
 RE-SCOPED 2026-08-28; see the operative banner at the top of this node.
 
-The sweep gains a check that FAILS when an ignored row names a condition whose
-tracker node reads `status: merged` while the row remains ignored.
+The sweep gains a check that REPORTS A FINDING when an ignored row names a
+condition whose tracker node reads `status: merged` while the row remains
+ignored. **Exit zero, routed, and every stale row named** — see the
+channel-semantics ruling in the OPERATIVE banner at the top of this node. The
+instrument's OWN failures (malformed, missing, invalid, census/registry
+mismatch) exit nonzero and block.
 
 **D4a — enumerate the population first, across BOTH sources.** A readmission
 condition is recorded in two places and they do not agree on shape: the
@@ -321,6 +375,36 @@ comment prose fires on any sentence mentioning a node id, including one that
 denies the row is blocked on it, and it stops working the moment someone rewords
 a comment. Resolve the cited id to `docs/program/issues/<ID>.md` and read its
 `status:` field.
+
+**D4c — PARSE THE IGNORE REASONS PROPERLY. RELEASED 2026-08-29 as the repair
+scope for the Architect's first blocking defect (`evt_bfg568nhmpth`).** The
+candidate's source discovery parsed **35 of 39** valid ignore reasons: a
+one-line `IGNORE_REASON_RE` silently drops escaped-quote and multiline string
+literals, and a token `findall` over prose treats **historical and explicitly
+DENIED** node ids as current conditions. **The silence is the defect** — four
+rows fell out of the population with no diagnostic, which is precisely the
+"instrument failure that reads as coverage" the channel ruling above forbids.
+
+Required:
+
+- A parser accepting **every valid Rust `#[ignore = ...]` literal form** —
+  escaped quotes, multiline, and raw strings — not a single-line regex.
+- **Declared / current-condition extraction**, so a node id appearing in prose
+  is only a condition when the row asserts it as one. An id mentioned in a
+  denial ("no longer blocked on X") or as history is NOT a current condition.
+- Three committed controls, each two-sided: an **escaped-quote** row, a
+  **multiline denial** row, and a **current-plus-historical** row where both
+  ids appear and only the current one may fire.
+- **Reconcile census, registry, and finding count**, and state the arithmetic.
+  Any row the parser cannot classify is an INSTRUMENT FAILURE (nonzero), never
+  a silent drop.
+
+**Fold the Steward's owed reconciliation in here:** I counted **45** `#[ignore`
+lines under `crates/` against the ring's **39** source rows, and the parser
+defect makes that gap load-bearing rather than bookkeeping — a discrepancy in
+how many rows exist is the same class of error as parsing 35 of 39. Report the
+arithmetic that reconciles 45, 39, and the final population, or state plainly
+which part is still unexplained. **Do not close it by assertion.**
 
 **THE UNRESOLVABLE-CONDITION RULE IS A FORK, AND D4a's TABLE DECIDES IT — do not
 pick one here.** Four of the six registry entries are free prose and one names a
@@ -385,10 +469,22 @@ to D1-D3; it is the ignored-row sweep work and shares no file with them.
 
 - **`AC-STALE-READMISSION` — the detector fires on the real population, and its
   power is proved BY MUTATION on BOTH sides.** For D4:
-  - **Positive.** Against the tree as it stands, the sweep FAILS and names both
-    rows — `rt_parity_native.rs:675` / `RT-SITEOP-CARRIED-WITNESS` and `:2039` /
-    `RT-CLOSURE-BOUNDARY-LANE` — with the node status it read for each. A
-    detector that reports a count without naming the rows is not actionable.
+  - **Positive.** Against the tree as it stands, the sweep REPORTS A FINDING —
+    exit zero, routed — and NAMES every stale row with the node status it read
+    for each. A detector that reports a count without naming the rows is not
+    actionable.
+
+    > **TWO CORRECTIONS TO THIS ARM AS ORIGINALLY WRITTEN, both mine.**
+    > **(a) "FAILS" is superseded** by the channel-semantics ruling in the
+    > OPERATIVE banner at the top of this node: a stale row is a finding, not a
+    > red gate; only the instrument's own failures are enforced.
+    > **(b) "both rows" IS NOT THE ROSTER.** It named
+    > `rt_parity_native.rs:675` / `RT-SITEOP-CARRIED-WITNESS` and `:2039` /
+    > `RT-CLOSURE-BOUNDARY-LANE`, and D4a measured **16**. Those two were a
+    > FLOOR I could see from a narrow view, exactly as this node's earlier
+    > "exactly two" correction warned. **Satisfy this arm against the measured
+    > population, never against the two rows named here** — an enumerated roster
+    > in an AC is what lets a detector look complete while under-covering.
   - **Negative, and this is the arm that has to be exhibited.** Mutate the
     STATUS OPERAND, not the row: point a row's comment at a node whose `status:`
     is not `merged`, and the sweep must PASS for that row. **This is the arm the
