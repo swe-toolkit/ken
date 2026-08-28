@@ -1,7 +1,7 @@
 ---
 id: RT-RETAINED-UNIT-RESULT-CLOSURE-REPRESENTATION
 title: "Post-call retained-unit RESULT closure-representation route at constructor composition — the distinct object behind the retained-unit target derivation. After the derived declared-unit call returns (lower_computational_producer_call, core.rs:5221-5227), the carrier is handed to lower_computational_match_value_composed (core.rs:5228-5232); later constructor composition sees a carried sibling, enters transfer_constructor_operands, and its whole-child preflight (core.rs:11478-11485) meets a specialized raw closure and refuses via boundary_transfer_admissibility. This consumer reads value-class / aggregate-representation facts, NOT call-target facts, which is why it is a different component object. NOT framed as generic Closure transport: the same total refusal arm is shared by multiple production roots, and a repeated refusal string proves the shared GATE, not a shared PRODUCER."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
