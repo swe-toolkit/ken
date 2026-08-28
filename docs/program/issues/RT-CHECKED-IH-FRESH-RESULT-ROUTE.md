@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-FRESH-RESULT-ROUTE
 title: "RT-ITREE checked-IH fresh-result ROUTE relation — REPLACES the falsified CheckedIhFreshResultProducer. HS9 ruling evt_7wbxwxa74cdnr determined that for the loop rows fresh R2 is the governed K application result AS DELIVERED INTO THE RET CASE'S INPUT BINDER, not the result of evaluating that Ret body, so it is NOT the carried elimination's merge parameter: normative spec/40-runtime/42-evaluation.md section 6.2 is Ret r -> r, and the emitted order (header input -> Ret/checked-fallback input -> case environment/capture -> body evaluation -> merge) puts the merge parameter causally DOWNSTREAM of the capture, unreachable backward under SSA dominance. The landed CarriedLoopExitResult named the Ret body's OUTPUT where the consumer needs its INPUT, so it is latent false authority and D3 must not consume it. This node replaces the enum with a planner-owned typed fresh-result ROUTE relation over two variants, DirectInvocationReturn (preserving the accepted body-refined governed invocation-return relation) and TailResumedRetInput (the forward route through the existing active-self-resumption header and checked-answer/Ret input edge into the exact Ret-case binder consumed by CheckedIhFreshResultDestination). It lands BEHAVIORALLY INERT: no K application, no R2 binding. Replace, do not extend -- the old enum and arm are not retained in parallel."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
