@@ -12,6 +12,67 @@ github: null
 origin: "Architect component ruling evt_2jdfsv6w8nh19, 2026-08-28 (thr_4vk7ks9gk3bmn), on exact base 077286dbcaf166af4c3bd8b8910c113871825690 and exact WIP 6282f149545c973f801c1cf8e715212d9ba77d99 / tree 3993a2653d5812fa97c6318261ccd73c7f88b112. Runtime raised the component-design request evt_5gytgyp26b3sp after its completed target derivation advanced the trigger row to a new refusal. The Steward split the question at evt_6mmj97njjpq3e: the WP cut and partial-landing call are the Steward's, the distinctness call the Architect's, and the Steward asked specifically whether this chain had begun repeating the HS7 last-gap-decomposition defect (evt_1z1p9t4tdyd2v). The Architect ruled it does NOT: HS7's predicate was 'each stop supplies another missing input to the same generated-entry accessor at the same final consumer', and no such predicate holds here. Steward-owned framing per the ruling's disposition."
 ---
 
+> # OPERATIVE AND NEWEST — Architect component ruling `evt_4t60zeht79x36`
+> # (2026-08-28), plus the Steward recut it authorizes. Nothing below is newer.
+>
+> This ADDS TO the `evt_2jdfsv6w8nh19` banner beneath it; that banner remains
+> operative and is not superseded. Read both, this one first.
+>
+> **THE LATER `ResourceBodyResult` RUNTIME MATCH IS A DISTINCT DOWNSTREAM
+> CONSUMER, AND IT IS ALREADY OWNED BY
+> [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]]. DO NOT MINT A SUCCESSOR** — the
+> Steward's conditional disposition said it would frame one, and the Architect
+> corrected that. There is nothing to create; the frontier has an owner.
+>
+> **THE STEWARD ASKED WHETHER THE TRAP MEANT M4 REPRESENTED THE WRONG VALUE. THE
+> ANSWER IS NO, AND IT IS MEASURED, NOT ARGUED.** The runtime match does NOT
+> receive this node's nine-capture M4 closure-environment representation. The
+> Architect replaced only the reached default's trap identity with runtime
+> observations and reran the exact ignored row: the first reached
+> `ResourceBodyResult` scrutinee is class `Constructor`, emitted constructor tag
+> exactly `0`, **seven** fields. That triple is the landed
+> `CheckedIhCapturedEnvironment` shape — emitted tagless at
+> `lowering/aggregates.rs:3803-3924` — and NOT this node's nine-field object. It
+> is the frozen D3 defect: a planner-typed captured environment returned
+> unapplied where a fresh result belongs, already recorded at
+> `RT-RESULT-CONTINUATION-BINDING-PROVENANCE.md:301-304`. Raw word/index values
+> are diagnostic coordinates only; the authority is the planner role and its
+> declared seven-child model.
+>
+> **THE COMPILE-TIME GATE DID NOT MERELY STOP LOOKING.** The concern was that a
+> gate ceasing to fire proves only that it stopped looking, so a malformed
+> nine-field representation could hide behind a green compile and surface at the
+> first runtime consumer. That is refuted on evidence: the object reaching the
+> match is a DIFFERENT object, separately planned. **But the refutation is
+> narrow, and AC-POSITIONAL below is what keeps it narrow** — candidate review
+> must still prove the nine captures are consumed in exact positional order.
+> **Advancement is not correctness, and the seven-field downstream frontier may
+> NEVER be credited as proof the M4 representation is right.**
+>
+> **HS7 RE-DERIVED AT THIS THIRD STOP: STILL NO SHARED PREDICATE.** The Steward
+> re-asked rather than inheriting the stop-two answer, and the answer held. The
+> three stops are (1) `unit_calls[body 1236]`, static target authority before
+> call entry; (2) M4 `BoundaryClosureEnvironment`, nine-capture
+> code/environment representation at `ITree::Vis` constructor composition;
+> (3) `ResourceBodyResult` selection, dynamic application/result delivery where a
+> seven-field `CheckedIhCapturedEnvironment` arrives instead of fresh `R2`.
+> Different consumers, phases, values, and authorities. **The new runtime
+> measurement STRENGTHENS the distinction rather than weakening it: object 3 is
+> not object 2 missing another field.** Their only common predicate is that one
+> end-to-end fixture advances after each earlier refusal, which is not a
+> component boundary.
+>
+> **This ruling is a component/scope classification. It is NOT approval of WIP
+> `aa1b3c7939c1d57c1d5346cad266a47065c04634` and NOT authorization to route QA.**
+> After this recut, Runtime may finish controls and cut a fresh exact-SHA
+> candidate for Architect then Runtime QA.
+>
+> **D3A+D3B REMAINS FROZEN.** This classification neither repairs nor re-releases
+> it. The corrected fresh-result-route predecessor
+> [[RT-CHECKED-IH-FRESH-RESULT-ROUTE]] and a SECOND explicit Steward release both
+> remain mandatory. Re-pointing the `#[ignore]` at that node names the owner of
+> the next frontier; it does not unfreeze, release, or create a dependency on it.
+
 > # OPERATIVE — Architect component ruling `evt_2jdfsv6w8nh19` (2026-08-28)
 >
 > **DO NOT FRAME THIS AS GENERIC `Closure` TRANSPORT.** This exact px8f row
@@ -52,8 +113,38 @@ occurrence is authorized by a typed relation rather than by the refusal itself.
   `core.rs:11478-11485` encounters a specialized raw closure and applies
   `boundary_transfer_admissibility`, which refuses it. Localized refusal site:
   `core.rs:11483`.
-- Trigger row: `crates/ken-cli/tests/px8f_buffer_native.rs:201`, whose `#[ignore]`
-  is re-pointed to THIS node by the predecessor.
+- Trigger row: `crates/ken-cli/tests/px8f_buffer_native.rs`, fn
+  `linked_checked_write_all_observes_short_progress_and_matches_interpreter`,
+  whose `#[ignore]` is re-pointed to THIS node by the predecessor.
+  **COORDINATE CORRECTED 2026-08-28 (Architect recut item 1).** This frame said
+  `:201`, which predated the predecessor's landing and resolves in no current
+  tree. Measured on `origin/main` `513d268e143a4305f12d7e22def1b066de59ff0e`:
+  file blob `e0046cd4e5656e66c53d474586075356932089e7`, `#[ignore]` at line
+  **250**, fn at **251**. **Cite the fn name and the blob, not the line** — the
+  line is what went stale, and it will again.
+
+## Trigger-row evidence measured at WIP (Architect `evt_4t60zeht79x36`)
+
+**These are the Architect's measurements on WIP `aa1b3c793`, recorded so the
+recut ACs are checkable. They are NOT a Steward measurement and NOT an approval
+of that WIP.** With the narrow reach/wiring repair applied, the row compiles,
+starts native execution, opens `input.bin` and `output.bin`, and reaches
+`PatternMatchFailure: no runtime match case selected for
+decl:px8f_write_all_native::ResourceBodyResult`, exit 1, before `FsReadAt` /
+`FsWriteAt`. The closure refusal this node owns is ABSENT at that point.
+
+- This node's object: the `ITree::Vis` field-1 continuation capability `K` —
+  owner specialization 2, result `1537`, construct `815`, seat `810`, body
+  `800`, nine capture origins `809..801`, target specialization 3. Materialized
+  at `lowering/aggregates.rs:3927` as an untagged positional capture aggregate;
+  D0 proves this instance has **nine** fields.
+- The later consumer is a different site: the ordinary carried match at
+  `lowering/joins.rs:867-1022`, which reads runtime class, constructor tag,
+  arity and fields, and reaches its unchanged closed default only after no
+  `ResourceBodyOk` / `ResourceBodyErr` identity matched.
+- What actually arrives there: class `Constructor`, emitted constructor tag
+  **0**, **seven** fields — the `CheckedIhCapturedEnvironment` shape, not this
+  node's nine-field object.
 
 ## Deliverables
 
@@ -75,6 +166,35 @@ occurrence is authorized by a typed relation rather than by the refusal itself.
 
 ## Acceptance criteria, each with its control
 
+- **AC-ADVANCE (ADDED AT RECUT 2026-08-28 — Architect item 2; this node
+  previously had NO advancement criterion at all, a Steward frame defect noted
+  at `evt_24pf5b7qea3zx`).** Before the change the trigger row reaches THIS
+  node's closure-representation refusal. After it, the row **must not reach that
+  refusal**, and must advance through the exact represented call either to
+  completion or to the named existing `ResourceBodyResult` frontier owned by
+  [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]].
+  **The observation must DISTINGUISH those two end states. Compile success alone
+  is insufficient** — a green build says only that the gate stopped firing, and
+  a run that stops for a third, unnamed reason is neither outcome. Control: the
+  row reaches the closure refusal at base and demonstrably does not after, with
+  the reached end state named.
+  > **Keyed to THIS refusal ceasing, never to the whole path succeeding.** That
+  > is the predecessor's corrected `AC-DERIVE` shape, and the reason for it is
+  > unchanged: an AC for a node that unblocks ONE refusal must not make its
+  > acceptance depend on every refusal behind it. Carrying only half of the
+  > predecessor's lesson — the predicate form, without this shape — is what left
+  > this node with no advancement criterion.
+- **AC-POSITIONAL (ADDED AT RECUT 2026-08-28 — Architect item 4).** Candidate
+  review must produce **exact positional-consumption evidence** for the one
+  nine-capture environment: that captures `809..801` are consumed in exact
+  positional order by body `800` / target specialization 3.
+  **The seven-field downstream frontier may NEVER be credited as evidence that
+  the M4 representation is correct.** The two objects are separately planned and
+  the downstream one is not this node's; that a different object arrives later
+  says nothing about whether these nine captures are ordered right.
+  **Advancement is not correctness.** Control: a positional permutation of the
+  captures must REDDEN a named control while the build still succeeds — two-
+  sided, as the corpus requires.
 - **AC-EXACT-OCCURRENCE.** D0's row is established from planner/declaration
   authority. Control: it must be derivable without reading the refusal.
 - **AC-NO-PARALLEL-REPRESENTATION.** If an existing row covers the occurrence,
@@ -111,6 +231,26 @@ occurrence is authorized by a typed relation rather than by the refusal itself.
 - **AC-GATE-INTACT.** `boundary_transfer_admissibility` still refuses everything
   it refused before, for every root that is not this authorized occurrence.
   Control: the shared refusal arm still fires for a neighbouring production root.
+- **AC-IGNORE-REPOINTED (ADDED AT RECUT 2026-08-28 — Architect item 3).** The
+  `#[ignore]` on the trigger row **STAYS**, and its reason text is re-pointed to
+  [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] — **the existing owner of the
+  frontier, NOT a new node, and NOT removed.** Removing it is required only when
+  the row runs end-to-end, which this node does not deliver. Control: the row is
+  still ignored after the change and its reason names that node.
+
+## Symptom inventory
+
+Append one line per hard stop; never rewrite history.
+
+1. D0 grounded and a narrow existing-M4 reach/wiring repair cleared the closure
+   refusal, but the trigger row then compiled, ran, and reached
+   `PatternMatchFailure: no runtime match case selected for ResourceBodyResult`
+   — a boundary with no named owner in this frame. Runtime stopped cleanly for
+   component/scope disposition rather than broadening into it; the Steward
+   routed the classification and the Architect ruled the trap a distinct
+   downstream consumer already owned by
+   [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]]
+   (`evt_3nwtnet6ragc3` → `evt_24pf5b7qea3zx` → `evt_4t60zeht79x36`).
 
 ## FORBIDDEN — any of these means the turn stopped wrong
 
@@ -141,3 +281,21 @@ mechanical diff.
 where a wrong turn here gets caught cheaply. If no existing typed relation can
 authorize the exact post-call result occurrence, **STOP and return the design
 gap** — that is a correct outcome of the turn, not a failure of it.
+
+### RECUT COMPLETE, 2026-08-28 — Runtime may resume
+
+D0 IS DONE and its stop is ruled. All five recut items the Architect required
+(`evt_4t60zeht79x36`) are applied above: corrected trigger coordinate,
+`AC-ADVANCE`, `AC-IGNORE-REPOINTED`, `AC-POSITIONAL`, and the symptom inventory.
+Every pre-existing control is retained unchanged.
+
+**Runtime may now finish controls and cut a fresh exact-SHA candidate**, which
+takes Architect then Runtime QA on that exact SHA. WIP
+`aa1b3c7939c1d57c1d5346cad266a47065c04634` is a starting point, not an approved
+one — the ruling classified the component and did not review that code.
+
+It then lands as **accepted partial work** on the predecessor's policy: the row
+still will not run end-to-end, the `#[ignore]` stays, and that is `AC-ADVANCE`
+being met rather than an outstanding defect.
+
+**D3A+D3B remains FROZEN throughout.**
