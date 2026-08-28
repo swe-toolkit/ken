@@ -79,6 +79,12 @@ pub(crate) use artifact::api::{
 // into the private `lowering` module severs that path, and neither
 // `-p ken-runtime` build config can observe the break — only the consumer can.
 #[cfg(feature = "px8-ds-test-support")]
+pub use lowering::units::{
+    retained_unit_call_target_mutation_is_exact,
+    with_retained_unit_call_target_mutation,
+    RetainedUnitCallTargetMutation,
+};
+#[cfg(feature = "px8-ds-test-support")]
 pub use lowering::with_px8ds_retired_flat_order;
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::source::{
