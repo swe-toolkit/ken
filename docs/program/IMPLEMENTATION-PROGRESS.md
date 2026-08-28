@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-28 14:17:05Z — from 470 issue file(s) in `docs/program/issues/`.
+2026-08-28 14:27:59Z — from 471 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -355,6 +355,7 @@ the committed file matches the generator's output.
 | `RT-FNUNIT-RESULT-TOKEN` | Broad starter shapes fail the result-token table on the FunctionizedUnits lane — pre-existing, unmasked by retiring SeedClosureCall | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1892 |
 | `RT-FORCED-RETURNS-BOUND-RESTORE` | One clause: the six ignored tests' eighteen empty returns are FORCED by the refusal, not observed -- the measurement the Architect barred from this comment came back one repair later, and it now sits one sentence above the 81-return tally a reader will add it to | merged | runtime | XS | none | — |
 | `RT-FRAME-MARKER-ONCE` | Checked Runtime frame marker is consumed more than once under a nested computational eliminator | draft | runtime | TBD | none | — |
+| `RT-FRESH-RESULT-ROUTE-PAIRING-LEG-CONTROLS` | The fresh-result route pairing proof pins ONE of its five substantive conjuncts — CheckedIhFreshResultRouteObservationMutation has exactly two arms and suppresses only source_result_value, so the sink-half identity (header_input_value == ret_input_value) and three sibling conjuncts have no negative control at all and can be deleted with the whole suite green. Latent today; the directed-edge claim that distinguishes this node from the co-emission object it replaced is asserted in the positive alone. | draft | runtime | S | none | — |
 | `RT-FRONTEND-REACHABILITY-TRIPWIRE` | Nothing in the tree would notice if a frontend change made one of the source-unreachable refusal shapes constructible -- the emitter fixtures that look like they cover this bypass the parser and elaborator entirely | draft | runtime | M | none | — |
 | `RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` | The carried-operand projection path for FsReadAt's Argument(2) buffer reply arm handles ONLY ONE observation kind (BytesPointerLength, observe_carried_bytes_span at effects.rs:1405) and re-refuses a carried ResourceScalar buffer; removing the dead specialized-only gate at 3267 (whose span_origin binding is genuinely unused) only RELOCATES that refusal one function deeper and greens nothing, so the fix is NEED-DIRECTED resource-awareness in site_operand_argument's carried branch (a seat whose declared need is ResourceScalar projects via lower_resource_token_seat, not the byte-span observer) WITH the dead gate removed as part of that one change -- the ResourceScalar-family reader RT-EXACTINT moved onto the cap41_* critical path (D0 re-scoped 2026-08-22 from removal-only: point (1) was FALSE, Architect ruling evt_7h23767bakhgm) | closed | runtime | M | none | — |
 | `RT-GENERATED-CONTINUATION-OPERAND-PAIRING` | Lane-1 successor after the merged HostResult repair — bind px8ta's next causal object: funcid51's Bool eliminator receives a tag-7 InvocationBorrowed carrier where the selected Console Bool(false) (ImmediateBool, tag 0) belongs. D0 produces one exact source-to-slot lineage table for the funcid51 Bool binder; repair at the first authority that pairs the wrong source with that frame slot | merged | runtime | M | none | — |
