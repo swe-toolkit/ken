@@ -195,6 +195,49 @@ decl:px8f_write_all_native::ResourceBodyResult`, exit 1, before `FsReadAt` /
   **Advancement is not correctness.** Control: a positional permutation of the
   captures must REDDEN a named control while the build still succeeds — two-
   sided, as the corpus requires.
+- **AC-EXCLUSIVE (FOLDED IN 2026-08-28 AFTER TWO GATE REJECTS — Steward framing
+  debt, discharged here; read the box).** The exact continuation-result proof
+  must be the **EXCLUSIVE** authorizer of the result-derived environment. When
+  the exact caller authorization is absent, the crossing must return **no
+  authorization BEFORE either weaker arm is consulted** — before the bind arm
+  and before `boundary_closure_owner_returns_seat` owner-wide containment — and
+  the trigger must not reach D3. Both weaker arms stay **physically present**
+  and keep serving their own populations; exclusivity is a claim on this
+  environment, never a deletion of the arms.
+  **Control, and the shape is the whole criterion: the suppression must be
+  CALLER-SIDE.** It removes or skips only the exact caller authorization match,
+  leaving proof selection, the result-derived environment record, and both
+  fallback arms byte-present. **A control that manufactures an error INSIDE the
+  arm it claims to suppress is not evidence of causal necessity** — it proves
+  only that a detector-side refusal prevents D3, which was true before the
+  change. Two-sided as everywhere else: the mutated build must still succeed,
+  and the named control must redden.
+  > **WHY THIS IS HERE AND NOT IN GATE PROSE — the debt was mine.** "Prove the
+  > exact result arm is causally necessary" originated in the Architect's
+  > reject-1 respin list, so it lived only in a gate message. **A gate that
+  > exists only in prose gates nothing**, and this frame carried no exclusivity
+  > criterion at all while the ring failed the requirement TWICE against it.
+  > Reject 1 (`evt_x9s5s9fks5tg`, `ad7f5044`) found it fail-OPEN: a missing
+  > target relation returned `Ok(false)` and owner-wide containment authorized
+  > the same environment anyway. Reject 2 (`evt_63cdjgpfzzp1e`, `7b5fc2374`)
+  > found the control itself inert: it injected an unconditional `Err` inside
+  > `boundary_continuation_result_authorization`, and when the Architect applied
+  > the real caller-side mutation the build compiled and the trigger still
+  > reached the same D3 frontier.
+  > **The two rejects are ONE defect, and that is the reusable half.** The
+  > repair between them made the proof fail-CLOSED on disagreement — a correct
+  > fix to a real symptom that left exclusivity entirely untouched, which is why
+  > the second reject looked like a fresh finding and was not. **Fail-closed and
+  > exclusive are different properties**: the first says this arm refuses when
+  > its inputs disagree, the second says no OTHER arm may authorize what this
+  > one governs. A frame asking only for the first admits a candidate that has
+  > neither.
+  > Satisfied by `e0ec51c5247b05792b7c17a9323c359ec7df8ff1` (Architect APPROVE
+  > `evt_b3xny9yz85m4`): selection separated from authorization, the exclusivity
+  > check observing the selected proof and returning no environment ahead of
+  > both weaker arms. **This fold is bookkeeping and must not be read as
+  > weakening or re-opening that approved mechanism** — it writes down what the
+  > gate already required, so the next copier of this frame inherits it.
 - **AC-EXACT-OCCURRENCE.** D0's row is established from planner/declaration
   authority. Control: it must be derivable without reading the refusal.
 - **AC-NO-PARALLEL-REPRESENTATION.** If an existing row covers the occurrence,
