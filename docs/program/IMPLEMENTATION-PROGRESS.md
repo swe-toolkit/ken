@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-28 02:40:55Z — from 467 issue file(s) in `docs/program/issues/`.
+2026-08-28 02:54:49Z — from 468 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -59,6 +59,7 @@ the committed file matches the generator's output.
 | `CAT-C2` | Localized Map/Set key-interface split: a non-canonical carrier becomes a lawful Map/Set key under a weaker key-order dictionary while staying an unlawful Ord key wherever antisym concludes kernel Equal | draft | spec-enclave | M | none | — |
 | `CAT-CAPEX` | catalog exhibits no checked capability/authority exemplar — write one against the landed Cap/Auth surface | merged | ergo | M | none | — |
 | `CAT-DEQUE` | Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial | merged | foundation | M | none | — |
+| `CAT-DERIVED-PUB-EXPORT` | Bring catalog Data/Collections/Derived.ken.md to the pub-export standard — mark its census-recorded exported operations pub so consuming packages can selectively import them instead of reimplementing. The provider prerequisite that unblocks census group 4 (derived-list reuse) and is a necessary half of the LawfulFunctors standalone repair. | draft | foundation | S | none | — |
 | `CAT-GCD-REFACTOR` | Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last) | merged | foundation | S | none | — |
 | `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | merged | foundation | M | none | — |
 | `CAT-NAT-REUSE-CONSUMERS` | Catalog-reuse rework, first scoped batch: the nine unblocked low-risk Nat arithmetic/order consumer duplicates from the census (groups 2 and 3), across six packages — each package imports add/leq_nat/sub/min from its canonical owner and drops the local reimplementation, one independently-releasable increment per package | active | foundation | M | none | — |
@@ -550,6 +551,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: ready)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
+- `CAT-DERIVED-PUB-EXPORT` blocked by `CAT-NAT-REUSE-CONSUMERS` (status: active)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
