@@ -453,7 +453,7 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 >
 > **Disambiguation, because this file contains an earlier in-line mention of
 > "HS8" inside the HS7 banner.** That older mention is NOT this ruling. The
-> operative hard-stop-8 ruling is **`evt_54efxydhb3n6w`, cited by event id
+> hard-stop-8 ruling recorded here is **`evt_54efxydhb3n6w`, cited by event id
 > throughout this banner**. Cite the event id, never the number.
 >
 > **D3A+D3B is FROZEN AGAIN and needs a THIRD sibling proof first.** Runtime
