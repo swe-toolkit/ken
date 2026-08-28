@@ -1358,39 +1358,76 @@ fn assert_generated_entry_arrival_mutation_child() {
 /// **THE GAP:** each control therefore mutates the real operation/control path,
 /// never the observation counters, and must make the corresponding relation
 /// unequal.
-#[test]
-fn checked_ih_generated_entry_per_arrival_operation_mutations_break_equality() {
-    if std::env::var_os(GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD).is_some() {
-        in_generated_entry_stack_thread(
-            "rt-parity-generated-entry-arrival-mutation-child",
-            assert_generated_entry_arrival_mutation_child,
-        );
-        return;
-    }
-    for mode in [
-        "duplicate-lookup",
-        "skip-lookup",
-        "duplicate-validation",
-        "skip-validation",
-        "governed-through-non-governed",
-        "non-governed-through-governed",
-    ] {
-        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
-            .arg("--exact")
-            .arg("checked_ih_generated_entry_per_arrival_operation_mutations_break_equality")
-            .arg("--nocapture")
-            .env(GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, mode)
-            .env_remove("RUST_MIN_STACK")
-            .output()
-            .expect("spawn isolated generated-entry arrival mutation child");
-        assert!(
-            output.status.success(),
-            "{mode}: arrival mutation child failed\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+
+macro_rules! generated_entry_case {
+    ($name:ident, $env:ident, $runner:ident, $child:ident, $mode:literal) => {
+        #[test]
+        fn $name() {
+            if std::env::var_os($env).is_some() {
+                $runner(concat!("rt-parity-", stringify!($name), "-child"), $child);
+                return;
+            }
+            let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+                .arg("--exact").arg(stringify!($name)).arg("--nocapture")
+                .env($env, $mode).env_remove("RUST_MIN_STACK").output()
+                .expect("spawn isolated mutation child");
+            assert!(output.status.success(), "{}: mutation child failed\nstdout:\n{}\nstderr:\n{}", $mode, String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+        }
+    };
 }
+
+macro_rules! generated_entry_checked_case {
+    ($name:ident, $env:ident, $runner:ident, $child:ident, $mode:literal, $expected:literal) => {
+        #[test]
+        fn $name() {
+            if std::env::var_os($env).is_some() {
+                $runner(concat!("rt-parity-", stringify!($name), "-child"), $child);
+                return;
+            }
+            let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+                .arg("--exact").arg(stringify!($name)).arg("--nocapture")
+                .env($env, $mode).env_remove("RUST_MIN_STACK").output()
+                .expect("spawn isolated mutation child");
+            assert!(output.status.success(), "{}: mutation child failed\nstdout:\n{}\nstderr:\n{}", $mode, String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(stderr.contains($expected), "{}: mutation missed intended arm; stderr:\n{}", $mode, stderr);
+        }
+    };
+}
+
+macro_rules! d1_route_case {
+    ($name:ident, $mode:literal, $control:expr, $recursor:expr) => {
+        #[test]
+        fn $name() {
+            if std::env::var_os(D1_ROUTE_CONTROL_CHILD).is_some() {
+                in_large_stack_thread(concat!("rt-parity-", stringify!($name), "-child"), assert_d1_route_control_child);
+                return;
+            }
+            let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"));
+            child.arg("--exact").arg(stringify!($name)).arg("--nocapture")
+                .env(D1_ROUTE_CONTROL_CHILD, $mode)
+                .env_remove("KEN_RT_ITREE_D1_ROUTE_CONTROL")
+                .env_remove("KEN_RT_ITREE_D1_RECURSOR_ROUTE")
+                .env_remove("RUST_MIN_STACK");
+            let control: Option<&str> = $control;
+            let recursor: Option<&str> = $recursor;
+            if let Some(control) = control { child.env("KEN_RT_ITREE_D1_ROUTE_CONTROL", control); }
+            if let Some(recursor) = recursor { child.env("KEN_RT_ITREE_D1_RECURSOR_ROUTE", recursor); }
+            let output = child.output().expect("spawn isolated D1 control child");
+            assert!(output.status.success(), "{} child failed\nstdout:\n{}\nstderr:\n{}", $mode, String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if let Some(control) = control { assert!(stderr.contains(&format!("RT_ITREE_D1_CONTROL_APPLIED mode={control}")), "{}: the route-control mutation did not reach its real producer: {}", $mode, stderr); }
+            if let Some(recursor) = recursor { assert!(stderr.contains(&format!("RT_ITREE_D1_RECURSOR_APPLIED mode={recursor}")), "{}: the recursor-route mutation did not reach its real producer: {}", $mode, stderr); }
+        }
+    };
+}
+
+generated_entry_case!(generated_entry_arrival_duplicate_lookup, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "duplicate-lookup");
+generated_entry_case!(generated_entry_arrival_skip_lookup, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "skip-lookup");
+generated_entry_case!(generated_entry_arrival_duplicate_validation, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "duplicate-validation");
+generated_entry_case!(generated_entry_arrival_skip_validation, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "skip-validation");
+generated_entry_case!(generated_entry_arrival_governed_through_non_governed, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "governed-through-non-governed");
+generated_entry_case!(generated_entry_arrival_non_governed_through_governed, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "non-governed-through-governed");
 
 const GENERATED_ENTRY_ADMISSION_MUTATION_CHILD: &str =
     "KEN_RT_CHECKED_IH_GENERATED_ENTRY_ADMISSION_MUTATION_CHILD";
@@ -1423,81 +1460,24 @@ fn assert_generated_entry_admission_mutation_child() {
     );
 }
 
-/// **Promise class: durable invariant.** Intended planner extensions may grow
-/// P, but every row must still have one explicit, disjoint Governed/NonGoverned
-/// classification and governed call-key projection must remain functional.
-///
-/// **MEASURED:** drop, duplicate, cross-variant reclassification, and projected
-/// collision mutations applied to the real admission population.
-/// **CLAIMED:** the six closed-partition laws reject both variants at their
-/// named planner-validation arms.
-/// **THE GAP:** the child asserts the exact error text for each arm, so an
-/// earlier unrelated rejection cannot masquerade as admission validation.
-#[test]
-fn checked_ih_generated_entry_admission_population_mutations_reject() {
-    if std::env::var_os(GENERATED_ENTRY_ADMISSION_MUTATION_CHILD).is_some() {
-        in_generated_entry_stack_thread(
-            "rt-parity-generated-entry-admission-mutation-child",
-            assert_generated_entry_admission_mutation_child,
-        );
-        return;
-    }
-    let cases = [
-        (
-            "drop-governed",
-            "total generated-entry admission keys are not equal to the closed call population",
-        ),
-        (
-            "drop-non-governed",
-            "total generated-entry admission keys are not equal to the closed call population",
-        ),
-        (
-            "duplicate-governed",
-            "one Governed generated-entry admission key was inserted twice",
-        ),
-        (
-            "duplicate-non-governed",
-            "one NonGoverned generated-entry admission key was inserted twice",
-        ),
-        (
-            "governed-to-non-governed",
-            "governed generated-entry admission keys are not equal to the projected governed set",
-        ),
-        (
-            "non-governed-to-governed",
-            "governed generated-entry admission keys are not equal to the projected governed set",
-        ),
-        (
-            "governed-key-collision",
-            "two governed coordinates project one call key to different typed projections",
-        ),
-        (
-            "non-governed-key-collision",
-            "one NonGoverned generated-entry admission key was inserted twice or overlapped Governed",
-        ),
-    ];
-    for (mode, expected) in cases {
-        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
-            .arg("--exact")
-            .arg("checked_ih_generated_entry_admission_population_mutations_reject")
-            .arg("--nocapture")
-            .env(GENERATED_ENTRY_ADMISSION_MUTATION_CHILD, mode)
-            .env_remove("RUST_MIN_STACK")
-            .output()
-            .expect("spawn isolated generated-entry admission mutation child");
-        assert!(
-            output.status.success(),
-            "{mode}: admission mutation child failed\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.contains(expected),
-            "{mode}: admission mutation missed intended arm; stderr:\n{stderr}"
-        );
-    }
-}
+// **Promise class: durable invariant.** Intended planner extensions may grow
+// P, but every row must still have one explicit, disjoint Governed/NonGoverned
+// classification and governed call-key projection must remain functional.
+//
+// **MEASURED:** drop, duplicate, cross-variant reclassification, and projected
+// collision mutations applied to the real admission population.
+// **CLAIMED:** the six closed-partition laws reject both variants at their
+// named planner-validation arms.
+// **THE GAP:** the child asserts the exact error text for each arm, so an
+// earlier unrelated rejection cannot masquerade as admission validation.
+generated_entry_checked_case!(generated_entry_admission_drop_governed, GENERATED_ENTRY_ADMISSION_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_admission_mutation_child, "drop-governed", "total generated-entry admission keys are not equal to the closed call population");
+generated_entry_checked_case!(generated_entry_admission_drop_non_governed, GENERATED_ENTRY_ADMISSION_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_admission_mutation_child, "drop-non-governed", "total generated-entry admission keys are not equal to the closed call population");
+generated_entry_checked_case!(generated_entry_admission_duplicate_governed, GENERATED_ENTRY_ADMISSION_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_admission_mutation_child, "duplicate-governed", "one Governed generated-entry admission key was inserted twice");
+generated_entry_checked_case!(generated_entry_admission_duplicate_non_governed, GENERATED_ENTRY_ADMISSION_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_admission_mutation_child, "duplicate-non-governed", "one NonGoverned generated-entry admission key was inserted twice");
+generated_entry_checked_case!(generated_entry_admission_governed_to_non_governed, GENERATED_ENTRY_ADMISSION_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_admission_mutation_child, "governed-to-non-governed", "governed generated-entry admission keys are not equal to the projected governed set");
+generated_entry_checked_case!(generated_entry_admission_non_governed_to_governed, GENERATED_ENTRY_ADMISSION_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_admission_mutation_child, "non-governed-to-governed", "governed generated-entry admission keys are not equal to the projected governed set");
+generated_entry_checked_case!(generated_entry_admission_governed_key_collision, GENERATED_ENTRY_ADMISSION_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_admission_mutation_child, "governed-key-collision", "two governed coordinates project one call key to different typed projections");
+generated_entry_checked_case!(generated_entry_admission_non_governed_key_collision, GENERATED_ENTRY_ADMISSION_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_admission_mutation_child, "non-governed-key-collision", "one NonGoverned generated-entry admission key was inserted twice or overlapped Governed");
 
 const GENERATED_ENTRY_MUTATION_CHILD: &str =
     "KEN_RT_CHECKED_IH_GENERATED_ENTRY_MUTATION_CHILD";
@@ -1561,132 +1541,59 @@ fn assert_generated_entry_mutation_child() {
     );
 }
 
-/// **Promise class: durable invariant.** Every quotient-key weakening,
-/// projection disagreement, route corruption, and set-membership corruption
-/// must reject before a certificate can be published.
-///
-/// **MEASURED:** each population-side mutation changes one real route relation,
-/// membership operation, declared-body transport selector, or legal neighboring
-/// header/kind/binder/key and reaches its named planner refusal.
-/// **CLAIMED:** the governed projection carries exactly one directed route; its
-/// Direct arm preserves the body-refined transport, and its tail arm composes
-/// source, active checked header, direct Ret-input delivery, and capture sink.
-/// **THE GAP:** both same-variant positives live in
-/// `checked_ih_generated_entry_confluence_reaches_exact_capsules`; these
-/// mutation children establish rejection, not positive reach. Neighboring
-/// bodies, frames, binders, and keys are drawn from validated planner rows.
-#[test]
-fn checked_ih_generated_entry_confluence_and_route_mutations_reject() {
-    if std::env::var_os(GENERATED_ENTRY_MUTATION_CHILD).is_some() {
-        in_generated_entry_stack_thread(
-            "rt-parity-generated-entry-mutation-child",
-            assert_generated_entry_mutation_child,
-        );
-        return;
-    }
-    let projection_disagreement = "disagree on their typed consumer projection";
-    let cases = [
-        ("context-key", projection_disagreement),
-        ("identity-key", "not equal as sets"),
-        ("projection-key", "not equal as sets"),
-        ("destination-owner", projection_disagreement),
-        ("destination-body", projection_disagreement),
-        ("binding-frame", projection_disagreement),
-        ("binding-position", projection_disagreement),
-        ("locator-invocation", projection_disagreement),
-        ("locator-callee", projection_disagreement),
-        ("locator-domain", projection_disagreement),
-        ("locator-index", projection_disagreement),
-        ("fresh-active-frame", projection_disagreement),
-        ("fresh-ret-body", projection_disagreement),
-        ("fresh-constructor-role", projection_disagreement),
-        ("fresh-constructor-coordinate", projection_disagreement),
-        ("fresh-closure-record", projection_disagreement),
-        ("fresh-closure-origin", projection_disagreement),
-        ("fresh-closure-body", projection_disagreement),
-        ("fresh-closure-parameters", projection_disagreement),
-        ("fresh-capture-ordinal", projection_disagreement),
-        ("fresh-capture-occurrence", projection_disagreement),
-        ("fresh-body-reads", projection_disagreement),
-        (
-            "route-removal",
-            "governed fresh-result route population is absent",
-        ),
-        (
-            "route-duplication",
-            "governed fresh-result route population is ambiguous",
-        ),
-        (
-            "route-cross-variant",
-            "route variant contradicts its exact direct-transport partition",
-        ),
-        (
-            "route-wrong-active-frame",
-            "route active header is not the exact governed frame",
-        ),
-        (
-            "route-wrong-header-edge",
-            "route does not use the active self-resumption header edge",
-        ),
-        (
-            "route-wrong-answer-route",
-            "route does not carry the checked selected-recursor route kind",
-        ),
-        (
-            "route-wrong-direct-edge",
-            "direct fresh-result route's declared recursive-unit body has no exact typed invocation transport",
-        ),
-        (
-            "route-wrong-ret-input-body",
-            "route does not name the exact Ret-input body",
-        ),
-        (
-            "route-wrong-ret-input-binder",
-            "route does not name the exact logical Ret-input binder",
-        ),
-        (
-            "route-wrong-governed-key",
-            "route does not name its governed call key",
-        ),
-        (
-            "route-pretend-ordinary-projection",
-            "pretends the checked fallback projected a constructor field instead of directly occupying the Ret input",
-        ),
-        (
-            "route-body-merge-output",
-            "substituted the causally downstream body merge output for the Ret input",
-        ),
-        (
-            "route-reversed",
-            "reverses the governed source and Ret-input sink",
-        ),
-        ("route-disagreement", projection_disagreement),
-        ("remove-member", "not equal as sets"),
-        ("duplicate-member", "inserted twice"),
-        ("filter-member", "not equal as sets"),
-    ];
-    for (mode, expected) in cases {
-        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
-            .arg("--exact")
-            .arg("checked_ih_generated_entry_confluence_and_route_mutations_reject")
-            .arg("--nocapture")
-            .env(GENERATED_ENTRY_MUTATION_CHILD, mode)
-            .env_remove("RUST_MIN_STACK")
-            .output()
-            .expect("spawn isolated generated-entry mutation child");
-        assert!(
-            output.status.success(),
-            "{mode}: mutation child failed\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.contains(expected),
-            "{mode}: mutation missed intended arm; stderr:\n{stderr}"
-        );
-    }
-}
+// **Promise class: durable invariant.** Every quotient-key weakening,
+// projection disagreement, route corruption, and set-membership corruption
+// must reject before a certificate can be published.
+//
+// **MEASURED:** each population-side mutation changes one real route relation,
+// membership operation, declared-body transport selector, or legal neighboring
+// header/kind/binder/key and reaches its named planner refusal.
+// **CLAIMED:** the governed projection carries exactly one directed route; its
+// Direct arm preserves the body-refined transport, and its tail arm composes
+// source, active checked header, direct Ret-input delivery, and capture sink.
+// **THE GAP:** both same-variant positives live in
+// `checked_ih_generated_entry_confluence_reaches_exact_capsules`; these
+// mutation children establish rejection, not positive reach. Neighboring
+// bodies, frames, binders, and keys are drawn from validated planner rows.
+generated_entry_checked_case!(generated_entry_confluence_context_key, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "context-key", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_identity_key, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "identity-key", "not equal as sets");
+generated_entry_checked_case!(generated_entry_confluence_projection_key, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "projection-key", "not equal as sets");
+generated_entry_checked_case!(generated_entry_confluence_destination_owner, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "destination-owner", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_destination_body, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "destination-body", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_binding_frame, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "binding-frame", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_binding_position, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "binding-position", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_locator_invocation, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "locator-invocation", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_locator_callee, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "locator-callee", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_locator_domain, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "locator-domain", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_locator_index, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "locator-index", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_active_frame, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-active-frame", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_ret_body, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-ret-body", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_constructor_role, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-constructor-role", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_constructor_coordinate, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-constructor-coordinate", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_closure_record, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-closure-record", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_closure_origin, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-closure-origin", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_closure_body, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-closure-body", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_closure_parameters, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-closure-parameters", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_capture_ordinal, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-capture-ordinal", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_capture_occurrence, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-capture-occurrence", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_fresh_body_reads, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "fresh-body-reads", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_route_removal, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-removal", "governed fresh-result route population is absent");
+generated_entry_checked_case!(generated_entry_confluence_route_duplication, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-duplication", "governed fresh-result route population is ambiguous");
+generated_entry_checked_case!(generated_entry_confluence_route_cross_variant, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-cross-variant", "route variant contradicts its exact direct-transport partition");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_active_frame, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-active-frame", "route active header is not the exact governed frame");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_header_edge, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-header-edge", "route does not use the active self-resumption header edge");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_answer_route, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-answer-route", "route does not carry the checked selected-recursor route kind");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_direct_edge, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-direct-edge", "direct fresh-result route's declared recursive-unit body has no exact typed invocation transport");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_ret_input_body, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-ret-input-body", "route does not name the exact Ret-input body");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_ret_input_binder, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-ret-input-binder", "route does not name the exact logical Ret-input binder");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_governed_key, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-governed-key", "route does not name its governed call key");
+generated_entry_checked_case!(generated_entry_confluence_route_pretend_ordinary_projection, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-pretend-ordinary-projection", "pretends the checked fallback projected a constructor field instead of directly occupying the Ret input");
+generated_entry_checked_case!(generated_entry_confluence_route_body_merge_output, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-body-merge-output", "substituted the causally downstream body merge output for the Ret input");
+generated_entry_checked_case!(generated_entry_confluence_route_reversed, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-reversed", "reverses the governed source and Ret-input sink");
+generated_entry_checked_case!(generated_entry_confluence_route_disagreement, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-disagreement", "disagree on their typed consumer projection");
+generated_entry_checked_case!(generated_entry_confluence_remove_member, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "remove-member", "not equal as sets");
+generated_entry_checked_case!(generated_entry_confluence_duplicate_member, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "duplicate-member", "inserted twice");
+generated_entry_checked_case!(generated_entry_confluence_filter_member, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "filter-member", "not equal as sets");
 
 const GENERATED_ENTRY_CAPSULE_MUTATION_CHILD: &str =
     "KEN_RT_CHECKED_IH_GENERATED_ENTRY_CAPSULE_MUTATION_CHILD";
@@ -1725,92 +1632,32 @@ fn assert_generated_entry_capsule_mutation_child() {
     );
 }
 
-/// **Promise class: durable invariant.** Only the exact computational-recursor
-/// capsule satisfying every governed fact may pass the pre-dispatch guard; each
-/// independently varied sibling/fact must reject at its named arm.
-///
-/// **MEASURED:** projection controls mutate each terminal projection fact after
-/// planner validation and before generated-function forwarding, then assert the
-/// consumer guard's exact refusal text.
-/// **CLAIMED:** every terminal projection conjunct, including locator domain
-/// and index, is independently load-bearing at the consumer seat.
-/// **THE GAP:** upstream confluence disagreements remain separate population
-/// controls and cannot discharge either consumer-side claim.
-#[test]
-fn checked_ih_generated_entry_capsule_mutations_reject() {
-    if std::env::var_os(GENERATED_ENTRY_CAPSULE_MUTATION_CHILD).is_some() {
-        in_generated_entry_stack_thread(
-            "rt-parity-generated-entry-capsule-mutation-child",
-            assert_generated_entry_capsule_mutation_child,
-        );
-        return;
-    }
-    let cases = [
-        ("outer-carried", "does not name a specialized computational-recursor capsule"),
-        ("specialized-sibling", "is not a computational-recursor capsule"),
-        (
-            "static-worker",
-            "StaticWorkerBinding: a source-machine Var in value position is a value-producing position",
-        ),
-        ("wrong-frame", "checked frame, slot, call template, or residual phase"),
-        ("wrong-slot", "checked frame, slot, call template, or residual phase"),
-        (
-            "wrong-invocation",
-            "projection disagrees with its current function, binding, or call coordinate",
-        ),
-        ("non-carried-residual", "checked frame, slot, call template, or residual phase"),
-        ("provenance-index", "callee Var disagrees with the immediate K locator index"),
-        (
-            "wrong-destination-owner",
-            "projection disagrees with its current function, binding, or call coordinate",
-        ),
-        (
-            "wrong-destination-body",
-            "projection disagrees with its current function, binding, or call coordinate",
-        ),
-        (
-            "wrong-binding",
-            "projection disagrees with its current function, binding, or call coordinate",
-        ),
-        (
-            "wrong-locator-invocation",
-            "projection disagrees with its current function, binding, or call coordinate",
-        ),
-        (
-            "wrong-locator-callee",
-            "projection disagrees with its current function, binding, or call coordinate",
-        ),
-        (
-            "wrong-locator-domain",
-            "immediate K locator has the wrong domain or is outside the current environment",
-        ),
-        (
-            "wrong-locator-index",
-            "immediate K locator has the wrong domain or is outside the current environment",
-        ),
-    ];
-    for (mode, expected) in cases {
-        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
-            .arg("--exact")
-            .arg("checked_ih_generated_entry_capsule_mutations_reject")
-            .arg("--nocapture")
-            .env(GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, mode)
-            .env_remove("RUST_MIN_STACK")
-            .output()
-            .expect("spawn isolated generated-entry capsule mutation child");
-        assert!(
-            output.status.success(),
-            "{mode}: capsule mutation child failed\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.contains(expected),
-            "{mode}: capsule mutation missed intended arm; stderr:\n{stderr}"
-        );
-    }
-}
+// **Promise class: durable invariant.** Only the exact computational-recursor
+// capsule satisfying every governed fact may pass the pre-dispatch guard; each
+// independently varied sibling/fact must reject at its named arm.
+//
+// **MEASURED:** projection controls mutate each terminal projection fact after
+// planner validation and before generated-function forwarding, then assert the
+// consumer guard's exact refusal text.
+// **CLAIMED:** every terminal projection conjunct, including locator domain
+// and index, is independently load-bearing at the consumer seat.
+// **THE GAP:** upstream confluence disagreements remain separate population
+// controls and cannot discharge either consumer-side claim.
+generated_entry_checked_case!(generated_entry_capsule_outer_carried, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "outer-carried", "does not name a specialized computational-recursor capsule");
+generated_entry_checked_case!(generated_entry_capsule_specialized_sibling, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "specialized-sibling", "is not a computational-recursor capsule");
+generated_entry_checked_case!(generated_entry_capsule_static_worker, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "static-worker", "StaticWorkerBinding: a source-machine Var in value position is a value-producing position");
+generated_entry_checked_case!(generated_entry_capsule_wrong_frame, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-frame", "checked frame, slot, call template, or residual phase");
+generated_entry_checked_case!(generated_entry_capsule_wrong_slot, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-slot", "checked frame, slot, call template, or residual phase");
+generated_entry_checked_case!(generated_entry_capsule_wrong_invocation, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-invocation", "projection disagrees with its current function, binding, or call coordinate");
+generated_entry_checked_case!(generated_entry_capsule_non_carried_residual, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "non-carried-residual", "checked frame, slot, call template, or residual phase");
+generated_entry_checked_case!(generated_entry_capsule_provenance_index, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "provenance-index", "callee Var disagrees with the immediate K locator index");
+generated_entry_checked_case!(generated_entry_capsule_wrong_destination_owner, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-destination-owner", "projection disagrees with its current function, binding, or call coordinate");
+generated_entry_checked_case!(generated_entry_capsule_wrong_destination_body, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-destination-body", "projection disagrees with its current function, binding, or call coordinate");
+generated_entry_checked_case!(generated_entry_capsule_wrong_binding, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-binding", "projection disagrees with its current function, binding, or call coordinate");
+generated_entry_checked_case!(generated_entry_capsule_wrong_locator_invocation, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-invocation", "projection disagrees with its current function, binding, or call coordinate");
+generated_entry_checked_case!(generated_entry_capsule_wrong_locator_callee, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-callee", "projection disagrees with its current function, binding, or call coordinate");
+generated_entry_checked_case!(generated_entry_capsule_wrong_locator_domain, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-domain", "immediate K locator has the wrong domain or is outside the current environment");
+generated_entry_checked_case!(generated_entry_capsule_wrong_locator_index, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-index", "immediate K locator has the wrong domain or is outside the current environment");
 
 /// **Promise class: durable invariant.** Dense numbering may move, but planner
 /// iteration and context-interning order must not change class/member/caller
@@ -1977,79 +1824,21 @@ fn assert_continuation_inheritance_mutation_child() {
     );
 }
 
-#[test]
-fn checked_ih_continuation_inheritance_mutations_bite_their_own_arms() {
-    if std::env::var_os(CONTINUATION_INHERITANCE_MUTATION_CHILD).is_some() {
-        in_large_stack_thread(
-            "rt-parity-continuation-inheritance-mutation-child",
-            assert_continuation_inheritance_mutation_child,
-        );
-        return;
-    }
-
-    let cases = [
-        ("remove", "not the exact closed forward derivation"),
-        (
-            "duplicate",
-            "resolve more than one continuation inheritance",
-        ),
-        (
-            "swap",
-            "does not reference one exact existing transport endpoint",
-        ),
-        ("break-step", "self-resumption step is disconnected"),
-        (
-            "remove-k-locator",
-            "does not have exactly one immediate K locator",
-        ),
-        (
-            "duplicate-k-locator",
-            "does not have exactly one immediate K locator",
-        ),
-        ("wrong-k-domain", "wrong runtime environment domain"),
-        (
-            "wrong-k-consumer",
-            "different descendant invocation or callee",
-        ),
-        ("wrong-k-index", "does not equal its forward binder re-derivation"),
-        ("source-slot-k-locator", "wrong runtime environment domain"),
-        (
-            "final-residual-k-locator",
-            "wrong runtime environment domain",
-        ),
-        ("reclassify-ret", "reclassified as an induction hypothesis"),
-        ("descriptor-only", "descriptor-only closure was substituted"),
-        (
-            "earlier-result",
-            "earlier transport source result was substituted",
-        ),
-        (
-            "read-write-swap",
-            "does not reference one exact existing transport endpoint",
-        ),
-    ];
-    for (mode, expected) in cases {
-        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
-            .arg("--exact")
-            .arg("checked_ih_continuation_inheritance_mutations_bite_their_own_arms")
-            .arg("--nocapture")
-            .env(CONTINUATION_INHERITANCE_MUTATION_CHILD, mode)
-            .env_remove("RUST_MIN_STACK")
-            .output()
-            .expect("spawn isolated continuation-inheritance mutation child");
-        assert!(
-            output.status.success(),
-            "{mode}: mutation child failed\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.contains(expected),
-            "{mode}: mutation missed its intended validator arm; stderr:\n{stderr}"
-        );
-    }
-}
+generated_entry_checked_case!(continuation_inheritance_remove, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "remove", "not the exact closed forward derivation");
+generated_entry_checked_case!(continuation_inheritance_duplicate, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "duplicate", "resolve more than one continuation inheritance");
+generated_entry_checked_case!(continuation_inheritance_swap, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "swap", "does not reference one exact existing transport endpoint");
+generated_entry_checked_case!(continuation_inheritance_break_step, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "break-step", "self-resumption step is disconnected");
+generated_entry_checked_case!(continuation_inheritance_remove_k_locator, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "remove-k-locator", "does not have exactly one immediate K locator");
+generated_entry_checked_case!(continuation_inheritance_duplicate_k_locator, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "duplicate-k-locator", "does not have exactly one immediate K locator");
+generated_entry_checked_case!(continuation_inheritance_wrong_k_domain, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "wrong-k-domain", "wrong runtime environment domain");
+generated_entry_checked_case!(continuation_inheritance_wrong_k_consumer, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "wrong-k-consumer", "different descendant invocation or callee");
+generated_entry_checked_case!(continuation_inheritance_wrong_k_index, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "wrong-k-index", "does not equal its forward binder re-derivation");
+generated_entry_checked_case!(continuation_inheritance_source_slot_k_locator, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "source-slot-k-locator", "wrong runtime environment domain");
+generated_entry_checked_case!(continuation_inheritance_final_residual_k_locator, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "final-residual-k-locator", "wrong runtime environment domain");
+generated_entry_checked_case!(continuation_inheritance_reclassify_ret, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "reclassify-ret", "reclassified as an induction hypothesis");
+generated_entry_checked_case!(continuation_inheritance_descriptor_only, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "descriptor-only", "descriptor-only closure was substituted");
+generated_entry_checked_case!(continuation_inheritance_earlier_result, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "earlier-result", "earlier transport source result was substituted");
+generated_entry_checked_case!(continuation_inheritance_read_write_swap, CONTINUATION_INHERITANCE_MUTATION_CHILD, in_large_stack_thread, assert_continuation_inheritance_mutation_child, "read-write-swap", "does not reference one exact existing transport endpoint");
 
 const D1_ROUTE_CONTROL_CHILD: &str = "KEN_RT_ITREE_D1_ROUTE_CONTROL_CHILD";
 
@@ -2131,74 +1920,23 @@ fn assert_d1_route_control_child() {
     );
 }
 
-/// Durable invariant. MEASURED: isolated child compiles of both admitted full
-/// programs replace the active checked edge's control with Direct and return to
-/// the exact ITree default; an unknown active control also defaults; malformed
-/// initial Direct control cannot shadow an ordinary case; and a real
-/// recursor-layer Direct producer defaults unless that same edge is misrouted
-/// Checked. CLAIMED: both header edges consume only their exact route control,
-/// ordinary cases precede fallback, and all out-of-domain controls fail closed.
-/// THE GAP: these are test-support mutations at frame 1, not production route
-/// authority; the unmutated transitional witness above records the later
-/// ResourceBodyResult frontier and D2 owns final InvalidOffset behavior.
-#[test]
-fn d1_route_control_full_program_mutations_are_fail_closed() {
-    if std::env::var_os(D1_ROUTE_CONTROL_CHILD).is_some() {
-        in_large_stack_thread("rt-parity-d1-route-child", assert_d1_route_control_child);
-        return;
-    }
-
-    let cases = [
-        ("exact-write", None, None),
-        ("drop-read", Some("active-checked-to-direct"), None),
-        ("drop-write", Some("active-checked-to-direct"), None),
-        ("unknown-read", Some("active-checked-to-unknown"), None),
-        ("ordinary-read", Some("initial-direct-to-unknown"), None),
-        ("direct-read", None, Some("drop-checked-frame-1")),
-        (
-            "misroute-direct-read",
-            Some("active-direct-to-checked"),
-            Some("drop-checked-frame-1"),
-        ),
-    ];
-    for (mode, control, recursor) in cases {
-        let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"));
-        child
-            .arg("--exact")
-            .arg("d1_route_control_full_program_mutations_are_fail_closed")
-            .arg("--nocapture")
-            .env(D1_ROUTE_CONTROL_CHILD, mode)
-            .env_remove("KEN_RT_ITREE_D1_ROUTE_CONTROL")
-            .env_remove("KEN_RT_ITREE_D1_RECURSOR_ROUTE")
-            .env_remove("RUST_MIN_STACK");
-        if let Some(control) = control {
-            child.env("KEN_RT_ITREE_D1_ROUTE_CONTROL", control);
-        }
-        if let Some(recursor) = recursor {
-            child.env("KEN_RT_ITREE_D1_RECURSOR_ROUTE", recursor);
-        }
-        let output = child.output().expect("spawn isolated D1 control child");
-        assert!(
-            output.status.success(),
-            "{mode} child failed\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if let Some(control) = control {
-            assert!(
-                stderr.contains(&format!("RT_ITREE_D1_CONTROL_APPLIED mode={control}")),
-                "{mode}: the route-control mutation did not reach its real producer: {stderr}"
-            );
-        }
-        if let Some(recursor) = recursor {
-            assert!(
-                stderr.contains(&format!("RT_ITREE_D1_RECURSOR_APPLIED mode={recursor}")),
-                "{mode}: the recursor-route mutation did not reach its real producer: {stderr}"
-            );
-        }
-    }
-}
+// Durable invariant. MEASURED: isolated child compiles of both admitted full
+// programs replace the active checked edge's control with Direct and return to
+// the exact ITree default; an unknown active control also defaults; malformed
+// initial Direct control cannot shadow an ordinary case; and a real
+// recursor-layer Direct producer defaults unless that same edge is misrouted
+// Checked. CLAIMED: both header edges consume only their exact route control,
+// ordinary cases precede fallback, and all out-of-domain controls fail closed.
+// THE GAP: these are test-support mutations at frame 1, not production route
+// authority; the unmutated transitional witness above records the later
+// ResourceBodyResult frontier and D2 owns final InvalidOffset behavior.
+d1_route_case!(d1_route_control_exact_write, "exact-write", None, None);
+d1_route_case!(d1_route_control_drop_read, "drop-read", Some("active-checked-to-direct"), None);
+d1_route_case!(d1_route_control_drop_write, "drop-write", Some("active-checked-to-direct"), None);
+d1_route_case!(d1_route_control_unknown_read, "unknown-read", Some("active-checked-to-unknown"), None);
+d1_route_case!(d1_route_control_ordinary_read, "ordinary-read", Some("initial-direct-to-unknown"), None);
+d1_route_case!(d1_route_control_direct_read, "direct-read", None, Some("drop-checked-frame-1"));
+d1_route_case!(d1_route_control_misroute_direct_read, "misroute-direct-read", Some("active-direct-to-checked"), Some("drop-checked-frame-1"));
 
 #[test]
 #[ignore = "post-M6 runtime parity debt: native construction completes, but execution traps on a malformed ExitCode::Failure payload instead of observing InvalidOffset"]

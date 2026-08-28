@@ -25,18 +25,18 @@ jobs:
   # theoretical 4.00. nextest was already saturating the machine, so no
   # further scheduling change can help. The only two levers left are LESS
   # WORK (see `opt-level` in the root Cargo.toml) and MORE CORES — which is
-  # what this matrix buys: 4 shards x 4 vCPU = 16 effective cores.
+  # what this matrix buys: 8 shards x 4 vCPU = 32 effective cores.
   #
   # Sharding is by TEST, not by crate. A per-crate matrix would floor at the
   # slowest crate (`ken-cli` holds the heaviest binaries);
-  # `--partition count:N/4` ignores crate boundaries and balances by count.
+  # `--partition count:N/8` ignores crate boundaries and balances by count.
   #
-  # This trades ~4x total compute for ~4x wall clock. Actions minutes are
+  # This trades ~8x total compute for ~8x wall clock. Actions minutes are
   # free on public repos, so the trade is worth it — but it IS a real
   # increase in compute, not a free win.
   # See docs/program/11-test-suite-and-ci-remediation.md §1/§3.
   test-shard:
-    name: test shard ${{ matrix.shard }}/4
+    name: test shard ${{ matrix.shard }}/8
     runs-on: ubuntu-latest
     strategy:
       # Do not cancel siblings on first failure — a full picture of which
@@ -44,7 +44,7 @@ jobs:
       # independent.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v4
       # NO dependency cache, deliberately. `Swatinem/rust-cache` was removed
@@ -119,7 +119,7 @@ jobs:
       - name: Test
         run: >-
           cargo nextest run --workspace --locked
-          --partition count:${{ matrix.shard }}/4
+          --partition count:${{ matrix.shard }}/8
           -E 'not (binary(rt_parity_native) or binary(px8f_buffer_native) or binary(px8f_write_partition))'
       # nextest does not execute rustdoc tests, so run the workspace doctest
       # population once rather than once per shard.
@@ -323,8 +323,12 @@ jobs:
   # here would mean something broke in selection, and it must stay an error.
   # See docs/program/issues/CI-SKIPPED-NATIVE-TESTS.md.
   native-rt-parity:
-    name: native-slow (rt_parity_native)
+    name: native-slow (rt_parity_native) ${{ matrix.shard }}/3
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -349,7 +353,9 @@ jobs:
         with:
           tool: nextest
       - name: Test
-        run: cargo nextest run --locked -p ken-cli --test rt_parity_native
+        run: >-
+          cargo nextest run --locked -p ken-cli --test rt_parity_native
+          --partition count:${{ matrix.shard }}/3
 
   z3-process-adapter:
     name: optional z3 process adapter
@@ -376,7 +382,7 @@ jobs:
   # ⛔ DO NOT RENAME OR DELETE THIS JOB. `build + test` is a REQUIRED status
   # check in branch protection (docs/ops/github-setup.md §"Required status
   # checks"). The sharded matrix above publishes checks named `test shard
-  # N/4`, which branch protection does not know about — so if this
+  # N/8`, which branch protection does not know about — so if this
   # name-preserving aggregator were removed, the required check would never
   # report and EVERY pull request would become unmergeable until an admin
   # edited branch protection. This job exists so the workflow can be resharded
