@@ -11,10 +11,76 @@ github: null
 origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision). Hard-stop-5 ruling evt_494k61s04fnv9, 2026-08-26: D3B localization is VALID and lowering has reached the end of its authority — the missing component is an UPSTREAM planner-owned checked-IH result-successor relation, framed as the independently-landable predecessor RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR (which this node now depends_on); D3A stays frozen/non-landable until it lands, then the atomic D3A+D3B consumer builds and D3B consumes ONLY that successor projection. Inventory fold 244b2468afd4f0cd06837fd3079f291d7d330af5 (entry 5). Architect INCORPORATION ruling evt_2prk31prke9cc, 2026-08-26 (accepting Research advisory evt_261gm8y54xttt), grounded on origin/main@a09878026: the predecessor and this consumer conflated two semantic edges by pairing the D3A application result R1 forward to the later capture. Reconciled to the continuation-inheritance reading — D3A applies the inherited continuation capability K at each exact recursive arrival to yield the FRESH result R2, and D3B binds that R2 through ordinary Ret-case/capture semantics; the transitive R1 -> capture requirement is deleted from the operative Objective/Deliverables/ACs/pairing/suppressions/reviewers/Sequencing. Suppression and at-most-once controls are now THREE independent axes (inheritance, application, fresh-result binding). The advisory is incorporated and is NOT hard stop 6 (count remains five). Runtime stays HELD until the predecessor recut lands and the D3A+D3B work is explicitly re-released. Architect hard-stop-8 ruling evt_54efxydhb3n6w, 2026-08-27 (thr_2g0w05my2d5ym), verified on exact base 00e66312b4ef617eb658a2e75db9f99ff2c56492 / tree e286949f8fe5053e4719e54d0cc66adbe073dcdf: on four of five governed coordinates the exact governed K application exposes NO LOCAL LoweringOperand result at CheckedComputationalIHInvocationReturn, because the active self-resumption arm returns Lowered::RecursiveBackedge, a protocol marker and not a value (lowering/source.rs:1969). That is an absence of a LOCAL result and NOT a proof that no fresh dynamic result is eventually produced — the owning carried merge may still produce it, which is precisely D0's question. The landed architecture's two sibling proofs (K authority plus governed application coordinate; fresh-result destination) lack a THIRD — which emitted control edge PRODUCES the fresh dynamic result. That producer relation is a component boundary, not a D3B field, and is framed as the behaviorally-inert predecessor RT-CHECKED-IH-SELF-RESUMPTION-RESULT-PROVENANCE, which this node now depends_on. No mechanism is authorized: spec/40-runtime/42-evaluation.md section 6.2 makes the tail-resumptive loop realization normative, so a mandatory D0 measures the existing carried-loop exit first and a D0 answering NO stops and returns coordinates to the Architect rather than selecting a recursive call, frame morphism, or explicit continuation. The atomic D3A+D3B contract, the three independent suppression axes, and the deletion of the transitive R1 -> capture requirement are all UNCHANGED; the producer proof does not become a fourth axis. D3A+D3B stays frozen with no candidate and no QA until the predecessor lands and the Steward issues a SECOND explicit release. The next hard stop is 9 and mechanically triggers the mandatory Research advisory before any Architect ruling, including during the predecessor's D0."
 ---
 
-> # OPERATIVE RULING — HARD STOP 9, `evt_7wbxwxa74cdnr` (2026-08-28)
+> # OPERATIVE RULING — HARD STOP 10, `evt_1ckwtvwe23e3e` (2026-08-28)
 >
-> **This is now the operative ruling. It SUPERSEDES the hard-stop-8 banner
-> below, which is history.** Cite it by event id, never by number.
+> **THIS IS THE OPERATIVE RULING. It supersedes the HS9 banner below and every
+> banner under it, all of which are history.** Cite by event id, never by number.
+> Bound object `da95daadf`, tree `94d9177eee14`, frame blob `531039677cb9`,
+> spec-42 blob `69b9d6d267ba`.
+>
+> **HS10 WAS A VALID CLEAN STOP — ON THIS FRAME'S DEFECT, NOT ON A MISSING
+> COMPONENT.** The stop was correct and the D0 measurements are accepted: four
+> real Tail rows plus one body-refined Direct row; every real Tail callee has
+> `recursive_unit_body=None`; `source.rs:4512-4515` hands the carried residual
+> word onward; declared-target inventories are multi-valued; replaying the old
+> direct-call D3A experiment leaves both `ResourceBodyResult` products unchanged.
+>
+> **BUT THE INFERENCE FROM THEM WAS WRONG. `recursive_unit_body=None` means TAIL
+> VARIANT, not NO K APPLICATION.** The landed route constructor makes that
+> partition explicitly: at `aggregates.rs:5508-5578` a body-refined invocation
+> transport yields `DirectInvocationReturn`, and ABSENCE of that direct transport
+> yields `TailResumedRetInput`. The Tail validator (`:5765-5805`) then requires
+> the exact zero-argument checked invocation/call/callee, selected recursive case,
+> active governed frame, `ActiveSelfResumption`, `CheckedSelectedRecursor`, and
+> forward Ret-input edge. **That IS the authorized application protocol, and it
+> deliberately has NO declared target to select.**
+>
+> **LOWERING ALREADY EXECUTES IT.** The governed call reaches the exact
+> `ComputationalRecursorClosure`; `mint_checked_computational_ih_instance`
+> consumes its checked marker; `install_recursor_invocation` installs the
+> already-checked semantic frames (`source.rs:4424-4469`, `:4912-4984`);
+> `ApplyRecursorSelection` raises the route from the exact checked selecting layer
+> (`source.rs:1528-1567`, `mod.rs:10015+`). **That is the Tail `K` application.
+> It is not a declared-unit call.**
+>
+> **The carried word at `source.rs:4512-4515` is the SEED/INPUT to that installed
+> continuation, never the completed application result.** Treating the local step
+> as the whole application repeats HS8's distinction exactly: no local result is
+> not no eventual dynamic result. Normative `42 §6.2` agrees — `apply k resp`
+> produces the next tree, the tail loop re-evaluates, `Ret r -> r`. **The
+> unchanged final products show D3's fresh-result BINDING is still absent; they do
+> NOT show the source APPLICATION is absent.**
+>
+> ## THE DEFECT IS THE OLD D3A RECIPE, AND IT IS THIS FRAME'S
+>
+> It applied ONE **Direct** mechanism to BOTH route variants: resolve
+> `transport.source_call_identity()` and emit a declared target call. **That
+> recipe is valid only for `DirectInvocationReturn`.** The multi-valued target
+> inventories correctly prove that INVENTING a Tail target is forbidden; they do
+> NOT create a new predecessor need.
+>
+> ⇒ **ADD NO PREDECESSOR**, and no source identity, target authority, inventory
+> search, persistent receipt, second lookup, runtime carrier, clone, stack, ABI
+> lane, direct capture write, or merge fallback. **The landed fused route is
+> sufficient authority.** D3A is amended below to be ROUTE-VARIANT-SPECIFIC.
+>
+> **HS COUNT AND THE RESEARCH TRIGGER.** This is hard stop 10 chronologically;
+> the HS9 research trigger is already discharged, and **the next mechanical
+> research trigger remains HS12.** The shared predicate is unchanged from HS9: a
+> local/static endpoint mistaken for a complete directed dynamic edge. **No
+> Decision object is required** — deductive from the landed route partition,
+> lowering control flow, and `42 §6.2`.
+>
+> **D3A+D3B IS FROZEN AGAIN and needs a FRESH EXPLICIT STEWARD RELEASE against
+> the AMENDED frame blob.** Neither this ruling nor any landing authorizes a code
+> turn. No QA and no candidate from the HS10 D0.
+
+> # SUPERSEDED — HARD STOP 9, `evt_7wbxwxa74cdnr` (2026-08-28)
+>
+> **HISTORY. Superseded by the HS10 banner above.** Its determination of what
+> fresh `R2` IS still holds and is carried forward; what it did not settle is the
+> Direct/Tail variant split, which is why the D3A recipe below was uniform and
+> wrong. Cite it by event id, never by number.
 >
 > **THE DETERMINATION.** For the loop rows, fresh `R2` is the result of the
 > governed `K` application **as delivered into the Ret case's INPUT BINDER**. It
@@ -525,7 +591,16 @@ Localize the first unresolved authority, which is UPSTREAM of ordinary
 `ResourceBodyResult` selection: the checked ITree `Ret` carried arm that should
 apply the inherited continuation capability `K` at the exact recursively-exposed
 checked invocation and yield the FRESH result `R2`, instead of the carried arm
-returning the transported captured-environment word unapplied. Consuming the
+returning the transported captured-environment word unapplied.
+
+**THE APPLICATION IS ROUTE-VARIANT-SPECIFIC (HS10, `evt_1ckwtvwe23e3e`). There is
+no single uniform D3A mechanism, and assuming one is what produced HS10.**
+For `DirectInvocationReturn` the application is the existing body-refined
+transport plus ONE declared call, whose local return IS fresh `R2`. For
+`TailResumedRetInput` the application is the EXISTING exact zero-argument
+governed recursor call — consume the checked marker once, install the invocation
+segment once, run the existing active self-resumption — and it has NO declared
+target by construction. Consuming the
 predecessor's **single typed fresh-result ROUTE relation**
 (`CheckedIhFreshResultRoute`, landed `7d36d24f0`), bind that FRESH `R2` — NOT the
 earlier D3A result `R1` traced forward — ALONG THAT CERTIFIED FORWARD ROUTE
@@ -544,13 +619,27 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   and returned `CheckedIhCapturedEnvironment` (the stronger causal gloss is
   WITHDRAWN — HS4). Its ACs are the census (AC-D2-1/2/3, satisfied by the
   accepted evidence) plus the reworded natural-reachability AC-D2-4.
-- **D3A — apply the inherited continuation capability. EVIDENCE ONLY; must NOT
-  land alone.** The ruled `CheckedIhEnvironmentTransport` single-application shape
-  (proven feasible by WIP `719933055`) applies the inherited `K` at each exact
-  recursively-exposed arrival — the site supplied by the predecessor's
-  `K`-inheritance proof — and yields the FRESH result `R2`. Every governed arrival
-  is paired to its exact transport/call identity. Makes NO claim about the final
-  capture or `InvalidOffset`, and asserts NO identity between `R1` and `R2`.
+- **D3A — apply the inherited continuation capability, PER ROUTE VARIANT.
+  EVIDENCE ONLY; must NOT land alone.** Applies the inherited `K` at each exact
+  recursively-exposed arrival and yields the FRESH result `R2`. **The mechanism
+  is selected by the landed route variant and the two are NOT interchangeable
+  (HS10):**
+  - **`DirectInvocationReturn`** — retain the existing body-refined
+    `CheckedIhEnvironmentTransport` plus ONE declared call (the shape proven
+    feasible by WIP `719933055`). **Its local return IS fresh `R2`.**
+  - **`TailResumedRetInput`** — the application is the EXISTING exact
+    zero-argument governed recursor call. Consume the checked marker ONCE,
+    install the invocation segment ONCE, run the existing active self-resumption.
+    **`recursive_unit_body=None` and `direct_transport=None` are REQUIRED
+    DISCRIMINATORS, not obstacles.** There is no declared target and none may be
+    selected or invented. **The initial `CheckedIhCapturedEnvironment` residual
+    is NEVER `R2`** — fresh `R2` is named only when the installed checked
+    computation returns on the existing `CheckedSelectedRecursor` answer route
+    and flows forward through the certified active-header / Ret-input edge.
+
+  Every governed arrival is paired to its exact identity for its own variant.
+  Makes NO claim about the final capture or `InvalidOffset`, and asserts NO
+  identity between `R1` and `R2`.
 - **D3B — fresh-result route binding then single-edge repair.** On both
   unchanged admitted programs, take D3A's FRESH `R2` and bind it, through the
   predecessor's certified fresh-result ROUTE relation, via the Ret case's
@@ -654,14 +743,36 @@ transitively into the capture, or re-derive the inheritance relation in lowering
     ordinals; continuation inputs still come from the existing transport
     morphism. Do NOT synthesize a `StaticWorkerBinding` or redirect into the
     neighboring `StaticWorker` branch.
-  - Resolve only
-    `function_local.continuation_calls[transport.source_call_identity()]`,
-    emit ONE declared call through the existing call authority, record it under
-    the exact transport, and pair every governed arrival to that exact
-    transport/call identity. Factor the `StaticWorker` and carried-capture
-    sources into one downstream envelope/call path rather than duplicating the
-    continuation body or creating a second call lane. This phase makes NO claim
-    about the final capture or `InvalidOffset` and must NOT land alone.
+  - **THE APPLICATION STEP, SPLIT BY ROUTE VARIANT. Amended at HS10
+    (`evt_1ckwtvwe23e3e`): the single recipe below previously applied to BOTH
+    variants, and that uniformity IS the defect HS10 found.** Applying the Direct
+    recipe to a Tail row demands a declared target that does not exist, and the
+    multi-valued inventories then make selecting one an invention.
+    - **`DirectInvocationReturn` ONLY** — resolve only
+      `function_local.continuation_calls[transport.source_call_identity()]`, emit
+      ONE declared call through the existing call authority, record it under the
+      exact transport, and pair every governed arrival to that exact
+      transport/call identity. Factor the `StaticWorker` and carried-capture
+      sources into one downstream envelope/call path rather than duplicating the
+      continuation body or creating a second call lane.
+    - **`TailResumedRetInput` ONLY** — do NOT resolve a source call identity, do
+      NOT consult `continuation_calls`, and do NOT emit a declared call. The
+      application is the EXISTING governed recursor call path already in
+      lowering: the governed call reaches the exact `ComputationalRecursorClosure`
+      (`source.rs:4424-4469`), `mint_checked_computational_ih_instance` consumes
+      its checked marker ONCE, `install_recursor_invocation` installs the
+      already-checked semantic frames ONCE (`:4912-4984`), and
+      `ApplyRecursorSelection` raises the route from the exact checked selecting
+      layer (`source.rs:1528-1567`, `mod.rs:10015+`). Pair every governed arrival
+      to its exact invocation/call/callee triple and active governed frame.
+    - **Selection between the two is by the LANDED ROUTE VARIANT**
+      (`aggregates.rs:5508-5578`), never by probing a runtime tag, family,
+      spelling, body word, or field-count coincidence. A row whose variant cannot
+      be determined from the landed route is a HARD STOP, not a default to
+      either arm.
+
+    This phase makes NO claim about the final capture or `InvalidOffset` and must
+    NOT land alone.
   - If the source record cannot be validated, its captures cannot be projected
     from existing planner facts, or the exact continuation target was not
     already declared into this destination function — HARD-STOP. Do NOT add a
@@ -671,8 +782,11 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   half; Architect evt_6mnawfvm8fc4j):**
   - On both unchanged admitted programs, take D3A's FRESH `R2` (the result of
     applying inherited `K` at the exact recursively-exposed invocation) and,
-    through the predecessor's fresh-`R2`-destination projection, carry it to the
-    eventual ordinary `ITree::Ret` payload the Ret-case closure consumes. Do NOT
+    through the predecessor's single certified fresh-result ROUTE relation
+    (`CheckedIhFreshResultRoute`), carry it to the
+    eventual ordinary `ITree::Ret` payload the Ret-case closure consumes.
+    **Bind ONLY that later `R2`. NEVER the initial carried environment word, and
+    never `R1`** (HS10). Do NOT
     trace the earlier D3A result `R1` transitively through the source-control
     chain into the capture — that is the withdrawn reading. The READ program's
     destination coordinates are origin 301 active frame / closure 460 / capture
@@ -738,21 +852,40 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   test may remain as instrument/regression health only and MUST NOT be credited
   as same-path evidence. This AC is discharged by the accepted evidence plus the
   reachability-marker mutation; it does NOT require a post-repair positive.
-- AC-D3A-APPLICATION (carried application executes — D3A, evidence only) — on
-  the UNCHANGED admitted read/write programs the D3A candidate makes each
-  governed carried arrival apply its exact source continuation through the ruled
-  transport/projection/envelope/single-call shape and return the call result.
-  This AC makes NO claim about the final capture or `InvalidOffset` and does NOT
-  land alone.
-- AC-D3A-PAIRING (one application per arrival) — pair EVERY governed
-  carried-branch arrival with EXACTLY ONE application event carrying the same
-  transport identity, source record, worker body, source result, and
-  destination owner. Unpaired scalar totals are INSUFFICIENT — the programs may
-  legitimately reach the seam more than once.
+- AC-D3A-APPLICATION (carried application executes — D3A, evidence only;
+  **ROUTE-VARIANT-SPECIFIC, amended at HS10**) — on the UNCHANGED admitted
+  read/write programs the D3A candidate makes each governed carried arrival apply
+  its exact source continuation **through the mechanism its LANDED ROUTE VARIANT
+  authorizes**, and expose the fresh result:
+  - **`DirectInvocationReturn`** — through the ruled
+    transport/projection/envelope/single-declared-call shape; the call result is
+    fresh `R2`.
+  - **`TailResumedRetInput`** — through the existing zero-argument governed
+    recursor call: checked marker consumed once, invocation segment installed
+    once, existing active self-resumption run. **Fresh `R2` is the value returned
+    on the existing `CheckedSelectedRecursor` answer route and carried forward
+    through the certified active-header / Ret-input edge — NEVER the initial
+    `CheckedIhCapturedEnvironment` residual word, and never a declared-call
+    return, because there is no declared call on this variant.**
+
+  **A candidate that satisfies this AC by making Tail rows take the Direct path
+  FAILS it**, however green the suite: that is the HS10 defect restated, not the
+  criterion met. This AC makes NO claim about the final capture or
+  `InvalidOffset` and does NOT land alone.
+- AC-D3A-PAIRING (one application per arrival, **per variant**) — pair EVERY
+  governed carried-branch arrival with EXACTLY ONE application event, keyed by
+  the identity its own variant carries: for Direct, the same transport identity,
+  source record, worker body, source result and destination owner; for Tail, the
+  same exact invocation/call/callee triple and active governed frame. Unpaired
+  scalar totals are INSUFFICIENT — the programs may legitimately reach the seam
+  more than once. **A pairing that silently covers only the Direct row satisfies
+  nothing about the four Tail rows; report the pairing population per variant so
+  a one-row proof cannot read as a five-row one.**
 - AC-D3B-RESULTFLOW (fresh-result-delivery positive — D3B; TWO separately paired
   paths) — the atomic (D3A+D3B) candidate applies inherited `K` at each exact
   recursively-exposed invocation, yields the FRESH result `R2`, and binds THAT
-  `R2` — through the predecessor's fresh-`R2`-destination projection and the
+  `R2` — through the predecessor's single certified fresh-result ROUTE relation
+  (`CheckedIhFreshResultRoute`) and the
   Ret-case `CheckedCaseBinderLayout` — to THAT program's own exact closure-capture
   occurrence and body read, then proceeds through exact `ResourceBodyOk` /
   `ResourceBodyErr` selection to the independently specified `InvalidOffset`
@@ -771,8 +904,9 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   capture. Do NOT collapse the two into one transitive pairing from `R1` to the
   capture. No scalar-total substitution; a bare target-call / consumption count
   does not suffice.
-- AC-D3-TRIPLE-SUPPRESS (three independent causal mutations) — after the full
-  repair, INDEPENDENTLY: (i) suppress ONLY the `K`-inheritance (the inherited
+- AC-D3-TRIPLE-SUPPRESS (three independent causal mutations; **the application
+  axis is ROUTE-VARIANT-SPECIFIC, amended at HS10**) — after the full repair,
+  INDEPENDENTLY: (i) suppress ONLY the `K`-inheritance (the inherited
   continuation capability at the recursively-exposed invocation), keeping
   application and binding paths live; (ii) suppress ONLY the D3A production
   application of `K`, keeping entry/descriptor/detector and the inheritance live;
@@ -780,10 +914,31 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   inheritance and application live. EACH must return BOTH programs to the
   localized sole default, and restore byte-identically to recover both exact
   products. No scalar-total substitution.
+
+  **Axis (ii) is TWO DIFFERENT MUTATIONS, one per variant, and neither covers the
+  other:**
+  - **Direct suppression deletes ONLY its declared call.**
+  - **Tail suppression deletes ONLY the exact marker-consumption /
+    invocation-install application, while keeping the inheritance AND the
+    certified route PRESENT — and it MUST FAIL CLOSED.** A Tail suppression that
+    also removes the route, or that lets the row fall back to any other arm, is
+    measuring the wrong thing.
+
+  **Per the standing lesson from `RT-FRESH-RESULT-ROUTE-PAIRING-LEG-CONTROLS`:
+  count these controls PER CONJUNCT, not per axis.** One mutation that reddens
+  the suite does not establish that the axis is pinned for a variant it never
+  exercised. Name, for each variant, the arm that reddens when only that
+  variant's application is deleted.
 - AC-D3-ATMOSTONCE — prove at-most-once INDEPENDENTLY for the `K`-inheritance, the
   application of `K`, AND the fresh-`R2` binding, each either STRUCTURALLY or via
   the opposite duplicate mutation. A removal mutation proves at-least-once only;
-  no scalar total substitutes for any of the three.
+  no scalar total substitutes for any of the three. **All three dynamic axes are
+  retained (HS10) and the static route certificate is still NOT a fourth.**
+  **On the Tail variant, at-most-once is specifically about the marker
+  consumption and the invocation install: each must happen EXACTLY ONCE per
+  governed arrival.** Prove it for Tail rows on their own population — a Direct
+  row's proof says nothing here, because the two variants apply through different
+  mechanisms.
 - AC-D3-CHECKED-TRACE — retain a SEPARATE exact checked-route trace through
   `CheckedSelectedRecursor`, checked `CarriedEliminationEntered`, and
   `CarriedFallbackEmitted`, but do NOT substitute that trace for the
@@ -820,12 +975,20 @@ transitively into the capture, or re-derive the inheritance relation in lowering
 Architect (D2 reworded reachability introduces no application/result and no
 spelling/ABI/family/trap/field-count/index authority; D3A applies the inherited
 `K` at the exact recursively-exposed invocation supplied by the predecessor's
-`K`-inheritance proof — the authorized `CheckedIhEnvironmentTransport`
-single-application shape, sole two-endpoint authority, projected capture ordinals,
-single envelope/call path, no `StaticWorkerBinding` synthesis, no second identity
-catalog/ABI lane — yields fresh `R2`, and does NOT land alone; D3B binds that
-FRESH `R2` (never `R1` traced transitively) through the predecessor's
-fresh-`R2`-destination projection and the Ret-case binder to the exact ordinary
+`K`-inheritance proof, **through the mechanism its LANDED ROUTE VARIANT
+authorizes and not a uniform one (HS10)** — for `DirectInvocationReturn` the
+body-refined `CheckedIhEnvironmentTransport` plus ONE declared call, projected
+capture ordinals, single envelope/call path, no `StaticWorkerBinding` synthesis,
+no second identity catalog/ABI lane; for `TailResumedRetInput` the EXISTING
+zero-argument governed recursor call with checked marker consumed once and
+invocation segment installed once, **no declared call, no source call identity,
+no target selection, and the initial carried environment word never treated as
+`R2`** — yields fresh `R2`, and does NOT land alone. **Reject any candidate that
+routes Tail rows through the Direct recipe, and check the pairing population PER
+VARIANT so a one-row Direct proof cannot pass as a five-row one.** D3B binds that
+FRESH `R2` (never `R1` traced transitively, never the initial environment word)
+through the predecessor's single certified fresh-result ROUTE relation
+(`CheckedIhFreshResultRoute`) and the Ret-case binder to the exact ordinary
 closure capture, repairing the FIRST graph-authorized edge where `R2` fails to
 reach it, with authority from EXISTING planner relations only, no lowering-side
 reverse search, no second binder catalog, no direct capture-0 write, the
@@ -858,15 +1021,22 @@ objects. Size M.
 Lane-1 (runtime, priority). D2 localization is ACCEPTED (evidence `ac1ebdacb`,
 no merge, no QA); D3A application feasibility is proven (evidence `719933055`,
 no merge, no QA); D3B localization is ACCEPTED (evidence `4e516e54`, HS5). The
-UPSTREAM planner-only predecessor [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]] lands
-FIRST (independently landable, behaviorally inert); Runtime is HELD on this node
-until that predecessor lands and the successor D3A+D3B work is explicitly
-re-released. Then the Runtime ring rebases the D3 branch and builds the ATOMIC
-D3A+D3B consumer candidate (D3A application of inherited `K` yielding fresh `R2` +
-D3B fresh-`R2` destination binding to the ordinary Ret capture + product) — no
-application-only checkpoint; D3A and D3B consume ONLY the predecessor's
-continuation-inheritance projection, never re-deriving it in lowering and never
-tracing `R1` into the capture. After this node greens `InvalidOffset`,
+**ALL PREDECESSORS HAVE LANDED AND NO FURTHER ONE IS AUTHORIZED (HS10,
+`evt_1ckwtvwe23e3e`).** Every node in `depends_on` is `merged`, including
+[[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]] and the corrected
+[[RT-CHECKED-IH-FRESH-RESULT-ROUTE]] (`7d36d24f0`). **The landed fused route is
+sufficient authority; adding a predecessor is explicitly forbidden.** What
+blocked HS10 was this frame's uniform D3A recipe, now amended to be
+route-variant-specific.
+
+Runtime is HELD until the Steward issues a **FRESH EXPLICIT RELEASE against the
+AMENDED frame blob** — neither the HS10 ruling nor any landing authorizes a code
+turn. Then the Runtime ring rebases the D3 branch and builds the ATOMIC D3A+D3B
+consumer candidate (D3A application of inherited `K` **per route variant**
+yielding fresh `R2` + D3B fresh-`R2` binding to the ordinary Ret capture +
+product) — no application-only checkpoint; D3A and D3B consume ONLY the landed
+route relation, never re-deriving it in lowering, never tracing `R1` into the
+capture, and never binding the initial carried environment word. After this node greens `InvalidOffset`,
 [[RT-RETAINED-UNIT-CALL-TARGET-DERIVATION]] (ReadSome/Wrote) and the final
 four-value closure fold follow; the D1 follow-up
 [[RT-CHECKED-SUCCESSOR-EMIT-REACHABILITY]] is sequenced after this node on the

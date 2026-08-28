@@ -342,6 +342,122 @@ not `crates/`) — it is the standing exception, not a lane (`CLAUDE.md`).
 
 ## Roster history
 
+- 2026-08-28 (at `50369d47b`): **no roster change. All three lanes moved in one
+  stretch, and two of the three moves were mine to make.**
+  - **Lane 2 ROUTED.** `CORE-FO-CHECK-TREE-SORT-VALIDATION` node 1 candidate
+    `57d209fcacab914c8616199bd01bbeb698480266` cleared all three gates on the
+    exact SHA (Architect `evt_thwayapdvwds`, Language QA `evt_282w3vzhacddy`,
+    Adversary CLEAN `evt_3txpdz4gtw81r`). Decision `dec_41xx97vpph08m` resolved
+    and routed `evt_64qqd97hf8kbq`. I verified the shape against the DECLARED
+    range rather than the handback: tree, merge-base, three commits, four paths,
+    `+615/-76` all exact, changed-path intersection with `origin/main` empty, M3
+    clean. **M8 is pre-discharged on this SHA alone** — the hunt was requested
+    pre-merge; a respin is uncovered.
+    > **THEN CI WENT RED ON THE APPROVED OBJECT. `dec_41xx97vpph08m` IS SPENT;
+    > PR #3041 is an orphan.** Run `33183516806`, `test shard 3/4`:
+    > `forall_world_right_constructor_and_checker_reject_a_nonfresh_eigenparameter`
+    > panicked at
+    > `crates/ken-elaborator/tests/v3_fo_checker_soundness_d1a_rule_correspondence.rs:40`
+    > — `d1a_world_checker_accepts` failed to kernel-check (expected
+    > `(((g225 Dg3) ((g691 g771) g777)) cg4)`, found `g1`).
+    > **Candidate-caused, attributed and not assumed:** main is GREEN at
+    > `50369d47b`, and that test file is UNTOUCHED by the candidate while
+    > `include_str!`ing at `:24` the exact `FoKripke.ken` the candidate edited.
+    > **An increment that changes a CLOSURE rather than a FILE breaks consumers
+    > no diff-touched target set can see.**
+    > **THIRD LANE, SAME DEFECT, MINE AGAIN.** `AC-AFFECTED-CLOSURE` was
+    > diagnosed in FOUNDATION 2026-08-27, carried to RUNTIME 2026-08-28 after it
+    > cost that lane a red merge, and **never carried to LANGUAGE** — when this
+    > candidate reddened it sat in three runtime frames and zero language frames.
+    > Now folded into `CORE-FO-CHECK-TREE-SORT-VALIDATION` durably, not left in
+    > gate prose (a criterion living only in gate prose is the `AC-EXCLUSIVE`
+    > failure). **A criterion repaired in one lane is not thereby repaired in the
+    > fleet, and repairing the lane where it bit is the easy half that feels
+    > complete.** Neither gate was negligent: both ran the targets my frame named,
+    > and the frame named the wrong set.
+  - **Lane 1 took HARD STOP 10 on D3A+D3B**, cleanly, at `da95daadf` with no
+    commit, candidate, or QA, branch freed (`evt_4wkf1n81x7zq`). Routed to the
+    Architect by `runtime-leader` `evt_3yy045bpks910`, picked up
+    `evt_3zqmkf8bgngfs`. The measured gap: every real tail callee is
+    `ComputationalRecursorClosure { recursive_unit_body: None }` and the exact
+    lowering arm returns the carried residual word unchanged
+    (`lowering/source.rs:4512-4515`) — `CheckedIhCapturedEnvironment`, not fresh
+    `R2`. The static route certificate derives; tail execution has no authorized
+    K-application source. Every prohibited alternative was enumerated and NOT
+    taken.
+    > **I HAD THE ADVISORY OBLIGATION WRONG IN MY OWN RESUME CHECKPOINT, and the
+    > ring was right without me.** The checkpoint asserted *"HS10 mechanically
+    > triggers the mandatory Research advisory before any Architect ruling."* It
+    > does not. `§1a`/`§1b` is the **Architect's** counting procedure
+    > (`architect.md`), and the Architect's own ruling `evt_2s144kdddyckn` puts
+    > the next mandatory trigger at **stop 12, not 10**; HS9 consumed the
+    > ninth-stop advisory. The D3 frame's HS10 stop rule carries no advisory
+    > clause either. **I had carried the HS8 banner's "the next stop is 9 and it
+    > MECHANICALLY triggers the advisory" forward one stop.** Had I acted on it I
+    > would have inserted a gate the law does not require, in front of a ruling
+    > the lane was already waiting on. **The general form: a trigger stated as
+    > "the NEXT one" is a fact about a specific count, and it expires the moment
+    > that count is consumed — re-read it at the next stop instead of
+    > incrementing it.**
+  - **HS10 IS RULED — `evt_1ckwtvwe23e3e`, and it does NOT mint a predecessor.**
+    The stop was VALID but its inference was wrong: `recursive_unit_body=None`
+    means **Tail variant**, not **no K application**. The landed route
+    constructor partitions explicitly (`aggregates.rs:5508-5578`), the Tail
+    validator (`:5765-5805`) IS the authorized application protocol, and lowering
+    already executes it (`source.rs:4424-4469`, `:4912-4984`, `:1528-1567`). The
+    carried word at `source.rs:4512-4515` is the SEED to that installed
+    continuation, never the completed result. **The defect was THIS FRAME's
+    uniform D3A recipe applying one Direct mechanism to both route variants.**
+    Add no predecessor. **Steward owns the amendment + a fresh explicit release
+    against the amended frame blob; runtime resumes only then.** Amendment
+    applied this route: Objective, phase structure, D3A deliverable, reviewers,
+    `AC-D3A-APPLICATION`, `AC-D3A-PAIRING`, `AC-D3-TRIPLE-SUPPRESS` axis (ii),
+    `AC-D3-ATMOSTONCE`, and Sequencing all made ROUTE-VARIANT-SPECIFIC.
+    **Next mechanical research trigger remains HS12** — this confirms the
+    correction below.
+    > **THREE MORE STALE PASSAGES FOUND WHILE AMENDING, and the count is the
+    > point.** `fresh-`R2`-destination projection` — the two-proof language HS9
+    > falsified — still sat in the D3B deliverable, `AC-D3B-RESULTFLOW`, and the
+    > Reviewers line. **I corrected exactly two instances of this on 2026-08-28
+    > and believed the correction complete.** A `grep` for the phrase, which
+    > costs one command, would have found all five then. **Correcting the
+    > instances you were looking at is not correcting the defect; enumerate the
+    > phrase before declaring the class closed.**
+  - **Lane 1 successor NOT released, and the near-miss is worth recording.**
+    `RT-RESULT-CLOSURE-LIFETIME-CONTAINMENT-CONTROL` (S/**T1**) was flipped
+    `draft` -> `active` while D3 sat blocked at HS10 with the seat idle — chosen
+    over its two S/T2 siblings on a `§4h` capability match, contention
+    re-measured clear on `aggregates.rs`. **The HS10 ruling then unblocked D3,
+    which is lane 1's main line and takes the seat, so the flip was REVERTED to
+    `draft` before any release was posted.** Nothing reached the ring.
+    > **What made the reversal free was holding the release post until the frame
+    > correction LANDED.** Had I posted on the strength of my own working-tree
+    > edit, I would have had to retract a release. **The rule that a correction
+    > is corrected only when the tree says so also bounds the blast radius of
+    > being wrong about priority.**
+    > That node needed THREE stale-passage corrections of its own before it was
+    > releasable — a banner forbidding the ring to pick it up, a contention
+    > section calling a merged node "in flight", and a sequencing line calling it
+    > `draft`. Those corrections were kept; only the status flip was reverted.
+    > It also claimed the two surfaces were *"expected disjoint"*. **They were
+    > not** — the route node's landing touched `aggregates.rs`. The merge removed
+    > the conflict; the disjointness never existed. An unmeasured expectation had
+    > been sitting in the frame as though it were a finding.
+    >
+    > **THE STANDING RULE THIS EARNS, across three consecutive nodes now:
+    > re-reading a queued frame's OWN banners against today's tree is an
+    > unconditional step of releasing it, not a thing to remember.** The passages
+    > that go void while a node waits are exactly the ones written to describe
+    > what it was waiting on.
+  - **Lane 3 was STRANDED and is moving again.** `foundation-qa` posted a PENDING
+    verdict on D6 Arm-A `4bebdec09` at 14:08 and then ENDED ITS TURN — pane idle,
+    branch switched back to home, the closure/substitution/mutation work it had
+    itself named left unowned, while `foundation-leader`'s status still read "QA
+    active". WIP audit fired `evt_4va4qwkakd8c7` and the pane roused directly;
+    seat confirmed `Working`. **The thread is what resolved this — an idle pane
+    cannot separate "handed off" from "stalled", but a leader and a QA describing
+    the same seat differently can.**
+
 - 2026-08-27 (fifth refresh, at `00e66312b`): **no roster change.** Lane 1's
   `RT-CHECKED-IH-GENERATED-ENTRY-ACCESS` LANDED (15/15 paths blob-verified by
   me, not taken on the lieutenant's report), which discharged the last of the
