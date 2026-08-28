@@ -802,11 +802,25 @@ Append one line per hard stop; never rewrite history.
 
 ## Objective
 
-Localize the first unresolved authority, which is UPSTREAM of ordinary
-`ResourceBodyResult` selection: the checked ITree `Ret` carried arm that should
-apply the inherited continuation capability `K` at the exact recursively-exposed
-checked invocation and yield the FRESH result `R2`, instead of the carried arm
-returning the transported captured-environment word unapplied.
+Deliver, as ONE atomic increment, the route-specific repair UPSTREAM of ordinary
+`ResourceBodyResult` selection:
+
+- **`DirectInvocationReturn`** — add its ruled declared call; its local return IS
+  fresh `R2`.
+- **Tail (`TailProducerToBackedge`)** — its governed application ALREADY EXISTS
+  and is preserved. **The missing work is exact produced-result TRANSFER: the
+  producer-to-backedge value bridge** carrying `RoutedAnswer::checked(returned)`
+  to the existing active jump and header.
+- **D3B** — bind the delivered operand to the exact ordinary Ret closure capture
+  and body read, then repair the FIRST graph-authorized edge where it fails to
+  arrive, so both admitted programs green the exact `InvalidOffset`.
+
+> **Do NOT restate this as "the carried arm fails to apply `K` and returns the
+> transported word unapplied."** That was the pre-HS12 diagnosis and it is
+> WITHDRAWN for Tail. Tail's application is not missing — its produced result is
+> DISCARDED at `source.rs:4478-4515`. Stating the withdrawn uniform-application
+> defect here and correcting it further down is exactly how this frame kept
+> re-authorizing superseded readings.
 
 **THE APPLICATION IS ROUTE-VARIANT-SPECIFIC (HS10, `evt_1ckwtvwe23e3e`). There is
 no single uniform D3A mechanism, and assuming one is what produced HS10.**
@@ -849,11 +863,13 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   and returned `CheckedIhCapturedEnvironment` (the stronger causal gloss is
   WITHDRAWN — HS4). Its ACs are the census (AC-D2-1/2/3, satisfied by the
   accepted evidence) plus the reworded natural-reachability AC-D2-4.
-- **D3A — apply the inherited continuation capability, PER ROUTE VARIANT.
-  EVIDENCE ONLY; must NOT land alone.** Applies the inherited `K` at each exact
-  recursively-exposed arrival and yields the FRESH result `R2`. **The mechanism
-  is selected by the landed route variant and the two are NOT interchangeable
-  (HS10):**
+- **D3A — route-specific application and, for Tail, produced-result transfer.
+  EVIDENCE ONLY; must NOT land alone.** **The mechanism is selected by THIS
+  CANDIDATE'S SINGLE ROUTE RELATION, after it replaces the Tail variant — NOT by
+  the landed route variant.** The landed `DirectInvocationReturn` is RETAINED and
+  still selects Direct; the landed Tail variant `TailResumedRetInput` is REPLACED
+  and contributes only topology/identity facts, **never selection or value
+  authority.** The two arms are NOT interchangeable (HS10):
   - **`DirectInvocationReturn`** — retain the existing body-refined
     `CheckedIhEnvironmentTransport` plus ONE declared call (the shape proven
     feasible by WIP `719933055`). **Its local return IS fresh `R2`.**
@@ -973,24 +989,39 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   provable on the unchanged programs plus an entry-marker/refusal mutation at
   the carried branch that does NOT apply the worker or inject a result. NO
   repair site, NO QA on the evidence object.
-- **D3A (exact carried application — evidence only; the ruled component shape,
-  proven feasible by `719933055`; Architect evt_1hren6zm8mgxv):**
-  - Keep the exact `CheckedIhEnvironmentTransport` as the sole two-endpoint
-    authority. In the `Carried(word)` branch, validate its planner record as the
-    exact `CheckedIhCapturedEnvironment` for the transport's source owner and
-    seat, and validate the runtime field count against the planner-declared
-    capture count. The word is a capture vector — NOT code identity, NOT a
-    semantic answer.
-  - Project capture ordinal `i` from that word with the existing positional
-    carrier projection, governed by the transport's exact source record and
-    `checked_ih_capture_origin`. NEVER inspect a runtime tag, family, spelling,
-    body word, or field-count coincidence to choose the path.
-  - Assemble the existing `ContinuationOrdinaryEnvelopeRole` ONCE: nonrecursive
-    fields still come from their ruled case-environment coordinates;
-    `WorkerCapture` fields come from the exact projected carried-environment
-    ordinals; continuation inputs still come from the existing transport
-    morphism. Do NOT synthesize a `StaticWorkerBinding` or redirect into the
-    neighboring `StaticWorker` branch.
+- **D3A (route-specific application plus the Tail produced-result transfer —
+  evidence only; Architect evt_1hren6zm8mgxv, amended HS10/HS11/HS12):**
+
+  > **WIP `719933055` PROVED THE DIRECT CALL RECIPE ONLY.** It is not evidence
+  > for the whole route-specific shape. Tail's application, its producer, and the
+  > value bridge are grounded separately by HS11 (`evt_79trx05xee0dj`) and HS12
+  > (`evt_7a6pp8n24r1ms`). Do not cite `719933055` for any Tail claim.
+
+  > ### THE NEXT THREE BULLETS ARE `DirectInvocationReturn`-ONLY.
+  >
+  > **Tail's discriminator is `direct_transport=None`, so requiring a Direct
+  > transport of it is the HS10 demand this frame exists to have removed.** Tail
+  > preparation is the EXISTING governed recursor application plus the new typed
+  > value bridge — nothing from these three bullets is required of it.
+
+  - **(Direct only.)** Keep the exact `CheckedIhEnvironmentTransport` as the
+    sole two-endpoint authority. In the `Carried(word)` branch, validate its
+    planner record as the exact `CheckedIhCapturedEnvironment` for the
+    transport's source owner and seat, and validate the runtime field count
+    against the planner-declared capture count. The word is a capture vector —
+    NOT code identity, NOT a semantic answer.
+  - **(Direct only.)** Project capture ordinal `i` from that word with the
+    existing positional carrier projection, governed by the transport's exact
+    source record and `checked_ih_capture_origin`. NEVER inspect a runtime
+    tag, family, spelling, body word, or field-count coincidence to choose the
+    path.
+  - **(Direct only.)** Assemble the existing
+    `ContinuationOrdinaryEnvelopeRole` ONCE: nonrecursive fields still come
+    from their ruled case-environment coordinates; `WorkerCapture` fields come
+    from the exact projected carried-environment ordinals; continuation inputs
+    still come from the existing transport morphism. Do NOT synthesize a
+    `StaticWorkerBinding` or redirect into the neighboring `StaticWorker`
+    branch.
   - **THE APPLICATION STEP, SPLIT BY ROUTE VARIANT. Amended at HS10
     (`evt_1ckwtvwe23e3e`): the single recipe below previously applied to BOTH
     variants, and that uniformity IS the defect HS10 found.** Applying the Direct
@@ -1050,11 +1081,15 @@ transitively into the capture, or re-derive the inheritance relation in lowering
       predecessor/header/Ret/binder/capture/body route. **One Tail authority, not
       two.** `DirectInvocationReturn` is unchanged and its blob is proved
       identical across the increment.
-    - **Selection between the two is by the LANDED ROUTE VARIANT**
-      (`aggregates.rs:5508-5578`), never by probing a runtime tag, family,
-      spelling, body word, or field-count coincidence. A row whose variant cannot
-      be determined from the landed route is a HARD STOP, not a default to
-      either arm.
+    - **Selection between the two is by THIS CANDIDATE'S SINGLE ROUTE RELATION,
+      after it replaces the Tail variant** — the landed `DirectInvocationReturn`
+      is retained and still selects Direct, while the landed Tail variant
+      contributes only topology/identity facts and **never selection or value
+      authority (HS12).** The landed partition at `aggregates.rs:5508-5578` is the
+      shape to follow, not the authority to consume. Never select by probing a
+      runtime tag, family, spelling, body word, or field-count coincidence. A row
+      whose variant cannot be determined is a HARD STOP, not a default to either
+      arm.
 
     This phase makes NO claim about the final capture or `InvalidOffset` and must
     NOT land alone.
@@ -1187,8 +1222,10 @@ transitively into the capture, or re-derive the inheritance relation in lowering
 - AC-D3A-APPLICATION (carried application executes — D3A, evidence only;
   **ROUTE-VARIANT-SPECIFIC, amended at HS10**) — on the UNCHANGED admitted
   read/write programs the D3A candidate makes each governed carried arrival apply
-  its exact source continuation **through the mechanism its LANDED ROUTE VARIANT
-  authorizes**, and expose the fresh result:
+  its exact source continuation **through the mechanism THIS CANDIDATE'S ROUTE
+  RELATION selects after replacing the Tail variant** — landed Direct retained,
+  landed Tail topology/identity only, never value authority (HS12) — and expose
+  the fresh result:
   - **`DirectInvocationReturn`** — through the ruled
     transport/projection/envelope/single-declared-call shape; the call result is
     fresh `R2`.
@@ -1257,10 +1294,13 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   other:**
   - **Direct suppression deletes ONLY its declared call.**
   - **Tail suppression deletes ONLY the exact marker-consumption /
-    invocation-install application, while keeping the inheritance AND the
-    certified route PRESENT — and it MUST FAIL CLOSED.** A Tail suppression that
-    also removes the route, or that lets the row fall back to any other arm, is
-    measuring the wrong thing.
+    invocation-install application, while keeping the inheritance AND THIS
+    CANDIDATE'S REPLACEMENT TAIL ROUTE/TOPOLOGY IDENTITIES PRESENT — and it MUST
+    FAIL CLOSED.** A Tail suppression that also removes the route, or that lets
+    the row fall back to any other arm, is measuring the wrong thing.
+    **"Present" here means the replacement route's topology and identity facts,
+    NOT the predecessor's withdrawn value-certified edge (HS12) — that edge does
+    not exist and cannot be kept present.**
 
   **Per the standing lesson from `RT-FRESH-RESULT-ROUTE-PAIRING-LEG-CONTROLS`:
   count these controls PER CONJUNCT, not per axis.** One mutation that reddens
@@ -1313,8 +1353,10 @@ transitively into the capture, or re-derive the inheritance relation in lowering
 Architect (D2 reworded reachability introduces no application/result and no
 spelling/ABI/family/trap/field-count/index authority; D3A applies the inherited
 `K` at the exact recursively-exposed invocation supplied by the predecessor's
-`K`-inheritance proof, **through the mechanism its LANDED ROUTE VARIANT
-authorizes and not a uniform one (HS10)** — for `DirectInvocationReturn` the
+`K`-inheritance proof, **through the mechanism THIS CANDIDATE'S ROUTE RELATION
+selects after replacing the Tail variant, and not a uniform one (HS10); landed
+Direct retained, landed Tail topology/identity only (HS12)** — for
+`DirectInvocationReturn` the
 body-refined `CheckedIhEnvironmentTransport` plus ONE declared call, projected
 capture ordinals, single envelope/call path, no `StaticWorkerBinding` synthesis,
 no second identity catalog/ABI lane; for `TailProducerToBackedge` the EXISTING
@@ -1360,8 +1402,11 @@ objects. Size M.
 ## Sequencing
 
 Lane-1 (runtime, priority). D2 localization is ACCEPTED (evidence `ac1ebdacb`,
-no merge, no QA); D3A application feasibility is proven (evidence `719933055`,
-no merge, no QA); D3B localization is ACCEPTED (evidence `4e516e54`, HS5). The
+no merge, no QA); **D3A's DIRECT call recipe is proven feasible (evidence
+`719933055`, no merge, no QA) — that WIP proves NOTHING about Tail, whose
+application, producer and value bridge are grounded by HS11
+`evt_79trx05xee0dj` and HS12 `evt_7a6pp8n24r1ms`**; D3B localization is ACCEPTED
+(evidence `4e516e54`, HS5). The
 **ALL PREDECESSORS HAVE LANDED AND NO FURTHER ONE IS AUTHORIZED — restated and
 HARDENED at HS12 (`evt_7a6pp8n24r1ms`), previously HS10
 (`evt_1ckwtvwe23e3e`).** Every node in `depends_on` is `merged`, including
