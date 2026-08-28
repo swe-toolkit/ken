@@ -296,9 +296,26 @@ decl:px8f_write_all_native::ResourceBodyResult`, exit 1, before `FsReadAt` /
   > `4d3d4d848`, so it was candidate-caused, not pre-existing.
   > **Neither gate was negligent — both ran the targets this frame told them to
   > run, and the criterion was wrong.** An increment that changes a CLOSURE
-  > rather than a FILE breaks consumers that no diff-touched set can see, and
-  > the nine-capture environment is exactly such a change: capture counts are
-  > read by a planner invariant living in another file.
+  > rather than a FILE breaks consumers that no diff-touched set can see.
+  > **CORRECTED BY D0 (`evt_34gsff3cf1wq7`) — the AC stands, my first mechanism
+  > for it did not, and the correction is the more useful half.** I wrote here
+  > that the nine-capture environment moved a capture count read by a planner
+  > invariant elsewhere. **Measured, that is false.** Base and candidate select
+  > the SAME worker with the SAME two captures `[0,1]`, and production
+  > `ordinary` is 2 on both; there is no nine-capture population and no
+  > worker-selection change. What actually happened is that the candidate's new
+  > result-proof path routes the consumer test's ALREADY-EXISTING
+  > `ConstructorFieldCountPrefix` mutation through `ordinary_envelope`, which
+  > enforces the invariant — so a shape the full planner previously tolerated is
+  > now refused.
+  > **This makes the AC MORE necessary, not less.** I had assumed the blind spot
+  > needed a changed production value to hide behind. It did not: production
+  > values were identical on both sides, and the consumer still broke, because
+  > what changed was which code path an existing test state flows through.
+  > **A closure change can break an untouched consumer while every production
+  > count it reads stays byte-identical** — which is exactly the case a
+  > diff-touched target set, and a reviewer reasoning about changed values, will
+  > both miss.
   > **The same defect was diagnosed and fixed in the lane-3 foundation frames on
   > 2026-08-27** (CV found a candidate passing 170/170 diff-touched targets while
   > reddening a consumer-closure oracle in an untouched file). I did not carry it
