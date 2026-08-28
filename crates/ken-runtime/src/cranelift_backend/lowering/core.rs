@@ -12214,6 +12214,14 @@ impl<'a> Lowering<'a> {
             .rev()
             .find(|(origin, _)| *origin == eliminator.static_origin)
         {
+            #[cfg(feature = "px8-ds-test-support")]
+            record_checked_ih_fresh_result_route_active_edge(
+                eliminator.static_origin,
+                scrutinee.word,
+                *header,
+                builder.block_params(*header)[0],
+                eliminator.answer_route,
+            );
             let route_control_word = carried_computational_loop_control_word(
                 eliminator.checked_frame_id,
                 CarriedComputationalLoopEdge::ActiveSelfResumption,
@@ -12618,6 +12626,20 @@ impl<'a> Lowering<'a> {
                 &return_case.body,
             )?;
             let body_origin = body.static_origin;
+            #[cfg(feature = "px8-ds-test-support")]
+            if let Some((_, header)) = self
+                .active_carried_computational_eliminations
+                .iter()
+                .rev()
+                .find(|(origin, _)| *origin == eliminator.static_origin)
+            {
+                record_checked_ih_fresh_result_route_ret_input(
+                    eliminator.static_origin,
+                    body_origin,
+                    *header,
+                    scrutinee.word,
+                );
+            }
             // ⭐ Lowered through the ORDINARY continuation of this eliminator,
             // exactly as a non-recursive case body beside it is. The eliminated
             // value returns to `SourceContinuation::ComputationalMatchScrutinee`,

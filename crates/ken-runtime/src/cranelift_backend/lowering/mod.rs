@@ -250,8 +250,9 @@ pub(in crate::cranelift_backend) use super::planning::{
     // is an unresolved import the test profile cannot see.
     BoolMatchCaseOrdinals, BoundaryClosureEnvironment, CheckedCaseBinderLayout,
     CheckedCaseBinderRole, CheckedIhBinding, CheckedIhEnvironmentTransport,
-    CheckedIhGeneratedEntryAccess, CheckedIhGeneratedEntryAdmission,
-    CheckedIhGeneratedEntryProjection, CheckedIhKAvailabilityDomain,
+    CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
+    CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
+    CheckedIhKAvailabilityDomain,
     CheckedIhTransportInputDestination,
     CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
     DeclarationCallTargetClass,
@@ -9583,6 +9584,221 @@ impl SourceComputationalAnswerRoute {
 pub(crate) enum CarriedComputationalLoopEdge {
     Initial,
     ActiveSelfResumption,
+}
+
+/// Test-only emitted graph observation for one selected tail fresh-result
+/// route. Cranelift value/block names are diagnostics only and never enter the
+/// planner certificate or runtime ABI.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CheckedIhFreshResultRouteEmissionObservation {
+    pub invocation_origin: String,
+    pub call_origin: String,
+    pub callee_origin: String,
+    pub active_frame_origin: String,
+    pub expected_ret_case_body_origin: String,
+    pub actual_ret_case_body_origin: Option<String>,
+    pub source_emitted: bool,
+    pub source_result_value: Option<String>,
+    pub active_edge_value: Option<String>,
+    pub active_answer_route: Option<String>,
+    pub header_block: Option<String>,
+    pub header_input_value: Option<String>,
+    pub ret_input_value: Option<String>,
+    pub selected_order: usize,
+    pub source_order: Option<usize>,
+    pub active_edge_order: Option<usize>,
+    pub ret_input_order: Option<usize>,
+}
+
+/// Observer-side control: preserve all four co-emitted seats while deleting
+/// only the value-identity pairing between the governed result and active edge.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckedIhFreshResultRouteObservationMutation {
+    Exact,
+    CoEmissionOnly,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static FRESH_RESULT_ROUTE_OBSERVATION_MUTATION:
+        std::cell::Cell<CheckedIhFreshResultRouteObservationMutation> =
+        const { std::cell::Cell::new(CheckedIhFreshResultRouteObservationMutation::Exact) };
+    static FRESH_RESULT_ROUTE_OBSERVATION_SEQUENCE: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static FRESH_RESULT_ROUTE_OBSERVATIONS:
+        std::cell::RefCell<Vec<CheckedIhFreshResultRouteEmissionObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn next_fresh_result_route_observation_order() -> usize {
+    FRESH_RESULT_ROUTE_OBSERVATION_SEQUENCE.with(|sequence| {
+        let next = sequence
+            .get()
+            .checked_add(1)
+            .expect("test-only fresh-result route observation sequence exhausted");
+        sequence.set(next);
+        next
+    })
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_fresh_result_route_emission_observations<T>(
+    mutation: CheckedIhFreshResultRouteObservationMutation,
+    f: impl FnOnce() -> T,
+) -> (T, Vec<CheckedIhFreshResultRouteEmissionObservation>) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(|active| active.set(false));
+            FRESH_RESULT_ROUTE_OBSERVATION_MUTATION
+                .with(|held| held.set(CheckedIhFreshResultRouteObservationMutation::Exact));
+        }
+    }
+
+    FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| rows.borrow_mut().clear());
+    FRESH_RESULT_ROUTE_OBSERVATION_SEQUENCE.with(|sequence| sequence.set(0));
+    FRESH_RESULT_ROUTE_OBSERVATION_MUTATION.with(|held| held.set(mutation));
+    FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(|active| active.set(true));
+    let _restore = Restore;
+    let result = f();
+    FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(|active| active.set(false));
+    let rows = FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| std::mem::take(&mut *rows.borrow_mut()));
+    (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_checked_ih_fresh_result_route_selected(
+    route: &CheckedIhFreshResultRoute,
+) {
+    if !FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(std::cell::Cell::get) {
+        return;
+    }
+    let Some((active_frame_origin, ret_case_body_origin)) = route.tail_resumed_coordinates() else {
+        return;
+    };
+    let (invocation_origin, call_origin, callee_origin) = route.governed_call_coordinates();
+    FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| {
+        rows.borrow_mut()
+            .push(CheckedIhFreshResultRouteEmissionObservation {
+                invocation_origin: format!("{invocation_origin:?}"),
+                call_origin: format!("{call_origin:?}"),
+                callee_origin: format!("{callee_origin:?}"),
+                active_frame_origin: format!("{active_frame_origin:?}"),
+                expected_ret_case_body_origin: format!("{ret_case_body_origin:?}"),
+                actual_ret_case_body_origin: None,
+                source_emitted: false,
+                source_result_value: None,
+                active_edge_value: None,
+                active_answer_route: None,
+                header_block: None,
+                header_input_value: None,
+                ret_input_value: None,
+                selected_order: next_fresh_result_route_observation_order(),
+                source_order: None,
+                active_edge_order: None,
+                ret_input_order: None,
+            });
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_checked_ih_fresh_result_route_source(
+    frame_origin: StaticOriginId,
+    value: cranelift_codegen::ir::Value,
+) {
+    if !FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(std::cell::Cell::get) {
+        return;
+    }
+    let rendered = format!("{value:?}");
+    let rendered_frame = format!("{frame_origin:?}");
+    let order = next_fresh_result_route_observation_order();
+    let coemission_only = FRESH_RESULT_ROUTE_OBSERVATION_MUTATION.with(|mutation| {
+        mutation.get() == CheckedIhFreshResultRouteObservationMutation::CoEmissionOnly
+    });
+    FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| {
+        if let Some(row) = rows
+            .borrow_mut()
+            .iter_mut()
+            .rev()
+            .find(|row| row.active_frame_origin == rendered_frame && !row.source_emitted)
+        {
+            row.source_emitted = true;
+            row.source_order = Some(order);
+            if !coemission_only {
+                row.source_result_value = Some(rendered);
+            }
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_checked_ih_fresh_result_route_active_edge(
+    frame_origin: StaticOriginId,
+    value: cranelift_codegen::ir::Value,
+    header: cranelift_codegen::ir::Block,
+    header_input: cranelift_codegen::ir::Value,
+    answer_route: SourceComputationalAnswerRoute,
+) {
+    if !FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(std::cell::Cell::get) {
+        return;
+    }
+    let rendered = format!("{value:?}");
+    let rendered_frame = format!("{frame_origin:?}");
+    let order = next_fresh_result_route_observation_order();
+    FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| {
+        let mut rows = rows.borrow_mut();
+        let index = rows
+            .iter()
+            .rposition(|row| {
+                row.active_frame_origin == rendered_frame
+                    && row.active_edge_value.is_none()
+                    && row.source_result_value.as_deref() == Some(rendered.as_str())
+            })
+            .or_else(|| {
+                rows.iter().rposition(|row| {
+                    row.active_frame_origin == rendered_frame && row.active_edge_value.is_none()
+                })
+            });
+        if let Some(index) = index {
+            let row = &mut rows[index];
+            row.active_edge_value = Some(rendered);
+            row.active_answer_route = Some(format!("{answer_route:?}"));
+            row.header_block = Some(format!("{header:?}"));
+            row.header_input_value = Some(format!("{header_input:?}"));
+            row.active_edge_order = Some(order);
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_checked_ih_fresh_result_route_ret_input(
+    frame_origin: StaticOriginId,
+    ret_case_body_origin: StaticOriginId,
+    header: cranelift_codegen::ir::Block,
+    value: cranelift_codegen::ir::Value,
+) {
+    if !FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(std::cell::Cell::get) {
+        return;
+    }
+    let order = next_fresh_result_route_observation_order();
+    let rendered_frame = format!("{frame_origin:?}");
+    let header = format!("{header:?}");
+    FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| {
+        for row in rows.borrow_mut().iter_mut().filter(|row| {
+            row.active_frame_origin == rendered_frame
+                && row.header_block.as_deref() == Some(header.as_str())
+                && row.ret_input_value.is_none()
+        }) {
+            row.actual_ret_case_body_origin = Some(format!("{ret_case_body_origin:?}"));
+            row.ret_input_value = Some(format!("{value:?}"));
+            row.ret_input_order = Some(order);
+        }
+    });
 }
 
 fn carried_computational_loop_control_word(

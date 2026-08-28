@@ -85,7 +85,10 @@ pub use lowering::units::{
     RetainedUnitCallTargetMutation,
 };
 #[cfg(feature = "px8-ds-test-support")]
-pub use lowering::with_px8ds_retired_flat_order;
+pub use lowering::{
+    with_checked_ih_fresh_result_route_emission_observations, with_px8ds_retired_flat_order,
+    CheckedIhFreshResultRouteEmissionObservation, CheckedIhFreshResultRouteObservationMutation,
+};
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::source::{
     checked_ih_generated_entry_capsule_mutation_is_exact,

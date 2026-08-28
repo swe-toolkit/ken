@@ -947,11 +947,11 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
 /// this witness while preserving quotient membership and exact-capsule reach.
 ///
 /// **MEASURED:** the two fixed products' complete governed certificate classes,
-/// installation state, typed direct/loop producer projections, and successful
+/// installation state, typed direct/tail fresh-result routes, and successful
 /// terminal validation observations.
 /// **CLAIMED:** W0/W1 share one typed projection while context-sharing siblings
-/// remain separate, every governed key is reached, and both producer variants
-/// retain their exact typed edge coordinates.
+/// remain separate, every governed key is reached, and both route variants
+/// retain their exact typed source, intermediate edge, and sink coordinates.
 /// **THE GAP:** the fixed coordinate table is independent of the certificate
 /// builder and is paired with population-side disagreement mutations below;
 /// numeric origins remain transition witnesses rather than durable authority.
@@ -993,9 +993,9 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
         assert_eq!(collision.locator_domain, "ImmediateInvocationEnvironment");
         assert!(
             collision
-                .fresh_result_producer
-                .starts_with("DirectInvocationResult"),
-            "the exact governed invocation-return edge is the direct producer: {collision:?}"
+                .fresh_result_route
+                .starts_with("DirectInvocationReturn"),
+            "the exact body-refined invocation-return edge is the direct route: {collision:?}"
         );
         for coordinate in [
             "invocation_origin: StaticOriginId(741)",
@@ -1004,8 +1004,8 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
             "binding: CheckedIhBinding { frame_origin: StaticOriginId(737), recursive_position: 1 }",
         ] {
             assert!(
-                collision.fresh_result_producer.contains(coordinate),
-                "the direct producer must retain {coordinate}: {collision:?}"
+                collision.fresh_result_route.contains(coordinate),
+                "the direct route must retain {coordinate}: {collision:?}"
             );
         }
         assert!(
@@ -1021,23 +1021,79 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
         assert_ne!(write_singleton.callee_origin, collision.callee_origin);
         assert!(
             write_singleton
-                .fresh_result_producer
-                .starts_with("CarriedLoopExitResult"),
-            "the active self-resumption must name the carried-loop producer: {write_singleton:?}"
+                .fresh_result_route
+                .starts_with("TailResumedRetInput"),
+            "the active self-resumption must name the forward Ret-input route: {write_singleton:?}"
         );
         for coordinate in [
             "invocation_origin: StaticOriginId(529)",
             "call_origin: StaticOriginId(528)",
             "callee_origin: StaticOriginId(527)",
             "active_frame_origin: StaticOriginId(525)",
+            "header_edge: ActiveSelfResumption",
+            "answer_route: CheckedSelectedRecursor",
+            "direction: Forward",
             "ret_case_body_origin: StaticOriginId(691)",
+            "ret_input_binder: ConstructorChild { frame_origin: StaticOriginId(525), field_position: 0 }",
+            "ret_input_delivery: CheckedAnswerFallbackDirect",
         ] {
             assert!(
-                write_singleton.fresh_result_producer.contains(coordinate),
-                "the loop producer must retain {coordinate}: {write_singleton:?}"
+                write_singleton.fresh_result_route.contains(coordinate),
+                "the tail-resumed route must retain {coordinate}: {write_singleton:?}"
             );
         }
-        for row in read.iter().chain(&write) {
+        let all_rows = read.iter().chain(&write).collect::<Vec<_>>();
+        let tail_rows = all_rows
+            .iter()
+            .copied()
+            .filter(|row| row.fresh_result_route.starts_with("TailResumedRetInput"))
+            .collect::<Vec<_>>();
+        let direct_rows = all_rows
+            .iter()
+            .copied()
+            .filter(|row| row.fresh_result_route.starts_with("DirectInvocationReturn"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            tail_rows.len(),
+            4,
+            "the fixed products have four tail routes"
+        );
+        assert_eq!(
+            direct_rows.len(),
+            1,
+            "the fixed products have one direct route"
+        );
+        assert_eq!(
+            tail_rows
+                .iter()
+                .map(|row| row.binding_frame_origin)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            tail_rows.len(),
+            "each fixed-product tail route has a distinct active frame, so the emitted observer's frame pairing is unambiguous"
+        );
+        for row in &tail_rows {
+            for coordinate in [
+                format!("invocation_origin: StaticOriginId({})", row.invocation_origin),
+                format!("call_origin: StaticOriginId({})", row.call_origin),
+                format!("callee_origin: StaticOriginId({})", row.callee_origin),
+                format!("active_frame_origin: StaticOriginId({})", row.binding_frame_origin),
+                "header_edge: ActiveSelfResumption".to_string(),
+                "answer_route: CheckedSelectedRecursor".to_string(),
+                "direction: Forward".to_string(),
+                format!(
+                    "ret_input_binder: ConstructorChild {{ frame_origin: StaticOriginId({}), field_position: 0 }}",
+                    row.binding_frame_origin
+                ),
+                "ret_input_delivery: CheckedAnswerFallbackDirect".to_string(),
+            ] {
+                assert!(
+                    row.fresh_result_route.contains(&coordinate),
+                    "each real tail-route neighbor must retain {coordinate}: {row:?}"
+                );
+            }
+        }
+        for row in all_rows {
             assert!(row.installed, "every certificate key is installed: {row:?}");
             assert!(
                 row.reached_count > 0,
@@ -1058,6 +1114,86 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
             };
             assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
         }
+    });
+}
+
+/// **Promise class: durable invariant.** The observation is stated over emitted
+/// edge pairing rather than fixed Cranelift block/value numbers.
+///
+/// **MEASURED:** one selected governed tail route records the result delivered
+/// to its unambiguous source-machine resumption seat, that same value on the
+/// active self-resumption jump, the target header's input parameter, and that
+/// same header input directly installed in the exact Ret body environment, in
+/// forward emission order.
+/// **CLAIMED:** the certified tail route is a directed value-flow edge rather
+/// than four co-emitted endpoints.
+/// **THE GAP:** Cranelift identities are diagnostic only. The static route proof
+/// separately owns source/sink authority, and the fixed-product positive above
+/// asserts one tail key per active frame; this observation proves the emitted
+/// graph pairs them. The `CoEmissionOnly` arm preserves every seat and removes
+/// only result-to-active-edge identity, so a co-emission oracle cannot pass.
+#[test]
+fn checked_ih_fresh_result_route_observation_is_forward_and_paired() {
+    in_generated_entry_stack_thread("rt-parity-fresh-result-route-pairing", || {
+        use ken_runtime::CheckedIhFreshResultRouteObservationMutation as Mutation;
+
+        let (exact_result, exact) =
+            ken_runtime::with_checked_ih_fresh_result_route_emission_observations(
+                Mutation::Exact,
+                || differential("fs-write-at-offset-single", "rt_write_writable_stage"),
+            );
+        assert!(
+            !exact.is_empty(),
+            "the governed tail-route population must emit"
+        );
+        let paired = |row: &ken_runtime::CheckedIhFreshResultRouteEmissionObservation| {
+            row.source_emitted
+                && row.source_result_value.is_some()
+                && row.source_result_value == row.active_edge_value
+                && row.active_answer_route.as_deref() == Some("CheckedSelectedRecursor")
+                && row.header_input_value.is_some()
+                && row.header_input_value == row.ret_input_value
+                && row.actual_ret_case_body_origin.as_ref()
+                    == Some(&row.expected_ret_case_body_origin)
+                && matches!(
+                    (row.source_order, row.active_edge_order, row.ret_input_order),
+                    (Some(source), Some(active), Some(ret))
+                        if row.selected_order < source && source < active && active < ret
+                )
+        };
+        assert!(
+            exact.iter().all(paired),
+            "every governed tail route must be value-paired in forward order: {exact:#?}"
+        );
+
+        let (coemitted_result, coemitted) =
+            ken_runtime::with_checked_ih_fresh_result_route_emission_observations(
+                Mutation::CoEmissionOnly,
+                || differential("fs-write-at-offset-single", "rt_write_writable_stage"),
+            );
+        assert_eq!(
+            coemitted.len(),
+            exact.len(),
+            "the control must preserve the selected route population"
+        );
+        assert!(
+            coemitted.iter().all(|row| {
+                row.source_emitted
+                    && row.active_edge_value.is_some()
+                    && row.header_input_value.is_some()
+                    && row.ret_input_value.is_some()
+                    && !paired(row)
+            }),
+            "co-emitting every seat without value identity must not satisfy pairing: {coemitted:#?}"
+        );
+        assert_eq!(
+            exact_result.native.effect_trace, coemitted_result.native.effect_trace,
+            "observer-only pairing suppression must change no emitted behavior"
+        );
+        assert_eq!(
+            exact_result.native.terminal_error, coemitted_result.native.terminal_error,
+            "observer-only pairing suppression must preserve the terminal frontier"
+        );
     });
 }
 
@@ -1394,14 +1530,20 @@ fn assert_generated_entry_mutation_child() {
         "fresh-capture-ordinal" => Mutation::FreshCaptureOrdinal,
         "fresh-capture-occurrence" => Mutation::FreshCaptureOccurrence,
         "fresh-body-reads" => Mutation::FreshBodyReadMembership,
-        "producer-removal" => Mutation::ProducerRemoval,
-        "producer-duplication" => Mutation::ProducerDuplication,
-        "producer-cross-variant" => Mutation::ProducerCrossVariant,
-        "producer-wrong-active-frame" => Mutation::ProducerWrongActiveFrame,
-        "producer-wrong-direct-edge" => Mutation::ProducerWrongDirectEdge,
-        "producer-wrong-loop-edge" => Mutation::ProducerWrongLoopEdge,
-        "producer-wrong-governed-key" => Mutation::ProducerWrongGovernedKey,
-        "producer-disagreement" => Mutation::ProducerDisagreement,
+        "route-removal" => Mutation::RouteRemoval,
+        "route-duplication" => Mutation::RouteDuplication,
+        "route-cross-variant" => Mutation::RouteCrossVariant,
+        "route-wrong-active-frame" => Mutation::RouteWrongActiveFrame,
+        "route-wrong-header-edge" => Mutation::RouteWrongHeaderEdge,
+        "route-wrong-answer-route" => Mutation::RouteWrongAnswerRoute,
+        "route-wrong-direct-edge" => Mutation::RouteWrongDirectEdge,
+        "route-wrong-ret-input-body" => Mutation::RouteWrongRetInputBody,
+        "route-wrong-ret-input-binder" => Mutation::RouteWrongRetInputBinder,
+        "route-wrong-governed-key" => Mutation::RouteWrongGovernedKey,
+        "route-pretend-ordinary-projection" => Mutation::RoutePretendOrdinaryProjection,
+        "route-body-merge-output" => Mutation::RouteBodyMergeOutput,
+        "route-reversed" => Mutation::RouteReversed,
+        "route-disagreement" => Mutation::RouteDisagreement,
         "remove-member" => Mutation::RemoveFirstMember,
         "duplicate-member" => Mutation::DuplicateFirstMember,
         "filter-member" => Mutation::FilterCollidingMember,
@@ -1420,24 +1562,21 @@ fn assert_generated_entry_mutation_child() {
 }
 
 /// **Promise class: durable invariant.** Every quotient-key weakening,
-/// projection disagreement, producer corruption, and set-membership corruption
+/// projection disagreement, route corruption, and set-membership corruption
 /// must reject before a certificate can be published.
 ///
-/// **MEASURED:** each population-side mutation changes one real relation field,
-/// membership operation, declared-body transport selector, or ordinary-Ret
-/// result edge and reaches its named planner refusal.
-/// **CLAIMED:** the governed projection carries exactly one typed producer, the
-/// Direct arm uses lowering's body-refined transport predicate, the loop arm
-/// uses its exact ordinary-Ret edge, and quotient members agree before
-/// publication.
-/// **THE GAP:** the direct and loop same-variant positives live in
+/// **MEASURED:** each population-side mutation changes one real route relation,
+/// membership operation, declared-body transport selector, or legal neighboring
+/// header/kind/binder/key and reaches its named planner refusal.
+/// **CLAIMED:** the governed projection carries exactly one directed route; its
+/// Direct arm preserves the body-refined transport, and its tail arm composes
+/// source, active checked header, direct Ret-input delivery, and capture sink.
+/// **THE GAP:** both same-variant positives live in
 /// `checked_ih_generated_entry_confluence_reaches_exact_capsules`; these
-/// mutation children establish rejection, not positive producer reach. The
-/// Direct neighbor is a different validated transport-source unit body; the
-/// loop neighbor is a different certified Ret/capture edge from the same
-/// destination owner. Neither is an invented dense origin.
+/// mutation children establish rejection, not positive reach. Neighboring
+/// bodies, frames, binders, and keys are drawn from validated planner rows.
 #[test]
-fn checked_ih_generated_entry_confluence_and_producer_mutations_reject() {
+fn checked_ih_generated_entry_confluence_and_route_mutations_reject() {
     if std::env::var_os(GENERATED_ENTRY_MUTATION_CHILD).is_some() {
         in_generated_entry_stack_thread(
             "rt-parity-generated-entry-mutation-child",
@@ -1470,34 +1609,58 @@ fn checked_ih_generated_entry_confluence_and_producer_mutations_reject() {
         ("fresh-capture-occurrence", projection_disagreement),
         ("fresh-body-reads", projection_disagreement),
         (
-            "producer-removal",
-            "governed fresh-result producer population is absent",
+            "route-removal",
+            "governed fresh-result route population is absent",
         ),
         (
-            "producer-duplication",
-            "governed fresh-result producer population is ambiguous",
+            "route-duplication",
+            "governed fresh-result route population is ambiguous",
         ),
         (
-            "producer-cross-variant",
-            "producer variant contradicts its exact direct-transport partition",
+            "route-cross-variant",
+            "route variant contradicts its exact direct-transport partition",
         ),
         (
-            "producer-wrong-active-frame",
-            "producer active frame/eliminator is not the exact governed frame",
+            "route-wrong-active-frame",
+            "route active header is not the exact governed frame",
         ),
         (
-            "producer-wrong-direct-edge",
-            "direct fresh-result producer's declared recursive-unit body has no exact typed invocation transport",
+            "route-wrong-header-edge",
+            "route does not use the active self-resumption header edge",
         ),
         (
-            "producer-wrong-loop-edge",
-            "producer does not name the exact merge/result edge",
+            "route-wrong-answer-route",
+            "route does not carry the checked selected-recursor route kind",
         ),
         (
-            "producer-wrong-governed-key",
-            "producer does not name its governed call key",
+            "route-wrong-direct-edge",
+            "direct fresh-result route's declared recursive-unit body has no exact typed invocation transport",
         ),
-        ("producer-disagreement", projection_disagreement),
+        (
+            "route-wrong-ret-input-body",
+            "route does not name the exact Ret-input body",
+        ),
+        (
+            "route-wrong-ret-input-binder",
+            "route does not name the exact logical Ret-input binder",
+        ),
+        (
+            "route-wrong-governed-key",
+            "route does not name its governed call key",
+        ),
+        (
+            "route-pretend-ordinary-projection",
+            "pretends the checked fallback projected a constructor field instead of directly occupying the Ret input",
+        ),
+        (
+            "route-body-merge-output",
+            "substituted the causally downstream body merge output for the Ret input",
+        ),
+        (
+            "route-reversed",
+            "reverses the governed source and Ret-input sink",
+        ),
+        ("route-disagreement", projection_disagreement),
         ("remove-member", "not equal as sets"),
         ("duplicate-member", "inserted twice"),
         ("filter-member", "not equal as sets"),
@@ -1505,7 +1668,7 @@ fn checked_ih_generated_entry_confluence_and_producer_mutations_reject() {
     for (mode, expected) in cases {
         let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
             .arg("--exact")
-            .arg("checked_ih_generated_entry_confluence_and_producer_mutations_reject")
+            .arg("checked_ih_generated_entry_confluence_and_route_mutations_reject")
             .arg("--nocapture")
             .env(GENERATED_ENTRY_MUTATION_CHILD, mode)
             .env_remove("RUST_MIN_STACK")
@@ -1712,13 +1875,13 @@ fn checked_ih_generated_entry_confluence_is_interning_and_inheritance_order_inde
 /// **MEASURED:** the exact inheritance-to-producer planner chain and the
 /// upstream-suppressed chain emit identical semantic hashes, executable hashes,
 /// and executable bytes.
-/// **CLAIMED:** adding the fresh-result producer proof changes no ABI, call, or
+/// **CLAIMED:** adding the fresh-result route proof changes no ABI, call, or
 /// emitted behavior.
-/// **THE GAP:** suppression removes the producer with its upstream inheritance;
-/// the production-use review separately establishes that the producer's only
-/// consumer is the pre-dispatch validation guard.
+/// **THE GAP:** suppression removes the route with its upstream inheritance;
+/// the production-use review separately establishes that the route's only
+/// production consumer is the pre-dispatch validation guard.
 #[test]
-fn checked_ih_inheritance_and_fresh_result_producer_are_byte_inert() {
+fn checked_ih_inheritance_and_fresh_result_route_are_byte_inert() {
     in_large_stack_thread("rt-parity-continuation-inheritance-inert", || {
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
         let exact_root = output_dir("continuation-inheritance-inert-exact");
@@ -1760,7 +1923,7 @@ fn checked_ih_inheritance_and_fresh_result_producer_are_byte_inert() {
             std::fs::read(&exact.artifact.executable_path).expect("exact executable bytes"),
             std::fs::read(&suppressed.artifact.executable_path)
                 .expect("suppressed executable bytes"),
-            "planner-only inheritance and fresh-result producer proofs must change no emitted ABI, call, or artifact byte"
+            "planner-only inheritance and fresh-result route proofs must change no emitted ABI, call, or artifact byte"
         );
         assert!(ken_runtime::checked_ih_continuation_inheritance_mutation_is_exact());
     });
