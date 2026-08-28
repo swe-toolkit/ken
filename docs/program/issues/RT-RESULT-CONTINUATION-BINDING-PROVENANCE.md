@@ -1,6 +1,6 @@
 ---
 id: RT-RESULT-CONTINUATION-BINDING-PROVENANCE
-title: "RT-ITREE D2/D3A/D3B — repair the checked ITree Ret fresh-result binding, ROUTE-SPECIFICALLY (HS12, evt_7a6pp8n24r1ms). The two arms fail DIFFERENTLY and a uniform diagnosis is withdrawn. DirectInvocationReturn: the carried CFG arm of call_checked_ih_transport_from_case_environment (core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word with NO Direct declared-call application on that arm, so D3A ADDS the ruled declared call and its local return is fresh R2. TailProducerToBackedge: the governed application ALREADY EXISTS and a real declared-call producer ALREADY emits fresh R2 (calls.rs:2022, Result-slot load :2120, RoutedAnswer::checked(returned) source.rs:4369-4374) — nothing is unapplied; the bodyless recursor arm (source.rs:4478-4515) DISCARDS that result and substitutes the initial carried seed, so the missing work is exact produced-result TRANSFER. HS13 (evt_59t7b49m41z8m) REFUTED HS12's MECHANISM LOCUS while its semantic property stands: the Tail route does not exist at the producer (cursor N vs a freshly minted selected continuation at N+2) and composed lowering reduces RoutedAnswer to a bare LoweringOperand in between, so no value/route pair exists there to couple and ownership cannot carry an already-erased value. THIS NODE IS THEREFORE D0-ONLY: enumerate every natural-path seam where the Rust type shrinks to LoweringOperand plus the complete caller closure, and determine whether that closure admits ONE compile-time affine return typestate (Produced owns operand and ContinuationCallIdentity; Routed forms only by consuming Produced when the exact Tail route arrives with agreeing producer identity; the active jump consumes Routed once; ordinary/direct is a distinct exhaustive variant). A compiler-control return value, never a runtime carrier. D0 lands no production and routes no QA; an unboundable closure is HS14. D3B binds the DELIVERED fresh R2 to the ordinary Ret-case capture on both arms (301/460/459/452 are READ-side evidence coordinates only; the write analogue is derived independently). D2 localization ACCEPTED as evidence (ac1ebdacb; no merge, no QA) and is DIRECT-SCOPED. The merge is ATOMIC (D3A + graph-authorized result flow + product) — no application-only checkpoint. The landed fresh-result route contributes retained topology/identity facts only; NO predecessor supplies Tail value authority and none is authorized."
+title: "RT-ITREE D2/D3A/D3B — repair the checked ITree Ret fresh-result binding, ROUTE-SPECIFICALLY. CURRENT AUTHORITY IS HS13 (evt_59t7b49m41z8m); route-specificity is inherited from HS12 (evt_7a6pp8n24r1ms), whose MECHANISM LOCUS is refuted. The two arms fail DIFFERENTLY and a uniform diagnosis is withdrawn. DirectInvocationReturn: the carried CFG arm of call_checked_ih_transport_from_case_environment (core.rs:7699-7714) settles InlineNoCall and returns the transported CheckedIhCapturedEnvironment word with NO Direct declared-call application on that arm, so D3A ADDS the ruled declared call and its local return is fresh R2. TailProducerToBackedge: the governed application ALREADY EXISTS and a real declared-call producer ALREADY emits fresh R2 (calls.rs:2022, Result-slot load :2120, RoutedAnswer::checked(returned) source.rs:4369-4374) — nothing is unapplied; the bodyless recursor arm (source.rs:4478-4515) DISCARDS that result and substitutes the initial carried seed, so the missing work is exact produced-result TRANSFER. HS13 (evt_59t7b49m41z8m) REFUTED HS12's MECHANISM LOCUS while its semantic property stands: the Tail route does not exist at the producer (cursor N vs a freshly minted selected continuation at N+2) and composed lowering reduces RoutedAnswer to a bare LoweringOperand in between, so no value/route pair exists there to couple and ownership cannot carry an already-erased value. THIS NODE IS THEREFORE D0-ONLY: enumerate every natural-path seam where the Rust type shrinks to LoweringOperand plus the complete caller closure, and determine whether that closure admits ONE compile-time affine return typestate (Produced owns operand and ContinuationCallIdentity; Routed forms only by consuming Produced when the exact Tail route arrives with agreeing producer identity; the active jump consumes Routed once; ordinary/direct is a distinct exhaustive variant). A compiler-control return value, never a runtime carrier. D0 lands no production and routes no QA; an unboundable closure is HS14. D3B binds the DELIVERED fresh R2 to the ordinary Ret-case capture on both arms (301/460/459/452 are READ-side evidence coordinates only; the write analogue is derived independently). D2 localization ACCEPTED as evidence (ac1ebdacb; no merge, no QA) and is DIRECT-SCOPED. The merge is ATOMIC (D3A + graph-authorized result flow + product) — no application-only checkpoint. The landed fresh-result route contributes retained topology/identity facts only; NO predecessor supplies Tail value authority and none is authorized."
 status: active
 owner: runtime
 size: M
@@ -8,13 +8,72 @@ gate: none
 depends_on: [RT-ITREE-DEFAULT-SELECTION-PROVENANCE, RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR, RT-CHECKED-IH-K-AVAILABILITY-LOCATOR, RT-CHECKED-IH-GENERATED-ENTRY-ACCESS, RT-CHECKED-IH-SELF-RESUMPTION-RESULT-PROVENANCE, RT-CHECKED-IH-FRESH-RESULT-ROUTE]
 blocks: []
 github: null
-origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision). Hard-stop-5 ruling evt_494k61s04fnv9, 2026-08-26: D3B localization is VALID and lowering has reached the end of its authority — the missing component is an UPSTREAM planner-owned checked-IH result-successor relation, framed as the independently-landable predecessor RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR (which this node now depends_on); D3A stays frozen/non-landable until it lands, then the atomic D3A+D3B consumer builds and D3B consumes ONLY that successor projection. Inventory fold 244b2468afd4f0cd06837fd3079f291d7d330af5 (entry 5). Architect INCORPORATION ruling evt_2prk31prke9cc, 2026-08-26 (accepting Research advisory evt_261gm8y54xttt), grounded on origin/main@a09878026: the predecessor and this consumer conflated two semantic edges by pairing the D3A application result R1 forward to the later capture. Reconciled to the continuation-inheritance reading — D3A applies the inherited continuation capability K at each exact recursive arrival to yield the FRESH result R2, and D3B binds that R2 through ordinary Ret-case/capture semantics; the transitive R1 -> capture requirement is deleted from the operative Objective/Deliverables/ACs/pairing/suppressions/reviewers/Sequencing. Suppression and at-most-once controls are now THREE independent axes (inheritance, application, fresh-result binding). The advisory is incorporated and is NOT hard stop 6 (count remains five). Runtime stays HELD until the predecessor recut lands and the D3A+D3B work is explicitly re-released. Architect hard-stop-8 ruling evt_54efxydhb3n6w, 2026-08-27 (thr_2g0w05my2d5ym), verified on exact base 00e66312b4ef617eb658a2e75db9f99ff2c56492 / tree e286949f8fe5053e4719e54d0cc66adbe073dcdf: on four of five governed coordinates the exact governed K application exposes NO LOCAL LoweringOperand result at CheckedComputationalIHInvocationReturn, because the active self-resumption arm returns Lowered::RecursiveBackedge, a protocol marker and not a value (lowering/source.rs:1969). That is an absence of a LOCAL result and NOT a proof that no fresh dynamic result is eventually produced — the owning carried merge may still produce it, which is precisely D0's question. The landed architecture's two sibling proofs (K authority plus governed application coordinate; fresh-result destination) lack a THIRD — which emitted control edge PRODUCES the fresh dynamic result. That producer relation is a component boundary, not a D3B field, and is framed as the behaviorally-inert predecessor RT-CHECKED-IH-SELF-RESUMPTION-RESULT-PROVENANCE, which this node now depends_on. No mechanism is authorized: spec/40-runtime/42-evaluation.md section 6.2 makes the tail-resumptive loop realization normative, so a mandatory D0 measures the existing carried-loop exit first and a D0 answering NO stops and returns coordinates to the Architect rather than selecting a recursive call, frame morphism, or explicit continuation. The atomic D3A+D3B contract, the three independent suppression axes, and the deletion of the transitive R1 -> capture requirement are all UNCHANGED; the producer proof does not become a fourth axis. D3A+D3B stays frozen with no candidate and no QA until the predecessor lands and the Steward issues a SECOND explicit release. The next hard stop is 9 and mechanically triggers the mandatory Research advisory before any Architect ruling, including during the predecessor's D0. TERMINAL CLAUSE — HS9 THROUGH HS12, AND HS12 IS THE CURRENT AUTHORITY; everything above this sentence is chronology, not live contract. Hard-stop-9 ruling evt_7wbxwxa74cdnr, 2026-08-28: fresh R2 for the loop rows is the governed K application result AS DELIVERED INTO THE RET CASE'S INPUT BINDER, not the Ret body output and not the merge parameter; the prior D0 YES was an instrumentation error (co-emission is not pairing) and the corrected predecessor RT-CHECKED-IH-FRESH-RESULT-ROUTE landed 7d36d24f0. Hard-stop-12 ruling evt_7a6pp8n24r1ms, 2026-08-28 (clean stop evt_4av4pckhtjd3f, Research advisory evt_4v1wg8hb4zxtm returning a confident negative): stops 1-11 each found an endpoint MISSING; stop 12 found BOTH endpoints PRESENT and the directed edge between them ABSENT. A real declared-call producer and the exact active header both exist; the bodyless Tail transition discards the producer and supplies the initial seed as the only active-jump value. DISPOSITION: NO NEW PREDECESSOR — RT-CHECKED-IH-TAIL-RESULT-PRODUCER-ROUTE is closed/subsumed and removed from depends_on, because changing the active predecessor operand changes the Ret input, capture and body result, so a node landing it first would be either behaviourally inert (and not the repair) or would break the products it landed ahead of. The landed TailResumedRetInput variant is REPLACED by TailProducerToBackedge and its Tail VALUE authority is WITHDRAWN, retaining topology/identity facts only; this atomic candidate supplies the replacement relation and the one typed producer-to-backedge bridge itself. D3A+D3B stays FROZEN and requires a NEW explicit Steward release against the recut frame blob — the HS12 ruling releases nothing, landing releases nothing, and all prior releases are SPENT. Next mechanical Research trigger is HS15."
+origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting RT-ITREE-DEFAULT-SELECTION-PROVENANCE; then hard-stop-3 ruling evt_1hren6zm8mgxv, 2026-08-26 (option (c), D2/D3 phase separation, Research advisory evt_4cbecpkg2e0gs accepted). D1's route slice landed independently (21d62130); this node localizes the ResourceBodyResult continuation-binding boundary observed on top of it, then repairs it. Steward-owned recut per the ruling; the final-product ACs (AC-5 / AC-D1-PRODUCT / final InvalidOffset witnesses) live here. Hard-stop-4 ruling evt_6mnawfvm8fc4j, 2026-08-26: the single D3 application leap is split into coupled D3A (application, evidence only) + D3B (result-flow localization then single-edge repair); the atomic merge adds per-step result-flow pairing and dual suppression. Inventory fold 529f21c43e1c0c5257d2f7898481aaa3dc3a0429 (entries 1-4). Frame fixed-input correction evt_10rgb8n31c5sj, 2026-08-26: origins 301/460/459/452 are READ-side evidence coordinates only; D3B derives the write analogue independently from its own planner facts and forbids reusing the read coordinates as write authority (Steward-owned, not a Decision). Hard-stop-5 ruling evt_494k61s04fnv9, 2026-08-26: D3B localization is VALID and lowering has reached the end of its authority — the missing component is an UPSTREAM planner-owned checked-IH result-successor relation, framed as the independently-landable predecessor RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR (which this node now depends_on); D3A stays frozen/non-landable until it lands, then the atomic D3A+D3B consumer builds and D3B consumes ONLY that successor projection. Inventory fold 244b2468afd4f0cd06837fd3079f291d7d330af5 (entry 5). Architect INCORPORATION ruling evt_2prk31prke9cc, 2026-08-26 (accepting Research advisory evt_261gm8y54xttt), grounded on origin/main@a09878026: the predecessor and this consumer conflated two semantic edges by pairing the D3A application result R1 forward to the later capture. Reconciled to the continuation-inheritance reading — D3A applies the inherited continuation capability K at each exact recursive arrival to yield the FRESH result R2, and D3B binds that R2 through ordinary Ret-case/capture semantics; the transitive R1 -> capture requirement is deleted from the operative Objective/Deliverables/ACs/pairing/suppressions/reviewers/Sequencing. Suppression and at-most-once controls are now THREE independent axes (inheritance, application, fresh-result binding). The advisory is incorporated and is NOT hard stop 6 (count remains five). Runtime stays HELD until the predecessor recut lands and the D3A+D3B work is explicitly re-released. Architect hard-stop-8 ruling evt_54efxydhb3n6w, 2026-08-27 (thr_2g0w05my2d5ym), verified on exact base 00e66312b4ef617eb658a2e75db9f99ff2c56492 / tree e286949f8fe5053e4719e54d0cc66adbe073dcdf: on four of five governed coordinates the exact governed K application exposes NO LOCAL LoweringOperand result at CheckedComputationalIHInvocationReturn, because the active self-resumption arm returns Lowered::RecursiveBackedge, a protocol marker and not a value (lowering/source.rs:1969). That is an absence of a LOCAL result and NOT a proof that no fresh dynamic result is eventually produced — the owning carried merge may still produce it, which is precisely D0's question. The landed architecture's two sibling proofs (K authority plus governed application coordinate; fresh-result destination) lack a THIRD — which emitted control edge PRODUCES the fresh dynamic result. That producer relation is a component boundary, not a D3B field, and is framed as the behaviorally-inert predecessor RT-CHECKED-IH-SELF-RESUMPTION-RESULT-PROVENANCE, which this node now depends_on. No mechanism is authorized: spec/40-runtime/42-evaluation.md section 6.2 makes the tail-resumptive loop realization normative, so a mandatory D0 measures the existing carried-loop exit first and a D0 answering NO stops and returns coordinates to the Architect rather than selecting a recursive call, frame morphism, or explicit continuation. The atomic D3A+D3B contract, the three independent suppression axes, and the deletion of the transitive R1 -> capture requirement are all UNCHANGED; the producer proof does not become a fourth axis. D3A+D3B stays frozen with no candidate and no QA until the predecessor lands and the Steward issues a SECOND explicit release. The next hard stop is 9 and mechanically triggers the mandatory Research advisory before any Architect ruling, including during the predecessor's D0. TERMINAL CLAUSE — HS9 THROUGH HS13, AND HS13 IS THE CURRENT AUTHORITY; everything above this sentence is chronology, not live contract. Hard-stop-9 ruling evt_7wbxwxa74cdnr, 2026-08-28: fresh R2 for the loop rows is the governed K application result AS DELIVERED INTO THE RET CASE'S INPUT BINDER, not the Ret body output and not the merge parameter; the prior D0 YES was an instrumentation error (co-emission is not pairing) and the corrected predecessor RT-CHECKED-IH-FRESH-RESULT-ROUTE landed 7d36d24f0. Hard-stop-12 ruling evt_7a6pp8n24r1ms, 2026-08-28 (clean stop evt_4av4pckhtjd3f, Research advisory evt_4v1wg8hb4zxtm returning a confident negative): stops 1-11 each found an endpoint MISSING; stop 12 found BOTH endpoints PRESENT and the directed edge between them ABSENT. A real declared-call producer and the exact active header both exist; the bodyless Tail transition discards the producer and supplies the initial seed as the only active-jump value. DISPOSITION: NO NEW PREDECESSOR — RT-CHECKED-IH-TAIL-RESULT-PRODUCER-ROUTE is closed/subsumed and removed from depends_on, because changing the active predecessor operand changes the Ret input, capture and body result, so a node landing it first would be either behaviourally inert (and not the repair) or would break the products it landed ahead of. The landed TailResumedRetInput variant is REPLACED by TailProducerToBackedge and its Tail VALUE authority is WITHDRAWN, retaining topology/identity facts only; this atomic candidate supplies the replacement relation and the one typed producer-to-backedge bridge itself. D3A+D3B stays FROZEN and requires a NEW explicit Steward release against the recut frame blob — the HS12 ruling releases nothing, landing releases nothing, and all prior releases are SPENT. Next mechanical Research trigger is HS15. Hard-stop-13 ruling evt_59t7b49m41z8m, 2026-08-28 (clean stop evt_36303wpnhwx18: no commit, no candidate, no QA, baseline restored) — THIS IS THE CURRENT AUTHORITY AND IT SUPERSEDES HS12's MECHANISM LOCUS WHILE HS12's SEMANTIC PROPERTY STANDS. The ring built the HS12-ruled design exactly and the erasure happens underneath it: the declared-call result is produced in selected continuation cursor N, the governed Tail route becomes available only in a freshly minted selected continuation at N+2, and in between lower_computational_match_value_composed and the adjacent source/active return seams reduce RoutedAnswer to a bare LoweringOperand — so no value/route pair exists at the producer to couple, and ownership cannot carry an already-erased value. Cursor N/N+2 is diagnostic evidence only, never an identity key and never a proximity match. THIS NODE IS THEREFORE D0-ONLY and D3A/D3B are NOT AUTHORIZED: enumerate every natural-path seam where the Rust type shrinks to LoweringOperand plus the complete caller closure, and determine whether that closure admits ONE compile-time affine return typestate. D0 lands no production and routes no QA; the Architect reviews the D0 report and Runtime QA stays unrouted; an unboundable closure is HS14, a clean stop. No Decision and no Research advisory follow from HS13; HS15 remains the next mechanical Research trigger. Symptom inventory entry 13 is a LIFETIME/ORDERING class — the endpoint-addition predicate stays terminal at entry 12."
 ---
 
-> # OPERATIVE RULING — HARD STOP 12, `evt_7a6pp8n24r1ms` (2026-08-28)
+> # OPERATIVE RULING — HARD STOP 13, `evt_59t7b49m41z8m` (2026-08-28)
 >
-> **THIS IS THE OPERATIVE RULING. It supersedes the HS11 banner below and every
-> banner under it, all of which are history.** Cite by event id, never by number.
+> **THIS IS THE OPERATIVE RULING AND THE CURRENT AUTHORITY. It supersedes the
+> HS12 banner below and every banner under it, all of which are history.** Cite
+> by event id, never by number. Clean stop `evt_36303wpnhwx18`: no commit, no
+> candidate, no QA, baseline restored, branch free.
+>
+> ## THIS NODE IS D0-ONLY. D3A AND D3B ARE NOT AUTHORIZED.
+>
+> The only authorized phase is the **D0 return-boundary closure** in Phase
+> structure, and its acceptance criteria are the two `AC-HS13-D0-*` entries that
+> open Acceptance criteria. **D0 lands no production and routes no QA** — the
+> Architect reviews the D0 report and Runtime QA stays unrouted. An unboundable
+> closure is **HS14**: a clean stop to the Architect, never a mechanism selected
+> under pressure. **Every passage below that describes D3A/D3B as the deliverable
+> states the TARGET, not the authorized work.**
+>
+> ## HS12's MECHANISM LOCUS IS REFUTED; ITS SEMANTIC PROPERTY STANDS.
+>
+> The required directed edge is still producer result -> active jump -> Ret
+> input; the seed is still the negative control; `RecursiveBackedge` remains
+> marker-only; Direct is preserved; no predecessor is authorized. **But "couple
+> the operand with the existing Tail route AT THE EXACT PRODUCER" is IMPOSSIBLE
+> AS WRITTEN, because the route does not exist there:** the declared-call result
+> is produced in selected continuation cursor N, the governed Tail route becomes
+> available only in a freshly minted selected continuation at N+2, and in between
+> `lower_computational_match_value_composed` and the adjacent source/active
+> return seams reduce `RoutedAnswer` to a plain `LoweringOperand`. No value/route
+> pair exists at the producer locus, so every later bind observes `Unavailable`.
+>
+> **The ring built the HS12-ruled design exactly — a real
+> `ContinuationCallIdentity` producer, a move-shaped transfer, nothing on the
+> rejection list — and the erasure happens underneath it.** So "carry it by
+> ownership" may not be repairable by a better carry, which is why the authorized
+> turn measures the boundary instead of selecting a mechanism.
+>
+> **Cursor N/N+2 is DIAGNOSTIC EVIDENCE ONLY. It is never an identity key and it
+> authorizes no proximity match.** Permitting `Unavailable` merely preserves the
+> exact `ResourceBodyResult` default — it is not partial progress, and the
+> ring's refusal to permit it was correct.
+>
+> **Appending another carrier field to `SourceSelectedContinuation` cannot repair
+> a value already erased by a Rust return type.** That is why this is a return
+> BOUNDARY question and not a carrier question.
+>
+> **Symptom inventory entry 13 is a LIFETIME/ORDERING class and the
+> endpoint-addition predicate stays TERMINAL at entry 12.** Do not answer HS13 by
+> adding an endpoint.
+>
+> No Decision and no Research advisory follow from HS13; **HS15 remains the next
+> mechanical Research trigger.** Runtime is HELD until the Steward issues a NEW
+> EXPLICIT release against the recut frame blob: **landing a frame releases
+> nothing**, and all prior releases are SPENT.
+
+> # SUPERSEDED — HARD STOP 12, `evt_7a6pp8n24r1ms` (2026-08-28)
+>
+> **HISTORY, NOT THE OPERATIVE RULING.** HS13 (`evt_59t7b49m41z8m`) above
+> REFUTES this banner's MECHANISM LOCUS. Its SEMANTIC PROPERTY survives — the
+> required directed edge, the seed negative, marker-only `RecursiveBackedge`,
+> no new predecessor — and is restated in the HS13 banner, which is what to
+> cite. **The permitted-design recipe in this banner is refuted and must not be
+> built.** It supersedes the HS11 banner below and every banner under it, all of
+> which are history. Cite by event id, never by number.
 > Bound object `bb33dfb71e302a68377ffde8038f7dc8bd2c82ac`, tree
 > `3a63194c34fd0bb8c485f142e61a84769751a742`. Hard stop `evt_4av4pckhtjd3f`;
 > Architect hold/call `evt_64n0w33af4n6k`; **Research advisory
@@ -797,6 +856,23 @@ Append one line per hard stop; never rewrite history.
     but the bodyless Tail transition discards the producer and supplies the
     initial seed as the only active-jump value — keyed on treating two endpoints
     as though tail resumption made their missing directed value edge implicit.
+13. Both endpoints and the HS12-ruled transfer design are present, but the
+    producer and the later route live in DIFFERENT selected-continuation
+    lifetimes, and an intervening Rust return boundary erases the result-bearing
+    type before the consumer route exists — keyed on
+    `lower_computational_match_value_composed` and the adjacent source/active
+    return seams reducing `RoutedAnswer` to a bare `LoweringOperand` between the
+    producer at cursor N and the freshly minted selected continuation at N+2, so
+    there is no pair at the producer to couple and no value left to carry by
+    ownership.
+
+> **ENTRY 13 IS NOT A THIRTEENTH ENDPOINT GAP. THE ENDPOINT-ADDITION PREDICATE
+> STAYS TERMINAL AT ENTRY 12.** Entries 1-12 are one class — a static or local
+> endpoint read as a complete directed dynamic value edge. Entry 13 is a
+> LIFETIME/ORDERING class: nothing is missing at either endpoint, and there is
+> nothing left to add an endpoint to. **Do not stretch the 1-12 predicate to
+> cover it, and do not answer it by adding another endpoint** — that is the move
+> the first twelve stops exhausted.
 
 > **ENTRIES 5 AND 11 ARE THE STALE-ENTRY LESSON, NOT JUST TWO STOPS.** The
 > inventory was left stale at entry 5 while stops 6-10 accumulated, so the frame
@@ -832,7 +908,10 @@ Deliver, as ONE atomic increment, the route-specific repair UPSTREAM of ordinary
   and body read, then repair the FIRST graph-authorized edge where it fails to
   arrive, so both admitted programs green the exact `InvalidOffset`.
 
-> ## HS13 (`evt_59t7b49m41z8m`) — **D0-ONLY**. D3A/D3B NOT AUTHORIZED.
+> ## HS13 RESTATED IN THE OBJECTIVE — **D0-ONLY**. D3A/D3B NOT AUTHORIZED.
+>
+> **The operative HS13 banner is at the TOP of this file** (`evt_59t7b49m41z8m`);
+> this is a restatement in place, not a second authority.
 >
 > **Everything below describing D3A/D3B as the deliverable states the TARGET, not
 > the authorized work.** The only authorized phase is the D0 return-boundary
@@ -1220,10 +1299,17 @@ transitively into the capture, or re-derive the inheritance relation in lowering
     Direct declared target, so a source record, a capture projection and a
     declared target do not exist there to validate.** Requiring them of Tail
     re-creates the HS10 demand for a Direct transport.
-  - **`TailProducerToBackedge` fail-closed condition.** If the typed
-    producer/route pair does not REACH its exact active jump, or is not consumed
-    there EXACTLY ONCE — HARD-STOP. That is the whole Tail condition; nothing
-    about transport, projection, or target enters it.
+  - **`TailProducerToBackedge` fail-closed condition — TARGET-ONLY, and
+    CONDITIONAL ON WHATEVER MECHANISM D0 ESTABLISHES.** The exact produced
+    operand and an agreeing later route must REACH the exact active jump and be
+    consumed there EXACTLY ONCE; failing either is a HARD-STOP. **Do not state
+    this as an already-formed typed producer/route pair, and do not select its
+    carrier here.** HS13 (`evt_59t7b49m41z8m`) is precisely the finding that no
+    such pair exists at the producer — the route does not yet exist there and the
+    result-bearing type is erased in between — so a condition phrased over a
+    formed pair is unsatisfiable as written and presumes the mechanism D0 is
+    authorized to determine. Nothing about transport, projection, or target
+    enters this condition.
   - Under EITHER arm: do NOT add a second identity catalog, ABI lane, raw cast,
     environment search, or family-specific fallback.
 - **D3B (result-flow localization then single-edge repair — the coupled atomic
@@ -1284,6 +1370,41 @@ transitively into the capture, or re-derive the inheritance relation in lowering
 
 ## Acceptance criteria
 
+> **THE ONLY CRITERIA IN SCOPE FOR THE AUTHORIZED TURN ARE THE TWO
+> `AC-HS13-D0-*` ENTRIES IMMEDIATELY BELOW.** Everything after them governs the
+> eventual D3 increment and is NOT satisfiable at D0. **The Architect reviews
+> the D0 report; Runtime QA stays UNROUTED, because D0 lands no production.**
+
+- **`AC-HS13-D0-CLOSURE` (HS13, `evt_59t7b49m41z8m`) — the seam and caller
+  closure is proved CLOSED, structurally, and NOT by a grep roster.** On both
+  unchanged admitted products, deliver a ledger naming every exact
+  `RoutedAnswer` -> `LoweringOperand` shrink seam on the natural path, that
+  seam's input and output types, EVERY caller of it, and each caller's
+  disposition. **A name list is not a closure proof.** The instrument must be
+  compiler-backed, so that an OMITTED caller is a build ERROR rather than a
+  silent absence — the observation has to differ when the claim is false. One
+  acceptable instrument: a disposable private result wrapper that is neither
+  `Copy` nor `Clone` and exposes no bare-operand conversion, so every surviving
+  extraction site must be named to compile. **An equivalent instrument is
+  acceptable only if the report NAMES the false appearance it rules out.** The
+  completed measured closure must build green under the TARGETED affected builds
+  only (`scripts/ken-cargo -p <crate>` / `--test <name>`; never `--workspace`).
+  Record the diff and log hashes, then byte-restore: the wrapper is measurement
+  scaffolding and lands nothing.
+- **`AC-HS13-D0-AFFINE` (HS13, `evt_59t7b49m41z8m`) — the affine feasibility
+  answer is two-sided, and its NO is as much a delivered result as its YES.**
+  Report **YES** only if ALL of the following hold across the closure
+  `AC-HS13-D0-CLOSURE` measured: every pending `Produced`/`Routed` path remains
+  owned; no path can extract a bare `LoweringOperand`; ordinary/direct is an
+  explicit exhaustive variant rather than a fallthrough; the exact producer
+  identity is CHECKED when the later route arrives, not assumed from position or
+  proximity; and one-shot consumption at the active jump is expressible without
+  any mechanism on the rejection list in Phase structure. Report **NO** with the
+  FIRST exact seam and caller that forces a general composed-lowering redesign.
+  **A NO is HS14 — a clean stop routed to the Architect, and a successful D0
+  outcome rather than a failed turn.** Reporting YES on a closure that was not
+  measured closed under `AC-HS13-D0-CLOSURE` is the failure this pair exists to
+  prevent.
 - **`AC-TAIL-TRANSFER-CONTROLS` (HS12, `evt_7a6pp8n24r1ms`) — the controls must
   discriminate the NEW EDGE, not the endpoints it connects.**
 
@@ -1504,6 +1625,13 @@ transitively into the capture, or re-derive the inheritance relation in lowering
 
 ## Reviewers
 
+> **FOR THE AUTHORIZED TURN (D0, HS13 `evt_59t7b49m41z8m`): the ARCHITECT
+> reviews the D0 report against `AC-HS13-D0-CLOSURE` and `AC-HS13-D0-AFFINE`,
+> and RUNTIME QA IS NOT ROUTED — D0 lands no production, so there is no
+> candidate to gate.** A D0 NO is HS14 and routes to the Architect as a clean
+> stop. **Everything below is the review contract for the eventual D3A+D3B
+> candidate and is NOT in scope now.**
+
 Architect (D2 reworded reachability introduces no application/result and no
 spelling/ABI/family/trap/field-count/index authority; D3A applies the inherited
 `K` at the exact recursively-exposed invocation supplied by the predecessor's
@@ -1637,9 +1765,12 @@ four-value closure fold follow; the D1 follow-up
 [[RT-CHECKED-SUCCESSOR-EMIT-REACHABILITY]] is sequenced after this node on the
 single Runtime ring (ring contention, no logical dependency). PX8 stays blocked
 until the whole native carried-value program lands. Single Runtime lane object
-at a time. **Operative inventory state: entries 1-12, TERMINAL under HS12
-(`evt_7a6pp8n24r1ms`) — stop 12 ends the endpoint series, and entry 12 is the
-live symptom (both endpoints present, the directed edge between them absent).**
+at a time. **Operative inventory state: entries 1-13. The ENDPOINT-ADDITION
+predicate is TERMINAL at entry 12 under HS12 (`evt_7a6pp8n24r1ms`) — stop 12
+ends the endpoint series. Entry 13 (HS13, `evt_59t7b49m41z8m`) is the LIVE
+symptom and is a DIFFERENT class: lifetime/ordering, with the result-bearing
+type erased at an intervening Rust return boundary before the consumer route
+exists.**
 Earlier fold hashes (`529f21c43e1c0c5257d2f7898481aaa3dc3a0429`, entries 1-4;
 `244b2468afd4f0cd06837fd3079f291d7d330af5`, entry 5) are HISTORY and are not the
 current inventory.
