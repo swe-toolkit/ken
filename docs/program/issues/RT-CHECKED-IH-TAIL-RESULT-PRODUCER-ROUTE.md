@@ -1,19 +1,51 @@
 ---
 id: RT-CHECKED-IH-TAIL-RESULT-PRODUCER-ROUTE
 title: "Replace the Tail variant of the fresh-result route with one whose SOURCE endpoint is the actual result-producing operation after the checked computation returns. HS11 ruling evt_79trx05xee0dj established that the landed TailResumedRetInput certifies the INITIAL CARRIED SEED as though it were fresh R2: source.rs:4512-4515 returns the carried residual unchanged, source.rs:2148-2150 records that same word.word as a source result, and core.rs:12218-12233 then :12615-12621/:12636-12640 carry the identical scrutinee into the active header, the Ret case environment and the Ret input. The certified pairing is therefore exact SSA identity from seed to sink, not a value edge -- the observer renamed its input. This node starts with D0 ONLY: name the actual producer on the natural emitted path, prove its provenance is DISTINCT from the seed, and pair it forward. Preserve DirectInvocationReturn unchanged; the initial CheckedIhCapturedEnvironment word becomes an explicit NEGATIVE CONTROL, never the source. Replace, do not extend -- no sibling authority."
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none
 tier: T1
 depends_on: [RT-CHECKED-IH-FRESH-RESULT-ROUTE]
-blocks: [RT-RESULT-CONTINUATION-BINDING-PROVENANCE]
+blocks: []
 github: null
 origin: "Architect hard-stop-11 ruling evt_79trx05xee0dj, 2026-08-28 (thr_725bmt2m6sv9s), bound to amended release 24c14f4dacbcdf6789952f7a9d3f75155b310e64 / tree 36abd930d5acd2a8ab84141f422bd7bc795a5074 / frame blob 492235777030f4f12083f0de883efe008e1aa0af / spec-42 blob 69b9d6d267ba20235f42972865c2b20504531d62. The ruling accepted the HS11 D0 measurements (four Tail rows, one Direct row; the static/emitted Tail source-active-header-Ret-input pairing still passes; the Direct-only authorized implementation compiles; both admitted products remain the exact ResourceBodyResult defaults) and the linked-artifact observation that the final unit frame carries 0x0e09 while 0x1109/0x1209 are separately live. It then ruled the sharper conclusion: the landed Tail route certifies the carried seed as though it were fresh R2, so TailResumedRetInput is WITHDRAWN as fresh-result value authority while its destination topology, active-header identity and Ret binder identity remain useful facts. Explicitly NOT a sibling authority: the existing fresh-result-route predecessor is recut by replacement. No Decision object is required -- the ruling follows deductively from the exact source path and the runtime value observation. Steward-owned recut and release sequencing per the ruling's closing instruction. Steward-filed per COORDINATION section 2."
 ---
 
-> # THIS NODE EXISTS BECAUSE AN ENDPOINT PAIRING WAS REAL AND PAIRED THE WRONG
-> # VALUE. Read that sentence before designing anything.
+> # CLOSED — SUBSUMED INTO [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] AT
+> # HARD STOP 12, `evt_7a6pp8n24r1ms` (2026-08-28)
+>
+> **This node is HISTORY. Do not pick it up, do not release it, and do not treat
+> anything below as a live contract.** It is retained for its D0 evidence and its
+> hard-stop record, which the Architect directed be preserved.
+>
+> **ITS D0 SUCCEEDED, AND THAT IS WHY IT CLOSED RATHER THAN FAILING.** D0 named a
+> real compiler-visible fresh-result producer, provenance-distinct from the seed:
+> the continuation-specialization call at `calls.rs:2022`, its Result-slot load at
+> `:2120`, and `RoutedAnswer::checked(returned)` at `source.rs:4369-4374`. On all
+> four natural Tail rows the value is then discarded — the bodyless recursor arm
+> at `source.rs:4478-4515` constructs a new `RoutedAnswer::direct(Carried(word))`
+> from the seed, and that seed alone becomes the active-jump argument and then the
+> header/Ret input. Read rows 301/511 and write rows 525/314 dynamically
+> distinguish producer, jump seed, and header value. **HARD STOP 12
+> (`evt_4av4pckhtjd3f`): both true endpoints present, the directed edge between
+> them absent.** Bounded prior-art advisory `evt_4v1wg8hb4zxtm` returned a
+> confident negative — no known technique manufactures that edge from the
+> endpoints.
+>
+> **WHY IT WAS SUBSUMED RATHER THAN RECUT, and this is the part worth carrying:**
+> the missing edge IS the semantic Tail repair. Changing the active predecessor
+> operand changes the Ret input, the capture, and the body result — so **a node
+> that landed this first would either be behaviourally inert, and therefore not
+> the repair, or would break the products it landed ahead of.** It belongs inside
+> the already-atomic D3A+D3B increment. Removed from that node's `depends_on`
+> rather than left as a sibling authority.
+>
+> **The live contract is the HS12 OPERATIVE banner and the D3A Tail-value-transfer
+> bullet in [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]]. Read those, not this.**
+
+> # HISTORY BELOW — THIS NODE EXISTS BECAUSE AN ENDPOINT PAIRING WAS REAL AND
+> # PAIRED THE WRONG VALUE.
 >
 > The landed `TailResumedRetInput` is not broken in the way a missing relation is
 > broken. It certifies a genuine, exact, forward pairing — and both of its
