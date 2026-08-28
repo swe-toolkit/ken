@@ -951,10 +951,18 @@ fn fok_validate_certificate
       }
   }
 
--- The `ForallRight` guard: shared by both `FokForallWorld`/`FokForallObj`
--- targets (Rust's single `Form::ForallWorld(b) | Form::ForallObj(b) => b`
--- arm) -- freshness, then exactly-one-child, then recurse on the
--- instantiated child sequent.
+-- The `ForallRight` freshness/child guard -- freshness, then
+-- exactly-one-child, then recurse on the instantiated child sequent. It is
+-- SHARED by both binder kinds and the World-vs-Object distinction lives
+-- elsewhere: `fok_check_rule` dispatches `FokForallWorld` and `FokForallObj`
+-- targets to SEPARATE arms (mirroring Rust's now-split
+-- `Form::ForallWorld(b) => b` and `Form::ForallObj(b) => b` arms of
+-- `check_tree_structural`, `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` `D1`), and
+-- the eigenparameter's SORT is demanded per binder kind by the separate
+-- derived-sort validation pass (`fok_validate_forall_eigen`). This guard runs
+-- on the structural side with sortedness already established, so it is
+-- sort-agnostic: freshness and the single-child recurrence are identical for a
+-- world eigen and an object eigen.
 fn fok_check_forall_right
       (conclusion : FokSequent) (gamma : List FokForm) (delta : List FokForm)
       (right : Nat) (eigen : FokQTerm) (body : FokForm) (children : List FokCert)
