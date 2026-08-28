@@ -1,14 +1,29 @@
 //! `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` `AC-3`/`AC-6`: wrong-sort refusal
 //! controls, each paired with a near-identical accepted certificate.
 //!
-//! Promise class: durable invariant. Each row asserts the Ken checker
-//! `fok_check_tree` REFUSES a certificate whose only defect is a sort error at
-//! one named INJECTION POINT, and ACCEPTS a certificate that differs only in
-//! that one coordinate (`AC-6`, so the refusal is not an artefact of an
-//! unrelated malformed tree). The injection points are distinct source
-//! coordinates even where their English effect overlaps ("a world term where an
-//! object term belongs"): the eigen slot of a `FokForallObj`/`FokForallWorld`
-//! node, an atom's argument role, and a bound index beyond its binder depth.
+//! Promise class: durable invariant. Two distinct guarantees, kept separate.
+//!
+//! PUBLIC DIRECT REFUSAL (unmodified `fok_check_tree`, every row). The checker
+//! REFUSES the bad certificate and ACCEPTS a near-identical one differing only
+//! at the named injection point (`AC-6`, so the refusal is not an inert-checker
+//! artefact). The injection points are distinct source coordinates even where
+//! their English effect overlaps ("a world term where an object term belongs"):
+//! the eigen slot of a `FokForallObj`/`FokForallWorld` node, an atom's argument
+//! role, and a bound index beyond its binder depth. This public assertion does
+//! NOT claim the bad tree has ONLY a sort defect.
+//!
+//! The malformed-atom and out-of-scope rows ARE single-guard (a sort/scope
+//! error, no eigen). The wrong-sort EIGEN rows are OVER-DETERMINED: reusing a
+//! parameter as the eigen makes it non-fresh as well as wrong-sorted, so the
+//! public refusal alone cannot say which guard fired.
+//!
+//! TWO-STAGE SORT ISOLATION (eigen rows only, by mutation, after the public
+//! assertion). To attribute the eigen refusal to the sort guard specifically:
+//! (1) neutralize the freshness predicate but keep the sort check LIVE -- the
+//! cert STILL rejects, so the sort guard is an independent cause; (2) neutralize
+//! freshness AND collapse `fok_derived_sort_eq` -- the same cert ACCEPTS, so the
+//! sort guard was the sole surviving cause. Freshness is neutralized only for
+//! this isolation proof.
 //!
 //! These pair with the Rust-surface refusals exercised by the in-crate
 //! `fo_kripke` unit tests; `AC-1`'s embedded refuting certificate is exercised
@@ -56,13 +71,34 @@ fn fok_derived_sort_eq (a : FokDerivedSort) (b : FokDerivedSort) : Bool =
 const SORT_EQ_COLLAPSED: &str =
     "fn fok_derived_sort_eq (a : FokDerivedSort) (b : FokDerivedSort) : Bool = True";
 
-fn sort_collapsed_source() -> String {
+/// Mutation: neutralize the EXACT freshness predicate by making
+/// `fok_sequent_mentions_parameter` return the constant `False`, so no eigen is
+/// ever "mentioned" and the freshness guard always passes. Independent of the
+/// sort check, so the two can be applied together or separately.
+const FRESHNESS_PREDICATE_BODY: &str =
+    "      fok_or (fok_list_form_any_mentions gamma target) (fok_list_form_any_mentions delta target)";
+const FRESHNESS_PREDICATE_NEUTERED: &str = "      False";
+
+fn with_sort_collapsed(source: &str) -> String {
     assert_eq!(
-        FOK_SOURCE.matches(SORT_EQ_ORIG).count(),
+        source.matches(SORT_EQ_ORIG).count(),
         1,
         "fok_derived_sort_eq anchor must occur exactly once -- re-measure if the source moved"
     );
-    FOK_SOURCE.replace(SORT_EQ_ORIG, SORT_EQ_COLLAPSED)
+    source.replace(SORT_EQ_ORIG, SORT_EQ_COLLAPSED)
+}
+
+fn with_freshness_neutralized(source: &str) -> String {
+    assert_eq!(
+        source.matches(FRESHNESS_PREDICATE_BODY).count(),
+        1,
+        "freshness predicate anchor must occur exactly once -- re-measure if the source moved"
+    );
+    source.replace(FRESHNESS_PREDICATE_BODY, FRESHNESS_PREDICATE_NEUTERED)
+}
+
+fn sort_collapsed_source() -> String {
+    with_sort_collapsed(FOK_SOURCE)
 }
 
 /// True iff the checker verdict `Equal Bool (fok_check_tree sequent cert)
@@ -104,9 +140,13 @@ fn assert_wrong_sort_pair(
 }
 
 // Shared pieces. A ForallRight certificate over one binder, whose single child
-// closes by `Init` on the trailing `FokBottom`. The body names no `FokQBound 0`,
-// so `subst0` is a no-op and the child matches any eigen; the reject variants
-// therefore fail on SORT (the eigen slot), not on a child-shape mismatch.
+// closes by `Init` on the trailing `FokBottom`. The single child is built with
+// the SAME `eigen_ix` the rule carries, so the COHERENT child substitution
+// belongs to the eigen coordinate: `child_delta = subst0(body, FokQParameter
+// eigen_ix)` is exactly what the checker recomputes for that eigen, so the child
+// matches by construction. A reject variant therefore fails on the eigen's SORT
+// or on FRESHNESS -- never on a child-shape mismatch -- which is what lets the
+// two-stage isolation below attribute the refusal to a specific guard.
 fn forall_cert(forall_ctor: &str, body: &str, eigen_ix: &str) -> (String, String) {
     let gamma = "Cons FokForm FokBottom (Nil FokForm)";
     let delta = format!("Cons FokForm ({forall_ctor} ({body})) (Cons FokForm FokBottom (Nil FokForm))");
@@ -121,39 +161,90 @@ fn forall_cert(forall_ctor: &str, body: &str, eigen_ix: &str) -> (String, String
     (sequent, cert)
 }
 
-#[test]
-fn world_eigen_into_object_binder_is_refused() {
-    // Object body: ForcingP(World=param1, Object=bound0). The sort-correct eigen
-    // is a fresh OBJECT parameter (2). Injection point: the eigen slot of the
-    // FokForallObj node -- reusing parameter 1 there asks the OBJECT binder to
-    // take the parameter the world slot fixed as WORLD.
-    let body = "FokForcingP (FokQParameter (Suc Zero)) (FokQBound Zero)";
-    let (accept_seq, accept_cert) = forall_cert("FokForallObj", body, "Suc (Suc Zero)");
-    let (reject_seq, reject_cert) = forall_cert("FokForallObj", body, "Suc Zero");
-    assert_wrong_sort_pair(
-        "world_eigen_into_object_binder",
-        &accept_seq,
-        &accept_cert,
-        &reject_seq,
-        &reject_cert,
+/// Public direct refusal PLUS two-stage SORT-isolation for a wrong-sort EIGEN
+/// certificate.
+///
+/// The unmodified checker's public verdict is asserted first: the bad
+/// certificate is REFUSED and not accepted. That is a refusal claim only -- the
+/// tree is OVER-DETERMINED (reusing parameter `1`, which the body fixes to the
+/// wrong sort, as the eigen makes it both wrong-sorted AND non-fresh), so the
+/// public `= False` cannot say WHICH guard rejected it. The two stages then
+/// isolate the sort guard by measurement:
+///   - Stage 1: neutralize the freshness predicate but keep the sort check LIVE.
+///     The certificate STILL rejects -- so the sort guard is an independent
+///     cause, not merely masked by freshness. Freshness is neutralized here
+///     ONLY for the isolation proof.
+///   - Stage 2: neutralize freshness AND collapse `fok_derived_sort_eq`. The
+///     SAME certificate now ACCEPTS -- confirming the sort guard was the sole
+///     surviving discriminator (no third guard rejects it).
+/// The lawful control (a fresh, correctly-sorted parameter `2` eigen) is kept
+/// and accepted unmutated, so the refusals are not an inert-checker artefact.
+fn assert_wrong_sort_eigen_isolated(label: &str, forall_ctor: &str, body: &str) {
+    // Lawful control: fresh, correctly-sorted eigen (parameter 2), accepted.
+    let (ok_seq, ok_cert) = forall_cert(forall_ctor, body, "Suc (Suc Zero)");
+    let mut env = mk_env();
+    assert!(
+        verdict_is(&mut env, &format!("{label}_lawful_accepts"), &ok_seq, &ok_cert, "True"),
+        "{label}: the lawful fresh correctly-sorted eigen certificate must be ACCEPTED"
+    );
+
+    // The wrong-sort eigen certificate: parameter 1, fixed to the wrong sort by
+    // the body and non-fresh because it occurs there.
+    let (bad_seq, bad_cert) = forall_cert(forall_ctor, body, "Suc Zero");
+
+    // Public direct refusal on the UNMODIFIED checker, in separate environments.
+    // The unmodified `fok_check_tree` refuses the bad certificate and does not
+    // accept it. This asserts refusal only -- NOT that the sole cause is sort
+    // (the tree is over-determined); the two stages below make that attribution.
+    let mut env_pub_reject = mk_env();
+    assert!(
+        verdict_is(&mut env_pub_reject, &format!("{label}_public_rejects"), &bad_seq, &bad_cert, "False"),
+        "{label}: the unmodified checker must REFUSE the wrong-sort eigen certificate"
+    );
+    let mut env_pub_not_accept = mk_env();
+    assert!(
+        !verdict_is(&mut env_pub_not_accept, &format!("{label}_public_not_accepted"), &bad_seq, &bad_cert, "True"),
+        "{label}: the unmodified checker must not also accept it"
+    );
+
+    // Stage 1: freshness neutralized, sort LIVE -> still rejects.
+    let mut env1 = env_for(&with_freshness_neutralized(FOK_SOURCE));
+    assert!(
+        verdict_is(&mut env1, &format!("{label}_stage1_sort_rejects"), &bad_seq, &bad_cert, "False"),
+        "{label}: with freshness neutralized and the sort check live, the wrong-sort eigen \
+         certificate must STILL REJECT -- the sort guard rejects it independently of freshness"
+    );
+
+    // Stage 2: freshness neutralized AND sort collapsed -> same cert accepts.
+    let mut env2 = env_for(&with_sort_collapsed(&with_freshness_neutralized(FOK_SOURCE)));
+    assert!(
+        verdict_is(&mut env2, &format!("{label}_stage2_accepts"), &bad_seq, &bad_cert, "True"),
+        "{label}: with BOTH freshness and the sort check neutralized, the SAME certificate must \
+         ACCEPT -- confirming the sort guard was the sole surviving cause of the refusal"
     );
 }
 
 #[test]
-fn object_eigen_into_world_binder_is_refused() {
-    // World body: ForcingP(World=bound0, Object=param1). The sort-correct eigen
-    // is a fresh WORLD parameter (2). Injection point: the eigen slot of the
-    // FokForallWorld node -- reusing parameter 1 asks the WORLD binder to take
-    // the parameter the object slot fixed as OBJECT.
-    let body = "FokForcingP (FokQBound Zero) (FokQParameter (Suc Zero))";
-    let (accept_seq, accept_cert) = forall_cert("FokForallWorld", body, "Suc (Suc Zero)");
-    let (reject_seq, reject_cert) = forall_cert("FokForallWorld", body, "Suc Zero");
-    assert_wrong_sort_pair(
+fn world_eigen_into_object_binder_is_refused_by_the_sort_guard() {
+    // Object body: ForcingP(World=param1, Object=bound0). Injection point: the
+    // eigen slot of the FokForallObj node -- reusing parameter 1 asks the OBJECT
+    // binder to take the parameter the world slot fixed as WORLD.
+    assert_wrong_sort_eigen_isolated(
+        "world_eigen_into_object_binder",
+        "FokForallObj",
+        "FokForcingP (FokQParameter (Suc Zero)) (FokQBound Zero)",
+    );
+}
+
+#[test]
+fn object_eigen_into_world_binder_is_refused_by_the_sort_guard() {
+    // World body: ForcingP(World=bound0, Object=param1). Injection point: the
+    // eigen slot of the FokForallWorld node -- reusing parameter 1 asks the
+    // WORLD binder to take the parameter the object slot fixed as OBJECT.
+    assert_wrong_sort_eigen_isolated(
         "object_eigen_into_world_binder",
-        &accept_seq,
-        &accept_cert,
-        &reject_seq,
-        &reject_cert,
+        "FokForallWorld",
+        "FokForcingP (FokQBound Zero) (FokQParameter (Suc Zero))",
     );
 }
 
@@ -227,11 +318,12 @@ fn collapsing_the_sort_check_reddens_the_wrong_sort_controls() {
          proving the refusal was caused by the sort check"
     );
 
-    // The malformed-atom certificate is the clean target here: its `Init` closes
-    // structurally, so the ONLY reason the checker refuses it is the sort clash.
-    // The wrong-sort EIGEN controls are deliberately NOT reused for this
-    // mutation -- reusing a parameter as an eigen makes it non-fresh as well as
-    // wrong-sorted, so the freshness guard still refuses them after the sort
-    // check is collapsed (that entanglement is exactly why AC-FRESHNESS-ISOLATED
-    // uses a Bound-0-free, well-sorted body instead).
+    // The malformed-atom certificate is the clean SINGLE-guard target here: its
+    // `Init` closes structurally and no eigen is involved, so the ONLY reason the
+    // checker refuses it is the sort clash, and collapsing the sort check alone
+    // flips it. The wrong-sort EIGEN certificates are over-determined (wrong-sort
+    // AND non-fresh), so they get the TWO-stage isolation above
+    // (`assert_wrong_sort_eigen_isolated`): neutralize freshness to expose that
+    // the sort guard rejects them independently, then collapse the sort check to
+    // confirm it was the sole surviving cause.
 }
