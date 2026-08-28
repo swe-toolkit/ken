@@ -189,6 +189,10 @@ const RETAINED_UNIT_CALL_TARGET_MUTATION_CHILD: &str =
     "KEN_RT_RETAINED_UNIT_CALL_TARGET_MUTATION_CHILD";
 
 #[cfg(target_os = "linux")]
+const RETAINED_RESULT_CLOSURE_PROOF_MUTATION_CHILD: &str =
+    "KEN_RT_RETAINED_RESULT_CLOSURE_PROOF_MUTATION_CHILD";
+
+#[cfg(target_os = "linux")]
 fn assert_retained_unit_call_target_mutation_child() {
     use ken_runtime::RetainedUnitCallTargetMutation as Mutation;
 
@@ -242,12 +246,103 @@ fn assert_retained_unit_call_target_mutation_child() {
 }
 
 #[cfg(target_os = "linux")]
+fn assert_retained_result_closure_proof_mutation_child() {
+    use ken_runtime::RetainedResultClosureProofMutation as Mutation;
+
+    let mode = std::env::var(RETAINED_RESULT_CLOSURE_PROOF_MUTATION_CHILD)
+        .expect("retained result-closure proof mutation child mode");
+    let (mutation, expected) = match mode.as_str() {
+        "exact" => (Mutation::Exact, None),
+        "missing" => (
+            Mutation::DropTypedOccurrence,
+            Some("proof population omits an exact typed occurrence"),
+        ),
+        "duplicate" => (
+            Mutation::DuplicateTypedOccurrence,
+            Some("proof population duplicates an exact typed occurrence"),
+        ),
+        "wrong-owner" => (
+            Mutation::SubstituteEveryOtherOwner,
+            Some("proof changes the exact emission owner"),
+        ),
+        "wrong-body" => (
+            Mutation::SubstituteEveryOtherBody,
+            Some("proof changes the exact closure body"),
+        ),
+        "wrong-field" => (
+            Mutation::SubstituteEveryOtherField,
+            Some("proof changes the exact result constructor field"),
+        ),
+        "wrong-generated-target" => (
+            Mutation::SubstituteEveryOtherTarget,
+            Some("proof changes the exact generated continuation target"),
+        ),
+        "permuted-captures" => (
+            Mutation::PermuteCaptureOrder,
+            Some("proof changes the exact positional capture run"),
+        ),
+        "widened-population" => (
+            Mutation::WidenToEveryOtherCapturedClosure,
+            Some("proof population widens beyond an exact typed occurrence"),
+        ),
+        "missing-static-body-call-edge" => (
+            Mutation::DropExactStaticBodyCallEdge,
+            Some("proof has no unique exact static-body call edge"),
+        ),
+        "suppressed-result-authorization" => (
+            Mutation::SuppressResultAuthorizationArm,
+            Some("a closure cannot cross the boundary"),
+        ),
+        other => panic!("unknown retained result-closure proof mutation: {other}"),
+    };
+    let dir = tempfile::Builder::new()
+        .prefix("ken-px8f-retained-result-closure-control-")
+        .tempdir()
+        .unwrap();
+    let result = ken_runtime::with_retained_result_closure_proof_mutation(mutation, || {
+        ken_cli::build_native_program(
+            WRITE_ALL,
+            ken_cli::SourceFormat::Ken,
+            "px8f_write_all_retained_result_closure_control",
+            dir.path(),
+        )
+    });
+    match expected {
+        None => {
+            result.expect("the exact typed retained result-closure proof must compile");
+            assert_eq!(
+                ken_runtime::retained_result_closure_proof_mutation_applied(),
+                0,
+                "the exact positive must not perturb the proof population"
+            );
+        }
+        Some(expected) => {
+            let error = result.expect_err("a malformed retained result-closure proof compiled");
+            let rendered = format!("{error:?}");
+            assert!(
+                rendered.contains(expected),
+                "{mode}: mutation missed intended refusal; error:\n{rendered}"
+            );
+            assert!(
+                ken_runtime::retained_result_closure_proof_mutation_applied() > 0,
+                "{mode}: no exact retained-result relation or consumer was changed"
+            );
+            eprintln!("{mode}: {rendered}");
+        }
+    }
+    assert!(
+        ken_runtime::retained_result_closure_proof_mutation_is_exact(),
+        "{mode}: scoped retained result-closure proof mutation did not restore"
+    );
+}
+
+#[cfg(target_os = "linux")]
 /// Promise class: durable invariant. The native run and interpreter must agree
 /// on the ordered short-write observations required by runtime evaluation
 /// (`spec/40-runtime/42-evaluation.md` section 6.2 and
 /// `spec/40-runtime/45-native-backend.md` section 4).
 #[test]
-#[ignore = "RT-RETAINED-UNIT-RESULT-CLOSURE-REPRESENTATION: retained-unit target derivation succeeds; post-call constructor composition next refuses the result closure representation"]
+#[ignore = "RT-RESULT-CONTINUATION-BINDING-PROVENANCE: retained result-closure representation succeeds; the existing D3 frontier next returns a CheckedIhCapturedEnvironment where fresh R2 belongs"]
 fn linked_checked_write_all_observes_short_progress_and_matches_interpreter() {
     std::thread::Builder::new()
         .name("px8f-write-all".to_string())
@@ -321,11 +416,117 @@ fn retained_unit_call_target_controls_reject_malformed_derivations() {
 }
 
 #[cfg(target_os = "linux")]
+/// Promise class: durable invariant. The admitted proof population is exactly
+/// the planner's typed continuation-result relation for this occurrence, and
+/// its capture run is positional (`spec/40-runtime/45-native-backend.md`
+/// sections 3.2 and 7).
+///
+/// MEASURED: the same real px8f compile accepts the exact population, while
+/// dropping, duplicating, substituting real neighboring owner/body/field/target
+/// rows, permuting the real capture run, widening to every other captured
+/// lexical occurrence, dropping the exact downstream call edge, or suppressing
+/// the caller's exact result arm reaches a distinct production refusal.
+/// CLAIMED: only the exact result/constructor/field/closure/body/capture/target
+/// tuple and its joined static call edge may acquire the existing M4 environment
+/// representation, and the result arm is causally necessary: its result-derived
+/// record cannot borrow either weaker M4 authorization.
+/// THE GAP: numeric coordinates below establish that each population mutation
+/// reached D0's exact fixture row; they select no authority and are never inputs
+/// to production derivation.
+#[test]
+fn retained_result_closure_proof_controls_are_exact_and_positional() {
+    let cases = [
+        ("exact", None),
+        (
+            "missing",
+            Some("proof population omits an exact typed occurrence"),
+        ),
+        (
+            "duplicate",
+            Some("proof population duplicates an exact typed occurrence"),
+        ),
+        (
+            "wrong-owner",
+            Some("proof changes the exact emission owner"),
+        ),
+        ("wrong-body", Some("proof changes the exact closure body")),
+        (
+            "wrong-field",
+            Some("proof changes the exact result constructor field"),
+        ),
+        (
+            "wrong-generated-target",
+            Some("proof changes the exact generated continuation target"),
+        ),
+        (
+            "permuted-captures",
+            Some("proof changes the exact positional capture run"),
+        ),
+        (
+            "widened-population",
+            Some("proof population widens beyond an exact typed occurrence"),
+        ),
+        (
+            "missing-static-body-call-edge",
+            Some("proof has no unique exact static-body call edge"),
+        ),
+        (
+            "suppressed-result-authorization",
+            Some("a closure cannot cross the boundary"),
+        ),
+    ];
+    for (mode, expected) in cases {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "linked_checked_write_all_observes_short_progress_and_matches_interpreter",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env(RETAINED_RESULT_CLOSURE_PROOF_MUTATION_CHILD, mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated retained result-closure proof mutation child");
+        assert!(
+            output.status.success(),
+            "{mode}: mutation child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if let Some(expected) = expected {
+            assert!(
+                stderr.contains(expected),
+                "{mode}: child did not publish intended refusal; stderr:\n{stderr}"
+            );
+            for coordinate in [
+                "construct=StaticOriginId(815)",
+                "field=1",
+                "seat=StaticOriginId(810)",
+                "body=StaticOriginId(800)",
+                "StaticOriginId(809)",
+                "StaticOriginId(801)",
+                "target=ContinuationSpecializationId(3)",
+            ] {
+                assert!(
+                    stderr.contains(coordinate),
+                    "{mode}: mutation did not report D0's exact typed row coordinate {coordinate}; stderr:\n{stderr}"
+                );
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn run_linked_checked_write_all() {
     use std::os::unix::ffi::OsStrExt as _;
 
     if std::env::var_os(RETAINED_UNIT_CALL_TARGET_MUTATION_CHILD).is_some() {
         assert_retained_unit_call_target_mutation_child();
+        return;
+    }
+    if std::env::var_os(RETAINED_RESULT_CLOSURE_PROOF_MUTATION_CHILD).is_some() {
+        assert_retained_result_closure_proof_mutation_child();
         return;
     }
 
@@ -357,6 +558,23 @@ fn run_linked_checked_write_all() {
     .expect("linked checked writeAll runs");
     eprintln!("PX8-F: running interpreter fixture");
 
+    if observation.exit_status != 0 {
+        let frontier = format!(
+            "{:?}",
+            observation
+                .terminal_error
+                .as_ref()
+                .expect("a nonzero linked run must report its terminal error")
+        );
+        assert!(
+            frontier.contains("PatternMatchFailure") && frontier.contains("ResourceBodyResult"),
+            "the represented call stopped at an unnamed frontier: {frontier}"
+        );
+        eprintln!(
+            "PX8-F: retained result-closure representation advanced to the named D3 frontier: \
+             {frontier}"
+        );
+    }
     assert_eq!(observation.exit_status, 0);
     assert_eq!(observation.terminal_error, None);
     assert_eq!(

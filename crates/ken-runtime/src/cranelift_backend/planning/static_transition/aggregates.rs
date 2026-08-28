@@ -805,6 +805,10 @@ thread_local! {
     static GENERATED_ENTRY_ADMISSION_MUTATION:
         Cell<CheckedIhGeneratedEntryAdmissionMutation> =
             const { Cell::new(CheckedIhGeneratedEntryAdmissionMutation::Exact) };
+    static RETAINED_RESULT_CLOSURE_PROOF_MUTATION:
+        Cell<RetainedResultClosureProofMutation> =
+            const { Cell::new(RetainedResultClosureProofMutation::Exact) };
+    static RETAINED_RESULT_CLOSURE_PROOF_MUTATION_APPLIED: Cell<usize> = const { Cell::new(0) };
 }
 
 /// Closure-free report of one planner certificate class and its downstream
@@ -888,6 +892,62 @@ pub enum CheckedIhGeneratedEntryAdmissionMutation {
     NonGovernedToGoverned,
     GovernedProjectedCollision,
     NonGovernedProjectedCollision,
+}
+
+/// Mutations for the retained result-closure proof and its final consumer.
+///
+/// Proof-tuple arms change the already-derived typed population before the
+/// unchanged exactness validator consumes it. Alternatives are taken only from
+/// real planner rows: all other issued owners, bodies, constructor fields,
+/// generated targets, or captured lexical occurrences. The downstream arm
+/// removes the exact real static-body call edge after production and before its
+/// unchanged count detector. The suppression arm skips the caller's exact
+/// authorization consumer while leaving the result-derived environment record
+/// and both weaker M4 arms present. No numeric identity is synthesized.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RetainedResultClosureProofMutation {
+    Exact,
+    DropTypedOccurrence,
+    DuplicateTypedOccurrence,
+    SubstituteEveryOtherOwner,
+    SubstituteEveryOtherBody,
+    SubstituteEveryOtherField,
+    SubstituteEveryOtherTarget,
+    PermuteCaptureOrder,
+    WidenToEveryOtherCapturedClosure,
+    DropExactStaticBodyCallEdge,
+    SuppressResultAuthorizationArm,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_retained_result_closure_proof_mutation<T>(
+    mutation: RetainedResultClosureProofMutation,
+    f: impl FnOnce() -> T,
+) -> T {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            RETAINED_RESULT_CLOSURE_PROOF_MUTATION
+                .with(|active| active.set(RetainedResultClosureProofMutation::Exact));
+        }
+    }
+
+    RETAINED_RESULT_CLOSURE_PROOF_MUTATION.with(|active| active.set(mutation));
+    RETAINED_RESULT_CLOSURE_PROOF_MUTATION_APPLIED.with(|count| count.set(0));
+    let _restore = Restore;
+    f()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn retained_result_closure_proof_mutation_is_exact() -> bool {
+    RETAINED_RESULT_CLOSURE_PROOF_MUTATION.with(Cell::get)
+        == RetainedResultClosureProofMutation::Exact
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn retained_result_closure_proof_mutation_applied() -> usize {
+    RETAINED_RESULT_CLOSURE_PROOF_MUTATION_APPLIED.with(Cell::get)
 }
 
 /// Population-side mutations for the generated-entry quotient and its exact
@@ -2989,14 +3049,15 @@ impl StaticTransitionPlan<'_> {
         }))
     }
 
-    /// Resolve an environment descriptor only under one of M4's two exact
-    /// crossing proofs.
+    /// Resolve an environment descriptor only under one of M4's exact crossing
+    /// proofs.
     ///
     /// The original arm is unchanged: the exact owner returns a value graph
-    /// structurally containing this closure occurrence. The second arm is the
-    /// bind-continuation proof: an exact constructor field declares a recursive
-    /// resume, has one static closure-body target, and pairs that field with this
-    /// owner's exact positional environment record. Everything else remains on
+    /// structurally containing this closure occurrence. The bind-continuation
+    /// arm proves an exact recursive response field. The retained-result arm
+    /// consumes an already-issued continuation result edge whose emission owner,
+    /// result constructor, recursive field, closure occurrence, body, and
+    /// capture run all agree with this descriptor. Everything else remains on
     /// the ordinary closure refusal route.
     pub(in crate::cranelift_backend) fn boundary_closure_crossing_environment(
         &self,
@@ -3015,10 +3076,39 @@ impl StaticTransitionPlan<'_> {
             return Ok(None);
         }
         let environment = self.boundary_closure_environment(owner, seat)?;
-        // Second, independent arm. It is checked before result containment so a
-        // closure at a bind response cannot acquire metadata while bypassing the
-        // singleton-target and instance-pairing proof.
+        // Independent result-edge and bind-response arms. A result proof which
+        // names this exact environment is fail-closed: disagreement in any
+        // joined relation is an error, never permission to try the weaker arms.
         if let Some(environment) = environment.as_ref() {
+            let result_proof =
+                boundary_continuation_result_proof_for_environment(self, environment)?;
+            #[cfg(feature = "px8-ds-test-support")]
+            let suppress_result_authorization =
+                RETAINED_RESULT_CLOSURE_PROOF_MUTATION.with(Cell::get)
+                    == RetainedResultClosureProofMutation::SuppressResultAuthorizationArm;
+            #[cfg(not(feature = "px8-ds-test-support"))]
+            let suppress_result_authorization = false;
+            if suppress_result_authorization {
+                #[cfg(feature = "px8-ds-test-support")]
+                RETAINED_RESULT_CLOSURE_PROOF_MUTATION_APPLIED.with(|count| count.set(1));
+            } else {
+                match boundary_continuation_result_authorization(
+                    self,
+                    environment,
+                    result_proof.as_ref(),
+                )? {
+                    BoundaryContinuationResultAuthorization::Authorized => {
+                        return Ok(Some(environment.clone()));
+                    }
+                    BoundaryContinuationResultAuthorization::NotApplicable => {}
+                }
+            }
+            // A continuation-result proof claims this environment exclusively.
+            // If its exact authorization consumer is absent, neither weaker M4
+            // arm may borrow the result-derived record.
+            if result_proof.is_some() {
+                return Ok(None);
+            }
             if boundary_bind_continuation_is_authorized(self, environment)? {
                 return Ok(Some(environment.clone()));
             }
@@ -3827,6 +3917,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
     // that same occurrence is the statically described result or child at a
     // generated-unit edge, and the ordinary Closure refusal remains the
     // fail-closed answer everywhere else.
+    let continuation_result_proofs = boundary_continuation_result_proofs(plan)?;
     for occurrence in plan.source_occurrences.iter().flatten() {
         let RuntimeExpr::LexicalClosure { captures, .. } = occurrence.expr else {
             continue;
@@ -3875,7 +3966,16 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 PlannedAggregateAllocation::PersistentGround,
             )
         };
-        for owner in inline_synthesized_seat_emission_owners(plan, seat)? {
+        let mut owners = inline_synthesized_seat_emission_owners(plan, seat)?;
+        owners.extend(
+            continuation_result_proofs
+                .iter()
+                .filter(|proof| proof.seat == seat)
+                .map(|proof| proof.owner),
+        );
+        owners.sort();
+        owners.dedup();
+        for owner in owners {
             records.push(PlannedAggregateOwnership {
                 id: AggregateOccurrenceId(0),
                 producer: AggregateOccurrenceProducer::SynthesizedUse {
@@ -6278,6 +6378,609 @@ impl StaticTransitionPlan<'_> {
         }
         Ok(access)
     }
+}
+
+/// One already-issued continuation result edge projected onto the exact lexical
+/// closure field whose positional environment may replace the raw closure.
+///
+/// This is an ephemeral read-only join over the existing continuation call,
+/// specialization, source-occurrence, and ABI planes. It is not stored in the
+/// plan and cannot create authority absent from those relations.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct BoundaryContinuationResultProof {
+    owner: ContinuationEmissionOwner,
+    producer_result_origin: StaticOriginId,
+    producer_construct_origin: StaticOriginId,
+    recursive_position: u32,
+    seat: StaticOriginId,
+    body_origin: StaticOriginId,
+    params: Vec<String>,
+    capture_origins: Vec<StaticOriginId>,
+    source_owner: PredeclaredFunctionId,
+    target: ContinuationSpecializationId,
+}
+
+fn validate_boundary_continuation_result_proof_population(
+    expected: &[BoundaryContinuationResultProof],
+    actual: &[BoundaryContinuationResultProof],
+) -> Result<(), CraneliftBackendError> {
+    let mut seen = BTreeSet::new();
+    for proof in actual {
+        if !seen.insert(proof) {
+            return Err(planner_error(
+                "the retained result-closure proof population duplicates an exact typed occurrence",
+            ));
+        }
+        if expected.contains(proof) {
+            continue;
+        }
+        if expected.iter().any(|typed| {
+            BoundaryContinuationResultProof {
+                owner: proof.owner,
+                ..typed.clone()
+            } == *proof
+        }) {
+            return Err(planner_error(
+                "a retained result-closure proof changes the exact emission owner",
+            ));
+        }
+        if expected.iter().any(|typed| {
+            BoundaryContinuationResultProof {
+                body_origin: proof.body_origin,
+                ..typed.clone()
+            } == *proof
+        }) {
+            return Err(planner_error(
+                "a retained result-closure proof changes the exact closure body",
+            ));
+        }
+        if expected.iter().any(|typed| {
+            BoundaryContinuationResultProof {
+                recursive_position: proof.recursive_position,
+                ..typed.clone()
+            } == *proof
+        }) {
+            return Err(planner_error(
+                "a retained result-closure proof changes the exact result constructor field",
+            ));
+        }
+        if expected.iter().any(|typed| {
+            BoundaryContinuationResultProof {
+                target: proof.target,
+                ..typed.clone()
+            } == *proof
+        }) {
+            return Err(planner_error(
+                "a retained result-closure proof changes the exact generated continuation target",
+            ));
+        }
+        if expected.iter().any(|typed| {
+            BoundaryContinuationResultProof {
+                capture_origins: proof.capture_origins.clone(),
+                ..typed.clone()
+            } == *proof
+        }) {
+            return Err(planner_error(
+                "a retained result-closure proof changes the exact positional capture run",
+            ));
+        }
+        return Err(planner_error(
+            "the retained result-closure proof population widens beyond an exact typed occurrence",
+        ));
+    }
+    if expected.iter().any(|proof| !actual.contains(proof)) {
+        return Err(planner_error(
+            "the retained result-closure proof population omits an exact typed occurrence",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn mutate_boundary_continuation_result_proof_population(
+    plan: &StaticTransitionPlan<'_>,
+    proofs: &mut Vec<BoundaryContinuationResultProof>,
+) -> Result<(), CraneliftBackendError> {
+    let mutation = RETAINED_RESULT_CLOSURE_PROOF_MUTATION.with(Cell::get);
+    if mutation == RetainedResultClosureProofMutation::Exact {
+        return Ok(());
+    }
+    if proofs.is_empty() {
+        return Err(planner_error(
+            "the retained result-closure control found no typed occurrence to mutate",
+        ));
+    }
+    for proof in proofs.iter() {
+        eprintln!(
+            "retained-result-closure-control mutation={mutation:?} owner={:?} result={:?} construct={:?} field={} seat={:?} body={:?} captures={:?} target={:?}",
+            proof.owner,
+            proof.producer_result_origin,
+            proof.producer_construct_origin,
+            proof.recursive_position,
+            proof.seat,
+            proof.body_origin,
+            proof.capture_origins,
+            proof.target,
+        );
+    }
+
+    let originals = proofs.clone();
+    let mut applied = 0usize;
+    match mutation {
+        RetainedResultClosureProofMutation::Exact => unreachable!(),
+        RetainedResultClosureProofMutation::DropTypedOccurrence => {
+            applied = proofs.len();
+            proofs.clear();
+        }
+        RetainedResultClosureProofMutation::DuplicateTypedOccurrence => {
+            applied = originals.len();
+            proofs.extend(originals);
+        }
+        RetainedResultClosureProofMutation::SubstituteEveryOtherOwner => {
+            let owners = plan
+                .continuation_calls()?
+                .into_iter()
+                .map(|call| call.emission_owner())
+                .collect::<BTreeSet<_>>();
+            proofs.clear();
+            for proof in &originals {
+                for owner in owners.iter().copied().filter(|owner| *owner != proof.owner) {
+                    let mut substituted = proof.clone();
+                    substituted.owner = owner;
+                    proofs.push(substituted);
+                    applied += 1;
+                }
+            }
+        }
+        RetainedResultClosureProofMutation::SubstituteEveryOtherBody => {
+            let bodies = plan
+                .emittable_units()?
+                .into_iter()
+                .filter_map(|unit| {
+                    matches!(
+                        unit.definition(),
+                        AbiUnitDefinition::ClosureBody {
+                            provenance: AbiCaptureProvenance::Lexical,
+                            ..
+                        }
+                    )
+                    .then_some(unit.body_occurrence())
+                })
+                .collect::<BTreeSet<_>>();
+            proofs.clear();
+            for proof in &originals {
+                for body in bodies
+                    .iter()
+                    .copied()
+                    .filter(|body| *body != proof.body_origin)
+                {
+                    let mut substituted = proof.clone();
+                    substituted.body_origin = body;
+                    proofs.push(substituted);
+                    applied += 1;
+                }
+            }
+        }
+        RetainedResultClosureProofMutation::SubstituteEveryOtherField => {
+            proofs.clear();
+            for proof in &originals {
+                for (position, _) in plan
+                    .semantic
+                    .child_origins(proof.producer_construct_origin)?
+                    .iter()
+                    .enumerate()
+                    .filter(|(position, _)| *position != proof.recursive_position as usize)
+                {
+                    let mut substituted = proof.clone();
+                    substituted.recursive_position = position as u32;
+                    proofs.push(substituted);
+                    applied += 1;
+                }
+            }
+        }
+        RetainedResultClosureProofMutation::SubstituteEveryOtherTarget => {
+            let targets = plan
+                .continuation_units()?
+                .into_iter()
+                .map(|unit| unit.id())
+                .collect::<BTreeSet<_>>();
+            proofs.clear();
+            for proof in &originals {
+                for target in targets
+                    .iter()
+                    .copied()
+                    .filter(|target| *target != proof.target)
+                {
+                    let mut substituted = proof.clone();
+                    substituted.target = target;
+                    proofs.push(substituted);
+                    applied += 1;
+                }
+            }
+        }
+        RetainedResultClosureProofMutation::PermuteCaptureOrder => {
+            for proof in proofs
+                .iter_mut()
+                .filter(|proof| proof.capture_origins.len() > 1)
+            {
+                proof.capture_origins.rotate_left(1);
+                applied += 1;
+            }
+        }
+        RetainedResultClosureProofMutation::WidenToEveryOtherCapturedClosure => {
+            let mut neighbors = Vec::new();
+            for occurrence in plan.source_occurrences.iter().flatten() {
+                let RuntimeExpr::LexicalClosure {
+                    captures, params, ..
+                } = occurrence.expr
+                else {
+                    continue;
+                };
+                if captures.is_empty()
+                    || originals
+                        .iter()
+                        .any(|proof| proof.seat == occurrence.static_origin)
+                {
+                    continue;
+                }
+                let Some(source_owner) = plan.semantic.function_owner(occurrence.static_origin)?
+                else {
+                    continue;
+                };
+                let body_origin = plan.semantic.child_origin(occurrence.static_origin, 0)?;
+                let capture_origins = (0..captures.len())
+                    .map(|ordinal| {
+                        plan.semantic
+                            .child_origin(occurrence.static_origin, 1 + ordinal)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                neighbors.push((
+                    occurrence.static_origin,
+                    body_origin,
+                    params.clone(),
+                    capture_origins,
+                    source_owner,
+                ));
+            }
+            for proof in &originals {
+                for (seat, body_origin, params, capture_origins, source_owner) in &neighbors {
+                    let mut widened = proof.clone();
+                    widened.seat = *seat;
+                    widened.body_origin = *body_origin;
+                    widened.params = params.clone();
+                    widened.capture_origins = capture_origins.clone();
+                    widened.source_owner = *source_owner;
+                    proofs.push(widened);
+                    applied += 1;
+                }
+            }
+        }
+        RetainedResultClosureProofMutation::DropExactStaticBodyCallEdge
+        | RetainedResultClosureProofMutation::SuppressResultAuthorizationArm => return Ok(()),
+    }
+    if applied == 0 {
+        return Err(planner_error(
+            "the retained result-closure control found no real neighboring row for its mutation",
+        ));
+    }
+    RETAINED_RESULT_CLOSURE_PROOF_MUTATION_APPLIED.with(|count| count.set(applied));
+    Ok(())
+}
+
+/// Project every lexical-closure member of the planner's already-issued
+/// continuation result-edge relation.
+///
+/// Each coordinate is checked against an independent plane before publication:
+/// result/construct/field/target from the causal edge, closure/body/captures from
+/// the target specialization, and positional source origins from the semantic
+/// tree. A disagreement refuses; it is never treated as non-membership.
+fn boundary_continuation_result_proofs(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<BoundaryContinuationResultProof>, CraneliftBackendError> {
+    let units = plan.continuation_units()?;
+    let owners = plan
+        .continuation_calls()?
+        .into_iter()
+        .map(|call| call.emission_owner())
+        .collect::<BTreeSet<_>>();
+    let mut proofs = Vec::new();
+    for owner in owners {
+        for edge in plan.continuation_result_edges_owned_by(owner)? {
+            if edge.identity.emission_owner() != owner {
+                return Err(planner_error(
+                    "a continuation result edge disagrees with the emission owner that projected it",
+                ));
+            }
+            let unit = units
+                .iter()
+                .find(|unit| unit.id() == edge.identity.target())
+                .ok_or_else(|| {
+                    planner_error(
+                        "a continuation result edge targets no planned specialization",
+                    )
+                })?;
+            if unit.emission_owner() != owner
+                || unit.producer_owner() != edge.identity.producer_owner()
+                || unit.producer_result_origin() != edge.producer_result_origin
+                || unit.producer_construct_origin() != edge.producer_construct_origin
+                || unit.recursive_position() != edge.recursive_position
+            {
+                return Err(planner_error(
+                    "a continuation result edge disagrees with its target specialization tuple",
+                ));
+            }
+            let seat = unit.worker_closure_origin();
+            let RuntimeExpr::LexicalClosure {
+                captures, params, ..
+            } = plan.planned_occurrence_expr(seat)?
+            else {
+                // Seed closures are a different representation population. This
+                // projection does not reinterpret them as positional lexical
+                // environments.
+                continue;
+            };
+            if captures.is_empty() {
+                // M4 deliberately leaves capture-free closures on the ordinary
+                // refusal route; no environment needs to cross for them.
+                continue;
+            }
+            let body_origin = plan.semantic.child_origin(seat, 0)?;
+            let capture_origins = (0..captures.len())
+                .map(|ordinal| plan.semantic.child_origin(seat, 1 + ordinal))
+                .collect::<Result<Vec<_>, _>>()?;
+            let source_owner = plan.semantic.function_owner(seat)?.ok_or_else(|| {
+                planner_error(
+                    "a continuation result closure has no predeclared source owner",
+                )
+            })?;
+            if unit.worker_body_origin() != body_origin
+                || unit.worker_declared_arity() as usize != params.len()
+                || unit.worker_capture_count() != capture_origins.len()
+                || unit.producer_owner() != source_owner
+                || plan.semantic.child_origin(
+                    edge.producer_construct_origin,
+                    edge.recursive_position as usize,
+                )? != seat
+            {
+                return Err(planner_error(
+                    "a continuation result edge disagrees with its lexical closure occurrence",
+                ));
+            }
+            let worker_captures = unit
+                .ordinary_envelope()?
+                .into_iter()
+                .filter_map(|role| match role {
+                    ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+                        ordinal,
+                        owner,
+                        closure_origin,
+                        source,
+                        ..
+                    } => Some((ordinal, owner, closure_origin, source)),
+                    ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField { .. } => None,
+                })
+                .collect::<Vec<_>>();
+            if worker_captures.len() != capture_origins.len()
+                || worker_captures.iter().enumerate().any(
+                    |(position, (ordinal, capture_owner, closure_origin, source))| {
+                        *ordinal as usize != position
+                            || *capture_owner != source_owner
+                            || *closure_origin != seat
+                            || *source
+                                != ContinuationWorkerCaptureSource::Lexical(
+                                    capture_origins[position],
+                                )
+                    },
+                )
+            {
+                return Err(planner_error(
+                    "a continuation result edge's worker captures are not the exact positional closure environment",
+                ));
+            }
+            proofs.push(BoundaryContinuationResultProof {
+                owner,
+                producer_result_origin: edge.producer_result_origin,
+                producer_construct_origin: edge.producer_construct_origin,
+                recursive_position: edge.recursive_position,
+                seat,
+                body_origin,
+                params: params.clone(),
+                capture_origins,
+                source_owner,
+                target: edge.identity.target(),
+            });
+        }
+    }
+    proofs.sort_by_key(|proof| {
+        (
+            proof.owner,
+            proof.producer_result_origin,
+            proof.producer_construct_origin,
+            proof.recursive_position,
+            proof.seat,
+            proof.target,
+        )
+    });
+    let expected = proofs.clone();
+    #[cfg(feature = "px8-ds-test-support")]
+    mutate_boundary_continuation_result_proof_population(plan, &mut proofs)?;
+    validate_boundary_continuation_result_proof_population(&expected, &proofs)?;
+    Ok(proofs)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BoundaryContinuationResultAuthorization {
+    NotApplicable,
+    Authorized,
+}
+
+/// Select the one typed continuation-result proof which claims an environment.
+///
+/// This classification is separate from authorization so a result-derived
+/// environment remains exclusive even if its exact authorization consumer is
+/// absent. It stores no authority and grants no crossing by itself.
+fn boundary_continuation_result_proof_for_environment(
+    plan: &StaticTransitionPlan<'_>,
+    environment: &BoundaryClosureEnvironment,
+) -> Result<Option<BoundaryContinuationResultProof>, CraneliftBackendError> {
+    let matches = boundary_continuation_result_proofs(plan)?
+        .into_iter()
+        .filter(|proof| proof.owner == environment.owner() && proof.seat == environment.seat())
+        .collect::<Vec<_>>();
+    let [proof] = matches.as_slice() else {
+        if matches.len() > 1 {
+            return Err(planner_error(
+                "two continuation result edges authorize one boundary closure environment",
+            ));
+        }
+        return Ok(None);
+    };
+    Ok(Some(proof.clone()))
+}
+
+/// Prove that one positional environment is the exact recursive field of one
+/// already-issued continuation result edge.
+///
+/// Absence of a proof for this owner and seat is ordinary non-applicability.
+/// Once such a proof exists, every remaining join is part of that proof and
+/// disagrees by refusal rather than falling through to a weaker M4 arm.
+fn boundary_continuation_result_authorization(
+    plan: &StaticTransitionPlan<'_>,
+    environment: &BoundaryClosureEnvironment,
+    proof: Option<&BoundaryContinuationResultProof>,
+) -> Result<BoundaryContinuationResultAuthorization, CraneliftBackendError> {
+    let Some(proof) = proof else {
+        return Ok(BoundaryContinuationResultAuthorization::NotApplicable);
+    };
+    if proof.body_origin != environment.body_origin()
+        || proof.params != environment.params()
+        || proof.capture_origins != environment.capture_origins()
+    {
+        return Err(planner_error(
+            "a retained result-closure proof disagrees with its exact environment descriptor",
+        ));
+    }
+
+    let RuntimeExpr::Construct { args, .. } =
+        plan.planned_occurrence_expr(proof.producer_construct_origin)?
+    else {
+        return Err(planner_error(
+            "a retained result-closure proof names a non-constructor result occurrence",
+        ));
+    };
+    if args.get(proof.recursive_position as usize).is_none() {
+        return Err(planner_error(
+            "a retained result-closure proof names no result constructor field",
+        ));
+    }
+    let mut parent_records = plan.aggregate_ownership.iter().filter(|record| {
+        record.producer == AggregateOccurrenceProducer::Source(proof.producer_construct_origin)
+    });
+    let Some(parent_record) = parent_records.next() else {
+        return Err(planner_error(
+            "a retained result-closure proof has no exact parent aggregate record",
+        ));
+    };
+    if parent_records.next().is_some()
+        || parent_record.shape != PlannedAggregateShape::Constructor
+        || parent_record.owner != Some(proof.source_owner)
+        || parent_record.children.len() != args.len()
+    {
+        return Err(planner_error(
+            "a retained result-closure proof disagrees with its exact parent aggregate record",
+        ));
+    }
+    let paired_fields = parent_record
+        .children
+        .iter()
+        .filter(|child| {
+            child.position == proof.recursive_position && child.origin == Some(proof.seat)
+        })
+        .collect::<Vec<_>>();
+    let [paired_field] = paired_fields.as_slice() else {
+        return Err(planner_error(
+            "a retained result-closure proof has no unique paired constructor field",
+        ));
+    };
+    let Some(environment_record) = plan
+        .aggregate_ownership
+        .get(environment.record().0 as usize)
+    else {
+        return Err(planner_error(
+            "a retained result-closure proof names no environment aggregate record",
+        ));
+    };
+    if environment_record.meet > paired_field.lifetime {
+        return Err(planner_error(
+            "a retained result-closure environment outlives its exact constructor field",
+        ));
+    }
+
+    // The result edge selects the generated continuation target. The closure
+    // environment independently retains exactly one lexical static-body unit
+    // and one raw-owner call edge, so neither endpoint can be recovered from the
+    // other or from the closure refusal.
+    let target_units = plan
+        .emittable_units()?
+        .into_iter()
+        .filter(|unit| {
+            matches!(
+                unit.definition(),
+                AbiUnitDefinition::ClosureBody {
+                    defining_origin,
+                    provenance: AbiCaptureProvenance::Lexical,
+                } if defining_origin == proof.seat
+            )
+        })
+        .collect::<Vec<_>>();
+    let [target_unit] = target_units.as_slice() else {
+        return Err(planner_error(
+            "a retained result-closure proof has no unique lexical static-body target",
+        ));
+    };
+    if target_unit.body_occurrence() != proof.body_origin {
+        return Err(planner_error(
+            "a retained result-closure proof disagrees with its lexical static-body target",
+        ));
+    }
+    let mut call_edges = plan.emittable_call_edges()?;
+    #[cfg(feature = "px8-ds-test-support")]
+    if RETAINED_RESULT_CLOSURE_PROOF_MUTATION.with(Cell::get)
+        == RetainedResultClosureProofMutation::DropExactStaticBodyCallEdge
+    {
+        let before = call_edges.len();
+        call_edges.retain(|edge| {
+            !(edge.kind() == EmittableCallKind::StaticBody
+                && edge.caller() == proof.source_owner
+                && edge.callee() == target_unit.function()
+                && edge.callee_origin() == target_unit.entry_origin()
+                && edge.call_site_origin() == proof.body_origin)
+        });
+        let applied = before - call_edges.len();
+        RETAINED_RESULT_CLOSURE_PROOF_MUTATION_APPLIED.with(|count| count.set(applied));
+        if applied == 0 {
+            return Err(planner_error(
+                "the retained result-closure target control found no exact static-body call edge",
+            ));
+        }
+    }
+    if call_edges
+        .iter()
+        .filter(|edge| {
+            edge.kind() == EmittableCallKind::StaticBody
+                && edge.caller() == proof.source_owner
+                && edge.callee() == target_unit.function()
+                && edge.callee_origin() == target_unit.entry_origin()
+                && edge.call_site_origin() == proof.body_origin
+        })
+        .count()
+        != 1
+    {
+        return Err(planner_error(
+            "a retained result-closure proof has no unique exact static-body call edge",
+        ));
+    }
+    Ok(BoundaryContinuationResultAuthorization::Authorized)
 }
 
 /// One static target admitted at a bind-resume site.

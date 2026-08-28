@@ -8938,25 +8938,30 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
 
     /// MEASURED: one static worker field and two ordered worker capture fields
     /// produce ABI prefix two. The static worker identity itself is excluded.
-    /// The compile-valid constructor-field-count mutation produces prefix one.
+    /// At the direct specialization-production seam, the constructor-field-count
+    /// mutation preserves that exact worker but produces prefix one. The full
+    /// planner then refuses that malformed prefix before aggregate ownership can
+    /// treat it as a result-closure environment.
     ///
     /// CLAIMED: D1 derives the prefix by walking the runtime worker envelope,
-    /// not from constructor arity or a closure-count proxy.
+    /// not from constructor arity or a closure-count proxy, and every affected
+    /// result-proof consumer fails closed when the two disagree.
     ///
     /// GAP: capture values remain intentionally absent from the immutable key;
     /// only their ordered static provenance participates.
     #[test]
     fn contspec_ordinary_prefix_uses_the_ordered_worker_envelope() {
         let expr = Box::leak(Box::new(contspec_multiple_worker_captures_fixture()));
-        let plan = plan_static_transition_graph(expr, &BTreeMap::new()).expect("plans");
-        let unit = plan
+        let baseline_plan = plan_static_transition_graph(expr, &BTreeMap::new()).expect("plans");
+        let baseline_unit = baseline_plan
             .continuation_specializations
             .first()
             .expect("one continuation specialization");
-        assert_eq!(plan.continuation_specializations.len(), 1);
-        assert_eq!(unit.key.recursive_position, 0);
+        assert_eq!(baseline_plan.continuation_specializations.len(), 1);
+        assert_eq!(baseline_unit.key.recursive_position, 0);
         assert_eq!(
-            unit.key
+            baseline_unit
+                .key
                 .worker
                 .captures
                 .iter()
@@ -8964,28 +8969,63 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
                 .collect::<Vec<_>>(),
             vec![0, 1],
         );
-        assert_eq!(unit.key.ordinary_parameters, 2);
+        assert_eq!(baseline_unit.key.ordinary_parameters, 2);
         assert_eq!(
-            unit.key.continuation_inputs[0].ordinary_abi_position,
+            baseline_unit.key.continuation_inputs[0].ordinary_abi_position,
             2,
         );
 
         CONTINUATION_PRODUCTION_MUTATION.with(|mutation| {
             mutation.set(ContinuationProductionMutation::ConstructorFieldCountPrefix)
         });
-        let wrong = plan_static_transition_graph(expr, &BTreeMap::new())
-            .expect("compile-valid constructor-field count plans");
+        let mutated_derivation = build_continuation_specialization_plan(&baseline_plan);
         CONTINUATION_PRODUCTION_MUTATION
             .with(|mutation| mutation.set(ContinuationProductionMutation::Exact));
+        let (mutated_units, _, _, _, _) = mutated_derivation
+            .expect("the direct specialization producer exposes the malformed prefix");
+        assert_eq!(mutated_units.len(), 1);
+        let mutated_unit = &mutated_units[0];
         assert_eq!(
-            wrong.continuation_specializations[0].key.ordinary_parameters,
-            1,
+            mutated_unit.key.worker, baseline_unit.key.worker,
+            "the prefix mutation must not change the selected worker identity",
+        );
+        assert_eq!(mutated_unit.key.worker.captures.len(), 2);
+        assert_eq!(
+            mutated_unit
+                .key
+                .worker
+                .captures
+                .iter()
+                .map(|capture| capture.ordinal)
+                .collect::<Vec<_>>(),
+            vec![0, 1],
+        );
+        assert_eq!(
+            mutated_unit.key.ordinary_parameters, 1,
             "the production mutation must count the worker and omit both captures",
         );
         assert_eq!(
-            wrong.continuation_specializations[0].key.continuation_inputs[0]
-                .ordinary_abi_position,
+            mutated_unit.key.continuation_inputs[0].ordinary_abi_position,
             1,
+        );
+
+        CONTINUATION_PRODUCTION_MUTATION.with(|mutation| {
+            mutation.set(ContinuationProductionMutation::ConstructorFieldCountPrefix)
+        });
+        let malformed_full_plan = plan_static_transition_graph(expr, &BTreeMap::new());
+        CONTINUATION_PRODUCTION_MUTATION
+            .with(|mutation| mutation.set(ContinuationProductionMutation::Exact));
+        let reason = match malformed_full_plan {
+            Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason))) => reason,
+            Err(other) => panic!("the malformed prefix returned the wrong failure: {other:?}"),
+            Ok(_) => {
+                panic!("the full planner admitted an ordinary prefix shorter than its captures")
+            }
+        };
+        assert_eq!(
+            reason,
+            "a continuation declares fewer ordinary parameters than its selected worker has \
+             captures, so the ruled envelope has no nonrecursive prefix",
         );
     }
 

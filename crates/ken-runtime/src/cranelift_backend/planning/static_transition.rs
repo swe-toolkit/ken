@@ -116,18 +116,19 @@ pub use aggregates::{
     checked_ih_generated_entry_admission_mutation_is_exact,
     checked_ih_generated_entry_arrival_mutation_is_exact,
     checked_ih_generated_entry_confluence_mutation_is_exact,
+    retained_result_closure_proof_mutation_applied,
+    retained_result_closure_proof_mutation_is_exact,
     with_checked_ih_continuation_inheritance_mutation,
     with_checked_ih_continuation_inheritance_observations,
     with_checked_ih_generated_entry_admission_mutation,
     with_checked_ih_generated_entry_admission_observations,
     with_checked_ih_generated_entry_arrival_mutation,
     with_checked_ih_generated_entry_confluence_mutation,
-    with_checked_ih_generated_entry_observations,
-    CheckedIhContinuationInheritanceMutation,
-    CheckedIhContinuationInheritanceObservation,
+    with_checked_ih_generated_entry_observations, with_retained_result_closure_proof_mutation,
+    CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
     CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
-    CheckedIhGeneratedEntryObservation,
+    CheckedIhGeneratedEntryObservation, RetainedResultClosureProofMutation,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
