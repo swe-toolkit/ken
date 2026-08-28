@@ -1460,19 +1460,24 @@ fn self_imp_certificate(atom: Form) -> (Form, Cert) {
     (target, root)
 }
 
-fn forall_self_imp_certificate(
+fn probe_then_self_imp_certificate(probe: Form) -> (Form, Cert) {
+    self_imp_certificate(probe)
+}
+
+fn forall_probe_certificate(
     world: bool,
-    bound_atom: Form,
-    instantiated_atom: Form,
+    bound_probe: Form,
+    instantiated_probe: Form,
     eigen: usize,
 ) -> (Form, Cert) {
-    let body = Form::Imp(Box::new(bound_atom.clone()), Box::new(bound_atom));
+    let (instantiated_body, child) = self_imp_certificate(instantiated_probe);
+    let body = Form::Imp(Box::new(bound_probe.clone()), Box::new(bound_probe));
     let target = if world {
         Form::ForallWorld(Box::new(body))
     } else {
         Form::ForallObj(Box::new(body))
     };
-    let (_, child) = self_imp_certificate(instantiated_atom);
+    debug_assert_eq!(child.conclusion.delta, vec![instantiated_body]);
     let root = Cert {
         conclusion: Sequent {
             gamma: vec![],
@@ -1525,77 +1530,100 @@ fn nested_reused_eigen_certificate(inner_eigen: usize) -> (Form, Cert) {
 /// Promise class: durable invariant. Both certificate checkers derive the
 /// world/object sort of every occurrence, reject an unscoped bound reference,
 /// and share one parameter constraint environment across the complete tree.
-#[test]
-fn certificate_sort_validation_is_fail_closed_on_both_boundaries() {
+/// Each local pair keeps one complete structural certificate shape and changes
+/// exactly one qterm coordinate between its literal accept and reject member.
+fn assert_sort_validation_pair(name: &str, lawful: (Form, Cert), rejected: (Form, Cert)) {
     let mut env = ElabEnv::new().expect("prelude construction");
     catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken failed to elaborate/kernel-check");
     let ids = FokIds::resolve(&env);
 
-    let world_atom = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
-    let world_instantiated = Form::Access(QTerm::Parameter(0), QTerm::Parameter(0));
-    let lawful_world = forall_self_imp_certificate(true, world_atom.clone(), world_instantiated, 0);
-
-    let object_atom = Form::DomainA(QTerm::Parameter(9), QTerm::Bound(0));
-    let object_instantiated = Form::DomainA(QTerm::Parameter(9), QTerm::Parameter(0));
-    let lawful_object = forall_self_imp_certificate(false, object_atom, object_instantiated, 0);
-
-    // The original QA counterexample: a world binder occupies ForcingP's
-    // object slot. The structurally valid ForallRight/ImpRight/Init tree must
-    // now reject at the derived-sort boundary.
-    let qa_wrong_atom = Form::ForcingP(QTerm::Bound(0), QTerm::Bound(0));
-    let qa_wrong_instantiated = Form::ForcingP(QTerm::Parameter(0), QTerm::Parameter(0));
-    let wrong_world_in_object =
-        forall_self_imp_certificate(true, qa_wrong_atom, qa_wrong_instantiated, 0);
-
-    // The opposite direction: an object binder occupies both world slots.
-    let wrong_object_atom = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
-    let wrong_object_instantiated = Form::Access(QTerm::Parameter(0), QTerm::Parameter(0));
-    let wrong_object_in_world =
-        forall_self_imp_certificate(false, wrong_object_atom, wrong_object_instantiated, 0);
-
-    let role_conflict_atom = Form::DomainA(QTerm::Parameter(0), QTerm::Parameter(0));
-    let role_conflict = self_imp_certificate(role_conflict_atom);
-
-    let out_of_scope_atom = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
-    let out_of_scope = self_imp_certificate(out_of_scope_atom);
-
-    // Parameter 0 is the outer world eigen and then the inner object eigen.
-    // Each rule is locally consistent; only a certificate-wide environment
-    // distinguishes this from the lawful parameter-1 inner eigen.
-    let reused_parameter_conflict = nested_reused_eigen_certificate(0);
-    let distinct_parameters = nested_reused_eigen_certificate(1);
-
-    let cases = [
-        ("lawful_world_quantifier", lawful_world, true),
-        ("lawful_object_quantifier", lawful_object, true),
-        ("world_binder_in_object_role", wrong_world_in_object, false),
-        ("object_binder_in_world_role", wrong_object_in_world, false),
-        ("atomic_parameter_role_conflict", role_conflict, false),
-        ("out_of_scope_bound", out_of_scope, false),
-        (
-            "certificate_wide_parameter_conflict",
-            reused_parameter_conflict,
-            false,
-        ),
-        (
-            "certificate_wide_distinct_parameters",
-            distinct_parameters,
-            true,
-        ),
-    ];
-
-    for (name, (q, pi), expected) in cases {
-        let (rust_verdict, ken_verdict) =
-            differential_check_cert(&mut env, &ids, &format!("core_fo_sort_{name}"), &q, &pi);
+    for (member, (q, pi), expected) in [("lawful", lawful, true), ("rejected", rejected, false)] {
+        let (rust_verdict, ken_verdict) = differential_check_cert(
+            &mut env,
+            &ids,
+            &format!("core_fo_sort_{name}_{member}"),
+            &q,
+            &pi,
+        );
         assert_eq!(
             rust_verdict, expected,
-            "case {name}: Rust check_cert returned the wrong sort-validation verdict"
+            "pair {name} {member}: Rust check_cert returned the wrong literal verdict"
         );
         assert_eq!(
             ken_verdict, expected,
-            "case {name}: Ken fok_check_cert returned the wrong sort-validation verdict"
+            "pair {name} {member}: Ken fok_check_cert returned the wrong literal verdict"
         );
     }
+}
+
+#[test]
+fn certificate_sort_validation_world_in_object_pair() {
+    // The World binder remains in ForcingP's World slot; only its Object-slot
+    // neighbour changes from an Object parameter to the same World binder.
+    let lawful = forall_probe_certificate(
+        true,
+        Form::ForcingP(QTerm::Bound(0), QTerm::Parameter(1)),
+        Form::ForcingP(QTerm::Parameter(0), QTerm::Parameter(1)),
+        0,
+    );
+    let rejected = forall_probe_certificate(
+        true,
+        Form::ForcingP(QTerm::Bound(0), QTerm::Bound(0)),
+        Form::ForcingP(QTerm::Parameter(0), QTerm::Parameter(0)),
+        0,
+    );
+    assert_sort_validation_pair("world_in_object", lawful, rejected);
+}
+
+#[test]
+fn certificate_sort_validation_object_in_world_pair() {
+    // The Object binder remains in DomainA's Object slot; only its World-slot
+    // neighbour changes from a World parameter to the same Object binder.
+    let lawful = forall_probe_certificate(
+        false,
+        Form::DomainA(QTerm::Parameter(1), QTerm::Bound(0)),
+        Form::DomainA(QTerm::Parameter(1), QTerm::Parameter(0)),
+        0,
+    );
+    let rejected = forall_probe_certificate(
+        false,
+        Form::DomainA(QTerm::Bound(0), QTerm::Bound(0)),
+        Form::DomainA(QTerm::Parameter(0), QTerm::Parameter(0)),
+        0,
+    );
+    assert_sort_validation_pair("object_in_world", lawful, rejected);
+}
+
+#[test]
+fn certificate_sort_validation_parameter_world_object_role_pair() {
+    // Only DomainA's Object coordinate changes, from a distinct Object
+    // parameter to the World parameter next to it.
+    let lawful =
+        probe_then_self_imp_certificate(Form::DomainA(QTerm::Parameter(0), QTerm::Parameter(1)));
+    let rejected =
+        probe_then_self_imp_certificate(Form::DomainA(QTerm::Parameter(0), QTerm::Parameter(0)));
+    assert_sort_validation_pair("parameter_world_object_role", lawful, rejected);
+}
+
+#[test]
+fn certificate_sort_validation_bound_scope_pair() {
+    // Only Access's first coordinate changes from a scoped World parameter to
+    // unscoped Bound(0); the World-parameter neighbour is unchanged.
+    let lawful =
+        probe_then_self_imp_certificate(Form::Access(QTerm::Parameter(1), QTerm::Parameter(2)));
+    let rejected =
+        probe_then_self_imp_certificate(Form::Access(QTerm::Bound(0), QTerm::Parameter(2)));
+    assert_sort_validation_pair("bound_scope", lawful, rejected);
+}
+
+#[test]
+fn certificate_sort_validation_certificate_wide_parameter_pair() {
+    // Parameter 0 is the outer World eigen and then the inner Object eigen.
+    // Each rule is locally consistent; only a certificate-wide environment
+    // distinguishes this from the lawful parameter-1 inner eigen.
+    let lawful = nested_reused_eigen_certificate(1);
+    let rejected = nested_reused_eigen_certificate(0);
+    assert_sort_validation_pair("certificate_wide_parameter", lawful, rejected);
 }
