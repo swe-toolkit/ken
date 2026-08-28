@@ -187,21 +187,35 @@ requires a rejection verdict is not satisfied by unrepresentability, and would
 have forced reintroducing legacy representation solely to feed a dead exploit
 back in.** The language-leader ruled against that and the ruling stands.
 
+**THE HISTORICAL PROVENANCE, recorded exactly — provenance, NOT a
+reproducibility claim.** The refutation that motivated this repair
+(`evt_2yh515wg0mczy`, base `ef91b8225`) was a certificate for the `fok_embed`
+image of the non-valid source form `forall x : A. forall y : A. P x -> P y`. Its
+recorded certificate hash was
+`db1bf51e9434307d587fbf9cd565af1343cbd877831ff2477f857d5a740779a8`, and the
+recorded 14-step tree instantiated the two OBJECT quantifiers with BOUND
+references (`ForallR Bound5`, `ForallR Bound3`) into outer WORLD binders — the
+"invent an object-sort inhabitant" exploit. Under the released parameter-only
+representation the eigen is a parameter index, so that exact tree is
+UNREPRESENTABLE. **Nothing may be asserted to follow from recomputing the hash.**
+
 **The criterion is therefore stated as a PREDICATE over the exploit's
 nonexistence, at both levels. All three parts are required:**
 
-1. **Constructor-level unrepresentability.** Exhibit that the two historical
-   `Bound`-eigen object steps have **no constructor encoding** in the released
-   representation. This is a statement about the datatype, not about a search
-   outcome.
+1. **Constructor-level unrepresentability, pinned on BOTH surfaces
+   concretely.** A bound object eigen has no constructor encoding in Rust
+   `Rule::ForallRight { eigen: usize }` or Ken `FokForallRight Nat Nat`. On the
+   Ken surface this is pinned BEHAVIOURALLY: a `FokQTerm` eigen is a **type
+   error, not a checker `False`.** This is a statement about the datatype, not
+   about a search outcome.
 2. **Embed-image and search nonexistence on BOTH surfaces.** No term in
    `fok_embed`'s image, and no term the corrected search reaches, derives the
    false conclusion — measured on the Rust surface and the Ken surface
-   separately, never one standing in for the other.
-3. **The recorded historical hash is retained as PROVENANCE ONLY.** It records
-   which artifact the refutation came from. **It is explicitly NOT a
-   reproducibility claim**, and nothing may be asserted to follow from
-   recomputing it.
+   separately, never one standing in for the other. **Demonstrated by RUNNING
+   the decision procedure on the exact source form's genuine `fok_embed` image,
+   not argued.**
+3. **The recorded historical hash is retained as PROVENANCE ONLY**, per the block
+   above.
 
 **`AC-1-POWER` — the nonexistence claims must be shown to have power, and this
 is the load-bearing half.** Parts 1 and 2 are both NEGATIVE claims, and a
@@ -216,6 +230,19 @@ evidence; it is none.** Required, by measurement rather than by argument:
   steps: exhibit a near-miss that IS representable and IS refused downstream.
   **An argument that would equally prove some lawful certificate unrepresentable
   is refuting itself, not the exploit.**
+
+> **`AC-1-POWER` IS WHY THIS AC WAS NOT SIMPLY TAKEN FROM THE RING'S OWN
+> DRAFT.** The candidate `04ad4379c` proposed its own AC-1 reconciliation
+> carrying the concrete provenance and both surface pins above — which is why
+> they are now here — but it dropped the anti-vacuity half and reverted `AC-6`'s
+> pointer. **"Demonstrated by running the decision procedure" proves the
+> procedure RAN; it does not prove the procedure CAN FIND ANYTHING.** A search
+> misconfigured to return nothing on every input satisfies part 2 perfectly and
+> establishes nothing at all. That gap is exactly the class this program has paid
+> for repeatedly, so the running requirement is kept AND the planted-witness
+> requirement is kept beside it. The named control
+> `crates/ken-elaborator/tests/v3_fo_sorted_eigenparameter_refuting_cert.rs` is
+> where both belong.
 
 > **This amendment does NOT reopen the "released node" banner elsewhere in this
 > file, and the distinction matters.** That banner forbids FOLDING IN A NEW
