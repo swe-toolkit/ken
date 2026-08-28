@@ -11,6 +11,43 @@ github: null
 origin: "Architect hard-stop-8 ruling evt_54efxydhb3n6w, 2026-08-27 (thr_2g0w05my2d5ym), verified on exact base 00e66312b4ef617eb658a2e75db9f99ff2c56492 / tree e286949f8fe5053e4719e54d0cc66adbe073dcdf with ambient RUST_MIN_STACK unset. Runtime hard-stopped an eighth time on the same mechanism chain (implementer observation accepted; Architect independently reproduced, log SHA-256 401c52398b2f221bfff2987f36c6f29b003318d6ecd78b8f7c53bf0c605d5352, source bytes restored to blob 4ea7b32e2295ae98ce53906a4f1941bb33fce421). On four of five governed coordinates the exact governed K application exposes NO LOCAL LoweringOperand result at CheckedComputationalIHInvocationReturn: the active self-resumption arm jumps to the already-active loop header, switches the builder to an unreachable block, and returns Lowered::RecursiveBackedge, which source.rs defines in its own comment as a PROTOCOL MARKER, not a value. This is an absence of a LOCAL result, NOT a proof that no fresh dynamic result is eventually produced — the owning carried merge may still produce it, and that is exactly what D0 measures. The ruling establishes that the missing piece is a COMPONENT BOUNDARY — a third sibling proof — and NOT one more D3B field, because adding it inside the atomic consumer would make lowering invent the very edge whose authority is absent and would repeat this chain's decomposition failure. It deliberately does NOT authorize a recursive call or frame morphism: spec/40-runtime/42-evaluation.md section 6.2 specifies the ITree driver as tail-resumptive and therefore realizable as a loop without a suspended-resumption stack, so the first candidate producer to MEASURE is the existing carried-loop exit. Steward-owned frame; the Architect supplied the provisional node name. RT-RESULT-CONTINUATION-BINDING-PROVENANCE is frozen and recut to depend_on this node; its atomic D3A+D3B consumer needs a SECOND explicit Steward release after this lands. Architect PRE-RELEASE FRAME REVIEW evt_33ajd0hmezn2c, 2026-08-27, on landed blob 94a1d4f74a6b559738ee171f8fa571f9515ab10f (origin/main f868f43c1, crates tree ae84c42092f3c1233878a8b9772b8f80fb4b6d69): mechanism, component boundary, D0 fork and its YES/NO dispositions, total sealed producer relation, typed planner-to-emission provenance, sanitized projection, three-proof separation, mutation families, absence of an arrival-count pin, tail-loop preservation, stop-9 trigger, and two-stage explicit release all APPROVED as faithful to evt_54efxydhb3n6w, with the D0 NO arm confirmed correctly written as a successful delivered result. Release was withheld pending four narrow text-only corrections, folded here: (1) this node's depends_on stated the real proof inputs instead of an empty list; (2) the local-result absence is no longer overclaimed as 'does not yield a fresh R2' in either origin or the consumer banner; (3) the Objective and Deliverables no longer authorize a second keyed read — the producer proof is a field of Governed(projection), reached through the existing single admission lookup; (4) AC-PRODUCER-KEY now pins the DirectInvocationResult variant by typed static provenance of the governed CheckedComputationalIHInvocationReturn result edge, and AC-PRODUCER-MUTATIONS splits wrong-direct-edge and wrong-loop-edge into independent mutations each with its own same-shape positive, so a neighbouring carried invocation result is not admissible as the governed producer. No mechanism, scope, fork, or sequencing change was made beyond that text, so the approval carries and no new Architect round is required."
 ---
 
+> # MERGED, BUT ITS CENTRAL CLAIM IS FALSIFIED — HS9 ruling `evt_7wbxwxa74cdnr` (2026-08-28)
+>
+> **This node is `merged` and stays merged. Everything below it is the frame it
+> was built to, and that frame's loop arm is now known to name the WRONG
+> SEMANTIC OBJECT.** Read this block before treating anything below as current.
+>
+> **What was falsified.** Its `CarriedLoopExitResult` arm named the Ret body's
+> OUTPUT — the carried elimination's merge parameter. The consumer needs that
+> body's INPUT. Normative `spec/40-runtime/42-evaluation.md §6.2` is `Ret r -> r`,
+> so the result is `r`; and the emitted order (header input, then Ret /
+> checked-fallback input, then case environment and capture, then body
+> evaluation, then merge) puts the merge parameter causally DOWNSTREAM of the
+> capture. Under SSA dominance it cannot flow backward into a capture evaluated
+> in its own predecessor body. The edge is not merely unrepresented — **it is
+> backwards in the emitted CFG.**
+>
+> **Its D0 `YES` was an INSTRUMENTATION ERROR.** The observation co-emitted
+> header, Ret body, merge predecessor, and merge parameter and never paired ONE
+> dynamic result across them. **Co-emission is not a value-flow edge.** The
+> correct answer to that D0 is **NO**. Both gates and both approvals were given
+> in good faith against evidence that did not measure what it was read as
+> measuring.
+>
+> **Nothing in `main` is behaviorally regressed and nothing is reverted.** Both
+> landed fields are compile-time validation-only, the destination is discarded at
+> `source.rs:4108`, and the false loop arm drives no emitted value or block. The
+> node is not being reopened as a product defect.
+>
+> **BUT `CarriedLoopExitResult` IS LATENT FALSE AUTHORITY. D3 MUST NOT CONSUME
+> IT**, and this node no longer establishes predecessor sufficiency for D3 (the
+> Architect withdrew that specific consequence of its approval of `c8ddfb896`,
+> landed as `830aa0952`). The replacement is
+> [[RT-CHECKED-IH-FRESH-RESULT-ROUTE]], which REPLACES the
+> `CheckedIhFreshResultProducer` abstraction rather than extending it. The
+> `DirectInvocationResult` arm was NOT falsified and is preserved there as
+> `DirectInvocationReturn`.
+>
 > # THIRD SIBLING PROOF — a PRODUCER, not a destination (evt_54efxydhb3n6w)
 >
 > Read `evt_54efxydhb3n6w` in full before building. This frame is faithful to it,
