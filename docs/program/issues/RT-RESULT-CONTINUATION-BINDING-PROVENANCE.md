@@ -672,6 +672,13 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > and do NOT turn the zero-argument invocation into the later one-parameter
 > closure call.
 >
+> **HISTORY ONLY — the predecessor-ownership model below is SUPERSEDED by HS12
+> (`evt_7a6pp8n24r1ms`). It is retained to record what HS5 concluded and why, and
+> it is NOT a live instruction.** The landed successor contributes retained
+> topology/identity facts only; no predecessor owns the Tail relation, this
+> candidate supplies it, and no further predecessor or predecessor-node hard stop
+> is authorized. The live contract is the HS12 UPDATE in Deliverables (D3B).
+>
 > **Lowering has reached the end of its authority.** The next component is an
 > UPSTREAM planner-owned checked-IH result-successor relation — a genuine
 > predecessor, not a lowering fallback and not another continuation-identity lane.
@@ -933,7 +940,8 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   arm with read `608`/`662`/`939`/spec 1, write `720`/`1238`/`1257`/spec 3.
   Durable inventory anchor `7e5d54b9839451d8d31d76070934af84516e7cf8` over
   current main. STAYS FROZEN — do not edit, do not promote, no QA.
-- HS4 application-feasibility object `7199330550f9eae611b417c30b289722cd8057b1`
+- HS4 **DIRECT-CALL-RECIPE** feasibility object
+  `7199330550f9eae611b417c30b289722cd8057b1`
   (tree `9f838714182f6a2b837b5819fe6b194adc1e569a`, base `6f00843de`) — EVIDENCE
   ONLY, do NOT merge/QA. One production path, `core.rs +124/-41`, no fallback:
   revalidates the two-endpoint transport, validates `source_record` and capture
@@ -942,13 +950,20 @@ transitively into the capture, or re-derive the inheritance relation in lowering
   `call_declared_unit_target`. LLDB proves `ken_continuation_1` executes at the
   new carried site (returned words `0x0f09`/`0x1109`), but final closure body 452
   capture 0 / `Var(1)` still reads `0x1009` (the untagged transported
-  environment) — application executed, result NOT delivered. Proves D3A
-  feasibility; D3B (result flow) is unbuilt. `erasure.rs` blob `8532ced2...`
-  unchanged; `RoutedAnswer::checked(` remains 3 callers. STAYS FROZEN.
+  environment) — application executed, result NOT delivered. **Proves the DIRECT
+  CALL RECIPE only. Its body is exclusively the Direct mechanism — the
+  two-endpoint `CheckedIhEnvironmentTransport`, `source_record` validation,
+  ordinal projection through `checked_ih_capture_origin`, the
+  `continuation_calls[...]` lookup and `call_declared_unit_target`. It proves NO
+  Tail application, producer, or bridge claim, and none of those constructs
+  exists on Tail (`direct_transport=None`).** D3B (result flow) is unbuilt.
+  `erasure.rs` blob `8532ced2...` unchanged; `RoutedAnswer::checked(` remains 3
+  callers. STAYS FROZEN.
 - HS5 D3B-localization object `4e516e54712a47cf14c47b7abf2840f943071af9` (tree
   `9f7ac95f038bfb69bd6a881ec14133957e569078`, corrected base `14040ecae`, frame
-  blob `5e043db9`) — EVIDENCE ONLY, do NOT merge/QA. The mechanically-rebased D3A
-  feasibility tip; its D3B localization independently derived BOTH read (frame
+  blob `5e043db9`) — EVIDENCE ONLY, do NOT merge/QA. The mechanically-rebased
+  **DIRECT-CALL** feasibility tip; its D3B localization independently derived
+  BOTH read (frame
   301 / closure 460 / capture 459 / body 452) and write (frame 314 / closure 473
   / capture 472 / body 465) paths from their own planner facts and proved each
   reaches an ordinary zero-argument checked invocation with NO planner-issued
@@ -1093,11 +1108,20 @@ transitively into the capture, or re-derive the inheritance relation in lowering
 
     This phase makes NO claim about the final capture or `InvalidOffset` and must
     NOT land alone.
-  - If the source record cannot be validated, its captures cannot be projected
-    from existing planner facts, or the exact continuation target was not
-    already declared into this destination function — HARD-STOP. Do NOT add a
-    second identity catalog, ABI lane, raw cast, environment search, or
-    family-specific fallback.
+  - **`DirectInvocationReturn` ONLY.** If the source record cannot be validated,
+    its captures cannot be projected from existing planner facts, or the exact
+    continuation target was not already declared into this destination function
+    — HARD-STOP. **These three conditions are Direct-only and may NEVER be
+    demanded of Tail: Tail is required to have `direct_transport=None` and no
+    Direct declared target, so a source record, a capture projection and a
+    declared target do not exist there to validate.** Requiring them of Tail
+    re-creates the HS10 demand for a Direct transport.
+  - **`TailProducerToBackedge` fail-closed condition.** If the typed
+    producer/route pair does not REACH its exact active jump, or is not consumed
+    there EXACTLY ONCE — HARD-STOP. That is the whole Tail condition; nothing
+    about transport, projection, or target enters it.
+  - Under EITHER arm: do NOT add a second identity catalog, ABI lane, raw cast,
+    environment search, or family-specific fallback.
 - **D3B (result-flow localization then single-edge repair — the coupled atomic
   half; Architect evt_6mnawfvm8fc4j):**
   - On both unchanged admitted programs, take D3A's FRESH `R2` (the result of
@@ -1132,18 +1156,25 @@ transitively into the capture, or re-derive the inheritance relation in lowering
     origins are report coordinates only. `CheckedIhBinding(None)` at the Ret
     capture is a NEGATIVE CONTROL — it forbids reclassifying the capture as an
     IH.
-  - HS5 UPDATE: the missing planner relation is now OWNED UPSTREAM by
-    [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]]. The atomic D3A+D3B consumer builds
-    ONLY after that predecessor lands; D3B then CONSUMES that exact successor
-    projection through the existing shared D3A call lane and ordinary
-    active-continuation semantics — it does NOT re-derive the relation in
-    lowering. Do NOT create a lowering-side reverse search, a second binder
-    catalog, a second identity catalog, an ABI lane, a raw cast, an environment
-    search, or a family-specific fallback; do NOT write capture 0 directly,
-    project a convenient result field, inject the result after `ResumeOuter`, or
-    change D1. If the predecessor cannot derive the complete relation from its
-    forward planner facts, that is HARD STOP 6 on the predecessor node (Research
-    triggered) — not a lowering exception here.
+  - **HS12 UPDATE (`evt_7a6pp8n24r1ms`) — this REPLACES the former HS5 update,
+    which is WITHDRAWN.** The landed successor
+    [[RT-ITREE-CHECKED-IH-RESULT-SUCCESSOR]] contributes RETAINED TOPOLOGY AND
+    IDENTITY FACTS ONLY. **It does NOT own the missing Tail relation, and NO
+    predecessor supplies Tail value authority.** This atomic candidate SUPPLIES
+    the replacement Tail relation and the value bridge itself, and D3B CONSUMES
+    the replacement relation plus the bridge-delivered operand — through the
+    ordinary active-continuation semantics, never re-deriving the relation in
+    lowering. **NO new predecessor and NO further hard stop on a predecessor
+    node is authorized**; the former "builds ONLY after that predecessor lands"
+    and "HARD STOP 6 on the predecessor node" instructions are void, since the
+    edge HS12 identified is the semantic repair itself and cannot be landed
+    ahead of the products it changes. Direct is unaffected: it consumes its own
+    declared-call result as before.
+  - Prohibitions PRESERVED under both arms: do NOT create a lowering-side
+    reverse search, a second binder catalog, a second identity catalog, an ABI
+    lane, a raw cast, an environment search, or a family-specific fallback; do
+    NOT write capture 0 directly, project a convenient result field, inject the
+    result after `ResumeOuter`, or change D1.
 
 ## Acceptance criteria
 
