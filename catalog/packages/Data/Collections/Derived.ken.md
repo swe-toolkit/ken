@@ -72,7 +72,7 @@ import Core.Logic.OrdResult
 
 import Core.Logic.Transport (cong, sym, trans)
 
-fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
+pub fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
   match xs {
     Nil ↦ ys;
     Cons x xs2 ↦ Cons a x (list_append a xs2 ys)
@@ -160,7 +160,7 @@ fn mem (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Bool =
       }
   }
 
-fn length (a : Type) (xs : List a) : Nat =
+pub fn length (a : Type) (xs : List a) : Nat =
   match xs {
     Nil ↦ Zero;
     Cons h t ↦ Suc (length a t)
@@ -235,7 +235,7 @@ inventing one solely to state a law here would be exactly the proliferation
 this package avoids elsewhere.
 
 ```ken
-fn reverse (a : Type) (xs : List a) : List a =
+pub fn reverse (a : Type) (xs : List a) : List a =
   match xs {
     Nil ↦ Nil a;
     Cons h t ↦ list_append a (reverse a t) (Cons a h (Nil a))
@@ -339,7 +339,7 @@ theorem zip_length
       }
   }
 
-fn concat_map (a : Type) (b : Type) (f : a → List b) (xs : List a) : List b =
+pub fn concat_map (a : Type) (b : Type) (f : a → List b) (xs : List a) : List b =
   match xs {
     Nil ↦ Nil b;
     Cons h t ↦ list_append b (f h) (concat_map a b f t)
@@ -404,10 +404,10 @@ fn bool_leq (x : Bool) (y : Bool) : Bool =
     True ↦ y
   }
 
-fn eq_from_ord (a : Type) (le : a → a → Bool) (x : a) (y : a) : Bool =
+pub fn eq_from_ord (a : Type) (le : a → a → Bool) (x : a) (y : a) : Bool =
   bool_and (le x y) (le y x)
 
-fn count (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Nat =
+pub fn count (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Nat =
   match xs {
     Nil ↦ Zero;
     Cons h t ↦
