@@ -151,3 +151,112 @@ disposition `evt_5te99temrdcty` and drain determination `evt_1xndnw1dp1r6v`
 (current main `863bf0fbf`, tree `67089b7b22d36ca8ac04b21ce88856e23e6ada32`); closed
 node `RT-COMPOSED-RETURN-PRODUCED-TRANSFER` (D0b report SHA-256 `fdd5e859...`); spec
 §6.2.
+
+## Discovery verdict — probably viable
+
+**Verdict: shape (a) is probably viable.** At working SHA
+`751e35e03d475fd15dfd9234d47695f9ef1884fd`, source-specific planner
+membership and the sanitized governed-arrival projection can be joined before
+the existing producer. The join needs no second catalog, source-order guess,
+runtime discriminator, store, captured continuation, recovery, or backward
+token movement.
+
+This is a constructive paper verdict, not an implementation or executable
+probe. It does not trigger a Runtime QA gate.
+
+### Current executable order
+
+The release coordinates remain exact at the working SHA:
+
+- `lowering/source.rs` is blob
+  `88fcc401b0e078f78298a0998d09364b22e64a27`.
+  `validate_checked_ih_generated_entry_governed_arrival` starts at line 3976.
+  It checks the exact invocation/call/callee triple against
+  `projection.fresh_result_route()` at lines 4102–4113. Its caller,
+  `source_call_state`, starts at line 4119 and performs that total admission
+  and validation before callee dispatch.
+- The same function selects the existing exact environment `transport` at line
+  4309. Only afterwards does it call
+  `call_checked_ih_transport_from_case_environment` at line 4369 and mint
+  `RoutedAnswer::checked(returned)` at line 4373.
+- `planning/static_transition/aggregates.rs` is blob
+  `9eb2c118e227c3a7db2849e03046db02d93a48eb`.
+  `checked_ih_fresh_result_route` remains at line 5461. It derives one exact
+  Direct or Tail route from the governed invocation, immediate-K locator,
+  binding, typed transport partition, active frame, Ret binder, and forward
+  destination.
+
+The required order therefore already has an unused forward interval:
+
+1. validate the governed arrival and its exact route;
+2. select the exact source transport;
+3. emit the transport call;
+4. mint the checked routed answer.
+
+The missing operation is an exact join between steps 1 and 2, not a movement
+of either endpoint.
+
+### Constructive shape
+
+A follow-on build can make the interval authoritative as follows.
+
+1. Make the existing governed-arrival validator return an opaque, compiler-only
+   proof instead of returning only `CheckedIhBinding` and discarding the fresh
+   route. The proof carries the already-validated access identity, exact
+   invocation/call/callee key, binding, and common projection. It is a Rust
+   lowering value and emits no runtime field or SSA value.
+2. After line 4309 has selected the existing `CheckedIhEnvironmentTransport`,
+   but before line 4369 emits it, join that proof to the transport through the
+   planner's existing `checked_ih_generated_entry_confluences` relation. Build
+   the exact `CheckedIhGeneratedEntryCoordinate` from the access context,
+   enclosing specialization, worker body, binding, and governed call key; use
+   exact map lookup, require projection equality, and require
+   `confluence.members.contains(transport.source_call_identity())`.
+3. Return a private, opaque producer-authority proof only from that exact join.
+   Require that proof at the line-4373 fresh-result mint. A governed admission
+   paired with the wrong transport, a non-governed admission reaching this
+   producer, an absent class, or a non-member transport refuses before call
+   emission. The producer-to-mint flow remains forward.
+
+This does not recover source identity from the generated-entry quotient. The
+exact transport already carries `source_call_identity`; the join only verifies
+that identity is a member of the exact pre-existing certificate class. The
+identity is neither copied into `CheckedIhGeneratedEntryAccess` nor emitted at
+runtime.
+
+### Why this is one authority, not a second catalog
+
+The planner already retains both sides of the join:
+
+- `CheckedIhGeneratedEntryConfluence` stores the source-specific member set and
+  common projection at lines 439–443;
+- `CheckedIhGeneratedEntryAccess` publishes the sanitized call-key projection
+  at lines 467–475;
+- `build_checked_ih_generated_entry_confluences` at line 6123 refuses
+  projection disagreement among colliding source identities;
+- plan validation proves source-specific governed pairs equal certificate
+  members at lines 6656–6659, and certificate keys equal installed sanitized
+  keys at lines 6681–6684.
+
+The new operation is therefore an exact accessor over one already-validated
+relation. It neither copies the member set into the installed access nor scans
+transports and chooses a first match. Multi-member confluence is not ambiguous:
+each member is allowed only because every member has the same typed projection,
+and the producer's already-selected transport supplies the exact member tested.
+
+### Prohibition and scope audit
+
+- No store or captured continuation: the proof lives only in the compiler's
+  current Rust call stack between validation and emission.
+- No runtime tag or discriminator: neither the route nor source identity enters
+  the generated ABI or carrier word.
+- No recovery: every absent or mismatched exact relation refuses before the
+  producer.
+- No backward token move: validation and membership join precede the existing
+  call and mint in source order.
+- No second catalog or positional guess: the join uses the existing exact
+  confluence key and set membership, never iteration order or numeric
+  proximity.
+- Shape (b), Produced-transfer, the D3 chain, Direct-only salvage, and HS15
+  remain untouched. A build WP for the opaque proof and exact join is a
+  separate successor; this discovery does not begin it.
