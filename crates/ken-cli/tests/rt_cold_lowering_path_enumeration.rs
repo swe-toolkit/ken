@@ -590,13 +590,6 @@ fn entry_mismatch(entry: &str, outcome: &str) -> Option<String> {
     }
 }
 
-fn format_population_report(outcomes: &[(&str, String)]) -> String {
-    let mut report = format!("RT_COLD_ENUMERATION population={}", outcomes.len());
-    for (entry, outcome) in outcomes {
-        report.push_str(&format!("\nRT_COLD_ENUMERATION {entry} => {outcome}"));
-    }
-    report
-}
 
 macro_rules! generate_entry_tests {
     ($($entry:ident),+ $(,)?) => {
