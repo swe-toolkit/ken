@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Focused fixtures for scripts/check-ci-shard-union.py."""
-
+"""Focused schema-faithful fixtures for realized shard partition evidence."""
 from __future__ import annotations
 
 import json
@@ -14,89 +13,93 @@ import unittest
 SCRIPT = Path(__file__).with_name("check-ci-shard-union.py").resolve()
 
 
-def listing(*identities: tuple[str, str]) -> dict[str, object]:
-    suites: dict[str, object] = {}
-    for index, (binary_id, testcase) in enumerate(identities):
-        suite = suites.setdefault(
-            f"suite-{index}", {"binary-id": binary_id, "testcases": {}}
-        )
-        suite["testcases"][testcase] = {}
-    return {"test-count": len(identities), "rust-suites": suites}
+def listing(rows, matches):
+    suites = {}
+    for index, (binary_id, testcase) in enumerate(rows):
+        suites[f"suite-{index}"] = {
+            "binary-id": binary_id,
+            "testcases": {
+                testcase: {"filter-match": {"status": "matches" if (binary_id, testcase) in matches else "mismatch"}}
+            },
+        }
+    return {"test-count": len(rows), "rust-suites": suites}
 
 
-class RealizedShardFixtures(unittest.TestCase):
-    def fixture(self) -> tempfile.TemporaryDirectory[str]:
+class Fixtures(unittest.TestCase):
+    def fixture(self):
         temporary = tempfile.TemporaryDirectory()
         root = Path(temporary.name) / "realized-shards"
-        population = [("fixture::bin", f"test_{index}") for index in range(1, 9)]
-        for index, identity in enumerate(population, start=1):
+        rows = [("fixture::bin", f"test_{index}") for index in range(1, 9)]
+        for index, identity in enumerate(rows, start=1):
             artifact = root / f"realized-shard-{index}"
             artifact.mkdir(parents=True)
-            (artifact / "inventory.json").write_text(json.dumps(listing(*population)))
-            (artifact / f"selected-{index}.json").write_text(json.dumps(listing(identity)))
+            (artifact / "unfiltered-inventory.json").write_text(json.dumps(listing(rows, set(rows))))
+            (artifact / "inventory.json").write_text(json.dumps(listing(rows, set(rows))))
+            (artifact / f"selected-{index}.json").write_text(json.dumps(listing(rows, {identity})))
         return temporary
 
-    def run_fixture(self, temporary: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            [sys.executable, str(SCRIPT)],
-            cwd=temporary,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
+    def run_fixture(self, temporary):
+        return subprocess.run([sys.executable, str(SCRIPT)], cwd=temporary, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
 
-    def test_success(self) -> None:
+    def assert_red(self, mutate, message):
+        with self.fixture() as temporary:
+            mutate(Path(temporary) / "realized-shards")
+            result = self.run_fixture(temporary)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(message, result.stderr)
+
+    def test_success(self):
         with self.fixture() as temporary:
             result = self.run_fixture(temporary)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_missing_and_extra_artifact_fail(self) -> None:
-        with self.fixture() as temporary:
-            root = Path(temporary) / "realized-shards"
-            (root / "realized-shard-8").rename(root / "unexpected")
-            result = self.run_fixture(temporary)
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("expected exactly eight", result.stderr)
+    def test_missing_or_extra_artifact_and_member_red(self):
+        self.assert_red(lambda root: (root / "realized-shard-8").rename(root / "extra"), "exactly eight")
+        self.assert_red(lambda root: (root / "realized-shard-1" / "inventory.json").unlink(), "member is missing")
 
-    def test_inventory_mismatch_fails(self) -> None:
-        with self.fixture() as temporary:
-            root = Path(temporary) / "realized-shards" / "realized-shard-2"
-            (root / "inventory.json").write_text(json.dumps(listing(("fixture::bin", "other"))))
-            result = subprocess.run([sys.executable, str(SCRIPT)], cwd=temporary, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("unfiltered inventories differ", result.stderr)
+    def test_invalid_json_object_and_schema_rows_red(self):
+        self.assert_red(lambda root: (root / "realized-shard-1" / "inventory.json").write_text("not json"), "invalid JSON")
+        self.assert_red(lambda root: (root / "realized-shard-1" / "inventory.json").write_text("[]"), "not an object")
+        def null_metadata(root):
+            path = root / "realized-shard-1" / "inventory.json"
+            value = json.loads(path.read_text())
+            next(iter(value["rust-suites"].values()))["testcases"]["test_1"] = None
+            path.write_text(json.dumps(value))
+        self.assert_red(null_metadata, "metadata is not an object")
+        def empty_suites(root):
+            path = root / "realized-shard-1" / "inventory.json"
+            value = json.loads(path.read_text())
+            value["rust-suites"] = {}
+            path.write_text(json.dumps(value))
+        self.assert_red(empty_suites, "rust-suites must be a non-empty")
+        def invalid_status(root):
+            path = root / "realized-shard-1" / "inventory.json"
+            value = json.loads(path.read_text())
+            testcase = next(iter(next(iter(value["rust-suites"].values()))["testcases"].values()))
+            testcase["filter-match"]["status"] = "unknown"
+            path.write_text(json.dumps(value))
+        self.assert_red(invalid_status, "invalid filter-match status")
 
-    def test_selected_overlap_fails(self) -> None:
-        with self.fixture() as temporary:
-            path = Path(temporary) / "realized-shards" / "realized-shard-2" / "selected-2.json"
-            path.write_text(json.dumps(listing(("fixture::bin", "test_1"))))
-            result = subprocess.run([sys.executable, str(SCRIPT)], cwd=temporary, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("selections overlap", result.stderr)
+    def test_count_duplicate_and_inventory_mismatch_red(self):
+        def wrong_count(root):
+            path = root / "realized-shard-1" / "inventory.json"; value = json.loads(path.read_text()); value["test-count"] = 7; path.write_text(json.dumps(value))
+        self.assert_red(wrong_count, "differs from")
+        def duplicate(root):
+            path = root / "realized-shard-1" / "inventory.json"; value = json.loads(path.read_text()); value["rust-suites"]["duplicate"] = {"binary-id": "fixture::bin", "testcases": {"test_1": {"filter-match": {"status": "matches"}}}}; value["test-count"] = 9; path.write_text(json.dumps(value))
+        self.assert_red(duplicate, "duplicate canonical identity")
+        def mismatch(root):
+            path = root / "realized-shard-2" / "inventory.json"; value = json.loads(path.read_text()); next(iter(value["rust-suites"].values()))["binary-id"] = "other::bin"; path.write_text(json.dumps(value))
+        self.assert_red(mismatch, "filtered and unfiltered")
 
-    def test_union_missing_and_extra_fail(self) -> None:
-        with self.fixture() as temporary:
-            path = Path(temporary) / "realized-shards" / "realized-shard-8" / "selected-8.json"
-            path.write_text(json.dumps(listing(("fixture::bin", "extra"))))
-            result = subprocess.run([sys.executable, str(SCRIPT)], cwd=temporary, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("union differs", result.stderr)
-
-    def test_duplicate_canonical_identity_fails(self) -> None:
-        with self.fixture() as temporary:
-            path = Path(temporary) / "realized-shards" / "realized-shard-1" / "inventory.json"
-            duplicate = {
-                "test-count": 2,
-                "rust-suites": {
-                    "one": {"binary-id": "fixture::bin", "testcases": {"test_1": {}}},
-                    "two": {"binary-id": "fixture::bin", "testcases": {"test_1": {}}},
-                },
-            }
-            path.write_text(json.dumps(duplicate))
-            result = subprocess.run([sys.executable, str(SCRIPT)], cwd=temporary, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("duplicate canonical identity", result.stderr)
+    def test_overlap_and_union_missing_extra_red(self):
+        def overlap(root):
+            path = root / "realized-shard-2" / "selected-2.json"; value = json.loads(path.read_text());
+            for suite in value["rust-suites"].values(): suite["testcases"][next(iter(suite["testcases"]))]["filter-match"]["status"] = "mismatch"
+            next(iter(value["rust-suites"].values()))["testcases"]["test_1"]["filter-match"]["status"] = "matches"; path.write_text(json.dumps(value))
+        self.assert_red(overlap, "selections overlap")
+        def union_extra(root):
+            path = root / "realized-shard-8" / "selected-8.json"; value = json.loads(path.read_text()); suite = next(iter(value["rust-suites"].values())); suite["testcases"] = {"extra": {"filter-match": {"status": "matches"}}}; path.write_text(json.dumps(value))
+        self.assert_red(union_extra, "union differs")
 
 
 if __name__ == "__main__":
