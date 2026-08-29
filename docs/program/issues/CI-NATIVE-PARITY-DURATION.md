@@ -1,6 +1,6 @@
 ---
 id: CI-NATIVE-PARITY-DURATION
-title: "Rework the CI test suite to run faster, under the operator's 20-minute ceiling and toward the 10-minute target, by removing three measured serial floors: split checked_ih_generated_entry_confluence_and_route_mutations_reject (39 sequential subprocess mutations, 1299.983s in ONE scheduling unit) and its five siblings into per-case tests so nextest can schedule them; then partition native-rt-parity across runners; then rebalance the workspace shards. Splitting alone is necessary but NOT sufficient -- it takes the job from 25m to about 18m, because 4171.65 CPU-seconds on a 4-vCPU runner floors at 17.4m -- and partitioning is INERT until the split lands, because --partition cannot subdivide a single 1300s test. Separately, the ignored-row sweep EXECUTES 33 ignored rows for 10m and treats their failures as non-blocking findings. D1-D3 LANDED at c555f843a. D4 was RE-SCOPED 2026-08-28 after the verify ring measured its original short-circuit population EMPTY: no ignored row names an unbuilt capability, so the short-circuit half is INAPPLICABLE, and D4 instead builds a STALE-READMISSION DETECTOR -- the sweep reports a FINDING when an ignored row names a condition whose tracker node reads merged while the row stays ignored, which is the operator's own re-enablement concern already realized twice in this file. CHANNEL SEMANTICS RULED 2026-08-29 after the Architect rejected 7c607486: a stale row is an EXIT-ZERO routed finding naming every stale row, never a red gate (D4a measured 16 against the tree, so an enforced gate would red main on arrival); the instrument's OWN failures -- malformed, missing, invalid, census/registry mismatch -- exit nonzero and block. The flip to enforcement at zero population is a separate later increment needing its own release. The contradiction was the Steward's: that ruling was made in a convo thread and never landed here, so four operative passages still said FAIL. D4c released to repair source discovery, which parsed 35 of 39 ignore reasons and read historical/denied ids in prose as current conditions. Behaviour-preserving throughout: the same 90 mutation cases with the same assertions and outcomes."
+title: "Rework the CI test suite to run faster, under the operator's 20-minute ceiling and toward the 10-minute target, by removing three measured serial floors: split checked_ih_generated_entry_confluence_and_route_mutations_reject (39 sequential subprocess mutations, 1299.983s in ONE scheduling unit) and its five siblings into per-case tests so nextest can schedule them; then partition native-rt-parity across runners; then rebalance the workspace shards. Splitting alone is necessary but NOT sufficient -- it takes the job from 25m to about 18m, because 4171.65 CPU-seconds on a 4-vCPU runner floors at 17.4m -- and partitioning is INERT until the split lands, because --partition cannot subdivide a single 1300s test. Separately, the ignored-row sweep EXECUTES 33 ignored rows for 10m and treats their failures as non-blocking findings. D1-D3 LANDED at c555f843a. D4 was RE-SCOPED 2026-08-28 after the verify ring measured its original short-circuit population EMPTY: no ignored row names an unbuilt capability, so the short-circuit half is INAPPLICABLE, and D4 instead builds a STALE-READMISSION DETECTOR -- the sweep reports a FINDING when an ignored row names a condition whose tracker node reads merged while the row stays ignored, which is the operator's own re-enablement concern already realized twice in this file. CHANNEL SEMANTICS RULED 2026-08-29 after the Architect rejected 7c607486: a stale row is an EXIT-ZERO routed finding naming every stale row, never a red gate (D4a measured 16 against the tree, so an enforced gate would red main on arrival); the instrument's OWN failures -- malformed, missing, invalid, census/registry mismatch -- exit nonzero and block. The flip to enforcement at zero population is a separate later increment needing its own release. The contradiction was the Steward's: that ruling was made in a convo thread and never landed here, so four operative passages still said FAIL. D4c is RECUT 2026-08-29 (Architect evt_2933nxk4x45d4) and its original scope -- repair the source-text ignore-reason parser -- is RETIRED as the wrong layer: source-derived discovery and association are REPLACED by the compiler-generated test descriptors, which supply BOTH the test identity and the decoded ignore_message, after five gate cycles proved that lexical masking plus a raw-line substring search cannot establish outer-attribute ownership. Compiler-owned inventory plus source-parsed reason does NOT close the class -- the attribute-ownership join is the defect, so the compiler must supply both halves. D4c is PARKED at rejected 1f26af0d8 and holds no seat; D5 splits the 574s test, which is exactly shard 1 entire excess over the mean. Behaviour-preserving throughout: the same 90 mutation cases with the same assertions and outcomes."
 status: active
 owner: verify
 size: M
@@ -11,6 +11,64 @@ blocks: []
 github: null
 origin: "Operator request 2026-08-28: 'diagnose the native-slow test and brief me on what we can do about it? ideally CI should be less than 10 minutes, but less than 20 is acceptable.' Then the operator's directing message the same day: 'split up checked_ih_generated_entry_confluence_and_route_mutations_reject so that it can be parallelized and/or sharded into separate jobs. Are ignored tests run, but not considered failures if they do fail? If so, add a short circuit quick end to the tests with a comment so that they are properly re-enabled when they are rearmed. let lane 2 finish its current wp, then bring up verify on lane 2 to rework CI tests to make them run faster.' That last clause is a ROSTER RULING and is recorded in steward/lanes.md. Steward diagnosis measured against completed main run 33192361977 at bb33dfb71e302a68377ffde8038f7dc8bd2c82ac -- the first fully completed main run since 31258f403. Steward-filed per COORDINATION section 2."
 ---
+
+> # OPERATIVE AND TOPMOST — D4's DISCOVERY MECHANISM IS REPLACED. THE COMPILER
+> # OWNS BOTH TEST IDENTITY AND IGNORE REASON. DO NOT REPAIR THE PYTHON LEXER.
+>
+> **Architect ruling `evt_2933nxk4x45d4`, 2026-08-29, on the Steward's mechanism
+> disposition request `evt_7xa7h67epj47m`. It governs every D4 passage below.**
+> Where anything further down describes source-text discovery, association, or
+> reason decoding as the mechanism, THIS BANNER WINS and that passage states a
+> retired design. Sections `D4a`, `D4c`, the 43-vs-39 residual ruling, and
+> `AC-COMPILER-ORACLE` have each been rewritten in place; nothing was left to be
+> read as still-live by anyone who reaches it first.
+>
+> **Five gate cycles were spent making a Python Rust lexer agree with rustc** —
+> on comments, then `\bfn\b`, then `stringify!` and `macro_rules!` token trees.
+> Each cycle closed the exhibited counterexample and the next found another
+> spelling of one class: **lexical masking plus a raw-line `#[test]` substring
+> search cannot establish outer-attribute ownership.** Robustly, that path ends
+> at a full Rust parser written in Python.
+>
+> **The correction the Architect made to the Steward's diagnosis, and it is the
+> load-bearing half:** compiler-owned INVENTORY plus source-parsed REASON does
+> **not** close the class. Attaching a source reason to a compiler test id still
+> requires deciding which outer attributes belong to which item — the exact join
+> that failed on all four shapes. **The compiler must supply BOTH the identity
+> and the decoded reason.** A half-migration keeps the defect.
+>
+> The current toolchain already exposes both, Architect-probed on `rustc
+> 1.97.1` (descriptor log SHA-256
+> `327e7330d5824817dc8a3eff00d1159f6051c8d464a71d2ea565667618985252`):
+>
+> ```sh
+> RUSTC_BOOTSTRAP=1 "$test_binary" --list --format json -Z unstable-options
+> ```
+>
+> emitting per descriptor: `name`, `ignore`, `ignore_message`, `source_path`,
+> and `start_line`/`start_col`/`end_line`/`end_col`.
+>
+> **This closes the class structurally rather than case by case.** Comments,
+> raw/cooked escapes, lifetimes, character literals, item boundaries, attribute
+> order, macro expansion, `cfg`, and attribute-shaped tokens are all resolved by
+> rustc *before* the descriptor exists. An ignored helper is not an ignored
+> TEST and is correctly absent, rather than a census failure. A `cfg`-disabled
+> test is absent from this profile; if another profile matters, **compile and
+> list that profile** rather than pretending a static scan models `cfg`.
+>
+> **`AC-COMPILER-ORACLE` IS NOT "TRIVIALLY SATISFIED" NOW — that phrasing was the
+> Steward's and the Architect struck it.** Shared derivation is not
+> corroboration. The descriptor becomes the AUTHORITY; independence comes from
+> the fixed known-answer fixture, exact nextest-versus-descriptor set equality,
+> fixed registry authority, and compile-preserving mutations of the adapter's
+> inputs.
+>
+> **D4c is PARKED at rejected `1f26af0d8e0c6df596ffc99b3f4e2162fab2fe27` and D5
+> holds the implementer.** This recut is what D4c resumes onto; it is not a
+> release. **The branch's own `docs/program/wp/CI-NATIVE-PARITY-DURATION-D4c.md`
+> (blob `139ef45104e4a03991d147ea94aaf0afa5907102`) still carries the retired
+> mechanism and MUST be rewritten to this ruling before any respin** — it exists
+> only on the branch, so this node cannot correct it for you.
 
 > # OPERATIVE — D1-D3 LANDED; D4 IS RE-SCOPED TO A STALE-READMISSION DETECTOR
 >
@@ -354,11 +412,15 @@ channel-semantics ruling in the OPERATIVE banner at the top of this node. The
 instrument's OWN failures (malformed, missing, invalid, census/registry
 mismatch) exit nonzero and block.
 
-**D4a — enumerate the population first, across BOTH sources.** A readmission
+**D4a — enumerate the population first, across BOTH authorities.** A readmission
 condition is recorded in two places and they do not agree on shape: the
 `readmission` field in `.github/ignored-test-exemptions.toml`, and the row's own
-`#[ignore = "..."]` reason / adjacent comment. Deliver a table of every ignored
-row, both recorded conditions, whether each resolves to a
+ignore reason. **The row's reason is the COMPILER-DECODED `ignore_message` from
+the test descriptor, NOT the source `#[ignore = "..."]` literal and NOT an
+adjacent comment** — see the topmost banner. An adjacent comment is not an
+authority at all under the ruled mechanism; where D4a's original text treated
+comment prose as a recorded condition, that is retired. Deliver a table of every
+ignored row, both recorded conditions, whether each resolves to a
 `docs/program/issues/<ID>.md` file, and that node's `status:` when it does.
 **Three instances are known to the Steward and the enumeration must find at
 least these three, or it is under-covering:**
@@ -376,79 +438,102 @@ denies the row is blocked on it, and it stops working the moment someone rewords
 a comment. Resolve the cited id to `docs/program/issues/<ID>.md` and read its
 `status:` field.
 
-**D4c — PARSE THE IGNORE REASONS PROPERLY. RELEASED 2026-08-29 as the repair
-scope for the Architect's first blocking defect (`evt_bfg568nhmpth`).** The
-candidate's source discovery parsed **35 of 39** valid ignore reasons: a
-one-line `IGNORE_REASON_RE` silently drops escaped-quote and multiline string
-literals, and a token `findall` over prose treats **historical and explicitly
-DENIED** node ids as current conditions. **The silence is the defect** — four
-rows fell out of the population with no diagnostic, which is precisely the
-"instrument failure that reads as coverage" the channel ruling above forbids.
+**D4c — REPLACE SOURCE-DERIVED DISCOVERY AND ASSOCIATION WITH THE
+COMPILER-GENERATED TEST DESCRIPTORS. RECUT 2026-08-29 on Architect ruling
+`evt_2933nxk4x45d4`; PARKED at rejected `1f26af0d8`, not released.**
 
-Required:
+The original D4c scope — repair the Rust literal parser, add declared-condition
+extraction, add three literal-form controls — **is RETIRED IN FULL.** It was a
+correct description of the symptoms and the wrong layer. Do not implement it,
+and do not treat the retired bullets as a floor to also satisfy.
 
-- A parser accepting **every valid Rust `#[ignore = ...]` literal form** —
-  escaped quotes, multiline, and raw strings — not a single-line regex.
-- **Declared / current-condition extraction**, so a node id appearing in prose
-  is only a condition when the row asserts it as one. An id mentioned in a
-  denial ("no longer blocked on X") or as history is NOT a current condition.
-- Three committed controls, each two-sided: an **escaped-quote** row, a
-  **multiline denial** row, and a **current-plus-historical** row where both
-  ids appear and only the current one may fire.
-- **Reconcile census, registry, and finding count**, and state the arithmetic.
-  Any row the parser cannot classify is an INSTRUMENT FAILURE (nonzero), never
-  a silent drop.
+**Required mechanism, all six steps:**
 
-**Fold the Steward's owed reconciliation in here:** I counted **45** `#[ignore`
-lines under `crates/` against the ring's **39** source rows, and the parser
-defect makes that gap load-bearing rather than bookkeeping — a discrepancy in
-how many rows exist is the same class of error as parsing 35 of 39. Report the
-arithmetic that reconciles 45, 39, and the final population, or state plainly
-which part is still unexplained. **Do not close it by assertion.**
+1. **Keep the existing authoritative nextest listing** as the suite enumerator:
 
-> ## RULING ON THE DISCLOSED 43-vs-39 RESIDUAL (Steward, 2026-08-29)
+   ```sh
+   cargo nextest list --workspace --locked --run-ignored=only \
+     --message-format json > ignored-row-all.json
+   ```
+
+   Its suite records already carry `package-name`, `binary-id`, `binary-name`,
+   `binary-path`, `cwd`, and full test names.
+
+2. **For each listed suite, invoke that exact `binary-path` in its `cwd`** with
+   the libtest JSON discovery command in the topmost banner. Parse only complete
+   `event=discovered` records. **Identity is `(package-name, binary-name,
+   descriptor.name)`; the reason is `descriptor.ignore_message` on
+   `ignore=true`.**
+
+3. **Reconcile EXACT SETS, per suite and package — never counts:**
+
+   ```text
+   nextest ignored identities == compiler-descriptor ignored identities
+   ```
+
+   Missing suite, duplicate identity, malformed JSON, missing required field,
+   empty ignore reason, or any set difference is an INSTRUMENT FAILURE and exits
+   nonzero. **Counts may be printed only as summaries of already-equal sets** —
+   a count is a summary here, never a check.
+
+4. **Resolve every exemption registry `test_path` to exactly one compiler
+   identity**, as the current nextest-side resolver already does. Apply
+   `readmission_kind` unchanged: `tracker-node` requires the compiled
+   `ignore_message` to BEGIN with the exact `TRACKER-ID:` declaration and agree
+   with the registry row; `relation-symbol` requires the compiled message to
+   contain the exact bounded symbol; `free-prose` invents no tracker resolution.
+   Tracker status lookup and the exit-zero named stale-row findings are
+   UNCHANGED. Invalid, missing, or unresolvable claimed authority stays blocking.
+
+5. **Source paths and spans are DIAGNOSTICS ONLY.** Source text is no longer an
+   inventory, an association oracle, or a reason decoder.
+
+6. **DELETE the source mechanism rather than leaving it as a second authority:**
+   `rust_code_mask`, Rust literal decoding, `ignore_attributes`,
+   `has_adjacent_test_attribute`, source attribute counts, and every
+   count-equality rule derived from them. **Two authorities recreate the exact
+   disagreement D4c exists to retire** — leaving the old path in place as a
+   cross-check reintroduces the defect under a new name.
+
+**The unstable-interface boundary, and its three hard limits.** `--format json
+-Z unstable-options` is an unstable libtest observation surface, acceptable here
+ONLY under all three: `RUSTC_BOOTSTRAP=1` is set on the already-built test-binary
+LISTING SUBPROCESS ONLY — never on cargo/rustc compilation and never exported to
+the job; **no tests execute in that subprocess**; and schema drift or removal
+**fails closed** as an instrument error. This adds no Ken product or TCB
+assumption and is strictly smaller than maintaining a second Rust parser in
+Python. **If that narrow interface becomes unavailable, STOP and re-route the
+mechanism to the Steward — do not fall back to keyword enumeration or another
+masked-line parser.**
+
+**The 45-vs-39 reconciliation the Steward owed here is DISCHARGED BY THE RECUT,
+not by an answer.** It was arithmetic over source `#[ignore` grep hits against
+source-parsed rows, and neither quantity exists under the ruled mechanism. Step
+3's set equality is the invariant that replaces it, and it is stronger: it
+compares identities rather than reconciling counts.
+
+> ## THE 43-vs-39 RESIDUAL RULING IS RETIRED (superseded 2026-08-29)
 >
-> Held candidate `652d7b4e173ee637fbea46929a211fa7c5675c29` reconciled
-> **`45 - 6 = 39`** — six prose-only grep hits, 39 syntactic attributes — and
-> stated plainly that **43 function-associated records against 39 attributes**
-> remains unexplained, handing the SHA back rather than claiming route-ready.
-> **That disclosure is the frame working, and the ring was right to refuse to
-> promote a stated gap into coverage.** The answer to "is disclosure enough" is
-> no, and the reason is specific rather than a general demand for rigour.
+> **Both quantities were artifacts of the source-parsing mechanism and neither
+> exists under the ruled one.** "43 function-associated records" was the output
+> of the association step that the Architect has now removed, and "39 syntactic
+> attributes" was the source attribute count that D4c step 6 DELETES. A
+> reconciliation between two retired numbers is not a deliverable, and demanding
+> it would send the ring back into the layer the ruling vacated.
 >
-> **THE DISCREPANCY IS IN THE ASSOCIATION STEP, AND MIS-ASSOCIATION IS THE EXACT
-> MECHANISM THAT MADE THE PRIOR COUNT FALSE REASSURANCE.** The candidate's own
-> report says so: the old matcher dropped four literal forms and mis-association
-> compensated, so 39 looked right while the parse was wrong. **A residual sitting
-> in the mechanism that produced the defect is the defect surviving with a note
-> attached**, and a note does not fire in CI.
+> **The general requirement it was protecting SURVIVES and is now stronger.** It
+> was: *the instrument must not be able to be silently inconsistent with itself.*
+> That is realized by **D4c step 3's exact set equality** between the nextest
+> ignored identities and the compiler-descriptor ignored identities, enforced
+> nonzero and blocking. Set equality over identities is a strictly better form of
+> the same invariant than reconciling two counts, because it names WHICH row
+> disagrees rather than only that a total differs.
 >
-> **DO NOT ASSUME 43-vs-39 IS A DEFECT. MEASURE THE DIRECTION FIRST.** It may be
-> entirely legitimate: one function can carry `#[ignore]` under two `cfg`
-> profiles, and "record" granularity need not equal "attribute" granularity.
-> **Attribute every count to its `cfg` profile before calling it a discrepancy.**
-> State which side is wrong — 43 real associable sites that the attribute parse
-> under-finds, or 39 real attributes against which the associator emits 4
-> spurious records — because the two need opposite repairs and guessing costs a
-> respin.
->
-> **THE BOUNDED REQUIREMENT IS NOT "EXPLAIN ALL FOUR". IT IS THAT THE INSTRUMENT
-> MUST NOT BE ABLE TO BE SILENTLY INCONSISTENT WITH ITSELF.** Whichever way the
-> measurement lands:
->
-> - If the counts should be equal, wire that equality as an ENFORCED instrument
->   check — nonzero and blocking, per the channel ruling above, which already
->   puts census/registry mismatch in the enforced channel. An internal
->   self-disagreement is that same class.
-> - If the counts should NOT be equal because `cfg` profiles or granularity
->   legitimately separate them, then **state the CORRECT invariant and enforce
->   THAT.** "The numbers differ for a known reason" is only acceptable when the
->   known reason is itself checkable.
->
-> **Either outcome is a landing.** What may not land is an instrument that
-> computes two numbers, does not reconcile them, and says nothing at runtime —
-> because that is indistinguishable from the state this deliverable exists to
-> repair.
+> **One measurement lesson from it is worth carrying** and does not depend on the
+> retired mechanism: `cfg` profile is part of a population's identity. Under the
+> new mechanism this is handled structurally rather than by attribution — a
+> `cfg`-disabled test is simply absent from the descriptor population for that
+> profile, and if another profile matters you **compile and list that profile**.
 
 **THE UNRESOLVABLE-CONDITION RULE IS A FORK, AND D4a's TABLE DECIDES IT — do not
 pick one here.** Four of the six registry entries are free prose and one names a
@@ -607,17 +692,52 @@ landed precedent in D1, not a design problem. Size S/M.
   passes for a reason unrelated to the property, and this program has twice paid
   for a control that could not fail.
 
-- **`AC-COMPILER-ORACLE` (D4) — the instrument's model of Rust is proved against
-  RUSTC, never against the instrument.** Wherever the sweep decides a question
-  the Rust language already decides — is this apostrophe a lifetime or a
-  character literal, does this attribute block associate with that test, is this
-  string escape valid — the control must compile a fixture and compare the
-  candidate's ignored inventory and association key against
-  `rustc --test` + `--ignored --list`. Two-sided: a form rustc ACCEPTS must be
-  accepted with the same inventory and key, and a form rustc REJECTS must fail
-  as a named instrument error. Every case must travel the **whole source path**
-  — ignore discovery, association, current-condition extraction, verifier
-  enforcement — never a direct call into the parser.
+- **`AC-COMPILER-ORACLE` (D4) — RECUT 2026-08-29. The compiler descriptor is the
+  AUTHORITY, not a thing the instrument is compared against.** The sweep no
+  longer holds a model of Rust to prove correct; it holds an ADAPTER over
+  `(nextest suite listing, libtest JSON descriptors)`. What must be proved is
+  that the adapter reads those inputs faithfully and fails closed when they
+  disagree.
+
+  > **DO NOT RESTATE THIS AS "TRIVIALLY SATISFIED BECAUSE THE INSTRUMENT AND
+  > ORACLE NOW SHARE A SOURCE."** That phrasing was the Steward's and the
+  > Architect struck it: **shared derivation is not corroboration.** Independence
+  > comes from four places, and every one of them must be exhibited — the fixed
+  > known-answer fixture, the exact nextest-versus-descriptor set equality,
+  > the independently fixed registry authority, and compile-preserving mutations
+  > of the adapter's inputs.
+
+  Required, and each case must travel the **whole path** — suite listing,
+  descriptor discovery, set reconciliation, registry resolution, verifier
+  enforcement — **never a direct call into an internal helper**:
+
+  - **Retain the exact positives** and require that each COMPILES and that its
+    **compiler descriptor** carries the independently fixed full test identity
+    and decoded reason, after which fixed registry/tracker authority and the
+    full verifier must pass: multiline-nested comment, same-line comment,
+    zero-fence raw, compiled `\u{2_d}`, hashed raw, escapes, continuations, and
+    either attribute order.
+  - **Retain the exact `#[test] fn decoy` negative**, and add the two class
+    controls the Architect measured: `const _: &str = stringify!(#[test]);` and
+    a one-line `macro_rules!` transcriber containing `#[test]`, each followed by
+    an ignored helper. Rustc, nextest, and the descriptor inventory must all be
+    EMPTY for the helper, and the verifier must not associate it.
+  - **Add a macro-generated POSITIVE ignored test.** This is the case that
+    proves the mechanism FOLLOWS compiler expansion rather than merely excluding
+    macro-shaped decoys — an exclusion-only control set would pass a mechanism
+    that silently drops every macro-generated test.
+  - **Keep the wrong-node mutation:** changing independently fixed registry
+    authority to `RT-WRONG` must red.
+  - **Replace the four custom invalid-Rust-literal parser diagnostics with
+    compiler negatives paired to valid controls.** An invalid escape must fail
+    the rustc/nextest BUILD before any inventory exists; **the sweep must not
+    reimplement rustc merely to issue its own wording.** Malformed descriptor
+    JSON and registry/descriptor disagreement still exercise
+    `ignored-sweep instrument error:` and exit 2.
+  - **Mutation-prove the adapter in BOTH directions:** remove one compiler
+    descriptor while holding nextest fixed, and change one ignored flag or
+    reason while holding nextest and the registry fixed. Each must red on an
+    exact identity/reason diagnostic, not a count mismatch.
 
   > **A CONTROL THAT CALLS THE CANDIDATE'S OWN PARSER IS A SELF-ORACLE, AND A
   > SELF-ORACLE CANNOT DETECT A DEFECT IN THE THING IT ORACLES.** It agrees with
@@ -638,15 +758,25 @@ landed precedent in D1, not a design problem. Size S/M.
   > nobody reads it, and the ring fails it repeatedly without ever being wrong
   > about the frame.
 
-  **The cases below are ILLUSTRATION, NOT THE ROSTER.** Satisfy this AC as the
-  predicate stated above; an enumerated list of escape forms is finishable, and
-  a finished checklist is what let the previous controls look complete. Known
-  members at the time of writing: lifetime and label apostrophes versus
-  character literals; a block-comment spacer between `#[test]` and `#[ignore]`;
-  continuation starting only at an immediate newline and never at
-  backslash-space; the escaped apostrophe `\'`; `\0`; hex, Unicode, raw and
-  escaped-quote forms; and non-ASCII hex, surrogate Unicode and unknown escapes
-  as rejections.
+  > **THE SELF-ORACLE WARNING STILL BINDS, AND THE RECUT DOES NOT DISCHARGE
+  > IT.** It now applies to the ADAPTER: a control that calls the adapter's own
+  > reconciliation helper instead of running the whole path is the same
+  > self-oracle in a new layer. The retired lexer is gone; the way to certify
+  > by construction is not.
+
+  **The lexical cases this AC used to enumerate are RETIRED with the mechanism.**
+  Apostrophes versus lifetimes, block-comment spacers, backslash-continuation,
+  `\'`, `\0`, and the hex/Unicode/raw escape grammar are all resolved by rustc
+  before a descriptor exists, so they are no longer the instrument's questions
+  to get right. **Do not carry that list forward as a checklist to also satisfy**
+  — several of its members are now unreachable by construction, and a control
+  that still exercises them is testing a code path D4c step 6 deletes.
+
+  The cases named in the bullets above are the REQUIRED controls, and they are a
+  floor rather than a roster: **satisfy the predicate, which is that the adapter
+  reads its two inputs faithfully and fails closed on any disagreement.** An
+  enumerated list is finishable, and a finished checklist is exactly what let the
+  previous controls look complete across five rejected candidates.
 
 - **`AC-DURATION-MEASURED`.** Report the post-increment `native-slow
   (rt_parity_native)` Test-step duration, the `ignored-row sweep` duration, and
@@ -716,6 +846,24 @@ landed precedent in D1, not a design problem. Size S/M.
   for an unrelated reason and would red if simply re-enabled.
 - **Do not key the detector on comment TEXT.** Resolve the cited node id and read
   its `status:` field. A prose match is not the property.
+- **Do not keep the source mechanism as a second authority or a cross-check**
+  (D4c step 6). `rust_code_mask`, Rust literal decoding, `ignore_attributes`,
+  `has_adjacent_test_attribute` and every count-equality rule derived from them
+  are DELETED, not retained beside the descriptor path. Two authorities recreate
+  the exact disagreement D4c exists to retire, and a cross-check is the most
+  persuasive way to reintroduce it.
+- **Do not repair the Python Rust lexer again, and do not add another item
+  keyword, mask, or adjacency heuristic.** Five cycles closed five spellings of
+  one class. If the descriptor interface is unavailable, **STOP and re-route to
+  the Steward** — a fallback to keyword enumeration is banned, not merely
+  discouraged.
+- **Do not set `RUSTC_BOOTSTRAP=1` on cargo/rustc COMPILATION, and do not export
+  it to the job.** It is permitted only on the already-built test-binary listing
+  subprocess. **No tests execute in that subprocess**, and schema drift or
+  removal of the unstable interface must FAIL CLOSED as an instrument error.
+- **Do not reimplement rustc to issue the sweep's own wording** for invalid Rust
+  literals. An invalid escape fails the build before any inventory exists; that
+  is the diagnostic.
 - **Do not assign a node id to the four generic "post-M6 runtime parity debt"
   rows.** Their real blockers are runtime's to name. Guessing one manufactures
   the false pairing this node already rejected.
