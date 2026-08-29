@@ -4339,6 +4339,105 @@ fn ac_c7_computational_match_edge(scrutinee: &str, inner: &str) -> (i64, u64, u6
     (observed, inner_identity, sentinel_identity)
 }
 
+fn direct_none_frame_recursive_ret_vis_compile() -> Result<(), CraneliftBackendError> {
+    let fixture = RuntimeExpr::Let {
+        value: Box::new(ac_c7_wrap("Absent", "Gamma")),
+        body: Box::new(RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Var(0)),
+            cases: vec![
+                crate::RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::ITree::Ret".to_string(),
+                    argument_binders: 1,
+                    recursive_positions: vec![0],
+                    body: RuntimeExpr::Var(2),
+                },
+                crate::RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::ITree::Vis".to_string(),
+                    argument_binders: 2,
+                    recursive_positions: Vec::new(),
+                    body: ac_c7_ctor("Sentinel"),
+                },
+            ],
+            default: ac_c7_trap(),
+        }),
+    };
+    let RuntimeExpr::Let {
+        body: match_expr, ..
+    } = &fixture
+    else {
+        unreachable!()
+    };
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let scrutinee_origin = plan.child_static_origin(root, 0).unwrap();
+    let match_origin = plan.child_static_origin(root, 1).unwrap();
+    let lowered = ac_c7_lowered_wrap(&plan, scrutinee_origin, "Absent", "Gamma");
+    let seed_env = NativeSeedEnvironment::empty();
+    ac_c7_try_compile_edge(&seed_env, plan, move |compiler, builder| {
+        let word = compiler.transfer_into_carrier(builder, scrutinee_origin, &lowered)?;
+        let eliminated = compiler.lower_expr(
+            builder,
+            SourceOccurrence {
+                expr: match_expr.as_ref(),
+                static_origin: match_origin,
+            },
+            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+                word,
+            ))],
+        )?;
+        let LoweringOperand::Carried(selected) = eliminated else {
+            panic!("carried computational match must return a carried merge")
+        };
+        compiler.emit_carrier_tag(builder, selected)
+    })
+    .map(|_| ())
+}
+
+/// **Promise class: durable invariant.** A Direct/None strict Ret+Vis topology
+/// lowers its recursive Ret body once through the ordinary payload path. The
+/// `Var(2)` body is the discriminator: separately lowering the runtime-dead
+/// checked successor supplies no IH and returns the exact error pinned below.
+#[test]
+fn architect_probe_direct_none_frame_ret_vis_carried_match_compiles() {
+    PX8TR_TRAP_PROVENANCE.with(|trace| trace.borrow_mut().clear());
+    direct_none_frame_recursive_ret_vis_compile()
+        .expect("Direct/None Ret+Vis lowering must not compile a dead checked body");
+    let provenance = PX8TR_TRAP_PROVENANCE.with(|trace| trace.borrow().clone());
+    assert!(
+        !provenance.iter().any(|event| matches!(
+            event,
+            Px8trTrapProvenanceEvent::CarriedAnswerRouteEmitted { .. }
+        )),
+        "a None-frame fixture must not claim a checked-frame emission"
+    );
+}
+
+/// **Promise class: durable invariant.** The test-only mutation restores the
+/// pre-repair separate checked-body lowering at the changed seam. It must
+/// recreate the original `Unsupported(Var, ...)` failure, then clearing it must
+/// return the same fixture to `Ok` in this process.
+#[test]
+fn unconditionally_separate_checked_successor_lowering_recreates_the_regression() {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING.with(|armed| armed.set(false));
+        }
+    }
+    let _reset = Reset;
+    CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING.with(|armed| armed.set(true));
+    assert_eq!(
+        direct_none_frame_recursive_ret_vis_compile(),
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Var",
+            reason: "no runtime binding for index 2".to_string(),
+        })),
+        "the mutation must recreate the exact pre-repair failure"
+    );
+    CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING.with(|armed| armed.set(false));
+    direct_none_frame_recursive_ret_vis_compile()
+        .expect("clearing the mutation must restore the repaired lowering");
+}
+
 /// ⭐⭐ **`AC-C7` ROW 3 OF 3 — `ComputationalMatch`.** Its own row; ⛔ never
 /// aggregated with the other two.
 ///

@@ -10026,10 +10026,22 @@ fn carried_computational_loop_control_word(
             );
             2
         }
+        Ok("initial-checked-to-direct")
+            if checked_frame_id == Some(7)
+                && edge == CarriedComputationalLoopEdge::Initial
+                && authored_route == SourceComputationalAnswerRoute::CheckedSelectedRecursor =>
+        {
+            eprintln!(
+                "RT_CHECKED_SUCCESSOR_CONTROL_APPLIED mode=initial-checked-to-direct \
+                 frame=7 edge=initial"
+            );
+            SourceComputationalAnswerRoute::DIRECT_CONTROL_WORD
+        }
         Ok("active-checked-to-direct")
         | Ok("active-direct-to-checked")
         | Ok("active-checked-to-unknown")
-        | Ok("initial-direct-to-unknown") => emitted,
+        | Ok("initial-direct-to-unknown")
+        | Ok("initial-checked-to-direct") => emitted,
         Ok(other) => panic!("unknown KEN_RT_ITREE_D1_ROUTE_CONTROL mode: {other}"),
     };
 
@@ -12936,6 +12948,8 @@ thread_local! {
     pub(super) static PX8TR_TRAP_PROVENANCE: std::cell::RefCell<Vec<Px8trTrapProvenanceEvent>> =
         const { std::cell::RefCell::new(Vec::new()) };
     pub(super) static PX8TR_DISABLE_DEFORESTED_ANSWER_ROUTE: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    pub(super) static CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
 }
 #[cfg(test)]

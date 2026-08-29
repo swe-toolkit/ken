@@ -3207,7 +3207,7 @@ mod tests {
         };
 
         let (success, success_provenance) = run("px8tr-post-effect-success", false);
-        assert_eq!(success.status.code(), Some(0));
+        let success_status = success.status.code();
         // ⭐⭐ `RT-DECL-CLOSURE-PORT` `D6a` — THE EVIDENCE RULE, APPLIED.
         //
         // This row used to assert `DeforestedAnswerResumed`. That event is
@@ -3222,10 +3222,10 @@ mod tests {
         // ⛔ The pair below is the ruled replacement, and neither half
         // substitutes for the other:
         //
-        // - **runtime**: `success.status.code() == Some(0)` above. The linked
-        //   artifact ran, took the return case, and exited through the unique
-        //   return-case-dependent success. Only that can testify to a runtime
-        //   choice.
+        // - **runtime**: the exact `(Some(0), Some(1))` outcome relation
+        //   below. The linked artifact ran, took the return case, and exited
+        //   through the unique return-case-dependent success. Only that can
+        //   testify to a runtime choice.
         // - **emission**: `CarriedAnswerRouteEmitted`, which claims only that
         //   the carried route was emitted into this frame's return case.
         //
@@ -3286,7 +3286,13 @@ mod tests {
         )));
 
         let (trapped, trapped_provenance) = run("px8tr-post-effect-route-disabled", true);
-        assert_eq!(trapped.status.code(), Some(1));
+        let trapped_status = trapped.status.code();
+        assert_eq!(
+            (success_status, trapped_status),
+            (Some(0), Some(1)),
+            "the enabled checked route must return successfully while disabling that exact \
+             route must select the planned checked-ITree default"
+        );
         assert!(String::from_utf8_lossy(&trapped.stderr)
             .contains("planned runtime trap token"));
 
@@ -3408,7 +3414,84 @@ mod tests {
             crate::cranelift_backend::Px8trTrapProvenanceEvent::PlannedTrapEmitted { trap, .. }
                 if trap == &expected
         )));
-        assert_ne!(success.status.code(), trapped.status.code());
+    }
+
+    /// **Promise class: durable invariant.** One isolated test-support compile
+    /// gives the closed Initial and ActiveSelfResumption predecessors different
+    /// emitted control words. Swapping the two production call sites reverses
+    /// the labeled sequence and must red this exact relation.
+    #[cfg(all(target_os = "linux", feature = "px8-ds-test-support"))]
+    #[test]
+    fn carried_loop_header_edges_keep_their_distinct_control_words() {
+        const CHILD: &str = "KEN_RT_CHECKED_SUCCESSOR_EDGE_PAIR_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            let route = crate::cranelift_backend::emit_px8tr_nested_post_effect_object(
+                "checked-successor-edge-pair-child",
+                false,
+            )
+            .expect("the mixed checked fixture emits");
+            let header_edges = route
+                .provenance
+                .iter()
+                .filter_map(|event| match event {
+                    crate::cranelift_backend::Px8trTrapProvenanceEvent::CarriedLoopHeaderEdgeEmitted {
+                        checked_frame_id,
+                        edge,
+                        authored_control_word,
+                        emitted_control_word,
+                    } => Some((
+                        *checked_frame_id,
+                        *edge,
+                        *authored_control_word,
+                        *emitted_control_word,
+                    )),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                header_edges,
+                vec![
+                    (
+                        Some(7),
+                        crate::cranelift_backend::CarriedComputationalLoopEdge::Initial,
+                        1,
+                        0,
+                    ),
+                    (
+                        Some(7),
+                        crate::cranelift_backend::CarriedComputationalLoopEdge::ActiveSelfResumption,
+                        1,
+                        1,
+                    ),
+                ],
+                "each call site must retain its own edge label and emitted control"
+            );
+            return;
+        }
+
+        let output = Command::new(std::env::current_exe().expect("unit-test binary"))
+            .arg("--exact")
+            .arg(
+                "object_linker_packaging::tests::\
+                 carried_loop_header_edges_keep_their_distinct_control_words",
+            )
+            .arg("--nocapture")
+            .env(CHILD, "1")
+            .env("KEN_RT_ITREE_D1_ROUTE_CONTROL", "initial-checked-to-direct")
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated edge-pair control child");
+        assert!(
+            output.status.success(),
+            "edge-pair child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("RT_CHECKED_SUCCESSOR_CONTROL_APPLIED mode=initial-checked-to-direct"),
+            "the control-word mutation did not reach the Initial producer"
+        );
     }
 
     #[cfg(target_os = "linux")]

@@ -12338,6 +12338,35 @@ impl<'a> Lowering<'a> {
         let merge = builder.create_block();
         builder.append_block_param(merge, types::I64);
 
+        // The strict existing topology, re-derived exactly as the specialized
+        // arm derives it: one `Ret` case with one binder, one `Vis` case, two
+        // cases total, and no checked control markers in the return body.
+        let return_case = if px8tr_deforested_answer_route_enabled() {
+            let mut returns = eliminator.cases.iter().enumerate().filter(|(_, case)| {
+                case.argument_binders == 1 && case.constructor.ends_with("::ITree::Ret")
+            });
+            let return_case = returns.next();
+            let exact_return = returns.next().is_none();
+            let mut visible = eliminator
+                .cases
+                .iter()
+                .filter(|case| case.constructor.ends_with("::ITree::Vis"));
+            let exact_visible =
+                visible.next().is_some() && visible.next().is_none() && eliminator.cases.len() == 2;
+            return_case.filter(|(_, return_case)| {
+                exact_return
+                    && exact_visible
+                    && source_case_has_no_checked_control_markers(&return_case.body)
+            })
+        } else {
+            None
+        };
+        let return_body = return_case.map(|_| {
+            let block = builder.create_block();
+            builder.append_block_param(block, types::I64);
+            block
+        });
+
         for (index, case) in eliminator.cases.iter().enumerate() {
             // ⛔ Malformed recursive positions are rejected before any code is
             // emitted for this case, exactly as the specialized composed path
@@ -12390,6 +12419,30 @@ impl<'a> Lowering<'a> {
                 #[cfg(test)]
                 px8j_record_carrier_field_projection(Px8jProducerPath::Composed, position, child);
                 children.push(LoweringOperand::Carried(child));
+            }
+
+            // The strict Ret continuation is lowered once. Its ordinary
+            // constructor arm and the checked whole-answer arm feed the same
+            // carried payload block; recursive-position IHs and the body are
+            // built only after that join, so neither predecessor gets a second
+            // lowering with a different environment shape.
+            if return_case
+                .as_ref()
+                .is_some_and(|(return_index, _)| *return_index == index)
+            {
+                let return_body =
+                    return_body.expect("a strict return case has a shared return-body block");
+                let [LoweringOperand::Carried(returned)] = children.as_slice() else {
+                    return Err(unsupported(
+                        "ComputationalMatch",
+                        "the strict return case did not bind one carried payload",
+                    ));
+                };
+                builder.ins().jump(return_body, &[returned.word.into()]);
+                builder.switch_to_block(return_body);
+                children = vec![LoweringOperand::Carried(CarriedBoundaryWord {
+                    word: builder.block_params(return_body)[0],
+                })];
             }
 
             // ── ⭐⭐ `AC-C4` — the induction hypotheses over carried children ──
@@ -12578,32 +12631,7 @@ impl<'a> Lowering<'a> {
         // constructor is matched by name. The guard is a compile-time property
         // of the case *topology*, identical to the specialized arm's, and the
         // word never participates in it.
-        let return_case = if px8tr_deforested_answer_route_enabled() {
-            // The strict existing topology, re-derived here exactly as the
-            // specialized arm derives it: one `Ret` case with one binder, one
-            // `Vis` case, two cases total, and no checked control markers in the
-            // return body.
-            let mut returns = eliminator.cases.iter().enumerate().filter(|(_, case)| {
-                case.argument_binders == 1 && case.constructor.ends_with("::ITree::Ret")
-            });
-            let return_case = returns.next();
-            let exact_return = returns.next().is_none();
-            let mut visible = eliminator
-                .cases
-                .iter()
-                .filter(|case| case.constructor.ends_with("::ITree::Vis"));
-            let exact_visible =
-                visible.next().is_some() && visible.next().is_none() && eliminator.cases.len() == 2;
-            return_case.filter(|(_, return_case)| {
-                exact_return
-                    && exact_visible
-                    && source_case_has_no_checked_control_markers(&return_case.body)
-            })
-        } else {
-            None
-        };
-
-        if let Some((return_index, return_case)) = return_case {
+        if let Some((_return_index, _return_case)) = return_case {
             let checked_route = builder.create_block();
             let default_route = builder.create_block();
             let route_is_checked = builder.ins().icmp_imm(
@@ -12627,29 +12655,28 @@ impl<'a> Lowering<'a> {
             // carried route was emitted, for this frame, into this return case.
             // The runtime half is the linked artifact's exit status.
             #[cfg(test)]
-            px8tr_record_trap_provenance(Px8trTrapProvenanceEvent::CarriedAnswerRouteEmitted {
-                checked_frame_id: eliminator
-                    .checked_frame_id
-                    .expect("checked answer routes carry exact frame ids"),
-                return_constructor: return_case.constructor.clone(),
-            });
+            if let Some(checked_frame_id) = eliminator.checked_frame_id {
+                px8tr_record_trap_provenance(Px8trTrapProvenanceEvent::CarriedAnswerRouteEmitted {
+                    checked_frame_id,
+                    return_constructor: _return_case.constructor.clone(),
+                });
+            }
             #[cfg(test)]
             record_d6a_route_event(D6aRouteEvent::CarriedFallbackEmitted {
                 static_origin: eliminator.static_origin,
             });
-            // The one retained argument is the SAME carried word. ⛔ Not a
-            // projected field of it: the checked answer is the value the return
-            // case binds, and projecting would ask the carrier for structure
-            // this route never claimed it has.
-            let mut case_env = vec![LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
-                scrutinee,
-            ))];
-            case_env.extend(eliminator.env.to_vec());
+            // The checked answer is the return case's retained argument, not a
+            // projected field. Feed it to the same block as the ordinary Ret
+            // child; that block already owns the only lowering of the Ret body.
+            let return_body =
+                return_body.expect("a strict return case has a shared return-body block");
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
             let body = self.case_body_occurrence(
                 eliminator.static_origin,
-                return_index,
-                &return_case.body,
+                _return_index,
+                &_return_case.body,
             )?;
+            #[cfg(feature = "px8-ds-test-support")]
             let body_origin = body.static_origin;
             #[cfg(feature = "px8-ds-test-support")]
             if let Some((_, header)) = self
@@ -12659,8 +12686,8 @@ impl<'a> Lowering<'a> {
                 .find(|(origin, _)| *origin == eliminator.static_origin)
             {
                 // The alternate value is the header's existing route-control
-                // parameter and reaches only the observer call. `case_env`
-                // above keeps the emitted Ret input byte-for-behavior intact.
+                // parameter and reaches only the observer call. The shared
+                // return-body block still receives `scrutinee.word` unchanged.
                 let (observed_body_origin, observed_value, observed_order) =
                     checked_ih_fresh_result_route_ret_input_observer_inputs(
                         eliminator.static_origin,
@@ -12677,34 +12704,43 @@ impl<'a> Lowering<'a> {
                     observed_order,
                 );
             }
-            // ⭐ Lowered through the ORDINARY continuation of this eliminator,
-            // exactly as a non-recursive case body beside it is. The eliminated
-            // value returns to `SourceContinuation::ComputationalMatchScrutinee`,
-            // which resumes the original source control — so the source
-            // continuation after the return case is observed, and a helper that
-            // returned an isolated value could not stand in for it.
-            let lowered = if remaining_eliminators.is_empty() {
-                self.lower_expr(builder, body, &case_env)?
-            } else {
-                self.lower_computational_producer_expr(
-                    builder,
-                    body,
-                    &case_env,
-                    remaining_eliminators,
-                )?
-            };
-            if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
-                let word = self.carried_join_arm(
-                    builder,
-                    body_origin,
+            #[cfg(test)]
+            let lowered_separately =
+                CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING.with(std::cell::Cell::get);
+            #[cfg(not(test))]
+            let lowered_separately = false;
+            #[cfg(test)]
+            if lowered_separately {
+                let mut case_env = vec![LoweringEnvironmentBinding::Value(
+                    LoweringOperand::Carried(scrutinee),
+                )];
+                case_env.extend(eliminator.env.to_vec());
+                let lowered = if remaining_eliminators.is_empty() {
+                    self.lower_expr(builder, body, &case_env)?
+                } else {
+                    self.lower_computational_producer_expr(
+                        builder,
+                        body,
+                        &case_env,
+                        remaining_eliminators,
+                    )?
+                };
+                if !matches!(
                     lowered,
-                    None,
-                    "a carried checked-answer arm",
-                )?;
-                builder.ins().jump(merge, &[word.word.into()]);
+                    LoweringOperand::Specialized(Lowered::RecursiveBackedge)
+                ) {
+                    let word = self.carried_join_arm(
+                        builder,
+                        body.static_origin,
+                        lowered,
+                        None,
+                        "a test-mutated separately lowered checked-answer arm",
+                    )?;
+                    builder.ins().jump(merge, &[word.word.into()]);
+                }
+            }
+            if !lowered_separately {
+                builder.ins().jump(return_body, &[scrutinee.word.into()]);
             }
 
             builder.switch_to_block(default_route);
