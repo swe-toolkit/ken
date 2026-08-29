@@ -558,6 +558,85 @@ const EXPECTED: &[(&str, Disposition)] = &[
     ("rt_write_writable_stage", Disposition::Completes),
 ];
 
+fn entry_outcome(entry: &str) -> String {
+    let root = tempfile::tempdir().expect("temporary native-build root");
+    std::fs::write(root.path().join("source"), b"ab").unwrap();
+    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+    match ken_cli::build_native_program(
+        &source,
+        ken_cli::SourceFormat::Ken,
+        &format!("rt_cold_enum_{entry}"),
+        root.path(),
+    ) {
+        Ok(_) => "OK".to_string(),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+fn entry_mismatch(entry: &str, outcome: &str) -> Option<String> {
+    let expected = EXPECTED.iter().find(|(name, _)| name == &entry)
+        .map(|(_, disposition)| *disposition)
+        .expect("covered by the_expectation_table_covers_exactly_the_population");
+    match expected {
+        Disposition::Completes if outcome != "OK" => Some(format!(
+            "{entry}: expected a completed artifact, refused with {outcome}")),
+        Disposition::Refuses { key, retired_by } if outcome == "OK" => Some(format!(
+            "{entry}: now COMPLETES. Its blocker is retired by {retired_by}; \
+             if that landed, move this row to `Disposition::Completes`.")),
+        Disposition::Refuses { key, retired_by } if !outcome.contains(key) => Some(format!(
+            "{entry}: refuses for a DIFFERENT reason than the expected {key:?} \
+             (retired by {retired_by}). A new layer is behind the known one. Got: {outcome}")),
+        _ => None,
+    }
+}
+
+
+macro_rules! generate_entry_tests {
+    ($($entry:ident),+ $(,)?) => {
+        const GENERATED_TEST_ENTRIES: &[&str] = &[$(stringify!($entry)),+];
+        $(
+            #[test]
+            fn $entry() {
+                assert!(ENTRIES.contains(&stringify!($entry)));
+                let outcome = entry_outcome(stringify!($entry));
+                eprintln!("RT_COLD_ENUMERATION {} => {}", stringify!($entry), outcome);
+                assert!(entry_mismatch(stringify!($entry), &outcome).is_none(),
+                    "{}", entry_mismatch(stringify!($entry), &outcome).unwrap());
+            }
+        )+
+    };
+}
+
+generate_entry_tests!(
+    rt_allocate_stage,
+    rt_cap41_endpoint_stage,
+    rt_cap41_offset_endpoint_stage,
+    rt_cap41_offset_out_of_range_stage,
+    rt_cap41_out_of_range_stage,
+    rt_read_norights_stage,
+    rt_read_offset_stage,
+    rt_read_window_stage,
+    rt_write_pair_source,
+    rt_write_readonly_stage,
+    rt_write_writable_stage,
+);
+
+/// Every enumerated entry must have a generated test; this is a predicate over
+/// `ENTRIES`, not a convention-based roster.
+
+
+#[test]
+fn every_enumerated_entry_has_a_generated_test() {
+    let generated: std::collections::BTreeSet<&str> =
+        GENERATED_TEST_ENTRIES.iter().copied().collect();
+    let missing: Vec<&str> = ENTRIES
+        .iter()
+        .copied()
+        .filter(|entry| !generated.contains(entry))
+        .collect();
+    assert!(missing.is_empty(), "entries without generated tests: {missing:?}");
+}
+
 /// The expectation table must range over exactly the population, so a new entry
 /// cannot be added to `ENTRIES` without being dispositioned here.
 #[test]
@@ -572,70 +651,7 @@ fn the_expectation_table_covers_exactly_the_population() {
 }
 
 #[test]
-fn every_rt_parity_entry_reaches_its_expected_terminal_state() {
-    let mut outcomes: Vec<(&str, String)> = Vec::new();
-    for entry in ENTRIES {
-        let root = tempfile::tempdir().expect("temporary native-build root");
-        std::fs::write(root.path().join("source"), b"ab").unwrap();
-        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
-        let outcome = match ken_cli::build_native_program(
-            &source,
-            ken_cli::SourceFormat::Ken,
-            &format!("rt_cold_enum_{entry}"),
-            root.path(),
-        ) {
-            Ok(_) => "OK".to_string(),
-            // The terminating subsystem and its exact message, which is what
-            // AC-3's report is made of. Collected from the finished pipeline.
-            Err(error) => format!("{error:?}"),
-        };
-        outcomes.push((entry, outcome));
-    }
-
-    // The report is printed unconditionally, pass or fail. A refusal set that is
-    // only visible when the assertion happens to fail is not a report.
+fn cold_lowering_population_coverage_header() {
     eprintln!("RT_COLD_ENUMERATION population={}", ENTRIES.len());
-    for (entry, outcome) in &outcomes {
-        eprintln!("RT_COLD_ENUMERATION {entry} => {outcome}");
-    }
-
-    let mut mismatches: Vec<String> = Vec::new();
-    for (entry, outcome) in &outcomes {
-        let expected = EXPECTED
-            .iter()
-            .find(|(name, _)| name == entry)
-            .map(|(_, disposition)| *disposition)
-            .expect("covered by the_expectation_table_covers_exactly_the_population");
-        match expected {
-            Disposition::Completes => {
-                if outcome != "OK" {
-                    mismatches.push(format!(
-                        "{entry}: expected a completed artifact, refused with {outcome}"
-                    ));
-                }
-            }
-            Disposition::Refuses { key, retired_by } => {
-                if outcome == "OK" {
-                    mismatches.push(format!(
-                        "{entry}: now COMPLETES. Its blocker is retired by {retired_by}; \
-                         if that landed, move this row to `Disposition::Completes`."
-                    ));
-                } else if !outcome.contains(key) {
-                    mismatches.push(format!(
-                        "{entry}: refuses for a DIFFERENT reason than the expected \
-                         {key:?} (retired by {retired_by}). A new layer is behind the \
-                         known one. Got: {outcome}"
-                    ));
-                }
-            }
-        }
-    }
-
-    assert!(
-        mismatches.is_empty(),
-        "{} of {} entries reached an unexpected terminal state:\n{}",
-        mismatches.len(),
-        ENTRIES.len(),
-        mismatches.join("\n")
-    );
+    assert_eq!(ENTRIES.len(), GENERATED_TEST_ENTRIES.len());
 }
