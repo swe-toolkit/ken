@@ -153,6 +153,38 @@ every control in the tree.
   testing co-emission, not pairing, and does not discharge its conjunct — that
   distinction is the whole content of HS9.
 
+- **AC-INPUT-SIDE-CAUSALITY.** Each arm must perturb the **observer input /
+  call site, BEFORE the recorder consumes it** — never the stored detector
+  output after recording. `Exact` and `PairingLegOnly` must assign through the
+  **same argument-consumption path**; the control varies only the observer
+  argument or event, and real emission stays untouched. Inverse mutation
+  REQUIRED per leg: replacing a recorder's consumed argument with its
+  sibling/expected stored field must RED the unchanged governed test. Do not
+  synthesize a suffixed stored string.
+
+  > **Added by the Steward 2026-08-29 after the first reject
+  > (`evt_afv3b4qxf00q`), and the reason it is an AC rather than a rejection
+  > note is the point.** The hazard was already NAMED in this frame — the
+  > rationale above says a refactor making `ret_input_value` derive
+  > tautologically from `header_input_value` would pass. **Naming a hazard in
+  > rationale does not require anyone to avoid it.** The rejected candidate
+  > satisfied `AC-DISCRIMINATES` and `AC-NOT-MANUFACTURED` exactly as written —
+  > its arms broke the identity, left both seats co-emitted and `.is_some()`,
+  > and reddened two-sided — and was still causally hollow, because appending
+  > `#pairing-control` AFTER a tautological copy manufactures inequality no
+  > matter where the value came from. The Architect had to find by mutation
+  > (`header == header` stays GREEN, 1 passed / 0 failed) what a criterion could
+  > have demanded up front.
+  >
+  > **The reusable form: a control proves sensitivity of whatever it perturbs.**
+  > Perturb the stored output and you prove the predicate reads its own storage.
+  > Only perturbing the INPUT proves the recorded leg consumes an independent
+  > production-side value. These are different properties, and an AC asking for
+  > the first admits a candidate that has only the first.
+  >
+  > This binds every leg — route, origin, source/active value, and ordering, not
+  > just `HeaderToRetInput`.
+
 - **AC-POSITIVE-INTACT.** `Exact`'s `all(paired)` and the existing
   `CoEmissionOnly` behaviour must be byte-unchanged in effect. This node adds
   discrimination; it does not weaken, relax, or re-scope the landed positive.

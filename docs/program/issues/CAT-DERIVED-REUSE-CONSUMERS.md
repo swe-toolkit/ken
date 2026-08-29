@@ -157,6 +157,33 @@ shares no file with the others.
   > ahead three more times; that is why this is written into the frame rather
   > than left in a rejection message. **A requirement that lives only in gate
   > rejection prose is not a criterion.**
+
+  **WHICH REMAINING INCREMENT ACTUALLY TRIPS IT — measured by the Steward at
+  `origin/main`, not predicted.** The erratum above left "the trap is ahead three
+  more times" as a warning; it is cheaper to say which. Bucket membership in
+  `lang_mod_strict_resolution_d0.rs`, read from the ENCLOSING BINDING in each
+  case:
+
+  | increment | package | bucket | ambient step runs? |
+  |---|---|---|---|
+  | D3 | `Core.Classes.EffectfulClasses` | `expected_residuals` | NO — baseline-red |
+  | D4 | `Capability.Parsing.Cursor` | `expected_residuals` | NO — baseline-red |
+  | D5 | `Tooling.Testing.Property` | **measured census row** `["MkUnit", "Unit"]` | **YES — baseline-green** |
+
+  ⇒ **D3 and D4 behave like D2/Parsing: correctly leave that file untouched.**
+  **D5 behaves like D1/Deque: the ambient step DOES run for Property, so its
+  measured row can move and the increment must re-measure and update it.**
+
+  Two limits on this table, stated because ignoring either is how the first
+  version of this AC went wrong. **The bucket memberships are measurements I
+  performed; the consequence for D5 is a MECHANISM claim, not a measured
+  outcome** — whether Property's row actually gains names depends on what
+  `Derived`'s closure contributes beyond Property's current ambient set, and
+  **only the increment's own run settles that.** And `expected_clean` holds
+  exactly four packages, none of them a consumer here — so **no remaining
+  increment can move a leaf OUT of `expected_clean`**, which is the specific
+  thing the withdrawn M8 finding claimed. Re-measure at your own base regardless:
+  this is a reading of one SHA, and a row describes when it was written.
 - **`AC-CLOSURE-TARGETS`.** Re-run the COMPLETE AFFECTED-TARGET CLOSURE, not the
   diff-touched set: every target that loads any module whose closure the
   increment changes, whether or not the increment touches its file. **This is
