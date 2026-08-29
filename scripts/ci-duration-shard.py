@@ -6,13 +6,29 @@ from pathlib import Path
 N = 8
 
 def tests(value):
-    # nextest's list JSON groups tests under suites; preserve canonical fields.
-    for suite in value.get("rust-suites", {}).values():
-        package = suite["package-name"]
-        binary = suite["binary-name"]
-        identity = package if binary == package else f"{package}::{binary}"
-        for name in suite["testcases"]:
-            yield identity, name
+    # nextest's binary-id is its authoritative filter identity. Display fields
+    # are deliberately not reconstructed into a substitute key.
+    suites = value.get("rust-suites")
+    if not isinstance(suites, dict) or not suites:
+        raise SystemExit("nextest listing has no non-empty rust-suites map")
+    seen = set()
+    for suite in suites.values():
+        if not isinstance(suite, dict):
+            raise SystemExit("nextest listing contains a malformed rust suite")
+        binary_id = suite.get("binary-id")
+        testcases = suite.get("testcases")
+        if not isinstance(binary_id, str) or not binary_id:
+            raise SystemExit("nextest rust suite has no non-empty binary-id")
+        if not isinstance(testcases, dict) or not testcases:
+            raise SystemExit("nextest rust suite has no non-empty testcases")
+        for name in testcases:
+            if not isinstance(name, str) or not name:
+                raise SystemExit("nextest rust suite has an invalid testcase")
+            identity = (binary_id, name)
+            if identity in seen:
+                raise SystemExit(f"duplicate canonical identity: {binary_id} {name}")
+            seen.add(identity)
+            yield identity
 
 def main():
     inventory = json.load(open(sys.argv[1]))
@@ -21,10 +37,15 @@ def main():
     median = statistics.median(durations.values())
     bins = [(0.0, index, []) for index in range(N)]
     heapq.heapify(bins)
-    live = sorted((f"{identity} {name}", identity, name) for identity, name in tests(inventory))
-    for rendered, identity, name in sorted(live, key=lambda x: (-durations.get(x[0], median), x[0])):
+    live = sorted(
+        (f"{binary_id} {name}", binary_id, name)
+        for binary_id, name in tests(inventory)
+    )
+    for rendered, binary_id, name in sorted(
+        live, key=lambda x: (-durations.get(x[0], median), x[0])
+    ):
         total, index, selected = heapq.heappop(bins)
-        selected.append((identity, name))
+        selected.append((binary_id, name))
         heapq.heappush(bins, (total + durations.get(rendered, median), index, selected))
     result = []
     for _, index, selected in sorted(bins, key=lambda x:x[1]):

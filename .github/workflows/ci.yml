@@ -508,6 +508,7 @@ jobs:
 
   verify-realized-shard-union:
     needs: test-shard
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
