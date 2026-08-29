@@ -1,7 +1,7 @@
 ---
 id: RT-RESULT-CLOSURE-LIFETIME-CONTAINMENT-CONTROL
 title: "The result-closure lifetime-containment check has zero negative coverage — aggregates.rs:6913 refuses an environment whose meet outlives its paired constructor field, but no control ever constructs that shape, so deleting the check leaves the whole suite green. Latent today; it guards an escape invariant that goes live when D3 lifts."
-status: draft
+status: active
 owner: runtime
 size: S
 gate: none
@@ -27,15 +27,25 @@ origin: "Adversary M8 hunt evt_2kdx72vs884zp (thr_3q2mw0qb0xcq8), 2026-08-28, on
 > not read as stale — it reads as authoritative, and a ring reading this node
 > cold would have refused a node the Steward had just released.
 >
-> **This node REMAINS QUEUED (`draft`), and the reason is a priority call, not a
-> dependency.** It was briefly flipped `active` on 2026-08-28 while
-> [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] sat blocked at HS10 with the
-> runtime seat idle. The Architect then ruled that stop (`evt_1ckwtvwe23e3e`):
-> D3A+D3B is NOT blocked on a new predecessor, the landed fused route is
-> sufficient authority, and it resumes as soon as the Steward amends the frame
-> and re-releases. **D3 is lane 1's main line and the seat holds one WP, so this
-> node returns to the queue.** The flip was reverted before any release was
-> posted; nothing was ever handed to the ring.
+> **RELEASED 2026-08-29 — this node is `active` and IS the runtime ring's
+> current work.** The queue condition it waited on is discharged:
+> [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]] took **HARD STOP 14** when its
+> corrected D0 returned **NO** (Architect acceptance `evt_bm4trnrjpymy`, exact
+> `47b55bd5a`), so D3 is frozen pending a Steward-routed design ruling and is
+> not holding the seat. `aggregates.rs` contention was re-measured at release,
+> not inherited: no branch ahead of `origin/main` carries any commit over that
+> file, and D3 has no remote branch at all.
+>
+> **The standing yield rule still binds.** If D3 is re-released over
+> `aggregates.rs`, that is live contention and this node yields — see the
+> Contention check, which is a criterion and not a historical note.
+>
+> **Prior history, kept because it explains the banner above it.** This node was
+> briefly flipped `active` on 2026-08-28 while D3 sat blocked at HS10 with the
+> runtime seat idle; the Architect then ruled that stop (`evt_1ckwtvwe23e3e`)
+> and D3 resumed, so the flip was reverted before any release was posted and
+> nothing was handed to the ring. **That is the opposite of what happened here:
+> this release follows a D0 that returned NO, not a stop that was cleared.**
 
 ## Objective
 
@@ -198,7 +208,8 @@ contention.
 
 ## Sequencing
 
-**`draft`, QUEUED. Dependencies are clear; the queue is a PRIORITY call.** Both
+**`active`, RELEASED 2026-08-29. Dependencies were always clear; the queue was a
+PRIORITY call and that priority has moved.** Both
 `depends_on` are `merged` (re-measured 2026-08-28), and
 [[RT-CHECKED-IH-FRESH-RESULT-ROUTE]] — which this node was originally queued
 behind — has landed. **Nothing blocks it technically.** It waits because
@@ -213,9 +224,11 @@ defect, but this one is T1 and the runtime implementer seat is T1-provisioned,
 while putting a T2 node on that seat spends a reasoning tier the work would
 never exercise (`steward.md` §4h).
 
-**Release trigger:** the next time the runtime seat frees with D3 not holding it
-— and re-check `aggregates.rs` contention at that moment rather than trusting
-this paragraph, because D3's own surface is still being amended.
+**Release trigger — FIRED 2026-08-29.** The condition was "the next time the
+runtime seat frees with D3 not holding it, re-checking `aggregates.rs`
+contention at that moment rather than trusting this paragraph." Both halves were
+measured at release: D3 froze at HS14 on a D0 that returned NO, and no branch
+ahead of `origin/main` carries a commit over `aggregates.rs`.
 
 **Tier T1, though the node is small.** Size and capability are independent axes
 (`steward.md` §4h). Nothing here is mechanical: the whole deliverable is an
