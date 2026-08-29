@@ -1,14 +1,14 @@
 ---
 id: RT-COMPOSED-RETURN-SHAPE-B-DISCOVERY
 title: "DISCOVERY (binary viability verdict only): can the planner statically de-quotient the generated entry into a bounded one-member generated-function identity — so exact transport identity and its input-environment morphism are available by construction, Tail route selection precedes the relocated declared call, and that call's returned SSA value feeds the existing shared Ret-body parameter — WITHOUT a runtime discriminator, store, capture, recovery, or general composed-return result carrier? The shape-(b) prerequisite the Architect ruled must precede any build."
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
 tier: T1
 depends_on: []
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3116
 origin: "Operator decision 2026-08-29 (FUND THE SEMANTIC REPAIR), then Architect ruling evt_79qhv6m9dj5j4 (binds exact main ba1c92214, tree f606a7483): fund a SCOPED shape-(b) DISCOVERY first — do NOT frame a direct build, because current code deliberately erases the authority and environment facts a relocated call needs, so a direct build is under-specified. Follows the shape-(a) build hard stop (RT-COMPOSED-RETURN-PRODUCER-ORDER-BUILD, held draft; Architect evt_6bq9q76rmzm90) — shape (a) is a viable authority join but insufficient as the Tail semantic repair because the private proof can only refuse earlier and cannot alter the emitted returned word. Steward-filed per COORDINATION section 2."
 ---
 
