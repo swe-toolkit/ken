@@ -10,13 +10,18 @@ import sys
 
 SHARD_COUNT = 8
 ROOT = Path("realized-shards")
+EXCLUDED_BINARIES = {
+    "rt_parity_native",
+    "px8f_buffer_native",
+    "px8f_write_partition",
+}
 
 
 class ShardCheckError(RuntimeError):
     pass
 
 
-def read_listing(path: Path) -> tuple[set[tuple[str, str]], set[tuple[str, str]]]:
+def read_listing(path: Path) -> tuple[set[tuple[str, str]], set[tuple[str, str]], set[tuple[str, str]]]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -32,13 +37,17 @@ def read_listing(path: Path) -> tuple[set[tuple[str, str]], set[tuple[str, str]]
 
     discovered: set[tuple[str, str]] = set()
     selected: set[tuple[str, str]] = set()
+    excluded: set[tuple[str, str]] = set()
     for suite in suites.values():
         if not isinstance(suite, dict):
             raise ShardCheckError(f"{path}: rust-suites contains a malformed suite")
         binary_id = suite.get("binary-id")
+        binary_name = suite.get("binary-name")
         testcases = suite.get("testcases")
         if not isinstance(binary_id, str) or not binary_id:
             raise ShardCheckError(f"{path}: suite has no non-empty binary-id")
+        if not isinstance(binary_name, str) or not binary_name:
+            raise ShardCheckError(f"{path}: suite has no non-empty binary-name")
         if not isinstance(testcases, dict) or not testcases:
             raise ShardCheckError(f"{path}: suite has no non-empty testcases")
         for testcase, metadata in testcases.items():
@@ -58,11 +67,13 @@ def read_listing(path: Path) -> tuple[set[tuple[str, str]], set[tuple[str, str]]
             discovered.add(identity)
             if status == "matches":
                 selected.add(identity)
+                if binary_name in EXCLUDED_BINARIES:
+                    excluded.add(identity)
     if len(discovered) != count:
         raise ShardCheckError(
             f"{path}: test-count {count} differs from {len(discovered)} discovered testcases"
         )
-    return discovered, selected
+    return discovered, selected, excluded
 
 
 def artifact_paths(root: Path) -> list[tuple[Path, Path, Path]]:
@@ -90,15 +101,20 @@ def main() -> int:
         unfiltered = [read_listing(paths[0]) for paths in artifacts]
         inventories = [read_listing(paths[1]) for paths in artifacts]
         selections = [read_listing(paths[2]) for paths in artifacts]
-        if any(rows[0] != unfiltered[0][0] for rows in unfiltered[1:]):
+        authority_discovered, authority_live, authority_excluded = unfiltered[0]
+        if any(rows[:2] != (authority_discovered, authority_live) for rows in unfiltered[1:]):
             raise ShardCheckError("unfiltered inventories differ")
-        if any(rows[0] != unfiltered[0][0] for rows in inventories):
-            raise ShardCheckError("filtered and unfiltered discovered inventories differ")
-        population = inventories[0][1]
-        if any(rows[1] != population for rows in inventories[1:]):
-            raise ShardCheckError("filtered inventories differ")
+        population = authority_live - authority_excluded
+        for discovered, selected, _ in inventories:
+            if discovered != authority_discovered:
+                raise ShardCheckError("filtered and unfiltered discovered inventories differ")
+            if selected != population:
+                raise ShardCheckError("filtered inventory differs from unfiltered live complement")
+        for discovered, _, _ in selections:
+            if discovered != authority_discovered:
+                raise ShardCheckError("selected listing differs from unfiltered authority")
         union: set[tuple[str, str]] = set()
-        for _, selected in selections:
+        for _, selected, _ in selections:
             if union & selected:
                 raise ShardCheckError("realized shard selections overlap")
             union |= selected
