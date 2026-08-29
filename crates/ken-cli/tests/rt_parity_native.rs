@@ -1130,8 +1130,9 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
 /// **THE GAP:** Cranelift identities are diagnostic only. The static route proof
 /// separately owns source/sink authority, and the fixed-product positive above
 /// asserts one tail key per active frame; this observation proves the emitted
-/// graph pairs them. The `CoEmissionOnly` arm preserves every seat and removes
-/// only result-to-active-edge identity, so a co-emission oracle cannot pass.
+/// graph pairs them. `CoEmissionOnly` preserves its landed aggregate control;
+/// the substantive leg inventory derives one identity-only arm per predicate
+/// leg, so no conjunct borrows another conjunct's negative observation.
 #[test]
 fn checked_ih_fresh_result_route_observation_is_forward_and_paired() {
     in_generated_entry_stack_thread("rt-parity-fresh-result-route-pairing", || {
@@ -1147,19 +1148,7 @@ fn checked_ih_fresh_result_route_observation_is_forward_and_paired() {
             "the governed tail-route population must emit"
         );
         let paired = |row: &ken_runtime::CheckedIhFreshResultRouteEmissionObservation| {
-            row.source_emitted
-                && row.source_result_value.is_some()
-                && row.source_result_value == row.active_edge_value
-                && row.active_answer_route.as_deref() == Some("CheckedSelectedRecursor")
-                && row.header_input_value.is_some()
-                && row.header_input_value == row.ret_input_value
-                && row.actual_ret_case_body_origin.as_ref()
-                    == Some(&row.expected_ret_case_body_origin)
-                && matches!(
-                    (row.source_order, row.active_edge_order, row.ret_input_order),
-                    (Some(source), Some(active), Some(ret))
-                        if row.selected_order < source && source < active && active < ret
-                )
+            row.is_forward_and_paired()
         };
         assert!(
             exact.iter().all(paired),
@@ -1194,6 +1183,54 @@ fn checked_ih_fresh_result_route_observation_is_forward_and_paired() {
             exact_result.native.terminal_error, coemitted_result.native.terminal_error,
             "observer-only pairing suppression must preserve the terminal frontier"
         );
+
+        for leg in ken_runtime::CheckedIhFreshResultRoutePairingLeg::ALL
+            .iter()
+            .copied()
+        {
+            let (controlled_result, controlled) =
+                ken_runtime::with_checked_ih_fresh_result_route_emission_observations(
+                    Mutation::PairingLegOnly(leg),
+                    || differential("fs-write-at-offset-single", "rt_write_writable_stage"),
+                );
+            assert_eq!(
+                controlled.len(),
+                exact.len(),
+                "the {leg:?} control must preserve the selected route population"
+            );
+            assert!(
+                controlled
+                    .iter()
+                    .all(|row| row.pairing_seats_are_coemitted()),
+                "the {leg:?} control must preserve every optional seat: {controlled:#?}"
+            );
+            assert!(
+                controlled.iter().all(|row| !row.pairing_leg_holds(leg)),
+                "the {leg:?} control must break its named identity: {controlled:#?}"
+            );
+            assert!(
+                controlled.iter().all(|row| {
+                    ken_runtime::CheckedIhFreshResultRoutePairingLeg::ALL
+                        .iter()
+                        .copied()
+                        .filter(|other| *other != leg)
+                        .all(|other| row.pairing_leg_holds(other))
+                }),
+                "the {leg:?} control must preserve every sibling identity: {controlled:#?}"
+            );
+            assert!(
+                controlled.iter().all(|row| !paired(row)),
+                "deleting the {leg:?} conjunct must expose this control: {controlled:#?}"
+            );
+            assert_eq!(
+                exact_result.native.effect_trace, controlled_result.native.effect_trace,
+                "the {leg:?} observer control must change no emitted behavior"
+            );
+            assert_eq!(
+                exact_result.native.terminal_error, controlled_result.native.terminal_error,
+                "the {leg:?} observer control must preserve the terminal frontier"
+            );
+        }
     });
 }
 

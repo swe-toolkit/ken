@@ -9611,13 +9611,95 @@ pub struct CheckedIhFreshResultRouteEmissionObservation {
     pub ret_input_order: Option<usize>,
 }
 
-/// Observer-side control: preserve all four co-emitted seats while deleting
-/// only the value-identity pairing between the governed result and active edge.
+/// The substantive legs of the dynamic fresh-result pairing predicate.
+///
+/// This declaration is the predicate's single inventory: the macro derives the
+/// public variants and `ALL` population together. The observation predicate and
+/// its negative-control loop both consume `ALL`, so adding a leg cannot leave a
+/// separately maintained control roster behind.
+#[cfg(feature = "px8-ds-test-support")]
+macro_rules! define_checked_ih_fresh_result_route_pairing_legs {
+    ($($variant:ident),+ $(,)?) => {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        pub enum CheckedIhFreshResultRoutePairingLeg {
+            $($variant),+
+        }
+
+        impl CheckedIhFreshResultRoutePairingLeg {
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+        }
+    };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+define_checked_ih_fresh_result_route_pairing_legs! {
+    SourceToActiveEdge,
+    ActiveAnswerRoute,
+    HeaderToRetInput,
+    RetCaseBodyOrigin,
+    ForwardEmissionOrder,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+impl CheckedIhFreshResultRouteEmissionObservation {
+    pub fn pairing_leg_holds(&self, leg: CheckedIhFreshResultRoutePairingLeg) -> bool {
+        match leg {
+            CheckedIhFreshResultRoutePairingLeg::SourceToActiveEdge => {
+                self.source_result_value == self.active_edge_value
+            }
+            CheckedIhFreshResultRoutePairingLeg::ActiveAnswerRoute => {
+                self.active_answer_route.as_deref() == Some("CheckedSelectedRecursor")
+            }
+            CheckedIhFreshResultRoutePairingLeg::HeaderToRetInput => {
+                self.header_input_value == self.ret_input_value
+            }
+            CheckedIhFreshResultRoutePairingLeg::RetCaseBodyOrigin => {
+                self.actual_ret_case_body_origin.as_ref()
+                    == Some(&self.expected_ret_case_body_origin)
+            }
+            CheckedIhFreshResultRoutePairingLeg::ForwardEmissionOrder => matches!(
+                (self.source_order, self.active_edge_order, self.ret_input_order),
+                (Some(source), Some(active), Some(ret))
+                    if self.selected_order < source && source < active && active < ret
+            ),
+        }
+    }
+
+    pub fn is_forward_and_paired(&self) -> bool {
+        self.source_emitted
+            && self.source_result_value.is_some()
+            && self.header_input_value.is_some()
+            && CheckedIhFreshResultRoutePairingLeg::ALL
+                .iter()
+                .copied()
+                .all(|leg| self.pairing_leg_holds(leg))
+    }
+
+    pub fn pairing_seats_are_coemitted(&self) -> bool {
+        self.source_emitted
+            && self.source_result_value.is_some()
+            && self.active_edge_value.is_some()
+            && self.active_answer_route.is_some()
+            && self.header_input_value.is_some()
+            && self.ret_input_value.is_some()
+            && self.actual_ret_case_body_origin.is_some()
+            && self.source_order.is_some()
+            && self.active_edge_order.is_some()
+            && self.ret_input_order.is_some()
+    }
+}
+
+/// Observer-side controls. `CoEmissionOnly` preserves its landed behavior;
+/// `PairingLegOnly` keeps every seat present while breaking exactly one
+/// substantive identity selected from the predicate's derived inventory.
+/// Call sites vary typed recorder inputs; each recorder unconditionally renders
+/// and stores the same argument path for exact and controlled observations.
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CheckedIhFreshResultRouteObservationMutation {
     Exact,
     CoEmissionOnly,
+    PairingLegOnly(CheckedIhFreshResultRoutePairingLeg),
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -9632,6 +9714,40 @@ thread_local! {
     static FRESH_RESULT_ROUTE_OBSERVATIONS:
         std::cell::RefCell<Vec<CheckedIhFreshResultRouteEmissionObservation>> =
         const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn fresh_result_route_observation_breaks(leg: CheckedIhFreshResultRoutePairingLeg) -> bool {
+    FRESH_RESULT_ROUTE_OBSERVATION_MUTATION.with(|mutation| {
+        matches!(
+            mutation.get(),
+            CheckedIhFreshResultRouteObservationMutation::PairingLegOnly(active)
+                if active == leg
+        )
+    })
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn checked_ih_fresh_result_route_active_edge_observer_inputs(
+    value: cranelift_codegen::ir::Value,
+    alternate_value: cranelift_codegen::ir::Value,
+    answer_route: SourceComputationalAnswerRoute,
+) -> (cranelift_codegen::ir::Value, SourceComputationalAnswerRoute) {
+    let value = if fresh_result_route_observation_breaks(
+        CheckedIhFreshResultRoutePairingLeg::SourceToActiveEdge,
+    ) {
+        alternate_value
+    } else {
+        value
+    };
+    let answer_route = if fresh_result_route_observation_breaks(
+        CheckedIhFreshResultRoutePairingLeg::ActiveAnswerRoute,
+    ) {
+        SourceComputationalAnswerRoute::DirectScrutinee
+    } else {
+        answer_route
+    };
+    (value, answer_route)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -9737,6 +9853,55 @@ fn record_checked_ih_fresh_result_route_source(
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+fn checked_ih_fresh_result_route_ret_input_observer_inputs(
+    frame_origin: StaticOriginId,
+    ret_case_body_origin: StaticOriginId,
+    header: cranelift_codegen::ir::Block,
+    value: cranelift_codegen::ir::Value,
+    alternate_value: cranelift_codegen::ir::Value,
+) -> (StaticOriginId, cranelift_codegen::ir::Value, usize) {
+    let order = if FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(std::cell::Cell::get) {
+        next_fresh_result_route_observation_order()
+    } else {
+        0
+    };
+    let ret_case_body_origin = if fresh_result_route_observation_breaks(
+        CheckedIhFreshResultRoutePairingLeg::RetCaseBodyOrigin,
+    ) {
+        frame_origin
+    } else {
+        ret_case_body_origin
+    };
+    let value = if fresh_result_route_observation_breaks(
+        CheckedIhFreshResultRoutePairingLeg::HeaderToRetInput,
+    ) {
+        alternate_value
+    } else {
+        value
+    };
+    let order = if fresh_result_route_observation_breaks(
+        CheckedIhFreshResultRoutePairingLeg::ForwardEmissionOrder,
+    ) {
+        let rendered_frame = format!("{frame_origin:?}");
+        let rendered_header = format!("{header:?}");
+        FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| {
+            rows.borrow()
+                .iter()
+                .rev()
+                .find(|row| {
+                    row.active_frame_origin == rendered_frame
+                        && row.header_block.as_deref() == Some(rendered_header.as_str())
+                })
+                .and_then(|row| row.active_edge_order)
+                .unwrap_or(order)
+        })
+    } else {
+        order
+    };
+    (ret_case_body_origin, value, order)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
 fn record_checked_ih_fresh_result_route_active_edge(
     frame_origin: StaticOriginId,
     value: cranelift_codegen::ir::Value,
@@ -9781,11 +9946,11 @@ fn record_checked_ih_fresh_result_route_ret_input(
     ret_case_body_origin: StaticOriginId,
     header: cranelift_codegen::ir::Block,
     value: cranelift_codegen::ir::Value,
+    order: usize,
 ) {
     if !FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(std::cell::Cell::get) {
         return;
     }
-    let order = next_fresh_result_route_observation_order();
     let rendered_frame = format!("{frame_origin:?}");
     let header = format!("{header:?}");
     FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| {
