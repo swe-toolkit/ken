@@ -406,6 +406,50 @@ how many rows exist is the same class of error as parsing 35 of 39. Report the
 arithmetic that reconciles 45, 39, and the final population, or state plainly
 which part is still unexplained. **Do not close it by assertion.**
 
+> ## RULING ON THE DISCLOSED 43-vs-39 RESIDUAL (Steward, 2026-08-29)
+>
+> Held candidate `652d7b4e173ee637fbea46929a211fa7c5675c29` reconciled
+> **`45 - 6 = 39`** — six prose-only grep hits, 39 syntactic attributes — and
+> stated plainly that **43 function-associated records against 39 attributes**
+> remains unexplained, handing the SHA back rather than claiming route-ready.
+> **That disclosure is the frame working, and the ring was right to refuse to
+> promote a stated gap into coverage.** The answer to "is disclosure enough" is
+> no, and the reason is specific rather than a general demand for rigour.
+>
+> **THE DISCREPANCY IS IN THE ASSOCIATION STEP, AND MIS-ASSOCIATION IS THE EXACT
+> MECHANISM THAT MADE THE PRIOR COUNT FALSE REASSURANCE.** The candidate's own
+> report says so: the old matcher dropped four literal forms and mis-association
+> compensated, so 39 looked right while the parse was wrong. **A residual sitting
+> in the mechanism that produced the defect is the defect surviving with a note
+> attached**, and a note does not fire in CI.
+>
+> **DO NOT ASSUME 43-vs-39 IS A DEFECT. MEASURE THE DIRECTION FIRST.** It may be
+> entirely legitimate: one function can carry `#[ignore]` under two `cfg`
+> profiles, and "record" granularity need not equal "attribute" granularity.
+> **Attribute every count to its `cfg` profile before calling it a discrepancy.**
+> State which side is wrong — 43 real associable sites that the attribute parse
+> under-finds, or 39 real attributes against which the associator emits 4
+> spurious records — because the two need opposite repairs and guessing costs a
+> respin.
+>
+> **THE BOUNDED REQUIREMENT IS NOT "EXPLAIN ALL FOUR". IT IS THAT THE INSTRUMENT
+> MUST NOT BE ABLE TO BE SILENTLY INCONSISTENT WITH ITSELF.** Whichever way the
+> measurement lands:
+>
+> - If the counts should be equal, wire that equality as an ENFORCED instrument
+>   check — nonzero and blocking, per the channel ruling above, which already
+>   puts census/registry mismatch in the enforced channel. An internal
+>   self-disagreement is that same class.
+> - If the counts should NOT be equal because `cfg` profiles or granularity
+>   legitimately separate them, then **state the CORRECT invariant and enforce
+>   THAT.** "The numbers differ for a known reason" is only acceptable when the
+>   known reason is itself checkable.
+>
+> **Either outcome is a landing.** What may not land is an instrument that
+> computes two numbers, does not reconcile them, and says nothing at runtime —
+> because that is indistinguishable from the state this deliverable exists to
+> repair.
+
 **THE UNRESOLVABLE-CONDITION RULE IS A FORK, AND D4a's TABLE DECIDES IT — do not
 pick one here.** Four of the six registry entries are free prose and one names a
 relation symbol rather than a node, so **failing on every non-resolving string
