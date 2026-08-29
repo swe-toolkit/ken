@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{Decl, GlobalId, Term};
+use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, Term};
 
 const COLLECTIONS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
@@ -31,20 +31,41 @@ fn module_transparent_kernel_equivalents(
     module: &str,
     provider: GlobalId,
 ) -> BTreeSet<String> {
-    let (provider_ty, provider_body) = match env.env.lookup(provider) {
-        Some(Decl::Transparent { ty, body, .. }) => (ty, body),
+    let (provider_level_params, provider_ty, provider_body) = match env.env.lookup(provider) {
+        Some(Decl::Transparent {
+            level_params,
+            ty,
+            body,
+            ..
+        }) => (level_params, ty, body),
         other => panic!("provider must be transparent, got {other:?}"),
     };
+    assert!(
+        provider_level_params.is_empty(),
+        "the D1 Boolean providers must be monomorphic"
+    );
+
     let prefix = format!("{module}.");
+    let context = Context::new();
     env.globals
         .iter()
         .filter_map(|(name, id)| {
             let local_name = name.strip_prefix(&prefix)?;
-            let (ty, body) = match env.env.lookup(*id) {
-                Some(Decl::Transparent { ty, body, .. }) => (ty, body),
+            let (level_params, ty, body) = match env.env.lookup(*id) {
+                Some(Decl::Transparent {
+                    level_params,
+                    ty,
+                    body,
+                    ..
+                }) => (level_params, ty, body),
                 _ => return None,
             };
-            (ty == provider_ty && body == provider_body).then(|| local_name.to_owned())
+            if !level_params.is_empty() {
+                return None;
+            }
+            (convert_type(&env.env, &context, ty, provider_ty)
+                && convert(&env.env, &context, provider_ty, body, provider_body))
+            .then(|| local_name.to_owned())
         })
         .collect()
 }
@@ -238,14 +259,14 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: roots-loading Derived after LawfulClasses adds no trust, mints no
-/// Derived-local `bool_and`/`bool_leq`, and leaves no module-owned transparent
-/// definition with both the exact checked type and exact transparent body of
-/// either canonical provider. CLAIMED: no renamed kernel-equivalent local can
-/// serve the drained computation instead of the import. THE GAP: this exact
-/// kernel-equivalence inventory does not claim extensional uniqueness across
-/// non-identical bodies; the concrete sort and law tests separately own behavior.
+/// Derived-local `bool_and`/`bool_leq`, and leaves no module-owned admitted
+/// transparent zero-level declaration whose checked type and body at the provider
+/// type are kernel-definitionally equal to either canonical provider. CLAIMED:
+/// this is a narrow anti-duplication inventory only. THE GAP: it establishes no
+/// causal flow or route authority and no extensional uniqueness across
+/// non-convertible bodies; the concrete sort and law tests separately own behavior.
 #[test]
-fn derived_has_no_kernel_equivalent_local_bool_reimplementation() {
+fn derived_has_no_definitionally_equivalent_local_bool_reimplementation() {
     let mut env = ElabEnv::new().expect("base env");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("the canonical Boolean provider must roots-load");
@@ -270,7 +291,7 @@ fn derived_has_no_kernel_equivalent_local_bool_reimplementation() {
         assert_eq!(
             module_transparent_kernel_equivalents(&env, "Data.Collections.Derived", provider),
             BTreeSet::new(),
-            "Derived must define no transparent local with the exact type and body of canonical {provider_name}"
+            "Derived must define no transparent local with kernel-definitionally equal checked type and body at the provider type for canonical {provider_name}"
         );
     }
 
