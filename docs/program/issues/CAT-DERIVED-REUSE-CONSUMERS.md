@@ -95,6 +95,35 @@ shares no file with the others.
   closes and re-measure the remainder. **Report the count you measure, not the
   count this frame predicts** — six is a fixed input measured at a SHA, and the
   census is recountable from §3.
+- **`AC-BOTH-CENSUSES`. "Census" names TWO different artifacts in this node, and
+  satisfying one says nothing about the other.** Every increment must re-measure
+  **both**:
+  1. the **reuse census**, `docs/program/cat-reuse-census.md` §4.4 — which
+     group-4 rows drained (that is `AC-CENSUS-ROW-DRAINED` above); and
+  2. the **strict-resolution ambient census**,
+     `crates/ken-elaborator/tests/lang_mod_strict_resolution_d0.rs` — which
+     partitions every catalog leaf by `ambient_dependencies` into an
+     `expected_clean` bucket and a measured census row. **Importing `Derived`
+     adds its ambient debt (`eqChar`, `is_sorted`, `leqChar`), so a package that
+     was `expected_clean` MOVES to a measured census row.** An increment that
+     imports `Derived` into a previously-clean package and leaves this file
+     untouched is deterministically CI-red.
+
+  > **This is not a new criterion; it is a disambiguation, and the record shows
+  > exactly why it was needed.** `AC-CLOSURE-TARGETS` already covered this file
+  > as an affected target, and **D1 applied it correctly** — landing at
+  > `4f6d340c6`, D1 edited this exact file to expand Deque's row with exactly
+  > `eqChar`, `is_sorted`, `leqChar`. **D2 then made the structurally identical
+  > change to `Parsing` and did not touch it, and both gates approved.** The
+  > Architect's approval explicitly checked census evidence — the *reuse* census
+  > — and read as census-complete. **One word naming two artifacts is what let a
+  > satisfied criterion and an unsatisfied one look like the same check.** Found
+  > by the mandatory M8 hunt, not by the gates.
+  >
+  > **D3, D4 and D5 each make this same `Derived`-import change**, so the trap is
+  > ahead three more times; that is why this is written into the frame rather
+  > than left in a rejection message. **A requirement that lives only in gate
+  > rejection prose is not a criterion.**
 - **`AC-CLOSURE-TARGETS`.** Re-run the COMPLETE AFFECTED-TARGET CLOSURE, not the
   diff-touched set: every target that loads any module whose closure the
   increment changes, whether or not the increment touches its file. **This is
