@@ -50,6 +50,8 @@ these interfaces, so a `Monad List` instance can reuse the laws of
 canonical field per law:
 
 ```ken
+import Data.Collections.Derived (concat_map)
+
 fn apply_to (a : Type) (b : Type) (y : a) (g : a → b) : b = g y
 
 fn compose (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (x : a) : c = g (h x)
@@ -466,16 +468,10 @@ instance Monad Option {
 
 `pure x = [x]`; `ap` is the cartesian product-of-effects; `bind = concat_map`
 (chapter `§3.3`/`§4.4`, Fork D — the shape coherent with `Monad List`).
-`concat_map` is a straightforward structural recursion built from
-`list_append`:
+The implementation selectively imports the canonical `concat_map` from
+`Data.Collections.Derived` rather than maintaining a package-local recursion:
 
 ```ken
-fn concat_map (a : Type) (b : Type) (f : a → List b) (xs : List a) : List b =
-  match xs {
-    Nil ↦ Nil b;
-    Cons h t ↦ list_append b (f h) (concat_map a b f t)
-  }
-
 fn list_pure (a : Type) (x : a) : List a = Cons a x (Nil a)
 
 fn list_ap (a : Type) (b : Type) (mf : List (a → b)) (mx : List a) : List b =
@@ -726,7 +722,7 @@ theorem list_map_concat_map_fusion
           (list_map_concat_map_fusion a b c g f t))
   }
 
-proof pointwise_eq for concat_map
+theorem concat_map_pointwise_eq
       (a : Type)
       (b : Type)
       (f : a → List b)
@@ -749,7 +745,7 @@ proof pointwise_eq for concat_map
           (concat_map a b f t)
           (concat_map a b g t)
           (list_append b (g h))
-          ((proof pointwise_eq for concat_map) a b f g pf t))
+          (concat_map_pointwise_eq a b f g pf t))
   }
 ```
 
@@ -924,7 +920,7 @@ theorem list_ap_cmp_mid1
       u
       (λg1. list_map (a → b) (a → c) (compose a b c g1) v)
       (λh2. list_map a c h2 w))
-    ((proof pointwise_eq for concat_map)
+    (concat_map_pointwise_eq
       (b → c)
       c
       (λg1.
@@ -944,7 +940,7 @@ theorem list_ap_cmp_mid2
         (List c)
         (concat_map (b → c) c (ap_comp_h1 a b c v w) u)
         (list_ap b c u (list_ap a b v w)) =
-  proof pointwise_eq for concat_map
+  concat_map_pointwise_eq
     (b → c)
     c
     (ap_comp_h1 a b c v w)
@@ -1211,7 +1207,8 @@ across this entry's `Option` and `List` proofs.
 
 1. **Public API.** `Applicative`, `Monad`, `Applicative_instance_Option`,
    `Monad_instance_Option`, `Applicative_instance_List`,
-   `Monad_instance_List`, plus every named helper in `§2`.
+   `Monad_instance_List`, plus every helper declared in `§2`; list flattening
+   reuses the selectively imported canonical `concat_map`.
 2. **Source map.**
 
    | Task | Section |
@@ -1222,9 +1219,10 @@ across this entry's `Option` and `List` proofs.
    | Why the proof shapes are what they are | [Design notes](#5-design-notes) |
 
 3. **Derivation path.** `Applicative` and `Monad` are ordinary class
-   declarations. `Option`'s laws use finite case splits; `List`'s laws use
-   structural induction together with congruence, composition, and symmetry.
-   The `ITree` discussion is a correspondence, not a second implementation.
+   declarations. `Option`'s laws use finite case splits; `List` reuses the
+   canonical `concat_map`, and its laws use structural induction together with
+   congruence, composition, and symmetry. The `ITree` discussion is a
+   correspondence, not a second implementation.
 4. **`trusted_base()` delta.** **Zero.** Every law field is a real,
    kernel-checked proof term; the entry introduces no `Axiom`, primitive, or
    postulate.

@@ -25,7 +25,7 @@ fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture(&mut env, "concat_map");
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
         .expect("Core/Classes/LawfulFunctors.ken.md must elaborate fourth");
     env.elaborate_ken_md_file(EFFECTFUL_CLASSES_KEN_MD)
