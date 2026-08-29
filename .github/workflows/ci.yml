@@ -127,6 +127,14 @@ jobs:
           -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)"
       # nextest does not execute rustdoc tests, so run the workspace doctest
       # population once rather than once per shard.
+      - name: Upload realized shard selection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: realized-shard-${{ matrix.shard }}
+          path: |
+            inventory.json
+            selected-${{ matrix.shard }}.json
       - name: Doctests
         if: matrix.shard == 1
         run: cargo test --workspace --doc --locked
