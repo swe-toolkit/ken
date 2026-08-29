@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-PRODUCED-TRANSFER
 title: "Carry the closed predecessor's FULL route-specific objective: add Direct's ruled declared call whose local return is fresh R2, replace the general composed-return protocol with one exhaustive affine state machine carrying Tail's produced result to the exact Tail consume, and bind the delivered R2 from BOTH variants through each independently derived Ret capture. Atomic over Direct application + Tail produced transfer + both-arm D3B + products."
-status: draft
+status: active
 owner: runtime
 size: L
 gate: none
@@ -37,9 +37,35 @@ origin: "Architect HS14 component-design ruling evt_7gnw8s9k7rh6, 2026-08-29, an
 > substitute for a scope item, and a sentence that reads as preservation can
 > authorize an omission.**
 >
-> **`draft` — NOT RELEASED.** A landing discharges a dependency; only an
-> explicit Steward release starts a turn. Flip `draft` -> `ready` -> `active` on
-> release.
+> **RELEASED by the Steward, 2026-08-29 06:30 UTC. `active`.**
+>
+> The prefix is confirmed `merged` **by blob identity, not ancestry** — the
+> publisher squashes. At `origin/main`
+> `fdbf35686104b527d9eb74f15ac67a4eaa1436c5` (PR #3083, merged 06:21:52 UTC),
+> `crates/ken-runtime/src/cranelift_backend/lowering/core.rs` is blob
+> `bde7db36c8190875492b87f2839bd3a20420d5b5`, identical to the gated candidate
+> `aab371f951746ef3ce922185922fa14f060d925a`.
+>
+> **The prefix landed INERT, and that is what makes this node's baseline
+> trustworthy.** Its `AC-PRODUCTS-UNCHANGED` was discharged as a differential,
+> not a green suite: baseline and candidate each emitted 122 finalized objects
+> over the same 993-pass population, and the sorted
+> `(label, length, SHA-256(bytes))` ledgers are byte-identical at
+> `da4739dc20e67ea8d75c849c1461b205c9fc27d6e478a9c82f958e86bf3cc48d`. **So every
+> product this node changes is a product THIS node changed** — there is no
+> inherited drift to disentangle from your own.
+>
+> Two facts from the prefix that constrain the work here:
+>
+> - **Both `ProducerTrampolineStep` payloads are boxed, and that is
+>   load-bearing.** Direct payloads and boxing only `Continue` each reproduce a
+>   cold-path stack overflow in `rt_cold_lowering_path_enumeration`; boxing both
+>   restores it without touching a test stack. Do not "simplify" it. The reason
+>   is stated in the enum's own comment — keep it there.
+> - **`ComposedReturn` currently has only `Ordinary`.** This node is what adds
+>   the pending states, so the exhaustive match that is trivially total today
+>   becomes the real obligation. `AC-EXHAUSTIVE-PROPAGATION` bites here, not in
+>   the prefix.
 
 ## What this preserves, and what was refuted
 
