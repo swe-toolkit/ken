@@ -11,6 +11,23 @@ github: null
 origin: "Steward, 2026-08-22, filing the Architect's native-program design frame (evt_9kat78d438cb) per operator decision 3. Replaces the earlier six-node 'native carried-value family' premise: the Architect re-verified each seam at the producer (not the #[ignore] strings) and found the premise half already-closed. Steward-filed per COORDINATION section 2."
 ---
 
+> # CAMPAIGN FRONT DRAINED (2026-08-29, current main `863bf0fbf`)
+>
+> The Track-1 Native Carried Value COMPONENT front is drained: the Architect
+> determined on current main (`evt_1xndnw1dp1r6v`, tree
+> `67089b7b22d36ca8ac04b21ce88856e23e6ada32`) that no remaining Track-1 component
+> object is derivable, and the runtime-leader returned it (`evt_6bmd84zd6yzg2`).
+> This node stays **product-level open and keeps blocking PX8** — the ignored
+> native full-program rows remain (the fresh-R2 row `px8f_buffer_native.rs:345`,
+> the write-partition row `px8f_write_partition.rs:354`, and the six
+> `rt_parity_native` ignores) — so "Track 1 is the remaining product critical
+> path" is still TRUE. What is stale is the DETAILED decomposition below: the
+> Produced-transfer and D3 axes are closed with no revival clause (no HS15, no
+> Direct-only salvage), and the first eligible semantic object is now the
+> separately operator-funded [[RT-COMPOSED-RETURN-PRODUCER-ORDER-DISCOVERY]]
+> (released 2026-08-29). Read the drain banner before the component text that
+> follows.
+
 > # PROGRAM ROOT — Architect frame evt_9kat78d438cb @ 6425709fb
 >
 > The six-member premise collapses. Two corrections, both load-bearing:
