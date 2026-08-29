@@ -1,6 +1,6 @@
 ---
 id: RT-COMPOSED-RETURN-PRODUCED-TRANSFER
-title: "Replace the general composed-return protocol with one exhaustive affine state machine carrying a pending Produced result from Tail's exact checked producer through construction to the exact Tail route, then bind it as D3B's Ret input — the successor that preserves the semantic objective of the structurally-refuted RT-RESULT-CONTINUATION-BINDING-PROVENANCE. Atomic from the first production mint onward."
+title: "Carry the closed predecessor's FULL route-specific objective: add Direct's ruled declared call whose local return is fresh R2, replace the general composed-return protocol with one exhaustive affine state machine carrying Tail's produced result to the exact Tail consume, and bind the delivered R2 from BOTH variants through each independently derived Ret capture. Atomic over Direct application + Tail produced transfer + both-arm D3B + products."
 status: draft
 owner: runtime
 size: L
@@ -22,6 +22,20 @@ origin: "Architect HS14 component-design ruling evt_7gnw8s9k7rh6, 2026-08-29, an
 > **A dropped-or-reported `Produced` is the precise failure this node exists to
 > prevent**, so it can never be an acceptable intermediate state. There is no
 > application-only checkpoint and no evidence-only partial.
+>
+> ### THE ATOMIC OBJECT IS FOUR THINGS, NOT TWO (Architect `evt_3vpt967507xw3`)
+>
+> **Direct application + Tail produced transfer + BOTH-ARM D3B + products.**
+>
+> **This corrects a Steward omission in the first recut.** That version scoped
+> the node to the Tail transfer and D3B alone, and said of Direct only that
+> `DirectInvocationReturn` "remains an explicit ordinary/direct arm" — which is
+> the ruled PROTOCOL SHAPE, not a deliverable. **No production Direct call ever
+> landed: Direct D3A was FROZEN with Tail, never discharged.** So in this tree
+> "Direct remains ordinary" **preserves the MISSING Direct application** instead
+> of carrying the objective forward. **A protocol-shape constraint is not a
+> substitute for a scope item, and a sentence that reads as preservation can
+> authorize an omission.**
 >
 > **`draft` — NOT RELEASED.** A landing discharges a dependency; only an
 > explicit Steward release starts a turn. Flip `draft` -> `ready` -> `active` on
@@ -72,7 +86,9 @@ obstruction; the remaining work is construction, not localization.
    The certificate uses the landed Tail route for **retained topology/destination
    facts only — it must NOT resurrect `TailResumedRetInput` as value
    authority.**
-6. **`DirectInvocationReturn` remains an explicit separate ordinary/direct arm.**
+6. **`DirectInvocationReturn` remains an explicit separate ordinary/direct arm**
+   in the protocol. **That is a shape constraint and NOT the Direct deliverable
+   — see D-DIRECT below, which is what actually discharges the obligation.**
 
 ## Deliverables
 
@@ -82,9 +98,19 @@ obstruction; the remaining work is construction, not localization.
   **Compile every named caller, `cfg(test)` included.**
 - **D1 — the affine state machine**, points 1-6 above.
 - **D2 — the exact Tail consume**, point 5, consumed exactly once.
-- **D3 — the Ret-input binding** (the surviving D3B): bind the consumed result
-  through ordinary Ret-case/capture semantics, with the read and write analogues
-  **derived independently** from their own planner facts.
+- **D-DIRECT — add Direct's ruled declared call.** Retain the body-refined
+  `CheckedIhEnvironmentTransport`; **validate its source record and capture
+  projection**; resolve **only**
+  `continuation_calls[transport.source_call_identity()]`; emit **exactly one**
+  ruled declared call; **treat its local return as fresh `R2`**; and pair it to
+  the exact governed Direct arrival. **This is the
+  predecessor's still-live D3A obligation for the Direct variant** — it was
+  frozen alongside Tail and never discharged, so it is added here, not
+  preserved by leaving Direct "ordinary".
+- **D3 — the Ret-input binding** (the surviving D3B): bind the delivered fresh
+  `R2` **from BOTH variants** through ordinary Ret-case/capture semantics, with
+  the read and write analogues **derived independently** from their own planner
+  facts. **Both arms, not Tail alone.**
 - **D4 — the read/write `InvalidOffset` products** and the fresh-`R2`/seed
   inequality proof.
 
@@ -109,6 +135,25 @@ obstruction; the remaining work is construction, not localization.
   retain the **old wrong seed/default**. **This is the two-sided proof the whole
   chain turns on** — a suppression that reds for any other reason proves
   nothing.
+- **AC-DIRECT-APPLICATION.** Exactly ONE ruled declared call is emitted per
+  governed Direct arrival, resolved **only** through
+  `continuation_calls[transport.source_call_identity()]`, with its source record
+  and capture projection validated and its local return treated as fresh `R2`.
+  Control: mutate the resolved identity and observe refusal; a Direct arrival
+  that silently emits zero calls must FAIL, not pass quietly. **Zero emitted
+  calls is the pre-existing state, so an AC that cannot distinguish zero from
+  one certifies the defect.**
+- **AC-ROUTE-SUPPRESSION-INDEPENDENT.** Direct application must be
+  mutable/suppressible **independently** of Tail production, Tail propagation,
+  Tail consume, and D3B binding — five separately movable axes, and the parent's
+  route-variant discriminator is preserved. Control: suppress each alone and
+  observe a distinct, named failure. **A shared suppression proves only that
+  something in the union matters**, which is how a two-arm defect hides behind a
+  one-arm control.
+- **AC-BOTH-ARM-BINDING.** D3B binds the delivered fresh `R2` for **both**
+  variants, each through its own independently derived Ret capture. Control: an
+  arm-specific mutation reds only its own arm; keep ordinary/direct positive
+  controls alongside.
 - **AC-AFFINE-ONCE.** Duplicate mint and duplicate consume must **fail closed**.
   Control: attempt each and show the named refusal.
 - **AC-NO-CLONE.** The constructor field is emitted from a **borrow** and the
