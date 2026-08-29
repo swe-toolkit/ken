@@ -137,6 +137,15 @@ fn collections_prelude() -> String {
     let or_source = catalog_source("catalog/packages/Core/Logic/Or.ken.md");
     let ord_result = catalog_source("catalog/packages/Core/Logic/OrdResult.ken.md");
     let mut compare = catalog_source("catalog/packages/Core/Logic/Compare.ken.md");
+    let lawful_classes = catalog_source("catalog/packages/Core/Classes/LawfulClasses.ken.md");
+    let canonical_bool_ops = ["pub fn bool_leq", "pub fn bool_and"]
+        .into_iter()
+        .map(|start| {
+            let declaration = flattened_braced_declaration(&lawful_classes, "LawfulClasses", start);
+            &lawful_classes[declaration]
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
     let mut nat_order = catalog_source("catalog/packages/Data/Numeric/Nat/Order.ken.md");
     let mut collections = catalog_source("catalog/packages/Data/Collections/Derived.ken.md");
 
@@ -161,6 +170,7 @@ fn collections_prelude() -> String {
     remove_flattened_tail(&mut nat_order, "Nat.Order", "pub fn compare");
 
     for import in [
+        "import Core.Classes.LawfulClasses (bool_and, bool_leq)",
         "import Core.Logic.Compare (list_compare, list_eq)",
         "import Core.Logic.Or (Or, Inl, Inr)",
         "import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)",
@@ -171,7 +181,9 @@ fn collections_prelude() -> String {
         remove_flattened_import(&mut collections, "Derived", import);
     }
 
-    format!("{transport}\n{or_source}\n{ord_result}\n{compare}\n{nat_order}\n{collections}")
+    format!(
+        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_bool_ops}\n{nat_order}\n{collections}"
+    )
 }
 
 enum Oracle {
