@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, apply, eval};
+use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const DIAGNOSTIC_KEN_MD: &str =
@@ -22,7 +22,7 @@ fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture(&mut env, "length");
     catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
     env.elaborate_module_from_roots(&[catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("canonical Nat arithmetic provider must elaborate third");
