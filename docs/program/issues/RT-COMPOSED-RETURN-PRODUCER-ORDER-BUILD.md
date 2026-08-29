@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-PRODUCER-ORDER-BUILD
 title: "Implement the shape-(a) producer-authority proof: an opaque, compiler-only proof that joins the already-validated governed transport to the existing confluence key AFTER transport selection and BEFORE emission, and licenses the fresh-result mint with it — closing the composed-return wall's Tail route without a store, captured continuation, runtime tag, or recovery. Builds the probably-viable verdict from RT-COMPOSED-RETURN-PRODUCER-ORDER-DISCOVERY."
-status: ready
+status: active
 owner: runtime
 size: L
 gate: none
@@ -12,7 +12,13 @@ github: null
 origin: "Operator decision 2026-08-29: frame and release the shape-(a) build as lane 1's next objective, after the discovery RT-COMPOSED-RETURN-PRODUCER-ORDER-DISCOVERY returned a decisive verdict of PROBABLY VIABLE (merged b7c0c913f, PR #3105). The Architect approved the constructive sketch as genuinely constructive and prohibition-clean (evt_2se624p3t1eym) and was explicit that the paper approval covers the verdict ONLY — any implementation receives a fresh gate and MUST encode the stated unforgeability. The composed-return wall RT-COMPOSED-RETURN-PRODUCED-TRANSFER (D0b=NO) and the D3 chain stay closed; this is the authority/producer-order construction the wall's disposition named, not a Produced-transfer successor. Steward-filed per COORDINATION section 2."
 ---
 
-> # RELEASED — lane 1, the new runtime objective. `ready`.
+> # ACTIVE — lane 1, the new runtime objective. Dispatched 2026-08-29.
+>
+> Released `evt_7f5wx652c0bez` (anchor), runtime-leader took it
+> `evt_5ddaewx0bqz6` and dispatched the implementer on
+> `wp/RT-COMPOSED-RETURN-PRODUCER-ORDER-BUILD` unheld at exact base
+> `1045cae6c` (`evt_268yzfg2vmysf`); implementer pickup confirmed
+> `evt_3vagnf38nwexq`. Steward learns the outcome from the leader's handback.
 >
 > The native carried-value campaign COMPONENT front is drained (Architect
 > `evt_1xndnw1dp1r6v`); `RT-NATIVE-CARRIED-VALUE` stays product-open and blocks
