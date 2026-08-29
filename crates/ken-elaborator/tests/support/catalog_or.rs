@@ -85,6 +85,22 @@ pub fn load_derived_fixture(env: &mut ElabEnv) {
     env.module_state = provider_state;
 }
 
+/// Retain Derived's module record while withholding one legacy flat alias.
+/// The consumer's real selective import must install that exact binding; other
+/// aliases remain available to the legacy dependency fixture.
+pub fn load_derived_importing_fixture(env: &mut ElabEnv, imported: &str) {
+    env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("Derived's canonical Nat-order dependency must roots-load");
+    env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
+        .expect("Data.Collections.Derived must load through its real provider closure");
+    expose_module(env, "Core.Classes.LawfulClasses");
+    expose_module(env, "Data.Collections.Derived");
+    assert!(
+        env.globals.remove(imported).is_some(),
+        "Derived fixture must contain the selectively imported binding `{imported}`"
+    );
+}
+
 /// Assert at a measured legacy-fixture boundary that the shared Derived loader
 /// retained its canonical class owner. Re-loading the provider must be a no-op:
 /// if `load_derived_fixture` restores a state from before LawfulClasses, the

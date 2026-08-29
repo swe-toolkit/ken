@@ -7,23 +7,26 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
+use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::Decl;
 use ken_kernel::GlobalId;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 const PARSING_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
-const DIAGNOSTIC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
-const CURSOR_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
-const DECODER_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
+const DIAGNOSTIC_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
+const CURSOR_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
+const DECODER_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture(&mut env, "list_append");
     catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
@@ -226,6 +229,61 @@ fn term_mentions(term: &ken_kernel::Term, target: GlobalId) -> bool {
     }
 }
 
+fn leading_pi_count(term: &ken_kernel::Term) -> usize {
+    let mut count = 0;
+    let mut current = term;
+    while let ken_kernel::Term::Pi(_, body) = current {
+        count += 1;
+        current = body;
+    }
+    count
+}
+
+fn term_contains_saturated_provider_head_occurrence(
+    term: &ken_kernel::Term,
+    provider: GlobalId,
+    arity: usize,
+) -> bool {
+    if matches!(term, ken_kernel::Term::App(_, _)) {
+        let mut argument_count = 0;
+        let mut head = term;
+        while let ken_kernel::Term::App(function, _) = head {
+            argument_count += 1;
+            head = function;
+        }
+        if argument_count >= arity
+            && matches!(head, ken_kernel::Term::Const { id, .. } if *id == provider)
+        {
+            return true;
+        }
+    }
+    term.children()
+        .into_iter()
+        .any(|child| term_contains_saturated_provider_head_occurrence(child, provider, arity))
+}
+
+fn transparent_parsing_bodies_with_saturated_provider_head_occurrence(
+    env: &ElabEnv,
+    provider: GlobalId,
+) -> BTreeSet<String> {
+    let provider_type = match env.env.lookup(provider) {
+        Some(Decl::Transparent { ty, .. }) => ty,
+        other => panic!("Derived list_append must be transparent, got {other:?}"),
+    };
+    let arity = leading_pi_count(provider_type);
+    assert!(arity > 0, "Derived list_append must have a function type");
+    let prefix = "Capability.Parsing.Parsing.";
+    env.globals
+        .iter()
+        .filter_map(|(qualified, id)| {
+            let local = qualified.strip_prefix(prefix)?;
+            let (_, body) = env.env.transparent_body(*id)?;
+            term_contains_saturated_provider_head_occurrence(&body, provider, arity)
+                .then(|| local.to_owned())
+        })
+        .collect()
+}
+
 #[test]
 fn cat5_d1_source_span_package_elaborates_zero_delta() {
     let mut env = dependency_env();
@@ -280,7 +338,6 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "syntax_root",
         "syntax_children",
         "erase_spans",
-        "list_append",
         "ValidLocatedList",
         "ValidSyntax",
         "bool_expr_eq",
@@ -341,6 +398,70 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
             "{name}'s type id must never enter trusted_base()"
         );
     }
+}
+
+/// MEASURED: roots-loaded transparent Parsing bodies containing at least one
+/// saturated application-head occurrence of the exact Derived `list_append`
+/// identity form the literal expected population. The retired qualified local
+/// name is absent, and a selective-import pair distinguishes the named binding
+/// from another available provider.
+///
+/// LIMITATION: this is a syntactic occurrence-population pin. It does not prove
+/// that an occurrence is evaluated, lies on every reachable route, reaches a
+/// body's result, or excludes unrelated or local computation elsewhere.
+/// Concrete round-trip observations, including the fixed syntax-child span
+/// order, pin behavior in a sibling test; the census and affected closure own
+/// the remaining migration obligations.
+#[test]
+fn parsing_append_occurrence_population_and_migration_shape_are_pinned() {
+    let mut env = dependency_env();
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
+        .expect("Capability.Parsing.Parsing must roots-load with its selective import");
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Parsing must add zero consumer-local trust");
+
+    assert!(
+        !env.globals
+            .contains_key("Capability.Parsing.Parsing.list_append"),
+        "the retired package-local list_append must be absent"
+    );
+    let provider = env.globals["Data.Collections.Derived.list_append"];
+    assert_eq!(
+        transparent_parsing_bodies_with_saturated_provider_head_occurrence(&env, provider),
+        BTreeSet::from(["syntax_node_binary".to_owned()]),
+        "transparent Parsing bodies containing a saturated exact list_append-provider \
+         application-head occurrence must match the closed expected population"
+    );
+
+    let mut imported = ElabEnv::empty().expect("prelude bootstrap");
+    imported
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Derived")
+        .expect("Derived provider must roots-load");
+    imported
+        .elaborate_file(
+            "import Data.Collections.Derived (list_append)\n\
+             fn parsing_append_positive \
+                 (xs : List Bool) (ys : List Bool) : List Bool = \
+               list_append Bool xs ys",
+        )
+        .expect("the selectively imported list_append binding must resolve");
+
+    let mut omitted = ElabEnv::empty().expect("prelude bootstrap");
+    omitted
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Derived")
+        .expect("Derived provider must roots-load");
+    let error = omitted
+        .elaborate_file(
+            "import Data.Collections.Derived (list_append)\n\
+             fn parsing_append_negative (xs : List Bool) : List Bool = \
+               reverse Bool xs",
+        )
+        .expect_err("available but unimported reverse must not resolve");
+    assert!(
+        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "reverse"),
+        "the non-import control must fail at the omitted binding, got {error:?}"
+    );
 }
 
 /// Durable invariant: the roots-loaded Parsing package references the
@@ -645,7 +766,11 @@ fn cat5_d1_source_span_surface_is_byte_artifact_and_source_explicit() {
     // read straight from the class registry, not grepped from a field-name
     // substring. A 4th field (a cached length carrier) would show up here.
     assert_eq!(
-        env.class_env.class("Source").unwrap().projection.field_names,
+        env.class_env
+            .class("Source")
+            .unwrap()
+            .projection
+            .field_names,
         vec!["source_id_field", "source_bytes_field", "source_utf8_field"],
         "Source must carry exactly id/bytes/utf8-proof, no cached length field"
     );
