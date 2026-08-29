@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Assign a live nextest JSON inventory to deterministic duration-balanced bins."""
-import json, sys, statistics, heapq
+import json, sys, statistics, heapq, os
 from pathlib import Path
 
 N = 8
@@ -30,5 +30,16 @@ def main():
     for _, index, selected in sorted(bins, key=lambda x:x[1]):
         terms = [f"(binary_id(={binary}) & test(={name}))" for binary, name in selected]
         result.append({"bin": index + 1, "tests": selected, "filter": " | ".join(terms)})
+    output = sys.argv[3] if len(sys.argv) > 3 else None
+    if output:
+        os.makedirs(output, exist_ok=True)
+        arg_max = os.sysconf("SC_ARG_MAX")
+        limit = arg_max // 4
+        for item in result:
+            expression = item["filter"]
+            if len(expression.encode()) > limit:
+                raise SystemExit(f"bin {item['bin']} filter exceeds argv guard {limit}")
+            with open(os.path.join(output, f"bin-{item['bin']}.expr"), "w") as file:
+                file.write(expression)
     print(json.dumps({"bins": result}, indent=2))
 if __name__ == "__main__": main()
