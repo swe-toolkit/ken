@@ -10,31 +10,35 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
 
-const BYTES_KEYS: &str =
-    include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
-const LAWFUL_FUNCTORS: &str = include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
+const BYTES_KEYS: &str = include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
+const LAWFUL_FUNCTORS: &str =
+    include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
 const EFFECTFUL_CLASSES: &str =
     include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
 const NONEMPTY: &str = include_str!("../../../catalog/packages/Data/Collections/NonEmpty.ken.md");
-const VALIDATION: &str =
-    include_str!("../../../catalog/packages/Data/Sums/Validation.ken.md");
-const DIAGNOSTIC: &str = include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
+const VALIDATION: &str = include_str!("../../../catalog/packages/Data/Sums/Validation.ken.md");
+const DIAGNOSTIC: &str =
+    include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const CURSOR: &str = include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
 const DECODER: &str = include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
 const STRING_BIJECTION: &str =
     include_str!("../../../catalog/packages/Data/Text/StringBijection.ken.md");
-const STRING_KEYS: &str =
-    include_str!("../../../catalog/packages/Data/Text/StringKeys.ken.md");
+const STRING_KEYS: &str = include_str!("../../../catalog/packages/Data/Text/StringKeys.ken.md");
 const CODEC: &str = include_str!("../../../catalog/packages/Data/Text/Codec.ken.md");
 const NUMERIC: &str = include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 const PRETTY: &str = include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
-const ARGUMENTS: &str = include_str!("../../../catalog/packages/Capability/Process/Arguments.ken.md");
-const ENVIRONMENT: &str = include_str!("../../../catalog/packages/Capability/Process/Environment.ken.md");
+const ARGUMENTS: &str =
+    include_str!("../../../catalog/packages/Capability/Process/Arguments.ken.md");
+const ENVIRONMENT: &str =
+    include_str!("../../../catalog/packages/Capability/Process/Environment.ken.md");
 const EXIT: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
-const DIAGNOSTIC_RENDER: &str = include_str!("../../../catalog/packages/Capability/Diagnostics/Render.ken.md");
+const DIAGNOSTIC_RENDER: &str =
+    include_str!("../../../catalog/packages/Capability/Diagnostics/Render.ken.md");
 const SCHEMA: &str = include_str!("../../../catalog/packages/Application/Input/Schema.ken.md");
-const ARGPARSE: &str = include_str!("../../../catalog/packages/Application/CommandLine/ArgParse.ken.md");
-const CONFIG_DECODER: &str = include_str!("../../../catalog/packages/Application/Configuration/Decoder.ken.md");
+const ARGPARSE: &str =
+    include_str!("../../../catalog/packages/Application/CommandLine/ArgParse.ken.md");
+const CONFIG_DECODER: &str =
+    include_str!("../../../catalog/packages/Application/Configuration/Decoder.ken.md");
 const EXAMPLE: &str = include_str!("../../../catalog/examples/CommandLine/Forge.ken.md");
 
 fn dependency_env() -> ElabEnv {
@@ -55,7 +59,7 @@ fn dependency_env() -> ElabEnv {
             panic!("{label} must elaborate before the Nat-order closure: {err:?}")
         });
     }
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture(&mut env, "concat_map");
     for (source, label) in [
         (LAWFUL_FUNCTORS, "Core.Classes.LawfulFunctors"),
         (EFFECTFUL_CLASSES, "Core.Classes.EffectfulClasses"),
