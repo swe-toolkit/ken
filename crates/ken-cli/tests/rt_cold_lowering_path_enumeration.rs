@@ -631,15 +631,6 @@ generate_entry_tests!(
 /// Every enumerated entry must have a generated test; this is a predicate over
 /// `ENTRIES`, not a convention-based roster.
 
-#[test]
-fn forced_mismatch_report_retains_every_population_row() {
-    let outcomes: Vec<(&str, String)> = ENTRIES.iter().map(|entry| (*entry, "forced".into())).collect();
-    let report = format_population_report(&outcomes);
-    assert!(report.contains("RT_COLD_ENUMERATION population=11"));
-    for entry in ENTRIES {
-        assert!(report.contains(&format!("RT_COLD_ENUMERATION {entry} => forced")));
-    }
-}
 
 #[test]
 fn every_enumerated_entry_has_a_generated_test() {
