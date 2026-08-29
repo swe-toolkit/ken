@@ -818,9 +818,58 @@ landed precedent in D1, not a design problem. Size S/M.
   row to `Disposition::Completes`") and the "refuses for a DIFFERENT reason"
   message. That text is the actionable half of a failure and a split that keeps
   the assertion while dropping the guidance has lost the deliverable.
-- **`AC-D5-REPORT-PRESERVED` (D5).** The population-level report is still
-  emitted UNCONDITIONALLY, pass or fail. Control: force one entry to mismatch
-  and show the full population still prints, not only the failing row.
+- **`AC-D5-REPORT-PRESERVED` (D5) — AMENDED by Steward ruling
+  `evt_5470g4y1q009b`, 2026-08-29. The report is preserved PER ENTRY and no
+  entry is built twice.** Each generated per-entry test emits its own measured
+  `RT_COLD_ENUMERATION {entry} => {outcome}` line UNCONDITIONALLY, ahead of its
+  assertion, on the pass path and the fail path alike. The
+  `RT_COLD_ENUMERATION population=N` header moves to the existing non-building
+  `the_expectation_table_covers_exactly_the_population`, which needs no build to
+  compute `ENTRIES.len()`. Controls, all three required:
+  1. the per-entry line is emitted on both paths;
+  2. **no entry is built more than once per run** — this is the half that makes
+     D5 real, and it is what the rejected aggregate-rerun design violated;
+  3. force one entry to mismatch and show, with output displayed, that all
+     entries' lines appear and the failing row is one of them.
+
+  > **The original control could not be performed against a split harness, and
+  > a criterion that cannot be run is not a criterion.** It read "force one
+  > entry to mismatch and show the full population still prints, not only the
+  > failing row" — written for ONE test owning every line. The ring reached it
+  > and stalled, and the fork it escalated (a static expectation report, or a
+  > shared-result design) had both arms wrong.
+  >
+  > **A static expectation report is REFUSED.** A report computed from
+  > `EXPECTED` is an echo of the source file: it prints identical text on a tree
+  > where every build is broken, so it reads as evidence while carrying none.
+  > The report's only non-static content is exactly the `Refuses` rows' full
+  > `{error:?}` text — `key` is a SUBSTRING match, so on a green run the message
+  > beyond that substring is unconstrained by the assertion and the report is
+  > its sole carrier. That is where a new layer surfaces.
+  >
+  > **A shared-result design is refused too**, because it resolves to either
+  > re-running (defeats D5 — the aggregate rerunning all 11 builds blew the
+  > 180s targeted timeout) or a cross-process side channel, which is new
+  > machinery with its own failure modes on a T2 mechanical split.
+  >
+  > **The premise both arms shared is what was wrong. Nothing needs
+  > aggregating.** The report is a header plus N independent lines, and after
+  > the split each line's producer is already the test that owns it. The union
+  > of the per-entry outputs IS the population report, every line measured.
+  >
+  > **One narrow loss, recorded rather than papered over.** Today a RED run
+  > shows every measured outcome, because the harness shows a failing test's
+  > output and one test holds every line. After the split a red run shows the
+  > failing entries' lines and captures the rest. What is lost is the full error
+  > text of a refusing-but-matching entry on a run where a DIFFERENT entry
+  > failed; the passing rows matched the dispositions this file states, so the
+  > loss is marginal but real. `--success-output final` on this target's
+  > invocation recovers it and is NOT required.
+  >
+  > **UNCONDITIONAL WAS NEVER A GUARANTEE OF REACHING THE LOG.** Under default
+  > capture the aggregate's report is already suppressed on a green run today.
+  > It is a property of the test code — it prints regardless of the assertion —
+  > and it stays exactly that property after the split.
 - **`AC-D5-DURATION` (D5).** Report shard 1's duration before and after **from
   completed CI runs on COMPARABLE RUNNER HARDWARE**, and state the hardware.
   **Do not repeat `AC-DURATION-MEASURED`'s defect** — that pair crossed
