@@ -1,14 +1,14 @@
 ---
 id: CAT-DERIVED-PUB-EXPORT
 title: "Bring catalog Data/Collections/Derived.ken.md to the pub-export standard — mark its census-recorded exported operations pub so consuming packages can selectively import them instead of reimplementing. The provider prerequisite that unblocks census group 4 (derived-list reuse) and is a necessary half of the LawfulFunctors standalone repair."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
 tier: T2
 depends_on: [CAT-NAT-REUSE-CONSUMERS]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3079
 origin: "Steward, 2026-08-28. The catalog-reuse census (docs/program/cat-reuse-census.md) records Data.Collections.Derived as [all-private] with a clean standalone state, and §4.2 lists its export set. CAT-NAT-REUSE-CONSUMERS drained census groups 2 and 3; of the five remaining low-risk groups, group 4 is the only one whose provider is NOT in the §4.3 standalone-failure set, so it is the next releasable lane-3 node. Shaped on the landed CAT-ORDER-PUB-EXPORT precedent. Steward-filed per COORDINATION section 2."
 ---
 
