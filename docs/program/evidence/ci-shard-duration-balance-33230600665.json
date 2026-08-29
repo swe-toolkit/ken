@@ -25845,5 +25845,13 @@
         "ken-runtime::value_depth_totality the_operational_carriers_drop_glue_dies_on_this_population_at_depth_d"
       ]
     }
-  ]
+  ],
+  "lpt_contract": {
+    "duration_representation": "JSON IEEE-754 number parsed from nextest PASS seconds",
+    "ordering": "descending seconds, then ascending test_id",
+    "bin_selection": "least cumulative seconds, then lowest one-based bin number",
+    "bins": 8,
+    "replay_assignment_mismatches": 0
+  },
+  "record_table_sha256": "a1e84c9f6490750d0b62263aa6d571814a37b0a319d73341ad28d780240ce922"
 }
