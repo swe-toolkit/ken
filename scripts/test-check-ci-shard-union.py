@@ -105,6 +105,41 @@ class Fixtures(unittest.TestCase):
             path.write_text(json.dumps(value))
         self.assert_red(classification, "unfiltered inventories differ")
 
+    def test_complement_relations_reach_their_own_errors(self):
+        def ordinary_classification(root):
+            path = root / "realized-shard-2" / "unfiltered-inventory.json"
+            value = json.loads(path.read_text())
+            value["rust-suites"]["suite-0"]["binary-name"] = "other_ordinary"
+            path.write_text(json.dumps(value))
+        self.assert_red(ordinary_classification, "unfiltered inventories differ")
+        def ordinary_removed(root):
+            path = root / "realized-shard-1" / "inventory.json"
+            value = json.loads(path.read_text())
+            value["rust-suites"]["suite-0"]["testcases"]["test_1"]["filter-match"]["status"] = "mismatch"
+            path.write_text(json.dumps(value))
+        self.assert_red(ordinary_removed, "filtered inventory differs from unfiltered live complement")
+        def ordinary_over_excluded(root):
+            for artifact in root.iterdir():
+                path = artifact / "unfiltered-inventory.json"
+                value = json.loads(path.read_text())
+                value["rust-suites"]["suite-0"]["binary-name"] = "rt_parity_native"
+                path.write_text(json.dumps(value))
+        self.assert_red(ordinary_over_excluded, "filtered inventory differs from unfiltered live complement")
+        for index in (8, 9, 10):
+            def native_included(root, index=index):
+                path = root / "realized-shard-1" / "inventory.json"
+                value = json.loads(path.read_text())
+                value["rust-suites"][f"suite-{index}"]["testcases"]["native_test"]["filter-match"]["status"] = "matches"
+                path.write_text(json.dumps(value))
+            self.assert_red(native_included, "filtered inventory differs from unfiltered live complement")
+        def selected_subset(root):
+            path = root / "realized-shard-1" / "selected-1.json"
+            value = json.loads(path.read_text())
+            del value["rust-suites"]["suite-8"]
+            value["test-count"] -= 1
+            path.write_text(json.dumps(value))
+        self.assert_red(selected_subset, "selected listing differs from unfiltered authority")
+
     def test_overlap_and_union_missing_extra_red(self):
         def overlap(root):
             path = root / "realized-shard-2" / "selected-2.json"; value = json.loads(path.read_text());
