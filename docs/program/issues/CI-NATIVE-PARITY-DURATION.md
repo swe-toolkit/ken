@@ -606,6 +606,48 @@ landed precedent in D1, not a design problem. Size S/M.
   **Do not satisfy this AC by matching label text.** A control keyed on prose
   passes for a reason unrelated to the property, and this program has twice paid
   for a control that could not fail.
+
+- **`AC-COMPILER-ORACLE` (D4) — the instrument's model of Rust is proved against
+  RUSTC, never against the instrument.** Wherever the sweep decides a question
+  the Rust language already decides — is this apostrophe a lifetime or a
+  character literal, does this attribute block associate with that test, is this
+  string escape valid — the control must compile a fixture and compare the
+  candidate's ignored inventory and association key against
+  `rustc --test` + `--ignored --list`. Two-sided: a form rustc ACCEPTS must be
+  accepted with the same inventory and key, and a form rustc REJECTS must fail
+  as a named instrument error. Every case must travel the **whole source path**
+  — ignore discovery, association, current-condition extraction, verifier
+  enforcement — never a direct call into the parser.
+
+  > **A CONTROL THAT CALLS THE CANDIDATE'S OWN PARSER IS A SELF-ORACLE, AND A
+  > SELF-ORACLE CANNOT DETECT A DEFECT IN THE THING IT ORACLES.** It agrees with
+  > the implementation by construction, so it stays green across exactly the
+  > divergences it appears to be testing. This is the shared predicate of every
+  > D4c rejection to date: the defects were in the lexer, the adjacency walk and
+  > the escape grammar, and the controls invoked `ignore_attributes`,
+  > `ignored_test_reasons`, `current_tracker_nodes` and
+  > `parse_rust_string_literal` directly. A green focused suite therefore
+  > certified neither the token boundary nor the cooked grammar (Architect
+  > `evt_50xbb17j0btt6`), and the suite was green on every rejected candidate.
+  >
+  > **THE FRAMING DEBT IS THE STEWARD'S.** "Use the compiler as the oracle" has
+  > lived only in successive rejection prose for four cycles and was never a
+  > criterion, so each respin could satisfy the frame and fail the gate. **This
+  > is the same shape as lane 1's `AC-EXCLUSIVE`** — a requirement that
+  > originates in a gate's respin list and is never folded back lives where
+  > nobody reads it, and the ring fails it repeatedly without ever being wrong
+  > about the frame.
+
+  **The cases below are ILLUSTRATION, NOT THE ROSTER.** Satisfy this AC as the
+  predicate stated above; an enumerated list of escape forms is finishable, and
+  a finished checklist is what let the previous controls look complete. Known
+  members at the time of writing: lifetime and label apostrophes versus
+  character literals; a block-comment spacer between `#[test]` and `#[ignore]`;
+  continuation starting only at an immediate newline and never at
+  backslash-space; the escaped apostrophe `\'`; `\0`; hex, Unicode, raw and
+  escaped-quote forms; and non-ASCII hex, surrogate Unicode and unknown escapes
+  as rejections.
+
 - **`AC-DURATION-MEASURED`.** Report the post-increment `native-slow
   (rt_parity_native)` Test-step duration, the `ignored-row sweep` duration, and
   the run wall-clock **from a completed CI run**, against the 24m / 10m / 28m55s
