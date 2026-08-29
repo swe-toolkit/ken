@@ -29,10 +29,21 @@ origin: "Architect hard-stop-2 ruling evt_5w03f4zbg02ry, 2026-08-26, splitting R
 > - [[RT-COMPOSED-RETURN-TRAMPOLINE-EXHAUSTIVE]] — the behaviour-preserving
 >   prefix: replace the `core.rs:3144-3164` clone/out-parameter protocol with an
 >   exhaustive `Continue`/`Complete` step result. Mints no `Produced`.
-> - [[RT-COMPOSED-RETURN-PRODUCED-TRANSFER]] — the atomic remainder: one
->   exhaustive affine state machine from Tail's exact producer through
->   construction to the exact Tail consume, then **D3B's Ret-input binding,
->   which moves there.**
+> - [[RT-COMPOSED-RETURN-PRODUCED-TRANSFER]] — the atomic remainder, and it
+>   carries **ALL THREE** parts of this node's operative objective:
+>   **(1) Direct's ruled declared call**, whose local return is fresh `R2`;
+>   **(2) Tail's** governed application and the exact produced transfer through
+>   the affine state machine; **(3) D3B's Ret-input binding for BOTH arms.**
+>
+> **CORRECTED 2026-08-29 (Architect `evt_3vpt967507xw3`) — the first version of
+> this banner listed only the Tail transfer and D3B, and that omission was
+> load-bearing.** No production Direct call ever landed; **Direct D3A was FROZEN
+> alongside Tail, never discharged.** Closing this node with a successor list
+> that did not name Direct would have made a live obligation **disappear from the
+> tracker while this node's own historical body still stated it** — visible
+> nowhere an agent reads forward. **A closure banner is the last place an
+> obligation can silently die, so it must enumerate what MOVES, not what the
+> successor happens to be about.**
 >
 > **Arm 2 was considered and collapses into arm 1.** Between the producer and
 > `ConstructArgument` the operand acquires two simultaneous obligations —
