@@ -670,4 +670,3 @@ fn cold_lowering_population_coverage_header() {
     eprintln!("RT_COLD_ENUMERATION population={}", ENTRIES.len());
     assert_eq!(ENTRIES.len(), GENERATED_TEST_ENTRIES.len());
 }
-
