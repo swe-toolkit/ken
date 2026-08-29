@@ -1,7 +1,7 @@
 ---
 id: CAT-EXPORT-CENSUS-DERIVES-LOADER-PREDICATE
 title: "Derive the export-census population from the loader's own publication predicate instead of a parallel hand-maintained Decl match, so the exactly-six equality control cannot silently narrow as new publishable declaration kinds are added."
-status: draft
+status: ready
 owner: foundation
 size: S
 gate: none
@@ -85,8 +85,18 @@ as derivation from the deciding predicate.
 
 ## Sequencing
 
-`draft`, queued behind [[CAT-DERIVED-PUB-EXPORT]] on file contention — it edits
-that node's acceptance test. Flip `ready` and release once the predecessor is
-confirmed `merged` by blob. **Do not fold this into the predecessor:** that node
+`ready` — ON DECK, not released. The predecessor is confirmed `merged` by blob
+at `origin/main` `04e157a450a0d17f9fab5437c8f1f60c523ff052`, so the file
+contention that held this at `draft` is discharged: the acceptance test it edits
+is now on `main`.
+
+**What it now queues behind is the seat, not the file.**
+[[CAT-DERIVED-REUSE-CONSUMERS]] was released ahead of it at 03:47 UTC because it
+is the lane's objective (draining census group 4) rather than a robustness
+repair, and lane 3 has one implementer. The two do **not** contend on content —
+this node edits `crates/ken-elaborator/tests/cat_derived_pub_export.rs`, that one
+edits five catalog packages (Deque, Parsing, EffectfulClasses, Cursor, Property)
+and neither touches the other's paths. Release this the moment the foundation
+implementer is free. **Do not fold this into the predecessor:** that node
 is gated, approved on an exact SHA, and routed; reopening it to add a criterion
 would void two exact-SHA votes for a latent finding with no live reproduction.

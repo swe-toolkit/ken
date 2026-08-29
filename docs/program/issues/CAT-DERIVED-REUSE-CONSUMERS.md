@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-REUSE-CONSUMERS
 title: "Drain catalog-reuse census group 4 (derived-list computational reuse) — replace six reimplementations of list_append, reverse, concat_map, and length across five packages with selective imports from Data.Collections.Derived. The consumer half of CAT-DERIVED-PUB-EXPORT, shaped on the landed CAT-NAT-REUSE-CONSUMERS per-package increment pattern."
-status: draft
+status: active
 owner: foundation
 size: M
 gate: none
@@ -12,13 +12,22 @@ github: null
 origin: "Steward, 2026-08-29, filed to remove lane-3 framing debt: CAT-DERIVED-PUB-EXPORT had no successor, so lane 3 would have gone idle on its landing. Group 4 membership is quoted verbatim from docs/program/cat-reuse-census.md section 4.4 at origin/main ac9b681e1f5a684b40a2da8b9ac0c0d19a13b2fc. The four providers group 4 consumes are exactly four of the six names CAT-DERIVED-PUB-EXPORT exports, so the prerequisite covers the consumers with nothing left over. Steward-filed per COORDINATION section 2."
 ---
 
-> # NOT RELEASED. `depends_on` IS NOT AUTHORIZATION.
+> # RELEASED by the Steward, 2026-08-29 03:47 UTC. `active`.
 >
-> This node is `draft` and is filed to remove framing debt, not to start work.
-> **`CAT-DERIVED-PUB-EXPORT` landing does not release it** — a landing
-> discharges a dependency; only an explicit Steward release starts a turn. Flip
-> `draft` -> `ready` -> `active` on release, because a dispatched node left at
-> `ready` is invisible to the per-node watchdog sweep.
+> The prerequisite is confirmed `merged` **by blob identity, not ancestry** —
+> the publisher squashes. At `origin/main`
+> `04e157a450a0d17f9fab5437c8f1f60c523ff052` (PR #3079, merged 03:38:54 UTC):
+> `catalog/packages/Data/Collections/Derived.ken.md` is blob
+> `fcaa8e4b60fc97a394b635f2d4bf3ea600ba61aa` and
+> `crates/ken-elaborator/tests/cat_derived_pub_export.rs` is blob
+> `624a33aa295b28c1e320a3771650679317cb0cd5`, both identical to the gated
+> candidate.
+>
+> **The fixed inputs below were re-measured at that SHA before release**, as
+> §"Fixed inputs" itself requires. All six group-4 consumer sites are still
+> present, and all four providers this node needs — `list_append`, `length`,
+> `reverse`, `concat_map` — are now `pub` in `Derived.ken.md` at lines 75, 163,
+> 238 and 342. Nothing in the table decayed.
 
 ## Fixed inputs, measured at `origin/main` `ac9b681e1f5a684b40a2da8b9ac0c0d19a13b2fc`
 
