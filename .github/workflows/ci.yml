@@ -116,11 +116,15 @@ jobs:
       # nothing here isolates the topology as the CAUSE of the timing; see
       # docs/program/11-test-suite-and-ci-remediation.md §1f for the
       # unisolated-hypothesis framing.
+      - name: Select duration-balanced shard
+        run: |
+          cargo nextest list --workspace --locked --message-format json > inventory.json
+          python3 scripts/ci-duration-shard.py inventory.json docs/program/evidence/ci-shard-duration-balance-33230600665.json duration-filters
+          cargo nextest list --workspace --locked --message-format json -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)" > "selected-${{ matrix.shard }}.json"
       - name: Test
         run: >-
           cargo nextest run --workspace --locked
-          --partition count:${{ matrix.shard }}/8
-          -E 'not (binary(rt_parity_native) or binary(px8f_buffer_native) or binary(px8f_write_partition))'
+          -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)"
       # nextest does not execute rustdoc tests, so run the workspace doctest
       # population once rather than once per shard.
       - name: Doctests
