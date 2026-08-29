@@ -9692,6 +9692,8 @@ impl CheckedIhFreshResultRouteEmissionObservation {
 /// Observer-side controls. `CoEmissionOnly` preserves its landed behavior;
 /// `PairingLegOnly` keeps every seat present while breaking exactly one
 /// substantive identity selected from the predicate's derived inventory.
+/// Call sites vary typed recorder inputs; each recorder unconditionally renders
+/// and stores the same argument path for exact and controlled observations.
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CheckedIhFreshResultRouteObservationMutation {
@@ -9723,6 +9725,29 @@ fn fresh_result_route_observation_breaks(leg: CheckedIhFreshResultRoutePairingLe
                 if active == leg
         )
     })
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn checked_ih_fresh_result_route_active_edge_observer_inputs(
+    value: cranelift_codegen::ir::Value,
+    alternate_value: cranelift_codegen::ir::Value,
+    answer_route: SourceComputationalAnswerRoute,
+) -> (cranelift_codegen::ir::Value, SourceComputationalAnswerRoute) {
+    let value = if fresh_result_route_observation_breaks(
+        CheckedIhFreshResultRoutePairingLeg::SourceToActiveEdge,
+    ) {
+        alternate_value
+    } else {
+        value
+    };
+    let answer_route = if fresh_result_route_observation_breaks(
+        CheckedIhFreshResultRoutePairingLeg::ActiveAnswerRoute,
+    ) {
+        SourceComputationalAnswerRoute::DirectScrutinee
+    } else {
+        answer_route
+    };
+    (value, answer_route)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -9828,6 +9853,55 @@ fn record_checked_ih_fresh_result_route_source(
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+fn checked_ih_fresh_result_route_ret_input_observer_inputs(
+    frame_origin: StaticOriginId,
+    ret_case_body_origin: StaticOriginId,
+    header: cranelift_codegen::ir::Block,
+    value: cranelift_codegen::ir::Value,
+    alternate_value: cranelift_codegen::ir::Value,
+) -> (StaticOriginId, cranelift_codegen::ir::Value, usize) {
+    let order = if FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(std::cell::Cell::get) {
+        next_fresh_result_route_observation_order()
+    } else {
+        0
+    };
+    let ret_case_body_origin = if fresh_result_route_observation_breaks(
+        CheckedIhFreshResultRoutePairingLeg::RetCaseBodyOrigin,
+    ) {
+        frame_origin
+    } else {
+        ret_case_body_origin
+    };
+    let value = if fresh_result_route_observation_breaks(
+        CheckedIhFreshResultRoutePairingLeg::HeaderToRetInput,
+    ) {
+        alternate_value
+    } else {
+        value
+    };
+    let order = if fresh_result_route_observation_breaks(
+        CheckedIhFreshResultRoutePairingLeg::ForwardEmissionOrder,
+    ) {
+        let rendered_frame = format!("{frame_origin:?}");
+        let rendered_header = format!("{header:?}");
+        FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| {
+            rows.borrow()
+                .iter()
+                .rev()
+                .find(|row| {
+                    row.active_frame_origin == rendered_frame
+                        && row.header_block.as_deref() == Some(rendered_header.as_str())
+                })
+                .and_then(|row| row.active_edge_order)
+                .unwrap_or(order)
+        })
+    } else {
+        order
+    };
+    (ret_case_body_origin, value, order)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
 fn record_checked_ih_fresh_result_route_active_edge(
     frame_origin: StaticOriginId,
     value: cranelift_codegen::ir::Value,
@@ -9857,24 +9931,8 @@ fn record_checked_ih_fresh_result_route_active_edge(
             });
         if let Some(index) = index {
             let row = &mut rows[index];
-            row.active_edge_value = Some(
-                if fresh_result_route_observation_breaks(
-                    CheckedIhFreshResultRoutePairingLeg::SourceToActiveEdge,
-                ) {
-                    format!("{rendered}#pairing-control")
-                } else {
-                    rendered
-                },
-            );
-            row.active_answer_route = Some(
-                if fresh_result_route_observation_breaks(
-                    CheckedIhFreshResultRoutePairingLeg::ActiveAnswerRoute,
-                ) {
-                    "DirectScrutinee".to_owned()
-                } else {
-                    format!("{answer_route:?}")
-                },
-            );
+            row.active_edge_value = Some(rendered);
+            row.active_answer_route = Some(format!("{answer_route:?}"));
             row.header_block = Some(format!("{header:?}"));
             row.header_input_value = Some(format!("{header_input:?}"));
             row.active_edge_order = Some(order);
@@ -9888,11 +9946,11 @@ fn record_checked_ih_fresh_result_route_ret_input(
     ret_case_body_origin: StaticOriginId,
     header: cranelift_codegen::ir::Block,
     value: cranelift_codegen::ir::Value,
+    order: usize,
 ) {
     if !FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(std::cell::Cell::get) {
         return;
     }
-    let order = next_fresh_result_route_observation_order();
     let rendered_frame = format!("{frame_origin:?}");
     let header = format!("{header:?}");
     FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| {
@@ -9901,35 +9959,9 @@ fn record_checked_ih_fresh_result_route_ret_input(
                 && row.header_block.as_deref() == Some(header.as_str())
                 && row.ret_input_value.is_none()
         }) {
-            let rendered_ret_case_body_origin = format!("{ret_case_body_origin:?}");
-            row.actual_ret_case_body_origin = Some(
-                if fresh_result_route_observation_breaks(
-                    CheckedIhFreshResultRoutePairingLeg::RetCaseBodyOrigin,
-                ) {
-                    format!("{rendered_ret_case_body_origin}#pairing-control")
-                } else {
-                    rendered_ret_case_body_origin
-                },
-            );
-            let rendered_value = format!("{value:?}");
-            row.ret_input_value = Some(
-                if fresh_result_route_observation_breaks(
-                    CheckedIhFreshResultRoutePairingLeg::HeaderToRetInput,
-                ) {
-                    format!("{rendered_value}#pairing-control")
-                } else {
-                    rendered_value
-                },
-            );
-            row.ret_input_order = Some(
-                if fresh_result_route_observation_breaks(
-                    CheckedIhFreshResultRoutePairingLeg::ForwardEmissionOrder,
-                ) {
-                    row.active_edge_order.unwrap_or(order)
-                } else {
-                    order
-                },
-            );
+            row.actual_ret_case_body_origin = Some(format!("{ret_case_body_origin:?}"));
+            row.ret_input_value = Some(format!("{value:?}"));
+            row.ret_input_order = Some(order);
         }
     });
 }

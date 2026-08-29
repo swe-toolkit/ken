@@ -12228,13 +12228,25 @@ impl<'a> Lowering<'a> {
             .find(|(origin, _)| *origin == eliminator.static_origin)
         {
             #[cfg(feature = "px8-ds-test-support")]
-            record_checked_ih_fresh_result_route_active_edge(
-                eliminator.static_origin,
-                scrutinee.word,
-                *header,
-                builder.block_params(*header)[0],
-                eliminator.answer_route,
-            );
+            {
+                // Observer controls vary only these typed recorder inputs. The
+                // emitted jump below still consumes `scrutinee.word` and the
+                // eliminator's authored route.
+                let header_input = builder.block_params(*header)[0];
+                let (observed_value, observed_route) =
+                    checked_ih_fresh_result_route_active_edge_observer_inputs(
+                        scrutinee.word,
+                        header_input,
+                        eliminator.answer_route,
+                    );
+                record_checked_ih_fresh_result_route_active_edge(
+                    eliminator.static_origin,
+                    observed_value,
+                    *header,
+                    header_input,
+                    observed_route,
+                );
+            }
             let route_control_word = carried_computational_loop_control_word(
                 eliminator.checked_frame_id,
                 CarriedComputationalLoopEdge::ActiveSelfResumption,
@@ -12646,11 +12658,23 @@ impl<'a> Lowering<'a> {
                 .rev()
                 .find(|(origin, _)| *origin == eliminator.static_origin)
             {
+                // The alternate value is the header's existing route-control
+                // parameter and reaches only the observer call. `case_env`
+                // above keeps the emitted Ret input byte-for-behavior intact.
+                let (observed_body_origin, observed_value, observed_order) =
+                    checked_ih_fresh_result_route_ret_input_observer_inputs(
+                        eliminator.static_origin,
+                        body_origin,
+                        *header,
+                        scrutinee.word,
+                        builder.block_params(*header)[1],
+                    );
                 record_checked_ih_fresh_result_route_ret_input(
                     eliminator.static_origin,
-                    body_origin,
+                    observed_body_origin,
                     *header,
-                    scrutinee.word,
+                    observed_value,
+                    observed_order,
                 );
             }
             // ⭐ Lowered through the ORDINARY continuation of this eliminator,
