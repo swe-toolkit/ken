@@ -13,10 +13,15 @@ SCRIPT = Path(__file__).with_name("ci-duration-shard.py").resolve()
 
 class DurationShardControls(unittest.TestCase):
     def test_live_native_binary_cannot_enter_a_shard(self):
-        rows = [
-            ("fixture::ordinary", "ordinary", "ordinary_test", "matches"),
-            ("fixture::native", "rt_parity_native", "native_test", "matches"),
-        ]
+        rows = [("fixture::ordinary", "ordinary", "ordinary_test", "matches")]
+        rows.extend(
+            (f"fixture::{name}", name, "native_test", "matches")
+            for name in (
+                "rt_parity_native",
+                "px8f_buffer_native",
+                "px8f_write_partition",
+            )
+        )
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             suites = {
@@ -44,7 +49,8 @@ class DurationShardControls(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         filters = [row["filter"] for row in json.loads(result.stdout)["bins"]]
         self.assertTrue(any("fixture::ordinary" in item for item in filters))
-        self.assertFalse(any("fixture::native" in item for item in filters))
+        for binary in ("rt_parity_native", "px8f_buffer_native", "px8f_write_partition"):
+            self.assertFalse(any(binary in item for item in filters))
 
 
 if __name__ == "__main__":

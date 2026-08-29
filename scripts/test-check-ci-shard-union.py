@@ -18,6 +18,7 @@ def listing(rows, matches):
     for index, (binary_id, testcase) in enumerate(rows):
         suites[f"suite-{index}"] = {
             "binary-id": binary_id,
+            "binary-name": "ordinary",
             "testcases": {
                 testcase: {"filter-match": {"status": "matches" if (binary_id, testcase) in matches else "mismatch"}}
             },
@@ -85,7 +86,7 @@ class Fixtures(unittest.TestCase):
             path = root / "realized-shard-1" / "inventory.json"; value = json.loads(path.read_text()); value["test-count"] = 7; path.write_text(json.dumps(value))
         self.assert_red(wrong_count, "differs from")
         def duplicate(root):
-            path = root / "realized-shard-1" / "inventory.json"; value = json.loads(path.read_text()); value["rust-suites"]["duplicate"] = {"binary-id": "fixture::bin", "testcases": {"test_1": {"filter-match": {"status": "matches"}}}}; value["test-count"] = 9; path.write_text(json.dumps(value))
+            path = root / "realized-shard-1" / "inventory.json"; value = json.loads(path.read_text()); value["rust-suites"]["duplicate"] = {"binary-id": "fixture::bin", "binary-name": "ordinary", "testcases": {"test_1": {"filter-match": {"status": "matches"}}}}; value["test-count"] = 9; path.write_text(json.dumps(value))
         self.assert_red(duplicate, "duplicate canonical identity")
         def mismatch(root):
             path = root / "realized-shard-2" / "inventory.json"; value = json.loads(path.read_text()); next(iter(value["rust-suites"].values()))["binary-id"] = "other::bin"; path.write_text(json.dumps(value))
@@ -99,7 +100,7 @@ class Fixtures(unittest.TestCase):
         self.assert_red(overlap, "selections overlap")
         def union_extra(root):
             path = root / "realized-shard-8" / "selected-8.json"; value = json.loads(path.read_text()); suite = next(iter(value["rust-suites"].values())); suite["testcases"] = {"extra": {"filter-match": {"status": "matches"}}}; path.write_text(json.dumps(value))
-        self.assert_red(union_extra, "union differs")
+        self.assert_red(union_extra, "selected listing differs from unfiltered authority")
 
 
 if __name__ == "__main__":
