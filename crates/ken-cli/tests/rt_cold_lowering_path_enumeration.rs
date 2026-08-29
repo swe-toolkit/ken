@@ -558,6 +558,38 @@ const EXPECTED: &[(&str, Disposition)] = &[
     ("rt_write_writable_stage", Disposition::Completes),
 ];
 
+fn entry_outcome(entry: &str) -> String {
+    let root = tempfile::tempdir().expect("temporary native-build root");
+    std::fs::write(root.path().join("source"), b"ab").unwrap();
+    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+    match ken_cli::build_native_program(
+        &source,
+        ken_cli::SourceFormat::Ken,
+        &format!("rt_cold_enum_{entry}"),
+        root.path(),
+    ) {
+        Ok(_) => "OK".to_string(),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+fn entry_mismatch(entry: &str, outcome: &str) -> Option<String> {
+    let expected = EXPECTED.iter().find(|(name, _)| name == &entry)
+        .map(|(_, disposition)| *disposition)
+        .expect("covered by the_expectation_table_covers_exactly_the_population");
+    match expected {
+        Disposition::Completes if outcome != "OK" => Some(format!(
+            "{entry}: expected a completed artifact, refused with {outcome}")),
+        Disposition::Refuses { key, retired_by } if outcome == "OK" => Some(format!(
+            "{entry}: now COMPLETES. Its blocker is retired by {retired_by}; \
+             if that landed, move this row to `Disposition::Completes`.")),
+        Disposition::Refuses { key, retired_by } if !outcome.contains(key) => Some(format!(
+            "{entry}: refuses for a DIFFERENT reason than the expected {key:?} \
+             (retired by {retired_by}). A new layer is behind the known one. Got: {outcome}")),
+        _ => None,
+    }
+}
+
 macro_rules! generate_entry_tests {
     ($($entry:ident),+ $(,)?) => {
         const GENERATED_TEST_ENTRIES: &[&str] = &[$(stringify!($entry)),+];
@@ -565,6 +597,9 @@ macro_rules! generate_entry_tests {
             #[test]
             fn $entry() {
                 assert!(ENTRIES.contains(&stringify!($entry)));
+                let outcome = entry_outcome(stringify!($entry));
+                assert!(entry_mismatch(stringify!($entry), &outcome).is_none(),
+                    "{}", entry_mismatch(stringify!($entry), &outcome).unwrap());
             }
         )+
     };
