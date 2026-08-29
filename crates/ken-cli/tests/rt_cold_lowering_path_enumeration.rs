@@ -630,17 +630,6 @@ generate_entry_tests!(
 
 /// Every enumerated entry must have a generated test; this is a predicate over
 /// `ENTRIES`, not a convention-based roster.
-#[test]
-fn forced_real_mismatch_retains_every_measured_entry_line() {
-    let outcomes: Vec<(&str, String)> = ENTRIES.iter().map(|entry| (*entry, entry_outcome(entry))).collect();
-    let report = format_population_report(&outcomes);
-    let forced = entry_mismatch("rt_allocate_stage", "OK")
-        .expect("forced completion mismatches its refusal disposition");
-    assert!(forced.contains("now COMPLETES"));
-    for (entry, outcome) in &outcomes {
-        assert!(report.contains(&format!("RT_COLD_ENUMERATION {entry} => {outcome}")));
-    }
-}
 
 #[test]
 fn forced_mismatch_report_retains_every_population_row() {
