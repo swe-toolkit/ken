@@ -1,7 +1,7 @@
 ---
 id: CAT-BOOL-REUSE-CONSUMERS
 title: "Drain catalog-reuse census group 6 (Boolean computational reuse) — replace three reimplementations (Derived#bool_and, Derived#bool_leq, Map#option_is_some) with selective imports of the now-public LC.bool_and, LC.bool_leq and SC.is_some. The consumer half of CAT-BOOL-PUB-EXPORT, shaped on the landed CAT-DERIVED-REUSE-CONSUMERS per-package increment pattern."
-status: ready
+status: active
 owner: foundation
 size: S
 gate: none
