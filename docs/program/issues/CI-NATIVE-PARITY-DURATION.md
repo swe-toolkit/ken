@@ -486,6 +486,59 @@ measurement order inside the turn and is untouched by the packaging change.
 **D4 remains independently packageable** and may land in either order relative
 to D1-D3; it is the ignored-row sweep work and shares no file with them.
 
+**D5 — SPLIT THE 574-SECOND TEST. This is the next serial floor and it is the
+largest single item left.** Framed by the Steward 2026-08-29. Independently
+packageable; shares no file with D4.
+
+Fixed inputs, measured at `origin/main`
+`ac9b681e1f5a684b40a2da8b9ac0c0d19a13b2fc`:
+
+- `crates/ken-cli/tests/rt_cold_lowering_path_enumeration.rs`, blob
+  `13c1a96f269d6345b39270ef5432d8337f27877b`;
+- `every_rt_parity_entry_reaches_its_expected_terminal_state` at `:575` — ONE
+  `#[test]` looping over `ENTRIES` and calling `ken_cli::build_native_program`
+  once per entry, in-process, each in its own `tempfile::tempdir()`;
+- `ENTRIES` at `:492` — **11 names**; `EXPECTED` — **11 rows**, one per entry;
+- the coverage guard `the_expectation_table_covers_exactly_the_population` at
+  `:564`, asserting `EXPECTED == ENTRIES` as sets;
+- **574s, 68% of shard 1.** `--partition count:N/M` balances by test COUNT and
+  never subdivides a single test, so **sharding cannot touch this** — the same
+  reason partitioning was inert before D1.
+
+**The arithmetic that makes this worth doing:** 574s over 11 entries is roughly
+52s each. Eleven schedulable units on a 4-vCPU runner is about three waves,
+call it ~160s against 574s. That is an estimate from the split alone and the
+real number is `AC-D5-DURATION`'s to measure, not this frame's to assert.
+
+**DESIGN JUDGMENT, FRONT-LOADED — three things a naive per-entry split breaks,
+and the second is the one that would pass review:**
+
+1. **The unconditional aggregate report at `:595-600`.** It prints the whole
+   population pass or fail, and the code says why: *"A refusal set that is only
+   visible when the assertion happens to fail is not a report."* Eleven
+   independent tests each print one line and the population-level view is gone.
+   Preserve it — either a separate aggregate reporting step, or per-entry lines
+   plus something that emits the population summary. **Do not drop it and do not
+   make it conditional on failure.**
+2. **A per-case split introduces a THIRD roster, and that is the failure mode.**
+   Today two rosters are cross-checked: `ENTRIES` against `EXPECTED`. After the
+   split there is also the set of entries that actually have a generated test.
+   **An entry can sit in `ENTRIES` and in `EXPECTED`, satisfy the existing
+   coverage guard, and never run** — silently untested, with every check green.
+   The existing guard cannot see this because it compares the two rosters that
+   still agree.
+3. **Prefer plain in-process `#[test]`s per entry.** Each entry already builds
+   in its own tempdir with no shared mutable state, so the subprocess isolation
+   of `generated_entry_case!` (`rt_parity_native.rs:1362`) is not obviously
+   needed here and costs a re-exec per case. **If a measured cross-entry
+   interference does require the subprocess pattern, the Adversary's latent on
+   it applies**: the plain variant asserts only child `status.success()` with no
+   marker, so its non-vacuity depends on the macro living at CRATE ROOT for
+   `--exact` to resolve. Name which pattern you used and why.
+
+**Capability tier: T2.** This is a behaviour-preserving mechanical split with a
+landed precedent in D1, not a design problem. Size S/M.
+
 ## Acceptance criteria
 
 - **`AC-CASE-FAITHFUL`.** Every one of the 90 cases survives with its mode
@@ -567,6 +620,41 @@ to D1-D3; it is the ignored-row sweep work and shares no file with them.
   > comparable-hardware measurement this criterion asks for. Report from
   > comparable hardware and state the caveat; a number reported without it
   > overclaims.
+- **`AC-D5-SCHEDULABLE` (D5).** After the split, nextest lists the 11 entries as
+  SEPARATE test items and schedules them independently. Prove it by listing
+  them, not by asserting it — the whole point of the increment is the scheduling
+  unit count, and that is directly observable.
+- **`AC-D5-INVOCATION-CENSUS` (D5) — the third roster must be checked, and this
+  is the criterion the split exists to not fail silently.** A per-case split
+  makes the set of entries that HAVE a generated test into a third roster
+  alongside `ENTRIES` and `EXPECTED`. **An entry present in both existing
+  rosters but missing a test satisfies
+  `the_expectation_table_covers_exactly_the_population` and never runs.**
+  Deliver a check that FAILS when an entry is added to `ENTRIES` without a
+  corresponding test, and exhibit that failure by actually adding one and
+  showing the red, then removing it.
+
+  > **PREDICATE FORM, NOT A ROSTER.** State the check as "every member of
+  > `ENTRIES` has a generated test", never as a list of the 11 current names. An
+  > enumerated roster is satisfied by editing the roster, which is the same
+  > unfalsifiability this node already corrected once in
+  > `AC-STALE-READMISSION`'s positive arm. **The count 11 in the D5 deliverable
+  > is a fixed input measured at a SHA, not the criterion.**
+- **`AC-D5-BEHAVIOUR-IDENTICAL` (D5).** Same 11 dispositions with the same
+  pass/fail outcomes, and the mismatch text preserved verbatim — including the
+  `retired_by` guidance ("its blocker is retired by X; if that landed, move this
+  row to `Disposition::Completes`") and the "refuses for a DIFFERENT reason"
+  message. That text is the actionable half of a failure and a split that keeps
+  the assertion while dropping the guidance has lost the deliverable.
+- **`AC-D5-REPORT-PRESERVED` (D5).** The population-level report is still
+  emitted UNCONDITIONALLY, pass or fail. Control: force one entry to mismatch
+  and show the full population still prints, not only the failing row.
+- **`AC-D5-DURATION` (D5).** Report shard 1's duration before and after **from
+  completed CI runs on COMPARABLE RUNNER HARDWARE**, and state the hardware.
+  **Do not repeat `AC-DURATION-MEASURED`'s defect** — that pair crossed
+  different runners, which is why it is still undischarged. If comparable
+  hardware is not available, say so and report the number as an inference
+  rather than a measurement.
 - **`AC-AFFECTED-CLOSURE`.** Cover every target that loads any module whose
   CLOSURE this increment changes, diff-touched or not. This is not a relaxation
   of the targeted-build rule: what changes is which targets count as affected,
