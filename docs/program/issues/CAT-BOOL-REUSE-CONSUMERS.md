@@ -63,9 +63,26 @@ deleting the local definition:
 
 - **AC-CENSUS-ROW-DRAINED** — the increment's census §4.4 group-6 row(s) no
   longer name a reimplementation: the local definition is deleted and the
-  computation comes from the imported provider. Control: the reimplementation is
-  gone (a grep for its `fn` at column 0 in the consumer module is empty) and the
-  selective import names the provider.
+  selective import names the provider. Control: the selective import names the
+  provider and the named local `fn` is gone.
+- **AC-NO-EQUIVALENT-LOCAL** (the load-bearing causal control; amended
+  2026-08-29, Steward disposition on the CV's second reject) — after the
+  drain the consumer module defines NO function kernel-equivalent (identical type
+  AND identical transparent body) to the imported provider, so the drained
+  computation cannot be served by a renamed reimplementation. This is a CLOSED
+  relation over the module's own definitions — the consumer-side MIRROR of the
+  provider-side loader-visible inventory the CV required on `CAT-BOOL-PUB-EXPORT`
+  (population from own definitions, closed equality, NOT an occurrence census).
+  It must be CAUSAL/equivalence-based, not occurrence-based: a control that
+  passes merely because the provider `Const` APPEARS somewhere in a type/body has
+  not measured reuse. Required reddening mutation (CV's counterexample): reroute
+  the consumers to a renamed kernel-equivalent local (e.g. `local_bool_leq`),
+  with or without an unused provider alias `let _ = bool_leq` padding, MUST
+  redden. Spelling-agnostic — ban the equivalence, never a name or the padding
+  spelling. **If a sound closed mechanism cannot be built (a legitimately-needed
+  local is kernel-equivalent to the provider, or the equivalence check has a real
+  gap), that is a HARD STOP to the Architect — not another occurrence-census
+  respin.**
 - **AC-SAME-BEHAVIOUR** — the consumer module elaborates to the same result
   through the imported provider as through the deleted local. Control: the
   module's existing checked declarations and any dependent headline
