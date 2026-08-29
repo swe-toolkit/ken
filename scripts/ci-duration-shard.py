@@ -26,5 +26,9 @@ def main():
         total, index, selected = heapq.heappop(bins)
         selected.append((identity, name))
         heapq.heappush(bins, (total + durations.get(rendered, median), index, selected))
-    print(json.dumps({"bins": [{"bin": index + 1, "tests": selected} for _, index, selected in sorted(bins, key=lambda x:x[1])]}, indent=2))
+    result = []
+    for _, index, selected in sorted(bins, key=lambda x:x[1]):
+        terms = [f"(binary_id(={binary}) & test(={name}))" for binary, name in selected]
+        result.append({"bin": index + 1, "tests": selected, "filter": " | ".join(terms)})
+    print(json.dumps({"bins": result}, indent=2))
 if __name__ == "__main__": main()
