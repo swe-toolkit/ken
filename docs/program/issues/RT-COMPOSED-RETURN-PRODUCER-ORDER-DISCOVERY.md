@@ -12,6 +12,27 @@ github: https://github.com/swe-toolkit/ken/pull/3105
 origin: "Operator decision 2026-08-29, concurring with the Steward recommendation after Research advisory evt_774v5fjnxcfcw and Architect disposition evt_5te99temrdcty. RELEASED 2026-08-29 after the native-carried-value campaign front was determined DRAINED on current main 863bf0fbf by the Architect (evt_1xndnw1dp1r6v) and returned by the runtime-leader (evt_6bmd84zd6yzg2) — the sequencing precondition the operator set (queue after the campaign) is met. The composed-return wall (closed node RT-COMPOSED-RETURN-PRODUCED-TRANSFER, D0b=NO) is a partial-order contradiction on the Tail lowering route. Research confirmed Q2 POSITIVE: the shape is reached by well-formed Ken SOURCE (two complete SourceFormat::Ken programs — fs-read-at-offset and fs-write-at-offset — through the real build_native_program pipeline; the 48 Tail / 3 Direct arrivals are compiler arrivals within them, not fixtures), so the wall is NOT moot. Research Q1: no surveyed family (Interaction Trees, Koka, CPS/SSA) preserves Ken's current order (emit R2 -> collapse -> quotient away source identity -> validate later) and still delivers R2 without a store/capture/tag/recovery; the Architect's two shapes are the only known families and there is no local patch. Operator: fund shape (a); the language has no users so a wrong-value-vs-refuse failure-mode check is unnecessary."
 ---
 
+> # VERDICT CORRECTION (2026-08-29, Architect ruling `evt_6bq9q76rmzm90`) — read first.
+>
+> The build `RT-COMPOSED-RETURN-PRODUCER-ORDER-BUILD` hard-stopped at exact base
+> `1045cae6c` (tree `cfd53fe4`). The Architect sustained the contradiction: the
+> private post-selection/pre-emission proof can only REFUSE earlier — it cannot
+> alter the already-emitted call/`returned` word, and the Tail `Ret` consumer
+> receives `scrutinee.word` unchanged, so it CANNOT turn the base-red
+> `ResourceBodyResult` `PatternMatchFailure` rows into `InvalidOffset`. Product
+> evidence `/tmp/rt-producer-order-base-products.log` (SHA-256
+> `6049241c8f164d5eaa4153b772bec45bdf2c56925155aa22d615a15e5c4c5686`).
+>
+> **Corrected verdict: shape (a) is constructively viable as an authority JOIN
+> (an unforgeability hardening of the producer-authority) but INSUFFICIENT as the
+> semantic Tail repair.** It does not flip the 0/48 Tail partition and does not
+> close PX8's Tail route. The "probably viable" verdict below was viable-for-what
+> it join-proves; it OVERCLAIMED closure of the Tail semantic route, which the
+> proof cannot reach. The semantic repair is a SEPARATE operator decision — shape
+> (b), or a fresh T1 semantic object with an explicit producer-result-to-Tail-Ret
+> binding — without reopening Produced-transfer / D3 / Direct-only salvage /
+> recovery / store / tag / HS15.
+>
 > # RELEASED — OPERATOR-FUNDED DISCOVERY, lane 1. Deliverable is a VIABILITY
 > # VERDICT, not a landed mechanism.
 >
@@ -153,6 +174,12 @@ node `RT-COMPOSED-RETURN-PRODUCED-TRANSFER` (D0b report SHA-256 `fdd5e859...`); 
 §6.2.
 
 ## Discovery verdict — probably viable
+
+> **SUPERSEDED IN PART by the top-of-file VERDICT CORRECTION (`evt_6bq9q76rmzm90`).**
+> The join below is real; its sufficiency as a Tail SEMANTIC repair is REFUTED —
+> the proof can only refuse earlier, never alter the emitted `returned` word.
+> Read "probably viable" as "viable as an authority join," not "closes the Tail
+> route."
 
 **Verdict: shape (a) is probably viable.** At working SHA
 `751e35e03d475fd15dfd9234d47695f9ef1884fd`, source-specific planner
