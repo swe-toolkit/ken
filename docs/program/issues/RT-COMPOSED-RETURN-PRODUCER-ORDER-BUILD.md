@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-PRODUCER-ORDER-BUILD
 title: "Implement the shape-(a) producer-authority proof: an opaque, compiler-only proof that joins the already-validated governed transport to the existing confluence key AFTER transport selection and BEFORE emission, and licenses the fresh-result mint with it — closing the composed-return wall's Tail route without a store, captured continuation, runtime tag, or recovery. Builds the probably-viable verdict from RT-COMPOSED-RETURN-PRODUCER-ORDER-DISCOVERY."
-status: active
+status: draft
 owner: runtime
 size: L
 gate: none
@@ -12,13 +12,37 @@ github: null
 origin: "Operator decision 2026-08-29: frame and release the shape-(a) build as lane 1's next objective, after the discovery RT-COMPOSED-RETURN-PRODUCER-ORDER-DISCOVERY returned a decisive verdict of PROBABLY VIABLE (merged b7c0c913f, PR #3105). The Architect approved the constructive sketch as genuinely constructive and prohibition-clean (evt_2se624p3t1eym) and was explicit that the paper approval covers the verdict ONLY — any implementation receives a fresh gate and MUST encode the stated unforgeability. The composed-return wall RT-COMPOSED-RETURN-PRODUCED-TRANSFER (D0b=NO) and the D3 chain stay closed; this is the authority/producer-order construction the wall's disposition named, not a Produced-transfer successor. Steward-filed per COORDINATION section 2."
 ---
 
-> # ACTIVE — lane 1, the new runtime objective. Dispatched 2026-08-29.
+> # HELD — HARD STOP at implementation. Awaiting an operator decision. `draft`
+> # (un-released; the schema has no `blocked` — `draft` = held/not-dispatchable).
 >
-> Released `evt_7f5wx652c0bez` (anchor), runtime-leader took it
-> `evt_5ddaewx0bqz6` and dispatched the implementer on
-> `wp/RT-COMPOSED-RETURN-PRODUCER-ORDER-BUILD` unheld at exact base
-> `1045cae6c` (`evt_268yzfg2vmysf`); implementer pickup confirmed
-> `evt_3vagnf38nwexq`. Steward learns the outcome from the leader's handback.
+> Released `evt_7f5wx652c0bez`, dispatched (`evt_268yzfg2vmysf`, pickup
+> `evt_3vagnf38nwexq`); the runtime implementer hit an immediate hard stop and
+> returned home with the branch UNCHANGED — no source edit, no candidate. The
+> Architect ruling `evt_6bq9q76rmzm90` (base `1045cae6c`, tree `cfd53fe4`)
+> SUSTAINS the contradiction: the private post-selection/pre-emission proof can
+> only REFUSE earlier. It cannot alter the already-emitted call/`returned` word,
+> and the Tail `Ret` consumer receives `scrutinee.word` unchanged, so it CANNOT
+> turn the base-red `ResourceBodyResult` `PatternMatchFailure` rows into
+> `InvalidOffset`. **Shape (a) is a viable authority join but INSUFFICIENT as the
+> semantic Tail repair** — it flips no Tail partition and closes no PX8 witness.
+>
+> The Architect's required disposition: HOLD this frame; permit NO
+> binding/consumer workaround. TWO forward paths, and the choice is the
+> OPERATOR's (a producer-authority hardening increment closes no PX8 witness and
+> `blocks` nothing — a priority call, not a Steward sequencing call):
+> 1. RETAIN this frame recut STRICTLY as a producer-authority HARDENING
+>    increment — keep AC-ORDER, AC-NO-FAIL-OPEN, AC-ONE-AUTHORITY,
+>    AC-AFFECTED-CLOSURE; ADD byte-inertness preservation; REMOVE
+>    AC-TAIL-PRODUCTS-EXACT, the "0/48 -> producing" claim, `blocks: [PX8]`, and
+>    every claim of closing the Tail semantic route.
+> 2. DROP it; the semantic repair is a fresh operator decision on shape (b) or a
+>    fresh T1 semantic object with an explicit producer-result-to-Tail-Ret
+>    binding — no reopening of Produced-transfer / D3 / Direct-only salvage /
+>    recovery / store / tag / HS15.
+>
+> Until the operator rules, this frame is HELD and NOT recut — the recut in
+> option 1 is applied only if the operator retains it. The discovery verdict
+> `RT-COMPOSED-RETURN-PRODUCER-ORDER-DISCOVERY` carries the matching correction.
 >
 > The native carried-value campaign COMPONENT front is drained (Architect
 > `evt_1xndnw1dp1r6v`); `RT-NATIVE-CARRIED-VALUE` stays product-open and blocks
