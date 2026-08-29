@@ -63,6 +63,8 @@ import Data.Numeric.Nat.Order (min, sub)
 
 import Core.Logic.Compare (list_compare, list_eq)
 
+import Core.Classes.LawfulClasses (bool_and, bool_leq)
+
 import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)
@@ -392,18 +394,6 @@ permutation of its input (`sort_bool_perm`, via the two count-preservation
 lemmas for `True`/`False`).
 
 ```ken
-fn bool_and (p : Bool) (q : Bool) : Bool =
-  match p {
-    True ↦ q;
-    False ↦ False
-  }
-
-fn bool_leq (x : Bool) (y : Bool) : Bool =
-  match x {
-    False ↦ True;
-    True ↦ y
-  }
-
 pub fn eq_from_ord (a : Type) (le : a → a → Bool) (x : a) (y : a) : Bool =
   bool_and (le x y) (le y x)
 

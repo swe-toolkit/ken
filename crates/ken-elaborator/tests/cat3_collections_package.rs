@@ -68,10 +68,7 @@ fn mk_env() -> ElabEnv {
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     catalog_or::load_derived_fixture(&mut env);
-    catalog_or::assert_transparent_result_uses_core_logic_or(
-        &env,
-        "pair_compare_lt_cases",
-    );
+    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "pair_compare_lt_cases");
     env
 }
 
@@ -87,8 +84,6 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
         "take_drop_decomposition",
         "map_length",
         "length_take_min",
-        "bool_and",
-        "bool_leq",
         "eq_from_ord",
         "count",
         "Perm",
@@ -215,6 +210,63 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
         1,
         "slice must use canonical saturating sub directly"
     );
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: roots-loading Derived after LawfulClasses adds no trust, mints no
+/// Derived-local `bool_and`/`bool_leq`, and the direct `eq_from_ord` and
+/// `bool_head_leq` bodies contain the exact transparent provider identities.
+/// CLAIMED: the two retired local bindings now resolve through the canonical
+/// provider import without changing their direct consumer computations. THE GAP:
+/// this is an identity-occurrence control, not a claim that every occurrence is
+/// evaluated; the existing concrete sort and law tests own behavior.
+#[test]
+fn derived_bool_operations_resolve_to_lawful_provider_with_zero_trust_delta() {
+    let mut env = ElabEnv::new().expect("base env");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("the canonical Boolean provider must roots-load");
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Derived")
+        .expect("Derived must roots-load through the Boolean provider import");
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Derived Boolean reuse must add zero trust");
+
+    let bool_and = env.globals["Core.Classes.LawfulClasses.bool_and"];
+    let bool_leq = env.globals["Core.Classes.LawfulClasses.bool_leq"];
+    assert!(env.env.transparent_body(bool_and).is_some());
+    assert!(env.env.transparent_body(bool_leq).is_some());
+    assert!(!env
+        .globals
+        .contains_key("Data.Collections.Derived.bool_and"));
+    assert!(!env
+        .globals
+        .contains_key("Data.Collections.Derived.bool_leq"));
+
+    for (consumer, provider) in [
+        ("Data.Collections.Derived.eq_from_ord", bool_and),
+        ("Data.Collections.Derived.bool_head_leq", bool_leq),
+    ] {
+        let (_, body) = env
+            .env
+            .transparent_body(env.globals[consumer])
+            .unwrap_or_else(|| panic!("{consumer} must remain transparent"));
+        assert_eq!(
+            term_reference_count(&body, provider),
+            1,
+            "{consumer} must retain one exact canonical provider occurrence"
+        );
+    }
+
+    env.elaborate_file(
+        "import Data.Collections.Derived (eq_from_ord as derived_eq_from_ord)\n\
+         import Core.Classes.LawfulClasses (bool_leq as lawful_bool_leq)\n\
+         theorem cat_bool_reuse_distinct \
+           : Equal Bool (derived_eq_from_ord Bool lawful_bool_leq False True) False = Proved\n\
+         theorem cat_bool_reuse_reflexive \
+           : Equal Bool (derived_eq_from_ord Bool lawful_bool_leq True True) True = Proved",
+    )
+    .expect("Derived equality must retain its nontrivial Boolean behavior");
 }
 
 #[test]
@@ -451,7 +503,10 @@ fn cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs() {
         );
     }
     assert!(
-        env.class_env.class("SetoidMorphism").unwrap().projection
+        env.class_env
+            .class("SetoidMorphism")
+            .unwrap()
+            .projection
             .field_names
             .iter()
             .any(|name| name == "project"),
