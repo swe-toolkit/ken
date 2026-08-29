@@ -829,8 +829,38 @@ landed precedent in D1, not a design problem. Size S/M.
   1. the per-entry line is emitted on both paths;
   2. **no entry is built more than once per run** — this is the half that makes
      D5 real, and it is what the rejected aggregate-rerun design violated;
-  3. force one entry to mismatch and show, with output displayed, that all
-     entries' lines appear and the failing row is one of them.
+  3. **SINGLE-ENTRY forced mismatch — one build, never eleven.** Temporarily
+     change **one** entry's `EXPECTED` row so that entry's test must fail; run
+     **only that test** (`--exact`); show the test RED **and its own
+     `RT_COLD_ENUMERATION` line present ahead of the failure**; restore and
+     prove it with `git diff --quiet`.
+
+  > **CORRECTED by Steward ruling `evt_36pk36gv1y6xz`, 2026-08-29. Controls 2
+  > and 3 as first written could not both hold, and that was a defect in this
+  > AC, not in the ring's work.** Control 3 originally said "force one entry to
+  > mismatch and show that ALL entries' lines appear". Implemented literally
+  > that needs a real whole-population failure run, which rebuilds all 11
+  > entries and **violates control 2 outright** — measured on `0249163`: the
+  > suite doubled from 82s and blew the 180s targeted bound. The implementer
+  > held that repair rather than hand it back as validated, which is correct.
+  >
+  > **Why ONE entry suffices, as an argument and not an assertion.** The
+  > per-entry tests are generated from one body. The property at risk is
+  > *"does a per-entry test emit its measured line when its own assertion
+  > fails"* — a property of that shared body, which one instance exercises.
+  > Demonstrating it eleven times is the enumerated-roster habit this node has
+  > already corrected twice in `AC-STALE-READMISSION` and
+  > `AC-D5-INVOCATION-CENSUS`. **The mechanism must hold; a count of
+  > demonstrations is not the criterion.** The landed mutation shape to copy is
+  > the census predicate proof at `evt_59a81qj0hnsjr`.
+  >
+  > **The honest limit, which belongs in the evidence and not dropped.** This
+  > control proves emission-before-assert on the failing entry. It does NOT
+  > measure that the other ten lines appear alongside it. That is
+  > **STRUCTURAL** — the lines come from independent tests and a failing test
+  > cannot suppress a sibling's output. **Report it as structural, never as
+  > measured.** One honestly-scoped control beats a measured-sounding one that
+  > costs 574 seconds.
 
   > **The original control could not be performed against a split harness, and
   > a criterion that cannot be run is not a criterion.** It read "force one
