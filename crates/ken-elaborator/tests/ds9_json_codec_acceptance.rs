@@ -27,7 +27,7 @@ fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture(&mut env, "length");
     catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
@@ -45,6 +45,9 @@ fn dependency_env() -> ElabEnv {
         })
         .collect();
     env.globals.extend(lawful_aliases);
+    // Preserve the provider records while preventing a dependency's selective
+    // import from laundering Json's own import at the next raw-source boundary.
+    let json_import_boundary = env.module_state.clone();
     for (name, source) in [
         ("Capability.Diagnostics.Core", DIAGNOSTIC_KEN_MD),
         ("Capability.Parsing.Cursor", CURSOR_KEN_MD),
@@ -53,6 +56,11 @@ fn dependency_env() -> ElabEnv {
         env.elaborate_ken_md_file(source)
             .unwrap_or_else(|error| panic!("{name} dependency must elaborate: {error:?}"));
     }
+    env.module_state = json_import_boundary;
+    assert!(
+        !env.globals.contains_key("length"),
+        "DS9 must withhold the flat length alias so Json's selective import is load-bearing"
+    );
     env
 }
 
@@ -78,6 +86,40 @@ fn assert_transparent_global(env: &ElabEnv, name: &str) {
         matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
         "`{name}` must be a real transparent, kernel-checked global"
     );
+}
+
+fn transparent_body_is_saturated_provider_application(
+    env: &ElabEnv,
+    consumer: GlobalId,
+    provider: GlobalId,
+) -> bool {
+    let provider_type = match env.env.lookup(provider) {
+        Some(Decl::Transparent { ty, .. }) => ty,
+        _ => return false,
+    };
+    let mut arity = 0;
+    let mut current_type = provider_type;
+    while let Term::Pi(_, body) = current_type {
+        arity += 1;
+        current_type = body;
+    }
+    if arity == 0 {
+        return false;
+    }
+
+    let Some((_, body)) = env.env.transparent_body(consumer) else {
+        return false;
+    };
+    let mut current = &body;
+    while let Term::Lam(_, body) = current {
+        current = body;
+    }
+    let mut argument_count = 0;
+    while let Term::App(function, _) = current {
+        argument_count += 1;
+        current = function;
+    }
+    argument_count == arity && matches!(current, Term::Const { id, .. } if *id == provider)
 }
 
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
@@ -165,9 +207,17 @@ fn json_and_all_six_constructors_are_real_globals() {
     env.elaborate_ken_md_file(JSON_KEN_MD)
         .expect("Data/Serialization/Json.ken.md must elaborate");
     let trusted_after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(
-        trusted_after, trusted_before,
-        "the Json carrier, character cursor, and cursor laws must add zero trusted declarations"
+    let new_trust_names: BTreeSet<_> = trusted_after
+        .difference(&trusted_before)
+        .map(|id| match env.env.lookup(*id) {
+            Some(Decl::Opaque { name, .. }) => name.clone(),
+            other => panic!("new trusted entry {id:?} must be named and opaque, got {other:?}"),
+        })
+        .collect();
+    assert!(
+        new_trust_names.is_empty(),
+        "the Json carrier, character cursor, and cursor laws must add zero qualified-name \
+         trusted declarations, got {new_trust_names:?}"
     );
 
     let json_id = *env.globals.get("Json").expect("missing `Json` global");
@@ -251,6 +301,25 @@ fn json_and_all_six_constructors_are_real_globals() {
     ] {
         assert_transparent_global(&env, name);
     }
+
+    // Durable invariant. MEASURED: after the fixture withholds the flat alias,
+    // the real Json source elaborates `char_cursor_remaining` as a transparent
+    // wrapper whose complete application spine is headed by the exact canonical
+    // Derived `length` identity at the provider's declaration-derived arity.
+    // CLAIMED: the shipped Json cursor uses that selective import rather than
+    // the retired Cursor helper or an ambient alias. THE GAP: this structural
+    // body-shape pin does not by itself prove runtime reduction; the concrete
+    // dictionary observations below independently exercise that behavior.
+    let length = env.globals["Data.Collections.Derived.length"];
+    assert!(
+        transparent_body_is_saturated_provider_application(
+            &env,
+            env.globals["char_cursor_remaining"],
+            length,
+        ),
+        "Json char_cursor_remaining must be headed by a saturated application of the \
+         exact Derived length provider"
+    );
 
     // Durable invariant (AC-2): re-check every law witness at its literal
     // public type, independently of its declaration annotation.

@@ -27,6 +27,8 @@ Arrays contain JSON values directly. Objects are ordered lists of string/value
 pairs; duplicate-key rejection belongs to decoding rather than to the carrier.
 
 ```ken
+import Data.Collections.Derived (length)
+
 data Json : Type where {
   JsonNull : Json;
   JsonBool : Bool → Json;
@@ -36,7 +38,7 @@ data Json : Type where {
   JsonObject : List (Pair String Json) → Json
 }
 
-fn char_cursor_remaining (cur : List Char) : Nat = cursor_list_length Char cur
+fn char_cursor_remaining (cur : List Char) : Nat = length Char cur
 
 fn char_cursor_peek (cur : List Char) : Option Char =
   match cur {

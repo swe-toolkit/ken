@@ -5,7 +5,7 @@ mod catalog_or;
 
 use std::collections::BTreeSet;
 
-use ken_elaborator::{ElabEnv, NumericLitVal};
+use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
@@ -22,7 +22,7 @@ fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_importing_fixture(&mut env, "list_append");
+    catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append", "length"]);
     catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
@@ -77,6 +77,81 @@ fn term_reference_count(term: &Term, target: GlobalId) -> usize {
         .into_iter()
         .map(|child| term_reference_count(child, target))
         .sum::<usize>()
+}
+
+fn leading_pi_count(term: &Term) -> usize {
+    let mut count = 0;
+    let mut current = term;
+    while let Term::Pi(_, body) = current {
+        count += 1;
+        current = body;
+    }
+    count
+}
+
+fn application_spine(term: &Term) -> (&Term, Vec<&Term>) {
+    let mut head = term;
+    let mut arguments = Vec::new();
+    while let Term::App(function, argument) = head {
+        arguments.push(argument.as_ref());
+        head = function;
+    }
+    arguments.reverse();
+    (head, arguments)
+}
+
+fn peel_lambdas(term: &Term) -> &Term {
+    let mut body = term;
+    while let Term::Lam(_, next) = body {
+        body = next;
+    }
+    body
+}
+
+fn is_saturated_provider_application(term: &Term, provider: GlobalId, arity: usize) -> bool {
+    let (head, arguments) = application_spine(term);
+    arguments.len() == arity && matches!(head, Term::Const { id, .. } if *id == provider)
+}
+
+fn transparent_cursor_bodies_routing_length_to_normalizer_remaining(
+    env: &ElabEnv,
+    provider: GlobalId,
+    normalizer: GlobalId,
+    cursor_globals: &BTreeSet<GlobalId>,
+) -> BTreeSet<String> {
+    let provider_type = match env.env.lookup(provider) {
+        Some(Decl::Transparent { ty, .. }) => ty,
+        other => panic!("Derived length must be transparent, got {other:?}"),
+    };
+    let provider_arity = leading_pi_count(provider_type);
+    assert!(
+        provider_arity > 0,
+        "Derived length must have a function type"
+    );
+    let normalizer_type = match env.env.lookup(normalizer) {
+        Some(Decl::Transparent { ty, .. }) => ty,
+        other => panic!("Cursor normalizer must be transparent, got {other:?}"),
+    };
+    let normalizer_arity = leading_pi_count(normalizer_type);
+    assert!(
+        normalizer_arity > 0,
+        "Cursor normalizer must have a function type"
+    );
+
+    env.globals
+        .iter()
+        .filter_map(|(local, id)| {
+            if !cursor_globals.contains(id) {
+                return None;
+            }
+            let (_, body) = env.env.transparent_body(*id)?;
+            let (head, arguments) = application_spine(peel_lambdas(&body));
+            (arguments.len() == normalizer_arity
+                && matches!(head, Term::Const { id, .. } if *id == normalizer)
+                && is_saturated_provider_application(arguments[0], provider, provider_arity))
+            .then(|| local.to_owned())
+        })
+        .collect()
 }
 
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
@@ -152,6 +227,96 @@ fn neutralize_fixture_proofs(env: &ElabEnv, store: &mut EvalStore, names: &[&str
             .unwrap_or_else(|| panic!("{name} should be in scope"));
         store.num_values.insert(id, EvalVal::Neutral);
     }
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: the literal expected population of dependency-loaded transparent
+/// Cursor bodies routes a saturated application of the exact Derived `length`
+/// identity directly into the first argument of a saturated application of the
+/// exact `arg_cursor_normalize` identity. The retired local declaration is
+/// absent, no consumer-local qualified-name trust is added, and a selective-
+/// import pair distinguishes the named binding from an available sibling.
+///
+/// CLAIMED: both Cursor construction routes pass canonical `length` into the
+/// normalizer's remaining-count slot and preserve separately exercised behavior.
+///
+/// THE GAP: this structural route pin does not by itself prove runtime reduction
+/// or that the normalizer consumes the argument correctly. The existing cursor
+/// observations independently exercise those behaviors; the reuse census and
+/// complete affected closure own the distinct population obligations.
+#[test]
+fn cursor_length_occurrence_population_and_migration_shape_are_pinned() {
+    let mut env = dependency_env();
+    let before_globals: BTreeSet<_> = env.globals.values().copied().collect();
+    let before_trust: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_ken_md_file(CURSOR_KEN_MD)
+        .expect("Cursor must elaborate through its selective import");
+    let after_trust: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    let new_trust_names: BTreeSet<_> = after_trust
+        .difference(&before_trust)
+        .map(|id| match env.env.lookup(*id) {
+            Some(Decl::Opaque { name, .. }) => name.clone(),
+            other => panic!("new trusted entry {id:?} must be named and opaque, got {other:?}"),
+        })
+        .collect();
+    assert!(
+        new_trust_names.is_empty(),
+        "Cursor must add zero consumer-local qualified-name trust, got {new_trust_names:?}"
+    );
+    let cursor_globals: BTreeSet<_> = env
+        .globals
+        .values()
+        .copied()
+        .filter(|id| !before_globals.contains(id))
+        .collect();
+
+    assert!(
+        !env.globals.contains_key("cursor_list_length"),
+        "the retired package-local cursor_list_length declaration must be absent"
+    );
+    let provider = env.globals["Data.Collections.Derived.length"];
+    let normalizer = env.globals["arg_cursor_normalize"];
+    assert_eq!(
+        transparent_cursor_bodies_routing_length_to_normalizer_remaining(
+            &env,
+            provider,
+            normalizer,
+            &cursor_globals,
+        ),
+        BTreeSet::from([
+            "arg_cursor_advance".to_owned(),
+            "arg_cursor_start".to_owned(),
+        ]),
+        "transparent Cursor bodies routing saturated exact length directly to the \
+         exact normalizer's first argument must match the closed expected population"
+    );
+
+    let mut imported = ElabEnv::empty().expect("prelude bootstrap");
+    imported
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Derived")
+        .expect("Derived provider must roots-load");
+    imported
+        .elaborate_file(
+            "import Data.Collections.Derived (length)\n\
+             fn cursor_length_positive (xs : List Bool) : Nat = length Bool xs",
+        )
+        .expect("the selectively imported length binding must resolve");
+
+    let mut omitted = ElabEnv::empty().expect("prelude bootstrap");
+    omitted
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Derived")
+        .expect("Derived provider must roots-load");
+    let error = omitted
+        .elaborate_file(
+            "import Data.Collections.Derived (length)\n\
+             fn cursor_length_negative (xs : List Bool) : List Bool = reverse Bool xs",
+        )
+        .expect_err("available but unimported reverse must not resolve");
+    assert!(
+        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "reverse"),
+        "the non-import control must fail at the omitted binding, got {error:?}"
+    );
 }
 
 #[test]

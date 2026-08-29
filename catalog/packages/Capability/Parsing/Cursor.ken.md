@@ -18,6 +18,8 @@ coordinate must use an explicit instance-specific conversion, such as
 `arg_location_origin` or `span_origin`, rather than infer one from `CursorOps`.
 
 ```ken
+import Data.Collections.Derived (length)
+
 import Data.Numeric.Nat.Arithmetic (add)
 
 import Data.Numeric.Nat.Order (sub)
@@ -125,12 +127,6 @@ fn cursor_nat_lt (a : Nat) (b : Nat) : Bool =
       }
   }
 
-fn cursor_list_length (a : Type) (xs : List a) : Nat =
-  match xs {
-    Nil ↦ Zero;
-    Cons x rest ↦ Suc (cursor_list_length a rest)
-  }
-
 fn arg_lengths_sum (args : List Bytes) : Nat =
   match args {
     Nil ↦ Zero;
@@ -177,11 +173,11 @@ fn arg_cursor_normalize
   }
 
 fn arg_cursor_start (args : List Bytes) : ArgCursor =
-  arg_cursor_normalize (cursor_list_length Bytes args) args Zero Zero
+  arg_cursor_normalize (length Bytes args) args Zero Zero
 
 fn arg_cursor_advance (cur : ArgCursor) : ArgCursor =
   arg_cursor_normalize
-    (cursor_list_length Bytes (arg_cursor_args cur))
+    (length Bytes (arg_cursor_args cur))
     (arg_cursor_args cur)
     (arg_cursor_index cur)
     (Suc (arg_cursor_offset cur))

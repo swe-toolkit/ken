@@ -59,7 +59,7 @@ fn dependency_env() -> ElabEnv {
             panic!("{label} must elaborate before the Nat-order closure: {err:?}")
         });
     }
-    catalog_or::load_derived_importing_fixture(&mut env, "concat_map");
+    catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "length"]);
     for (source, label) in [
         (LAWFUL_FUNCTORS, "Core.Classes.LawfulFunctors"),
         (EFFECTFUL_CLASSES, "Core.Classes.EffectfulClasses"),
