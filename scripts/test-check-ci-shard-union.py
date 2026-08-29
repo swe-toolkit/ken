@@ -18,7 +18,7 @@ def listing(rows, matches):
     for index, (binary_id, testcase) in enumerate(rows):
         suites[f"suite-{index}"] = {
             "binary-id": binary_id,
-            "binary-name": "ordinary",
+            "binary-name": binary_id.rpartition("::")[2],
             "testcases": {
                 testcase: {"filter-match": {"status": "matches" if (binary_id, testcase) in matches else "mismatch"}}
             },
@@ -30,12 +30,17 @@ class Fixtures(unittest.TestCase):
     def fixture(self):
         temporary = tempfile.TemporaryDirectory()
         root = Path(temporary.name) / "realized-shards"
-        rows = [("fixture::bin", f"test_{index}") for index in range(1, 9)]
-        for index, identity in enumerate(rows, start=1):
+        ordinary = [("fixture::bin", f"test_{index}") for index in range(1, 9)]
+        native = [
+            (f"fixture::{name}", "native_test")
+            for name in ("rt_parity_native", "px8f_buffer_native", "px8f_write_partition")
+        ]
+        rows = ordinary + native
+        for index, identity in enumerate(ordinary, start=1):
             artifact = root / f"realized-shard-{index}"
             artifact.mkdir(parents=True)
             (artifact / "unfiltered-inventory.json").write_text(json.dumps(listing(rows, set(rows))))
-            (artifact / "inventory.json").write_text(json.dumps(listing(rows, set(rows))))
+            (artifact / "inventory.json").write_text(json.dumps(listing(rows, set(ordinary))))
             (artifact / f"selected-{index}.json").write_text(json.dumps(listing(rows, {identity})))
         return temporary
 
@@ -86,11 +91,19 @@ class Fixtures(unittest.TestCase):
             path = root / "realized-shard-1" / "inventory.json"; value = json.loads(path.read_text()); value["test-count"] = 7; path.write_text(json.dumps(value))
         self.assert_red(wrong_count, "differs from")
         def duplicate(root):
-            path = root / "realized-shard-1" / "inventory.json"; value = json.loads(path.read_text()); value["rust-suites"]["duplicate"] = {"binary-id": "fixture::bin", "binary-name": "ordinary", "testcases": {"test_1": {"filter-match": {"status": "matches"}}}}; value["test-count"] = 9; path.write_text(json.dumps(value))
+            path = root / "realized-shard-1" / "inventory.json"; value = json.loads(path.read_text()); value["rust-suites"]["duplicate"] = {"binary-id": "fixture::bin", "binary-name": "bin", "testcases": {"test_1": {"filter-match": {"status": "matches"}}}}; value["test-count"] = 9; path.write_text(json.dumps(value))
         self.assert_red(duplicate, "duplicate canonical identity")
         def mismatch(root):
             path = root / "realized-shard-2" / "inventory.json"; value = json.loads(path.read_text()); next(iter(value["rust-suites"].values()))["binary-id"] = "other::bin"; path.write_text(json.dumps(value))
         self.assert_red(mismatch, "filtered and unfiltered")
+
+    def test_unfiltered_classification_disagreement_red(self):
+        def classification(root):
+            path = root / "realized-shard-2" / "unfiltered-inventory.json"
+            value = json.loads(path.read_text())
+            value["rust-suites"]["suite-8"]["binary-name"] = "ordinary"
+            path.write_text(json.dumps(value))
+        self.assert_red(classification, "unfiltered inventories differ")
 
     def test_overlap_and_union_missing_extra_red(self):
         def overlap(root):
@@ -101,6 +114,20 @@ class Fixtures(unittest.TestCase):
         def union_extra(root):
             path = root / "realized-shard-8" / "selected-8.json"; value = json.loads(path.read_text()); suite = next(iter(value["rust-suites"].values())); suite["testcases"] = {"extra": {"filter-match": {"status": "matches"}}}; path.write_text(json.dumps(value))
         self.assert_red(union_extra, "selected listing differs from unfiltered authority")
+        def union_loss(root):
+            path = root / "realized-shard-8" / "selected-8.json"
+            value = json.loads(path.read_text())
+            for suite in value["rust-suites"].values():
+                for metadata in suite["testcases"].values():
+                    metadata["filter-match"]["status"] = "mismatch"
+            path.write_text(json.dumps(value))
+        self.assert_red(union_loss, "union differs")
+        def union_extra_native(root):
+            path = root / "realized-shard-8" / "selected-8.json"
+            value = json.loads(path.read_text())
+            value["rust-suites"]["suite-8"]["testcases"]["native_test"]["filter-match"]["status"] = "matches"
+            path.write_text(json.dumps(value))
+        self.assert_red(union_extra_native, "union differs")
 
 
 if __name__ == "__main__":
