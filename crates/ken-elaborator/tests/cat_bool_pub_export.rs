@@ -1,12 +1,12 @@
 //! CAT-BOOL-PUB-EXPORT provider-surface acceptance controls.
 //!
 //! Promise class: durable invariants. The two provider modules expose exactly
-//! their authorized loader-visible definitions while retaining provider identity.
+//! their authorized loader-visible surfaces while retaining provider identity.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{parser, Decl, ElabEnv, ElabError};
+use ken_elaborator::{parser, Decl, ElabEnv, ElabError, ExportForm};
 use ken_kernel::{GlobalId, Term};
 
 const LAWFUL: &str = "Core.Classes.LawfulClasses";
@@ -92,7 +92,16 @@ fn rename_identifier(source: &str, from: &str, to: &str) -> String {
     renamed
 }
 
-fn top_level_publication_queries(module: &str, ken_md: &str) -> ModulePublicationQueries {
+fn direct_publication_query(module: &str, surface: &str, index: usize) -> PublicationQuery {
+    let alias = format!("cat_bool_export_direct_{index}");
+    PublicationQuery {
+        surface: surface.to_owned(),
+        source: format!("import {module} ({surface} as {alias})"),
+        unpublished_names: BTreeSet::from([format!("{module}.{surface}")]),
+    }
+}
+
+fn module_publication_queries(module: &str, ken_md: &str) -> ModulePublicationQueries {
     let extracted = ken_elaborator::literate::extract_ken_md(ken_md)
         .unwrap_or_else(|error| panic!("{module} literate source must extract: {error:?}"));
     let declarations = parser::parse_decls(&extracted.source)
@@ -121,12 +130,7 @@ fn top_level_publication_queries(module: &str, ken_md: &str) -> ModulePublicatio
             | Decl::TypeAlias { .. }
             | Decl::ClassDecl { .. } => {
                 let name = declaration.name();
-                let alias = format!("cat_bool_export_direct_{}", direct.len());
-                direct.push(PublicationQuery {
-                    surface: name.to_owned(),
-                    source: format!("import {module} ({name} as {alias})"),
-                    unpublished_names: BTreeSet::from([format!("{module}.{name}")]),
-                });
+                direct.push(direct_publication_query(module, name, direct.len()));
             }
             Decl::AttachedProofDecl {
                 proof_name,
@@ -170,6 +174,15 @@ fn top_level_publication_queries(module: &str, ken_md: &str) -> ModulePublicatio
                     ]),
                 });
             }
+            Decl::ExportDecl { form, .. } => {
+                let items = match form {
+                    ExportForm::Facade { items, .. } | ExportForm::InScope { items } => items,
+                };
+                for item in items {
+                    let surface = item.rename.as_deref().unwrap_or(&item.name);
+                    direct.push(direct_publication_query(module, surface, direct.len()));
+                }
+            }
             Decl::BoundaryDecl { .. }
             | Decl::SpaceDecl { .. }
             | Decl::ProveDecl { .. }
@@ -180,8 +193,7 @@ fn top_level_publication_queries(module: &str, ken_md: &str) -> ModulePublicatio
             | Decl::InstanceDecl { .. }
             | Decl::DeriveDecl { .. }
             | Decl::ModuleDecl { .. }
-            | Decl::ImportDecl { .. }
-            | Decl::ExportDecl { .. } => {}
+            | Decl::ImportDecl { .. } => {}
             Decl::Pub(_) => panic!("unwrap_pub must remove the visibility wrapper"),
         }
     }
@@ -193,8 +205,8 @@ fn top_level_publication_queries(module: &str, ken_md: &str) -> ModulePublicatio
     }
 }
 
-fn published_top_level_definitions(module: &str, ken_md: &str) -> BTreeSet<String> {
-    let queries = top_level_publication_queries(module, ken_md);
+fn published_module_surfaces(module: &str, ken_md: &str) -> BTreeSet<String> {
+    let queries = module_publication_queries(module, ken_md);
     let mut env = load_module(module);
     if !queries.dependency_imports.is_empty() {
         env.elaborate_file(&queries.dependency_imports)
@@ -270,17 +282,18 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
     }
 }
 
-/// MEASURED: for both real provider modules, every parsed publishable top-level
-/// definition is queried through the roots loader and the successful surfaces
-/// are compared with literal authorized-interface sets. CLAIMED: the complete
-/// loader-visible surfaces are exactly the authorized definitions. THE GAP:
-/// none among the exhaustively classified declaration forms represented by
-/// these modules; constructors and non-publishable declaration forms are not
-/// loader-selectable definitions.
+/// MEASURED: for both real provider modules, every parsed loader-surface source
+/// is queried through the roots loader: publishable top-level definitions,
+/// attached definitions, and every facade or in-scope re-export item under its
+/// selectable spelling. Successful queries are compared with literal authorized
+/// interface sets. CLAIMED: the complete loader-visible surfaces are exactly the
+/// authorized names. THE GAP: none among the exhaustively classified current
+/// declaration variants; constructors and non-publishable declaration forms are
+/// not loader-selectable definitions.
 #[test]
 fn boolean_provider_loader_visible_inventories_are_exact() {
     assert_eq!(
-        published_top_level_definitions(LAWFUL, LAWFUL_KEN_MD),
+        published_module_surfaces(LAWFUL, LAWFUL_KEN_MD),
         BTreeSet::from([
             "IsTrue".to_owned(),
             "Ord".to_owned(),
@@ -296,7 +309,7 @@ fn boolean_provider_loader_visible_inventories_are_exact() {
         "LawfulClasses loader-visible inventory must equal its authorized surface"
     );
     assert_eq!(
-        published_top_level_definitions(SUMS, SUMS_KEN_MD),
+        published_module_surfaces(SUMS, SUMS_KEN_MD),
         BTreeSet::from(["is_some".to_owned()]),
         "Sums loader-visible inventory must equal its authorized surface"
     );
