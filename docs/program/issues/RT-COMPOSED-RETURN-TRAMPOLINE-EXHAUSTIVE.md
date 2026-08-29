@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-TRAMPOLINE-EXHAUSTIVE
 title: "Replace the producer-trampoline clone/out-parameter return protocol with an exhaustive Continue/Complete step result — core.rs:3144-3164 clones answer.value only to return an ignored bare value while ProducerTrampolineWork owns the real answer, and a pending affine result cannot cross that shape. Behaviour-preserving PREFIX to the composed-return protocol replacement; mints no Produced state and changes no product."
-status: draft
+status: active
 owner: runtime
 size: M
 gate: none
