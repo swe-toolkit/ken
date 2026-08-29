@@ -88,6 +88,7 @@ pub use lowering::units::{
 pub use lowering::{
     with_checked_ih_fresh_result_route_emission_observations, with_px8ds_retired_flat_order,
     CheckedIhFreshResultRouteEmissionObservation, CheckedIhFreshResultRouteObservationMutation,
+    CheckedIhFreshResultRoutePairingLeg,
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::source::{
