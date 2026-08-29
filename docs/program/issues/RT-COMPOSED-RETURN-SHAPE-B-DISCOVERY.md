@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-SHAPE-B-DISCOVERY
 title: "DISCOVERY (binary viability verdict only): can the planner statically de-quotient the generated entry into a bounded one-member generated-function identity — so exact transport identity and its input-environment morphism are available by construction, Tail route selection precedes the relocated declared call, and that call's returned SSA value feeds the existing shared Ret-body parameter — WITHOUT a runtime discriminator, store, capture, recovery, or general composed-return result carrier? The shape-(b) prerequisite the Architect ruled must precede any build."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
