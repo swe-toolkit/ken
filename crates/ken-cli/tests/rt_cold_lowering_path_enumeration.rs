@@ -650,21 +650,7 @@ fn the_expectation_table_covers_exactly_the_population() {
 fn every_rt_parity_entry_reaches_its_expected_terminal_state() {
     let mut outcomes: Vec<(&str, String)> = Vec::new();
     for entry in ENTRIES {
-        let root = tempfile::tempdir().expect("temporary native-build root");
-        std::fs::write(root.path().join("source"), b"ab").unwrap();
-        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
-        let outcome = match ken_cli::build_native_program(
-            &source,
-            ken_cli::SourceFormat::Ken,
-            &format!("rt_cold_enum_{entry}"),
-            root.path(),
-        ) {
-            Ok(_) => "OK".to_string(),
-            // The terminating subsystem and its exact message, which is what
-            // AC-3's report is made of. Collected from the finished pipeline.
-            Err(error) => format!("{error:?}"),
-        };
-        outcomes.push((entry, outcome));
+        outcomes.push((entry, entry_outcome(entry)));
     }
 
     // The report is printed unconditionally, pass or fail. A refusal set that is
@@ -676,33 +662,8 @@ fn every_rt_parity_entry_reaches_its_expected_terminal_state() {
 
     let mut mismatches: Vec<String> = Vec::new();
     for (entry, outcome) in &outcomes {
-        let expected = EXPECTED
-            .iter()
-            .find(|(name, _)| name == entry)
-            .map(|(_, disposition)| *disposition)
-            .expect("covered by the_expectation_table_covers_exactly_the_population");
-        match expected {
-            Disposition::Completes => {
-                if outcome != "OK" {
-                    mismatches.push(format!(
-                        "{entry}: expected a completed artifact, refused with {outcome}"
-                    ));
-                }
-            }
-            Disposition::Refuses { key, retired_by } => {
-                if outcome == "OK" {
-                    mismatches.push(format!(
-                        "{entry}: now COMPLETES. Its blocker is retired by {retired_by}; \
-                         if that landed, move this row to `Disposition::Completes`."
-                    ));
-                } else if !outcome.contains(key) {
-                    mismatches.push(format!(
-                        "{entry}: refuses for a DIFFERENT reason than the expected \
-                         {key:?} (retired by {retired_by}). A new layer is behind the \
-                         known one. Got: {outcome}"
-                    ));
-                }
-            }
+        if let Some(mismatch) = entry_mismatch(entry, outcome) {
+            mismatches.push(mismatch);
         }
     }
 
