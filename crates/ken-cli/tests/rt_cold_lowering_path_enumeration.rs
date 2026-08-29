@@ -606,6 +606,7 @@ macro_rules! generate_entry_tests {
             fn $entry() {
                 assert!(ENTRIES.contains(&stringify!($entry)));
                 let outcome = entry_outcome(stringify!($entry));
+                eprintln!("RT_COLD_ENUMERATION {} => {}", stringify!($entry), outcome);
                 assert!(entry_mismatch(stringify!($entry), &outcome).is_none(),
                     "{}", entry_mismatch(stringify!($entry), &outcome).unwrap());
             }
@@ -665,28 +666,8 @@ fn the_expectation_table_covers_exactly_the_population() {
 }
 
 #[test]
-fn every_rt_parity_entry_reaches_its_expected_terminal_state() {
-    let mut outcomes: Vec<(&str, String)> = Vec::new();
-    for entry in ENTRIES {
-        outcomes.push((entry, entry_outcome(entry)));
-    }
-
-    // The report is printed unconditionally, pass or fail. A refusal set that is
-    // only visible when the assertion happens to fail is not a report.
-    eprintln!("{}", format_population_report(&outcomes));
-
-    let mut mismatches: Vec<String> = Vec::new();
-    for (entry, outcome) in &outcomes {
-        if let Some(mismatch) = entry_mismatch(entry, outcome) {
-            mismatches.push(mismatch);
-        }
-    }
-
-    assert!(
-        mismatches.is_empty(),
-        "{} of {} entries reached an unexpected terminal state:\n{}",
-        mismatches.len(),
-        ENTRIES.len(),
-        mismatches.join("\n")
-    );
+fn cold_lowering_population_coverage_header() {
+    eprintln!("RT_COLD_ENUMERATION population={}", ENTRIES.len());
+    assert_eq!(ENTRIES.len(), GENERATED_TEST_ENTRIES.len());
 }
+
