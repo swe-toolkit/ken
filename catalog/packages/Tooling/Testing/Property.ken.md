@@ -1,7 +1,7 @@
 # `Tooling.Testing.Property` — deterministic finite property checks
 
-`Tooling.Testing.Property` exercises decidable predicates over explicit finite samples and
-reports the first counterexample.
+`Tooling.Testing.Property` exercises decidable predicates over explicit finite
+samples and reports the first counterexample.
 
 ## Contents
 
@@ -30,6 +30,8 @@ use the ordinary error-biased `Result`: an error is the first counterexample,
 while success carries `Unit`.
 
 ```ken
+import Data.Collections.Derived (length)
+
 data Gen a = MkGen (List a)
 
 fn gen_from_list (a : Type) (samples : List a) : Gen a = MkGen a samples
@@ -99,15 +101,9 @@ data ByteCursor = MkByteCursor (List UInt8)
 
 fn byte_cursor_start (input : Bytes) : ByteCursor = MkByteCursor (bytes_to_list input)
 
-fn property_list_length (a : Type) (values : List a) : Nat =
-  match values {
-    Nil ↦ Zero;
-    Cons value rest ↦ Suc (property_list_length a rest)
-  }
-
 fn byte_cursor_remaining (cursor : ByteCursor) : Nat =
   match cursor {
-    MkByteCursor bytes ↦ property_list_length UInt8 bytes
+    MkByteCursor bytes ↦ length UInt8 bytes
   }
 
 fn byte_cursor_peek (cursor : ByteCursor) : Option UInt8 =

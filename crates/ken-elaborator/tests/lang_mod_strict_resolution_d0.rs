@@ -647,7 +647,25 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Tooling.Testing.Property".to_string(),
-            ["MkUnit", "Unit"].into_iter().map(str::to_string).collect(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "MkUnit",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
         ),
         (
             "Tooling.Verification.FoKripke".to_string(),
