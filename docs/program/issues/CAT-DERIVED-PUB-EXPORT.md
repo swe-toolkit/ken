@@ -128,9 +128,42 @@ reproduces or corrects.**
   `Derived` `GlobalId`. Control: the probe must FAIL for a name deliberately left
   unmarked — an import witness that passes regardless of the `pub` marking is
   measuring nothing.
-- **AC-EXCLUDED-UNMARKED.** `Perm`, `insert`, and `sort` remain unmarked, and any
-  name dropped by D0 remains unmarked. Control: a census of `^pub` in the file
-  matching exactly the in-scope set.
+- **AC-EXCLUDED-UNMARKED.** `Perm`, `insert`, and `sort` are NOT PUBLISHED BY THE
+  LOADER, and any name D0 dropped is not published either. **The criterion is
+  export visibility, not source spelling, and it is measured with the SAME
+  INSTRUMENT as `AC-IMPORT-RESOLVES`** — the roots loader / eligibility
+  mechanism, never a text scan. Control, in two parts:
+  - **Population from the file, verdict from the loader.** Derive the candidate
+    population mechanically from the module's own top-level definitions, ask the
+    loader which of them `Data.Collections.Derived` publishes, and assert that
+    the published set EQUALS the in-scope set. **Assert equality, never per-name
+    privacy** — a probe asking whether each excluded name resolves as private
+    stays true for reasons other than the marking, so a stray export does not
+    disturb it, whereas equality is falsified by any addition. Do NOT hand-write
+    the population: an enumerated roster is satisfied by editing the roster.
+  - **Required mutation, and it is CV's exact evasion.** Exporting an excluded
+    name in ANY compile-preserving spelling must RED this control — including one
+    leading space before `pub`, which the roots loader accepts and publishes at
+    the exact provider `GlobalId`. Byte-restore afterwards and show the
+    restoration.
+
+  > **Why this replaced a `^pub` source census (Steward ruling 2026-08-29, on
+  > conformance-validator `evt_a2130csdh28r` at exact `2d216d849`).** The census
+  > was a PROXY for export visibility, resting on an unstated invariant that
+  > `pub` always sits at column 0. CV refuted the proxy by measurement, not by
+  > argument: ` pub fn mem` compiles, the roots loader selectively imports `mem`
+  > at the exact provider `GlobalId`, and a `strip_prefix("pub ")` census stays
+  > green 3/3. **The tell was an asymmetry visible in this AC list itself — the
+  > positive arm asked the loader and the negative arm asked the text.** Two arms
+  > of one property measured by two instruments means the weaker arm is a proxy,
+  > and a proxy is only as strong as the invariant nobody wrote down. **General
+  > form: measure a negative arm with the instrument that DECIDES the property,
+  > not with one that merely usually agrees with it.**
+  >
+  > **The candidate's source state at `2d216d849` was already correct** — exactly
+  > the six in-scope names carry `pub fn` at column 0 and `Perm`/`insert`/`sort`
+  > are bare `fn`, Steward-verified independently at that SHA. **What is repaired
+  > here is the CONTROL, not the tree. Do not touch the markings.**
 - **AC-NO-COMPUTATIONAL-CHANGE.** `pub` is an export-visibility change only; no
   computational content of any operation changes. Control: a differential over
   the function bodies showing them byte-unchanged.
