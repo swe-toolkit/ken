@@ -12,12 +12,24 @@ github: null
 origin: "Steward, 2026-08-29, filed on the CAT-BOOL-PUB-EXPORT landing (providers public at 4faa97bfb, PR #3108) so lane 3 does not idle. Group 6 membership quoted verbatim from docs/program/cat-reuse-census.md §4.4 item 6 (lines 317-320) at origin/main 4faa97bfb; the three [low] consume tags read from §3 rows 36 (Derived) and 37 (Map). The two providers CAT-BOOL-PUB-EXPORT just published (LC.bool_and, LC.bool_leq, SC.is_some) are exactly the three names group 6 consumes, so the prerequisite covers the consumers with nothing left over. Steward-filed per COORDINATION section 2."
 ---
 
-> # RELEASED — lane 3, the group-6 consumer drain. `ready`.
+> # AMENDED — Architect HS3 ruling `evt_3k9km6125h088`, 2026-08-29. After this
+> # lands, Foundation may respin D1 TEST-ONLY from exact `bc56f2f7`.
 >
-> The provider prerequisite `CAT-BOOL-PUB-EXPORT` is MERGED (`4faa97bfb`,
-> PR #3108); the three names are `pub` and loader-visible. This node replaces the
-> three duplicate reimplementations with selective imports. Two consumer modules,
-> three sites, all census-tagged `[low]`.
+> D1 candidate `bc56f2f7ba2c65a5bc7f1ed67e1b70b29a8282cf` stays REJECTED: its
+> module-owned inventory compares raw `Term ==`, so CV's admitted zeta-redex is
+> kernel-convertible and stayed green — the object does not satisfy its advertised
+> AC, and no prior approval transfers. Three hard stops
+> (`evt_6frnqf7qpzw6`, `evt_7yqc1rh8g2805`, `evt_3ms5vh7szf17p`) share ONE
+> predicate: each substituted a representation proxy for a causal provider-
+> authority claim this drain never needed. This amendment SEPARATES the three
+> properties — candidate-specific migration evidence (`AC-CENSUS-ROW-DRAINED`), a
+> NARROW kernel-definitional anti-duplication control (`AC-NO-EQUIVALENT-LOCAL`),
+> and NO route-authority claim at all — and strips every causal-flow overclaim.
+> Research advisory `evt_7zan5cghe95jy`. The candidate's SOURCE (the Derived
+> import + local deletion) was already correct; the defect is the TEST/control, so
+> the respin is test-only. Provider prerequisite `CAT-BOOL-PUB-EXPORT` MERGED
+> (`4faa97bfb`, PR #3108); three names `pub`/loader-visible. Two consumer modules,
+> three `[low]` sites. D2 stays unstarted until D1 closes.
 
 ## Fixed inputs (re-measured at `origin/main` `4faa97bfb`)
 
@@ -62,27 +74,102 @@ deleting the local definition:
 ## Acceptance criteria (each increment)
 
 - **AC-CENSUS-ROW-DRAINED** — the increment's census §4.4 group-6 row(s) no
-  longer name a reimplementation: the local definition is deleted and the
-  selective import names the provider. Control: the selective import names the
-  provider and the named local `fn` is gone.
-- **AC-NO-EQUIVALENT-LOCAL** (the load-bearing causal control; amended
-  2026-08-29, Steward disposition on the CV's second reject) — after the
-  drain the consumer module defines NO function kernel-equivalent (identical type
-  AND identical transparent body) to the imported provider, so the drained
-  computation cannot be served by a renamed reimplementation. This is a CLOSED
-  relation over the module's own definitions — the consumer-side MIRROR of the
-  provider-side loader-visible inventory the CV required on `CAT-BOOL-PUB-EXPORT`
-  (population from own definitions, closed equality, NOT an occurrence census).
-  It must be CAUSAL/equivalence-based, not occurrence-based: a control that
-  passes merely because the provider `Const` APPEARS somewhere in a type/body has
-  not measured reuse. Required reddening mutation (CV's counterexample): reroute
-  the consumers to a renamed kernel-equivalent local (e.g. `local_bool_leq`),
-  with or without an unused provider alias `let _ = bool_leq` padding, MUST
-  redden. Spelling-agnostic — ban the equivalence, never a name or the padding
-  spelling. **If a sound closed mechanism cannot be built (a legitimately-needed
-  local is kernel-equivalent to the provider, or the equivalence check has a real
-  gap), that is a HARD STOP to the Architect — not another occurrence-census
-  respin.**
+  longer name a reimplementation, established by CANDIDATE-SPECIFIC migration
+  evidence (Architect HS3 ruling), NOT a universal property: the candidate diff
+  adds the selective import, deletes PRECISELY the named former definition(s) and
+  nothing else, and leaves the internal references byte-unchanged (D1: same
+  names; D2: the renamed references, measured); the candidate product INVERSELY
+  reconstructs the base product; roots loading resolves the imported identit(ies)
+  to the canonical transparent provider(s); WITHDRAWING either import produces the
+  expected unresolved-name failure; standalone behaviour and the trust delta stay
+  green with zero delta. This proves what THIS candidate did; it does not pretend
+  to a universal property under arbitrary future edits.
+- **AC-NO-EQUIVALENT-LOCAL** (a NARROW kernel-definitional ANTI-DUPLICATION
+  control — NOT a causal route proof; re-scoped 2026-08-29 by Architect HS3
+  ruling `evt_3k9km6125h088`, research advisory `evt_7zan5cghe95jy`, after three
+  hard stops). The property, closed over the module's own definitions:
+
+  > no module-owned admitted transparent declaration `d` such that
+  > `type(d) ≡ provider_ty` and `body(d) ≡ provider_body : provider_ty`
+  > (`≡` = kernel definitional equality).
+
+  The sound D1 mechanism IS kernel conversion — `convert_type(local_ty,
+  provider_ty) && convert(provider_ty, local_body, provider_body)` under
+  `Context::new()`, over each module-owned admitted `Decl::Transparent`, provider
+  and locals restricted to zero level parameters. `convert_type` establishes the
+  common type before type-directed `convert` uses `provider_ty`; the empty
+  context is correct for closed top-level terms. Do NOT reimplement kernel
+  conversion with a custom normalizer — beta/zeta/delta/typed-eta and proof
+  irrelevance are the kernel's own. The Architect compiled and probed the exact
+  helper (`/tmp/architect-cat-bool-convert`):
+
+  ```rust
+  use ken_kernel::{convert, convert_type, Context, Decl, GlobalId};
+
+  fn module_transparent_kernel_equivalents(
+      env: &ElabEnv,
+      module: &str,
+      provider: GlobalId,
+  ) -> BTreeSet<String> {
+      let (provider_level_params, provider_ty, provider_body) =
+          match env.env.lookup(provider) {
+              Some(Decl::Transparent { level_params, ty, body, .. }) =>
+                  (level_params, ty, body),
+              other => panic!("provider must be transparent, got {other:?}"),
+          };
+      assert!(
+          provider_level_params.is_empty(),
+          "the D1 Boolean providers must be monomorphic"
+      );
+      let prefix = format!("{module}.");
+      let context = Context::new();
+      env.globals
+          .iter()
+          .filter_map(|(name, id)| {
+              let local_name = name.strip_prefix(&prefix)?;
+              let (level_params, ty, body) = match env.env.lookup(*id) {
+                  Some(Decl::Transparent { level_params, ty, body, .. }) =>
+                      (level_params, ty, body),
+                  _ => return None,
+              };
+              if !level_params.is_empty() { return None; }
+              (convert_type(&env.env, &context, ty, provider_ty)
+                  && convert(&env.env, &context, provider_ty, body, provider_body))
+              .then(|| local_name.to_owned())
+          })
+          .collect()
+  }
+  ```
+
+  Required D1 controls: baseline inventory empty; exact-bodied `bool_and` and
+  `bool_leq` locals RED; CV's zeta-redex local (`let chosen = y`) plus an unused
+  provider alias padding RED (`left: {"local_bool_leq"}`); a same-typed but
+  non-convertible local (`fun x y => x`) GREEN. The assertion message reads
+  "kernel-definitionally equal checked type and body at the provider type", NOT
+  "exact type and body". Kernel conversion's own semantics need not be
+  reimplemented in the test.
+
+  **What this control does NOT prove (Architect, explicit): it does NOT establish
+  that any governed computation FLOWS THROUGH the import.** Inline
+  reimplementation, a specialized helper of another type, an opaque helper, a
+  non-definitionally-equal but behaviorally equal implementation, or unused
+  provider padding can all coexist with an empty inventory. No universal
+  causal-flow or per-route-authority claim rests on this AC, and NONE is required
+  for this T2 mechanical drain; a future route-authority requirement would be a
+  distinct design object with its own route binding, not an inference from the
+  absence of equivalent locals. Differently-spelled semantic duplication remains
+  the Architect catalog-factoring review's judgment surface — not decidable here.
+
+  **D2 IS NOT COVERED BY THE D1 HELPER AS WRITTEN.** D2's provider `SC.is_some`
+  is polymorphic — not the monomorphic `Bool -> Bool -> Bool` shape — so the
+  `provider_level_params.is_empty()` assertion and the `level_params.is_empty()`
+  filter do not hold. Measure `is_some`'s level/type parameters first; if it
+  carries level parameters, D2 must align level-parameter arity before comparing
+  (research advisory pitfall 6) or HARD STOP to the Architect. Do not reuse the
+  D1 monomorphic helper for D2 blindly. **If a sound closed mechanism cannot be
+  built for an increment (a legitimately-needed local is kernel-equivalent to the
+  provider, or the equivalence check has a real gap), that is a HARD STOP to the
+  Architect — never another occurrence-census or raw-`Term ==` respin.**
 - **AC-SAME-BEHAVIOUR** — the consumer module elaborates to the same result
   through the imported provider as through the deleted local. Control: the
   module's existing checked declarations and any dependent headline
@@ -118,3 +205,18 @@ census group 6. Groups 1, 5 and 7 are not re-measured and are not framed here
 (§4c — frame on need, not ahead of it); group 1's provider is the compiler
 prelude and may need no prerequisite, but that is a measurement for when this
 lands, not now.
+
+The exact D1 candidate `bc56f2f7`'s three-path intersection with `origin/main`
+since merge-base `ba1c92214` is empty (Architect), so no rebase is justified;
+Foundation respins D1 test-only from that SHA after this amendment lands. D2
+remains unstarted until D1 closes.
+
+## Symptom inventory (append one line per hard-stop; never rewrite history)
+
+```text
+1. One selected provider occurrence missed eight direct consumers — keyed on a chosen declaration.
+2. A complete occurrence census accepted unused provider padding — keyed on provider presence.
+3. Raw `Term ==` accepted a zeta-equivalent local — keyed on representation identity.
+
+Shared predicate: each detector substituted a representation proxy for causal provider authority. The structural closure is to separate candidate-specific migration evidence, kernel-definitional anti-duplication, and any future route-authority property; never infer one from another.
+```
