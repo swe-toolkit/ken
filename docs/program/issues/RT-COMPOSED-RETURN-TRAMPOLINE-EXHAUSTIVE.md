@@ -1,14 +1,14 @@
 ---
 id: RT-COMPOSED-RETURN-TRAMPOLINE-EXHAUSTIVE
 title: "Replace the producer-trampoline clone/out-parameter return protocol with an exhaustive Continue/Complete step result — core.rs:3144-3164 clones answer.value only to return an ignored bare value while ProducerTrampolineWork owns the real answer, and a pending affine result cannot cross that shape. Behaviour-preserving PREFIX to the composed-return protocol replacement; mints no Produced state and changes no product."
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
 tier: T1
 depends_on: []
 blocks: [RT-COMPOSED-RETURN-PRODUCED-TRANSFER]
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3083
 origin: "Architect HS14 component-design ruling evt_7gnw8s9k7rh6, 2026-08-29, on Steward disposition request evt_6dvw8j96w2sdx. The ruling selected arm 1 (widen the composed return protocol) and named the trampoline as a mandatory part of the replacement: 'A behavior-preserving trampoline/ordinary-return refactor may be a separately landable prefix only if it mints no Produced state and every existing product stays unchanged.' Steward cut this as a separate node under that permission; the atomic remainder is RT-COMPOSED-RETURN-PRODUCED-TRANSFER. Steward-owned cut per COORDINATION section 2 and steward.md section 4."
 ---
 
