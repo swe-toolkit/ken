@@ -14,7 +14,8 @@ bind t (\x. Ret (f x))
 
 The existing `fs-read-at-offset` and `fs-write-at-offset` programs reach its
 Tail route from checked Ken source. The open question is therefore not whether
-this construction has a lowering. Interaction Trees and Koka both give it one.
+this construction has a lowering. Interaction Trees gives the construction a
+direct semantic interpreter, and Koka gives it a compiled direct-call route.
 The question is which extra constraints Ken imposes that those systems do not.
 
 ## Result
@@ -57,8 +58,10 @@ resumption. It does not mandate the current compiler representation.
 Therefore the following are not spec rules: source-call emission before a
 later carried-match selection; `RoutedAnswer` collapse; the generated-entry
 confluence quotient; a two-`i64` active backedge; or a carried discriminant
-instead of an ordinary continuation function. Strict CBV is mandated, but all
-comparator orders below are strict and forward, so CBV is not the obstruction.
+instead of an ordinary continuation function. Strict CBV is mandated, but Koka
+and the described CPS/SSA route are strict and forward; Interaction Trees
+independently exposes the same forward response-to-continuation edge
+semantically. CBV is not the obstruction.
 
 ## The current Ken order
 
@@ -294,11 +297,13 @@ recreated from the response. Closure conversion and the ordinary target ABI
 carry captured lexical values in the conventional direction, caller to callee;
 the result returns callee to caller.
 
-The constraint delta is thus not merely “Koka carries more.” It **does not
-split** operation arguments, handler identity, and return continuation across
-three phases. Its dynamic evidence entry supplies the identity Ken quotients
-away, and its ordinary call activation supplies the environment Ken drops from
-the active backedge.
+The constraint delta is thus not merely “Koka carries more.” It does not split
+operation arguments, handler selection, and return continuation across three
+phases. Koka needs no analogue of Ken’s later-recovered source-member identity:
+evidence selection happens at the still-live operation call site, while the
+ordinary call activation preserves that site’s return continuation and lexical
+environment. Together those facts retain the operation-to-continuation
+association that Ken’s quotient and backedge separate.
 
 Again, the evidence vector is not a prohibition-clean Ken design. It shows
 which resources a successful implementation retains and when: identity and
