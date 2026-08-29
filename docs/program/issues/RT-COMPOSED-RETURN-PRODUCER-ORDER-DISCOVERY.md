@@ -1,14 +1,14 @@
 ---
 id: RT-COMPOSED-RETURN-PRODUCER-ORDER-DISCOVERY
 title: "DISCOVERY (viability verdict only): can source-specific validation authority be established BEFORE the existing producer — shape (a) — so the tail-resumptive composed-return fresh-R2 transfer becomes realizable without a store, captured continuation, runtime tag, or recovery. Scoped to shape (a); a refutation returns the shape (b) de-quotienting cost decision to the operator."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
 tier: T1
 depends_on: []
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3105
 origin: "Operator decision 2026-08-29, concurring with the Steward recommendation after Research advisory evt_774v5fjnxcfcw and Architect disposition evt_5te99temrdcty. RELEASED 2026-08-29 after the native-carried-value campaign front was determined DRAINED on current main 863bf0fbf by the Architect (evt_1xndnw1dp1r6v) and returned by the runtime-leader (evt_6bmd84zd6yzg2) — the sequencing precondition the operator set (queue after the campaign) is met. The composed-return wall (closed node RT-COMPOSED-RETURN-PRODUCED-TRANSFER, D0b=NO) is a partial-order contradiction on the Tail lowering route. Research confirmed Q2 POSITIVE: the shape is reached by well-formed Ken SOURCE (two complete SourceFormat::Ken programs — fs-read-at-offset and fs-write-at-offset — through the real build_native_program pipeline; the 48 Tail / 3 Direct arrivals are compiler arrivals within them, not fixtures), so the wall is NOT moot. Research Q1: no surveyed family (Interaction Trees, Koka, CPS/SSA) preserves Ken's current order (emit R2 -> collapse -> quotient away source identity -> validate later) and still delivers R2 without a store/capture/tag/recovery; the Architect's two shapes are the only known families and there is no local patch. Operator: fund shape (a); the language has no users so a wrong-value-vs-refuse failure-mode check is unnecessary."
 ---
 
