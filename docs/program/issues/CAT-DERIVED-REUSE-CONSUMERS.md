@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-REUSE-CONSUMERS
 title: "Drain catalog-reuse census group 4 (derived-list computational reuse) — replace six reimplementations of list_append, reverse, concat_map, and length across five packages with selective imports from Data.Collections.Derived. The consumer half of CAT-DERIVED-PUB-EXPORT, shaped on the landed CAT-NAT-REUSE-CONSUMERS per-package increment pattern."
-status: active
+status: merged
 owner: foundation
 size: M
 gate: none
@@ -12,7 +12,31 @@ github: null
 origin: "Steward, 2026-08-29, filed to remove lane-3 framing debt: CAT-DERIVED-PUB-EXPORT had no successor, so lane 3 would have gone idle on its landing. Group 4 membership is quoted verbatim from docs/program/cat-reuse-census.md section 4.4 at origin/main ac9b681e1f5a684b40a2da8b9ac0c0d19a13b2fc. The four providers group 4 consumes are exactly four of the six names CAT-DERIVED-PUB-EXPORT exports, so the prerequisite covers the consumers with nothing left over. Steward-filed per COORDINATION section 2."
 ---
 
-> # RELEASED by the Steward, 2026-08-29 03:47 UTC. `active`.
+> # CLOSED — Steward parent-closure disposition, 2026-08-29. All five per-package
+> # increments landed; census group 4 drained.
+>
+> Group 4's six consumer sites across five packages are all replaced by selective
+> imports from `Data.Collections.Derived`, verified by the Steward against
+> `origin/main` (blob identity, not ancestry):
+>
+> - **D1 Deque** (`deque_list_append`, `deque_list_reverse`) — `4f6d340c6`
+> - **D2 Parsing** (`list_append`) — `510c857e0` (PR #3092)
+> - **D3 EffectfulClasses** (`concat_map`) — `92c639e5e`
+> - **D4 Cursor** (`cursor_list_length`) — `863bf0fbf`
+> - **D5 Property** (`property_list_length`) — `3829c1baa` (PR #3102): three
+>   paths, `+246/-10`, all blob-identical to the reviewed candidate `2e7796d808`;
+>   `Property.ken.md` now `import Data.Collections.Derived (length)` with the
+>   `fn property_list_length` reimplementation deleted. Gates Architect
+>   `evt_3j7jjc1y9p27w` + Foundation QA `evt_4x1cv2dw7ycpf`, Decision
+>   `dec_604zqx8f5jmym`.
+>
+> No residual parent deliverable: the node's deliverables ARE the five
+> increments, each gate-verified on its own `AC-CENSUS-ROW-DRAINED`. The
+> Property.ken.md attestation currency is routed to the Librarian (post-merge,
+> non-blocking). Lifecycle complete.
+
+> # RELEASED by the Steward, 2026-08-29 03:47 UTC. `active`
+> # (superseded by the closure banner above).
 >
 > The prerequisite is confirmed `merged` **by blob identity, not ancestry** —
 > the publisher squashes. At `origin/main`
