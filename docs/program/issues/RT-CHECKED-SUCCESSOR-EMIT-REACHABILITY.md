@@ -1,13 +1,13 @@
 ---
 id: RT-CHECKED-SUCCESSOR-EMIT-REACHABILITY
 title: "RT-ITREE D1 follow-up — the D1 gate widening (core.rs:12546 dropped the answer_route==CheckedSelectedRecursor conjunct) makes every strict two-case Ret/Vis topology lower a checked successor body UNCONDITIONALLY, even for a Direct/None-frame eliminator where that successor is runtime-dead at control word 0. That production lowering can turn a pre-D1 Ok into Err before the dead branch is selected (Architect-proven: Unsupported(Var, 'no runtime binding for index 2') on a Direct/None recursive-Ret shape that compiled pre-D1). A latent compile-acceptance regression in the widened RuntimeExpr lowering domain; not a confirmed checked-source product regression. Guard the checked-successor emission on proven Checked-control emit-reachability, OR single-lower the Ret body behind a join fed by both payloads. Fold adversary Findings 2 (missing Initial!=ActiveSelfResumption witness) and 3 (tautological status assert_ne)."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3100
 origin: "Architect disposition evt_kgcdt4837jt4 (thr_6fe6wp65996a8), 2026-08-26, on the adversary M8 post-land hunt (evt_wxfvb470pxh1) of the RT-ITREE D1 squash 21d621303. The landed D1 merge STANDS (CI green, both gates bound byte-identical to reviewed candidate 7b1820194) and D2 is NOT interrupted; this is a separately-framed non-blocking follow-up. Steward-filed per COORDINATION section 2, sequenced after the in-flight D2 on the single runtime ring."
 ---
 
