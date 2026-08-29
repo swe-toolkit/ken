@@ -558,6 +558,46 @@ const EXPECTED: &[(&str, Disposition)] = &[
     ("rt_write_writable_stage", Disposition::Completes),
 ];
 
+macro_rules! generate_entry_tests {
+    ($($entry:ident),+ $(,)?) => {
+        const GENERATED_TEST_ENTRIES: &[&str] = &[$(stringify!($entry)),+];
+        $(
+            #[test]
+            fn $entry() {
+                assert!(ENTRIES.contains(&stringify!($entry)));
+            }
+        )+
+    };
+}
+
+generate_entry_tests!(
+    rt_allocate_stage,
+    rt_cap41_endpoint_stage,
+    rt_cap41_offset_endpoint_stage,
+    rt_cap41_offset_out_of_range_stage,
+    rt_cap41_out_of_range_stage,
+    rt_read_norights_stage,
+    rt_read_offset_stage,
+    rt_read_window_stage,
+    rt_write_pair_source,
+    rt_write_readonly_stage,
+    rt_write_writable_stage,
+);
+
+/// Every enumerated entry must have a generated test; this is a predicate over
+/// `ENTRIES`, not a convention-based roster.
+#[test]
+fn every_enumerated_entry_has_a_generated_test() {
+    let generated: std::collections::BTreeSet<&str> =
+        GENERATED_TEST_ENTRIES.iter().copied().collect();
+    let missing: Vec<&str> = ENTRIES
+        .iter()
+        .copied()
+        .filter(|entry| !generated.contains(entry))
+        .collect();
+    assert!(missing.is_empty(), "entries without generated tests: {missing:?}");
+}
+
 /// The expectation table must range over exactly the population, so a new entry
 /// cannot be added to `ENTRIES` without being dispositioned here.
 #[test]
