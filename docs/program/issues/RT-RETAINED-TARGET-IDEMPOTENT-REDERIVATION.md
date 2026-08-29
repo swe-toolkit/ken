@@ -1,7 +1,7 @@
 ---
 id: RT-RETAINED-TARGET-IDEMPOTENT-REDERIVATION
 title: "Retained-body uniqueness check rejects idempotent re-derivation, not just ambiguity — units.rs:683 collides on the body key without comparing target values, so a call-graph diamond (one static body reached from two reachable owners, resolving to the SAME target) is refused as ambiguous. Latent on the staged retained-unit path today; it bites when the closure-representation successor completes the path."
-status: active
+status: closed
 owner: runtime
 size: S
 gate: none

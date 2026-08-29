@@ -1,7 +1,7 @@
 ---
 id: CI-SHARD-DURATION-BALANCE
 title: "Partition the test shards by measured DURATION rather than by test count, and choose the shard count from the same measurement — count partitioning produced a 3.45x spread across 8 shards, so one shard ran 18m43s while another ran 5m25s and the run paid the maximum, not the mean."
-status: draft
+status: active
 owner: verify
 size: S
 gate: none
