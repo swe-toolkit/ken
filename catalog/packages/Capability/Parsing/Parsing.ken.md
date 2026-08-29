@@ -39,6 +39,8 @@ they must.
 ```ken
 import Core.Classes.LawfulClasses (leq_nat)
 
+import Data.Collections.Derived (list_append)
+
 import Data.Numeric.Nat.Order (sub)
 
 fn IsUtf8 (bs : Bytes) : Prop =
@@ -332,10 +334,9 @@ worked grammar is a genuine `Capability.Parsing.Decoder` client: fixed tokens us
 `decoder_many`, and recursive expressions use `decoder_recursive`. Both
 repetition and recursive descent seed their private structural fuel from the
 cursor's `remaining`; the old CAT-5-local fuel recursions are retired.
-`list_append` remains a second, verbatim package-local copy rather than a
-re-export. Keeping that landed helper avoids widening this focused refactor;
-the shared environment's later CAT-5 declaration intentionally shadows the
-earlier catalog helper for this compilation unit.
+The grammar selectively imports `list_append` from
+`Data.Collections.Derived` to assemble child lists without maintaining a
+package-local copy.
 
 ```ken
 data BoolExpr = BTrue | BFalse | BNot BoolExpr | BAnd BoolExpr BoolExpr
@@ -354,12 +355,6 @@ fn syntax_children (a : Type) (x : Syntax a) : List (Located a) =
 
 fn erase_spans (x : Syntax BoolExpr) : BoolExpr =
   located_value BoolExpr (syntax_root BoolExpr x)
-
-fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
-  match xs {
-    Nil ↦ ys;
-    Cons x rest ↦ Cons a x (list_append a rest ys)
-  }
 
 fn ValidLocatedList (a : Type) (s : Source) (xs : List (Located a)) : Prop =
   match xs {

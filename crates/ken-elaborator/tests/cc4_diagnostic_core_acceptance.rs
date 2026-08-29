@@ -9,18 +9,22 @@ use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const DIAGNOSTIC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
-const CURSOR_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
-const DECODER_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
+const DIAGNOSTIC_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
+const CURSOR_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
+const DECODER_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
 const PARSING_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
-const NUMERIC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
+const NUMERIC_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture(&mut env, "list_append");
     catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
