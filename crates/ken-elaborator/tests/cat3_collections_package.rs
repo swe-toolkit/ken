@@ -26,11 +26,15 @@ fn term_reference_count(term: &Term, target: GlobalId) -> usize {
         .sum::<usize>()
 }
 
-fn transparent_type_body_provider_occurrence_population(
+fn module_transparent_kernel_equivalents(
     env: &ElabEnv,
     module: &str,
     provider: GlobalId,
 ) -> BTreeSet<String> {
+    let (provider_ty, provider_body) = match env.env.lookup(provider) {
+        Some(Decl::Transparent { ty, body, .. }) => (ty, body),
+        other => panic!("provider must be transparent, got {other:?}"),
+    };
     let prefix = format!("{module}.");
     env.globals
         .iter()
@@ -40,8 +44,7 @@ fn transparent_type_body_provider_occurrence_population(
                 Some(Decl::Transparent { ty, body, .. }) => (ty, body),
                 _ => return None,
             };
-            (term_reference_count(ty, provider) + term_reference_count(body, provider) > 0)
-                .then(|| local_name.to_owned())
+            (ty == provider_ty && body == provider_body).then(|| local_name.to_owned())
         })
         .collect()
 }
@@ -235,15 +238,14 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: roots-loading Derived after LawfulClasses adds no trust, mints no
-/// Derived-local `bool_and`/`bool_leq`, and yields the exact complete population
-/// of roots-loaded transparent Derived declarations whose checked type or body
-/// contains each canonical provider identity. CLAIMED: this is the closed
-/// syntactic type/body occurrence population of the retired bindings. THE GAP:
-/// an occurrence need not be evaluated, lie on every reachable route, reach the
-/// result, or exclude unrelated/local computation; the concrete sort and law
-/// tests separately own behavior.
+/// Derived-local `bool_and`/`bool_leq`, and leaves no module-owned transparent
+/// definition with both the exact checked type and exact transparent body of
+/// either canonical provider. CLAIMED: no renamed kernel-equivalent local can
+/// serve the drained computation instead of the import. THE GAP: this exact
+/// kernel-equivalence inventory does not claim extensional uniqueness across
+/// non-identical bodies; the concrete sort and law tests separately own behavior.
 #[test]
-fn derived_bool_provider_occurrence_populations_have_zero_trust_delta() {
+fn derived_has_no_kernel_equivalent_local_bool_reimplementation() {
     let mut env = ElabEnv::new().expect("base env");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("the canonical Boolean provider must roots-load");
@@ -264,37 +266,13 @@ fn derived_bool_provider_occurrence_populations_have_zero_trust_delta() {
         .globals
         .contains_key("Data.Collections.Derived.bool_leq"));
 
-    let bool_and_population = transparent_type_body_provider_occurrence_population(
-        &env,
-        "Data.Collections.Derived",
-        bool_and,
-    );
-    assert_eq!(
-        bool_and_population,
-        BTreeSet::from(["eq_from_ord".to_owned()]),
-        "the exact roots-loaded transparent type/body bool_and occurrence population must stay closed"
-    );
-
-    let bool_leq_population = transparent_type_body_provider_occurrence_population(
-        &env,
-        "Data.Collections.Derived",
-        bool_leq,
-    );
-    assert_eq!(
-        bool_leq_population,
-        BTreeSet::from([
-            "bool_cons_sorted".to_owned(),
-            "bool_head_leq".to_owned(),
-            "insert_true_bool_count_false".to_owned(),
-            "insert_true_bool_count_true".to_owned(),
-            "sort_bool_count_false".to_owned(),
-            "sort_bool_count_true".to_owned(),
-            "sort_bool_perm".to_owned(),
-            "sort_bool_sorted".to_owned(),
-            "sorted_insert_true_bool".to_owned(),
-        ]),
-        "the exact roots-loaded transparent type/body bool_leq occurrence population must stay closed"
-    );
+    for (provider_name, provider) in [("bool_and", bool_and), ("bool_leq", bool_leq)] {
+        assert_eq!(
+            module_transparent_kernel_equivalents(&env, "Data.Collections.Derived", provider),
+            BTreeSet::new(),
+            "Derived must define no transparent local with the exact type and body of canonical {provider_name}"
+        );
+    }
 
     env.elaborate_file(
         "import Data.Collections.Derived (eq_from_ord as derived_eq_from_ord)\n\
