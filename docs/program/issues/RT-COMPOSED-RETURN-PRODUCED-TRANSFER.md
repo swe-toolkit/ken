@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-PRODUCED-TRANSFER
 title: "Carry the closed predecessor's FULL route-specific objective: add Direct's ruled declared call whose local return is fresh R2, replace the general composed-return protocol with one exhaustive affine state machine carrying Tail's produced result to the exact Tail consume, and bind the delivered R2 from BOTH variants through each independently derived Ret capture. Atomic over Direct application + Tail produced transfer + both-arm D3B + products."
-status: active
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -12,7 +12,81 @@ github: null
 origin: "Architect HS14 component-design ruling evt_7gnw8s9k7rh6, 2026-08-29, answering Steward disposition request evt_6dvw8j96w2sdx. Arm 1 selected: widen the composed return protocol. Arm 2 collapses into arm 1 (an earlier coupling still needs a carrier, and the only candidates are the already-rejected runtime data / capture / control stores, or arm 1). Arm 3 is true only of the predecessor's scope, not of the objective. This node is the Steward's recut of that ruling; the behaviour-preserving trampoline prefix is split out as RT-COMPOSED-RETURN-TRAMPOLINE-EXHAUSTIVE. Steward-owned cut per COORDINATION section 2."
 ---
 
-> # OPERATIVE AND TOPMOST — LOCAL-RETENTION REFUTED. D1-D4 HELD. ONLY D0b RUNS.
+> # OPERATIVE AND TOPMOST — NODE CLOSED. D0b RETURNED NO. NOTHING HERE IS WORK.
+>
+> **Steward disposition, 2026-08-29, on the corrected D0b NO reported at
+> `evt_6bsvka483jpdb` and accepted by the runtime leader at `evt_zp5s12nb7072`.**
+> The released frame required the Steward to disposition the node on a NO, and
+> this is that disposition. **D1-D4 are cancelled, not deferred.** No successor is
+> framed here, no fallback is authorized, and this is **not** HS15 — the HS15
+> Research trigger remains untouched.
+>
+> **The report is**
+> `/workspaces/ken/.scratch/rt-composed-return-produced-transfer-d0b.txt`,
+> SHA-256 `fdd5e8593839752ddfbcf2a069c45b4391b673725464ceded4babba96753a162`,
+> **verified by the Steward with `sha256sum`, not taken on report.** Manifest
+> SHA-256 `ce1434c092dc4ea6b851d2e064d4719f84d3895b7bf84ef9f2d47e3cff165fd3`.
+>
+> **WHAT WAS REFUTED IS ORDERING, NOT TRANSPORT — do not restate this as "the
+> token could not be moved."** Every governed arrival minted exactly one
+> `Selected` owner: 51 reached, 51 minted, pointwise per row. The owner moves. The
+> refutation is that on the Tail route it arrives **too late**:
+>
+> | source inv/call/callee | reached | minted | ResumeOuter | Direct | Tail |
+> |---|---|---|---|---|---|
+> | 305/304/303 | 29 | 29 | 29 | 0 | 0 |
+> | 515/514/513 | 1 | 1 | 1 | 0 | 0 |
+> | 529/528/527 | 16 | 16 | 16 | 0 | 0 |
+> | 741/740/739 | 3 | 3 | 0 | **3** | 0 |
+> | 318/317/316 | 2 | 2 | 2 | 0 | 0 |
+>
+> For **47 of 48** Tail arrivals the active successor at `ResumeOuter` has pending
+> length **0** — the exact producer has already emitted before `Selected` exists,
+> and crossing the successor **completes** rather than reaching another producer.
+> The 48th also fails the required pointwise partition. Reaching the producer
+> would require recovery, a forbidden store, or moving the mint earlier — and the
+> mint cannot move earlier because the projection is not selected until after the
+> governed validation the ruling pinned it to. **On Tail that interval is empty.**
+>
+> ⇒ The mint point is pinned between "after selection" and "before the producer",
+> and on Tail **no such point exists**. That is a structural refutation, not a
+> measurement gap, and it is why no amount of further D0 work on this axis pays.
+>
+> **THE ONLY DIRECT ROW IS 3/3 AND THAT IS THE INFORMATIVE HALF.** The protocol is
+> constructible exactly where the producer is still ahead of the carrier. Direct
+> is not a partial success to be salvaged into a half-node; it is the control that
+> proves the diagnostic had power and that the Tail zeros are a real finding
+> rather than an inert instrument.
+>
+> **`AC-D0b-POINTWISE-PARTITION` IS WHAT MADE THIS VISIBLE, AND IT EARNED ITS
+> KEEP.** The aggregate reads 51 reached / 51 minted / 3 dispatched — a 94%
+> transport success. Pointwise shows all three successes are one row and the four
+> Tail rows are 0/0/0/0. **A total that cannot expose a 0/0 split certifies the
+> defect it exists to catch**, which is how the previous false premise survived.
+>
+> All five D0b ACs are met: the partition is pointwise, the same token crosses
+> `ResumeOuter`, all four controls fail at named boundaries pre-call (the
+> duplicate-token control is compiler-enforced, `E0599 no method named clone`, so
+> non-`Clone` was **proved** rather than asserted), no production landed, and the
+> NO is stated as the complete deliverable. Full nominal closure compiled
+> including `cfg(test)` and the cross-crate native caller. Scratch was rooted on
+> disk at `/workspaces/ken/.scratch/`, byte-restored, and the preserved
+> eight-path evidence worktree was not edited.
+>
+> **THE OPEN QUESTION IS THE ARCHITECT'S, NOT THIS NODE'S.** HS14 ruled the scope
+> wrong but the goal intact — `spec §6.2` still requires perform -> observe ->
+> single tail resume. Two realizations of that goal have now been refuted on
+> measurement: the predecessor at HS14 and this node at D0b. Whether `§6.2` is
+> reachable on the Tail route at all is a component-design question above the
+> Steward's authority; it is routed as a question and **deliberately not framed
+> here as a successor**, because the ruling forbids inventing another mechanism
+> and a Steward-authored successor is exactly that.
+>
+> The historical banner below records the local-retention refutation that
+> authorized D0b. It is **history, not instruction** — D0b has since run and
+> returned NO.
+
+> # HISTORICAL — the ruling that authorized D0b. SPENT.
 >
 > **Architect ruling `evt_1nadp56v2k4rd`, 2026-08-29, on the runtime ring's
 > constructibility stop `evt_6dhkkaejn7tnd`.** Binds base
@@ -52,6 +126,12 @@ origin: "Architect HS14 component-design ruling evt_7gnw8s9k7rh6, 2026-08-29, an
 > Steward separately releases it** — this amendment is not that release. No HS15,
 > no fallback, no candidate, no D3 partial, no new predecessor. **The HS15
 > Research trigger is untouched.**
+
+> # HISTORICAL — the atomicity contract for a build that is now CANCELLED. SPENT.
+>
+> This banner governed D1-D4. D1-D4 are cancelled by the disposition at the top
+> of this file. It records why the build could not have landed in halves; it
+> authorizes nothing.
 
 > # ATOMIC FROM THE FIRST PRODUCTION MINT. NO PARTIAL LANDING.
 >
@@ -391,24 +471,30 @@ never automatically.** Re-measure at release.
 
 ## Sequencing
 
-**`active`.** The prefix [[RT-COMPOSED-RETURN-TRAMPOLINE-EXHAUSTIVE]] is
-`merged`; this node was released 2026-08-29 06:30 UTC, and D0 has since run and
-returned a refutation.
+**`closed`.** The prefix [[RT-COMPOSED-RETURN-TRAMPOLINE-EXHAUSTIVE]] is `merged`
+and stays merged — it landed behaviour-preserving and mints no `Produced`, so
+nothing about this closure regresses it or requires a revert.
 
-**CURRENT SEQUENCING STATE, 2026-08-29:**
+**FINAL SEQUENCING STATE, 2026-08-29. Nothing in this file is work.**
 
-- **D1-D4 are HELD.** Not refuted, not dispositioned. No candidate, no partial,
-  no D3 increment is authorized.
-- **D0b requires its own explicit Steward release.** This amendment is **not**
-  that release — amending a frame and starting a turn are two separate acts, and
-  the ring is correct to wait for the second. **No Runtime release follows from
-  a ruling itself**, here or at HS14.
-- **On D0b returning YES:** the Architect reviews the exact report, and **the
-  Steward separately releases the amended D1-D4 build.** D0b's own YES does not
-  start D1.
-- **On D0b returning NO:** the node is dispositioned by the Steward. **Do not
-  invent another mechanism** to keep it alive.
+- **D1-D4 are CANCELLED, not held.** The previous state was "held, not refuted,
+  not dispositioned"; D0b has since run and the disposition is made. No
+  candidate, no partial, no D3 increment, and no revival of D1-D4 on this axis.
+- **The D0b release is SPENT.** It was given, D0b ran, and it returned NO. No
+  further release attaches to this node.
+- **The YES branch never fired.** It is retained above only so the record shows
+  which branch the measurement took.
+- **No successor is framed here.** The ruling forbids inventing another
+  mechanism, and a Steward-authored successor is exactly that. The live question
+  — whether `spec §6.2`'s perform -> observe -> single tail resume is reachable
+  on the Tail route at all, after two measured refutations — is routed to the
+  Architect as a question.
 
-**No HS15, no fallback, no new predecessor. The HS15 Research trigger is
-untouched** — this is a correction of the HS14 realization frame after a measured
-false premise, not a new hard stop on the axis.
+**No HS15, no fallback, no new predecessor. The HS15 Research trigger remains
+untouched** — a released D0 returning its authorized NO is a completed
+deliverable, not a hard stop.
+
+**Lane 1 does not idle on this closure.**
+[[RT-FRESH-RESULT-ROUTE-PAIRING-LEG-CONTROLS]] was queued behind D3A+D3B purely
+on contention over `rt_parity_native.rs` and `lowering/mod.rs`; this closure
+removes the last owner of those files, and the Steward released it the same day.

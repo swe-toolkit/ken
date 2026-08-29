@@ -1,7 +1,7 @@
 ---
 id: RT-FRESH-RESULT-ROUTE-PAIRING-LEG-CONTROLS
 title: "The fresh-result route pairing proof pins ONE of its five substantive conjuncts — CheckedIhFreshResultRouteObservationMutation has exactly two arms and suppresses only source_result_value, so the sink-half identity (header_input_value == ret_input_value) and three sibling conjuncts have no negative control at all and can be deleted with the whole suite green. Latent today; the directed-edge claim that distinguishes this node from the co-emission object it replaced is asserted in the positive alone."
-status: draft
+status: active
 owner: runtime
 size: S
 gate: none
@@ -24,9 +24,25 @@ origin: "Adversary M8 hunt evt_39yvk4d78cfr (thr_3q2mw0qb0xcq8), 2026-08-28, on 
 > `AC-DERIVE` was recut to remove. **A criterion added to a frozen node is one
 > nobody reads.**
 >
-> **CONTENTION: this node edits the same two files D3A+D3B will edit**
-> (`rt_parity_native.rs`, `lowering/mod.rs`). It is QUEUED BEHIND D3 and must not
-> be released concurrently with it.
+> **THE CONTENTION HOLD IS DISCHARGED AND THIS NODE IS RELEASED (Steward,
+> 2026-08-29).** This node edits `rt_parity_native.rs` and `lowering/mod.rs`,
+> which is why it was queued behind D3A+D3B. **Both owners of that contention are
+> now `closed`**: `RT-RESULT-CONTINUATION-BINDING-PROVENANCE` at HS14, and
+> `RT-COMPOSED-RETURN-PRODUCED-TRANSFER` — which had absorbed D3B — on the
+> corrected D0b NO. Nothing else holds those two files. **The blocker did not
+> expire on a timer; it was removed by a disposition, and that is why the release
+> is sound rather than merely overdue.**
+>
+> **The closures do NOT transfer to this node.** It inherits no hard-stop count,
+> no suppression axis, and no frozen-frame obligation from either. It is what its
+> own frame says it is: a control-gap repair on the pairing proof's unpinned
+> conjuncts, S/T2, `gate: none`. Its `depends_on`
+> (`RT-CHECKED-IH-FRESH-RESULT-ROUTE`) is `merged` at `7d36d24f0` and unaffected.
+>
+> **Do not read the D0b NO as bearing on this node's subject.** That measurement
+> refuted a transport ORDERING on the Tail route. This node is about whether the
+> pairing predicate's five conjuncts each have a negative control. They touch the
+> same files and nothing else.
 
 ## The finding, re-measured by the Steward at the landed tree
 
