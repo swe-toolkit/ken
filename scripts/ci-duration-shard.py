@@ -1,34 +1,58 @@
 #!/usr/bin/env python3
-"""Assign a live nextest JSON inventory to deterministic duration-balanced bins."""
-import json, sys, statistics, heapq, os
-from pathlib import Path
+"""Assign a filtered live nextest inventory to deterministic duration bins."""
+import heapq
+import json
+import os
+import statistics
+import sys
+
 
 N = 8
+EXCLUDED_BINARIES = {
+    "rt_parity_native",
+    "px8f_buffer_native",
+    "px8f_write_partition",
+}
+
 
 def tests(value):
-    # nextest's binary-id is its authoritative filter identity. Display fields
-    # are deliberately not reconstructed into a substitute key.
     suites = value.get("rust-suites")
     if not isinstance(suites, dict) or not suites:
         raise SystemExit("nextest listing has no non-empty rust-suites map")
+    count = value.get("test-count")
+    if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+        raise SystemExit("nextest listing has no positive test-count")
     seen = set()
+    discovered = 0
     for suite in suites.values():
         if not isinstance(suite, dict):
             raise SystemExit("nextest listing contains a malformed rust suite")
         binary_id = suite.get("binary-id")
+        binary_name = suite.get("binary-name")
         testcases = suite.get("testcases")
         if not isinstance(binary_id, str) or not binary_id:
             raise SystemExit("nextest rust suite has no non-empty binary-id")
+        if not isinstance(binary_name, str) or not binary_name:
+            raise SystemExit("nextest rust suite has no non-empty binary-name")
         if not isinstance(testcases, dict) or not testcases:
             raise SystemExit("nextest rust suite has no non-empty testcases")
-        for name in testcases:
-            if not isinstance(name, str) or not name:
-                raise SystemExit("nextest rust suite has an invalid testcase")
+        for name, metadata in testcases.items():
+            if not isinstance(name, str) or not name or not isinstance(metadata, dict):
+                raise SystemExit("nextest rust suite has an invalid testcase record")
+            filter_match = metadata.get("filter-match")
+            status = filter_match.get("status") if isinstance(filter_match, dict) else None
+            if status not in {"matches", "mismatch"}:
+                raise SystemExit("nextest testcase has invalid filter-match status")
             identity = (binary_id, name)
             if identity in seen:
                 raise SystemExit(f"duplicate canonical identity: {binary_id} {name}")
             seen.add(identity)
-            yield identity
+            discovered += 1
+            if status == "matches" and binary_name not in EXCLUDED_BINARIES:
+                yield identity
+    if discovered != count:
+        raise SystemExit("nextest test-count differs from discovered testcases")
+
 
 def main():
     inventory = json.load(open(sys.argv[1]))
@@ -37,25 +61,21 @@ def main():
     median = statistics.median(durations.values())
     bins = [(0.0, index, []) for index in range(N)]
     heapq.heapify(bins)
-    live = sorted(
-        (f"{binary_id} {name}", binary_id, name)
-        for binary_id, name in tests(inventory)
-    )
-    for rendered, binary_id, name in sorted(
-        live, key=lambda x: (-durations.get(x[0], median), x[0])
-    ):
+    live = sorted((f"{binary_id} {name}", binary_id, name) for binary_id, name in tests(inventory))
+    if not live:
+        raise SystemExit("filtered live inventory selected zero testcases")
+    for rendered, binary_id, name in sorted(live, key=lambda x: (-durations.get(x[0], median), x[0])):
         total, index, selected = heapq.heappop(bins)
         selected.append((binary_id, name))
         heapq.heappush(bins, (total + durations.get(rendered, median), index, selected))
     result = []
-    for _, index, selected in sorted(bins, key=lambda x:x[1]):
+    for _, index, selected in sorted(bins, key=lambda x: x[1]):
         terms = [f"(binary_id(={binary}) & test(={name}))" for binary, name in selected]
         result.append({"bin": index + 1, "tests": selected, "filter": " | ".join(terms)})
     output = sys.argv[3] if len(sys.argv) > 3 else None
     if output:
         os.makedirs(output, exist_ok=True)
-        arg_max = os.sysconf("SC_ARG_MAX")
-        limit = arg_max // 4
+        limit = os.sysconf("SC_ARG_MAX") // 4
         for item in result:
             expression = item["filter"]
             if len(expression.encode()) > limit:
@@ -63,4 +83,7 @@ def main():
             with open(os.path.join(output, f"bin-{item['bin']}.expr"), "w") as file:
                 file.write(expression)
     print(json.dumps({"bins": result}, indent=2))
-if __name__ == "__main__": main()
+
+
+if __name__ == "__main__":
+    main()
