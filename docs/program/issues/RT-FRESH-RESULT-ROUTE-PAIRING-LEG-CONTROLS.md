@@ -1,14 +1,14 @@
 ---
 id: RT-FRESH-RESULT-ROUTE-PAIRING-LEG-CONTROLS
 title: "The fresh-result route pairing proof pins ONE of its five substantive conjuncts — CheckedIhFreshResultRouteObservationMutation has exactly two arms and suppresses only source_result_value, so the sink-half identity (header_input_value == ret_input_value) and three sibling conjuncts have no negative control at all and can be deleted with the whole suite green. Latent today; the directed-edge claim that distinguishes this node from the co-emission object it replaced is asserted in the positive alone."
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
 tier: T2
 depends_on: [RT-CHECKED-IH-FRESH-RESULT-ROUTE]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3095
 origin: "Adversary M8 hunt evt_39yvk4d78cfr (thr_3q2mw0qb0xcq8), 2026-08-28, on squash 7d36d24f04678d3c9a2636fb06fd8c7aaf5dfb89 (range bd4ddf213..208309bb1, eight paths, squash-diff byte-identical to range-diff). The hunt's verdict on that candidate was CLEAN core with mostly strong controls; this is its ONE grounded finding, classed leak/gap and explicitly LATENT, advisory and non-blocking. Routed to the Steward for disposition rather than reopening the merged node. Every coordinate below was re-measured by the Steward against the landed tree before filing. Steward framing per COORDINATION section 2."
 ---
 
