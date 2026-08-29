@@ -196,3 +196,188 @@ frames the atomic build from the verdict; if refuted, the Steward returns it to
 the operator with no fallback to the closed axes. The shape-(a) build frame stays
 `draft`, untouched. HS15 stays unspent — it belonged to the closed endpoint
 series.
+
+## Discovery verdict — refuted
+
+**Verdict: REFUTED.** At exact working SHA
+`68e25cd471bb115918b8b6e92791e8e683cbe2ce`, shape (b) cannot supply the
+relocated Tail call's ordinary operand run at the checked predecessor of the
+shared Ret body. The first unavoidable missing operands are the source
+constructor's nonrecursive fields. They exist in the earlier selected-case
+environment, but the active self-resumption backedge carries only the new
+scrutinee word and route-control word. Static de-quotienting can retain the
+exact call identity; it cannot make those runtime field values dominate a later
+loop iteration.
+
+This is a pure paper refutation. No production source, executable probe, Runtime
+QA route, CI run, semantic candidate, or PX8 state was changed.
+
+### Exact object and re-measured seam
+
+The working tree is `80a10ae14e494b1ac6d7b7cc8bd9f7ec7e5a4068`.
+All six authority blobs in the released frame remain exact:
+
+- `aggregates.rs`
+  `9eb2c118e227c3a7db2849e03046db02d93a48eb`;
+- `source.rs` `88fcc401b0e078f78298a0998d09364b22e64a27`;
+- `core.rs` `79ec94b749836a6e1747d6b6da0b572f919105cd`;
+- `lowering/mod.rs`
+  `d5837de3c5df3258e5db316fe901a1eb9cb8271a`;
+- `rt_parity_native.rs`
+  `b1adb83de3f97864d3b81da735eb759361bc962b`;
+- `spec/40-runtime/42-evaluation.md`
+  `69b9d6d267ba20235f42972865c2b20504531d62`.
+
+The member is still present before quotienting at
+`aggregates.rs:5902-5977`. Confluence construction still accumulates members at
+`:6123-6257`, and publication still discards them at `:6323-6543`, specifically
+`:6385` and `:6407`. The current producer remains at
+`source.rs:4309-4374`. The carried-loop header and active backedge remain at
+`core.rs:12225-12282`; the shared ordinary Ret predecessor is at
+`:12433-12445`; the checked predecessor and stale-word jump are at
+`:12634-12743`.
+
+### Four-axis census
+
+#### 1. Member and emitted-edge identity
+
+This axis is representable without a sibling map. The pre-quotient row already
+returns `(coordinate, member, retarget_caller, projection)`, and the member is
+the transport's exact `source_call_identity`. A hypothetical split publication
+could therefore replace
+`CheckedIhGeneratedEntryAdmission::Governed(projection)` with a private
+member-bound record containing the exact identity, transport, and projection.
+The identity need not be recovered from a body, position, or projection.
+
+That type split does not solve the discovery. The fixed products prove that
+function identity alone is not already one-member: the read product has two
+entry coordinates in one context; the write product has three coordinates in
+two contexts and four total members; its W0/W1 coordinate has two distinct
+members. These are asserted at `rt_parity_native.rs:959-1118`. A split must
+therefore preserve a member on an exact emitted edge, not merely rename the
+existing context function.
+
+#### 2. Caller and declared-call closure
+
+The static populations are bounded. `generated_entry_retarget_caller` at
+`aggregates.rs:5215-5254` requires exactly one incoming retarget caller for an
+enclosing specialization. Generated context definition declares its own
+continuation-call targets from the exact emission owner, and
+`declare_owned_in_func` includes identities transported into that owner. Thus,
+even granting a private member-bound Tail edge, the target `FuncRef` can be
+declared in the destination function without copying one from another
+function.
+
+This axis also does not supply operands. A declared call target proves which
+function may be called; it says nothing about which runtime values fill its
+frame.
+
+#### 3. Transport-input environment and ABI — the refuting axis
+
+The call has two independently derived operand runs:
+
+1. its ordinary `Parameter` envelope; and
+2. its continuation inputs.
+
+The transport morphism covers only the second run. Its type at
+`aggregates.rs:191-211` is a vector of continuation-input ordinal, source
+coordinate, and either `LexicalEnvironment(index)` or `EntryFrame(slot)`.
+Construction at `:4401-4463` iterates only
+`source.continuation_inputs()`. It has no entry for an ordinary constructor
+field or worker capture.
+
+The existing call assembler makes the missing division explicit.
+`call_checked_ih_transport_from_case_environment` at `core.rs:7642-7847`
+constructs the ordinary run before consulting the morphism:
+
+- `NonrecursiveConstructorField` reads the earlier selected-case environment at
+  `recursive_count + source_position` (`:7692-7768`);
+- `WorkerCapture` reads the compiler-only `StaticWorkerBinding` selected from
+  that same environment (`:7713-7791`);
+- only then do continuation inputs use the transport morphism at
+  `:7801-7837`.
+
+The checked Ret predecessor does not hold that selected-case environment. In
+`lower_carried_computational_match_inner`, the ordinary selected arm creates
+`case_env = IHs ++ children ++ frame_env` at `core.rs:12513-12532`. That value
+is scoped to the selected arm. When its induction hypothesis resumes the same
+carried eliminator, the active backedge at `:12225-12258` jumps to the header
+with exactly two arguments: `scrutinee.word` and the route-control word. The
+header at `:12260-12282` has exactly those two parameters. The later checked
+fallback begins after the ordinary case loop at `:12634` and therefore has
+neither the prior `case_env` nor a block parameter for any of its children.
+
+The generated context's entry ABI is not a substitute. It carries raw-worker
+arguments, raw-worker captures, and continuation-input captures. The target's
+ordinary envelope instead names nonrecursive fields of a producer `Construct`
+plus selected-worker captures. The code states this separation at
+`continuations.rs:1722-1737`: the ordinary envelope is a role projection, not a
+worker-body environment map; the continuation descriptor and worker
+`arity + captures` contracts are distinct, and no slot-to-lexical-position
+relation exists between them. Treating an entry argument as a source
+constructor field would therefore be occurrence-blind authority synthesis,
+even when two runtime words happened to agree.
+
+The exact Tail family makes the difference semantic as well as positional.
+`spec/30-surface/36-effects.md:489-491` (blob
+`d43477191c66419f75cda394ce15c7eddd33ef4a`) defines `Vis` with nonrecursive field
+`e : E.Op` and recursive worker `E.Resp e → ITree E R`. The generated context's
+raw worker argument is the response; the continuation ordinary envelope's
+nonrecursive source field is the operation. They are distinct typed values, not
+two spellings of one slot. The exact source products make the absence concrete:
+`rt_parity_native.rs:158-175` constructs `readAt` and gives `bind` a
+response-only `\outcome` continuation; `:222-236` does the same for `writeAt`.
+Neither continuation captures the prior operation value. The active backedge
+carries the later answer word and cannot supply that earlier operation field.
+
+A private type for the missing piece would have to look like a total
+`CheckedIhTailOrdinaryOperandPlan`, with one exact destination for every
+`ContinuationOrdinaryEnvelopeRole`. The current plan cannot inhabit its
+`NonrecursiveConstructorField` rows at the checked predecessor. Identity
+splitting changes no SSA dominance and supplies no value for those rows.
+
+Every way to make the type inhabitable is prohibited:
+
+- add the prior children to the active header's block-parameter run — a new
+  runtime lane;
+- retain the earlier selected-case environment through general composed return
+  — the closed Produced-transfer/D3 design;
+- add fields to the generated context frame — runtime capture/ABI transport;
+- store the fields and reload them — storage;
+- recover or project them from `scrutinee.word` — runtime recovery from the
+  stale topology carrier; or
+- emit the call while the selected-case environment is still live — before
+  Tail route selection, which is shape (a), not shape (b).
+
+This is an operand absence, not merely a missing validator. A new planner
+relation could name the old occurrences, but naming an occurrence does not
+recreate its SSA value on a later loop iteration.
+
+#### 4. Exact producer-result-to-Ret SSA binding
+
+If a lawful relocated call result existed, the final binding itself would be
+local and exact: replace only the checked predecessor's current
+`jump(return_body, &[scrutinee.word])` at `core.rs:12743` with the call's
+returned SSA word. The ordinary predecessor would continue to feed its projected
+child at `:12441`, and the single block parameter at `:12444` would still own the
+only Ret-body lowering.
+
+That local edge cannot rescue axis 3. There is no lawful relocated call result
+to bind because the call frame cannot be assembled after self-resumption.
+Passing a different word to `return_body` without first producing it would only
+rename the stale-value defect.
+
+### Decisive obstruction
+
+The first unavoidable missing environment operand is the ordinary
+`NonrecursiveConstructorField` run from the source-specific selected case. It
+is available before self-resumption and absent after the two-argument active
+backedge. A one-member static identity closes source authority but not runtime
+value availability. Closing both requires one of the expressly forbidden
+runtime transport forms above.
+
+Therefore **SOURCE-INDEXED PRODUCER/RET COLOCATION is not achievable by the
+released shape (b)**. The semantic goal in runtime spec section 6.2 remains
+open, but this discovery authorizes no fallback to Produced-transfer, D3,
+Direct-only salvage, recovery, storage, tags, carriers, a second Ret body, or
+HS15.
