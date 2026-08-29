@@ -75,7 +75,7 @@ proof none for get_or_else (a : Type) (d : a) : Equal a (get_or_else a d (None a
 proof some for get_or_else (a : Type) (d : a) (v : a) : Equal a (get_or_else a d (Some a v)) v =
   Refl
 
-fn is_some (a : Type) (x : Option a) : Bool =
+pub fn is_some (a : Type) (x : Option a) : Bool =
   match x {
     None ↦ False;
     Some v ↦ True

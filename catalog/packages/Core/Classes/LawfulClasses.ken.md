@@ -320,7 +320,7 @@ above, no further kernel capability needed. Getting here took a real
 correction, worth recording (`§6`).
 
 ```ken
-fn bool_leq (a : Bool) (b : Bool) : Bool =
+pub fn bool_leq (a : Bool) (b : Bool) : Bool =
   match a {
     False ↦ True;
     True ↦ b
@@ -636,7 +636,7 @@ proofs therefore route through the supplied `sound` and `complete` fields
 rather than treating a dictionary operation as if it reduced by itself.
 
 ```ken
-fn bool_and (a : Bool) (b : Bool) : Bool =
+pub fn bool_and (a : Bool) (b : Bool) : Bool =
   match a {
     True ↦ b;
     False ↦ False
