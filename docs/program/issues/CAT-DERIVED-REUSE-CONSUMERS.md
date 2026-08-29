@@ -101,13 +101,46 @@ shares no file with the others.
   1. the **reuse census**, `docs/program/cat-reuse-census.md` §4.4 — which
      group-4 rows drained (that is `AC-CENSUS-ROW-DRAINED` above); and
   2. the **strict-resolution ambient census**,
-     `crates/ken-elaborator/tests/lang_mod_strict_resolution_d0.rs` — which
-     partitions every catalog leaf by `ambient_dependencies` into an
-     `expected_clean` bucket and a measured census row. **Importing `Derived`
-     adds its ambient debt (`eqChar`, `is_sorted`, `leqChar`), so a package that
-     was `expected_clean` MOVES to a measured census row.** An increment that
-     imports `Derived` into a previously-clean package and leaves this file
-     untouched is deterministically CI-red.
+     `crates/ken-elaborator/tests/lang_mod_strict_resolution_d0.rs`.
+
+  **The strict-resolution census is a THREE-way classification gated on baseline
+  load, not a two-way clean/census split. Get this right before acting on it.**
+  At `:380-390` each leaf first attempts a baseline elaboration. **If the
+  baseline FAILS the leaf is pushed to `residuals` and `ambient_dependencies` is
+  NEVER CALLED for it.** Only a baseline-green leaf is measured for ambient debt
+  and then sorted into `expected_clean` or a measured census row.
+
+  ⇒ **Importing `Derived` can only move a leaf that is baseline-GREEN.** For a
+  leaf already in `expected_residuals` the import changes nothing measurable,
+  because the census never reaches the ambient step for it.
+
+  Worked example of each side, both verified against the landed tree:
+  - `Data.Collections.Deque` is baseline-green, so D1's import DID expand its
+    measured row (`4f6d340c6`, adding `eqChar`, `is_sorted`, `leqChar`).
+  - `Capability.Parsing.Parsing` is in **`expected_residuals`** — the list opens
+    at `:683` and Parsing sits at `:695`; `expected_clean` opens at `:674` and
+    closes at `:682`. Its baseline stops at `UnresolvedCon SourceId`, a
+    pre-existing failure unrelated to `Derived`. **D2 therefore correctly leaves
+    this file untouched.**
+
+  > **ERRATUM — this AC's first version asserted the opposite for Parsing, and it
+  > was wrong.** It claimed Parsing was `expected_clean` and would move to a
+  > measured row, making D2 deterministically CI-red. That came from the M8 hunt,
+  > which read line 695 and attributed it to the `expected_clean` bucket; the
+  > bucket boundary is at 682. **The Steward propagated it into this frame
+  > without independently resolving which binding line 695 belongs to, then
+  > voided a valid merge authorization on it.** Caught by the foundation
+  > implementer's hard stop, which reproduced the exact commanded test GREEN 1/1
+  > on the five staged blobs.
+  >
+  > **The reusable form: a line number is not a bucket.** Two readers cited
+  > `:695` and drew opposite conclusions; the discriminator was the enclosing
+  > `let`, which neither had opened. When a finding turns on set membership,
+  > resolve the ENCLOSING BINDING, never the line.
+  >
+  > **The AC itself survives — "re-measure both censuses" is correct and still
+  > binds.** What was wrong is the predicted DIRECTION for one package. Do not
+  > read this erratum as retiring the criterion.
 
   > **This is not a new criterion; it is a disambiguation, and the record shows
   > exactly why it was needed.** `AC-CLOSURE-TARGETS` already covered this file
