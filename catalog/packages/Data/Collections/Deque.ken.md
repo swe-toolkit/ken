@@ -11,6 +11,8 @@ already facing the requested end when possible; when that list is empty, it
 reverses the other list once and continues from there.
 
 ```ken
+import Data.Collections.Derived (list_append, reverse)
+
 data Deque a = MkDeque (List a) (List a)
 
 const empty (a : Type) : Deque a = MkDeque a (Nil a) (Nil a)
@@ -25,21 +27,9 @@ fn pushBack (a : Type) (x : a) (q : Deque a) : Deque a =
     MkDeque front back ↦ MkDeque a front (Cons a x back)
   }
 
-fn deque_list_append (a : Type) (xs : List a) (ys : List a) : List a =
-  match xs {
-    Nil ↦ ys;
-    Cons x rest ↦ Cons a x (deque_list_append a rest ys)
-  }
-
-fn deque_list_reverse (a : Type) (xs : List a) : List a =
-  match xs {
-    Nil ↦ Nil a;
-    Cons x rest ↦ deque_list_append a (deque_list_reverse a rest) (Cons a x (Nil a))
-  }
-
 fn toList (a : Type) (q : Deque a) : List a =
   match q {
-    MkDeque front back ↦ deque_list_append a front (deque_list_reverse a back)
+    MkDeque front back ↦ list_append a front (reverse a back)
   }
 
 fn popFront (a : Type) (q : Deque a) : Option (Pair a (Deque a)) =
@@ -47,7 +37,7 @@ fn popFront (a : Type) (q : Deque a) : Option (Pair a (Deque a)) =
     MkDeque front back ↦
       match front {
         Nil ↦
-          match deque_list_reverse a back {
+          match reverse a back {
             Nil ↦ None (Pair a (Deque a));
             Cons x rest ↦
               Some (Pair a (Deque a)) (mk_pair a (Deque a) x (MkDeque a rest (Nil a)))
@@ -61,7 +51,7 @@ fn popBack (a : Type) (q : Deque a) : Option (Pair a (Deque a)) =
     MkDeque front back ↦
       match back {
         Nil ↦
-          match deque_list_reverse a front {
+          match reverse a front {
             Nil ↦ None (Pair a (Deque a));
             Cons x rest ↦
               Some (Pair a (Deque a)) (mk_pair a (Deque a) x (MkDeque a (Nil a) rest))
@@ -88,16 +78,16 @@ theorem deque_append_snoc_assoc
       (a : Type) (front : List a) (tail : List a) (x : a)
     : Equal
         (List a)
-        (deque_list_append a front (deque_list_append a tail (Cons a x (Nil a))))
-        (deque_list_append a (deque_list_append a front tail) (Cons a x (Nil a))) =
+        (list_append a front (list_append a tail (Cons a x (Nil a))))
+        (list_append a (list_append a front tail) (Cons a x (Nil a))) =
   match front {
     Nil ↦ Refl;
     Cons h rest ↦
       deque_cong
         (List a)
         (List a)
-        (deque_list_append a rest (deque_list_append a tail (Cons a x (Nil a))))
-        (deque_list_append a (deque_list_append a rest tail) (Cons a x (Nil a)))
+        (list_append a rest (list_append a tail (Cons a x (Nil a))))
+        (list_append a (list_append a rest tail) (Cons a x (Nil a)))
         (Cons a h)
         (deque_append_snoc_assoc a rest tail x)
   }
@@ -110,8 +100,8 @@ theorem toList_pushFront
       deque_cong
         (List a)
         (List a)
-        (deque_list_append a front (deque_list_reverse a back))
-        (deque_list_append a front (deque_list_reverse a back))
+        (list_append a front (reverse a back))
+        (list_append a front (reverse a back))
         (Cons a x)
         Refl
   }
@@ -121,9 +111,9 @@ theorem toList_pushBack
     : Equal
         (List a)
         (toList a (pushBack a x q))
-        (deque_list_append a (toList a q) (Cons a x (Nil a))) =
+        (list_append a (toList a q) (Cons a x (Nil a))) =
   match q {
-    MkDeque front back ↦ deque_append_snoc_assoc a front (deque_list_reverse a back) x
+    MkDeque front back ↦ deque_append_snoc_assoc a front (reverse a back) x
   }
 
 data PopPreserves (a : Type) (x : a) (q : Deque a) : Option (Pair a (Deque a)) → Type where {
@@ -150,10 +140,13 @@ fn popBack_pushBack
 
 ## Trust and derivation
 
-`Deque` is an ordinary strictly positive inductive. Its operations recurse
-structurally over `List`; every law is a checked proof term. The package adds no
-axiom, postulate, primitive, foreign declaration, or unresolved hole, so its
-`trusted_base()` delta is zero.
+`Deque` is an ordinary strictly positive inductive. Its operations reuse the
+transparent `list_append` and `reverse` definitions from
+`Data.Collections.Derived`; every law is a checked proof term. Relative to that
+provider closure, the package adds no axiom, postulate, primitive, foreign
+declaration, unresolved hole, or consumer-local `trusted_base()` entry. Loading
+the full closure inherits the provider's existing audited trust footprint
+without widening or duplicating it.
 
 ## References
 

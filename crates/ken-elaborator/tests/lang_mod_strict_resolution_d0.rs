@@ -568,7 +568,24 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Data.Collections.Deque".to_string(),
-            ["Equal"].into_iter().map(str::to_string).collect(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
         ),
         (
             "Data.Collections.Derived".to_string(),

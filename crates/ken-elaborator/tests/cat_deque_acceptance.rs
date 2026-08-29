@@ -4,22 +4,102 @@
 //! concrete end-order observations, and zero-trust delta are durable invariants.
 
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
-use ken_kernel::Decl;
+use ken_kernel::{Decl, GlobalId, Term};
 
-const DEQUE_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Deque.ken.md");
+const DEQUE: &str = "Data.Collections.Deque";
+const DERIVED: &str = "Data.Collections.Derived";
 
 fn base_env() -> ElabEnv {
     ElabEnv::empty().expect("prelude bootstrap")
 }
 
+fn catalog_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages")
+}
+
+fn expose_module(env: &mut ElabEnv, module: &str) {
+    let prefix = format!("{module}.");
+    let aliases = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            name.strip_prefix(&prefix)
+                .map(|suffix| (suffix.to_owned(), *id))
+        })
+        .collect::<Vec<_>>();
+    env.globals.extend(aliases);
+}
+
 fn loaded_env() -> ElabEnv {
     let mut env = base_env();
-    env.elaborate_ken_md_file(DEQUE_KEN_MD)
-        .expect("Data/Collections/Deque.ken.md must elaborate");
+    env.elaborate_module_from_roots(&[catalog_root()], DEQUE)
+        .expect("Data.Collections.Deque must roots-load with its real provider closure");
+    expose_module(&mut env, DEQUE);
     env
+}
+
+fn leading_pi_count(term: &Term) -> usize {
+    let mut count = 0;
+    let mut current = term;
+    while let Term::Pi(_, body) = current {
+        count += 1;
+        current = body;
+    }
+    count
+}
+
+fn provider_arity(env: &ElabEnv, provider: GlobalId) -> usize {
+    let ty = match env.env.lookup(provider) {
+        Some(Decl::Transparent { ty, .. }) => ty,
+        other => panic!("Derived provider must be transparent, got {other:?}"),
+    };
+    let arity = leading_pi_count(ty);
+    assert!(arity > 0, "Derived provider must have a function type");
+    arity
+}
+
+fn term_contains_saturated_provider_head_occurrence(
+    term: &Term,
+    provider: GlobalId,
+    arity: usize,
+) -> bool {
+    if matches!(term, Term::App(_, _)) {
+        let mut argument_count = 0;
+        let mut head = term;
+        while let Term::App(function, _) = head {
+            argument_count += 1;
+            head = function;
+        }
+        if argument_count >= arity && matches!(head, Term::Const { id, .. } if *id == provider) {
+            return true;
+        }
+    }
+    term.children()
+        .into_iter()
+        .any(|child| term_contains_saturated_provider_head_occurrence(child, provider, arity))
+}
+
+fn transparent_bodies_with_saturated_provider_head_occurrence(
+    env: &ElabEnv,
+    provider: GlobalId,
+) -> BTreeSet<String> {
+    let prefix = format!("{DEQUE}.");
+    let arity = provider_arity(env, provider);
+    env.globals
+        .iter()
+        .filter_map(|(qualified, id)| {
+            let local = qualified.strip_prefix(&prefix)?;
+            let (_, body) = env.env.transparent_body(*id)?;
+            term_contains_saturated_provider_head_occurrence(&body, provider, arity)
+                .then(|| local.to_owned())
+        })
+        .collect()
 }
 
 fn boolean_list(env: &ElabEnv, value: EvalVal) -> Vec<bool> {
@@ -76,13 +156,100 @@ fn entry_elaborates_and_registers_operations_and_laws() {
 }
 
 #[test]
-fn entry_adds_no_trusted_declarations() {
+fn entry_adds_no_consumer_local_trusted_declarations() {
     let mut env = base_env();
+    env.elaborate_module_from_roots(&[catalog_root()], DERIVED)
+        .expect("the canonical Derived provider closure must roots-load");
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(DEQUE_KEN_MD)
-        .expect("Data/Collections/Deque.ken.md must elaborate");
+    env.elaborate_module_from_roots(&[catalog_root()], DEQUE)
+        .expect("Data.Collections.Deque must roots-load");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(before, after, "deque must add zero trusted declarations");
+    assert_eq!(
+        before, after,
+        "Deque must add zero consumer-local trusted declarations beyond its provider closure"
+    );
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: roots-loaded transparent `Data.Collections.Deque.*` bodies that
+/// contain at least one saturated application-head occurrence of an exact
+/// Derived provider identity form closed, literal expected populations.
+///
+/// LIMITATION: this is a syntactic occurrence-population pin. It does not prove
+/// that an occurrence is evaluated, lies on every reachable route, reaches the
+/// body's result, or excludes unrelated or local computation elsewhere in the
+/// body.
+///
+/// EVIDENCE DIVISION: exact provider identity and occurrence population are
+/// measured here. Retired named globals plus the positive/negative selective-
+/// import pair pin the elaboration-visible migration shape. Concrete
+/// observations below pin behavior. The WP census and affected-target closure
+/// own the remaining frame obligations.
+#[test]
+fn transparent_deque_bodies_have_exact_derived_head_occurrence_populations() {
+    let env = loaded_env();
+    let append = env.globals[&format!("{DERIVED}.list_append")];
+    let reverse = env.globals[&format!("{DERIVED}.reverse")];
+
+    for retired in ["deque_list_append", "deque_list_reverse"] {
+        assert!(
+            !env.globals.contains_key(&format!("{DEQUE}.{retired}")),
+            "retired local reimplementation {DEQUE}.{retired} must be absent"
+        );
+    }
+    assert_eq!(
+        transparent_bodies_with_saturated_provider_head_occurrence(&env, reverse),
+        BTreeSet::from([
+            "popBack".to_owned(),
+            "popFront".to_owned(),
+            "toList".to_owned(),
+            "toList_pushBack".to_owned(),
+            "toList_pushFront".to_owned(),
+        ]),
+        "transparent Deque bodies containing a saturated exact reverse-provider \
+         application-head occurrence must match the closed expected population"
+    );
+    assert_eq!(
+        transparent_bodies_with_saturated_provider_head_occurrence(&env, append),
+        BTreeSet::from([
+            "deque_append_snoc_assoc".to_owned(),
+            "toList".to_owned(),
+            "toList_pushBack".to_owned(),
+            "toList_pushFront".to_owned(),
+        ]),
+        "transparent Deque bodies containing a saturated exact list_append-provider \
+         application-head occurrence must match the closed expected population"
+    );
+
+    let mut imported = base_env();
+    imported
+        .elaborate_module_from_roots(&[catalog_root()], DERIVED)
+        .expect("Derived provider must roots-load");
+    imported
+        .elaborate_file(
+            "import Data.Collections.Derived (list_append)\n\
+             fn cat_deque_selective_positive \
+                 (xs : List Bool) (ys : List Bool) : List Bool = \
+               list_append Bool xs ys",
+        )
+        .expect("the selectively imported list_append binding must resolve");
+
+    let mut omitted = base_env();
+    omitted
+        .elaborate_module_from_roots(&[catalog_root()], DERIVED)
+        .expect("Derived provider must roots-load");
+    let error = omitted
+        .elaborate_file(
+            "import Data.Collections.Derived (list_append)\n\
+             fn cat_deque_selective_negative (xs : List Bool) : List Bool = \
+               reverse Bool xs",
+        )
+        .expect_err("available but unimported reverse must not resolve");
+    assert!(
+        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "reverse"),
+        "the non-import control must fail at the omitted binding, got {error:?}"
+    );
 }
 
 #[test]
@@ -99,7 +266,7 @@ fn both_homomorphisms_and_both_pop_inverses_instantiate_generically() {
              (a : Type) (x : a) (q : Deque a) \
            : Equal (List a) \
                (toList a (pushBack a x q)) \
-               (deque_list_append a (toList a q) (Cons a x (Nil a))) = \
+               (Data.Collections.Derived.list_append a (toList a q) (Cons a x (Nil a))) = \
            toList_pushBack a x q\n\
          fn cat_deque_ac2_front \
              (a : Type) (x : a) (q : Deque a) \
