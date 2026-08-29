@@ -73,14 +73,61 @@ origin: "Architect HS14 component-design ruling evt_7gnw8s9k7rh6, 2026-08-29, an
 > disk at `/workspaces/ken/.scratch/`, byte-restored, and the preserved
 > eight-path evidence worktree was not edited.
 >
-> **THE OPEN QUESTION IS THE ARCHITECT'S, NOT THIS NODE'S.** HS14 ruled the scope
-> wrong but the goal intact — `spec §6.2` still requires perform -> observe ->
-> single tail resume. Two realizations of that goal have now been refuted on
-> measurement: the predecessor at HS14 and this node at D0b. Whether `§6.2` is
-> reachable on the Tail route at all is a component-design question above the
-> Steward's authority; it is routed as a question and **deliberately not framed
-> here as a successor**, because the ruling forbids inventing another mechanism
-> and a Steward-authored successor is exactly that.
+> **THE OPEN QUESTION WAS THE ARCHITECT'S, AND IT IS NOW ANSWERED.** The Steward
+> routed it as a question (`evt_rpz5k4zqr7rs`) rather than framing a successor,
+> because the ruling forbids inventing another mechanism. **Architect answer
+> `evt_5te99temrdcty`, grounded at `origin/main`
+> `6c2b6a18f5ace0360d1258517a5d65b9554b1e8d`:**
+>
+> - **The `spec §6.2` semantic goal SURVIVES.** It requires `H e` to perform and
+>   observe, then exactly one tail-position `apply k resp`. It does **not**
+>   prescribe Ken's compiler-private Direct/Tail variants or the Cranelift
+>   emission traversal.
+> - **On the current Tail lowering route the answer is NO** — no realization
+>   exists without recovery, persistent storage, or an unvalidated earlier mint.
+> - **This is a PARTIAL-ORDER CONTRADICTION, not another missing carrier.** That
+>   is the reusable form. Current order:
+>   `emit fresh R2 -> collapse into constructor/ordinary return -> validate and
+>   select Tail route -> ResumeOuter completes`. Required order:
+>   `validate an exact source-to-destination authority -> emit fresh R2 -> move
+>   that same result -> consume as Ret input`. **No affine state machine can move
+>   a token backward across the first order**, and recovery or a store are exactly
+>   what manufacture that backward edge.
+> - Direct is 3/3 because its producer is still ahead of the selection point;
+>   Tail is 0/48 because its producer is behind it in the already-emitted
+>   traversal.
+>
+> **WHAT A FUTURE OBJECT MUST BE, IF THE OPERATOR EVER CHOOSES TO PURSUE IT.** It
+> is an **authority/producer-order** discovery/design object, fresh and T1 — **not
+> another `Produced`-transfer successor, not a revival of this node or its D1-D4,
+> not a Direct-only salvage, and not HS15.** Two lawful shapes were named:
+>
+> 1. Establish an equivalent **source-specific validation BEFORE the existing
+>    producer**, then mint only after it. **Not disproved by D0b** — the planner
+>    already reopens each exact inheritance using `transport.source_call_identity`
+>    and computes `checked_ih_fresh_result_route` per inheritance *before* folding
+>    equal projections into the generated-entry confluence class, so source-specific
+>    route authority does exist pre-quotient. What is unproved is whether it can be
+>    exposed at the producer under the current confluence and caller-closure
+>    guarantees without becoming a second catalog or a positional guess.
+> 2. Defer/relocate the producer to a **post-validation** compiler boundary that
+>    still has exact source identity by construction. This **cannot** simply call
+>    the producer at today's generated-entry seat: the sanitized
+>    `CheckedIhGeneratedEntryProjection` deliberately omits source identity and a
+>    confluence class may hold multiple `ContinuationCallIdentity` members, so it
+>    would first require a static de-quotienting/function-identity design. Adding
+>    a runtime discriminator is the forbidden store/recovery route in another form.
+>
+> **NO RESEARCH ADVISORY IS WARRANTED** — D0b plus the current planner/lowering
+> order determines this answer. The HS15 trigger stays unspent. **No Runtime work
+> is authorized by the answer**, and a discovery object may land as evidence, but
+> an outcome-changing production reorder must stay atomic with the fresh-R2 Ret
+> binding and exact product controls unless independently proved behaviorally
+> inert.
+>
+> ⇒ **The Tail NAME may survive; its authority-before-producer PARTIAL ORDER must
+> change.** Anyone arriving here from the D3 chain should read that as the
+> boundary, and should not re-derive it from the nine hard stops above.
 >
 > The historical banner below records the local-retention refutation that
 > authorized D0b. It is **history, not instruction** — D0b has since run and
