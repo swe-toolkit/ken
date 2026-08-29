@@ -193,7 +193,7 @@ The required order therefore already has an unused forward interval:
 3. emit the transport call;
 4. mint the checked routed answer.
 
-The missing operation is an exact join between steps 1 and 2, not a movement
+The missing operation is an exact join between steps 2 and 3, not a movement
 of either endpoint.
 
 ### Constructive shape
