@@ -590,6 +590,14 @@ fn entry_mismatch(entry: &str, outcome: &str) -> Option<String> {
     }
 }
 
+fn format_population_report(outcomes: &[(&str, String)]) -> String {
+    let mut report = format!("RT_COLD_ENUMERATION population={}", outcomes.len());
+    for (entry, outcome) in outcomes {
+        report.push_str(&format!("\nRT_COLD_ENUMERATION {entry} => {outcome}"));
+    }
+    report
+}
+
 macro_rules! generate_entry_tests {
     ($($entry:ident),+ $(,)?) => {
         const GENERATED_TEST_ENTRIES: &[&str] = &[$(stringify!($entry)),+];
@@ -621,6 +629,16 @@ generate_entry_tests!(
 
 /// Every enumerated entry must have a generated test; this is a predicate over
 /// `ENTRIES`, not a convention-based roster.
+#[test]
+fn forced_mismatch_report_retains_every_population_row() {
+    let outcomes: Vec<(&str, String)> = ENTRIES.iter().map(|entry| (*entry, "forced".into())).collect();
+    let report = format_population_report(&outcomes);
+    assert!(report.contains("RT_COLD_ENUMERATION population=11"));
+    for entry in ENTRIES {
+        assert!(report.contains(&format!("RT_COLD_ENUMERATION {entry} => forced")));
+    }
+}
+
 #[test]
 fn every_enumerated_entry_has_a_generated_test() {
     let generated: std::collections::BTreeSet<&str> =
@@ -655,10 +673,7 @@ fn every_rt_parity_entry_reaches_its_expected_terminal_state() {
 
     // The report is printed unconditionally, pass or fail. A refusal set that is
     // only visible when the assertion happens to fail is not a report.
-    eprintln!("RT_COLD_ENUMERATION population={}", ENTRIES.len());
-    for (entry, outcome) in &outcomes {
-        eprintln!("RT_COLD_ENUMERATION {entry} => {outcome}");
-    }
+    eprintln!("{}", format_population_report(&outcomes));
 
     let mut mismatches: Vec<String> = Vec::new();
     for (entry, outcome) in &outcomes {
