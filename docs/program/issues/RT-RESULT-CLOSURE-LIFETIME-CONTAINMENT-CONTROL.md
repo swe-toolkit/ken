@@ -1,7 +1,7 @@
 ---
 id: RT-RESULT-CLOSURE-LIFETIME-CONTAINMENT-CONTROL
-title: "The result-closure lifetime-containment check has zero negative coverage — aggregates.rs:6913 refuses an environment whose meet outlives its paired constructor field, but no control ever constructs that shape, so deleting the check leaves the whole suite green. Latent today; it guards an escape invariant that goes live when D3 lifts."
-status: active
+title: "CLOSED by its own D0: the result-closure lifetime-containment check at aggregates.rs:7253 is UNREACHABLE BY CONSTRUCTION, not merely uncovered. The exhaustive LexicalClosure occurrence-lifetime arm always yields ActivationOwned and aggregate construction copies that to the paired field, so with Persistent < ActivationOwned the refused ordering meet > paired_field.lifetime cannot hold for any well-formed proof row. Zero negative coverage is a consequence, not a gap."
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -12,7 +12,62 @@ github: null
 origin: "Adversary M8 hunt evt_2kdx72vs884zp (thr_3q2mw0qb0xcq8), 2026-08-28, on squash bd4ddf2138362bd1ac7066c39161602fdc9dddc2 (range 4d3d4d848..6ce003a26, six paths). The hunt's verdict on that candidate was CLEAN core, strongly fail-closed, controls non-vacuous; this is its ONE grounded finding, classed leak/gap and explicitly LATENT. Routed to the Steward for disposition rather than reopening the merged node. Steward framing per COORDINATION section 2."
 ---
 
-> # NOT AN AMENDMENT TO THE MERGED NODE, AND NOT D3 WORK
+> # CLOSED 2026-08-29 — D0 RETURNED "NOT CONSTRUCTIBLE", WHICH THIS FRAME
+> # DEFINED AS A COMPLETE DELIVERABLE. `AC-GUARD-NOT-SHADOWED` IS DISCHARGED.
+>
+> D0 at `origin/main` `041bdd637`, tree `da1c15001209dc4283ac18eb9ac3b196282046ba`
+> before and after, report SHA-256
+> `01be9e079ee2d6b4805c0b5b60dd4bb355a51452c5ffefa9622885f1bb1b724d`. No control,
+> no production change, no commit, no candidate, no QA route — as scoped.
+>
+> **The guard is unreachable BY CONSTRUCTION, and the block precedes population
+> validation.** `boundary_continuation_result_proofs` admits only a
+> lexical-closure proof seat and rechecks paired-field origin; aggregate
+> construction copies the field lifetime from occurrence authority; the
+> exhaustive `LexicalClosure` occurrence-lifetime arm always yields
+> `ActivationOwned`. With `Persistent < ActivationOwned` the paired field is
+> forced to the maximum while the environment meet is at most that maximum, so
+> **`meet > paired_field.lifetime` is impossible for every well-formed proof
+> row.** Measured, not only argued: 79 authorization visits across three exact
+> result rows, all `ActivationOwned`/`ActivationOwned`, **zero** `Persistent`
+> fields and zero mismatches.
+>
+> **Steward verified the two load-bearing facts independently** rather than
+> repeating the ring's verification: `PlannedReferentLifetime` has exactly two
+> variants declared `Persistent` then `ActivationOwned`, and the comparison sits
+> at `:7253` inside `boundary_continuation_result_authorization` opening at
+> `:7187`. The "always `ActivationOwned`" arm is taken on the ring's 79-visit
+> measurement, not on a Steward reading.
+>
+> **This is a RESOLUTION of the Adversary finding, not a deferral.** "Zero
+> negative coverage" is a CONSEQUENCE of unreachability, not a gap in the suite.
+> The check is belt-and-suspenders — the same disposition already recorded below
+> for the `:3109` exclusivity guard. **Rewriting the field or the lifetime arm to
+> force the shape manufactures a post-construction state; it does not produce a
+> real occurrence**, and doing so would have been precisely the manufactured
+> control `AC-NOT-MANUFACTURED` forbids.
+>
+> ### CARRY-FORWARD IS A PREDICATE, AND IT IS **NOT** KEYED ON D3
+>
+> **Rerun only if a later authorized design changes (a) the admitted proof-seat
+> shape, (b) the lexical-closure field-lifetime classification, or (c) the
+> lifetime order.** Nothing else re-opens it.
+>
+> **THIS CORRECTS THIS FRAME'S OWN PREMISE, WHICH WAS WRONG.** The text below
+> said the finding *"bites when [[RT-RESULT-CONTINUATION-BINDING-PROVENANCE]]
+> lifts D3 and real programs cross result-closure environments."* **D0 refuted
+> that: D3 execution alone cannot create the ordering.** So the carry-forward was
+> NOT re-pointed to that node's successors when it closed — re-pointing a
+> sentinel at whatever replaced its old target would have carried a FALSE trigger
+> forward and guaranteed a wasted rerun. **A carry-forward names the condition
+> that revives it, never the node that happened to be next.**
+>
+> **Stale coordinate corrected:** the frame carried `aggregates.rs:6913` from the
+> Adversary hunt; in the released tree the comparison is `:7253`. Same class as
+> the `~3957`-vs-`:3920` correction already recorded below — **a line number in a
+> hunt describes the tree when it was written.**
+
+> # HISTORICAL — NOT AN AMENDMENT TO THE MERGED NODE, AND NOT D3 WORK
 >
 > [[RT-RETAINED-UNIT-RESULT-CLOSURE-REPRESENTATION]] merged at `bd4ddf213`.
 > **This finding does NOT reopen it.** The check is CORRECT and it PASSES; what
