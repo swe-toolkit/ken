@@ -50,8 +50,8 @@ class Fixtures(unittest.TestCase):
     def run_fixture(self, temporary):
         return subprocess.run([sys.executable, str(SCRIPT)], cwd=temporary, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
 
-    def assert_red(self, mutate, message):
-        with self.fixture() as temporary:
+    def assert_red(self, mutate, message, empty_index=None):
+        with self.fixture(empty_index=empty_index) as temporary:
             mutate(Path(temporary) / "realized-shards")
             result = self.run_fixture(temporary)
         self.assertEqual(result.returncode, 2)
@@ -67,6 +67,24 @@ class Fixtures(unittest.TestCase):
             with self.fixture(empty_index=index) as temporary:
                 result = self.run_fixture(temporary)
             self.assertEqual(result.returncode, 0, f"empty shard {index}: {result.stderr}")
+
+    def test_empty_position_mutations_red(self):
+        empty = 8
+        self.assert_red(lambda root: (root / "realized-shard-8" / "selected-8.json").unlink(), "member is missing", empty)
+        def empty_match(root):
+            path = root / "realized-shard-8" / "selected-8.json"
+            value = json.loads(path.read_text())
+            value["rust-suites"]["suite-0"]["testcases"]["test_1"]["filter-match"]["status"] = "matches"
+            path.write_text(json.dumps(value))
+        self.assert_red(empty_match, "realized shard selections overlap", empty)
+        def sibling_loss(root):
+            path = root / "realized-shard-7" / "selected-7.json"
+            value = json.loads(path.read_text())
+            for suite in value["rust-suites"].values():
+                for metadata in suite["testcases"].values():
+                    metadata["filter-match"]["status"] = "mismatch"
+            path.write_text(json.dumps(value))
+        self.assert_red(sibling_loss, "union differs", empty)
 
     def test_missing_or_extra_artifact_and_member_red(self):
         self.assert_red(lambda root: (root / "realized-shard-8").rename(root / "extra"), "exactly eight")
