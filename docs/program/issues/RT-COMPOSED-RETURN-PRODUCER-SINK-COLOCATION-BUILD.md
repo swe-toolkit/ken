@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-PRODUCER-SINK-COLOCATION-BUILD
 title: "Production co-location repair: at each TRUE call emitter, consume the already-selected Tail proof and the actual returned SSA result into an exhaustive compiler-only forward disposition keyed per physical emission — installing/scheduling the exact Ret body once, branching the one real result to its one exact sink, and terminating the old path with no later carried/fallback claim, on both read and write products, holding every genuine spec wall (actual response, exact continuation, one application, one effect/resumption, no observable closure identity, differential agreement)."
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -12,22 +12,25 @@ github: null
 origin: "Architect ruling evt_6vpyaje9a7n85 (both gates on exact base 0be25235b188bc67b3f9209d1ff0b6f8fa063258, tree 769c24708fb2052c3d6e719a8adc135423c28192), resolving the operator-keyed disposition (Pat) on the RT-COMPOSED-RETURN-PRODUCER-SINK-COLOCATION D0=NO. The D0 returned NO only under campaign-situational constraints; the Architect grounded reachability-from-source YES (rt_parity_native.rs RT_PARITY_SOURCE, real build_native_program(SourceFormat::Ken) path) and ruled every blocking axis situational, not normative. Steward-recut per COORDINATION section 2. Design authority for this production recut only; no candidate/merge authority before fresh Runtime QA, Architect review, and publisher CI."
 ---
 
-> # READY — PRODUCTION recut. Released to the runtime ring (lane 1). Runtime was parked; this IS the release.
+> # CLOSED — TRUE-EMITTER PREMISE SPENT. SUPERSEDED BY
+> # `RT-HOST-RESPONSE-APPLICATION-RET-BUILD`. (Architect ruling
+> # `evt_3jn61sw0w23hy`, thr_6vmcjhwxc78sk, 2026-08-30.)
 >
-> The `PRODUCER-SINK-COLOCATION` D0 returned NO, but only under the funded
-> campaign-situational constraints. The Architect (`evt_6vpyaje9a7n85`) resolved
-> both operator gates on exact base `0be25235b`: the construction is REACHED FROM
-> WELL-FORMED KEN SOURCE, and the constraints that blocked true-producer/
-> predeclared-sink co-location are campaign search bounds, not spec-normative. Per
-> the operator's keyed disposition, un-close the minimum compiler return/control
-> axes and fund the direct co-location repair. This is a PRODUCTION node: it lands
-> production, routes Runtime QA, opens a merge gate, and needs a resolved Decision.
+> This node's whole design rested on `call_checked_ih_environment_transport` being
+> the TRUE response producer. The Architect WITHDREW that: it is an
+> environment-materialization call — its returned SSA is not the semantic Host
+> response and not the result of the one semantic `apply k resp`. The prior ruling
+> `evt_6vpyaje9a7n85` promoted physical call identity to semantic result identity;
+> the observed `Result` `PatternMatchFailure` is exactly the forbidden wrong-word
+> control that premise produces. Directly forwarding that word as `resp` is the
+> defect, not the repair.
 >
-> **Do NOT** send this to Research, and **do NOT** revive the spent
-> `source.rs:4492` / `CarriedEnvironment` / `InlineNoCall` D3 seat — that seat
-> owns no application result and forwarding its environment word as `resp`
-> violates `42 §6.2`. A different mechanism that carries the ACTUAL result is not
-> "D3 salvage". No reuse of `e65cef092`; no expectation change.
+> **The SEMANTIC OBJECTIVE survives** in the successor: identify the real response
+> (`HostResult`) and the existing sole application from structure already present,
+> and prove `Host response -> existing sole application -> application result ->
+> exact Ret` as two typed compiler-only edges. Runtime is released against
+> `RT-HOST-RESPONSE-APPLICATION-RET-BUILD`, base `0be25235b`. Everything below this
+> banner is retained as chronology; the true-emitter coordinates are spent.
 
 ## Exact base and coordinates (Architect `evt_6vpyaje9a7n85`)
 
