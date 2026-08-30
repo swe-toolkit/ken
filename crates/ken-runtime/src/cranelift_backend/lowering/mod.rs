@@ -2784,11 +2784,13 @@ struct ComposedReturnForwardRetAuthority {
 }
 
 /// Post-selection result of attempting to form the D2 compiler-only authority.
-/// `NonApplicable` is valid only for a Direct or non-governed route; the source
-/// consumer separately retains whether its validated projection was Tail.
+/// `NonApplicable` is valid only when the selected transport has no governed
+/// Tail inheritance or its exact projection is Direct.
 enum ComposedReturnForwardRetAuthorityOutcome {
     NonApplicable,
     Formed(ComposedReturnForwardRetAuthority),
+    #[cfg(feature = "px8-ds-test-support")]
+    MissingRequired,
     #[cfg(feature = "px8-ds-test-support")]
     SuppressedForInertness,
     #[cfg(feature = "px8-ds-test-support")]

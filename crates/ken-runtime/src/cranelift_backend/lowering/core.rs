@@ -12374,7 +12374,7 @@ impl<'a> Lowering<'a> {
                     target,
                     proof.source_call_identity(),
                 ) {
-                    return Ok(ComposedReturnForwardRetAuthorityOutcome::NonApplicable);
+                    return Ok(ComposedReturnForwardRetAuthorityOutcome::MissingRequired);
                 }
             }
             if let ComposedReturnForwardRetAuthorityMutation::DuplicateTailAuthorityAt(target) =

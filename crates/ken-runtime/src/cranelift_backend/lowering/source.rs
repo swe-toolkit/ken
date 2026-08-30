@@ -4099,7 +4099,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 "the governed recursor capsule disagrees with the checked frame, slot, call template, or residual phase",
             ));
         }
-        if !projection.fresh_result_route().matches_governed_arrival(
+        if !projection.matches_governed_arrival(
             pending.invocation_origin,
             pending.application_origin,
             callee_origin,
@@ -4124,10 +4124,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         env: Vec<LoweringEnvironmentBinding>,
         control: SourceControl<'b>,
     ) -> Result<SourceCallOutcome<'b>, CraneliftBackendError> {
-        // Retain only applicability from the already-validated projection.
-        // The post-selection join must still re-derive every exact coordinate,
-        // but a Tail route may no longer turn missing proof into non-applicability.
-        let mut forward_ret_authority_required = false;
+        // Generated-entry admission validates arrival E here. Tail authority
+        // remains post-selection: the exact transport independently reopens
+        // its inheritance, then joins E, producer source S, and member I.
         // Total generated-entry admission, before `specialized_at` and every
         // callable arm. The one map read answers both applicability and typed
         // authority: positive `NonGoverned` membership continues unchanged;
@@ -4232,8 +4231,6 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 &projection,
                             );
                         }
-                        forward_ret_authority_required =
-                            projection.requires_forward_ret_authority();
                     }
                     #[cfg(not(feature = "px8-ds-test-support"))]
                     {
@@ -4246,8 +4243,6 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             callee_origin,
                             &projection,
                         )?;
-                        forward_ret_authority_required =
-                            projection.requires_forward_ret_authority();
                     }
                 }
             }
@@ -4389,52 +4384,28 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         }
                         None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
                     };
-                    let _forward_ret_authority = match (
-                        forward_ret_authority_required,
-                        forward_ret_outcome,
-                    ) {
-                        (true, ComposedReturnForwardRetAuthorityOutcome::Formed(authority)) => {
+                    let _forward_ret_authority = match forward_ret_outcome {
+                        ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
                             Some(authority)
                         }
-                        (false, ComposedReturnForwardRetAuthorityOutcome::NonApplicable) => None,
+                        ComposedReturnForwardRetAuthorityOutcome::NonApplicable => None,
                         #[cfg(feature = "px8-ds-test-support")]
-                        (
-                            true,
-                            ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness,
-                        ) => None,
+                        ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => None,
                         #[cfg(feature = "px8-ds-test-support")]
-                        (
-                            _,
-                            ComposedReturnForwardRetAuthorityOutcome::Duplicated(
-                                _first,
-                                _duplicate,
-                            ),
-                        ) => {
-                            return Err(unsupported(
-                                "ComposedReturnForwardRetAuthority",
-                                "a validated Tail producer-to-Ret route formed more than one post-selection authority",
-                            ));
-                        }
-                        (true, ComposedReturnForwardRetAuthorityOutcome::NonApplicable) => {
+                        ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
                             return Err(unsupported(
                                 "ComposedReturnForwardRetAuthority",
                                 "a validated Tail producer-to-Ret route has no exact post-selection authority",
                             ));
                         }
-                        (false, ComposedReturnForwardRetAuthorityOutcome::Formed(_authority)) => {
-                            return Err(unsupported(
-                                "ComposedReturnForwardRetAuthority",
-                                "a Direct or non-governed route unexpectedly formed forward-Ret authority",
-                            ));
-                        }
                         #[cfg(feature = "px8-ds-test-support")]
-                        (
-                            false,
-                            ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness,
+                        ComposedReturnForwardRetAuthorityOutcome::Duplicated(
+                            _first,
+                            _duplicate,
                         ) => {
                             return Err(unsupported(
                                 "ComposedReturnForwardRetAuthority",
-                                "the byte-inert suppression arm reached a non-Tail route",
+                                "a validated Tail producer-to-Ret route formed more than one post-selection authority",
                             ));
                         }
                     };
