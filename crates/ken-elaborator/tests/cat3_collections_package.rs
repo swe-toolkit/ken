@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{Decl, GlobalId, Term};
+use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, Term};
 
 const COLLECTIONS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
@@ -24,6 +24,50 @@ fn term_reference_count(term: &Term, target: GlobalId) -> usize {
         .into_iter()
         .map(|child| term_reference_count(child, target))
         .sum::<usize>()
+}
+
+fn module_transparent_kernel_equivalents(
+    env: &ElabEnv,
+    module: &str,
+    provider: GlobalId,
+) -> BTreeSet<String> {
+    let (provider_level_params, provider_ty, provider_body) = match env.env.lookup(provider) {
+        Some(Decl::Transparent {
+            level_params,
+            ty,
+            body,
+            ..
+        }) => (level_params, ty, body),
+        other => panic!("provider must be transparent, got {other:?}"),
+    };
+    assert!(
+        provider_level_params.is_empty(),
+        "the D1 Boolean providers must be monomorphic"
+    );
+
+    let prefix = format!("{module}.");
+    let context = Context::new();
+    env.globals
+        .iter()
+        .filter_map(|(name, id)| {
+            let local_name = name.strip_prefix(&prefix)?;
+            let (level_params, ty, body) = match env.env.lookup(*id) {
+                Some(Decl::Transparent {
+                    level_params,
+                    ty,
+                    body,
+                    ..
+                }) => (level_params, ty, body),
+                _ => return None,
+            };
+            if !level_params.is_empty() {
+                return None;
+            }
+            (convert_type(&env.env, &context, ty, provider_ty)
+                && convert(&env.env, &context, provider_ty, body, provider_body))
+            .then(|| local_name.to_owned())
+        })
+        .collect()
 }
 
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
@@ -68,10 +112,7 @@ fn mk_env() -> ElabEnv {
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     catalog_or::load_derived_fixture(&mut env);
-    catalog_or::assert_transparent_result_uses_core_logic_or(
-        &env,
-        "pair_compare_lt_cases",
-    );
+    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "pair_compare_lt_cases");
     env
 }
 
@@ -87,8 +128,6 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
         "take_drop_decomposition",
         "map_length",
         "length_take_min",
-        "bool_and",
-        "bool_leq",
         "eq_from_ord",
         "count",
         "Perm",
@@ -215,6 +254,56 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
         1,
         "slice must use canonical saturating sub directly"
     );
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: roots-loading Derived after LawfulClasses adds no trust, mints no
+/// Derived-local `bool_and`/`bool_leq`, and leaves no module-owned admitted
+/// transparent zero-level declaration whose checked type and body at the provider
+/// type are kernel-definitionally equal to either canonical provider. CLAIMED:
+/// this is a narrow anti-duplication inventory only. THE GAP: it establishes no
+/// causal flow or route authority and no extensional uniqueness across
+/// non-convertible bodies; the concrete sort and law tests separately own behavior.
+#[test]
+fn derived_has_no_definitionally_equivalent_local_bool_reimplementation() {
+    let mut env = ElabEnv::new().expect("base env");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("the canonical Boolean provider must roots-load");
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Derived")
+        .expect("Derived must roots-load through the Boolean provider import");
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Derived Boolean reuse must add zero trust");
+
+    let bool_and = env.globals["Core.Classes.LawfulClasses.bool_and"];
+    let bool_leq = env.globals["Core.Classes.LawfulClasses.bool_leq"];
+    assert!(env.env.transparent_body(bool_and).is_some());
+    assert!(env.env.transparent_body(bool_leq).is_some());
+    assert!(!env
+        .globals
+        .contains_key("Data.Collections.Derived.bool_and"));
+    assert!(!env
+        .globals
+        .contains_key("Data.Collections.Derived.bool_leq"));
+
+    for (provider_name, provider) in [("bool_and", bool_and), ("bool_leq", bool_leq)] {
+        assert_eq!(
+            module_transparent_kernel_equivalents(&env, "Data.Collections.Derived", provider),
+            BTreeSet::new(),
+            "Derived must define no transparent local with kernel-definitionally equal checked type and body at the provider type for canonical {provider_name}"
+        );
+    }
+
+    env.elaborate_file(
+        "import Data.Collections.Derived (eq_from_ord as derived_eq_from_ord)\n\
+         import Core.Classes.LawfulClasses (bool_leq as lawful_bool_leq)\n\
+         theorem cat_bool_reuse_distinct \
+           : Equal Bool (derived_eq_from_ord Bool lawful_bool_leq False True) False = Proved\n\
+         theorem cat_bool_reuse_reflexive \
+           : Equal Bool (derived_eq_from_ord Bool lawful_bool_leq True True) True = Proved",
+    )
+    .expect("Derived equality must retain its nontrivial Boolean behavior");
 }
 
 #[test]
@@ -451,7 +540,10 @@ fn cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs() {
         );
     }
     assert!(
-        env.class_env.class("SetoidMorphism").unwrap().projection
+        env.class_env
+            .class("SetoidMorphism")
+            .unwrap()
+            .projection
             .field_names
             .iter()
             .any(|name| name == "project"),
