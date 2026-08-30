@@ -582,6 +582,7 @@ fn catalog_ambient_passthrough_migration_census() {
                 "eqChar",
                 "is_sorted",
                 "leqChar",
+                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -603,6 +604,7 @@ fn catalog_ambient_passthrough_migration_census() {
                 "eqChar",
                 "is_sorted",
                 "leqChar",
+                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -662,6 +664,7 @@ fn catalog_ambient_passthrough_migration_census() {
                 "eqChar",
                 "is_sorted",
                 "leqChar",
+                "map",
             ]
             .into_iter()
             .map(str::to_string)

@@ -136,22 +136,6 @@ comparator/Iff statement is pinned — no bare `Prop`-returning wrapper is
 shipped for it prematurely.
 
 ```ken
-fn map (a : Type) (b : Type) (f : a → b) (xs : List a) : List b =
-  match xs {
-    Nil ↦ Nil b;
-    Cons h t ↦ Cons b (f h) (map a b f t)
-  }
-
-fn filter (a : Type) (p : a → Bool) (xs : List a) : List a =
-  match xs {
-    Nil ↦ Nil a;
-    Cons h t ↦
-      match p h {
-        True ↦ Cons a h (filter a p t);
-        False ↦ filter a p t
-      }
-  }
-
 fn mem (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Bool =
   match xs {
     Nil ↦ False;
