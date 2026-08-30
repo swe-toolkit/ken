@@ -41,14 +41,8 @@ fn gen_samples (a : Type) (generator : Gen a) : List a =
     MkGen samples ↦ samples
   }
 
-fn gen_map_list (a : Type) (b : Type) (f : a → b) (samples : List a) : List b =
-  match samples {
-    Nil ↦ Nil b;
-    Cons sample rest ↦ Cons b (f sample) (gen_map_list a b f rest)
-  }
-
 fn gen_map (a : Type) (b : Type) (f : a → b) (generator : Gen a) : Gen b =
-  gen_from_list b (gen_map_list a b f (gen_samples a generator))
+  gen_from_list b (map a b f (gen_samples a generator))
 
 fn check_samples (a : Type) (samples : List a) (predicate : a → Bool) : Result a Unit =
   match samples {
