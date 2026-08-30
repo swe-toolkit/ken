@@ -116,6 +116,7 @@ pub use aggregates::{
     checked_ih_generated_entry_admission_mutation_is_exact,
     checked_ih_generated_entry_arrival_mutation_is_exact,
     checked_ih_generated_entry_confluence_mutation_is_exact,
+    composed_return_forward_ret_authority_mutation_is_exact,
     retained_result_closure_proof_mutation_applied,
     retained_result_closure_proof_mutation_is_exact,
     with_checked_ih_continuation_inheritance_mutation,
@@ -124,21 +125,24 @@ pub use aggregates::{
     with_checked_ih_generated_entry_admission_observations,
     with_checked_ih_generated_entry_arrival_mutation,
     with_checked_ih_generated_entry_confluence_mutation,
-    with_checked_ih_generated_entry_observations, with_retained_result_closure_proof_mutation,
-    CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
-    CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
-    CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
-    CheckedIhGeneratedEntryObservation, RetainedResultClosureProofMutation,
+    with_checked_ih_generated_entry_observations,
+    with_composed_return_forward_ret_authority_mutation,
+    with_retained_result_closure_proof_mutation, CheckedIhContinuationInheritanceMutation,
+    CheckedIhContinuationInheritanceObservation, CheckedIhGeneratedEntryAdmissionMutation,
+    CheckedIhGeneratedEntryAdmissionObservation, CheckedIhGeneratedEntryArrivalMutation,
+    CheckedIhGeneratedEntryConfluenceMutation, CheckedIhGeneratedEntryObservation,
+    ComposedReturnForwardRetAuthorityMutation, ComposedReturnForwardRetAuthorityObservation,
+    RetainedResultClosureProofMutation,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
 pub(in crate::cranelift_backend) use aggregates::{
-    checked_ih_generated_entry_arrival_mutation,
+    checked_ih_generated_entry_arrival_mutation, composed_return_forward_ret_authority_mutation,
     record_checked_ih_generated_entry_governed_validation,
     record_checked_ih_generated_entry_installed,
     record_checked_ih_generated_entry_ordinary_continuation,
-    record_checked_ih_generated_entry_raw_arrival,
-    record_checked_ih_generated_entry_reached,
+    record_checked_ih_generated_entry_raw_arrival, record_checked_ih_generated_entry_reached,
+    record_composed_return_forward_ret_authority,
 };
 
 // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — the aggregates domain's cross-boundary
@@ -149,7 +153,8 @@ pub(in crate::cranelift_backend) use aggregates::{
     AggregateOccurrenceId, AggregateOccurrenceProducer, BoundaryClosureEnvironment,
     CheckedIhCapabilityInheritance, CheckedIhContinuationInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
-    CheckedIhFreshResultDestination, CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
+    CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
+    CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryCallCoordinate,
     CheckedIhGeneratedEntryProjection,
     CheckedIhImmediateKBindingLocator,
@@ -596,8 +601,9 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     checked_ih_continuation_inheritances: Vec<CheckedIhContinuationInheritance>,
     /// Planner-owned confluence certificates proving that all source-specific
     /// inheritances at one generated entry agree on one typed consumer
-    /// projection. Source identities remain class members and never cross into
-    /// lowering authority.
+    /// projection. Source identities remain class members; D2 may move one
+    /// exact selected member into a compiler-only proof after membership and
+    /// projection equality close, never into a runtime value or carrier.
     checked_ih_generated_entry_confluences:
         BTreeMap<CheckedIhGeneratedEntryCoordinate, CheckedIhGeneratedEntryConfluence>,
     /// Total sanitized admission maps, one per generated context carrying a

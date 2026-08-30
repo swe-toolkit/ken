@@ -12210,13 +12210,14 @@ impl<'a> Lowering<'a> {
     }
 
     /// Resolve one strict `Ret` sink by its complete compiler-only coordinate.
-    /// This is the D1 seam only: the exact lookup validates the installed
-    /// population, but no result or control edge consumes the returned block.
-    pub(super) fn composed_return_ret_sink(
+    /// D1 records its installation-time validation through this function; D2
+    /// reuses the same checks without double-counting that D1 observation.
+    fn resolve_composed_return_ret_sink(
         &self,
         active_frame_origin: StaticOriginId,
         ret_case_body_origin: StaticOriginId,
         ret_input_field_position: u32,
+        record_d1_lookup: bool,
     ) -> Result<Block, CraneliftBackendError> {
         let mut matches = self
             .active_carried_computational_eliminations
@@ -12261,12 +12262,101 @@ impl<'a> Lowering<'a> {
             ));
         }
         #[cfg(feature = "px8-ds-test-support")]
-        record_composed_return_ret_sink_exact_lookup(
-            self.defining_function_id,
-            active.header,
-            sink,
-        );
+        if record_d1_lookup {
+            record_composed_return_ret_sink_exact_lookup(
+                self.defining_function_id,
+                active.header,
+                sink,
+            );
+        }
         Ok(sink.return_body)
+    }
+
+    /// Resolve one strict `Ret` sink by its complete compiler-only coordinate.
+    /// This is the D1 seam only: the exact lookup validates the installed
+    /// population, but no result or control edge consumes the returned block.
+    pub(super) fn composed_return_ret_sink(
+        &self,
+        active_frame_origin: StaticOriginId,
+        ret_case_body_origin: StaticOriginId,
+        ret_input_field_position: u32,
+    ) -> Result<Block, CraneliftBackendError> {
+        self.resolve_composed_return_ret_sink(
+            active_frame_origin,
+            ret_case_body_origin,
+            ret_input_field_position,
+            true,
+        )
+    }
+
+    /// Join one post-selection planner member proof to the unique function-local
+    /// Ret sink. The resulting authority is move-only and deliberately unused
+    /// by D2; D3 must be separately released before any returned SSA value may
+    /// consume its block.
+    pub(super) fn composed_return_forward_ret_authority(
+        &self,
+        access: &CheckedIhGeneratedEntryAccess,
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<Option<ComposedReturnForwardRetAuthority>, CraneliftBackendError> {
+        let Some(proof) = self
+            .static_transition_plan
+            .checked_ih_forward_ret_plan_proof(access, transport)?
+        else {
+            return Ok(None);
+        };
+        #[cfg(feature = "px8-ds-test-support")]
+        let requested_field = if composed_return_forward_ret_authority_mutation()
+            == ComposedReturnForwardRetAuthorityMutation::WrongSink
+        {
+            proof.ret_input_field_position().wrapping_add(1)
+        } else {
+            proof.ret_input_field_position()
+        };
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let requested_field = proof.ret_input_field_position();
+        let return_body = self
+            .resolve_composed_return_ret_sink(
+                proof.active_frame_origin(),
+                proof.ret_case_body_origin(),
+                requested_field,
+                false,
+            )
+            .map_err(|error| {
+                unsupported(
+                    "ComposedReturnForwardRetAuthority",
+                    format!(
+                        "the selected forward Ret plan does not match the unique emission sink; \
+                         plan=({:?}, {:?}, {}); active={:?}; cause={error:?}",
+                        proof.active_frame_origin(),
+                        proof.ret_case_body_origin(),
+                        requested_field,
+                        self.active_carried_computational_eliminations
+                            .iter()
+                            .map(|active| (
+                                active.active_frame_origin,
+                                active.ret_sink.map(|sink| (
+                                    sink.ret_case_body_origin,
+                                    sink.ret_input_field_position,
+                                )),
+                            ))
+                            .collect::<Vec<_>>(),
+                    ),
+                )
+            })?;
+        if requested_field != proof.ret_input_field_position() {
+            return Err(unsupported(
+                "ComposedReturnForwardRetAuthority",
+                "the selected forward Ret plan does not match the unique emission sink",
+            ));
+        }
+        #[cfg(feature = "px8-ds-test-support")]
+        {
+            record_composed_return_forward_ret_authority(&proof, format!("{return_body:?}"));
+        }
+        Ok(Some(ComposedReturnForwardRetAuthority {
+            _plan: proof,
+            _return_body: return_body,
+        }))
     }
 
     fn install_and_validate_composed_return_ret_sink(

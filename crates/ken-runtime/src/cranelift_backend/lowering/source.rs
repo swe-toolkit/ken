@@ -4110,7 +4110,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             ));
         }
         #[cfg(feature = "px8-ds-test-support")]
-        record_checked_ih_fresh_result_route_selected(projection.fresh_result_route());
+        record_checked_ih_fresh_result_route_selected(projection);
 
         let _fresh_result_destination = projection.fresh_result_destination();
         Ok(binding)
@@ -4365,6 +4365,20 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     (_, _) => unreachable!("this arm matched a computational recursor"),
                 };
                 if let Some(transport) = transport {
+                    // D2 forms one move-only compiler proof only after the
+                    // exact transport has been selected and before its call is
+                    // emitted. The proof is deliberately not consumed by the
+                    // returned value or any control edge in this increment.
+                    let _forward_ret_authority = match self
+                        .function_local
+                        .checked_ih_generated_entry_access
+                        .as_ref()
+                    {
+                        Some(access) => {
+                            self.composed_return_forward_ret_authority(access, &transport)?
+                        }
+                        None => None,
+                    };
                     self.pending_computational_ih_call.take();
                     let returned = self.call_checked_ih_transport_from_case_environment(
                         builder, &transport, &env,
