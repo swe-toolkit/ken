@@ -1,14 +1,14 @@
 ---
 id: CAT-PRELUDE-REUSE-CONSUMERS
 title: "Drain catalog-reuse census group 1 (prelude functional-floor reuse), P-provider subset only — remove three local reimplementations (Derived#map, Derived#filter, Property#gen_map_list) that shadow the ambient compiler-prelude map/filter, letting each reference fall through to the installed provider. Un-shadow, not selective import: P is [installed]/ambient, so there is NO import edge to add. Shaped on the landed CAT-BOOL/CAT-DERIVED per-package increment pattern; the source-equation-isomorphic subset of group 1, with the instance-bound and [higher]-module items deferred. Acceptance recut to a candidate-specific migration property (Architect evt_7spzy25qqdsqx on Spec evt_3z8y6pf6b6m5p): separately declared recursive heads are non-convertible, so this is not a kernel-equivalence drain."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
 tier: T2
 depends_on: []
 blocks: []
-github: https://github.com/swe-toolkit/ken/pull/3146
+github: https://github.com/swe-toolkit/ken/pull/3149
 origin: "Steward, 2026-08-30, filed on the CAT-BOOL-REUSE-CONSUMERS landing (group 6 drained, d95bc2df4) as the next L3 catalog-reuse objective. Group 1 membership quoted verbatim from docs/program/cat-reuse-census.md §4.4 item 1 at origin/main e71ddb479; the [low] consume tags read from §3 rows 36 (Derived) and 48 (Property). Scoped to the three definitionally-clean P-provider sites after a pre-frame measurement (below) found the other three group-1 members instance-bound or [higher]-module. The provider P is the compiler prelude (§3 row 63, [ambient]/[installed]) and needs NO pub-export prerequisite, so depends_on is empty. Steward-filed per COORDINATION section 2."
 ---
 
