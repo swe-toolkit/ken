@@ -34,4 +34,20 @@ done
 mkdir realized-shards
 mv realized-shard-* realized-shards/
 python3 "$OLDPWD/scripts/check-ci-shard-union.py"
-PATH="$root:$PATH" "$OLDPWD/scripts/run-ci-shard.sh" 0 ignored
+mkdir bin
+cat > bin/cargo <<'EOF'
+#!/usr/bin/env bash
+echo "$*" >> "$LOG"
+EOF
+chmod +x bin/cargo
+: > dispatch.log
+for n in $(seq 1 8); do
+  planned=$(python3 -c "import json; print(len(json.load(open('filters/assignments.json'))['bins'][$n - 1]['tests']))")
+  expression=$(<"filters/bin-$n.expr")
+  LOG="$root/dispatch.log" PATH="$root/bin:$PATH" "$OLDPWD/scripts/run-ci-shard.sh" "$planned" "$expression"
+  if [ "$planned" -eq 0 ]; then
+    ! grep -Fqx "nextest run --workspace --locked -E $expression" dispatch.log
+  else
+    grep -Fqx "nextest run --workspace --locked -E $expression" dispatch.log
+  fi
+done
