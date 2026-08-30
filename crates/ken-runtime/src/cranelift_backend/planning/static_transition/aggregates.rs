@@ -321,6 +321,18 @@ pub(in crate::cranelift_backend) struct CheckedIhFreshResultDestination {
     body_capture_reads: Vec<StaticOriginId>,
 }
 
+/// The final self-resumption arrival at one generated entry. This identity owns
+/// the sanitized P/G/N access coordinate and immediate-K locator. It is
+/// deliberately distinct from the producer source of a Tail result route.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct CheckedIhGeneratedEntryArrival {
+    invocation_origin: StaticOriginId,
+    call_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+    binding: CheckedIhBinding,
+    immediate_k_locator: CheckedIhImmediateKBindingLocator,
+}
+
 /// The governed K-application coordinate and immediate K locator at the source
 /// of one fresh-result route. Keeping them in one value makes source
 /// composition structural rather than an agreement between sibling fields.
@@ -383,6 +395,11 @@ pub(in crate::cranelift_backend) enum CheckedIhFreshResultRoute {
 /// carrier can be stored here.
 pub(in crate::cranelift_backend) struct CheckedIhForwardRetPlanProof {
     source_call_identity: ContinuationCallIdentity,
+    entry_invocation_origin: StaticOriginId,
+    entry_call_origin: StaticOriginId,
+    entry_callee_origin: StaticOriginId,
+    entry_binding: CheckedIhBinding,
+    entry_immediate_k_locator: CheckedIhImmediateKBindingLocator,
     invocation_origin: StaticOriginId,
     call_origin: StaticOriginId,
     callee_origin: StaticOriginId,
@@ -429,6 +446,7 @@ pub(super) struct CheckedIhGeneratedEntryCoordinate {
 pub(in crate::cranelift_backend) struct CheckedIhGeneratedEntryProjection {
     destination_owner: ContinuationEmissionOwner,
     destination_body_origin: StaticOriginId,
+    arrival: CheckedIhGeneratedEntryArrival,
     pub(in crate::cranelift_backend) fresh_result_route: CheckedIhFreshResultRoute,
     /// Test-support coordinates for the still-emitted pre-D3
     /// header/fallback path. This is observation metadata only, absent from
@@ -515,11 +533,7 @@ impl CheckedIhGeneratedEntryAccess {
         for admission in self.admissions.values_mut() {
             if let CheckedIhGeneratedEntryAdmission::Governed(projection) = admission {
                 if mutation == CheckedIhGeneratedEntryConfluenceMutation::LocatorIndex {
-                    projection
-                        .fresh_result_route
-                        .source_mut()
-                        .immediate_k_locator
-                        .environment_index = u32::MAX;
+                    projection.arrival.immediate_k_locator.environment_index = u32::MAX;
                 } else {
                     mutate_checked_ih_generated_entry_projection(projection, mutation);
                 }
@@ -578,24 +592,30 @@ impl CheckedIhGeneratedEntryProjection {
     }
 
     pub(in crate::cranelift_backend) fn binding(&self) -> CheckedIhBinding {
-        self.fresh_result_route.source().binding
+        self.arrival.binding
     }
 
     pub(in crate::cranelift_backend) fn immediate_k_locator(
         &self,
     ) -> &CheckedIhImmediateKBindingLocator {
-        &self.fresh_result_route.source().immediate_k_locator
+        &self.arrival.immediate_k_locator
+    }
+
+    pub(in crate::cranelift_backend) fn matches_governed_arrival(
+        &self,
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+    ) -> bool {
+        (
+            self.arrival.invocation_origin,
+            self.arrival.call_origin,
+            self.arrival.callee_origin,
+        ) == (invocation_origin, call_origin, callee_origin)
     }
 
     pub(in crate::cranelift_backend) fn fresh_result_route(&self) -> &CheckedIhFreshResultRoute {
         &self.fresh_result_route
-    }
-
-    pub(in crate::cranelift_backend) fn requires_forward_ret_authority(&self) -> bool {
-        matches!(
-            self.fresh_result_route,
-            CheckedIhFreshResultRoute::TailProducerToRet { .. }
-        )
     }
 
     pub(in crate::cranelift_backend) fn fresh_result_destination(
@@ -655,20 +675,6 @@ impl CheckedIhFreshResultRoute {
             Self::DirectInvocationReturn { destination, .. } => Some(destination),
             Self::TailProducerToRet { .. } => None,
         }
-    }
-
-    pub(in crate::cranelift_backend) fn matches_governed_arrival(
-        &self,
-        invocation_origin: StaticOriginId,
-        call_origin: StaticOriginId,
-        callee_origin: StaticOriginId,
-    ) -> bool {
-        let source = self.source();
-        (
-            source.invocation_origin,
-            source.call_origin,
-            source.callee_origin,
-        ) == (invocation_origin, call_origin, callee_origin)
     }
 }
 
@@ -1092,6 +1098,7 @@ pub enum CheckedIhGeneratedEntryConfluenceMutation {
     ContextOnlyKey,
     SourceIdentityInKey,
     ProjectionInKey,
+    EntryFromRouteSource,
     DestinationOwner,
     DestinationBody,
     BindingFrame,
@@ -1144,6 +1151,7 @@ pub enum ComposedReturnForwardRetAuthorityMutation {
     WrongMember,
     ProjectionDisagreement,
     WrongSource,
+    ProducerSourceFromEntry,
     WrongSink,
 }
 
@@ -1153,6 +1161,11 @@ pub enum ComposedReturnForwardRetAuthorityMutation {
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ComposedReturnForwardRetCoordinateObservation {
     pub source_call_identity: String,
+    pub entry_invocation_origin: String,
+    pub entry_call_origin: String,
+    pub entry_callee_origin: String,
+    pub entry_binding: String,
+    pub entry_immediate_k_locator: String,
     pub invocation_origin: String,
     pub call_origin: String,
     pub callee_origin: String,
@@ -1300,6 +1313,11 @@ pub(in crate::cranelift_backend) fn record_composed_return_forward_ret_authority
             .push(ComposedReturnForwardRetAuthorityObservation {
                 coordinate: ComposedReturnForwardRetCoordinateObservation {
                     source_call_identity: format!("{:?}", proof.source_call_identity),
+                    entry_invocation_origin: format!("{:?}", proof.entry_invocation_origin),
+                    entry_call_origin: format!("{:?}", proof.entry_call_origin),
+                    entry_callee_origin: format!("{:?}", proof.entry_callee_origin),
+                    entry_binding: format!("{:?}", proof.entry_binding),
+                    entry_immediate_k_locator: format!("{:?}", proof.entry_immediate_k_locator),
                     invocation_origin: format!("{:?}", proof.invocation_origin),
                     call_origin: format!("{:?}", proof.call_origin),
                     callee_origin: format!("{:?}", proof.callee_origin),
@@ -1437,15 +1455,13 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                 destination_body_origin: confluence.projection.destination_body_origin.0,
                 locator_invocation_origin: confluence
                     .projection
-                    .fresh_result_route
-                    .source()
+                    .arrival
                     .immediate_k_locator
                     .invocation_origin
                     .0,
                 locator_callee_origin: confluence
                     .projection
-                    .fresh_result_route
-                    .source()
+                    .arrival
                     .immediate_k_locator
                     .callee_origin
                     .0,
@@ -1453,15 +1469,13 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                     "{:?}",
                     confluence
                         .projection
-                        .fresh_result_route
-                        .source()
+                        .arrival
                         .immediate_k_locator
                         .environment_domain
                 ),
                 locator_index: confluence
                     .projection
-                    .fresh_result_route
-                    .source()
+                    .arrival
                     .immediate_k_locator
                     .environment_index,
                 fresh_result_route: format!("{:?}", confluence.projection.fresh_result_route),
@@ -1480,6 +1494,26 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                         .iter()
                         .map(|member| ComposedReturnForwardRetCoordinateObservation {
                             source_call_identity: format!("{member:?}"),
+                            entry_invocation_origin: format!(
+                                "{:?}",
+                                confluence.projection.arrival.invocation_origin
+                            ),
+                            entry_call_origin: format!(
+                                "{:?}",
+                                confluence.projection.arrival.call_origin
+                            ),
+                            entry_callee_origin: format!(
+                                "{:?}",
+                                confluence.projection.arrival.callee_origin
+                            ),
+                            entry_binding: format!(
+                                "{:?}",
+                                confluence.projection.arrival.binding
+                            ),
+                            entry_immediate_k_locator: format!(
+                                "{:?}",
+                                confluence.projection.arrival.immediate_k_locator
+                            ),
                             invocation_origin: format!("{:?}", source.invocation_origin),
                             call_origin: format!("{:?}", source.call_origin),
                             callee_origin: format!("{:?}", source.callee_origin),
@@ -5742,6 +5776,46 @@ fn checked_ih_fresh_result_source(
     Ok((source, *kind))
 }
 
+fn checked_ih_generated_entry_arrival(
+    plan: &StaticTransitionPlan<'_>,
+    step: &CheckedIhSelfResumptionStep,
+) -> Result<CheckedIhGeneratedEntryArrival, CraneliftBackendError> {
+    let RuntimeExpr::CheckedComputationalIHInvocation { .. } =
+        plan.planned_occurrence_expr(step.invocation_origin)?
+    else {
+        return Err(planner_error(
+            "a generated-entry arrival is not a checked computational-IH invocation",
+        ));
+    };
+    let [immediate_k_locator] = step.immediate_k_locators.as_slice() else {
+        return Err(planner_error(
+            "a generated-entry arrival has no unique immediate K locator",
+        ));
+    };
+    if plan.semantic.child_origin(step.invocation_origin, 0)? != step.call_origin {
+        return Err(planner_error(
+            "a generated-entry arrival does not contain its exact governed call",
+        ));
+    }
+    let RuntimeExpr::Call { args, .. } = plan.planned_occurrence_expr(step.call_origin)? else {
+        return Err(planner_error(
+            "a generated-entry arrival governed call is not a source Call",
+        ));
+    };
+    if !args.is_empty() || plan.semantic.child_origin(step.call_origin, 0)? != step.callee_origin {
+        return Err(planner_error(
+            "a generated-entry arrival disagrees with its exact zero-argument callee edge",
+        ));
+    }
+    Ok(CheckedIhGeneratedEntryArrival {
+        invocation_origin: step.invocation_origin,
+        call_origin: step.call_origin,
+        callee_origin: step.callee_origin,
+        binding: step.callee_binding,
+        immediate_k_locator: immediate_k_locator.clone(),
+    })
+}
+
 fn checked_ih_fresh_result_route(
     plan: &StaticTransitionPlan<'_>,
     inheritance: &CheckedIhContinuationInheritance,
@@ -6219,15 +6293,28 @@ fn checked_ih_generated_entry_row(
         .last()
         .ok_or_else(|| planner_error("a reopened generated-entry view has no final step"))?;
     let fresh_result_route = checked_ih_fresh_result_route(plan, inheritance, final_step)?;
-    let route_source = fresh_result_route.source();
+    let mut arrival = checked_ih_generated_entry_arrival(plan, final_step)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    if GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get)
+        == CheckedIhGeneratedEntryConfluenceMutation::EntryFromRouteSource
+    {
+        let route_source = fresh_result_route.source();
+        arrival = CheckedIhGeneratedEntryArrival {
+            invocation_origin: route_source.invocation_origin,
+            call_origin: route_source.call_origin,
+            callee_origin: route_source.callee_origin,
+            binding: route_source.binding,
+            immediate_k_locator: route_source.immediate_k_locator.clone(),
+        };
+    }
     let coordinate = CheckedIhGeneratedEntryCoordinate {
         context: context.id(),
         enclosing_specialization,
         worker_body_origin,
-        binding: route_source.binding,
-        invocation_origin: route_source.invocation_origin,
-        call_origin: route_source.call_origin,
-        callee_origin: route_source.callee_origin,
+        binding: arrival.binding,
+        invocation_origin: arrival.invocation_origin,
+        call_origin: arrival.call_origin,
+        callee_origin: arrival.callee_origin,
     };
     #[cfg(feature = "px8-ds-test-support")]
     let pre_d3_emission_observation = matches!(
@@ -6244,6 +6331,7 @@ fn checked_ih_generated_entry_row(
     let projection = CheckedIhGeneratedEntryProjection {
         destination_owner: view.capability().destination_owner(),
         destination_body_origin: view.capability().destination_body_origin(),
+        arrival,
         fresh_result_route,
         #[cfg(feature = "px8-ds-test-support")]
         pre_d3_emission_observation,
@@ -6280,39 +6368,27 @@ fn mutate_checked_ih_generated_entry_projection(
             projection.destination_body_origin = shifted(projection.destination_body_origin)
         }
         Mutation::BindingFrame => {
-            let binding = &mut projection.fresh_result_route.source_mut().binding;
+            let binding = &mut projection.arrival.binding;
             binding.frame_origin = shifted(binding.frame_origin)
         }
         Mutation::BindingPosition => {
-            let binding = &mut projection.fresh_result_route.source_mut().binding;
+            let binding = &mut projection.arrival.binding;
             binding.recursive_position = binding.recursive_position.wrapping_add(1)
         }
         Mutation::LocatorInvocation => {
-            let locator = &mut projection
-                .fresh_result_route
-                .source_mut()
-                .immediate_k_locator;
+            let locator = &mut projection.arrival.immediate_k_locator;
             locator.invocation_origin = shifted(locator.invocation_origin)
         }
         Mutation::LocatorCallee => {
-            let locator = &mut projection
-                .fresh_result_route
-                .source_mut()
-                .immediate_k_locator;
+            let locator = &mut projection.arrival.immediate_k_locator;
             locator.callee_origin = shifted(locator.callee_origin)
         }
         Mutation::LocatorDomain => {
-            projection
-                .fresh_result_route
-                .source_mut()
-                .immediate_k_locator
-                .environment_domain = CheckedIhKAvailabilityDomain::ForeignRuntimeEnvironment
+            projection.arrival.immediate_k_locator.environment_domain =
+                CheckedIhKAvailabilityDomain::ForeignRuntimeEnvironment
         }
         Mutation::LocatorIndex => {
-            let locator = &mut projection
-                .fresh_result_route
-                .source_mut()
-                .immediate_k_locator;
+            let locator = &mut projection.arrival.immediate_k_locator;
             locator.environment_index = locator.environment_index.wrapping_add(1)
         }
         Mutation::FreshActiveFrame => {
@@ -6396,6 +6472,7 @@ fn mutate_checked_ih_generated_entry_projection(
         | Mutation::ContextOnlyKey
         | Mutation::SourceIdentityInKey
         | Mutation::ProjectionInKey
+        | Mutation::EntryFromRouteSource
         | Mutation::RouteRemoval
         | Mutation::RouteDuplication
         | Mutation::RouteCrossVariant
@@ -7037,6 +7114,55 @@ impl StaticTransitionPlan<'_> {
                 "the forward Ret access coordinate disagrees with its generated context",
             ));
         }
+        let matching_inheritances = self
+            .checked_ih_continuation_inheritances
+            .iter()
+            .filter(|inheritance| {
+                &inheritance.transport == transport
+                    && inheritance.capability.destination_owner
+                        == ContinuationEmissionOwner::Specialization(
+                            access.enclosing_specialization,
+                        )
+                    && inheritance.capability.destination_body_origin == access.worker_body_origin
+            })
+            .collect::<Vec<_>>();
+        let selected_inheritance = match matching_inheritances.as_slice() {
+            [inheritance] => *inheritance,
+            [] => return Ok(None),
+            _ => {
+                return Err(planner_error(
+                    "the selected forward Ret transport resolves more than one continuation inheritance",
+                ))
+            }
+        };
+        let Some((
+            derived_coordinate,
+            derived_member,
+            _derived_retarget_caller,
+            derived_projection,
+        )) = checked_ih_generated_entry_row(self, selected_inheritance)?
+        else {
+            return Err(planner_error(
+                "the selected forward Ret inheritance does not derive a generated-entry row",
+            ));
+        };
+        if derived_coordinate.context != access.context
+            || derived_coordinate.enclosing_specialization != access.enclosing_specialization
+            || derived_coordinate.worker_body_origin != access.worker_body_origin
+            || derived_member != *transport.source_call_identity()
+        {
+            return Err(planner_error(
+                "the selected forward Ret member rederives a different generated-entry function or identity",
+            ));
+        }
+        let CheckedIhFreshResultRoute::TailProducerToRet {
+            source: expected_producer_source,
+            ..
+        } = derived_projection.fresh_result_route()
+        else {
+            return Ok(None);
+        };
+
         let classes = self
             .checked_ih_generated_entry_confluences
             .iter()
@@ -7048,7 +7174,11 @@ impl StaticTransitionPlan<'_> {
             })
             .collect::<Vec<_>>();
         let (coordinate, confluence) = match classes.as_slice() {
-            [] => return Ok(None),
+            [] => {
+                return Err(planner_error(
+                    "an admitted Tail producer-to-Ret route has no post-selection confluence class",
+                ))
+            }
             [class] => *class,
             _ => {
                 return Err(planner_error(
@@ -7079,6 +7209,34 @@ impl StaticTransitionPlan<'_> {
                 "the retained forward Ret confluence projection disagrees with the published access projection",
             ));
         }
+        let arrival = &selected_projection.arrival;
+        if (
+            arrival.binding,
+            arrival.invocation_origin,
+            arrival.call_origin,
+            arrival.callee_origin,
+        ) != (
+            coordinate.binding,
+            coordinate.invocation_origin,
+            coordinate.call_origin,
+            coordinate.callee_origin,
+        ) {
+            return Err(planner_error(
+                "the forward Ret access coordinate disagrees with its final generated-entry arrival",
+            ));
+        }
+
+        if &derived_coordinate != coordinate {
+            return Err(planner_error(
+                "the selected forward Ret member rederives a different final generated-entry coordinate",
+            ));
+        }
+        if derived_projection != confluence.projection {
+            return Err(planner_error(
+                "the selected forward Ret member's planner-derived projection disagrees with its confluence class",
+            ));
+        }
+
         let CheckedIhFreshResultRoute::TailProducerToRet {
             source,
             selected_case_body_origin,
@@ -7090,26 +7248,33 @@ impl StaticTransitionPlan<'_> {
             ..
         } = selected_projection.fresh_result_route()
         else {
-            return Ok(None);
-        };
-        if (
-            source.binding,
-            source.invocation_origin,
-            source.call_origin,
-            source.callee_origin,
-        ) != (
-            coordinate.binding,
-            coordinate.invocation_origin,
-            coordinate.call_origin,
-            coordinate.callee_origin,
-        ) {
             return Err(planner_error(
-                "the forward Ret plan source disagrees with its exact access coordinate",
+                "an admitted Tail confluence class published a Direct access projection",
             ));
-        }
+        };
         #[cfg(feature = "px8-ds-test-support")]
         record_composed_return_forward_ret_authority_application();
-
+        #[cfg(feature = "px8-ds-test-support")]
+        let compared_producer_source = if composed_return_forward_ret_authority_mutation()
+            == ComposedReturnForwardRetAuthorityMutation::ProducerSourceFromEntry
+        {
+            CheckedIhFreshResultSource {
+                invocation_origin: arrival.invocation_origin,
+                call_origin: arrival.call_origin,
+                callee_origin: arrival.callee_origin,
+                binding: arrival.binding,
+                immediate_k_locator: arrival.immediate_k_locator.clone(),
+            }
+        } else {
+            source.clone()
+        };
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let compared_producer_source = source.clone();
+        if &compared_producer_source != expected_producer_source {
+            return Err(planner_error(
+                "the Tail producer source disagrees with the selected member's planner-derived producer step",
+            ));
+        }
         if *direction != CheckedIhFreshResultDirection::Forward
             || *ret_input_delivery != CheckedIhFreshResultRetInputDelivery::ProducerResultDirect
         {
@@ -7145,8 +7310,7 @@ impl StaticTransitionPlan<'_> {
                     projection.destination_owner != access_projection.destination_owner
                         || projection.destination_body_origin
                             != access_projection.destination_body_origin
-                        || projection.fresh_result_route
-                            != access_projection.fresh_result_route
+                        || projection.fresh_result_route != access_projection.fresh_result_route
                 })
                 .cloned()
                 .ok_or_else(|| {
@@ -7220,6 +7384,11 @@ impl StaticTransitionPlan<'_> {
 
         Ok(Some(CheckedIhForwardRetPlanProof {
             source_call_identity: transport.source_call_identity().clone(),
+            entry_invocation_origin: arrival.invocation_origin,
+            entry_call_origin: arrival.call_origin,
+            entry_callee_origin: arrival.callee_origin,
+            entry_binding: arrival.binding,
+            entry_immediate_k_locator: arrival.immediate_k_locator.clone(),
             invocation_origin: source.invocation_origin,
             call_origin: source.call_origin,
             callee_origin: source.callee_origin,
