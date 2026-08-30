@@ -12,7 +12,7 @@ github: null
 origin: "Operator ruling 2026-08-30 (this session, verbatim: \"use shape (a)\") FUNDED the shape-(a) relaxation after the constraint-differential report (docs/program/rt-composed-return-constraint-differential-report.md, merged 5b20fe84f) found BOTH native walls INCIDENTAL, not spec-mandated. The build design is the fresh operator+Architect decision the report fed; Architect ruling evt_70n2y6s9wanf9 (base origin/main 7d807a78e, tree 37da2a975) mints this fresh T1 node and closes the held authority-only build RT-COMPOSED-RETURN-PRODUCER-ORDER-BUILD (refuted/superseded without implementation). Steward-filed and released per COORDINATION section 2."
 ---
 
-> # ACTIVE — lane 1, the funded shape-(a) build. D1+D2 LANDED; D3 RELEASED. `active`.
+> # ACTIVE — lane 1, funded shape-(a). D1+D2 LANDED; D3 REFUTED at HS15 (spent) — fresh D0-only successor released. `active`.
 >
 > The operator funded shape (a); the Architect designed it (`evt_70n2y6s9wanf9`)
 > and minted this fresh node in place of the refuted authority-only build. This is
