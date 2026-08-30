@@ -76,11 +76,20 @@ mkdir mutation-eight
 cp -a realized-shards mutation-eight/
 (
   cd mutation-eight
-  cp ../inventory.json raw-source.json
+  cp ../unfiltered-inventory.json raw-source.json
   "$repo/scripts/stage-ci-shard-artifact.sh" 1 raw-source.json ../inventory.json ../selected-1.json
   rm -rf realized-shards/realized-shard-1
   mv realized-shard-1 realized-shards/
-  if python3 "$repo/scripts/check-ci-shard-union.py"; then exit 1; fi
+  set +e
+  python3 "$repo/scripts/check-ci-shard-union.py" 2>err
+  status=$?
+  set -e
+  test "$status" -eq 2
+  grep -Fx 'realized-shard check failed: realized-shards/realized-shard-1: required artifact member is missing' err
+  "$repo/scripts/stage-ci-shard-artifact.sh" 1 ../unfiltered-inventory.json ../inventory.json ../selected-1.json
+  rm -rf realized-shards/realized-shard-1
+  mv realized-shard-1 realized-shards/
+  python3 "$repo/scripts/check-ci-shard-union.py"
 )
 mkdir mutation-content
 cp -a realized-shards mutation-content/
