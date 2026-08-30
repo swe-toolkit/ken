@@ -58,8 +58,9 @@ class DurationShardControls(unittest.TestCase):
             inventory = {"test-count": 1, "rust-suites": {"native": {"binary-id": "fixture::native", "binary-name": "rt_parity_native", "testcases": {"t": {"filter-match": {"status": "matches"}}}}}}
             (root / "inventory.json").write_text(json.dumps(inventory))
             (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": "fixture::native t", "seconds": 1}]}))
-            result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json"], cwd=root, check=False)
+            result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json"], cwd=root, text=True, stderr=subprocess.PIPE, check=False)
         self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stderr.strip(), "filtered live inventory selected zero testcases")
 
     def test_small_eligible_populations_keep_eight_bins(self):
         for size in range(1, 9):
@@ -95,12 +96,20 @@ class DurationShardControls(unittest.TestCase):
             (root / "selected.json").write_text(json.dumps(base))
             self.assertNotEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
             (root / "assignment.json").write_text(json.dumps({"bins": [{"tests": []}]}))
+            base["extra"] = {"preserve": [1, {"nested": True}]}
+            base["rust-suites"]["s"]["suite-metadata"] = {"keep": "me"}
+            base["rust-suites"]["s"]["testcases"]["t"]["metadata"] = {"keep": "me"}
             base["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"] = "matches"
+            base["rust-suites"]["second"] = {"binary-id": "fixture::second", "binary-name": "ordinary", "testcases": {"u": {"filter-match": {"status": "mismatch"}, "metadata": {"also": "kept"}}}}
+            base["test-count"] = 2
+            expected = json.loads(json.dumps(base))
+            for suite in expected["rust-suites"].values():
+                for metadata in suite["testcases"].values():
+                    metadata["filter-match"]["status"] = "mismatch"
             (root / "source.json").write_text(json.dumps(base))
             self.assertEqual(subprocess.run([sys.executable, str(SCRIPT), "project-empty", "source.json", "selected.json"], cwd=root, check=False).returncode, 0)
             projected = json.loads((root / "selected.json").read_text())
-            self.assertEqual(projected["test-count"], 1)
-            self.assertEqual(projected["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"], "mismatch")
+            self.assertEqual(projected, expected)
             self.assertEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
             base["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"] = "matches"
             (root / "selected.json").write_text(json.dumps(base))
