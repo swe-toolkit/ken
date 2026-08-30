@@ -55,8 +55,9 @@ class DurationShardControls(unittest.TestCase):
     def test_empty_eligible_population_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / "inventory.json").write_text(json.dumps({"test-count": 0, "rust-suites": {}}))
-            (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": "x", "seconds": 1}]}))
+            inventory = {"test-count": 1, "rust-suites": {"native": {"binary-id": "fixture::native", "binary-name": "rt_parity_native", "testcases": {"t": {"filter-match": {"status": "matches"}}}}}}
+            (root / "inventory.json").write_text(json.dumps(inventory))
+            (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": "fixture::native t", "seconds": 1}]}))
             result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json"], cwd=root, check=False)
         self.assertNotEqual(result.returncode, 0)
 
@@ -94,8 +95,13 @@ class DurationShardControls(unittest.TestCase):
             (root / "selected.json").write_text(json.dumps(base))
             self.assertNotEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
             (root / "assignment.json").write_text(json.dumps({"bins": [{"tests": []}]}))
+            base["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"] = "mismatch"
+            (root / "selected.json").write_text(json.dumps(base))
+            self.assertEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
             base["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"] = "matches"
             (root / "selected.json").write_text(json.dumps(base))
+            self.assertNotEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
+            (root / "assignment.json").write_text(json.dumps({"bins": [{"tests": [["fixture::bin", "wrong"]]}]}))
             self.assertNotEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
 
 
