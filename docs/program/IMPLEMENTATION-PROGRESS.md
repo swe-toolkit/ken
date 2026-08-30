@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-30 19:05:08Z — from 492 issue file(s) in `docs/program/issues/`.
+2026-08-30 20:14:48Z — from 492 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -84,7 +84,7 @@ the committed file matches the generator's output.
 | `CI-OLD-PRESTATE-ROW-CURRENCY` | The `old`-capture flip pair still asserts pre-state elaboration is unavailable, which LANG-SPACE-PRESTATE-BIND made false -- and the soundness row's stated relation, `reject/reject at distinct gates, not a verdict flip`, is now the opposite of what the code does | merged | verify | S | none | https://github.com/swe-toolkit/ken/pull/1854 |
 | `CI-ROW-CLAIM-COMMENT-FORM` | verify-row-claims extracts only from /// doc comments, so a row claim written with // is invisible to it -- two false soundness certificates survive on main in exactly that form | merged | verify | S | none | — |
 | `CI-ROW-CLAIM-NAMESPACE` | verify-row-claims hardcodes surface/ in both its claim and heading patterns, so eight of the nine conformance namespaces are structurally invisible to it -- a claim it cannot see is indistinguishable from a claim that does not exist | merged | verify | S | none | — |
-| `CI-SHARD-DURATION-BALANCE` | Partition the test shards by measured DURATION rather than by test count, and choose the shard count from the same measurement — count partitioning produced a 3.45x spread across 8 shards, so one shard ran 18m43s while another ran 5m25s and the run paid the maximum, not the mean. | active | verify | S | none | — |
+| `CI-SHARD-DURATION-BALANCE` | Partition the test shards by measured DURATION rather than by test count, and choose the shard count from the same measurement — count partitioning produced a 3.45x spread across 8 shards, so one shard ran 18m43s while another ran 5m25s and the run paid the maximum, not the mean. | merged | verify | S | none | https://github.com/swe-toolkit/ken/pull/3158 |
 | `CI-SKIPPED-NATIVE-TESTS` | Restore rt_parity_native — dedicated CI job, outlier not fixed | merged | verify | S | none | — |
 | `CI-TRACKER-GATE` | Wire the issue-tracker schema + regeneration gate into CI | closed | operator | S | none | 804 |
 | `CI-Z3-BASE-IMAGE` | Bake z3 into a digest-pinned ghcr base image and run the restored z3-process-adapter job in it, so the flaky apt-get-install-z3 step leaves CI's critical path | merged | verify | S | none | — |
@@ -577,7 +577,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: ready)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
-- `CI-SHARD-DURATION-BALANCE` blocked by `CI-NATIVE-PARITY-DURATION` (status: active)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
