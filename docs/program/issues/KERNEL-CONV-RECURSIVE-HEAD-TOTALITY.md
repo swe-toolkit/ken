@@ -1,7 +1,7 @@
 ---
 id: KERNEL-CONV-RECURSIVE-HEAD-TOTALITY
 title: "Restore kernel conversion totality at the distinct recursive-head boundary — converting two separately declared, source-isomorphic recursive transparent globals under a stuck eliminator currently unfolds their distinct self GlobalIds without bound and stack-overflows, instead of returning false and halting as the landed spec §17 contract now requires. Implement the finite §3.5 cross-identity boundary (no clone-equality, bisimulation, certificate, self-id rewrite, or custom normalizer), preserving ordinary same-head recursion, finite δ, and distinct-nonrecursive common reducts, and wire the executable black-box matrix."
-status: draft
+status: ready
 owner: kernel
 size: M
 gate: none
@@ -12,18 +12,18 @@ github: null
 origin: "Steward, 2026-08-30, filed on the Architect directive evt_7spzy25qqdsqx (re-confirmed evt_2q6s5215q1cth) after the Spec §17/conformance erratum LANDED (squash c2c12b090, blob-verified). The erratum specified the contract — distinct separately declared recursive self GlobalId heads under a stuck eliminator are non-convertible, observable false plus halting — and surfaced a real kernel totality bug: the current conversion diverges (stack overflow) on that case. The Architect ruled the repair a SEPARATE non-blocking follow-on to be framed after the erratum lands, and preselected no implementation technique. Steward-filed per COORDINATION section 2."
 ---
 
-> # DRAFT — operator-gated. Kernel is NOT one of the three active lanes
-> # (runtime/verify/foundation), so this is NOT released. It is SURFACED to the
-> # operator (offline until 2026-08-30 14:00 UTC) as a lane/dispatch decision:
-> # whether to authorize a kernel-lane turn for this soundness-adjacent totality
-> # repair. Non-blocking — nothing waits on it (CAT-PRELUDE removed the duplicate
-> # local recursive heads and does not depend on cross-identity conversion).
+> # RELEASED — assigned to the L3 lane slot (operator ruling, 2026-08-30).
+> # While foundation (L3) is blocked — its reuse-remediation waits on L2
+> # module/import — the operator temporarily assigned the L3 lane slot to the
+> # KERNEL ring to complete this divergence repair (operator, 2026-08-30, this
+> # session, verbatim: "While L3 is blocked, temporarily assign L3 to kernel to
+> # complete the divergence repair"). The slot reverts to foundation when L3
+> # unblocks.
 > #
 > # The spec prerequisite is LANDED: the §17/conformance erratum (squash
-> # c2c12b090) fixed the CONTRACT; this node fixes the KERNEL to meet it. Framed
-> # now, while the contract and the Architect's black-box matrix are fresh, per
-> # the Architect's directive. Do not release without operator authorization of a
-> # kernel lane.
+> # c2c12b090) fixed the CONTRACT; this node fixes the KERNEL to meet it. Base is
+> # current main; the kernel files are unchanged since c2c12b090 (verified), but
+> # coordinates decay — re-measure the conv.rs coordinates at D0.
 
 ## The contract (landed spec §17, erratum c2c12b090)
 
@@ -133,13 +133,15 @@ and without regressing ordinary reduction), not on a differential diff. Size M.
 
 ## Sequencing
 
-Kernel team. **NOT an active lane** — operator-gated; surfaced to the operator for
-a lane/dispatch decision, not released. The spec §17 contract prerequisite is
-LANDED (`c2c12b090`), so `depends_on` is empty. Non-blocking: no in-flight node
-depends on cross-identity conversion, and CAT-PRELUDE removed the duplicate local
-recursive heads rather than relying on their (non-)convertibility. This is the
-"real fix" behind CAT-PRELUDE's explicitly review/census-enforced residual; when
-this lands, that residual is discharged for the recursive case in the kernel.
+Kernel team, running in the **L3 lane slot** (operator ruling, 2026-08-30) while
+foundation is blocked on L2 module/import; the slot reverts to foundation when L3
+unblocks. **Released.** The spec §17 contract prerequisite is LANDED
+(`c2c12b090`), so `depends_on` is empty. Non-blocking to the other lanes: no
+in-flight node depends on cross-identity conversion, and CAT-PRELUDE removed the
+duplicate local recursive heads rather than relying on their (non-)convertibility.
+This is the "real fix" behind CAT-PRELUDE's explicitly review/census-enforced
+residual; when this lands, that residual is discharged for the recursive case in
+the kernel.
 
 ## Symptom inventory (append one line per hard-stop; never rewrite history)
 
