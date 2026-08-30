@@ -1136,11 +1136,12 @@ following reasons:
    loops; the conversion checker memoises unfolded constants to avoid
    re-unfolding.
 
-5. **No Ω, Eq, cast, or quotient equations** — those are K2/K2c, and their
-   termination depends on the NbE + SCT machinery of `17`.
+5. **No Ω, Eq, cast, or quotient equations** — those are K2/K2c. Full
+   conversion termination uses the NbE machinery, SCT admission for
+   recursive-group δ, and the finite cross-identity retry boundary of `17`.
 
-The full SCT-gated termination argument for general recursive δ-definitions is
-in K2c (`17-conversion.md §SCT`). K1's δ is only for non-recursive transparent
+The group-local SCT admission argument for general recursive δ-definitions is
+in K2c (`17-conversion.md §4`). K1's δ is only for non-recursive transparent
 definitions; recursive definitions are admitted via the inductive eliminator
 (whose termination is structural, not SCT-reliant) or deferred to K2c.
 
@@ -1195,9 +1196,10 @@ the recursion is on **children** of the scrutinee — with the children reached
 *through* the branching function (a β-step on `k`) rather than directly. The
 inner elim genuinely stalls only in the special case where `k` *inspects* its
 branch (`k = λx. elim_Bool x …`, so `k b*` is neutral on an abstract `b*`); that
-sub-case is incidental, not the basis of decidability. The K2c SCT/decidability
-guarantee is untouched: eliminator recursion remains total **without** SCT (§2),
-and W-style ι introduces no general recursive δ-definition. Large W-trees
+sub-case is incidental, not the basis of decidability. The K2c conversion-
+decidability guarantee is untouched: eliminator recursion remains total
+**without** SCT (§2), and W-style ι introduces no general recursive
+δ-definition. Large W-trees
 terminate by **finiteness**, not by a size budget.
 
 **Boundary check (the adversarial guard).** Soundness rests on rejecting the

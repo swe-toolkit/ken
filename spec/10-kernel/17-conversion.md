@@ -4,8 +4,10 @@
 > Defines what the kernel treats as *the same* — the reductions (β/ι/δ/obs), the
 > type-directed η + proof irrelevance, the conversion algorithm (lazy-WHNF +
 > on-the-fly structural comparison + lazy δ, with NbE as the declarative
-> reference, §3), and the **size-change termination (SCT)** gate (§4) that keeps
-> δ-unfolding — and therefore type-checking — **decidable** (§5). The contract
+> reference, §3), and the **size-change termination (SCT)** admission gate
+> (§4). SCT plus the finite δ-retry boundary for distinct recursive identities
+> (§3.5) keep
+> conversion — and therefore type-checking — **decidable** (§5). The contract
 > for K2c. (The three K2 obs-completion seams — `cast`-at-inductive index
 > rewrite, non-constant-motive `J`, full quotient `respect` — are **series 2**,
 > elaborated in `16 §3.2`/`§4.1`/`§5.1`; §3 consumes the `16` obs reductions as
@@ -187,9 +189,9 @@ Notes.
   structural measures of `14 §9` (including Π-bound and nested lifted
   recursive content); and obs descends on the type (`16 §3.3`). `Let` is
   non-recursive (a `let` binds a value, no self-reference). The `Const` branch
-  is the only source of unbounded unfolding — post-K2c δ **is** cyclic
-  (recursive transparent defs), and it is exactly what the **SCT gate (§4)**
-  bounds — see §5.
+  is the only source of term growth. SCT (§4) bounds recursive re-entry within
+  one admitted group's call graph; the finite §3.5 boundary separately stops
+  cyclic cross-identity symbolic retry — see §5.
 
 ### 3.3 `conv` — type-directed conversion
 
@@ -253,13 +255,19 @@ function convStruct(env, ctx, A, a, b):
       if h_a == h_b:                       // same variable / opaque const / stuck elim
         let hty = headType(env, ctx, h_a)
         return convSpine(env, ctx, hty, spine a, spine b)
-      // (6) δ-unfold trigger (§3.5): heads differ — unfold a transparent one and retry
+      // (6) controlled δ retry (§3.5): heads differ — unfold only within
+      //     the finite-retry discipline, including its recursive-identity boundary
       if isTransparent(env, h_a) or isTransparent(env, h_b):
         return conv(env, ctx, A, whnf_unfoldδ(env,ctx,a), whnf_unfoldδ(env,ctx,b))
       return false                         // distinct rigid heads — not convertible
 
     _ : return false                       // canonical/neutral head mismatch
 ```
+
+The step-(6) recursive call is schematic for the controlled retry of §3.5, not
+an unconditional permission to unfold again. Its observable contract includes
+halting with false at the distinct recursive-identity boundary; the spec does
+not prescribe how an implementation recognizes that boundary.
 
 The Ω test at (1) uses the membership check of `16 §8.2`: it fires **only** when
 `A` is a *proposition* — `Γ ⊢ A : Ω_l` — never when `A` *is* the universe `Ω_l`.
@@ -315,27 +323,52 @@ transparent definition as little as possible. Two `whnf` modes realise this:
 - **`whnf_unfoldδ`** — `whnf` with δ enabled at the head (the `deltaWanted =
   true` path of §3.2). Used only on the retry of `convStruct` step (6).
 
-**The trigger.** Unfold a transparent definition during conversion **only when**
-(i) the two heads differ after `whnf_deferδ`, **and** (ii) at least one head is
-a transparent constant. Consequences:
+**The candidate trigger.** Conversion may consider unfolding a transparent
+head only when (i) the two heads differ after `whnf_deferδ`, and (ii) at least
+one head is a transparent constant. Those conditions are necessary, not
+sufficient: the retry also obeys the finite-derivation boundary below.
+Consequences:
 
 - `f ā` vs `f ā` where `f` is transparent: heads are *equal* (`Const f`), so
   **no unfolding** — compare the spines `ā` structurally (`convSpine`). This is
   the congruence shortcut that avoids unfolding a shared definition on both
   sides.
-- `f ā` vs `g b̄` with `f` transparent and `g` distinct: heads differ and `f` is
-  transparent, so unfold (at least `f`) and retry from `conv` step (5).
-- a transparent head against an *opaque* / variable head: unfold the transparent
-  side and retry; if they still differ after the transparent side is fully
-  unfolded, they are not convertible.
+- `f ā` vs `g b̄` for distinct non-recursive transparent `f` and `g` may unfold
+  and retry. If finite ordinary reduction exposes a common reduct, the terms
+  are convertible.
+- a transparent head against an *opaque* / variable head may unfold and retry;
+  if finite ordinary reduction leaves distinct rigid heads, the terms are not
+  convertible.
+
+**Distinct recursive-identity boundary.** A declaration's `GlobalId` is its
+identity. Transparency makes its body available to ordinary δ-reduction; it
+neither identifies that declaration with a same-shaped declaration nor supplies
+a cyclic equality hypothesis. In particular, suppose comparison of two
+separately declared recursive definitions descends beneath a stuck eliminator
+and reaches recursive applications headed by distinct self `GlobalId`s `c` and
+`d`. No ι-step can consume the neutral scrutinee, and no Ken equality rule
+identifies `c` with `d`. Conversion MUST halt with **false** at that boundary.
+It MUST NOT keep unfolding `c` and `d` merely to recreate the same symbolic
+comparison at a fresh neutral recursive argument.
+
+This is a boundary on cyclic **cross-identity symbolic retry**, not a ban on
+ordinary δ-reduction. Either declaration may still compute on a canonical input
+where β/ι/δ exposes a finite reduct. Same-`GlobalId` recursive applications use
+the equal-head congruence path above. Distinct non-recursive transparent heads
+with a finite common reduct retain the positive behavior above. Source-clause
+isomorphism, raw body shape, SCT certification, and membership in recursive
+groups are not equality rules; Ken specifies no guarded cyclic comparison,
+bisimulation quotient, or equality certificate for separately declared
+recursive globals.
 
 **Resolution of the `whnf`/`conv` δ split.** A bare `whnf` (the API entry of
 `18 §4`, used by the interpreter and the prover's checker) unfolds transparent
 heads eagerly (`deltaWanted = true`) — that is what "transparent" means
 operationally. *Conversion* is the one caller that defers δ, to keep the lazy
-congruence shortcut above. Both observe the same equality; the deferral only
-changes *when* the work is done, never the yes/no. (This reconciles the two
-δ paths the K2/K1 build surfaced; it is the Lean discipline, and is settled by
+congruence shortcut above. Deferral changes when finite ordinary reduction is
+performed, never its result. It does not add a cyclic equality principle:
+conversion still returns false at the distinct recursive-identity boundary.
+(This reconciles the two δ paths the K2/K1 build surfaced; it is settled by
 `OQ-eval-strategy` — not an open question.)
 
 **(perf, non-normative).** *Which* side to unfold first when both heads are
@@ -386,7 +419,9 @@ is judged sound and complete. The reference read-back:
    weak-head normal form; it does *not* go under binders.
 2. **Compare** values type-directed, head-first — the same case split as `conv`
    (§3.3): η at Π/Σ, proof-irrelevance at Ω, structural at canonical/neutral
-   heads, level equality at universes, controlled δ on head mismatch.
+   heads, level equality at universes, and controlled δ on head mismatch. The
+   §3.5 distinct recursive-identity boundary is part of this reference: NbE
+   supplies no cyclic equality hypothesis for separately declared globals.
 3. **Read-back (quote)** to a normal form is used where a syntactic normal form
    is genuinely needed (storing an elaborated term, the conformance corpus's
    normal-form checks); η-long, δ-short normal forms are the reference output.
@@ -423,12 +458,15 @@ a fast path (`41 §2.1`). These optimizations are explicitly **out of the
 decidability-critical TCB**; they must never report unequal terms equal or vice
 versa.
 
-## 4. Termination of conversion — the SCT gate
+## 4. Recursive-definition admission — the SCT gate
 
-Type-checking calls conversion; conversion unfolds δ; an unrestricted recursive
-definition would make δ-unfolding (and hence conversion, and hence
-type-checking) **loop**. Ken keeps decidability with a **size-change termination
-(SCT)** check at definition-admission time (`11 §4`).
+Type-checking calls conversion and conversion unfolds δ, so an unrestricted
+recursive definition could make recursive δ re-entry loop. Ken admits a
+recursive transparent definition only after a **size-change termination (SCT)**
+check (`11 §4`). This gate certifies recursion within that admitted group's call
+graph. It is one part of conversion decidability, not the rule for comparing
+distinct recursive identities; §3.5 supplies that separate finite-retry
+boundary, and §5 composes the two obligations.
 
 **What SCT checks.** When admitting a (possibly recursive, possibly mutually
 recursive) transparent definition, the kernel:
@@ -617,8 +655,10 @@ definition outside any cycle can never δ-unfold into itself.
 
 **Consequences.**
 
-- A definition that **passes** SCT is admitted **transparent** (δ-unfoldable);
-  unfolding it during conversion is guaranteed to terminate (§5).
+- A definition that **passes** SCT is admitted **transparent** (δ-unfoldable).
+  SCT certifies recursive re-entry within that admitted group's call graph; it
+  does not identify separately declared recursive globals or authorize an
+  unbounded cross-identity symbolic retry (§3.5, §5).
 - A definition that **fails** SCT is **rejected** as a transparent definition.
   (The elaborator MAY offer to admit it **opaque** — usable as a postulate-style
   constant that never δ-reduces — or report a totality error; policy is
@@ -637,8 +677,8 @@ definition outside any cycle can never δ-unfold into itself.
 
 Conversion terminates on every well-typed input, so type-checking is
 **decidable** — the kernel is a *checker* (always halts with yes/no), not a
-semi-decision procedure. The argument has two halves that meet at the `whnf`
-loop of §3.2:
+semi-decision procedure. The argument has three obligations that meet at the
+`whnf`/`conv` boundary of §3.2–§3.5:
 
 1. **The core reductions are strongly normalizing.** β/Σ-β/ι/η/prim and the
    observational `Eq`/`cast` reductions terminate on well-typed terms:
@@ -648,37 +688,45 @@ loop of §3.2:
    the *type* being traversed, which is a finite tree (`16 §3.3`). None of these
    can diverge.
 
-2. **δ-unfolding is SCT-bounded.** The single branch of §3.2 that can grow a
-   term is `Const(c)` unfolding. Every transparent `c` in `env` passed the **SCT
-   gate (§4)** at admission, so each δ-unfolding sequence that re-enters a
-   definition does so only along call paths on which some parameter strictly
-   decreases in the well-founded structural order. By the **size-change
-   termination theorem** (Lee, Jones & Ben-Amram, *The Size-Change Principle for
-   Program Termination*, POPL 2001): if every idempotent loop of the call graph
-   has a strictly-decreasing thread, then there is no infinite call sequence —
-   so no infinite δ-unfolding chain. The environment is append-only, but **not**
-   acyclic — recursive transparent defs (K2c) are exactly the δ-cycles the gate
-   exists to bound; the call graph captures **all** the group's recursion
-   because step (1) edges **every** group-member occurrence, applied and bare
-   (call-graph completeness, §4.1).
+2. **Recursive re-entry within one admitted group is SCT-bounded.** The single
+   branch of §3.2 that can grow a term is `Const(c)` unfolding. Every
+   transparent recursive group in `env` passed the **SCT gate (§4)** at
+   admission, so a call sequence that re-enters that group follows call-graph
+   paths on which some parameter strictly decreases in the well-founded
+   structural order. By the **size-change termination theorem** (Lee, Jones &
+   Ben-Amram, *The Size-Change Principle for Program Termination*, POPL 2001):
+   if every idempotent loop of the call graph has a strictly-decreasing thread,
+   then there is no infinite call sequence. The group's graph captures all of
+   its recursion because step (1) edges every group-member occurrence, applied
+   and bare (call-graph completeness, §4.1).
 
-Combining (1) and (2): the `whnf` loop makes finitely many δ steps (each bounded
-by SCT) interleaved with strongly-normalizing core reductions, so `whnf` halts;
-`conv`/`convSpine` recurse only into structurally smaller subproblems (smaller
-governing type, shorter spine, or a guaranteed-progressing δ retry), so they
-halt too. Hence `convert` is total, and `check`/`infer` (`18 §3`) — which call
-it at the mode switch — are total. This is soundness commitment `README.md §6`
-(the SCT / decidability rows) and is exercised behaviorally by the §6 corpus
-(`conversion/decidable-halts`); the metatheory status is tracked honestly in `18
-§6`.
+3. **Cross-identity symbolic retry is not an SCT-certified call sequence.**
+   Comparing separately declared recursive bodies beneath a stuck eliminator
+   can expose distinct self `GlobalId`s on successively fresh neutral arguments.
+   No constructor step witnesses structural descent there, and neither
+   declaration's SCT certificate relates its identity to the other. The §3.5
+   boundary therefore halts that retry with false. SCT remains an admission
+   guarantee for each recursive group; it is not authority for cyclic symbolic
+   comparison between groups.
+
+Combining (1)–(3): `whnf` follows strongly-normalizing core reductions and
+SCT-certified recursive call paths; `conv`/`convSpine` recurse into structurally
+smaller subproblems or make finite ordinary δ progress, and stop at the distinct
+recursive-identity boundary rather than manufacturing a new cycle. Hence
+`convert` is total, and `check`/`infer` (`18 §3`) — which call it at the mode
+switch — are total. This is soundness commitment `README.md §6` (the SCT /
+decidability rows) and is exercised behaviorally by the §6 corpus
+(`conversion/decidable-halts`); the metatheory status is tracked honestly in
+`18 §6`.
 
 ## 6. What the kernel checks here
 
 A conforming kernel MUST: implement all §1 reductions and the §2 η + proof-
 irrelevance rules as **type-directed conversion** (§3); decide level equality
 (§3.6) and Ω proof-irrelevance; compare neutrals structurally with controlled δ
-(§3.5); run the **SCT check** at admission (§4) and refuse transparent admission
-of uncertified recursion; and **terminate** on every well-typed input (§5).
+and halt with false at the distinct recursive-identity boundary (§3.5); run the
+**SCT check** at admission (§4) and refuse transparent admission of uncertified
+recursion; and **terminate** on every well-typed input (§5).
 
 **Conformance.** `../../conformance/kernel/conversion/seed-conversion.md`
 (authored with the validator). The corpus, per the K2c acceptance criteria,
@@ -698,10 +746,14 @@ K1/K2 retro discipline applies:
    `sct-reject-ctor-wrap` (a parameter re-wrapped in a constructor — `↓=` would
    be unsound here, §4.2) are all **rejected** at admission — the kernel never
    admits uncertified transparent recursion.
-3. **δ-heavy convertibility terminates.** `delta-termination`: a query that
-   forces substantial controlled δ-unfolding along a certified-terminating
-   definition (e.g. `ackermann 3 3` converted against its numeral result)
-   **halts** with the correct yes/no.
+3. **δ-heavy and cross-identity conversion terminate.** `delta-termination`
+   forces substantial controlled δ-unfolding along one certified-terminating
+   definition (e.g. `ackermann 3 3` against its numeral result) and halts with
+   the correct yes/no. `delta-distinct-recursive-heads-stuck` compares two
+   separately declared source-isomorphic recursive definitions beneath a stuck
+   eliminator and halts with **false** at the distinct self-identity boundary;
+   the unmodified pair on closed `Nil` and finite `Cons` inputs instead makes
+   ordinary reduction progress and halts with **true**.
 4. **Full η + proof irrelevance.** `pi-eta` (`f ≡ λx. f x` at a Π type, ≥2
    distinct type variables), `sigma-eta` (`p ≡ (p.1, p.2)`), `unit-eta` (any two
    `Unit` elements equal), `omega-pi` (any two proofs of `P : Ω` equal,

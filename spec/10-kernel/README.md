@@ -64,25 +64,27 @@ it.
 
 The kernel is delivered in phases. **K1** (`11`–`14`) is the set-level MLTT
 core — the well-understood foundation the observational layer sits on. **K2**
-(`15`, `16`) adds the OTT equality layer. **K2c** (`17`) adds the full
-decidable conversion (NbE + SCT). **K-api** (`18`) publishes the stable,
-audited TCB boundary. This chapter describes the complete kernel; the table
-below maps what each phase delivers.
+(`15`, `16`) adds the OTT equality layer. **K2c** (`17`) adds full decidable
+conversion: NbE, SCT admission for recursive groups, and the finite δ-retry
+boundary between distinct recursive identities. **K-api** (`18`) publishes the
+stable, audited TCB boundary. This chapter describes the complete kernel; the
+table below maps what each phase delivers.
 
 | Phase | Files | What it delivers | Blocked by |
 |-------|-------|------------------|------------|
 | **K1** — core calculus | `11`, `12`, `13`, `14` | Syntax + de Bruijn, predicative non-cumulative checked universes, Π/Σ with βη, inductive families with dependent eliminator + strict positivity, basic structural conversion (β/η/ι/δ) | F2, F3 (both merged) |
 | **K2** — observational layer | `15`, `16` | `Eq`-by-type (definitional funext/propext), `cast` with regularity + by-type computation, derived `J` (reduces on non-`refl`), strict-prop Ω with proof irrelevance + Heyting logic, set-quotients `A/R` with relation-as-equality, propositional truncation `‖A‖` | K1 |
-| **K2c** — full conversion | `17` | Lazy-WHNF NbE, `Eq`/`cast` conversion equations, SCT termination gating δ, full decidable conversion | K1, K2 |
+| **K2c** — full conversion | `17` | Lazy-WHNF NbE, `Eq`/`cast` conversion equations, SCT admission for recursive-group δ, finite cross-identity δ retry, full decidable conversion | K1, K2 |
 | **K-api** — stable API | `18` | Audited `check`/`infer`/`convert`/`whnf` TCB boundary, complete typing judgment, kernel Rust API | K1, K2, K2c |
 
 K1 reserves the K2 grammar formers (`Ω`, `Eq`, `cast`, `J`, `A/R`, `‖A‖`) in
 the syntax (`11-syntax.md §1` — they parse; raw-well-formedness checks their
 scoping) but implements **none** of their typing or computation. That is K2. K1
 builds only the conversion its own rules require — β/η/ι/δ — structured so K2c
-can extend it with NbE later. The full SCT termination argument is K2c; K1's
-conversion must at least terminate on its own rules (structural decrease for ι,
-acyclic δ, β/η size-bounded on K1 terms).
+can extend it with NbE later. K2c supplies the full conversion-termination
+argument: SCT admission within recursive groups plus the finite cross-identity
+δ-retry boundary. K1 conversion must at least terminate on its own rules
+(structural decrease for ι, acyclic δ, β/η size-bounded on K1 terms).
 
 ## 4. The core calculus at a glance
 
@@ -124,7 +126,7 @@ tests encode — are in §6.
 | `14-inductive.md` | Inductive families, constructors, dependent eliminator, strict positivity, ι-reduction | **K1/K1.5** + nested-positive extension |
 | `15-identity.md` | Identity as observational `Eq`; `refl`; `cast`; `J` and its computation; funext/UIP | **K2** |
 | `16-observational.md` | The strict-prop Ω, `Eq`-by-type, `cast`, quotient types, propositional truncation | **K2** |
-| `17-conversion.md` | Full definitional equality, NbE, decidable conversion, β/η/δ/ι, regularity, SCT termination | K2c |
+| `17-conversion.md` | Full definitional equality, NbE, decidable conversion, β/η/δ/ι, regularity, SCT admission, finite cross-identity δ retry | K2c |
 | `18-judgments.md` | The complete typing judgment, the checking/inference algorithm, and the kernel's Rust API | K-api |
 
 ## 6. Soundness commitments (what "the kernel is correct" means)
@@ -142,7 +144,7 @@ designed now, verified later; the K1 fragment satisfies them within its scope.
 | 4 | **Inductive eliminator ι + dependent eliminator.** Eliminator reduces (ι) over a constructor; dependent eliminator checks (e.g. `Vec` length-indexed elimination) (`14-inductive.md`). | AC-4 | **K1** — `conformance/kernel/inductive/` |
 | 5 | **Strict positivity.** Positive inductive admitted; negative one (`data Bad = mk (Bad → Bad)`) rejected at admission (`14-inductive.md §2`). | AC-5 | **K1** — `conformance/kernel/inductive/` |
 | 6 | **Subject reduction on K1 fragment.** If `Γ ⊢ t : A` and `t` reduces by β/η/ι/δ, then `Γ ⊢ t' : A` (`13-pi-sigma.md §K1 conversion`, `14-inductive.md §K1 conversion`). | AC-6 | **K1** — property test across all K1 rules |
-| 7 | **Decidable checking on K1 fragment.** `check`/`infer` terminate on K1 rules (structural decrease for ι, acyclic δ, β/η size-bounded). The full SCT termination argument is K2c. | AC-7 | **K1** (within its scope) — termination test suite |
+| 7 | **Decidable checking on K1 fragment.** `check`/`infer` terminate on K1 rules (structural decrease for ι, acyclic δ, β/η size-bounded). K2c supplies the full termination argument: SCT admission within recursive groups plus finite cross-identity δ retry. | AC-7 | **K1** (within its scope) — termination test suite |
 | 8 | **K1 conformance passes.** All `conformance/kernel/` K1-subset tests pass; lint/CI green. | AC-8 | **K1** — CI gate |
 
 Beyond these K1-verifiable commitments, the full kernel (K2 + K2c + K-api)
@@ -160,7 +162,7 @@ must also satisfy:
 | 16 | **Canonicity / normalization.** Every closed term of an inductive type reduces to a constructor form; `Eq`/`cast` on closed terms compute (the computational content that makes `J`-on-non-`refl` reduce). Proven for OTT (`TTobs`/`CICobs`, ADR 0005). | K2 + K2c | Requires the full NbE in `17`. |
 | 17 | **Consistency.** There is no closed proof of the empty type `⊥`; the logic is not degenerate. | K2 | A documented argument; the positivity + predicativity + termination architecture is designed to support a future mechanized proof. |
 | 18 | **SCT termination gate.** Every transparent definition is admitted only if a size-change-termination check certifies it (`17 §4`): a lexicographic and a mutually-recursive def are admitted; a non-terminating def is **rejected** at admission. The kernel never admits uncertified transparent recursion. | K2c | `17 §4`; `conversion/sct-accept-*`, `conversion/sct-reject-*` |
-| 19 | **Operational decidability (termination).** `convert` — and hence `check`/`infer` — is **total**: it halts with yes/no on every well-typed input. SCT-bounded δ (#18) + strong normalization of the core reductions give termination (`17 §5`); the kernel never loops or panics on raw-well-formed input. | K2c | `17 §5`; `conversion/delta-termination`, `conversion/decidable-halts` |
+| 19 | **Operational decidability (termination).** `convert` — and hence `check`/`infer` — is **total**: it halts with yes/no on every well-typed input. SCT bounds recursive re-entry within an admitted group (#18); the finite δ-retry boundary rejects cyclic symbolic comparison across distinct recursive identities; and the core reductions are strongly normalizing (`17 §3.5`, §5). The kernel never loops or panics on raw-well-formed input. | K2c | `17 §3.5`, §5; `conversion/delta-termination`, `conversion/delta-distinct-recursive-heads-stuck`, `conversion/decidable-halts` |
 | 20 | **Nested strictly-positive induction.** A nested occurrence is admitted only through checked strictly-positive parameter positions; unknown/non-positive positions reject. The dependent eliminator supplies one structurally lifted IH per contained occurrence and nested ι computes on the contained children. Mutual families remain deferred. | Partially landed; `KERNEL-NESTED-IND` retains individually marked residuals | `14 §3.2`/`§7.8`/`§8.5`/`§9.5`; fresh/composed admission and both selector sorts execute; generated-family/method/topology/sort residuals stay gated |
 
 Where a commitment is currently an argument rather than a mechanized proof,

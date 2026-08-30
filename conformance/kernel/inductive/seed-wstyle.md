@@ -235,7 +235,7 @@ Spec: `14 §7.7`, `§9.4`.
 - given: normalize `elim_W`/`elim_ITree` applied to a finite (closed,
   constructor-built) W-tree under the conversion checker
 - expect: **terminates** with a normal form — no infinite loop, no regression to
-  the K2c SCT/decidability guarantee
+  the K2c conversion-decidability guarantee
 - why: structural decrease on a **finite, inductive** (not coinductive) W-tree
   (`§9.4`): the inner ι **fires** through the branching function (a β-step on
   `k`) and recurses on **children** `k b`, each a structurally-smaller subtree;

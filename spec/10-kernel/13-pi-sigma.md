@@ -176,9 +176,10 @@ proof-irrelevance is load-bearing for the propositional layer (`16`).
 
 K1 implements **basic structural conversion** — the β/η reductions of Π and Σ
 (plus ι from `14` and δ-unfolding from `11 §4`) — sufficient for `check`/`infer`
-to decide the K1 fragment. The full decidable conversion (lazy-WHNF NbE, the
-`Eq`/`cast` equations, Ω proof irrelevance, and SCT termination gating δ) is
-K2c (`17-conversion.md`). This section defines the K1 algorithm and the
+to decide the K1 fragment. K2c supplies full decidable conversion: lazy-WHNF
+NbE, the `Eq`/`cast` equations, Ω proof irrelevance, SCT admission for
+recursive-group δ, and the finite cross-identity δ-retry boundary
+(`17-conversion.md §3.5`, §4–§5). This section defines the K1 algorithm and the
 extension point for K2c.
 
 ### 6.1 Reduction relation (K1 fragment)
