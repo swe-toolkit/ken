@@ -54,6 +54,17 @@ def tests(value):
         raise SystemExit("nextest test-count differs from discovered testcases")
 
 
+def filtered_projection(inventory, output):
+    value = json.load(open(inventory))
+    list(tests(value))
+    for suite in value["rust-suites"].values():
+        if suite["binary-name"] in EXCLUDED_BINARIES:
+            for metadata in suite["testcases"].values():
+                metadata["filter-match"]["status"] = "mismatch"
+    with open(output, "w") as file:
+        json.dump(value, file)
+
+
 def empty_projection(inventory, output):
     value = json.load(open(inventory))
     # Reuse the selector's schema validation before projecting zero matches.
@@ -77,6 +88,9 @@ def validate_plan(assignment_path, shard, selected_path):
 
 
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "project-filtered":
+        filtered_projection(sys.argv[2], sys.argv[3])
+        return
     if len(sys.argv) == 4 and sys.argv[1] == "project-empty":
         empty_projection(sys.argv[2], sys.argv[3])
         return

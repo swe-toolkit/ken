@@ -120,7 +120,7 @@ jobs:
         run: |
           shard_exclusion='not (binary(=rt_parity_native) | binary(=px8f_buffer_native) | binary(=px8f_write_partition))'
           cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
-          cargo nextest list --workspace --locked --message-format json -E "$shard_exclusion" > inventory.json
+          python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
           python3 scripts/ci-duration-shard.py inventory.json docs/program/evidence/ci-shard-duration-balance-33230600665.json duration-filters
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
           if [ "$planned" -eq 0 ]; then
