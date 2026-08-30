@@ -3081,7 +3081,8 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 if let Some(access) = access.as_mut() {
                     use super::source::CheckedIhGeneratedEntryCapsuleMutation as Mutation;
                     use crate::CheckedIhGeneratedEntryConfluenceMutation as ProjectionMutation;
-                    let mutation = match super::source::checked_ih_generated_entry_capsule_mutation() {
+                    let active = super::source::checked_ih_generated_entry_capsule_mutation();
+                    let direct_mutation = match active {
                         Mutation::WrongDestinationOwner => {
                             Some(ProjectionMutation::DestinationOwner)
                         }
@@ -3101,8 +3102,35 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                         Mutation::WrongLocatorIndex => Some(ProjectionMutation::LocatorIndex),
                         _ => None,
                     };
-                    if let Some(mutation) = mutation {
-                        access.mutate_published_governed_projection_for_control(mutation);
+                    let tail_mutation = match active {
+                        Mutation::RetainedAccessWrongDestinationOwner => {
+                            Some(ProjectionMutation::DestinationOwner)
+                        }
+                        Mutation::RetainedAccessWrongDestinationBody => {
+                            Some(ProjectionMutation::DestinationBody)
+                        }
+                        Mutation::RetainedAccessWrongBinding => {
+                            Some(ProjectionMutation::BindingFrame)
+                        }
+                        Mutation::RetainedAccessWrongLocatorInvocation => {
+                            Some(ProjectionMutation::LocatorInvocation)
+                        }
+                        Mutation::RetainedAccessWrongLocatorCallee => {
+                            Some(ProjectionMutation::LocatorCallee)
+                        }
+                        Mutation::RetainedAccessWrongLocatorDomain => {
+                            Some(ProjectionMutation::LocatorDomain)
+                        }
+                        Mutation::RetainedAccessWrongLocatorIndex => {
+                            Some(ProjectionMutation::LocatorIndex)
+                        }
+                        _ => None,
+                    };
+                    if let Some(mutation) = direct_mutation {
+                        access.mutate_published_direct_projection_for_control(mutation);
+                    }
+                    if let Some(mutation) = tail_mutation {
+                        access.mutate_published_tail_projection_for_control(mutation);
                     }
                 }
                 access

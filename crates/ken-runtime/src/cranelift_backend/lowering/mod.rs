@@ -227,12 +227,16 @@ pub(in crate::cranelift_backend) use super::planning::{
 #[cfg(feature = "px8-ds-test-support")]
 use super::planning::{
     checked_ih_generated_entry_arrival_mutation,
+    composed_return_forward_ret_authority_mutation,
+    record_composed_return_forward_ret_authority,
+    record_composed_return_forward_ret_role_witness,
     record_checked_ih_generated_entry_governed_validation,
     record_checked_ih_generated_entry_installed,
     record_checked_ih_generated_entry_ordinary_continuation,
     record_checked_ih_generated_entry_raw_arrival,
     record_checked_ih_generated_entry_reached,
-    CheckedIhGeneratedEntryArrivalMutation,
+    take_composed_return_forward_ret_population_mutation,
+    CheckedIhGeneratedEntryArrivalMutation, ComposedReturnForwardRetAuthorityMutation,
 };
 pub(in crate::cranelift_backend) use super::planning::{
     collect_checked_oriented_markers, collect_checked_subcontinuation_frames,
@@ -250,6 +254,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     // is an unresolved import the test profile cannot see.
     BoolMatchCaseOrdinals, BoundaryClosureEnvironment, CheckedCaseBinderLayout,
     CheckedCaseBinderRole, CheckedIhBinding, CheckedIhEnvironmentTransport,
+    CheckedIhForwardRetPlanProof,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
     CheckedIhKAvailabilityDomain,
@@ -2769,6 +2774,31 @@ struct ActiveCarriedComputationalElimination {
     active_frame_origin: StaticOriginId,
     header: Block,
     ret_sink: Option<ActiveCarriedComputationalRetSink>,
+}
+
+/// One move-only compiler proof joining the selected planner member to the
+/// unique function-local Ret block. D2 deliberately has no result consumer;
+/// keeping both halves private makes a runtime carrier unrepresentable here.
+struct ComposedReturnForwardRetAuthority {
+    _plan: CheckedIhForwardRetPlanProof,
+    _return_body: Block,
+}
+
+/// Post-selection result of attempting to form the D2 compiler-only authority.
+/// `NonApplicable` is valid only when the selected transport has no governed
+/// Tail inheritance or its exact projection is Direct.
+enum ComposedReturnForwardRetAuthorityOutcome {
+    NonApplicable,
+    Formed(ComposedReturnForwardRetAuthority),
+    #[cfg(feature = "px8-ds-test-support")]
+    MissingRequired,
+    #[cfg(feature = "px8-ds-test-support")]
+    SuppressedForInertness,
+    #[cfg(feature = "px8-ds-test-support")]
+    Duplicated(
+        ComposedReturnForwardRetAuthority,
+        ComposedReturnForwardRetAuthority,
+    ),
 }
 
 /// Compile-preserving controls for the compiler-only composed-return `Ret`
@@ -9963,15 +9993,21 @@ pub fn with_checked_ih_fresh_result_route_emission_observations<T>(
 
 #[cfg(feature = "px8-ds-test-support")]
 pub(in crate::cranelift_backend) fn record_checked_ih_fresh_result_route_selected(
-    route: &CheckedIhFreshResultRoute,
+    projection: &CheckedIhGeneratedEntryProjection,
 ) {
     if !FRESH_RESULT_ROUTE_OBSERVATION_ACTIVE.with(std::cell::Cell::get) {
         return;
     }
-    let Some((active_frame_origin, ret_case_body_origin)) = route.tail_resumed_coordinates() else {
+    let Some((
+        invocation_origin,
+        call_origin,
+        callee_origin,
+        active_frame_origin,
+        ret_case_body_origin,
+    )) = projection.pre_d3_emission_observation()
+    else {
         return;
     };
-    let (invocation_origin, call_origin, callee_origin) = route.governed_call_coordinates();
     FRESH_RESULT_ROUTE_OBSERVATIONS.with(|rows| {
         rows.borrow_mut()
             .push(CheckedIhFreshResultRouteEmissionObservation {

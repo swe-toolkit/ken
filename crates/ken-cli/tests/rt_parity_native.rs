@@ -1022,31 +1022,29 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
         assert!(
             write_singleton
                 .fresh_result_route
-                .starts_with("TailResumedRetInput"),
-            "the active self-resumption must name the forward Ret-input route: {write_singleton:?}"
+                .starts_with("TailProducerToRet"),
+            "the Tail case must name the governed producer-to-Ret route: {write_singleton:?}"
         );
         for coordinate in [
-            "invocation_origin: StaticOriginId(529)",
-            "call_origin: StaticOriginId(528)",
-            "callee_origin: StaticOriginId(527)",
-            "active_frame_origin: StaticOriginId(525)",
-            "header_edge: ActiveSelfResumption",
-            "answer_route: CheckedSelectedRecursor",
+            "invocation_origin: StaticOriginId(700)",
+            "call_origin: StaticOriginId(699)",
+            "callee_origin: StaticOriginId(698)",
+            "active_frame_origin: StaticOriginId(696)",
             "direction: Forward",
-            "ret_case_body_origin: StaticOriginId(691)",
-            "ret_input_binder: ConstructorChild { frame_origin: StaticOriginId(525), field_position: 0 }",
-            "ret_input_delivery: CheckedAnswerFallbackDirect",
+            "ret_case_body_origin: StaticOriginId(731)",
+            "ret_input_binder: ConstructorChild { frame_origin: StaticOriginId(696), field_position: 0 }",
+            "ret_input_delivery: ProducerResultDirect",
         ] {
             assert!(
                 write_singleton.fresh_result_route.contains(coordinate),
-                "the tail-resumed route must retain {coordinate}: {write_singleton:?}"
+                "the Tail producer-to-Ret route must retain {coordinate}: {write_singleton:?}"
             );
         }
         let all_rows = read.iter().chain(&write).collect::<Vec<_>>();
         let tail_rows = all_rows
             .iter()
             .copied()
-            .filter(|row| row.fresh_result_route.starts_with("TailResumedRetInput"))
+            .filter(|row| row.fresh_result_route.starts_with("TailProducerToRet"))
             .collect::<Vec<_>>();
         let direct_rows = all_rows
             .iter()
@@ -1066,31 +1064,64 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
         assert_eq!(
             tail_rows
                 .iter()
-                .map(|row| row.binding_frame_origin)
+                .flat_map(|row| row.forward_ret_coordinates.iter())
+                .map(|coordinate| &coordinate.active_frame_origin)
                 .collect::<std::collections::BTreeSet<_>>()
                 .len(),
             tail_rows.len(),
-            "each fixed-product tail route has a distinct active frame, so the emitted observer's frame pairing is unambiguous"
+            "each fixed-product tail route has a distinct producer active frame"
         );
         for row in &tail_rows {
-            for coordinate in [
-                format!("invocation_origin: StaticOriginId({})", row.invocation_origin),
-                format!("call_origin: StaticOriginId({})", row.call_origin),
-                format!("callee_origin: StaticOriginId({})", row.callee_origin),
-                format!("active_frame_origin: StaticOriginId({})", row.binding_frame_origin),
-                "header_edge: ActiveSelfResumption".to_string(),
-                "answer_route: CheckedSelectedRecursor".to_string(),
-                "direction: Forward".to_string(),
-                format!(
-                    "ret_input_binder: ConstructorChild {{ frame_origin: StaticOriginId({}), field_position: 0 }}",
-                    row.binding_frame_origin
-                ),
-                "ret_input_delivery: CheckedAnswerFallbackDirect".to_string(),
-            ] {
-                assert!(
-                    row.fresh_result_route.contains(&coordinate),
-                    "each real tail-route neighbor must retain {coordinate}: {row:?}"
+            assert_eq!(row.forward_ret_coordinates.len(), row.members.len());
+            for coordinate in &row.forward_ret_coordinates {
+                assert_eq!(
+                    coordinate.entry_invocation_origin,
+                    format!("StaticOriginId({})", row.invocation_origin)
                 );
+                assert_eq!(
+                    coordinate.entry_call_origin,
+                    format!("StaticOriginId({})", row.call_origin)
+                );
+                assert_eq!(
+                    coordinate.entry_callee_origin,
+                    format!("StaticOriginId({})", row.callee_origin)
+                );
+                assert_eq!(
+                    coordinate.entry_binding,
+                    format!(
+                        "CheckedIhBinding {{ frame_origin: StaticOriginId({}), recursive_position: {} }}",
+                        row.binding_frame_origin, row.binding_recursive_position
+                    )
+                );
+                assert_ne!(
+                    (
+                        &coordinate.entry_binding,
+                        &coordinate.entry_invocation_origin,
+                        &coordinate.entry_call_origin,
+                        &coordinate.entry_callee_origin,
+                    ),
+                    (
+                        &coordinate.binding,
+                        &coordinate.invocation_origin,
+                        &coordinate.call_origin,
+                        &coordinate.callee_origin,
+                    ),
+                    "Tail generated-entry E and producer source S must remain distinct"
+                );
+                for route_coordinate in [
+                    format!("invocation_origin: {}", coordinate.invocation_origin),
+                    format!("call_origin: {}", coordinate.call_origin),
+                    format!("callee_origin: {}", coordinate.callee_origin),
+                    format!("active_frame_origin: {}", coordinate.active_frame_origin),
+                    "direction: Forward".to_string(),
+                    format!("ret_input_binder: {}", coordinate.ret_input_binder),
+                    "ret_input_delivery: ProducerResultDirect".to_string(),
+                ] {
+                    assert!(
+                        row.fresh_result_route.contains(&route_coordinate),
+                        "each real Tail route must retain {route_coordinate}: {row:?}"
+                    );
+                }
             }
         }
         for row in all_rows {
@@ -1117,20 +1148,22 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
     });
 }
 
-/// **Promise class: durable invariant.** The observation is stated over emitted
-/// edge pairing rather than fixed Cranelift block/value numbers.
+/// **Promise class: transition sentinel.** The observation is stated over the
+/// still-emitted pre-D3 edge pairing rather than fixed Cranelift block/value
+/// numbers; D3 retires this observer when it activates the new forward edge.
 ///
 /// **MEASURED:** one selected governed tail route records the result delivered
 /// to its unambiguous source-machine resumption seat, that same value on the
 /// active self-resumption jump, the target header's input parameter, and that
 /// same header input directly installed in the exact Ret body environment, in
 /// forward emission order.
-/// **CLAIMED:** the certified tail route is a directed value-flow edge rather
-/// than four co-emitted endpoints.
-/// **THE GAP:** Cranelift identities are diagnostic only. The static route proof
-/// separately owns source/sink authority, and the fixed-product positive above
-/// asserts one tail key per active frame; this observation proves the emitted
-/// graph pairs them. `CoEmissionOnly` preserves its landed aggregate control;
+/// **CLAIMED:** the pre-D3 emitted tail route is a directed value-flow edge
+/// rather than four co-emitted endpoints.
+/// **THE GAP:** Cranelift identities are diagnostic only. The feature-only
+/// observation coordinate intentionally preserves the old emitted-path
+/// controls without becoming a sibling production plan; D2's move-only proof
+/// separately owns the future source/sink authority and makes no live-edge
+/// claim. `CoEmissionOnly` preserves its landed aggregate control;
 /// the substantive leg inventory derives one identity-only arm per predicate
 /// leg, so no conjunct borrows another conjunct's negative observation.
 #[test]
@@ -1321,6 +1354,77 @@ fn checked_ih_generated_entry_admission_population_is_total() {
     });
 }
 
+/// **Promise class: durable invariant.**
+///
+/// **MEASURED:** substituting the Tail producer source for the final
+/// generated-entry arrival at `checked_ih_generated_entry_row` preserves the
+/// closed call-coordinate population but complements every governed bit in the
+/// non-degenerate read fixture.
+/// **CLAIMED:** producer source `S` cannot replace generated-entry arrival `E`
+/// as the P/G/N access discriminator.
+/// **THE GAP:** the mutation moves the production-side row key and arrival,
+/// while the exact comparison comes from a separately compiled unmutated plan;
+/// requiring identical key populations and opposite classifications proves the
+/// control reached this regression rather than an unrelated build failure.
+#[test]
+fn checked_ih_generated_entry_arrival_cannot_be_replaced_by_producer_source() {
+    in_generated_entry_stack_thread("rt-parity-generated-entry-e-from-s", || {
+        use ken_runtime::CheckedIhGeneratedEntryConfluenceMutation as Mutation;
+
+        let observe = |label: &str, mutation: Mutation| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+            let root = output_dir(&format!("generated-entry-e-from-s-{label}"));
+            let (result, rows) =
+                ken_runtime::with_checked_ih_generated_entry_confluence_mutation(mutation, || {
+                    ken_runtime::with_checked_ih_generated_entry_admission_observations(|| {
+                        ken_cli::build_native_program(
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_parity_generated_entry_e_from_s_{label}"),
+                            root.path(),
+                        )
+                    })
+                });
+            result.expect("the compile-preserving E-from-S control must build");
+            rows.into_iter()
+                .map(|row| {
+                    (
+                        (
+                            row.enclosing_specialization,
+                            row.worker_body_origin,
+                            row.binding_frame_origin,
+                            row.binding_recursive_position,
+                            row.invocation_origin,
+                            row.call_origin,
+                            row.callee_origin,
+                        ),
+                        row.governed,
+                    )
+                })
+                .collect::<std::collections::BTreeMap<_, _>>()
+        };
+
+        let exact = observe("exact", Mutation::Exact);
+        let substituted = observe("substituted", Mutation::EntryFromRouteSource);
+        assert!(
+            exact.len() > 1,
+            "the control fixture must be non-degenerate"
+        );
+        assert_eq!(
+            exact.keys().collect::<Vec<_>>(),
+            substituted.keys().collect::<Vec<_>>(),
+            "E-from-S must preserve P while changing its governed partition"
+        );
+        assert!(
+            exact
+                .iter()
+                .all(|(key, governed)| substituted.get(key) == Some(&!*governed)),
+            "E-from-S did not reproduce the admission-classification inversion"
+        );
+        assert!(ken_runtime::checked_ih_generated_entry_confluence_mutation_is_exact());
+    });
+}
+
 const GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD: &str =
     "KEN_RT_CHECKED_IH_GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD";
 
@@ -1428,6 +1532,61 @@ macro_rules! generated_entry_checked_case {
             assert!(output.status.success(), "{}: mutation child failed\nstdout:\n{}\nstderr:\n{}", $mode, String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
             let stderr = String::from_utf8_lossy(&output.stderr);
             assert!(stderr.contains($expected), "{}: mutation missed intended arm; stderr:\n{}", $mode, stderr);
+        }
+    };
+}
+
+macro_rules! generated_entry_split_checked_case {
+    ($name:ident, $mode:literal, $expected:literal, $reached:literal, $target:literal) => {
+        #[test]
+        fn $name() {
+            if std::env::var_os(GENERATED_ENTRY_CAPSULE_MUTATION_CHILD).is_some() {
+                in_generated_entry_stack_thread(
+                    concat!("rt-parity-", stringify!($name), "-child"),
+                    assert_generated_entry_capsule_mutation_child,
+                );
+                return;
+            }
+            let output = std::process::Command::new(
+                std::env::current_exe().expect("test binary"),
+            )
+            .arg("--exact")
+            .arg(stringify!($name))
+            .arg("--nocapture")
+            .env(GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, $mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated projection-control child");
+            assert!(
+                output.status.success(),
+                "{}: mutation child failed\nstdout:\n{}\nstderr:\n{}",
+                $mode,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                stderr.contains($expected),
+                "{}: mutation missed intended arm; stderr:\n{}",
+                $mode,
+                stderr
+            );
+            assert!(
+                stderr.contains($reached),
+                "{}: mutation did not reach its selected semantic layer; stderr:\n{}",
+                $mode,
+                stderr
+            );
+            let restored = format!(
+                "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_RESTORED_GREEN target={} mode={}",
+                $target, $mode
+            );
+            assert!(
+                stderr.contains(&restored),
+                "{}: restored target did not report GREEN; stderr:\n{}",
+                $mode,
+                stderr
+            );
         }
     };
 }
@@ -1551,14 +1710,12 @@ fn assert_generated_entry_mutation_child() {
         "route-duplication" => Mutation::RouteDuplication,
         "route-cross-variant" => Mutation::RouteCrossVariant,
         "route-wrong-active-frame" => Mutation::RouteWrongActiveFrame,
-        "route-wrong-header-edge" => Mutation::RouteWrongHeaderEdge,
-        "route-wrong-answer-route" => Mutation::RouteWrongAnswerRoute,
+        "route-wrong-selected-case" => Mutation::RouteWrongSelectedCase,
         "route-wrong-direct-edge" => Mutation::RouteWrongDirectEdge,
         "route-wrong-ret-input-body" => Mutation::RouteWrongRetInputBody,
         "route-wrong-ret-input-binder" => Mutation::RouteWrongRetInputBinder,
         "route-wrong-governed-key" => Mutation::RouteWrongGovernedKey,
-        "route-pretend-ordinary-projection" => Mutation::RoutePretendOrdinaryProjection,
-        "route-body-merge-output" => Mutation::RouteBodyMergeOutput,
+        "route-wrong-delivery" => Mutation::RouteWrongDelivery,
         "route-reversed" => Mutation::RouteReversed,
         "route-disagreement" => Mutation::RouteDisagreement,
         "remove-member" => Mutation::RemoveFirstMember,
@@ -1584,10 +1741,10 @@ fn assert_generated_entry_mutation_child() {
 //
 // **MEASURED:** each population-side mutation changes one real route relation,
 // membership operation, declared-body transport selector, or legal neighboring
-// header/kind/binder/key and reaches its named planner refusal.
+// case/frame/binder/key and reaches its named planner refusal.
 // **CLAIMED:** the governed projection carries exactly one directed route; its
-// Direct arm preserves the body-refined transport, and its tail arm composes
-// source, active checked header, direct Ret-input delivery, and capture sink.
+// Direct arm preserves the body-refined transport, and its Tail arm composes
+// source, selected case, active frame, and producer-result-direct Ret sink.
 // **THE GAP:** both same-variant positives live in
 // `checked_ih_generated_entry_confluence_reaches_exact_capsules`; these
 // mutation children establish rejection, not positive reach. Neighboring
@@ -1617,15 +1774,13 @@ generated_entry_checked_case!(generated_entry_confluence_fresh_body_reads, GENER
 generated_entry_checked_case!(generated_entry_confluence_route_removal, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-removal", "governed fresh-result route population is absent");
 generated_entry_checked_case!(generated_entry_confluence_route_duplication, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-duplication", "governed fresh-result route population is ambiguous");
 generated_entry_checked_case!(generated_entry_confluence_route_cross_variant, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-cross-variant", "route variant contradicts its exact direct-transport partition");
-generated_entry_checked_case!(generated_entry_confluence_route_wrong_active_frame, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-active-frame", "route active header is not the exact governed frame");
-generated_entry_checked_case!(generated_entry_confluence_route_wrong_header_edge, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-header-edge", "route does not use the active self-resumption header edge");
-generated_entry_checked_case!(generated_entry_confluence_route_wrong_answer_route, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-answer-route", "route does not carry the checked selected-recursor route kind");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_active_frame, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-active-frame", "route active frame is not the exact governed frame");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_selected_case, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-selected-case", "disconnected from its selected recursive case");
 generated_entry_checked_case!(generated_entry_confluence_route_wrong_direct_edge, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-direct-edge", "direct fresh-result route's declared recursive-unit body has no exact typed invocation transport");
 generated_entry_checked_case!(generated_entry_confluence_route_wrong_ret_input_body, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-ret-input-body", "route does not name the exact Ret-input body");
 generated_entry_checked_case!(generated_entry_confluence_route_wrong_ret_input_binder, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-ret-input-binder", "route does not name the exact logical Ret-input binder");
 generated_entry_checked_case!(generated_entry_confluence_route_wrong_governed_key, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-governed-key", "route does not name its governed call key");
-generated_entry_checked_case!(generated_entry_confluence_route_pretend_ordinary_projection, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-pretend-ordinary-projection", "pretends the checked fallback projected a constructor field instead of directly occupying the Ret input");
-generated_entry_checked_case!(generated_entry_confluence_route_body_merge_output, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-body-merge-output", "substituted the causally downstream body merge output for the Ret input");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_delivery, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-delivery", "does not deliver the selected producer result directly");
 generated_entry_checked_case!(generated_entry_confluence_route_reversed, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-reversed", "reverses the governed source and Ret-input sink");
 generated_entry_checked_case!(generated_entry_confluence_route_disagreement, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-disagreement", "disagree on their typed consumer projection");
 generated_entry_checked_case!(generated_entry_confluence_remove_member, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "remove-member", "not equal as sets");
@@ -1655,31 +1810,97 @@ fn assert_generated_entry_capsule_mutation_child() {
         "wrong-locator-callee" => Mutation::WrongLocatorCallee,
         "wrong-locator-domain" => Mutation::WrongLocatorDomain,
         "wrong-locator-index" => Mutation::WrongLocatorIndex,
+        "retained-access-wrong-destination-owner" => Mutation::RetainedAccessWrongDestinationOwner,
+        "retained-access-wrong-destination-body" => Mutation::RetainedAccessWrongDestinationBody,
+        "retained-access-wrong-binding" => Mutation::RetainedAccessWrongBinding,
+        "retained-access-wrong-locator-invocation" => {
+            Mutation::RetainedAccessWrongLocatorInvocation
+        }
+        "retained-access-wrong-locator-callee" => Mutation::RetainedAccessWrongLocatorCallee,
+        "retained-access-wrong-locator-domain" => Mutation::RetainedAccessWrongLocatorDomain,
+        "retained-access-wrong-locator-index" => Mutation::RetainedAccessWrongLocatorIndex,
         other => panic!("unknown generated-entry capsule mutation: {other}"),
     };
+    let direct_control = matches!(
+        mutation,
+        Mutation::WrongDestinationOwner
+            | Mutation::WrongDestinationBody
+            | Mutation::WrongBinding
+            | Mutation::WrongLocatorInvocation
+            | Mutation::WrongLocatorCallee
+            | Mutation::WrongLocatorDomain
+            | Mutation::WrongLocatorIndex
+    );
+    let retained_access_control = matches!(
+        mutation,
+        Mutation::RetainedAccessWrongDestinationOwner
+            | Mutation::RetainedAccessWrongDestinationBody
+            | Mutation::RetainedAccessWrongBinding
+            | Mutation::RetainedAccessWrongLocatorInvocation
+            | Mutation::RetainedAccessWrongLocatorCallee
+            | Mutation::RetainedAccessWrongLocatorDomain
+            | Mutation::RetainedAccessWrongLocatorIndex
+    );
+    let (target, stage) = if direct_control {
+        ("fs-write-at-offset-single", "rt_write_writable_stage")
+    } else {
+        ("fs-read-at-offset-single", "rt_read_offset_stage")
+    };
     let red = ken_runtime::with_checked_ih_generated_entry_capsule_mutation(mutation, || {
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            differential("fs-read-at-offset-single", "rt_read_offset_stage")
-        }))
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| differential(target, stage)))
     });
     assert!(red.is_err(), "{mode}: capsule mutation did not redden");
     assert!(
         ken_runtime::checked_ih_generated_entry_capsule_mutation_is_exact(),
         "{mode}: scoped capsule mutation state did not restore"
     );
+    if direct_control || retained_access_control {
+        differential(target, stage);
+        let target = if direct_control { "write" } else { "read" };
+        eprintln!(
+            "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_RESTORED_GREEN \
+             target={target} mode={mode}"
+        );
+    }
 }
+
+// **Promise class: durable invariant.** The D2 post-selection authority must
+// refuse any selected Tail entry whose published sanitized access projection
+// differs from its retained confluence projection.
+//
+// **MEASURED:** each control mutates one named projection field only on the
+// semantic Tail route population, observes the exact mutated entry selected by
+// the real read fixture, asserts the retained whole-projection refusal, and
+// reruns the same unmutated read target GREEN.
+// **CLAIMED:** no `(C,I,E,S)` authority forms from a Tail certificate whose E
+// access projection disagrees with its retained confluence class.
+// **THE GAP:** the paired Direct/write controls below independently prove the
+// older terminal consumer-boundary checks; neither layer borrows the other's
+// refusal.
+
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_destination_owner_disagreement, "retained-access-wrong-destination-owner", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=DestinationOwner direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_destination_body_disagreement, "retained-access-wrong-destination-body", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=DestinationBody direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_binding_disagreement, "retained-access-wrong-binding", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=BindingFrame direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_invocation_disagreement, "retained-access-wrong-locator-invocation", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=LocatorInvocation direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_callee_disagreement, "retained-access-wrong-locator-callee", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=LocatorCallee direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_domain_disagreement, "retained-access-wrong-locator-domain", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=LocatorDomain direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_index_disagreement, "retained-access-wrong-locator-index", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=LocatorIndex direct_applied=false tail_applied=true", "read");
 
 // **Promise class: durable invariant.** Only the exact computational-recursor
 // capsule satisfying every governed fact may pass the pre-dispatch guard; each
 // independently varied sibling/fact must reject at its named arm.
 //
-// **MEASURED:** projection controls mutate each terminal projection fact after
-// planner validation and before generated-function forwarding, then assert the
-// consumer guard's exact refusal text.
+// **MEASURED:** the seven published-projection controls select only the
+// GovernedDirect route population on the real write fixture, observe both
+// mutation application and entry into terminal validation, assert that
+// consumer's exact refusal, and rerun the same unmutated write target GREEN.
+// The remaining capsule controls mutate the real forwarding value consumed by
+// their named guard on the read fixture.
 // **CLAIMED:** every terminal projection conjunct, including locator domain
 // and index, is independently load-bearing at the consumer seat.
-// **THE GAP:** upstream confluence disagreements remain separate population
-// controls and cannot discharge either consumer-side claim.
+// **THE GAP:** the Tail/read controls above separately prove retained D2
+// access/confluence equality and prove that these Direct controls mutate zero
+// Tail projections.
 generated_entry_checked_case!(generated_entry_capsule_outer_carried, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "outer-carried", "does not name a specialized computational-recursor capsule");
 generated_entry_checked_case!(generated_entry_capsule_specialized_sibling, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "specialized-sibling", "is not a computational-recursor capsule");
 generated_entry_checked_case!(generated_entry_capsule_static_worker, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "static-worker", "StaticWorkerBinding: a source-machine Var in value position is a value-producing position");
@@ -1688,13 +1909,13 @@ generated_entry_checked_case!(generated_entry_capsule_wrong_slot, GENERATED_ENTR
 generated_entry_checked_case!(generated_entry_capsule_wrong_invocation, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-invocation", "projection disagrees with its current function, binding, or call coordinate");
 generated_entry_checked_case!(generated_entry_capsule_non_carried_residual, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "non-carried-residual", "checked frame, slot, call template, or residual phase");
 generated_entry_checked_case!(generated_entry_capsule_provenance_index, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "provenance-index", "callee Var disagrees with the immediate K locator index");
-generated_entry_checked_case!(generated_entry_capsule_wrong_destination_owner, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-destination-owner", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(generated_entry_capsule_wrong_destination_body, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-destination-body", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(generated_entry_capsule_wrong_binding, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-binding", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(generated_entry_capsule_wrong_locator_invocation, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-invocation", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(generated_entry_capsule_wrong_locator_callee, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-callee", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(generated_entry_capsule_wrong_locator_domain, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-domain", "immediate K locator has the wrong domain or is outside the current environment");
-generated_entry_checked_case!(generated_entry_capsule_wrong_locator_index, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-index", "immediate K locator has the wrong domain or is outside the current environment");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_destination_owner, "wrong-destination-owner", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=DestinationOwner direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_destination_body, "wrong-destination-body", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=DestinationBody direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_binding, "wrong-binding", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=BindingFrame direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_locator_invocation, "wrong-locator-invocation", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=LocatorInvocation direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_locator_callee, "wrong-locator-callee", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=LocatorCallee direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_locator_domain, "wrong-locator-domain", "the governed immediate K locator has the wrong domain or is outside the current environment", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=LocatorDomain direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_locator_index, "wrong-locator-index", "the governed immediate K locator has the wrong domain or is outside the current environment", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=LocatorIndex direct_applied=true tail_applied=false", "write");
 
 /// **Promise class: durable invariant.** Dense numbering may move, but planner
 /// iteration and context-interning order must not change class/member/caller
@@ -1960,8 +2181,9 @@ fn composed_return_ret_sink_lookup_controls_refuse() {
 /// **CLAIMED:** the compiler-only sink record changes no ABI, call, value,
 /// result route, or emitted behavior before D3 activates a consumer.
 /// **THE GAP:** suppression removes both the install and its internal lookup;
-/// the population and refusal controls above independently establish that the
-/// exact seam is present and fail-closed.
+/// D2 authority formation is suppressed in both arms so this differential
+/// still isolates D1. The population and refusal controls above independently
+/// establish that the exact seam is present and fail-closed.
 #[test]
 fn composed_return_ret_sink_is_byte_inert() {
     in_large_stack_thread("rt-parity-composed-return-ret-sink-inert", || {
@@ -1972,12 +2194,19 @@ fn composed_return_ret_sink_is_byte_inert() {
             ken_runtime::with_composed_return_ret_sink_mutation(
                 ken_runtime::ComposedReturnRetSinkMutation::Exact,
                 || {
-                    ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        "rt_parity_composed_return_ret_sink_inert",
-                        exact_root.path(),
-                    )
+                    let (artifact, _d2_rows, _d2_applications) =
+                        ken_runtime::with_composed_return_forward_ret_authority_mutation(
+                            ken_runtime::ComposedReturnForwardRetAuthorityMutation::SuppressForInertness,
+                            || {
+                                ken_cli::build_native_program(
+                                    &source,
+                                    ken_cli::SourceFormat::Ken,
+                                    "rt_parity_composed_return_ret_sink_inert",
+                                    exact_root.path(),
+                                )
+                            },
+                        );
+                    artifact
                 },
             );
         let exact = exact.expect("exact composed-return Ret-sink artifact");
@@ -1985,12 +2214,19 @@ fn composed_return_ret_sink_is_byte_inert() {
             ken_runtime::with_composed_return_ret_sink_mutation(
                 ken_runtime::ComposedReturnRetSinkMutation::SuppressForInertness,
                 || {
-                    ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        "rt_parity_composed_return_ret_sink_inert",
-                        suppressed_root.path(),
-                    )
+                    let (artifact, _d2_rows, _d2_applications) =
+                        ken_runtime::with_composed_return_forward_ret_authority_mutation(
+                            ken_runtime::ComposedReturnForwardRetAuthorityMutation::SuppressForInertness,
+                            || {
+                                ken_cli::build_native_program(
+                                    &source,
+                                    ken_cli::SourceFormat::Ken,
+                                    "rt_parity_composed_return_ret_sink_inert",
+                                    suppressed_root.path(),
+                                )
+                            },
+                        );
+                    artifact
                 },
             );
         let suppressed = suppressed.expect("suppressed composed-return Ret-sink artifact");
@@ -2019,6 +2255,469 @@ fn composed_return_ret_sink_is_byte_inert() {
             "the D1 sink seam must change no emitted byte"
         );
         assert!(ken_runtime::composed_return_ret_sink_mutation_is_exact());
+    });
+}
+
+/// **Promise class: durable invariant.**
+///
+/// **MEASURED:** exact post-selection D2 authority formation and complete
+/// suppression emit identical semantic hashes, executable hashes, and bytes;
+/// every exact observation names forward, producer-result-direct delivery to
+/// field zero of one compiler-local Ret block.
+/// **CLAIMED:** the move-only authority join changes no call, result route,
+/// ABI, runtime carrier, or artifact before D3 activates a consumer.
+/// **THE GAP:** the suppression arm moves the authority operation while leaving
+/// the same new planner route in place; the plan-shape positive and the five
+/// natural-site refusal arms independently cover what this differential does
+/// not.
+#[test]
+fn composed_return_forward_ret_authority_is_byte_inert() {
+    in_large_stack_thread("rt-parity-forward-ret-authority-inert", || {
+        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
+
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+        let exact_root = output_dir("forward-ret-authority-inert-exact");
+        let suppressed_root = output_dir("forward-ret-authority-inert-suppressed");
+        let (exact, exact_rows, exact_applications) =
+            ken_runtime::with_composed_return_forward_ret_authority_mutation(
+                Mutation::Exact,
+                || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        "rt_parity_forward_ret_authority_inert",
+                        exact_root.path(),
+                    )
+                },
+            );
+        let exact = exact.expect("exact D2 forward-Ret authority artifact");
+        let (suppressed, suppressed_rows, suppressed_applications) =
+            ken_runtime::with_composed_return_forward_ret_authority_mutation(
+                Mutation::SuppressForInertness,
+                || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        "rt_parity_forward_ret_authority_inert",
+                        suppressed_root.path(),
+                    )
+                },
+            );
+        let suppressed = suppressed.expect("suppressed D2 forward-Ret authority artifact");
+
+        assert!(
+            !exact_rows.is_empty(),
+            "the real Tail authority population must reach"
+        );
+        assert!(suppressed_rows.is_empty());
+        assert_eq!(exact_applications, exact_rows.len());
+        assert_eq!(suppressed_applications, exact_applications);
+        assert!(exact_rows.iter().all(|row| {
+            row.coordinate
+                .ret_input_binder
+                .ends_with("field_position: 0 }")
+                && row.coordinate.direction == "Forward"
+                && row.coordinate.delivery == "ProducerResultDirect"
+                && !row.coordinate.source_call_identity.is_empty()
+                && !row.return_body_block.is_empty()
+        }));
+        assert_eq!(exact.plan_transport_hash, suppressed.plan_transport_hash);
+        assert_eq!(
+            exact.runtime_program.core_semantic_hash,
+            suppressed.runtime_program.core_semantic_hash
+        );
+        assert_eq!(
+            exact.runtime_program.artifact_hash,
+            suppressed.runtime_program.artifact_hash
+        );
+        assert_eq!(
+            exact.artifact.executable_hash,
+            suppressed.artifact.executable_hash
+        );
+        assert_eq!(
+            std::fs::read(&exact.artifact.executable_path).expect("exact executable bytes"),
+            std::fs::read(&suppressed.artifact.executable_path)
+                .expect("suppressed executable bytes"),
+            "D2 authority formation must change no emitted byte"
+        );
+        assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
+    });
+}
+
+/// **Promise class: durable invariant.**
+///
+/// **MEASURED:** at the actual consumer call, every formed authority pairs the
+/// current C/admission and selected I with the same `(I,E,S)` coordinate that
+/// the independent planner and authority observers report; E's existing
+/// capsule row is installed and reached, and at least one real row has C != E.
+/// **CLAIMED:** current consumer call C and certificate entry E have distinct
+/// roles, while exact whole-transport selection I causally joins C to the real
+/// planned and reached `(E,S)` certificate without storing I in access.
+/// **THE GAP:** the role witness is observation-only and cannot license
+/// authority; existing production equality/member/source/projection/sink gates
+/// remain the enforcement, while the paired witness prevents their coordinates
+/// from being misdescribed as one call again.
+#[test]
+fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
+    in_large_stack_thread("rt-parity-forward-ret-role-witness", || {
+        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
+
+        let compile = |label: &str, entry: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("forward-ret-role-witness-{label}"));
+            let (((result, plan_rows), role_rows), authorities, applications) =
+                ken_runtime::with_composed_return_forward_ret_authority_mutation(
+                    Mutation::Exact,
+                    || {
+                        ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
+                            ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                                ken_cli::build_native_program(
+                                    &source,
+                                    ken_cli::SourceFormat::Ken,
+                                    &format!("rt_parity_forward_ret_role_witness_{label}"),
+                                    root.path(),
+                                )
+                            })
+                        })
+                    },
+                );
+            result.expect("the exact C/I/E/S role witness fixture must compile");
+            assert!(!authorities.is_empty(), "{label}: no authority formed");
+            assert_eq!(applications, authorities.len());
+
+            let planned = plan_rows
+                .iter()
+                .flat_map(|row| row.forward_ret_coordinates.iter().cloned())
+                .collect::<std::collections::BTreeSet<_>>();
+            let formed = authorities
+                .iter()
+                .map(|row| row.coordinate.clone())
+                .collect::<std::collections::BTreeSet<_>>();
+            let paired = role_rows
+                .iter()
+                .filter(|row| row.outcome == "Formed")
+                .map(|row| {
+                    let coordinate = row
+                        .formed_coordinate
+                        .clone()
+                        .expect("a Formed role witness must carry E/S proof coordinates");
+                    assert_eq!(
+                        row.selected_source_call_identity, coordinate.source_call_identity,
+                        "{label}: paired row's selected I differs from its proof I"
+                    );
+                    assert!(
+                        plan_rows.iter().any(|plan| {
+                            plan.installed
+                                && plan.reached_count > 0
+                                && plan.forward_ret_coordinates.contains(&coordinate)
+                        }),
+                        "{label}: formed E has no installed and reached capsule row: {coordinate:#?}"
+                    );
+                    coordinate
+                })
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(planned, formed, "{label}: planned/formed Tail set changed");
+            assert_eq!(
+                formed, paired,
+                "{label}: formed authority lacks one C/I/E/S row"
+            );
+            assert_eq!(
+                role_rows
+                    .iter()
+                    .filter(|row| row.outcome == "Formed")
+                    .count(),
+                authorities.len(),
+                "{label}: paired rows and formed authorities differ in multiplicity"
+            );
+            assert!(
+                role_rows.iter().any(|row| {
+                    row.outcome == "Formed"
+                        && row.formed_coordinate.as_ref().is_some_and(|coordinate| {
+                            (
+                                &row.current_invocation_origin,
+                                &row.current_call_origin,
+                                &row.current_callee_origin,
+                            ) != (
+                                &coordinate.entry_invocation_origin,
+                                &coordinate.entry_call_origin,
+                                &coordinate.entry_callee_origin,
+                            )
+                        })
+                }),
+                "{label}: fixture did not prove a real current C distinct from certificate E"
+            );
+            assert!(
+                role_rows.iter().all(|row| {
+                    !row.current_admission.is_empty()
+                        && !row.selected_source_call_identity.is_empty()
+                        && (row.outcome != "Formed" || row.formed_coordinate.is_some())
+                }),
+                "{label}: a role-witness row is incomplete"
+            );
+            assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
+        };
+
+        compile("read", "rt_read_offset_stage");
+        compile("write", "rt_write_writable_stage");
+    });
+}
+
+/// **Promise class: durable invariant.**
+///
+/// **MEASURED:** the complete set of real planned Tail coordinates equals the
+/// unique set of formed post-selection authorities across disjoint read and
+/// write fixtures; removing each Tail member or duplicating one makes the
+/// unchanged source consumer refuse before call emission.
+/// **CLAIMED:** every validated Tail producer-to-Ret route forms exactly one
+/// move-only authority, while Direct and non-governed routes form none.
+/// **THE GAP:** plan and authority observations come from independent sides of
+/// the consumer join; exact set equality closes pairing, per-source removal
+/// proves no member may fail open, and duplication separately closes
+/// multiplicity rather than relying on set equality.
+#[test]
+fn composed_return_forward_ret_authority_population_is_exact() {
+    in_large_stack_thread("rt-parity-forward-ret-authority-population", || {
+        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
+
+        let compile = |label: &str, mutation: Mutation, entry: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("forward-ret-authority-population-{label}"));
+            let ((result, plan_rows), formed, applications) =
+                ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
+                    ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                        ken_cli::build_native_program(
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_parity_forward_ret_authority_population_{label}"),
+                            root.path(),
+                        )
+                    })
+                });
+            let expected = plan_rows
+                .into_iter()
+                .flat_map(|row| row.forward_ret_coordinates)
+                .collect::<Vec<_>>();
+            let actual = formed
+                .iter()
+                .map(|row| row.coordinate.clone())
+                .collect::<Vec<_>>();
+            (result, expected, actual, applications)
+        };
+
+        let (exact, expected, actual, exact_applications) =
+            compile("read-exact", Mutation::Exact, "rt_read_offset_stage");
+        exact.expect("the exact Tail authority population must compile");
+        let expected_set = expected
+            .iter()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        let actual_set = actual
+            .iter()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            expected_set.len() > 1,
+            "the fixture must instantiate a non-degenerate Tail population"
+        );
+        assert_eq!(
+            expected.len(),
+            expected_set.len(),
+            "the real planned Tail population must be unique"
+        );
+        assert_eq!(expected_set, actual_set);
+        assert_eq!(exact_applications, actual.len());
+        assert!(
+            expected.iter().all(|coordinate| {
+                (
+                    &coordinate.entry_binding,
+                    &coordinate.entry_invocation_origin,
+                    &coordinate.entry_call_origin,
+                    &coordinate.entry_callee_origin,
+                ) != (
+                    &coordinate.binding,
+                    &coordinate.invocation_origin,
+                    &coordinate.call_origin,
+                    &coordinate.callee_origin,
+                ) && !coordinate.entry_immediate_k_locator.is_empty()
+            }),
+            "every planned Tail member must pair distinct generated-entry E and producer-source S coordinates"
+        );
+
+        for target in 0..expected.len() {
+            let label = format!("remove-{target}");
+            let (result, removed_expected, removed_actual, applications) = compile(
+                &format!("read-{label}"),
+                Mutation::RemoveTailAuthorityAt(target),
+                "rt_read_offset_stage",
+            );
+            let error = result.expect_err("one missing Tail authority must refuse");
+            assert!(
+                format!("{error:?}").contains(
+                    "validated Tail producer-to-Ret route has no exact post-selection authority"
+                ),
+                "removal {target} reached the wrong refusal: {error:?}"
+            );
+            assert_eq!(removed_expected, expected);
+            assert_eq!(applications, removed_actual.len() + 1);
+            let removed_set = removed_actual
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>();
+            assert!(
+                removed_set.is_subset(&expected_set) && removed_set != expected_set,
+                "removal {target} did not remove one real planned coordinate"
+            );
+            assert!(
+                ken_runtime::composed_return_forward_ret_authority_mutation_is_exact(),
+                "removal {target} did not restore its scoped mutation"
+            );
+        }
+
+        let (write_exact, write_expected, write_actual, write_applications) =
+            compile("write-exact", Mutation::Exact, "rt_write_writable_stage");
+        write_exact.expect("the exact write-side Tail authority population must compile");
+        let write_expected_set = write_expected
+            .iter()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        let write_actual_set = write_actual
+            .iter()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(write_expected_set.len() > 1);
+        assert_eq!(write_expected.len(), write_expected_set.len());
+        assert_eq!(write_expected_set, write_actual_set);
+        assert_eq!(write_applications, write_actual.len());
+        assert_eq!(
+            expected_set.union(&write_expected_set).count(),
+            expected_set.len() + write_expected_set.len(),
+            "read and write fixtures must cover disjoint Tail coordinates"
+        );
+
+        for target in 0..write_expected.len() {
+            let (result, removed_expected, removed_actual, applications) = compile(
+                &format!("write-remove-{target}"),
+                Mutation::RemoveTailAuthorityAt(target),
+                "rt_write_writable_stage",
+            );
+            let error = result.expect_err("one missing write-side Tail authority must refuse");
+            assert!(
+                format!("{error:?}").contains(
+                    "validated Tail producer-to-Ret route has no exact post-selection authority"
+                ),
+                "write removal {target} reached the wrong refusal: {error:?}"
+            );
+            assert_eq!(removed_expected, write_expected);
+            assert_eq!(applications, removed_actual.len() + 1);
+            let removed_set = removed_actual
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>();
+            assert!(
+                removed_set.is_subset(&write_expected_set) && removed_set != write_expected_set,
+                "write removal {target} did not remove one real planned coordinate"
+            );
+            assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
+        }
+
+        let duplicate_target = expected.len() / 2;
+        let (result, duplicate_expected, duplicated, applications) = compile(
+            "read-duplicate",
+            Mutation::DuplicateTailAuthorityAt(duplicate_target),
+            "rt_read_offset_stage",
+        );
+        let error = result.expect_err("one duplicated Tail authority must refuse");
+        assert!(
+            format!("{error:?}").contains(
+                "validated Tail producer-to-Ret route formed more than one post-selection authority"
+            ),
+            "duplication reached the wrong refusal: {error:?}"
+        );
+        assert_eq!(duplicate_expected, expected);
+        assert_eq!(applications, duplicated.len());
+        let [.., penultimate, last] = duplicated.as_slice() else {
+            panic!("the duplication control formed fewer than two authorities");
+        };
+        assert_eq!(
+            penultimate, last,
+            "the duplication control did not duplicate one real authority coordinate"
+        );
+        assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
+    });
+}
+
+/// **Promise class: durable invariant.**
+///
+/// **MEASURED:** each control changes one operand after exact generated-entry
+/// validation and transport selection, reaches the D2 join, and returns its
+/// specific member, projection, selected identity, producer source, or sink
+/// refusal.
+/// **CLAIMED:** no other confluence member, projection, source identity, or
+/// function-local Ret sink can yield usable forward authority.
+/// **THE GAP:** applications prove reach and exact messages distinguish the
+/// intended arms; the exact byte-inert positive above supplies the passing
+/// configuration each negative control needs.
+#[test]
+fn composed_return_forward_ret_authority_controls_refuse() {
+    in_large_stack_thread("rt-parity-forward-ret-authority-controls", || {
+        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
+
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_write_writable_stage");
+        for (label, mutation, expected) in [
+            (
+                "wrong-member",
+                Mutation::WrongMember,
+                "source-call identity is not a member of the exact forward Ret confluence class",
+            ),
+            (
+                "projection-disagreement",
+                Mutation::ProjectionDisagreement,
+                "projection disagrees with its exact access-coordinate projection",
+            ),
+            (
+                "wrong-source",
+                Mutation::WrongSource,
+                "proof source is not the selected transport's own source-call identity",
+            ),
+            (
+                "producer-source-from-entry",
+                Mutation::ProducerSourceFromEntry,
+                "Tail producer source disagrees with the selected member's planner-derived producer step",
+            ),
+            (
+                "wrong-sink",
+                Mutation::WrongSink,
+                "does not match the unique emission sink",
+            ),
+        ] {
+            let root = output_dir(&format!("forward-ret-authority-control-{label}"));
+            let (result, observations, applications) =
+                ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        &format!(
+                            "rt_parity_forward_ret_authority_control_{}",
+                            label.replace('-', "_")
+                        ),
+                        root.path(),
+                    )
+                });
+            assert!(
+                applications > 0,
+                "{label}: control missed the post-selection D2 join"
+            );
+            let error = result.expect_err("a mismatched D2 authority operand must refuse");
+            let rendered = format!("{error:?}");
+            assert!(
+                rendered.contains(expected),
+                "{label}: wrong refusal arm; error={rendered}; observations={observations:#?}"
+            );
+            assert!(
+                ken_runtime::composed_return_forward_ret_authority_mutation_is_exact(),
+                "{label}: scoped D2 authority mutation did not restore"
+            );
+        }
     });
 }
 

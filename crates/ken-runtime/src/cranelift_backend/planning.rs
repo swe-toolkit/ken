@@ -19,6 +19,7 @@ pub use static_transition::{
     checked_ih_generated_entry_admission_mutation_is_exact,
     checked_ih_generated_entry_arrival_mutation_is_exact,
     checked_ih_generated_entry_confluence_mutation_is_exact,
+    composed_return_forward_ret_authority_mutation_is_exact,
     retained_result_closure_proof_mutation_applied,
     retained_result_closure_proof_mutation_is_exact,
     with_checked_ih_continuation_inheritance_mutation,
@@ -27,22 +28,29 @@ pub use static_transition::{
     with_checked_ih_generated_entry_admission_observations,
     with_checked_ih_generated_entry_arrival_mutation,
     with_checked_ih_generated_entry_confluence_mutation,
-    with_checked_ih_generated_entry_observations, with_retained_result_closure_proof_mutation,
-    with_worker_prefix_deferrals, CheckedIhContinuationInheritanceMutation,
-    CheckedIhContinuationInheritanceObservation, CheckedIhGeneratedEntryAdmissionMutation,
-    CheckedIhGeneratedEntryAdmissionObservation, CheckedIhGeneratedEntryArrivalMutation,
-    CheckedIhGeneratedEntryConfluenceMutation, CheckedIhGeneratedEntryObservation,
+    with_checked_ih_generated_entry_observations,
+    with_composed_return_forward_ret_authority_mutation,
+    with_composed_return_forward_ret_role_witnesses,
+    with_retained_result_closure_proof_mutation, with_worker_prefix_deferrals,
+    CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
+    CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
+    CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
+    CheckedIhGeneratedEntryObservation, ComposedReturnForwardRetAuthorityMutation,
+    ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
+    ComposedReturnForwardRetRoleWitnessObservation,
     RetainedResultClosureProofMutation, WorkerPrefixDeferral,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
 pub(in crate::cranelift_backend) use static_transition::{
-    checked_ih_generated_entry_arrival_mutation,
+    checked_ih_generated_entry_arrival_mutation, composed_return_forward_ret_authority_mutation,
     record_checked_ih_generated_entry_governed_validation,
     record_checked_ih_generated_entry_installed,
     record_checked_ih_generated_entry_ordinary_continuation,
-    record_checked_ih_generated_entry_raw_arrival,
-    record_checked_ih_generated_entry_reached,
+    record_checked_ih_generated_entry_raw_arrival, record_checked_ih_generated_entry_reached,
+    record_composed_return_forward_ret_authority,
+    record_composed_return_forward_ret_role_witness,
+    take_composed_return_forward_ret_population_mutation,
 };
 
 pub(super) use static_transition::build_static_continuation_fusion_plan;
@@ -101,7 +109,8 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{
     AggregateOccurrenceId, BoundaryClosureEnvironment, CheckedIhCapabilityInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
-    CheckedIhFreshResultDestination, CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
+    CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
+    CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
     CheckedIhImmediateKBindingLocator,
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,

@@ -457,6 +457,13 @@ pub enum CheckedIhGeneratedEntryCapsuleMutation {
     WrongLocatorCallee,
     WrongLocatorDomain,
     WrongLocatorIndex,
+    RetainedAccessWrongDestinationOwner,
+    RetainedAccessWrongDestinationBody,
+    RetainedAccessWrongBinding,
+    RetainedAccessWrongLocatorInvocation,
+    RetainedAccessWrongLocatorCallee,
+    RetainedAccessWrongLocatorDomain,
+    RetainedAccessWrongLocatorIndex,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -477,8 +484,10 @@ pub fn with_checked_ih_generated_entry_capsule_mutation<T>(
             GENERATED_ENTRY_CAPSULE_MUTATION.with(|active| {
                 active.set(CheckedIhGeneratedEntryCapsuleMutation::Exact)
             });
+            CheckedIhGeneratedEntryAccess::reset_published_projection_control_observations();
         }
     }
+    CheckedIhGeneratedEntryAccess::reset_published_projection_control_observations();
     GENERATED_ENTRY_CAPSULE_MUTATION.with(|active| active.set(mutation));
     let _restore = Restore;
     f()
@@ -523,7 +532,14 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
         | Mutation::WrongLocatorInvocation
         | Mutation::WrongLocatorCallee
         | Mutation::WrongLocatorDomain
-        | Mutation::WrongLocatorIndex => {}
+        | Mutation::WrongLocatorIndex
+        | Mutation::RetainedAccessWrongDestinationOwner
+        | Mutation::RetainedAccessWrongDestinationBody
+        | Mutation::RetainedAccessWrongBinding
+        | Mutation::RetainedAccessWrongLocatorInvocation
+        | Mutation::RetainedAccessWrongLocatorCallee
+        | Mutation::RetainedAccessWrongLocatorDomain
+        | Mutation::RetainedAccessWrongLocatorIndex => {}
         Mutation::OuterCarried => {
             if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
                 Lowered::ComputationalRecursorClosure { residual, .. },
@@ -4041,6 +4057,12 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             )
         })?;
         let locator = projection.immediate_k_locator();
+        #[cfg(feature = "px8-ds-test-support")]
+        access.record_direct_projection_control_validation(
+            pending.invocation_origin,
+            pending.application_origin,
+            callee_origin,
+        );
         if projection.destination_owner() != destination_owner
             || projection.destination_body_origin() != access.worker_body_origin()
             || projection.binding() != binding
@@ -4099,7 +4121,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 "the governed recursor capsule disagrees with the checked frame, slot, call template, or residual phase",
             ));
         }
-        if !projection.fresh_result_route().matches_governed_arrival(
+        if !projection.matches_governed_arrival(
             pending.invocation_origin,
             pending.application_origin,
             callee_origin,
@@ -4110,7 +4132,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             ));
         }
         #[cfg(feature = "px8-ds-test-support")]
-        record_checked_ih_fresh_result_route_selected(projection.fresh_result_route());
+        record_checked_ih_fresh_result_route_selected(projection);
 
         let _fresh_result_destination = projection.fresh_result_destination();
         Ok(binding)
@@ -4124,6 +4146,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         env: Vec<LoweringEnvironmentBinding>,
         control: SourceControl<'b>,
     ) -> Result<SourceCallOutcome<'b>, CraneliftBackendError> {
+        // Generated-entry admission validates current consumer-call arrival C
+        // here. Test support retains C's role through later transport selection;
+        // production authority independently reopens I's certificate E/S.
+        #[cfg(feature = "px8-ds-test-support")]
+        let mut current_forward_ret_role_witness = None;
         // Total generated-entry admission, before `specialized_at` and every
         // callable arm. The one map read answers both applicability and typed
         // authority: positive `NonGoverned` membership continues unchanged;
@@ -4155,6 +4182,26 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         "the total generated-entry admission map has no current call key",
                     )
                 })?;
+            #[cfg(feature = "px8-ds-test-support")]
+            {
+                let current_admission = match &admission {
+                    CheckedIhGeneratedEntryAdmission::NonGoverned => "NonGoverned",
+                    CheckedIhGeneratedEntryAdmission::Governed(projection) => {
+                        match projection.fresh_result_route() {
+                            CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {
+                                "GovernedDirect"
+                            }
+                            CheckedIhFreshResultRoute::TailProducerToRet { .. } => "GovernedTail",
+                        }
+                    }
+                };
+                current_forward_ret_role_witness = Some((
+                    pending.invocation_origin,
+                    pending.application_origin,
+                    callee_origin,
+                    current_admission,
+                ));
+            }
             match admission {
                 CheckedIhGeneratedEntryAdmission::NonGoverned => {
                     #[cfg(feature = "px8-ds-test-support")]
@@ -4230,15 +4277,17 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         }
                     }
                     #[cfg(not(feature = "px8-ds-test-support"))]
-                    self.validate_checked_ih_generated_entry_governed_arrival(
-                        &callee,
-                        &args,
-                        &env,
-                        &access,
-                        pending,
-                        callee_origin,
-                        &projection,
-                    )?;
+                    {
+                        self.validate_checked_ih_generated_entry_governed_arrival(
+                            &callee,
+                            &args,
+                            &env,
+                            &access,
+                            pending,
+                            callee_origin,
+                            &projection,
+                        )?;
+                    }
                 }
             }
         }
@@ -4365,6 +4414,80 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     (_, _) => unreachable!("this arm matched a computational recursor"),
                 };
                 if let Some(transport) = transport {
+                    // D2 forms one move-only compiler proof only after the
+                    // exact transport has been selected and before its call is
+                    // emitted. The proof is deliberately not consumed by the
+                    // returned value or any control edge in this increment.
+                    let forward_ret_outcome = match self
+                        .function_local
+                        .checked_ih_generated_entry_access
+                        .as_ref()
+                    {
+                        Some(access) => {
+                            self.composed_return_forward_ret_authority(access, &transport)?
+                        }
+                        None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
+                    };
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if let Some((
+                        current_invocation_origin,
+                        current_call_origin,
+                        current_callee_origin,
+                        current_admission,
+                    )) = current_forward_ret_role_witness
+                    {
+                        let (outcome, proof) = match &forward_ret_outcome {
+                            ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
+                                ("NonApplicable", None)
+                            }
+                            ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
+                                ("Formed", Some(&authority._plan))
+                            }
+                            ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                                ("MissingRequired", None)
+                            }
+                            ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
+                                ("SuppressedForInertness", None)
+                            }
+                            ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                                ("Duplicated", None)
+                            }
+                        };
+                        record_composed_return_forward_ret_role_witness(
+                            current_invocation_origin,
+                            current_call_origin,
+                            current_callee_origin,
+                            current_admission,
+                            transport.source_call_identity(),
+                            outcome,
+                            proof,
+                        );
+                    }
+                    let _forward_ret_authority = match forward_ret_outcome {
+                        ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
+                            Some(authority)
+                        }
+                        ComposedReturnForwardRetAuthorityOutcome::NonApplicable => None,
+                        #[cfg(feature = "px8-ds-test-support")]
+                        ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => None,
+                        #[cfg(feature = "px8-ds-test-support")]
+                        ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                            return Err(unsupported(
+                                "ComposedReturnForwardRetAuthority",
+                                "a validated Tail producer-to-Ret route has no exact post-selection authority",
+                            ));
+                        }
+                        #[cfg(feature = "px8-ds-test-support")]
+                        ComposedReturnForwardRetAuthorityOutcome::Duplicated(
+                            _first,
+                            _duplicate,
+                        ) => {
+                            return Err(unsupported(
+                                "ComposedReturnForwardRetAuthority",
+                                "a validated Tail producer-to-Ret route formed more than one post-selection authority",
+                            ));
+                        }
+                    };
                     self.pending_computational_ih_call.take();
                     let returned = self.call_checked_ih_transport_from_case_environment(
                         builder, &transport, &env,
