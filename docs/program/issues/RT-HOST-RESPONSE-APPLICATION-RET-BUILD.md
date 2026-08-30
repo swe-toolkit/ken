@@ -1,7 +1,7 @@
 ---
 id: RT-HOST-RESPONSE-APPLICATION-RET-BUILD
 title: "Production recut on the checked Host-Vis route: prove the causal chain Host response (H e) -> the existing sole apply-k-resp application -> that application's result -> exact Ret, as TWO typed compiler-only edges (HostResponseToApplication + ApplicationResultToRet) that never let one discharge the other. Predeclare one private application-result continuation at the existing Host-Vis Let/application seat, lower the existing body exactly once, deliver every physical successful application return exactly once to that continuation, then consume the existing Tail proof and lower/schedule the exact Ret destination once. Read = the direct Computational head (D1, independently mergeable); write = Active as a distinct exhaustive arm (D2, revalidate the same application/frame/Ret-body/binder relation, deliver to the same logical continuation). Do NOT add or reapply k; do NOT forward the environment-transport word as resp."
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -12,11 +12,33 @@ github: null
 origin: "Architect ruling evt_3jn61sw0w23hy (thr_6vmcjhwxc78sk), 2026-08-30, on exact base 0be25235b188bc67b3f9209d1ff0b6f8fa063258, tree 769c24708fb2052c3d6e719a8adc135423c28192. This ruling BLOCKED the released production recut RT-COMPOSED-RETURN-PRODUCER-SINK-COLOCATION-BUILD as framed and WITHDREW the true-emitter premise it rested on: the prior ruling evt_6vpyaje9a7n85 incorrectly promoted physical call identity (call_checked_ih_environment_transport, an environment-materialization call) to semantic result identity. The prototype digest 1bf9907d604cf7248d007b83c311cf2b56e4032bebd2f770500c47746ead2122 is a valid refutation; the observed Result PatternMatchFailure is exactly the forbidden wrong-word control. The Architect authorizes this fresh recut: Host response -> existing sole application -> application result -> exact Ret, via the two causal edges below. Steward-recut per COORDINATION section 2. Design authority for this production recut only; NO candidate/merge authority before fresh Runtime QA, Architect review, and publisher CI. @steward owed the withdrawal/reframe/release; runtime was parked until this release."
 ---
 
-> # READY — PRODUCTION recut. Released to the runtime ring (lane 1). Runtime was
-> # parked at base `0be25235b`; this IS the release.
+> # CLOSED — SOUND D1-FEASIBILITY NO. SUPERSEDED BY the scratch-only
+> # `RT-HOST-APPLICATION-TRAP-PROVENANCE-D0`. (Architect ruling
+> # `evt_56t3wm78ax81h`, thr_3ht16h248rzqk, 2026-08-30.)
 >
-> This node SUPERSEDES `RT-COMPOSED-RETURN-PRODUCER-SINK-COLOCATION-BUILD`
-> (now closed): its true-emitter premise is SPENT.
+> The runtime ring built this recut and proved its central premise SPENT: the
+> current product NEVER produces a caller-visible successful result for the exact
+> continuation application. The seven `CheckedHostVisContinuation` applications in
+> `funcid45` all TRAP internally — the callee selects a real typed trap lane
+> (planned `PatternMatchFailure` at `ResourceBodyResult`) before any successful
+> application-result edge — so `ApplicationResultToRet` cannot be instantiated
+> (there is no result to carry), and the late direct edge fails Cranelift dominance
+> (`inst1269` from non-dominating `block5`). A private carrier cannot carry a value
+> this execution never produces.
+>
+> This is the SAME broader predicate again: a static phase/result identity standing
+> in for a semantic value role — every prior production frame designed a
+> caller-result/sink seat before proving which callee outcome lane the product
+> actually reaches. The structural response is PROVENANCE at the failing consumer,
+> not a third result seat. The successor `RT-HOST-APPLICATION-TRAP-PROVENANCE-D0`
+> (scratch-only, on the same base `0be25235b`) answers why context body 941 selects
+> the trap lane BEFORE any further production design is chosen. Everything below
+> this banner is retained as chronology; the two-edge production premise is spent.
+>
+> --- (retained chronology from the released recut) ---
+>
+> This node SUPERSEDED `RT-COMPOSED-RETURN-PRODUCER-SINK-COLOCATION-BUILD`
+> (also closed): its true-emitter premise was SPENT.
 > `call_checked_ih_environment_transport` is an
 > environment-materialization call — its returned SSA is NOT the semantic Host
 > response and NOT the result of the one semantic `apply k resp`. **Stop
