@@ -1,14 +1,14 @@
 ---
 id: CAT-BOOL-REUSE-CONSUMERS
 title: "Drain catalog-reuse census group 6 (Boolean computational reuse) — replace three reimplementations (Derived#bool_and, Derived#bool_leq, Map#option_is_some) with selective imports of the now-public LC.bool_and, LC.bool_leq and SC.is_some. The consumer half of CAT-BOOL-PUB-EXPORT, shaped on the landed CAT-DERIVED-REUSE-CONSUMERS per-package increment pattern."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
 tier: T2
 depends_on: [CAT-BOOL-PUB-EXPORT]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3136
 origin: "Steward, 2026-08-29, filed on the CAT-BOOL-PUB-EXPORT landing (providers public at 4faa97bfb, PR #3108) so lane 3 does not idle. Group 6 membership quoted verbatim from docs/program/cat-reuse-census.md §4.4 item 6 (lines 317-320) at origin/main 4faa97bfb; the three [low] consume tags read from §3 rows 36 (Derived) and 37 (Map). The two providers CAT-BOOL-PUB-EXPORT just published (LC.bool_and, LC.bool_leq, SC.is_some) are exactly the three names group 6 consumes, so the prerequisite covers the consumers with nothing left over. Steward-filed per COORDINATION section 2."
 ---
 

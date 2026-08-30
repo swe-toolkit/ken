@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-30 03:00:49Z — from 486 issue file(s) in `docs/program/issues/`.
+2026-08-30 03:16:47Z — from 486 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -56,7 +56,7 @@ the committed file matches the generator's output.
 | `BUDGET-EFF` | TransferCount.remaining must be bounded by the effective request | merged | verify | M | none | — |
 | `BUDGET-EXHAUST` | transfer-budget bound checks are fail-open on variant extension | merged | verify | S | none | — |
 | `CAT-BOOL-PUB-EXPORT` | Mark the three census group-6 boolean providers loader-visible (pub): bool_and and bool_leq in Core.Classes.LawfulClasses, is_some in Data.Sums.Combinators. The provider prerequisite for census group 6 (Boolean computational reuse), shaped on the twice-landed CAT-ORDER-PUB-EXPORT / CAT-DERIVED-PUB-EXPORT pattern. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3108 |
-| `CAT-BOOL-REUSE-CONSUMERS` | Drain catalog-reuse census group 6 (Boolean computational reuse) — replace three reimplementations (Derived#bool_and, Derived#bool_leq, Map#option_is_some) with selective imports of the now-public LC.bool_and, LC.bool_leq and SC.is_some. The consumer half of CAT-BOOL-PUB-EXPORT, shaped on the landed CAT-DERIVED-REUSE-CONSUMERS per-package increment pattern. | active | foundation | S | none | — |
+| `CAT-BOOL-REUSE-CONSUMERS` | Drain catalog-reuse census group 6 (Boolean computational reuse) — replace three reimplementations (Derived#bool_and, Derived#bool_leq, Map#option_is_some) with selective imports of the now-public LC.bool_and, LC.bool_leq and SC.is_some. The consumer half of CAT-BOOL-PUB-EXPORT, shaped on the landed CAT-DERIVED-REUSE-CONSUMERS per-package increment pattern. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3136 |
 | `CAT-BSEARCH` | Decidable ordered search — Algorithm/Searching: membership over a sorted List returning a Dec proof, target 3 of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-C2` | Localized Map/Set key-interface split: a non-canonical carrier becomes a lawful Map/Set key under a weaker key-order dictionary while staying an unlawful Ord key wherever antisym concludes kernel Equal | draft | spec-enclave | M | none | — |
 | `CAT-CAPEX` | catalog exhibits no checked capability/authority exemplar — write one against the landed Cap/Auth surface | merged | ergo | M | none | — |
