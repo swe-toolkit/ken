@@ -83,3 +83,24 @@ cp selected-1.json mutation/selected-1.json
   mv realized-shard-1 realized-shards/
   if python3 "$repo/scripts/check-ci-shard-union.py"; then exit 1; fi
 )
+# Both eight-artifact mutations retain seven valid siblings.
+mkdir mutation-eight
+cp -a realized-shards mutation-eight/
+(
+  cd mutation-eight
+  cp ../inventory.json raw-source.json
+  "$repo/scripts/stage-ci-shard-artifact.sh" 1 raw-source.json ../inventory.json ../selected-1.json
+  rm -rf realized-shards/realized-shard-1
+  mv realized-shard-1 realized-shards/
+  if python3 "$repo/scripts/check-ci-shard-union.py"; then exit 1; fi
+)
+mkdir mutation-content
+cp -a realized-shards mutation-content/
+(
+  cd mutation-content
+  cp ../inventory.json unfiltered-inventory.json
+  "$repo/scripts/stage-ci-shard-artifact.sh" 1 unfiltered-inventory.json ../inventory.json ../selected-1.json
+  rm -rf realized-shards/realized-shard-1
+  mv realized-shard-1 realized-shards/
+  if python3 "$repo/scripts/check-ci-shard-union.py"; then exit 1; fi
+)
