@@ -49,8 +49,8 @@ def read_listing(path: Path) -> tuple[set[tuple[str, str]], set[tuple[str, str]]
             raise ShardCheckError(f"{path}: suite has no non-empty binary-id")
         if not isinstance(binary_name, str) or not binary_name:
             raise ShardCheckError(f"{path}: suite has no non-empty binary-name")
-        if not isinstance(testcases, dict) or not testcases:
-            raise ShardCheckError(f"{path}: suite has no non-empty testcases")
+        if not isinstance(testcases, dict):
+            raise ShardCheckError(f"{path}: suite has no testcase map")
         for testcase, metadata in testcases.items():
             if not isinstance(testcase, str) or not testcase:
                 raise ShardCheckError(f"{path}: suite has an invalid testcase")

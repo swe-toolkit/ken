@@ -34,8 +34,8 @@ def tests(value):
             raise SystemExit("nextest rust suite has no non-empty binary-id")
         if not isinstance(binary_name, str) or not binary_name:
             raise SystemExit("nextest rust suite has no non-empty binary-name")
-        if not isinstance(testcases, dict) or not testcases:
-            raise SystemExit("nextest rust suite has no non-empty testcases")
+        if not isinstance(testcases, dict):
+            raise SystemExit("nextest rust suite has no testcase map")
         for name, metadata in testcases.items():
             if not isinstance(name, str) or not name or not isinstance(metadata, dict):
                 raise SystemExit("nextest rust suite has an invalid testcase record")

@@ -55,7 +55,7 @@ class DurationShardControls(unittest.TestCase):
     def test_empty_eligible_population_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            inventory = {"test-count": 1, "rust-suites": {"native": {"binary-id": "fixture::native", "binary-name": "rt_parity_native", "testcases": {"t": {"filter-match": {"status": "matches"}}}}}}
+            inventory = {"test-count": 1, "rust-suites": {"empty": {"binary-id": "fixture::empty", "binary-name": "ordinary", "testcases": {}}, "native": {"binary-id": "fixture::native", "binary-name": "rt_parity_native", "testcases": {"t": {"filter-match": {"status": "matches"}}}}}}
             (root / "inventory.json").write_text(json.dumps(inventory))
             (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": "fixture::native t", "seconds": 1}]}))
             result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json"], cwd=root, text=True, stderr=subprocess.PIPE, check=False)
