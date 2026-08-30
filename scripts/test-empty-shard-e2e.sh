@@ -92,6 +92,7 @@ cp -a realized-shards mutation-eight/
   mv realized-shard-1 realized-shards/
   python3 "$repo/scripts/check-ci-shard-union.py"
 )
+# Pre-fix construction substitutes the filtered projection for raw authority; real union must refuse it.
 mkdir mutation-content
 cp -a realized-shards mutation-content/
 (
