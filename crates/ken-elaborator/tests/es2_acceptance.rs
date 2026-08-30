@@ -38,6 +38,12 @@ fn mk_env_with_map() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Combinators")
+        .expect("Map's canonical Option-combinator provider must roots-load");
+    assert!(
+        !env.globals.contains_key("is_some"),
+        "the legacy Map fixture must not prebind an unqualified is_some alias"
+    );
     env.elaborate_ken_md_file(MAP_KEN_MD).expect("map.ken.md must elaborate");
     env
 }
