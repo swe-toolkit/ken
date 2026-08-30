@@ -13,3 +13,13 @@ LOG="$root/log" PATH="$root/bin:$PATH" scripts/run-ci-shard.sh 0 ignored
 LOG="$root/log" PATH="$root/bin:$PATH" scripts/run-ci-shard.sh 1 '(binary_id(=x) & test(=y))'
 [[ $(wc -l < "$root/log") -eq 1 ]]
 grep -Fx 'nextest run --workspace --locked -E (binary_id(=x) & test(=y))' "$root/log"
+printf a > "$root/unfiltered.json"
+printf b > "$root/inventory.json"
+printf c > "$root/selected.json"
+(
+  cd "$root"
+  "$OLDPWD/scripts/stage-ci-shard-artifact.sh" 8 unfiltered.json inventory.json selected.json
+)
+test -f "$root/realized-shard-8/unfiltered.json"
+test -f "$root/realized-shard-8/inventory.json"
+test -f "$root/realized-shard-8/selected.json"

@@ -130,8 +130,7 @@ jobs:
             cargo nextest list --workspace --locked --message-format json -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)" > "selected-${{ matrix.shard }}.json"
           fi
           python3 scripts/ci-duration-shard.py validate-plan duration-filters/assignments.json "${{ matrix.shard }}" "selected-${{ matrix.shard }}.json"
-          mkdir "realized-shard-${{ matrix.shard }}"
-          cp unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json" "realized-shard-${{ matrix.shard }}/"
+          scripts/stage-ci-shard-artifact.sh "${{ matrix.shard }}" unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json"
       - name: Test
         run: >-
           scripts/run-ci-shard.sh
