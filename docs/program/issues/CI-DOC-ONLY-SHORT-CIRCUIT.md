@@ -1,6 +1,6 @@
 ---
 id: CI-DOC-ONLY-SHORT-CIRCUIT
-title: "Detect doc-only PRs by changed-path classification and short-circuit the expensive CI matrix to a required-green pass, saving GitHub Actions compute given the doc-to-code PR ratio; any PR touching crates/catalog/spec/conformance or a CI-control file forces the full pipeline. The classifier must REPORT every required status-check context as success on the doc-only path (skipped != green under branch protection), must be PATH-based (any crates/ change, including a comment-only .rs edit, is full CI so a /// doctest is never mis-skipped), must reuse the publisher's existing --doc-only path taxonomy as a single source of truth, and must FAIL CLOSED (any error/ambiguity runs full CI)."
+title: "Detect doc-only PRs by changed-path classification and short-circuit the expensive CI matrix to a required-green pass, saving GitHub Actions compute given the doc-to-code PR ratio; any PR touching crates/catalog/spec/conformance or a CI-control file forces the full pipeline. The classifier must REPORT every required status-check context as success on the doc-only path (skipped != green under branch protection), must be PATH-based (any crates/ change, including a comment-only .rs edit, is full CI so a /// doctest is never mis-skipped), must be a SELF-CONTAINED path taxonomy whose short-circuit set is a subset of non-compiled/inert paths (decoupled from the publisher's caller-asserted --doc-only; amended 2026-08-30), and must FAIL CLOSED (any error/ambiguity runs full CI)."
 status: ready
 owner: verify
 size: M
@@ -25,6 +25,12 @@ origin: "Operator request 2026-08-30: 'can doc-only PRs be detected in CI and sh
 > # current workflow before designing the reporting shape (D1). This node's own
 > # candidate touches CI-control files, so it is itself in the denylist and MUST
 > # run full CI — a doc-only short-circuit of THIS PR would be a bug.
+> #
+> # AMENDED 2026-08-30 (hard stop `evt_30y7y1y4sdd84`): the classifier is
+> # SELF-CONTAINED and DECOUPLED from the publisher `--doc-only` flag (which has no
+> # classifier — it is caller-asserted). AC-CLASSIFIER-SINGLE-SOURCE is replaced by
+> # AC-SKIP-SET-SAFE-SUBSET; D2 (shared taxonomy) is dropped; D1 is the whole node.
+> # The publisher and the classifier are orthogonal mechanisms — see design point 3.
 
 ## The waste this closes
 
@@ -56,13 +62,20 @@ executed doctest, so "comment-only in a code file" is not safe to skip. A
 path-based classifier sidesteps that trap entirely: the doc-only set is a
 whitelist of non-compiled paths, and anything else is full CI.
 
-**3. Single source of truth with the publisher.** The fleet ALREADY computes
-doc-only in the publisher (`scripts/scripted-pr-automerge.sh --doc-only` plus the
-diff classifier in `agent/playbooks/federation/steward/merge-procedure.md`). The
-CI classifier MUST reuse the same path taxonomy, so the publisher and CI can never
-disagree on whether a PR is doc-only. A divergence (publisher skips while CI runs
-full, or CI short-circuits while the publisher treated it as code) is a subtle
-hazard — factor the taxonomy into one shared definition both consume.
+**3. The classifier is a SELF-CONTAINED authority, decoupled from the publisher
+`--doc-only` flag (Steward amendment 2026-08-30, hard stop `evt_30y7y1y4sdd84`).**
+The original framing was factually wrong: the publisher
+(`scripts/scripted-pr-automerge.sh`) has NO changed-path classifier — it accepts a
+caller-supplied `--doc-only` and trusts it, and `merge-procedure.md:143-149` is
+human guidance that even treats a comment-only `.rs` as `--doc-only`-eligible. That
+is a DIFFERENT mechanism: the CI classifier decides whether the expensive matrix
+RUNS; the publisher `--doc-only` is a caller judgment on whether the merge WAITS
+for CI. They are orthogonal and must not be forced to share a taxonomy. The only
+safety coupling is ONE-DIRECTIONAL: the classifier's short-circuit (skip) set must
+be a subset of genuinely non-compiled/inert paths, so CI never reports
+green-without-running for anything a normal (non-`--doc-only`) merge would need
+validated. Being STRICTER than the publisher's liberal prose is safe; the
+classifier owns its own path taxonomy and does not reuse the publisher's.
 
 **4. FAIL CLOSED.** A classifier that errors, cannot determine the changed paths,
 or is ambiguous must run FULL CI — never short-circuit on uncertainty. A
@@ -81,21 +94,25 @@ only ever taken on a positively-proven doc-only diff.
   denylist):** `docs/`, `*.md` anywhere outside the denylist, `agent/`,
   `library/`, and other non-compiled documentation paths.
 - The rule is set-disjointness: doc-only iff (changed-paths subset of allowlist)
-  AND (changed-paths intersect denylist == empty). Confirm the exact allowlist
-  against the publisher taxonomy at D1 rather than hard-coding a guess here.
+  AND (changed-paths intersect denylist == empty). The allowlist is this node's
+  OWN definition (not the publisher's); confirm its exact members at D1 against the
+  live repo layout rather than hard-coding a guess here.
 
 ## Deliverables
 
 **D1 — classifier + short-circuit + required-context reporting.** Measure the
-current required-check topology and the publisher's doc-only path taxonomy, then
-add the changed-path classifier to CI: on a positively-proven doc-only diff, skip
-the expensive jobs and report every required context `success`; otherwise run the
-full pipeline. Fail closed. D1 is the core and is independently mergeable.
+current required-check topology, then add the changed-path classifier to CI: on
+a positively-proven doc-only diff, skip the expensive jobs and report every
+required context `success`; otherwise run the full pipeline. Fail closed. D1 is
+the core and is independently mergeable.
 
-**D2 — shared taxonomy (only if separable).** Factor the doc-only path taxonomy
-into one definition consumed by BOTH the CI classifier and the publisher
-`--doc-only` determination, so the two cannot drift. If D1 must already unify them
-to be correct, fold D2 into D1 and say so.
+**D2 — none (DROPPED by the 2026-08-30 amendment).** The original D2 factored a
+shared taxonomy between the CI classifier and the publisher `--doc-only`. That
+coupling is withdrawn (design point 3): the classifier is self-contained, so D1 is
+the whole node. If, while building D1, a concrete case shows the publisher's
+caller-asserted `--doc-only` can actually bypass a validation the classifier proves
+is needed, that is a hard stop to the Steward (a separate publisher-policy
+question), NOT a deliverable here.
 
 ## Acceptance criteria (each carries its own control)
 
@@ -113,10 +130,13 @@ to be correct, fold D2 into D1 and say so.
   Control: enumerate the required contexts; a doc-only PR shows all green;
   removing the reporting for one context leaves it pending and blocks the merge
   (proving the reporting is load-bearing, not incidental).
-- **AC-CLASSIFIER-SINGLE-SOURCE.** The CI classifier and the publisher
-  `--doc-only` determination resolve doc-only from the SAME taxonomy. Control: a
-  path moved into the denylist changes both classifications together; construct a
-  PR at the taxonomy boundary and show CI and publisher agree on it.
+- **AC-SKIP-SET-SAFE-SUBSET.** The classifier's short-circuit (skip) set is a
+  subset of genuinely non-compiled/inert paths: every path that can carry compiled
+  or executed code (anything under `crates/`, INCLUDING a comment-only `.rs`, and
+  every denylist path) forces full CI. Control: for each denylist category, a PR
+  touching only it does NOT short-circuit; and exhibit the boundary showing no
+  allowlist member reaches a compiled/executed artifact (e.g. a `///` doctest lives
+  under `crates/`, which is denylist, so it can never enter the skip set).
 - **AC-FAIL-CLOSED.** The classifier runs full CI on any error, ambiguity, or
   inability to determine the changed paths. Control: a malformed/empty diff, an
   unresolvable base, or an injected classifier error forces full CI, never a green
@@ -127,9 +147,10 @@ to be correct, fold D2 into D1 and say so.
 - branch protection's required contexts cannot be made to report green on a
   short-circuit without disabling a protection the fleet relies on (a
   policy/topology wall, not a coding task);
-- the publisher taxonomy cannot be shared without a change to the publisher path
-  the verify ring is not authorized to make (route the publisher edge to the
-  Steward/lieutenant).
+- a concrete case shows the publisher's caller-asserted `--doc-only` can bypass a
+  validation this classifier proves is needed (e.g. a comment-only `.rs` doctest
+  merged without CI) — that is a SEPARATE publisher-policy question; route it to the
+  Steward, do not fold a publisher-semantics change into this node.
 
 ## Reviewers, sequencing, contention
 
@@ -140,13 +161,12 @@ to be correct, fold D2 into D1 and say so.
   merge Decision is required. No Conformance Validator (CI infrastructure, not
   kernel/conformance).
 - **Sequencing:** QUEUED behind CI-SHARD-DURATION-BALANCE; released to the verify
-  ring when that node closes. D1 then D2; D1 independently mergeable. Note the
+  ring when that node closes. D1 is the whole node (D2 dropped by the amendment). Note the
   self-consistency check: because this node edits CI-control files, its own
   candidate is in the denylist and MUST run full CI — a doc-only short-circuit of
   this PR would itself be a bug.
-- **Contention:** touches `.github/workflows/*`, CI/publisher scripts under
-  `scripts/`, and possibly the publisher's `--doc-only` classifier (shared
-  taxonomy) — coordinate any publisher-path edit with the Steward/lieutenant. No
+- **Contention:** touches `.github/workflows/*` and CI/publisher scripts under
+  `scripts/` — coordinate any publisher-path edit with the Steward/lieutenant. No
   crate/catalog contention with the concurrent lanes. Targeted local checks only;
   the real behavior (required-context reporting, job skipping) is provable ONLY in
   CI on GitHub.
