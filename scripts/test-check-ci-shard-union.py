@@ -85,6 +85,22 @@ class Fixtures(unittest.TestCase):
                     metadata["filter-match"]["status"] = "mismatch"
             path.write_text(json.dumps(value))
         self.assert_red(sibling_loss, "union differs", empty)
+        def authority_truncation(root):
+            path = root / "realized-shard-8" / "unfiltered-inventory.json"
+            value = json.loads(path.read_text())
+            del value["rust-suites"]["suite-8"]
+            value["test-count"] -= 1
+            path.write_text(json.dumps(value))
+        self.assert_red(authority_truncation, "unfiltered inventories differ", empty)
+        def sibling_overlap(root):
+            path = root / "realized-shard-7" / "selected-7.json"
+            value = json.loads(path.read_text())
+            for suite in value["rust-suites"].values():
+                for metadata in suite["testcases"].values():
+                    metadata["filter-match"]["status"] = "mismatch"
+            value["rust-suites"]["suite-0"]["testcases"]["test_1"]["filter-match"]["status"] = "matches"
+            path.write_text(json.dumps(value))
+        self.assert_red(sibling_overlap, "realized shard selections overlap", empty)
 
     def test_missing_or_extra_artifact_and_member_red(self):
         self.assert_red(lambda root: (root / "realized-shard-8").rename(root / "extra"), "exactly eight")
