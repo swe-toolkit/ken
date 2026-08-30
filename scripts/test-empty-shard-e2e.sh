@@ -42,12 +42,20 @@ EOF
 chmod +x bin/cargo
 : > dispatch.log
 for n in $(seq 1 8); do
-  planned=$(python3 -c "import json; print(len(json.load(open('filters/assignments.json'))['bins'][$n - 1]['tests']))")
-  expression=$(<"filters/bin-$n.expr")
-  LOG="$root/dispatch.log" PATH="$root/bin:$PATH" "$OLDPWD/scripts/run-ci-shard.sh" "$planned" "$expression"
-  if [ "$planned" -eq 0 ]; then
-    ! grep -Fqx "nextest run --workspace --locked -E $expression" dispatch.log
+  expected_planned=$(python3 -c "import json; print(len(json.load(open('filters/assignments.json'))['bins'][$n - 1]['tests']))")
+  expected_expression=$(<"filters/bin-$n.expr")
+  dispatched_planned=$expected_planned
+  LOG="$root/dispatch.log" PATH="$root/bin:$PATH" "$OLDPWD/scripts/run-ci-shard.sh" "$dispatched_planned" "$expected_expression"
+  if [ "$expected_planned" -eq 0 ]; then
+    ! grep -Fqx "nextest run --workspace --locked -E $expected_expression" dispatch.log
   else
-    grep -Fqx "nextest run --workspace --locked -E $expression" dispatch.log
+    grep -Fqx "nextest run --workspace --locked -E $expected_expression" dispatch.log
   fi
 done
+# Immutable expected plan metadata catches a zeroed dispatch of a nonempty bin.
+expected_expression=$(<filters/bin-1.expr)
+: > mutation.log
+LOG="$root/mutation.log" PATH="$root/bin:$PATH" "$OLDPWD/scripts/run-ci-shard.sh" 0 "$expected_expression"
+if grep -Fqx "nextest run --workspace --locked -E $expected_expression" mutation.log; then
+  exit 1
+fi
