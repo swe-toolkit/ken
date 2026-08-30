@@ -53,7 +53,7 @@ class DurationShardControls(unittest.TestCase):
             self.assertFalse(any(binary in item for item in filters))
 
     def test_small_eligible_populations_keep_eight_bins(self):
-        for size in range(1, 8):
+        for size in range(1, 9):
             with tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 rows = [("fixture::ordinary", "ordinary", f"test_{i}", "matches") for i in range(size)]
