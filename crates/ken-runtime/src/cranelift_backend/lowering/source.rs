@@ -4124,9 +4124,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         env: Vec<LoweringEnvironmentBinding>,
         control: SourceControl<'b>,
     ) -> Result<SourceCallOutcome<'b>, CraneliftBackendError> {
-        // Generated-entry admission validates arrival E here. Tail authority
-        // remains post-selection: the exact transport independently reopens
-        // its inheritance, then joins E, producer source S, and member I.
+        // Generated-entry admission validates current consumer-call arrival C
+        // here. Test support retains C's role through later transport selection;
+        // production authority independently reopens I's certificate E/S.
+        #[cfg(feature = "px8-ds-test-support")]
+        let mut current_forward_ret_role_witness = None;
         // Total generated-entry admission, before `specialized_at` and every
         // callable arm. The one map read answers both applicability and typed
         // authority: positive `NonGoverned` membership continues unchanged;
@@ -4158,6 +4160,26 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         "the total generated-entry admission map has no current call key",
                     )
                 })?;
+            #[cfg(feature = "px8-ds-test-support")]
+            {
+                let current_admission = match &admission {
+                    CheckedIhGeneratedEntryAdmission::NonGoverned => "NonGoverned",
+                    CheckedIhGeneratedEntryAdmission::Governed(projection) => {
+                        match projection.fresh_result_route() {
+                            CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {
+                                "GovernedDirect"
+                            }
+                            CheckedIhFreshResultRoute::TailProducerToRet { .. } => "GovernedTail",
+                        }
+                    }
+                };
+                current_forward_ret_role_witness = Some((
+                    pending.invocation_origin,
+                    pending.application_origin,
+                    callee_origin,
+                    current_admission,
+                ));
+            }
             match admission {
                 CheckedIhGeneratedEntryAdmission::NonGoverned => {
                     #[cfg(feature = "px8-ds-test-support")]
@@ -4384,6 +4406,41 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         }
                         None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
                     };
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if let Some((
+                        current_invocation_origin,
+                        current_call_origin,
+                        current_callee_origin,
+                        current_admission,
+                    )) = current_forward_ret_role_witness
+                    {
+                        let (outcome, proof) = match &forward_ret_outcome {
+                            ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
+                                ("NonApplicable", None)
+                            }
+                            ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
+                                ("Formed", Some(&authority._plan))
+                            }
+                            ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                                ("MissingRequired", None)
+                            }
+                            ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
+                                ("SuppressedForInertness", None)
+                            }
+                            ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                                ("Duplicated", None)
+                            }
+                        };
+                        record_composed_return_forward_ret_role_witness(
+                            current_invocation_origin,
+                            current_call_origin,
+                            current_callee_origin,
+                            current_admission,
+                            transport.source_call_identity(),
+                            outcome,
+                            proof,
+                        );
+                    }
                     let _forward_ret_authority = match forward_ret_outcome {
                         ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
                             Some(authority)

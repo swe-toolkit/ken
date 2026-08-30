@@ -229,6 +229,7 @@ use super::planning::{
     checked_ih_generated_entry_arrival_mutation,
     composed_return_forward_ret_authority_mutation,
     record_composed_return_forward_ret_authority,
+    record_composed_return_forward_ret_role_witness,
     record_checked_ih_generated_entry_governed_validation,
     record_checked_ih_generated_entry_installed,
     record_checked_ih_generated_entry_ordinary_continuation,

@@ -30,12 +30,14 @@ pub use static_transition::{
     with_checked_ih_generated_entry_confluence_mutation,
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_ret_authority_mutation,
+    with_composed_return_forward_ret_role_witnesses,
     with_retained_result_closure_proof_mutation, with_worker_prefix_deferrals,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
     CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
     CheckedIhGeneratedEntryObservation, ComposedReturnForwardRetAuthorityMutation,
     ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
+    ComposedReturnForwardRetRoleWitnessObservation,
     RetainedResultClosureProofMutation, WorkerPrefixDeferral,
 };
 
@@ -47,6 +49,7 @@ pub(in crate::cranelift_backend) use static_transition::{
     record_checked_ih_generated_entry_ordinary_continuation,
     record_checked_ih_generated_entry_raw_arrival, record_checked_ih_generated_entry_reached,
     record_composed_return_forward_ret_authority,
+    record_composed_return_forward_ret_role_witness,
     take_composed_return_forward_ret_population_mutation,
 };
 

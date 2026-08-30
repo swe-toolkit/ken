@@ -2225,6 +2225,124 @@ fn composed_return_forward_ret_authority_is_byte_inert() {
 
 /// **Promise class: durable invariant.**
 ///
+/// **MEASURED:** at the actual consumer call, every formed authority pairs the
+/// current C/admission and selected I with the same `(I,E,S)` coordinate that
+/// the independent planner and authority observers report; E's existing
+/// capsule row is installed and reached, and at least one real row has C != E.
+/// **CLAIMED:** current consumer call C and certificate entry E have distinct
+/// roles, while exact whole-transport selection I causally joins C to the real
+/// planned and reached `(E,S)` certificate without storing I in access.
+/// **THE GAP:** the role witness is observation-only and cannot license
+/// authority; existing production equality/member/source/projection/sink gates
+/// remain the enforcement, while the paired witness prevents their coordinates
+/// from being misdescribed as one call again.
+#[test]
+fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
+    in_large_stack_thread("rt-parity-forward-ret-role-witness", || {
+        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
+
+        let compile = |label: &str, entry: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("forward-ret-role-witness-{label}"));
+            let (((result, plan_rows), role_rows), authorities, applications) =
+                ken_runtime::with_composed_return_forward_ret_authority_mutation(
+                    Mutation::Exact,
+                    || {
+                        ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
+                            ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                                ken_cli::build_native_program(
+                                    &source,
+                                    ken_cli::SourceFormat::Ken,
+                                    &format!("rt_parity_forward_ret_role_witness_{label}"),
+                                    root.path(),
+                                )
+                            })
+                        })
+                    },
+                );
+            result.expect("the exact C/I/E/S role witness fixture must compile");
+            assert!(!authorities.is_empty(), "{label}: no authority formed");
+            assert_eq!(applications, authorities.len());
+
+            let planned = plan_rows
+                .iter()
+                .flat_map(|row| row.forward_ret_coordinates.iter().cloned())
+                .collect::<std::collections::BTreeSet<_>>();
+            let formed = authorities
+                .iter()
+                .map(|row| row.coordinate.clone())
+                .collect::<std::collections::BTreeSet<_>>();
+            let paired = role_rows
+                .iter()
+                .filter(|row| row.outcome == "Formed")
+                .map(|row| {
+                    let coordinate = row
+                        .formed_coordinate
+                        .clone()
+                        .expect("a Formed role witness must carry E/S proof coordinates");
+                    assert_eq!(
+                        row.selected_source_call_identity, coordinate.source_call_identity,
+                        "{label}: paired row's selected I differs from its proof I"
+                    );
+                    assert!(
+                        plan_rows.iter().any(|plan| {
+                            plan.installed
+                                && plan.reached_count > 0
+                                && plan.forward_ret_coordinates.contains(&coordinate)
+                        }),
+                        "{label}: formed E has no installed and reached capsule row: {coordinate:#?}"
+                    );
+                    coordinate
+                })
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(planned, formed, "{label}: planned/formed Tail set changed");
+            assert_eq!(
+                formed, paired,
+                "{label}: formed authority lacks one C/I/E/S row"
+            );
+            assert_eq!(
+                role_rows
+                    .iter()
+                    .filter(|row| row.outcome == "Formed")
+                    .count(),
+                authorities.len(),
+                "{label}: paired rows and formed authorities differ in multiplicity"
+            );
+            assert!(
+                role_rows.iter().any(|row| {
+                    row.outcome == "Formed"
+                        && row.formed_coordinate.as_ref().is_some_and(|coordinate| {
+                            (
+                                &row.current_invocation_origin,
+                                &row.current_call_origin,
+                                &row.current_callee_origin,
+                            ) != (
+                                &coordinate.entry_invocation_origin,
+                                &coordinate.entry_call_origin,
+                                &coordinate.entry_callee_origin,
+                            )
+                        })
+                }),
+                "{label}: fixture did not prove a real current C distinct from certificate E"
+            );
+            assert!(
+                role_rows.iter().all(|row| {
+                    !row.current_admission.is_empty()
+                        && !row.selected_source_call_identity.is_empty()
+                        && (row.outcome != "Formed" || row.formed_coordinate.is_some())
+                }),
+                "{label}: a role-witness row is incomplete"
+            );
+            assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
+        };
+
+        compile("read", "rt_read_offset_stage");
+        compile("write", "rt_write_writable_stage");
+    });
+}
+
+/// **Promise class: durable invariant.**
+///
 /// **MEASURED:** the complete set of real planned Tail coordinates equals the
 /// unique set of formed post-selection authorities across disjoint read and
 /// write fixtures; removing each Tail member or duplicating one makes the
