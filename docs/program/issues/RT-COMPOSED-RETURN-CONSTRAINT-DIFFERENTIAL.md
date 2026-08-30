@@ -8,7 +8,7 @@ gate: none
 tier: T1
 depends_on: []
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/commit/5b20fe84f2e2806a9d0de863ad0404f6ea09eefc
 origin: "Operator ruling 2026-08-29 (this session), overriding the Steward's accept-the-boundary recommendation. Verbatim: a compiler which cannot support this construction is of little use; it is a simple and common construction; other systems achieve it, so it is not a deep research question. Directive: revisit shape (a) and shape (b) through the constraint DIFFERENTIAL — the constraints of Ken that prevent each shape and how they differ from the constraints of other languages that support each shape — and ask research for a report. Inputs are the two closed discovery verdicts (RT-COMPOSED-RETURN-PRODUCER-ORDER-DISCOVERY shape (a) INSUFFICIENT; RT-COMPOSED-RETURN-SHAPE-B-DISCOVERY shape (b) REFUTED axis 3) and the closed RT-COMPOSED-RETURN-PRODUCED-TRANSFER (D0b=NO, partial-order contradiction). Steward-filed per COORDINATION section 2."
 ---
 
