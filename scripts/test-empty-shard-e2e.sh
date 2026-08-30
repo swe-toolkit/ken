@@ -34,6 +34,9 @@ done
 mkdir realized-shards
 mv realized-shard-* realized-shards/
 python3 "$OLDPWD/scripts/check-ci-shard-union.py"
+assert_expected_command() {
+  grep -Fqx "nextest run --workspace --locked -E $1" "$2"
+}
 mkdir bin
 cat > bin/cargo <<'EOF'
 #!/usr/bin/env bash
@@ -49,13 +52,13 @@ for n in $(seq 1 8); do
   if [ "$expected_planned" -eq 0 ]; then
     ! grep -Fqx "nextest run --workspace --locked -E $expected_expression" dispatch.log
   else
-    grep -Fqx "nextest run --workspace --locked -E $expected_expression" dispatch.log
+    assert_expected_command "$expected_expression" dispatch.log
   fi
 done
 # Immutable expected plan metadata catches a zeroed dispatch of a nonempty bin.
 expected_expression=$(<filters/bin-1.expr)
 : > mutation.log
 LOG="$root/mutation.log" PATH="$root/bin:$PATH" "$OLDPWD/scripts/run-ci-shard.sh" 0 "$expected_expression"
-if grep -Fqx "nextest run --workspace --locked -E $expected_expression" mutation.log; then
+if assert_expected_command "$expected_expression" mutation.log; then
   exit 1
 fi
