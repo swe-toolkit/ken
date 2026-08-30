@@ -122,13 +122,19 @@ jobs:
           cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
           cargo nextest list --workspace --locked --message-format json -E "$shard_exclusion" > inventory.json
           python3 scripts/ci-duration-shard.py inventory.json docs/program/evidence/ci-shard-duration-balance-33230600665.json duration-filters
-          cargo nextest list --workspace --locked --message-format json -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)" > "selected-${{ matrix.shard }}.json"
+          planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
+          if [ "$planned" -eq 0 ]; then
+            python3 scripts/ci-duration-shard.py project-empty inventory.json "selected-${{ matrix.shard }}.json"
+            touch .planned-empty
+          else
+            cargo nextest list --workspace --locked --message-format json -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)" > "selected-${{ matrix.shard }}.json"
+          fi
           mkdir "realized-shard-${{ matrix.shard }}"
           cp unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json" "realized-shard-${{ matrix.shard }}/"
       - name: Test
-        run: >-
-          cargo nextest run --workspace --locked
-          -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)"
+        run: |
+          if test -f .planned-empty; then exit 0; fi
+          cargo nextest run --workspace --locked -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)"
       # nextest does not execute rustdoc tests, so run the workspace doctest
       # population once rather than once per shard.
       - name: Upload realized shard selection

@@ -52,6 +52,21 @@ class DurationShardControls(unittest.TestCase):
         for binary in ("rt_parity_native", "px8f_buffer_native", "px8f_write_partition"):
             self.assertFalse(any(binary in item for item in filters))
 
+    def test_small_eligible_populations_keep_eight_bins(self):
+        for size in range(1, 8):
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                rows = [("fixture::ordinary", "ordinary", f"test_{i}", "matches") for i in range(size)]
+                suites = {str(i): {"binary-id": binary_id, "binary-name": binary_name, "testcases": {testcase: {"filter-match": {"status": status}}}} for i, (binary_id, binary_name, testcase, status) in enumerate(rows)}
+                (root / "inventory.json").write_text(json.dumps({"test-count": size, "rust-suites": suites}))
+                (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": f"fixture::ordinary test_{i}", "seconds": 1} for i in range(size)]}))
+                result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json"], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            bins = json.loads(result.stdout)["bins"]
+            self.assertEqual(len(bins), 8)
+            self.assertEqual(sum(len(item["tests"]) for item in bins), size)
+            self.assertEqual(sum(not item["tests"] for item in bins), 8 - size)
+
 
 if __name__ == "__main__":
     unittest.main()
