@@ -12,13 +12,31 @@ github: null
 origin: "Steward, 2026-08-29, from the first full-matrix run after CI-NATIVE-PARITY-DURATION D1/D2 landed (c555f843a). Measured on GitHub Actions run 33230600665, PR #3079, the CAT-DERIVED-PUB-EXPORT merge candidate. Serves the operator's standing priority-1 directive on CI duration (ideal under 10 minutes, under 20 acceptable). Steward-filed per COORDINATION section 2."
 ---
 
-> # NOT RELEASED. `depends_on` IS NOT AUTHORIZATION.
->
-> `draft`, filed so lane 2 has a successor when `CI-NATIVE-PARITY-DURATION`
-> closes rather than going idle at D5. **A landing discharges a dependency; only
-> an explicit Steward release starts a turn.** Flip `draft` -> `ready` ->
-> `active` on release, because a dispatched node left at `ready` is invisible to
-> the per-node watchdog sweep.
+> # TWICE CI-RED ON THE EMPTY-SHARD CLASS — new AC added, 2026-08-30. `active`.
+> #
+> # The candidate reddened in CI on the SAME empty-shard predicate twice: PR
+> # #3120 shard 2 (Decision `dec_49ga0n9q9ax99` spent), then respin PR #3133 /
+> # `f3685b50f` shard 1 (Decision `dec_5sdq3ev4vfxc0` spent, CI run
+> # `33286648107`). Both times a shard with zero tests makes `nextest` exit "no
+> # non-empty testcases", the job never writes `realized-shard-<k>/*`, and the
+> # union's `if-no-files-found: error` fires. Both are candidate-owned and
+> # deterministic (main green at base), not flakes — the lieutenant correctly did
+> # not rerun, run M8, or merge.
+> #
+> # The frame gap: no AC required the empty-shard CI fan-in to be handled
+> # end-to-end, so both local gates (QA + Architect) approved the selector's
+> # empty-partition handling and CI reddened anyway — the real fan-in runs only in
+> # CI. `AC-EMPTY-SHARD-FAN-IN` now pins it (see Acceptance criteria). Same
+> # predicate twice is a frame gap, NOT a recut: fix at a NEW SHA with fresh QA +
+> # Architect + a new Decision. Do not reuse #3120/#3133 or a spent Decision.
+
+> # SUPERSEDED (historical) — filed as a draft successor; released since.
+> #
+> # `draft`, filed so lane 2 has a successor when `CI-NATIVE-PARITY-DURATION`
+> # closes rather than going idle at D5. **A landing discharges a dependency; only
+> # an explicit Steward release starts a turn.** Flip `draft` -> `ready` ->
+> # `active` on release, because a dispatched node left at `ready` is invisible to
+> # the per-node watchdog sweep.
 
 ## The defect
 
@@ -103,6 +121,19 @@ operator's call — see "What this node does NOT do".
   run. **This is the arm that decides whether the mechanism rots** — a
   hand-maintained assignment list would fail it, which is why the assignment
   must be computed rather than checked in as a literal roster.
+- **AC-EMPTY-SHARD-FAN-IN.** Every shard job 1..N produces its
+  `realized-shard-<k>` artifact so the fan-in union step succeeds — INCLUDING any
+  shard the partition leaves empty. The failure mode, red TWICE (PR #3120 shard
+  2, PR #3133 shard 1, both CI run-confirmed): a partition assigns zero tests to
+  a shard, `nextest` exits with "no non-empty testcases", the job exits before
+  writing `realized-shard-<k>/*`, and the union's `if-no-files-found: error`
+  fires. The mechanism must EITHER guarantee no shard is empty (choose N and the
+  assignment so every shard is non-empty) OR make an empty shard emit a valid
+  empty `realized-shard-<k>` artifact the union tolerates. Control/proof: a GREEN
+  fan-in in CI with all N shards realized. **This AC is provable ONLY in CI** — a
+  local selector-level empty-partition test does NOT satisfy it (both local gates
+  approved exactly that and CI still reddened, twice). Do not rerun a red SHA; fix
+  at a new SHA.
 - **AC-NO-REGRESSION.** Whole-suite green in CI.
 
 ## What this node does NOT do
