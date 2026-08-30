@@ -119,6 +119,112 @@ fn assert_true(env: &ElabEnv, value: EvalVal, label: &str) {
     );
 }
 
+fn boolean_list(env: &ElabEnv, value: EvalVal) -> Vec<bool> {
+    let mut current = value;
+    let mut result = Vec::new();
+    loop {
+        match current {
+            EvalVal::Ctor { id, .. } if id == env.prelude_env.nil_id => return result,
+            EvalVal::Ctor { id, args, .. } if id == env.prelude_env.cons_id => {
+                let head = match &args[1] {
+                    EvalVal::Ctor { id, .. } if *id == env.numeric_env.bool_true_id => true,
+                    EvalVal::Ctor { id, .. } if *id == env.numeric_env.bool_false_id => false,
+                    other => panic!("expected a Boolean list head, got {other:?}"),
+                };
+                result.push(head);
+                current = args[2].clone();
+            }
+            other => panic!("expected a Boolean List constructor chain, got {other:?}"),
+        }
+    }
+}
+
+/// Promise class: durable invariant.
+///
+/// AC-RECURSIVE-UNSHADOW-MIGRATION's durable candidate-side guard.
+///
+/// MEASURED: roots-loading the real Property module leaves the installed
+/// prelude `map` identity selected, defines no qualified `gen_map_list`, and
+/// gives `gen_map` one saturated application headed directly by that installed
+/// identity. The real source maps Nil and a recursive Cons sample list with a
+/// nonidentity function to the expected lists. CLAIMED: Property removes its
+/// named recursive reimplementation and routes `gen_map` directly through
+/// installed P.map with no package-global intermediary. THE GAP / EXPLICIT
+/// RESIDUAL: the candidate diff and complete inventory separately own the
+/// no-import/no-new-declaration claim. This candidate-side guard does not
+/// mechanically prohibit a future differently named, behaviorally isomorphic
+/// recursive helper. Separately declared recursive globals are distinct rigid
+/// heads, so that residual remains review- and census-enforced rather than
+/// kernel-definitional-equality-backed.
+#[test]
+fn property_unshadows_installed_prelude_map_for_gen_map() {
+    let mut roots_env = ElabEnv::new().expect("base env");
+    let installed_map = roots_env.globals["map"];
+    roots_env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Tooling.Testing.Property")
+        .expect("Property must roots-load through its real dependency closure");
+
+    assert_eq!(
+        roots_env.globals["map"], installed_map,
+        "Property must leave unqualified map bound directly to installed P.map"
+    );
+    assert!(!roots_env
+        .globals
+        .contains_key("Tooling.Testing.Property.gen_map_list"));
+    assert!(!roots_env
+        .globals
+        .contains_key("Tooling.Testing.Property.map"));
+
+    let provider_type = match roots_env.env.lookup(installed_map) {
+        Some(Decl::Transparent { ty, .. }) => ty,
+        other => panic!("installed P.map must be transparent, got {other:?}"),
+    };
+    let provider_arity = leading_pi_count(provider_type);
+    let gen_map = roots_env.globals["Tooling.Testing.Property.gen_map"];
+    let gen_map_body = match roots_env.env.lookup(gen_map) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("Property.gen_map must remain transparent, got {other:?}"),
+    };
+    assert_eq!(
+        saturated_provider_occurrences(gen_map_body, installed_map, provider_arity),
+        1,
+        "Property.gen_map must contain one saturated installed P.map application"
+    );
+
+    let mut env = property_dependency_env();
+    let flat_installed_map = env.globals["map"];
+    env.elaborate_ken_md_file(PROPERTY_KEN_MD)
+        .expect("Property must elaborate through installed P.map");
+    assert_eq!(env.globals["map"], flat_installed_map);
+    env.elaborate_file(
+        "fn cat_prelude_property_flip (x : Bool) : Bool = \
+           match x { False ↦ True; True ↦ False }\n\
+         const cat_prelude_property_map_nil : List Bool = \
+           gen_samples Bool \
+             (gen_map Bool Bool cat_prelude_property_flip \
+               (gen_from_list Bool (Nil Bool)))\n\
+         const cat_prelude_property_map_recursive_cons : List Bool = \
+           gen_samples Bool \
+             (gen_map Bool Bool cat_prelude_property_flip \
+               (gen_from_list Bool \
+                 (Cons Bool True (Cons Bool False (Nil Bool)))))",
+    )
+    .expect("gen_map must retain nondegenerate Nil/Cons behavior");
+
+    let mut store = make_store(&env);
+    for (name, expected) in [
+        ("cat_prelude_property_map_nil", vec![]),
+        ("cat_prelude_property_map_recursive_cons", vec![false, true]),
+    ] {
+        let value = eval_global(&env, &mut store, name);
+        assert_eq!(
+            boolean_list(&env, value),
+            expected,
+            "{name} must preserve installed P.map's recursive behavior"
+        );
+    }
+}
+
 /// Promise class: durable invariant.
 ///
 /// MEASURED: among transparent declarations introduced by the real Property
