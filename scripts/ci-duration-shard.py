@@ -76,6 +76,17 @@ def empty_projection(inventory, output):
         json.dump(value, file)
 
 
+def selected_projection(inventory, assignment_path, shard, output):
+    value = json.load(open(inventory))
+    assignment = json.load(open(assignment_path))
+    planned = {tuple(item) for item in assignment["bins"][shard - 1]["tests"]}
+    for suite in value["rust-suites"].values():
+        for name, metadata in suite["testcases"].items():
+            metadata["filter-match"]["status"] = "matches" if (suite["binary-id"], name) in planned else "mismatch"
+    with open(output, "w") as file:
+        json.dump(value, file)
+
+
 def validate_plan(assignment_path, shard, selected_path):
     assignment = json.load(open(assignment_path))
     bins = assignment.get("bins")
@@ -93,6 +104,9 @@ def main():
         return
     if len(sys.argv) == 4 and sys.argv[1] == "project-empty":
         empty_projection(sys.argv[2], sys.argv[3])
+        return
+    if len(sys.argv) == 6 and sys.argv[1] == "project-selected":
+        selected_projection(sys.argv[2], sys.argv[3], int(sys.argv[4]), sys.argv[5])
         return
     if len(sys.argv) == 5 and sys.argv[1] == "validate-plan":
         validate_plan(sys.argv[2], int(sys.argv[3]), sys.argv[4])

@@ -126,7 +126,7 @@ jobs:
             python3 scripts/ci-duration-shard.py project-empty inventory.json "selected-${{ matrix.shard }}.json"
             touch .planned-empty
           else
-            cargo nextest list --workspace --locked --message-format json -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)" > "selected-${{ matrix.shard }}.json"
+            python3 scripts/ci-duration-shard.py project-selected inventory.json duration-filters/assignments.json "${{ matrix.shard }}" "selected-${{ matrix.shard }}.json"
           fi
           python3 scripts/ci-duration-shard.py validate-plan duration-filters/assignments.json "${{ matrix.shard }}" "selected-${{ matrix.shard }}.json"
           scripts/stage-ci-shard-artifact.sh "${{ matrix.shard }}" unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json"
