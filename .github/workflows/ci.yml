@@ -123,6 +123,8 @@ jobs:
           cargo nextest list --workspace --locked --message-format json -E "$shard_exclusion" > inventory.json
           python3 scripts/ci-duration-shard.py inventory.json docs/program/evidence/ci-shard-duration-balance-33230600665.json duration-filters
           cargo nextest list --workspace --locked --message-format json -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)" > "selected-${{ matrix.shard }}.json"
+          mkdir "realized-shard-${{ matrix.shard }}"
+          cp unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json" "realized-shard-${{ matrix.shard }}/"
       - name: Test
         run: >-
           cargo nextest run --workspace --locked
@@ -134,10 +136,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: realized-shard-${{ matrix.shard }}
-          path: |
-            unfiltered-inventory.json
-            inventory.json
-            selected-${{ matrix.shard }}.json
+          path: realized-shard-${{ matrix.shard }}/*
+          if-no-files-found: error
       - name: Doctests
         if: matrix.shard == 1
         run: cargo test --workspace --doc --locked
