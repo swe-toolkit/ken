@@ -112,6 +112,7 @@ class DurationShardControls(unittest.TestCase):
             base["rust-suites"]["s"]["testcases"]["t"]["metadata"] = {"keep": "me"}
             base["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"] = "matches"
             base["rust-suites"]["second"] = {"binary-id": "fixture::second", "binary-name": "ordinary", "testcases": {"u": {"filter-match": {"status": "mismatch"}, "metadata": {"also": "kept"}}}}
+            base["rust-suites"]["empty"] = {"binary-id": "fixture::empty", "binary-name": "ordinary", "testcases": {}}
             base["test-count"] = 2
             expected = json.loads(json.dumps(base))
             for suite in expected["rust-suites"].values():
