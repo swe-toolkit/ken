@@ -13,9 +13,10 @@ raw=json.load(open("inventory.json"))
 raw["test-count"] = 2
 raw["rust-suites"]["native"] = {"binary-id":"fixture::native","binary-name":"rt_parity_native","testcases":{"n":{"filter-match":{"status":"matches"}}}}
 open("unfiltered-inventory.json", "w").write(json.dumps(raw))
-raw["rust-suites"]["native"]["testcases"]["n"]["filter-match"]["status"] = "mismatch"
+open("raw.json", "w").write(json.dumps(raw))
 open("inventory.json", "w").write(json.dumps(raw))
 PY2
+python3 "$repo/scripts/ci-duration-shard.py" project-filtered raw.json inventory.json
 cat > evidence.json <<'EOF'
 {"records":[{"test_id":"fixture::live t","seconds":1}]}
 EOF
