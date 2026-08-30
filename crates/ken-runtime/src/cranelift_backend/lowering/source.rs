@@ -457,6 +457,13 @@ pub enum CheckedIhGeneratedEntryCapsuleMutation {
     WrongLocatorCallee,
     WrongLocatorDomain,
     WrongLocatorIndex,
+    RetainedAccessWrongDestinationOwner,
+    RetainedAccessWrongDestinationBody,
+    RetainedAccessWrongBinding,
+    RetainedAccessWrongLocatorInvocation,
+    RetainedAccessWrongLocatorCallee,
+    RetainedAccessWrongLocatorDomain,
+    RetainedAccessWrongLocatorIndex,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -477,8 +484,10 @@ pub fn with_checked_ih_generated_entry_capsule_mutation<T>(
             GENERATED_ENTRY_CAPSULE_MUTATION.with(|active| {
                 active.set(CheckedIhGeneratedEntryCapsuleMutation::Exact)
             });
+            CheckedIhGeneratedEntryAccess::reset_published_projection_control_observations();
         }
     }
+    CheckedIhGeneratedEntryAccess::reset_published_projection_control_observations();
     GENERATED_ENTRY_CAPSULE_MUTATION.with(|active| active.set(mutation));
     let _restore = Restore;
     f()
@@ -523,7 +532,14 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
         | Mutation::WrongLocatorInvocation
         | Mutation::WrongLocatorCallee
         | Mutation::WrongLocatorDomain
-        | Mutation::WrongLocatorIndex => {}
+        | Mutation::WrongLocatorIndex
+        | Mutation::RetainedAccessWrongDestinationOwner
+        | Mutation::RetainedAccessWrongDestinationBody
+        | Mutation::RetainedAccessWrongBinding
+        | Mutation::RetainedAccessWrongLocatorInvocation
+        | Mutation::RetainedAccessWrongLocatorCallee
+        | Mutation::RetainedAccessWrongLocatorDomain
+        | Mutation::RetainedAccessWrongLocatorIndex => {}
         Mutation::OuterCarried => {
             if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
                 Lowered::ComputationalRecursorClosure { residual, .. },
@@ -4041,6 +4057,12 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             )
         })?;
         let locator = projection.immediate_k_locator();
+        #[cfg(feature = "px8-ds-test-support")]
+        access.record_direct_projection_control_validation(
+            pending.invocation_origin,
+            pending.application_origin,
+            callee_origin,
+        );
         if projection.destination_owner() != destination_owner
             || projection.destination_body_origin() != access.worker_body_origin()
             || projection.binding() != binding

@@ -1536,6 +1536,61 @@ macro_rules! generated_entry_checked_case {
     };
 }
 
+macro_rules! generated_entry_split_checked_case {
+    ($name:ident, $mode:literal, $expected:literal, $reached:literal, $target:literal) => {
+        #[test]
+        fn $name() {
+            if std::env::var_os(GENERATED_ENTRY_CAPSULE_MUTATION_CHILD).is_some() {
+                in_generated_entry_stack_thread(
+                    concat!("rt-parity-", stringify!($name), "-child"),
+                    assert_generated_entry_capsule_mutation_child,
+                );
+                return;
+            }
+            let output = std::process::Command::new(
+                std::env::current_exe().expect("test binary"),
+            )
+            .arg("--exact")
+            .arg(stringify!($name))
+            .arg("--nocapture")
+            .env(GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, $mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated projection-control child");
+            assert!(
+                output.status.success(),
+                "{}: mutation child failed\nstdout:\n{}\nstderr:\n{}",
+                $mode,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                stderr.contains($expected),
+                "{}: mutation missed intended arm; stderr:\n{}",
+                $mode,
+                stderr
+            );
+            assert!(
+                stderr.contains($reached),
+                "{}: mutation did not reach its selected semantic layer; stderr:\n{}",
+                $mode,
+                stderr
+            );
+            let restored = format!(
+                "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_RESTORED_GREEN target={} mode={}",
+                $target, $mode
+            );
+            assert!(
+                stderr.contains(&restored),
+                "{}: restored target did not report GREEN; stderr:\n{}",
+                $mode,
+                stderr
+            );
+        }
+    };
+}
+
 macro_rules! d1_route_case {
     ($name:ident, $mode:literal, $control:expr, $recursor:expr) => {
         #[test]
@@ -1755,31 +1810,97 @@ fn assert_generated_entry_capsule_mutation_child() {
         "wrong-locator-callee" => Mutation::WrongLocatorCallee,
         "wrong-locator-domain" => Mutation::WrongLocatorDomain,
         "wrong-locator-index" => Mutation::WrongLocatorIndex,
+        "retained-access-wrong-destination-owner" => Mutation::RetainedAccessWrongDestinationOwner,
+        "retained-access-wrong-destination-body" => Mutation::RetainedAccessWrongDestinationBody,
+        "retained-access-wrong-binding" => Mutation::RetainedAccessWrongBinding,
+        "retained-access-wrong-locator-invocation" => {
+            Mutation::RetainedAccessWrongLocatorInvocation
+        }
+        "retained-access-wrong-locator-callee" => Mutation::RetainedAccessWrongLocatorCallee,
+        "retained-access-wrong-locator-domain" => Mutation::RetainedAccessWrongLocatorDomain,
+        "retained-access-wrong-locator-index" => Mutation::RetainedAccessWrongLocatorIndex,
         other => panic!("unknown generated-entry capsule mutation: {other}"),
     };
+    let direct_control = matches!(
+        mutation,
+        Mutation::WrongDestinationOwner
+            | Mutation::WrongDestinationBody
+            | Mutation::WrongBinding
+            | Mutation::WrongLocatorInvocation
+            | Mutation::WrongLocatorCallee
+            | Mutation::WrongLocatorDomain
+            | Mutation::WrongLocatorIndex
+    );
+    let retained_access_control = matches!(
+        mutation,
+        Mutation::RetainedAccessWrongDestinationOwner
+            | Mutation::RetainedAccessWrongDestinationBody
+            | Mutation::RetainedAccessWrongBinding
+            | Mutation::RetainedAccessWrongLocatorInvocation
+            | Mutation::RetainedAccessWrongLocatorCallee
+            | Mutation::RetainedAccessWrongLocatorDomain
+            | Mutation::RetainedAccessWrongLocatorIndex
+    );
+    let (target, stage) = if direct_control {
+        ("fs-write-at-offset-single", "rt_write_writable_stage")
+    } else {
+        ("fs-read-at-offset-single", "rt_read_offset_stage")
+    };
     let red = ken_runtime::with_checked_ih_generated_entry_capsule_mutation(mutation, || {
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            differential("fs-read-at-offset-single", "rt_read_offset_stage")
-        }))
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| differential(target, stage)))
     });
     assert!(red.is_err(), "{mode}: capsule mutation did not redden");
     assert!(
         ken_runtime::checked_ih_generated_entry_capsule_mutation_is_exact(),
         "{mode}: scoped capsule mutation state did not restore"
     );
+    if direct_control || retained_access_control {
+        differential(target, stage);
+        let target = if direct_control { "write" } else { "read" };
+        eprintln!(
+            "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_RESTORED_GREEN \
+             target={target} mode={mode}"
+        );
+    }
 }
+
+// **Promise class: durable invariant.** The D2 post-selection authority must
+// refuse any selected Tail entry whose published sanitized access projection
+// differs from its retained confluence projection.
+//
+// **MEASURED:** each control mutates one named projection field only on the
+// semantic Tail route population, observes the exact mutated entry selected by
+// the real read fixture, asserts the retained whole-projection refusal, and
+// reruns the same unmutated read target GREEN.
+// **CLAIMED:** no `(C,I,E,S)` authority forms from a Tail certificate whose E
+// access projection disagrees with its retained confluence class.
+// **THE GAP:** the paired Direct/write controls below independently prove the
+// older terminal consumer-boundary checks; neither layer borrows the other's
+// refusal.
+
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_destination_owner_disagreement, "retained-access-wrong-destination-owner", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=DestinationOwner direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_destination_body_disagreement, "retained-access-wrong-destination-body", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=DestinationBody direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_binding_disagreement, "retained-access-wrong-binding", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=BindingFrame direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_invocation_disagreement, "retained-access-wrong-locator-invocation", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=LocatorInvocation direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_callee_disagreement, "retained-access-wrong-locator-callee", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=LocatorCallee direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_domain_disagreement, "retained-access-wrong-locator-domain", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=LocatorDomain direct_applied=false tail_applied=true", "read");
+generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_index_disagreement, "retained-access-wrong-locator-index", "the retained forward Ret confluence projection disagrees with the published access projection", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_SELECTED layer=Tail mutation=LocatorIndex direct_applied=false tail_applied=true", "read");
 
 // **Promise class: durable invariant.** Only the exact computational-recursor
 // capsule satisfying every governed fact may pass the pre-dispatch guard; each
 // independently varied sibling/fact must reject at its named arm.
 //
-// **MEASURED:** projection controls mutate each terminal projection fact after
-// planner validation and before generated-function forwarding, then assert the
-// consumer guard's exact refusal text.
+// **MEASURED:** the seven published-projection controls select only the
+// GovernedDirect route population on the real write fixture, observe both
+// mutation application and entry into terminal validation, assert that
+// consumer's exact refusal, and rerun the same unmutated write target GREEN.
+// The remaining capsule controls mutate the real forwarding value consumed by
+// their named guard on the read fixture.
 // **CLAIMED:** every terminal projection conjunct, including locator domain
 // and index, is independently load-bearing at the consumer seat.
-// **THE GAP:** upstream confluence disagreements remain separate population
-// controls and cannot discharge either consumer-side claim.
+// **THE GAP:** the Tail/read controls above separately prove retained D2
+// access/confluence equality and prove that these Direct controls mutate zero
+// Tail projections.
 generated_entry_checked_case!(generated_entry_capsule_outer_carried, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "outer-carried", "does not name a specialized computational-recursor capsule");
 generated_entry_checked_case!(generated_entry_capsule_specialized_sibling, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "specialized-sibling", "is not a computational-recursor capsule");
 generated_entry_checked_case!(generated_entry_capsule_static_worker, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "static-worker", "StaticWorkerBinding: a source-machine Var in value position is a value-producing position");
@@ -1788,13 +1909,13 @@ generated_entry_checked_case!(generated_entry_capsule_wrong_slot, GENERATED_ENTR
 generated_entry_checked_case!(generated_entry_capsule_wrong_invocation, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-invocation", "projection disagrees with its current function, binding, or call coordinate");
 generated_entry_checked_case!(generated_entry_capsule_non_carried_residual, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "non-carried-residual", "checked frame, slot, call template, or residual phase");
 generated_entry_checked_case!(generated_entry_capsule_provenance_index, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "provenance-index", "callee Var disagrees with the immediate K locator index");
-generated_entry_checked_case!(generated_entry_capsule_wrong_destination_owner, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-destination-owner", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(generated_entry_capsule_wrong_destination_body, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-destination-body", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(generated_entry_capsule_wrong_binding, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-binding", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(generated_entry_capsule_wrong_locator_invocation, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-invocation", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(generated_entry_capsule_wrong_locator_callee, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-callee", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(generated_entry_capsule_wrong_locator_domain, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-domain", "immediate K locator has the wrong domain or is outside the current environment");
-generated_entry_checked_case!(generated_entry_capsule_wrong_locator_index, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-locator-index", "immediate K locator has the wrong domain or is outside the current environment");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_destination_owner, "wrong-destination-owner", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=DestinationOwner direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_destination_body, "wrong-destination-body", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=DestinationBody direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_binding, "wrong-binding", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=BindingFrame direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_locator_invocation, "wrong-locator-invocation", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=LocatorInvocation direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_locator_callee, "wrong-locator-callee", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=LocatorCallee direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_locator_domain, "wrong-locator-domain", "the governed immediate K locator has the wrong domain or is outside the current environment", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=LocatorDomain direct_applied=true tail_applied=false", "write");
+generated_entry_split_checked_case!(generated_entry_capsule_wrong_locator_index, "wrong-locator-index", "the governed immediate K locator has the wrong domain or is outside the current environment", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=LocatorIndex direct_applied=true tail_applied=false", "write");
 
 /// **Promise class: durable invariant.** Dense numbering may move, but planner
 /// iteration and context-interning order must not change class/member/caller

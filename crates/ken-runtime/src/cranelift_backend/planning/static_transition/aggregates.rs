@@ -506,6 +506,29 @@ pub(in crate::cranelift_backend) struct CheckedIhGeneratedEntryAccess {
     >,
 }
 
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CheckedIhPublishedProjectionControlLayer {
+    Direct,
+    Tail,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct CheckedIhPublishedProjectionControlApplication {
+    context: super::ContinuationContextId,
+    coordinate: CheckedIhGeneratedEntryCallCoordinate,
+    mutation: CheckedIhGeneratedEntryConfluenceMutation,
+    layer: CheckedIhPublishedProjectionControlLayer,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_APPLICATIONS:
+        RefCell<Vec<CheckedIhPublishedProjectionControlApplication>> =
+            const { RefCell::new(Vec::new()) };
+}
+
 impl CheckedIhGeneratedEntryAccess {
     pub(in crate::cranelift_backend) fn context(&self) -> super::ContinuationContextId {
         self.context
@@ -523,22 +546,153 @@ impl CheckedIhGeneratedEntryAccess {
 
     /// Test-only consumer mutation after planner validation and before any
     /// generated-function `Var` forwarding. It changes only the published
-    /// sanitized projection; call keys and admission variants remain exact, so
-    /// this cannot substitute an upstream confluence disagreement.
+    /// sanitized projection; call keys and admission variants remain exact.
+    ///
+    /// The semantic route selector is load-bearing. Direct controls must reach
+    /// the terminal generated-entry consumer without corrupting a Tail
+    /// certificate, while Tail controls must be caught by the retained D2
+    /// access/confluence equality. Dense coordinates and map order choose
+    /// neither population.
     #[cfg(feature = "px8-ds-test-support")]
-    pub(in crate::cranelift_backend) fn mutate_published_governed_projection_for_control(
+    fn mutate_published_governed_projection_layer_for_control(
+        &mut self,
+        mutation: CheckedIhGeneratedEntryConfluenceMutation,
+        layer: CheckedIhPublishedProjectionControlLayer,
+    ) {
+        let context = self.context;
+        for (coordinate, admission) in &mut self.admissions {
+            let CheckedIhGeneratedEntryAdmission::Governed(projection) = admission else {
+                continue;
+            };
+            let projection_layer = match projection.fresh_result_route() {
+                CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {
+                    CheckedIhPublishedProjectionControlLayer::Direct
+                }
+                CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
+                    CheckedIhPublishedProjectionControlLayer::Tail
+                }
+            };
+            if projection_layer != layer {
+                continue;
+            }
+            let before = projection.clone();
+            if mutation == CheckedIhGeneratedEntryConfluenceMutation::LocatorIndex {
+                projection.arrival.immediate_k_locator.environment_index = u32::MAX;
+            } else {
+                mutate_checked_ih_generated_entry_projection(projection, mutation);
+            }
+            if *projection == before {
+                continue;
+            }
+            CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_APPLICATIONS.with(|applications| {
+                applications
+                    .borrow_mut()
+                    .push(CheckedIhPublishedProjectionControlApplication {
+                        context,
+                        coordinate: *coordinate,
+                        mutation,
+                        layer,
+                    });
+            });
+        }
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn mutate_published_direct_projection_for_control(
         &mut self,
         mutation: CheckedIhGeneratedEntryConfluenceMutation,
     ) {
-        for admission in self.admissions.values_mut() {
-            if let CheckedIhGeneratedEntryAdmission::Governed(projection) = admission {
-                if mutation == CheckedIhGeneratedEntryConfluenceMutation::LocatorIndex {
-                    projection.arrival.immediate_k_locator.environment_index = u32::MAX;
-                } else {
-                    mutate_checked_ih_generated_entry_projection(projection, mutation);
-                }
-            }
-        }
+        self.mutate_published_governed_projection_layer_for_control(
+            mutation,
+            CheckedIhPublishedProjectionControlLayer::Direct,
+        );
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn mutate_published_tail_projection_for_control(
+        &mut self,
+        mutation: CheckedIhGeneratedEntryConfluenceMutation,
+    ) {
+        self.mutate_published_governed_projection_layer_for_control(
+            mutation,
+            CheckedIhPublishedProjectionControlLayer::Tail,
+        );
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn reset_published_projection_control_observations() {
+        CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_APPLICATIONS
+            .with(|applications| applications.borrow_mut().clear());
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    fn record_published_projection_control_reach(
+        &self,
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+        layer: CheckedIhPublishedProjectionControlLayer,
+        observation: &str,
+    ) {
+        let coordinate = CheckedIhGeneratedEntryCallCoordinate {
+            invocation_origin,
+            call_origin,
+            callee_origin,
+        };
+        CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_APPLICATIONS.with(|applications| {
+            let applications = applications.borrow();
+            let Some(application) = applications.iter().find(|application| {
+                application.context == self.context
+                    && application.coordinate == coordinate
+                    && application.layer == layer
+            }) else {
+                return;
+            };
+            let direct_applied = applications.iter().any(|application| {
+                application.layer == CheckedIhPublishedProjectionControlLayer::Direct
+            });
+            let tail_applied = applications.iter().any(|application| {
+                application.layer == CheckedIhPublishedProjectionControlLayer::Tail
+            });
+            eprintln!(
+                "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_{observation} \
+                 layer={layer:?} mutation={:?} direct_applied={direct_applied} \
+                 tail_applied={tail_applied}",
+                application.mutation,
+            );
+        });
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn record_direct_projection_control_validation(
+        &self,
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+    ) {
+        self.record_published_projection_control_reach(
+            invocation_origin,
+            call_origin,
+            callee_origin,
+            CheckedIhPublishedProjectionControlLayer::Direct,
+            "VALIDATION",
+        );
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    fn record_selected_tail_projection_control(
+        &self,
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+    ) {
+        self.record_published_projection_control_reach(
+            invocation_origin,
+            call_origin,
+            callee_origin,
+            CheckedIhPublishedProjectionControlLayer::Tail,
+            "SELECTED",
+        );
     }
 
     /// The sole generated-entry lookup. The map is total over the closed
@@ -7280,6 +7434,12 @@ impl StaticTransitionPlan<'_> {
                 ))
             }
         };
+        #[cfg(feature = "px8-ds-test-support")]
+        access.record_selected_tail_projection_control(
+            coordinate.invocation_origin,
+            coordinate.call_origin,
+            coordinate.callee_origin,
+        );
         if selected_projection != &confluence.projection {
             return Err(planner_error(
                 "the retained forward Ret confluence projection disagrees with the published access projection",
