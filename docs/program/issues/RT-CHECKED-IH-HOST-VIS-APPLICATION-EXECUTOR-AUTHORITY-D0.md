@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-HOST-VIS-APPLICATION-EXECUTOR-AUTHORITY-D0
 title: "Scratch-only Host-Vis application-executor-authority D0 (no production, no candidate, no QA, no Decision, no merge): answer ONE question before any application-executor design — does the later CheckedHostVisContinuation application at marker/call 147/146 (owner PredeclaredFunctionId(5)/funcid45, template 4, callee origin 145 Var(4), sole argument origin 144 Var(0) at environment index zero = the existing sole HostResult under the FSOp::ctor_488 branch at match origin 268) already carry a COMPLETE application recipe for worker body 662: an exact planner-issued route and target; explicit operand origin 144 as HostResult; captures 0..7 from record 608 in planner order; and any route-mandated suffix? Force eligibility is narrowed structurally to the exact 147/146 CheckedHostVisContinuation; the zero-argument OrdinaryApplication at 474/473 remains environment materialization and MUST be an explicit negative/no-call control. Do NOT widen CheckedIhEnvironmentTransport to Host-Vis (it stays environment-only; source_call_identity() stays the materializer identity). Trace the current funcid45 -> funcid50 call and identify precisely where the HostResult is retained, consumed, or lost. ONLY IF the exact route survives may one scratch call be made through the existing target-table mechanism under a separate move-only application authority, typed CheckedIhApplicationResult, Trap read before Result, paired naturally to match 451; otherwise return the exact lost-route/missing-binding outcome without selecting funcid43 by number/declaration/body-equality/table-coincidence/proximity. Restore byte-clean and report."
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -12,6 +12,35 @@ github: null
 origin: "Architect ruling evt_68ce7w8x6nb75 (thr_3fykd2macwy3t, 2026-08-30), accepting the runtime-implementer's RT-CHECKED-IH-CARRIED-WORKER-EXECUTOR-AUTHORITY-D0 outcome 4 (report evt_5tm8gbxs7584g, SHA-256 1b4fd13b68a1..., scratch-diff 59dfbc78a6b5...). The Architect reproduced all seven product blobs and every listed digest and confirmed: 474/473 is the zero-argument OrdinaryApplication escape that constructs ITree::Vis's carried checked-IH environment (record 608 reconstructs captures 0..7 but supplies neither body 662's explicit argument nor a call route; at carried funcid50 the environment has no StaticWorkerBinding, hence no carried StaticWorkerCallRoute; coincident worker_calls[662]/raw_worker_calls[662] do NOT restore authority). The semantic application is LATER at CheckedHostVisContinuation 147/146 (owner PredeclaredFunctionId(5)/funcid45), whose sole argument origin 144 is the existing sole HostResult produced after host dispatch — the arity-one value body 662 needs. The current funcid45 calls funcid50 seven times and raw body funcid43 zero times, so the semantic seat is identified but no executor route there is yet proven. Recut narrows force eligibility to 147/146. Steward-recut per COORDINATION section 2. Base origin/main e1ac1f27b5d55c6011db0d88347b479a093a1ff4, tree 9e4f8b20f3384ab4d4bf6f9046a929aba02c2cad; all seven reviewed product blobs Steward-verified identical to accepted base 0be25235b. @steward owns close/reframe/release; runtime parked until this named kick. Recurring predicate: authority for one semantic operation used as authority for another — this D0 tests whether the RIGHT semantic seat (147/146) carries its own executor authority, rather than borrowing another's."
 ---
 
+> # CLOSED — D0 COMPLETE, OUTCOME 3 ACCEPTED (147/146 is a real executor but binds
+> # outer body 941 / GeneratedContext / funcid50, NOT body 662; body-662 RawWorker
+> # route absent at the seat). Architect ruling `evt_9rvkwywwxms1`
+> # (thr_7f2m78epewqv1, 2026-08-30).
+> #
+> # Measurement node — never `merged`; report `evt_6rvrzpg80c02j` (SHA-256
+> # `7568d07b1780...`, scratch-diff `1bf9cab156f4...`) restored byte-clean at base
+> # `0ec00c1ed`. The Architect reproduced all seven product blobs and every digest
+> # and accepted the outcome. Finding: application 147/146 owns a complete route
+> # only for outer body 941 / GeneratedContext / funcid50 and owns origin 144's
+> # HostResult; body 662's distinct specialization-1 RawWorker authority stays
+> # upstream at funcid47; record 608 owns captures 0..7 but not callable authority;
+> # 474/473 is environment materialization. No lawful operation recovers dropped
+> # body-662 authority from declaration, body identity, table presence, outer route,
+> # payload shape, or captured word. No scratch call, no manufactured controls —
+> # correct.
+> #
+> # Third consecutive hard stop on the body-662 executor-authority question. The
+> # Architect held the ruling for a Research prior-art advisory (`evt_1c6ed7gntxg9s`
+> # — qualified positive on a planner-issued affine application capsule with typed
+> # nested placement, or a staging-boundary change) and then RULED
+> # (`evt_9rvkwywwxms1`): SELECT the planner-issued affine checked-IH application
+> # capsule with typed nested generated-context placement.
+> #
+> # Next: scratch-only successor
+> # **`RT-CHECKED-IH-AFFINE-APPLICATION-CAPSULE-FEASIBILITY-D0`** on the same base
+> # `0ec00c1ed` — a FEASIBILITY test of the selected representation, not a fourth
+> # executor-seat search. Everything below this banner is retained as chronology.
+>
 > # READY — SCRATCH-ONLY D0. Released to the runtime ring (lane 1) on `origin/main`
 > # `e1ac1f27b`. Runtime is parked; this IS the release.
 >
