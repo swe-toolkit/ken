@@ -68,6 +68,7 @@ class DurationShardControls(unittest.TestCase):
                 root = Path(temporary)
                 rows = [("fixture::ordinary", "ordinary", f"test_{i}", "matches") for i in range(size)]
                 suites = {str(i): {"binary-id": binary_id, "binary-name": binary_name, "testcases": {testcase: {"filter-match": {"status": status}}}} for i, (binary_id, binary_name, testcase, status) in enumerate(rows)}
+                suites["empty"] = {"binary-id": "fixture::empty", "binary-name": "ordinary", "testcases": {}}
                 (root / "inventory.json").write_text(json.dumps({"test-count": size, "rust-suites": suites}))
                 (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": f"fixture::ordinary test_{i}", "seconds": 1} for i in range(size)]}))
                 result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json", "out"], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
