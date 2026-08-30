@@ -54,7 +54,21 @@ def tests(value):
         raise SystemExit("nextest test-count differs from discovered testcases")
 
 
+def empty_projection(inventory, output):
+    value = json.load(open(inventory))
+    # Reuse the selector's schema validation before projecting zero matches.
+    list(tests(value))
+    for suite in value["rust-suites"].values():
+        for metadata in suite["testcases"].values():
+            metadata["filter-match"]["status"] = "mismatch"
+    with open(output, "w") as file:
+        json.dump(value, file)
+
+
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "project-empty":
+        empty_projection(sys.argv[2], sys.argv[3])
+        return
     inventory = json.load(open(sys.argv[1]))
     evidence = json.load(open(sys.argv[2]))
     durations = {r["test_id"]: r["seconds"] for r in evidence["records"]}
@@ -82,7 +96,11 @@ def main():
                 raise SystemExit(f"bin {item['bin']} filter exceeds argv guard {limit}")
             with open(os.path.join(output, f"bin-{item['bin']}.expr"), "w") as file:
                 file.write(expression)
-    print(json.dumps({"bins": result}, indent=2))
+    assignment = {"bins": result}
+    if output:
+        with open(os.path.join(output, "assignments.json"), "w") as file:
+            json.dump(assignment, file)
+    print(json.dumps(assignment, indent=2))
 
 
 if __name__ == "__main__":
