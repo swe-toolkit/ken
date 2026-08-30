@@ -1015,38 +1015,36 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
 
         let write_singleton = write
             .iter()
-            .find(|row| row.context == collision.context && row.invocation_origin == 529)
+            .find(|row| row.context == collision.context && row.invocation_origin == 700)
             .expect("W2 stays separate despite sharing the context");
         assert_eq!(write_singleton.members.len(), 1);
         assert_ne!(write_singleton.callee_origin, collision.callee_origin);
         assert!(
             write_singleton
                 .fresh_result_route
-                .starts_with("TailResumedRetInput"),
-            "the active self-resumption must name the forward Ret-input route: {write_singleton:?}"
+                .starts_with("TailProducerToRet"),
+            "the Tail case must name the governed producer-to-Ret route: {write_singleton:?}"
         );
         for coordinate in [
-            "invocation_origin: StaticOriginId(529)",
-            "call_origin: StaticOriginId(528)",
-            "callee_origin: StaticOriginId(527)",
-            "active_frame_origin: StaticOriginId(525)",
-            "header_edge: ActiveSelfResumption",
-            "answer_route: CheckedSelectedRecursor",
+            "invocation_origin: StaticOriginId(700)",
+            "call_origin: StaticOriginId(699)",
+            "callee_origin: StaticOriginId(698)",
+            "active_frame_origin: StaticOriginId(696)",
             "direction: Forward",
-            "ret_case_body_origin: StaticOriginId(691)",
-            "ret_input_binder: ConstructorChild { frame_origin: StaticOriginId(525), field_position: 0 }",
-            "ret_input_delivery: CheckedAnswerFallbackDirect",
+            "ret_case_body_origin: StaticOriginId(731)",
+            "ret_input_binder: ConstructorChild { frame_origin: StaticOriginId(696), field_position: 0 }",
+            "ret_input_delivery: ProducerResultDirect",
         ] {
             assert!(
                 write_singleton.fresh_result_route.contains(coordinate),
-                "the tail-resumed route must retain {coordinate}: {write_singleton:?}"
+                "the Tail producer-to-Ret route must retain {coordinate}: {write_singleton:?}"
             );
         }
         let all_rows = read.iter().chain(&write).collect::<Vec<_>>();
         let tail_rows = all_rows
             .iter()
             .copied()
-            .filter(|row| row.fresh_result_route.starts_with("TailResumedRetInput"))
+            .filter(|row| row.fresh_result_route.starts_with("TailProducerToRet"))
             .collect::<Vec<_>>();
         let direct_rows = all_rows
             .iter()
@@ -1078,14 +1076,12 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
                 format!("call_origin: StaticOriginId({})", row.call_origin),
                 format!("callee_origin: StaticOriginId({})", row.callee_origin),
                 format!("active_frame_origin: StaticOriginId({})", row.binding_frame_origin),
-                "header_edge: ActiveSelfResumption".to_string(),
-                "answer_route: CheckedSelectedRecursor".to_string(),
                 "direction: Forward".to_string(),
                 format!(
                     "ret_input_binder: ConstructorChild {{ frame_origin: StaticOriginId({}), field_position: 0 }}",
                     row.binding_frame_origin
                 ),
-                "ret_input_delivery: CheckedAnswerFallbackDirect".to_string(),
+                "ret_input_delivery: ProducerResultDirect".to_string(),
             ] {
                 assert!(
                     row.fresh_result_route.contains(&coordinate),
@@ -1117,20 +1113,22 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
     });
 }
 
-/// **Promise class: durable invariant.** The observation is stated over emitted
-/// edge pairing rather than fixed Cranelift block/value numbers.
+/// **Promise class: transition sentinel.** The observation is stated over the
+/// still-emitted pre-D3 edge pairing rather than fixed Cranelift block/value
+/// numbers; D3 retires this observer when it activates the new forward edge.
 ///
 /// **MEASURED:** one selected governed tail route records the result delivered
 /// to its unambiguous source-machine resumption seat, that same value on the
 /// active self-resumption jump, the target header's input parameter, and that
 /// same header input directly installed in the exact Ret body environment, in
 /// forward emission order.
-/// **CLAIMED:** the certified tail route is a directed value-flow edge rather
-/// than four co-emitted endpoints.
-/// **THE GAP:** Cranelift identities are diagnostic only. The static route proof
-/// separately owns source/sink authority, and the fixed-product positive above
-/// asserts one tail key per active frame; this observation proves the emitted
-/// graph pairs them. `CoEmissionOnly` preserves its landed aggregate control;
+/// **CLAIMED:** the pre-D3 emitted tail route is a directed value-flow edge
+/// rather than four co-emitted endpoints.
+/// **THE GAP:** Cranelift identities are diagnostic only. The feature-only
+/// observation coordinate intentionally preserves the old emitted-path
+/// controls without becoming a sibling production plan; D2's move-only proof
+/// separately owns the future source/sink authority and makes no live-edge
+/// claim. `CoEmissionOnly` preserves its landed aggregate control;
 /// the substantive leg inventory derives one identity-only arm per predicate
 /// leg, so no conjunct borrows another conjunct's negative observation.
 #[test]
@@ -1551,14 +1549,12 @@ fn assert_generated_entry_mutation_child() {
         "route-duplication" => Mutation::RouteDuplication,
         "route-cross-variant" => Mutation::RouteCrossVariant,
         "route-wrong-active-frame" => Mutation::RouteWrongActiveFrame,
-        "route-wrong-header-edge" => Mutation::RouteWrongHeaderEdge,
-        "route-wrong-answer-route" => Mutation::RouteWrongAnswerRoute,
+        "route-wrong-selected-case" => Mutation::RouteWrongSelectedCase,
         "route-wrong-direct-edge" => Mutation::RouteWrongDirectEdge,
         "route-wrong-ret-input-body" => Mutation::RouteWrongRetInputBody,
         "route-wrong-ret-input-binder" => Mutation::RouteWrongRetInputBinder,
         "route-wrong-governed-key" => Mutation::RouteWrongGovernedKey,
-        "route-pretend-ordinary-projection" => Mutation::RoutePretendOrdinaryProjection,
-        "route-body-merge-output" => Mutation::RouteBodyMergeOutput,
+        "route-wrong-delivery" => Mutation::RouteWrongDelivery,
         "route-reversed" => Mutation::RouteReversed,
         "route-disagreement" => Mutation::RouteDisagreement,
         "remove-member" => Mutation::RemoveFirstMember,
@@ -1584,10 +1580,10 @@ fn assert_generated_entry_mutation_child() {
 //
 // **MEASURED:** each population-side mutation changes one real route relation,
 // membership operation, declared-body transport selector, or legal neighboring
-// header/kind/binder/key and reaches its named planner refusal.
+// case/frame/binder/key and reaches its named planner refusal.
 // **CLAIMED:** the governed projection carries exactly one directed route; its
-// Direct arm preserves the body-refined transport, and its tail arm composes
-// source, active checked header, direct Ret-input delivery, and capture sink.
+// Direct arm preserves the body-refined transport, and its Tail arm composes
+// source, selected case, active frame, and producer-result-direct Ret sink.
 // **THE GAP:** both same-variant positives live in
 // `checked_ih_generated_entry_confluence_reaches_exact_capsules`; these
 // mutation children establish rejection, not positive reach. Neighboring
@@ -1617,15 +1613,13 @@ generated_entry_checked_case!(generated_entry_confluence_fresh_body_reads, GENER
 generated_entry_checked_case!(generated_entry_confluence_route_removal, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-removal", "governed fresh-result route population is absent");
 generated_entry_checked_case!(generated_entry_confluence_route_duplication, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-duplication", "governed fresh-result route population is ambiguous");
 generated_entry_checked_case!(generated_entry_confluence_route_cross_variant, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-cross-variant", "route variant contradicts its exact direct-transport partition");
-generated_entry_checked_case!(generated_entry_confluence_route_wrong_active_frame, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-active-frame", "route active header is not the exact governed frame");
-generated_entry_checked_case!(generated_entry_confluence_route_wrong_header_edge, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-header-edge", "route does not use the active self-resumption header edge");
-generated_entry_checked_case!(generated_entry_confluence_route_wrong_answer_route, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-answer-route", "route does not carry the checked selected-recursor route kind");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_active_frame, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-active-frame", "route active frame is not the exact governed frame");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_selected_case, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-selected-case", "disconnected from its selected recursive case");
 generated_entry_checked_case!(generated_entry_confluence_route_wrong_direct_edge, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-direct-edge", "direct fresh-result route's declared recursive-unit body has no exact typed invocation transport");
 generated_entry_checked_case!(generated_entry_confluence_route_wrong_ret_input_body, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-ret-input-body", "route does not name the exact Ret-input body");
 generated_entry_checked_case!(generated_entry_confluence_route_wrong_ret_input_binder, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-ret-input-binder", "route does not name the exact logical Ret-input binder");
 generated_entry_checked_case!(generated_entry_confluence_route_wrong_governed_key, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-governed-key", "route does not name its governed call key");
-generated_entry_checked_case!(generated_entry_confluence_route_pretend_ordinary_projection, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-pretend-ordinary-projection", "pretends the checked fallback projected a constructor field instead of directly occupying the Ret input");
-generated_entry_checked_case!(generated_entry_confluence_route_body_merge_output, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-body-merge-output", "substituted the causally downstream body merge output for the Ret input");
+generated_entry_checked_case!(generated_entry_confluence_route_wrong_delivery, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-wrong-delivery", "does not deliver the selected producer result directly");
 generated_entry_checked_case!(generated_entry_confluence_route_reversed, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-reversed", "reverses the governed source and Ret-input sink");
 generated_entry_checked_case!(generated_entry_confluence_route_disagreement, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "route-disagreement", "disagree on their typed consumer projection");
 generated_entry_checked_case!(generated_entry_confluence_remove_member, GENERATED_ENTRY_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_mutation_child, "remove-member", "not equal as sets");
@@ -1960,8 +1954,9 @@ fn composed_return_ret_sink_lookup_controls_refuse() {
 /// **CLAIMED:** the compiler-only sink record changes no ABI, call, value,
 /// result route, or emitted behavior before D3 activates a consumer.
 /// **THE GAP:** suppression removes both the install and its internal lookup;
-/// the population and refusal controls above independently establish that the
-/// exact seam is present and fail-closed.
+/// D2 authority formation is suppressed in both arms so this differential
+/// still isolates D1. The population and refusal controls above independently
+/// establish that the exact seam is present and fail-closed.
 #[test]
 fn composed_return_ret_sink_is_byte_inert() {
     in_large_stack_thread("rt-parity-composed-return-ret-sink-inert", || {
@@ -1972,12 +1967,19 @@ fn composed_return_ret_sink_is_byte_inert() {
             ken_runtime::with_composed_return_ret_sink_mutation(
                 ken_runtime::ComposedReturnRetSinkMutation::Exact,
                 || {
-                    ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        "rt_parity_composed_return_ret_sink_inert",
-                        exact_root.path(),
-                    )
+                    let (artifact, _d2_rows, _d2_applications) =
+                        ken_runtime::with_composed_return_forward_ret_authority_mutation(
+                            ken_runtime::ComposedReturnForwardRetAuthorityMutation::SuppressForInertness,
+                            || {
+                                ken_cli::build_native_program(
+                                    &source,
+                                    ken_cli::SourceFormat::Ken,
+                                    "rt_parity_composed_return_ret_sink_inert",
+                                    exact_root.path(),
+                                )
+                            },
+                        );
+                    artifact
                 },
             );
         let exact = exact.expect("exact composed-return Ret-sink artifact");
@@ -1985,12 +1987,19 @@ fn composed_return_ret_sink_is_byte_inert() {
             ken_runtime::with_composed_return_ret_sink_mutation(
                 ken_runtime::ComposedReturnRetSinkMutation::SuppressForInertness,
                 || {
-                    ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        "rt_parity_composed_return_ret_sink_inert",
-                        suppressed_root.path(),
-                    )
+                    let (artifact, _d2_rows, _d2_applications) =
+                        ken_runtime::with_composed_return_forward_ret_authority_mutation(
+                            ken_runtime::ComposedReturnForwardRetAuthorityMutation::SuppressForInertness,
+                            || {
+                                ken_cli::build_native_program(
+                                    &source,
+                                    ken_cli::SourceFormat::Ken,
+                                    "rt_parity_composed_return_ret_sink_inert",
+                                    suppressed_root.path(),
+                                )
+                            },
+                        );
+                    artifact
                 },
             );
         let suppressed = suppressed.expect("suppressed composed-return Ret-sink artifact");
@@ -2019,6 +2028,159 @@ fn composed_return_ret_sink_is_byte_inert() {
             "the D1 sink seam must change no emitted byte"
         );
         assert!(ken_runtime::composed_return_ret_sink_mutation_is_exact());
+    });
+}
+
+/// **Promise class: durable invariant.**
+///
+/// **MEASURED:** exact post-selection D2 authority formation and complete
+/// suppression emit identical semantic hashes, executable hashes, and bytes;
+/// every exact observation names forward, producer-result-direct delivery to
+/// field zero of one compiler-local Ret block.
+/// **CLAIMED:** the move-only authority join changes no call, result route,
+/// ABI, runtime carrier, or artifact before D3 activates a consumer.
+/// **THE GAP:** the suppression arm moves the authority operation while leaving
+/// the same new planner route in place; the plan-shape positive and the four
+/// natural-site refusal arms independently cover what this differential does
+/// not.
+#[test]
+fn composed_return_forward_ret_authority_is_byte_inert() {
+    in_large_stack_thread("rt-parity-forward-ret-authority-inert", || {
+        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
+
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+        let exact_root = output_dir("forward-ret-authority-inert-exact");
+        let suppressed_root = output_dir("forward-ret-authority-inert-suppressed");
+        let (exact, exact_rows, exact_applications) =
+            ken_runtime::with_composed_return_forward_ret_authority_mutation(
+                Mutation::Exact,
+                || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        "rt_parity_forward_ret_authority_inert",
+                        exact_root.path(),
+                    )
+                },
+            );
+        let exact = exact.expect("exact D2 forward-Ret authority artifact");
+        let (suppressed, suppressed_rows, suppressed_applications) =
+            ken_runtime::with_composed_return_forward_ret_authority_mutation(
+                Mutation::SuppressForInertness,
+                || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        "rt_parity_forward_ret_authority_inert",
+                        suppressed_root.path(),
+                    )
+                },
+            );
+        let suppressed = suppressed.expect("suppressed D2 forward-Ret authority artifact");
+
+        assert!(
+            !exact_rows.is_empty(),
+            "the real Tail authority population must reach"
+        );
+        assert!(suppressed_rows.is_empty());
+        assert_eq!(exact_applications, exact_rows.len());
+        assert_eq!(suppressed_applications, exact_applications);
+        assert!(exact_rows.iter().all(|row| {
+            row.ret_input_field_position == 0
+                && row.direction == "Forward"
+                && row.delivery == "ProducerResultDirect"
+                && !row.source_call_identity.is_empty()
+                && !row.return_body_block.is_empty()
+        }));
+        assert_eq!(exact.plan_transport_hash, suppressed.plan_transport_hash);
+        assert_eq!(
+            exact.runtime_program.core_semantic_hash,
+            suppressed.runtime_program.core_semantic_hash
+        );
+        assert_eq!(
+            exact.runtime_program.artifact_hash,
+            suppressed.runtime_program.artifact_hash
+        );
+        assert_eq!(
+            exact.artifact.executable_hash,
+            suppressed.artifact.executable_hash
+        );
+        assert_eq!(
+            std::fs::read(&exact.artifact.executable_path).expect("exact executable bytes"),
+            std::fs::read(&suppressed.artifact.executable_path)
+                .expect("suppressed executable bytes"),
+            "D2 authority formation must change no emitted byte"
+        );
+        assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
+    });
+}
+
+/// **Promise class: durable invariant.**
+///
+/// **MEASURED:** each control changes one operand after exact generated-entry
+/// validation and transport selection, reaches the D2 join, and returns its
+/// specific member, projection, source, or sink refusal.
+/// **CLAIMED:** no other confluence member, projection, source identity, or
+/// function-local Ret sink can yield usable forward authority.
+/// **THE GAP:** applications prove reach and exact messages distinguish the
+/// intended arms; the exact byte-inert positive above supplies the passing
+/// configuration each negative control needs.
+#[test]
+fn composed_return_forward_ret_authority_controls_refuse() {
+    in_large_stack_thread("rt-parity-forward-ret-authority-controls", || {
+        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
+
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_write_writable_stage");
+        for (label, mutation, expected) in [
+            (
+                "wrong-member",
+                Mutation::WrongMember,
+                "source-call identity is not a member of the exact forward Ret confluence class",
+            ),
+            (
+                "projection-disagreement",
+                Mutation::ProjectionDisagreement,
+                "projection disagrees with its exact access-coordinate projection",
+            ),
+            (
+                "wrong-source",
+                Mutation::WrongSource,
+                "proof source is not the selected transport's own source-call identity",
+            ),
+            (
+                "wrong-sink",
+                Mutation::WrongSink,
+                "does not match the unique emission sink",
+            ),
+        ] {
+            let root = output_dir(&format!("forward-ret-authority-control-{label}"));
+            let (result, observations, applications) =
+                ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        &format!(
+                            "rt_parity_forward_ret_authority_control_{}",
+                            label.replace('-', "_")
+                        ),
+                        root.path(),
+                    )
+                });
+            assert!(
+                applications > 0,
+                "{label}: control missed the post-selection D2 join"
+            );
+            let error = result.expect_err("a mismatched D2 authority operand must refuse");
+            let rendered = format!("{error:?}");
+            assert!(
+                rendered.contains(expected),
+                "{label}: wrong refusal arm; error={rendered}; observations={observations:#?}"
+            );
+            assert!(
+                ken_runtime::composed_return_forward_ret_authority_mutation_is_exact(),
+                "{label}: scoped D2 authority mutation did not restore"
+            );
+        }
     });
 }
 
