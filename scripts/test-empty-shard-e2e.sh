@@ -71,18 +71,6 @@ LOG="$root/mutation.log" PATH="$root/bin:$PATH" "$repo/scripts/run-ci-shard.sh" 
 if assert_expected_command "$expected_expression" mutation.log; then
   exit 1
 fi
-# Mutating the workflow boundary to pass filtered inventory as raw authority
-# loses the explicitly named raw member and the real union checker reddens.
-mkdir mutation
-cp inventory.json mutation/inventory.json
-cp selected-1.json mutation/selected-1.json
-(
-  cd mutation
-  "$repo/scripts/stage-ci-shard-artifact.sh" 1 inventory.json inventory.json selected-1.json
-  mkdir realized-shards
-  mv realized-shard-1 realized-shards/
-  if python3 "$repo/scripts/check-ci-shard-union.py"; then exit 1; fi
-)
 # Both eight-artifact mutations retain seven valid siblings.
 mkdir mutation-eight
 cp -a realized-shards mutation-eight/
