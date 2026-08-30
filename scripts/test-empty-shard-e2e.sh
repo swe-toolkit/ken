@@ -108,3 +108,34 @@ cp -a realized-shards mutation-content/
   test "$status" -eq 2
   grep -Fx 'realized-shard check failed: unfiltered inventories differ' err
 )
+# Pre-fix old-shape filtered listings omitted excluded native discovery rows.
+mkdir mutation-old-shape
+cp -a realized-shards mutation-old-shape/
+(
+  cd mutation-old-shape
+  python3 - <<'PY'
+import json
+v=json.load(open('../inventory.json'))
+del v['rust-suites']['native']; v['test-count'] -= 1
+import os
+os.mkdir('old')
+open('old/inventory.json','w').write(json.dumps(v))
+PY
+  for n in $(seq 1 8); do
+    "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json old/inventory.json ../selected-$n.json
+    rm -rf realized-shards/realized-shard-$n
+    mv realized-shard-$n realized-shards/
+  done
+  set +e; python3 "$repo/scripts/check-ci-shard-union.py" 2>err; status=$?; set -e
+  test "$status" -eq 2
+  grep -Fx 'realized-shard check failed: filtered and unfiltered discovered inventories differ' err
+  mkdir fixed
+  for n in $(seq 1 8); do
+    python3 "$repo/scripts/ci-duration-shard.py" project-filtered ../unfiltered-inventory.json fixed/inventory.json
+    "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json fixed/inventory.json ../selected-$n.json
+    rm -rf realized-shards/realized-shard-$n
+    mv realized-shard-$n realized-shards/
+  done
+  python3 "$repo/scripts/check-ci-shard-union.py"
+)
+exit 0

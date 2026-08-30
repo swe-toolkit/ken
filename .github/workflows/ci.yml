@@ -118,7 +118,6 @@ jobs:
       # unisolated-hypothesis framing.
       - name: Select duration-balanced shard
         run: |
-          shard_exclusion='not (binary(=rt_parity_native) | binary(=px8f_buffer_native) | binary(=px8f_write_partition))'
           cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
           python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
           python3 scripts/ci-duration-shard.py inventory.json docs/program/evidence/ci-shard-duration-balance-33230600665.json duration-filters
