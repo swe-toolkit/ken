@@ -79,6 +79,8 @@ immediate since `empty = Leaf`. Neither needs induction or a comparison.
 ```ken
 import Core.Logic.Or (Or, Inl, Inr)
 
+import Data.Sums.Combinators (is_some)
+
 data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
 
 const empty (k : Type) (v : Type) : Tree k v = Leaf k v
@@ -131,12 +133,6 @@ fn lookup (k : Type) (v : Type) (leq : k → k → Bool) (key : k) (m : Tree k v
 
 fn member (k : Type) (v : Type) (leq : k → k → Bool) (key : k) (m : Tree k v) : Bool =
   match lookup k v leq key m {
-    None ↦ False;
-    Some x ↦ True
-  }
-
-fn option_is_some (v : Type) (o : Option v) : Bool =
-  match o {
     None ↦ False;
     Some x ↦ True
   }
@@ -7711,8 +7707,8 @@ fn unit_combine (x : Unit) (y : Unit) : Unit = MkUnit
 theorem union_lookup_table_member
       (left : Option Unit) (right : Option Unit)
     : Equal Bool
-        (option_is_some Unit (union_lookup_table Unit unit_combine left right))
-        (cat4_bool_or (option_is_some Unit left) (option_is_some Unit right)) =
+        (is_some Unit (union_lookup_table Unit unit_combine left right))
+        (cat4_bool_or (is_some Unit left) (is_some Unit right)) =
   match left {
     None ↦
       match right {
@@ -7827,8 +7823,8 @@ fn difference_lookup_expected_member_option (left : Option Unit) (reject : Bool)
 theorem difference_lookup_expected_member_table
       (left : Option Unit) (reject : Bool)
     : Equal Bool
-        (option_is_some Unit (difference_lookup_expected_member_option left reject))
-        (bool_and (option_is_some Unit left) (bool_not reject)) =
+        (is_some Unit (difference_lookup_expected_member_option left reject))
+        (bool_and (is_some Unit left) (bool_not reject)) =
   match reject {
     True ↦
       match left {
@@ -7845,7 +7841,7 @@ theorem difference_lookup_expected_member_table
 theorem difference_lookup_expected_member
       (k : Type) (leq : k → k → Bool) (key : k) (s : Tree k Unit) (t : Tree k Unit)
     : Equal Bool
-        (option_is_some Unit (difference_lookup_expected k Unit leq key s t))
+        (is_some Unit (difference_lookup_expected k Unit leq key s t))
         (bool_and (set_member k leq key s) (bool_not (set_member k leq key t))) =
   difference_lookup_expected_member_table (lookup k Unit leq key s) (member k Unit leq key t)
 
@@ -11242,7 +11238,7 @@ theorem member_from_lookup_some
       (val : v)
       (h : Equal (Option v) (lookup k v leq key m) (Some v val))
     : Equal Bool (member k v leq key m) True =
-  cong (Option v) Bool (lookup k v leq key m) (Some v val) (option_is_some v) h
+  cong (Option v) Bool (lookup k v leq key m) (Some v val) (is_some v) h
 
 theorem lookup_none_from_member_false_hit
       (v : Type) (val : v) (h : Equal Bool True False)
@@ -14106,7 +14102,7 @@ theorem set_union_member_law
       trans
         Bool
         (set_member k leq x (set_union k leq s t))
-        (option_is_some
+        (is_some
           Unit
           (union_lookup_table
             Unit
@@ -14119,7 +14115,7 @@ theorem set_union_member_law
           Bool
           (lookup k Unit leq x (set_union k leq s t))
           (union_lookup_table Unit unit_combine (lookup k Unit leq x s) (lookup k Unit leq x t))
-          (option_is_some Unit)
+          (is_some Unit)
           (union_lookup_characterization
             k
             Unit
@@ -14540,14 +14536,14 @@ theorem set_difference_member_law
       trans
         Bool
         (set_member k leq x (set_difference k leq s t))
-        (option_is_some Unit (difference_lookup_expected k Unit leq x s t))
+        (is_some Unit (difference_lookup_expected k Unit leq x s t))
         (bool_and (set_member k leq x s) (bool_not (set_member k leq x t)))
         (cong
           (Option Unit)
           Bool
           (lookup k Unit leq x (set_difference k leq s t))
           (difference_lookup_expected k Unit leq x s t)
-          (option_is_some Unit)
+          (is_some Unit)
           (difference_lookup_characterization k Unit leq reflLeq transLeq x s t hord hdist))
         (difference_lookup_expected_member k leq x s t)
 

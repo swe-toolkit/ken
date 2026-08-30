@@ -16,9 +16,11 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
+use std::collections::BTreeSet;
+
+use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{Decl, GlobalId};
+use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, Term};
 
 const MAP_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Map.ken.md");
 
@@ -35,17 +37,235 @@ const D1_LEGACY_MAP_STACK_BYTES: usize = 2 * 1024 * 1024;
 /// inline-parent-SIGABRT; zero let both pass and 2,048 made both abort.
 const D1_LEGACY_MAP_STACK_RESERVATION_BYTES: usize = 512;
 
-fn mk_env() -> ElabEnv {
+fn term_reference_count(term: &Term, target: GlobalId) -> usize {
+    let here = usize::from(matches!(term, Term::Const { id, .. } if *id == target));
+    here + term
+        .children()
+        .into_iter()
+        .map(|child| term_reference_count(child, target))
+        .sum::<usize>()
+}
+
+fn module_transparent_kernel_equivalents(
+    env: &ElabEnv,
+    module: &str,
+    provider: GlobalId,
+) -> BTreeSet<String> {
+    let (provider_level_params, provider_ty, provider_body) = match env.env.lookup(provider) {
+        Some(Decl::Transparent {
+            level_params,
+            ty,
+            body,
+            ..
+        }) => (level_params, ty, body),
+        other => panic!("provider must be transparent, got {other:?}"),
+    };
+    assert!(
+        provider_level_params.is_empty(),
+        "group-6 providers in this control must have zero declaration-level parameters"
+    );
+
+    let prefix = format!("{module}.");
+    let context = Context::new();
+    env.globals
+        .iter()
+        .filter_map(|(name, id)| {
+            let local_name = name.strip_prefix(&prefix)?;
+            let (level_params, ty, body) = match env.env.lookup(*id) {
+                Some(Decl::Transparent {
+                    level_params,
+                    ty,
+                    body,
+                    ..
+                }) => (level_params, ty, body),
+                _ => return None,
+            };
+            if !level_params.is_empty() {
+                return None;
+            }
+            (convert_type(&env.env, &context, ty, provider_ty)
+                && convert(&env.env, &context, provider_ty, body, provider_body))
+            .then(|| local_name.to_owned())
+        })
+        .collect()
+}
+
+fn mk_map_dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
     let provider_state = catalog_or::core_logic_or_module_state(&env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Combinators")
+        .expect("Map's canonical Option-combinator provider must roots-load");
+    assert!(
+        env.globals.contains_key("Data.Sums.Combinators.is_some"),
+        "the fixture must load the qualified canonical is_some provider"
+    );
+    assert!(
+        !env.globals.contains_key("is_some"),
+        "the dependency fixture must not prebind an unqualified is_some alias"
+    );
+    env
+}
+
+fn mk_env() -> ElabEnv {
+    let mut env = mk_map_dependency_env();
     env.elaborate_ken_md_file(MAP_KEN_MD)
         .expect("catalog/packages/Data/Collections/Map.ken.md must elaborate");
     catalog_or::assert_transparent_result_uses_core_logic_or(&env, "bool_dichotomy");
     env
+}
+
+/// Promise class: durable invariant.
+///
+/// **MEASURED:** the established Map dependency fixture roots-loads the
+/// qualified canonical `Data.Sums.Combinators.is_some` without a flat alias;
+/// Map's own selective import then binds that exact transparent `GlobalId`,
+/// adds no trust, retires `Data.Collections.Map.option_is_some`, and leaves no
+/// module-owned zero-level transparent definition kernel-equivalent to the
+/// provider. **CLAIMED:** D2 adds exactly one load-bearing Map dependency edge
+/// and no definitionally equivalent local reimplementation. **THE GAP:** this
+/// is a narrow identity and anti-duplication observation, not a causal-flow or
+/// extensional-uniqueness claim; the existing Map behavior tests separately own
+/// computation.
+#[test]
+fn cat_bool_reuse_d2_resolves_exact_is_some_provider_without_equivalent_local() {
+    let mut env = mk_map_dependency_env();
+    let provider = env.globals["Data.Sums.Combinators.is_some"];
+    assert!(matches!(
+        env.env.lookup(provider),
+        Some(Decl::Transparent { .. })
+    ));
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    let map_ids: BTreeSet<_> = env
+        .elaborate_ken_md_file(MAP_KEN_MD)
+        .expect("Map must elaborate through its own selective is_some import")
+        .into_iter()
+        .collect();
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+
+    assert_eq!(before, after, "Map is_some reuse must add zero trust");
+    assert!(
+        !map_ids.contains(&provider),
+        "Map's direct declaration population must not absorb the imported provider"
+    );
+    let provider_references = map_ids
+        .iter()
+        .map(|id| match env.env.lookup(*id) {
+            Some(Decl::Transparent { ty, body, .. }) => {
+                term_reference_count(ty, provider) + term_reference_count(body, provider)
+            }
+            _ => 0,
+        })
+        .sum::<usize>();
+    assert!(
+        provider_references > 0,
+        "Map's checked direct declarations must retain the exact canonical is_some GlobalId"
+    );
+
+    // The established fixture elaborates the real Map source as one legacy
+    // flat unit, so qualify only the direct IDs returned by that elaboration,
+    // after it succeeds, for the unchanged module-owned inventory helper.
+    // The imported provider is excluded above and never receives a Map alias.
+    let owned_bindings: Vec<_> = env
+        .globals
+        .iter()
+        .filter(|(_, id)| map_ids.contains(id))
+        .map(|(name, id)| (name.clone(), *id))
+        .collect();
+    let bound_ids: BTreeSet<_> = owned_bindings.iter().map(|(_, id)| *id).collect();
+    let transparent_ids: BTreeSet<_> = map_ids
+        .iter()
+        .filter(|id| matches!(env.env.lookup(**id), Some(Decl::Transparent { .. })))
+        .copied()
+        .collect();
+    assert!(
+        !transparent_ids.is_empty() && transparent_ids.is_subset(&bound_ids),
+        "the real Map bindings must close over every direct transparent declaration"
+    );
+    for (name, id) in owned_bindings {
+        env.globals
+            .insert(format!("Data.Collections.Map.{name}"), id);
+    }
+    assert!(
+        !env.globals
+            .contains_key("Data.Collections.Map.option_is_some"),
+        "the former Map-local option_is_some global must be absent"
+    );
+    assert_eq!(
+        module_transparent_kernel_equivalents(&env, "Data.Collections.Map", provider),
+        BTreeSet::new(),
+        "Map must define no transparent local with kernel-definitionally equal checked type and body at the provider type for canonical is_some"
+    );
+}
+
+fn replace_exactly_once(source: &str, from: &str, to: &str) -> String {
+    assert_eq!(
+        source.matches(from).count(),
+        1,
+        "the Map import control must mutate exactly one `{from}`"
+    );
+    source.replacen(from, to, 1)
+}
+
+fn assert_map_import_mutation_fails_at_is_some(source: &str, label: &str) {
+    let mut env = mk_map_dependency_env();
+    match env.elaborate_ken_md_file(source) {
+        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(
+            name, "is_some",
+            "{label} must fail at Map's unqualified is_some use"
+        ),
+        other => panic!("{label} must fail with UnresolvedCon is_some, got {other:?}"),
+    }
+}
+
+/// Promise class: durable invariant.
+///
+/// **MEASURED:** withdrawing Map's exact selective import, or binding the
+/// canonical provider under the wrong local name, makes the real Map source
+/// fail specifically at unqualified `is_some` under the same fixture that
+/// keeps its legacy dependencies green. **CLAIMED:** the new product edge is load-bearing and is
+/// not supplied by fixture padding. **THE GAP:** these negative controls require
+/// the candidate-positive control above; without it, an invalid fixture could
+/// make every rejection pass vacuously.
+#[test]
+fn cat_bool_reuse_d2_import_withdrawal_and_wrong_name_fail_at_is_some() {
+    let import = "import Data.Sums.Combinators (is_some)\n";
+    let withdrawn = replace_exactly_once(MAP_KEN_MD, import, "");
+    assert_map_import_mutation_fails_at_is_some(&withdrawn, "withdrawn import");
+
+    let wrong_name = replace_exactly_once(
+        MAP_KEN_MD,
+        import,
+        "import Data.Sums.Combinators (is_some as not_is_some)\n",
+    );
+    assert_map_import_mutation_fails_at_is_some(&wrong_name, "wrong-name import");
+}
+
+/// Promise class: transition sentinel. This deliberately remains red as a raw
+/// standalone package until `CAT-MAP-DEPENDENCY-CLOSURE-REPAIR` supplies Map's
+/// full declared dependency closure; that follow-on retires or updates this
+/// boundary sentinel.
+///
+/// **MEASURED:** the candidate's roots-loader path resolves the new Sums import
+/// and reaches the same first pre-existing unresolved constructor,
+/// `list_append`. **CLAIMED:** D2 does not worsen Map's raw package boundary.
+/// **THE GAP:** this is negative-scope evidence only, not standalone success;
+/// `mk_env` is the separate positive legacy-closure control.
+#[test]
+fn cat_bool_reuse_d2_raw_boundary_remains_unresolved_list_append() {
+    let mut env = ElabEnv::new().expect("base env");
+    match env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Map") {
+        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(
+            name, "list_append",
+            "D2 must preserve Map's first raw unresolved constructor name"
+        ),
+        other => panic!(
+            "raw Map must retain its pre-existing UnresolvedCon list_append boundary, got {other:?}"
+        ),
+    }
 }
 
 fn make_store(env: &ElabEnv) -> EvalStore {
@@ -878,7 +1098,6 @@ fn cat4_new_api_is_derived_and_axiom_free() {
         "union_from_list_acc_cons_bridge",
         "union",
         "union_lookup_table",
-        "option_is_some",
         "unit_combine",
         "union_lookup_table_member",
         "intersection_lookup_table",
