@@ -132,7 +132,7 @@ pub use aggregates::{
     CheckedIhGeneratedEntryAdmissionObservation, CheckedIhGeneratedEntryArrivalMutation,
     CheckedIhGeneratedEntryConfluenceMutation, CheckedIhGeneratedEntryObservation,
     ComposedReturnForwardRetAuthorityMutation, ComposedReturnForwardRetAuthorityObservation,
-    RetainedResultClosureProofMutation,
+    ComposedReturnForwardRetCoordinateObservation, RetainedResultClosureProofMutation,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -143,6 +143,7 @@ pub(in crate::cranelift_backend) use aggregates::{
     record_checked_ih_generated_entry_ordinary_continuation,
     record_checked_ih_generated_entry_raw_arrival, record_checked_ih_generated_entry_reached,
     record_composed_return_forward_ret_authority,
+    take_composed_return_forward_ret_population_mutation,
 };
 
 // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — the aggregates domain's cross-boundary

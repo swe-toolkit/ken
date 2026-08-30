@@ -2086,10 +2086,12 @@ fn composed_return_forward_ret_authority_is_byte_inert() {
         assert_eq!(exact_applications, exact_rows.len());
         assert_eq!(suppressed_applications, exact_applications);
         assert!(exact_rows.iter().all(|row| {
-            row.ret_input_field_position == 0
-                && row.direction == "Forward"
-                && row.delivery == "ProducerResultDirect"
-                && !row.source_call_identity.is_empty()
+            row.coordinate
+                .ret_input_binder
+                .ends_with("field_position: 0 }")
+                && row.coordinate.direction == "Forward"
+                && row.coordinate.delivery == "ProducerResultDirect"
+                && !row.coordinate.source_call_identity.is_empty()
                 && !row.return_body_block.is_empty()
         }));
         assert_eq!(exact.plan_transport_hash, suppressed.plan_transport_hash);
@@ -2110,6 +2112,174 @@ fn composed_return_forward_ret_authority_is_byte_inert() {
             std::fs::read(&suppressed.artifact.executable_path)
                 .expect("suppressed executable bytes"),
             "D2 authority formation must change no emitted byte"
+        );
+        assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
+    });
+}
+
+/// **Promise class: durable invariant.**
+///
+/// **MEASURED:** the complete set of real planned Tail coordinates equals the
+/// unique set of formed post-selection authorities across disjoint read and
+/// write fixtures; removing each Tail member or duplicating one makes the
+/// unchanged source consumer refuse before call emission.
+/// **CLAIMED:** every validated Tail producer-to-Ret route forms exactly one
+/// move-only authority, while Direct and non-governed routes form none.
+/// **THE GAP:** plan and authority observations come from independent sides of
+/// the consumer join; exact set equality closes pairing, per-source removal
+/// proves no member may fail open, and duplication separately closes
+/// multiplicity rather than relying on set equality.
+#[test]
+fn composed_return_forward_ret_authority_population_is_exact() {
+    in_large_stack_thread("rt-parity-forward-ret-authority-population", || {
+        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
+
+        let compile = |label: &str, mutation: Mutation, entry: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("forward-ret-authority-population-{label}"));
+            let ((result, plan_rows), formed, applications) =
+                ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
+                    ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                        ken_cli::build_native_program(
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_parity_forward_ret_authority_population_{label}"),
+                            root.path(),
+                        )
+                    })
+                });
+            let expected = plan_rows
+                .into_iter()
+                .flat_map(|row| row.forward_ret_coordinates)
+                .collect::<Vec<_>>();
+            let actual = formed
+                .iter()
+                .map(|row| row.coordinate.clone())
+                .collect::<Vec<_>>();
+            (result, expected, actual, applications)
+        };
+
+        let (exact, expected, actual, exact_applications) =
+            compile("read-exact", Mutation::Exact, "rt_read_offset_stage");
+        exact.expect("the exact Tail authority population must compile");
+        let expected_set = expected
+            .iter()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        let actual_set = actual
+            .iter()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            expected_set.len() > 1,
+            "the fixture must instantiate a non-degenerate Tail population"
+        );
+        assert_eq!(
+            expected.len(),
+            expected_set.len(),
+            "the real planned Tail population must be unique"
+        );
+        assert_eq!(expected_set, actual_set);
+        assert_eq!(exact_applications, actual.len());
+
+        for target in 0..expected.len() {
+            let label = format!("remove-{target}");
+            let (result, removed_expected, removed_actual, applications) = compile(
+                &format!("read-{label}"),
+                Mutation::RemoveTailAuthorityAt(target),
+                "rt_read_offset_stage",
+            );
+            let error = result.expect_err("one missing Tail authority must refuse");
+            assert!(
+                format!("{error:?}").contains(
+                    "validated Tail producer-to-Ret route has no exact post-selection authority"
+                ),
+                "removal {target} reached the wrong refusal: {error:?}"
+            );
+            assert_eq!(removed_expected, expected);
+            assert_eq!(applications, removed_actual.len() + 1);
+            let removed_set = removed_actual
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>();
+            assert!(
+                removed_set.is_subset(&expected_set) && removed_set != expected_set,
+                "removal {target} did not remove one real planned coordinate"
+            );
+            assert!(
+                ken_runtime::composed_return_forward_ret_authority_mutation_is_exact(),
+                "removal {target} did not restore its scoped mutation"
+            );
+        }
+
+        let (write_exact, write_expected, write_actual, write_applications) =
+            compile("write-exact", Mutation::Exact, "rt_write_writable_stage");
+        write_exact.expect("the exact write-side Tail authority population must compile");
+        let write_expected_set = write_expected
+            .iter()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        let write_actual_set = write_actual
+            .iter()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(write_expected_set.len() > 1);
+        assert_eq!(write_expected.len(), write_expected_set.len());
+        assert_eq!(write_expected_set, write_actual_set);
+        assert_eq!(write_applications, write_actual.len());
+        assert_eq!(
+            expected_set.union(&write_expected_set).count(),
+            expected_set.len() + write_expected_set.len(),
+            "read and write fixtures must cover disjoint Tail coordinates"
+        );
+
+        for target in 0..write_expected.len() {
+            let (result, removed_expected, removed_actual, applications) = compile(
+                &format!("write-remove-{target}"),
+                Mutation::RemoveTailAuthorityAt(target),
+                "rt_write_writable_stage",
+            );
+            let error = result.expect_err("one missing write-side Tail authority must refuse");
+            assert!(
+                format!("{error:?}").contains(
+                    "validated Tail producer-to-Ret route has no exact post-selection authority"
+                ),
+                "write removal {target} reached the wrong refusal: {error:?}"
+            );
+            assert_eq!(removed_expected, write_expected);
+            assert_eq!(applications, removed_actual.len() + 1);
+            let removed_set = removed_actual
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>();
+            assert!(
+                removed_set.is_subset(&write_expected_set) && removed_set != write_expected_set,
+                "write removal {target} did not remove one real planned coordinate"
+            );
+            assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
+        }
+
+        let duplicate_target = expected.len() / 2;
+        let (result, duplicate_expected, duplicated, applications) = compile(
+            "read-duplicate",
+            Mutation::DuplicateTailAuthorityAt(duplicate_target),
+            "rt_read_offset_stage",
+        );
+        let error = result.expect_err("one duplicated Tail authority must refuse");
+        assert!(
+            format!("{error:?}").contains(
+                "validated Tail producer-to-Ret route formed more than one post-selection authority"
+            ),
+            "duplication reached the wrong refusal: {error:?}"
+        );
+        assert_eq!(duplicate_expected, expected);
+        assert_eq!(applications, duplicated.len());
+        let [.., penultimate, last] = duplicated.as_slice() else {
+            panic!("the duplication control formed fewer than two authorities");
+        };
+        assert_eq!(
+            penultimate, last,
+            "the duplication control did not duplicate one real authority coordinate"
         );
         assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
     });

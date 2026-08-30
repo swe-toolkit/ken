@@ -591,6 +591,13 @@ impl CheckedIhGeneratedEntryProjection {
         &self.fresh_result_route
     }
 
+    pub(in crate::cranelift_backend) fn requires_forward_ret_authority(&self) -> bool {
+        matches!(
+            self.fresh_result_route,
+            CheckedIhFreshResultRoute::TailProducerToRet { .. }
+        )
+    }
+
     pub(in crate::cranelift_backend) fn fresh_result_destination(
         &self,
     ) -> Option<&CheckedIhFreshResultDestination> {
@@ -666,6 +673,10 @@ impl CheckedIhFreshResultRoute {
 }
 
 impl CheckedIhForwardRetPlanProof {
+    pub(in crate::cranelift_backend) fn source_call_identity(&self) -> &ContinuationCallIdentity {
+        &self.source_call_identity
+    }
+
     pub(in crate::cranelift_backend) fn active_frame_origin(&self) -> StaticOriginId {
         self.active_frame_origin
     }
@@ -954,6 +965,7 @@ pub struct CheckedIhGeneratedEntryObservation {
     pub locator_domain: String,
     pub locator_index: u32,
     pub fresh_result_route: String,
+    pub forward_ret_coordinates: Vec<ComposedReturnForwardRetCoordinateObservation>,
     pub installed: bool,
     pub reached_count: usize,
     pub reached_exact_capsule: bool,
@@ -1127,16 +1139,19 @@ pub enum CheckedIhGeneratedEntryConfluenceMutation {
 pub enum ComposedReturnForwardRetAuthorityMutation {
     Exact,
     SuppressForInertness,
+    RemoveTailAuthorityAt(usize),
+    DuplicateTailAuthorityAt(usize),
     WrongMember,
     ProjectionDisagreement,
     WrongSource,
     WrongSink,
 }
 
-/// One successfully formed compiler-only D2 Tail producer-to-Ret authority.
+/// Complete compiler-only coordinate shared by one planned Tail route and its
+/// post-selection forward-Ret authority. This is observation data only.
 #[cfg(feature = "px8-ds-test-support")]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ComposedReturnForwardRetAuthorityObservation {
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct ComposedReturnForwardRetCoordinateObservation {
     pub source_call_identity: String,
     pub invocation_origin: String,
     pub call_origin: String,
@@ -1145,9 +1160,16 @@ pub struct ComposedReturnForwardRetAuthorityObservation {
     pub selected_case_body_origin: String,
     pub active_frame_origin: String,
     pub ret_case_body_origin: String,
-    pub ret_input_field_position: u32,
+    pub ret_input_binder: String,
     pub direction: String,
     pub delivery: String,
+}
+
+/// One successfully formed compiler-only D2 Tail producer-to-Ret authority.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComposedReturnForwardRetAuthorityObservation {
+    pub coordinate: ComposedReturnForwardRetCoordinateObservation,
     pub return_body_block: String,
 }
 
@@ -1163,6 +1185,8 @@ thread_local! {
         RefCell<Vec<ComposedReturnForwardRetAuthorityObservation>> =
             const { RefCell::new(Vec::new()) };
     static FORWARD_RET_AUTHORITY_APPLICATIONS: Cell<usize> = const { Cell::new(0) };
+    static FORWARD_RET_AUTHORITY_POPULATION_SOURCES:
+        RefCell<Vec<ContinuationCallIdentity>> = const { RefCell::new(Vec::new()) };
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1202,12 +1226,14 @@ pub fn with_composed_return_forward_ret_authority_mutation<T>(
             FORWARD_RET_AUTHORITY_OBSERVATIONS
                 .with(|observations| observations.borrow_mut().clear());
             FORWARD_RET_AUTHORITY_APPLICATIONS.with(|count| count.set(0));
+            FORWARD_RET_AUTHORITY_POPULATION_SOURCES.with(|sources| sources.borrow_mut().clear());
         }
     }
 
     FORWARD_RET_AUTHORITY_MUTATION.with(|active| active.set(mutation));
     FORWARD_RET_AUTHORITY_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
     FORWARD_RET_AUTHORITY_APPLICATIONS.with(|count| count.set(0));
+    FORWARD_RET_AUTHORITY_POPULATION_SOURCES.with(|sources| sources.borrow_mut().clear());
     let restore = Restore;
     let result = f();
     let observations = FORWARD_RET_AUTHORITY_OBSERVATIONS
@@ -1223,12 +1249,32 @@ pub fn composed_return_forward_ret_authority_mutation_is_exact() -> bool {
         == ComposedReturnForwardRetAuthorityMutation::Exact
         && FORWARD_RET_AUTHORITY_OBSERVATIONS.with(|observations| observations.borrow().is_empty())
         && FORWARD_RET_AUTHORITY_APPLICATIONS.with(Cell::get) == 0
+        && FORWARD_RET_AUTHORITY_POPULATION_SOURCES.with(|sources| sources.borrow().is_empty())
 }
 
 #[cfg(feature = "px8-ds-test-support")]
 pub(in crate::cranelift_backend) fn composed_return_forward_ret_authority_mutation(
 ) -> ComposedReturnForwardRetAuthorityMutation {
     FORWARD_RET_AUTHORITY_MUTATION.with(Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn take_composed_return_forward_ret_population_mutation(
+    target: usize,
+    source: &ContinuationCallIdentity,
+) -> bool {
+    FORWARD_RET_AUTHORITY_POPULATION_SOURCES.with(|sources| {
+        let mut sources = sources.borrow_mut();
+        let index = match sources.iter().position(|candidate| candidate == source) {
+            Some(index) => index,
+            None => {
+                let index = sources.len();
+                sources.push(source.clone());
+                index
+            }
+        };
+        index == target
+    })
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1252,17 +1298,22 @@ pub(in crate::cranelift_backend) fn record_composed_return_forward_ret_authority
         observations
             .borrow_mut()
             .push(ComposedReturnForwardRetAuthorityObservation {
-                source_call_identity: format!("{:?}", proof.source_call_identity),
-                invocation_origin: format!("{:?}", proof.invocation_origin),
-                call_origin: format!("{:?}", proof.call_origin),
-                callee_origin: format!("{:?}", proof.callee_origin),
-                binding: format!("{:?}", proof.binding),
-                selected_case_body_origin: format!("{:?}", proof.selected_case_body_origin),
-                active_frame_origin: format!("{:?}", proof.active_frame_origin),
-                ret_case_body_origin: format!("{:?}", proof.ret_case_body_origin),
-                ret_input_field_position: proof.ret_input_field_position,
-                direction: format!("{:?}", proof.direction),
-                delivery: format!("{:?}", proof.delivery),
+                coordinate: ComposedReturnForwardRetCoordinateObservation {
+                    source_call_identity: format!("{:?}", proof.source_call_identity),
+                    invocation_origin: format!("{:?}", proof.invocation_origin),
+                    call_origin: format!("{:?}", proof.call_origin),
+                    callee_origin: format!("{:?}", proof.callee_origin),
+                    binding: format!("{:?}", proof.binding),
+                    selected_case_body_origin: format!("{:?}", proof.selected_case_body_origin),
+                    active_frame_origin: format!("{:?}", proof.active_frame_origin),
+                    ret_case_body_origin: format!("{:?}", proof.ret_case_body_origin),
+                    ret_input_binder: format!(
+                        "ConstructorChild {{ frame_origin: {:?}, field_position: {} }}",
+                        proof.active_frame_origin, proof.ret_input_field_position
+                    ),
+                    direction: format!("{:?}", proof.direction),
+                    delivery: format!("{:?}", proof.delivery),
+                },
                 return_body_block,
             });
     });
@@ -1414,6 +1465,34 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                     .immediate_k_locator
                     .environment_index,
                 fresh_result_route: format!("{:?}", confluence.projection.fresh_result_route),
+                forward_ret_coordinates: match &confluence.projection.fresh_result_route {
+                    CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => Vec::new(),
+                    CheckedIhFreshResultRoute::TailProducerToRet {
+                        source,
+                        selected_case_body_origin,
+                        active_frame_origin,
+                        direction,
+                        ret_case_body_origin,
+                        ret_input_binder,
+                        ret_input_delivery,
+                    } => confluence
+                        .members
+                        .iter()
+                        .map(|member| ComposedReturnForwardRetCoordinateObservation {
+                            source_call_identity: format!("{member:?}"),
+                            invocation_origin: format!("{:?}", source.invocation_origin),
+                            call_origin: format!("{:?}", source.call_origin),
+                            callee_origin: format!("{:?}", source.callee_origin),
+                            binding: format!("{:?}", source.binding),
+                            selected_case_body_origin: format!("{:?}", selected_case_body_origin),
+                            active_frame_origin: format!("{:?}", active_frame_origin),
+                            ret_case_body_origin: format!("{:?}", ret_case_body_origin),
+                            ret_input_binder: format!("{:?}", ret_input_binder),
+                            direction: format!("{:?}", direction),
+                            delivery: format!("{:?}", ret_input_delivery),
+                        })
+                        .collect(),
+                },
                 installed: false,
                 reached_count: 0,
                 reached_exact_capsule: false,
@@ -7030,12 +7109,6 @@ impl StaticTransitionPlan<'_> {
         }
         #[cfg(feature = "px8-ds-test-support")]
         record_composed_return_forward_ret_authority_application();
-        #[cfg(feature = "px8-ds-test-support")]
-        if composed_return_forward_ret_authority_mutation()
-            == ComposedReturnForwardRetAuthorityMutation::SuppressForInertness
-        {
-            return Ok(None);
-        }
 
         if *direction != CheckedIhFreshResultDirection::Forward
             || *ret_input_delivery != CheckedIhFreshResultRetInputDelivery::ProducerResultDirect

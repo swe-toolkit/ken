@@ -35,8 +35,8 @@ pub use static_transition::{
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
     CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
     CheckedIhGeneratedEntryObservation, ComposedReturnForwardRetAuthorityMutation,
-    ComposedReturnForwardRetAuthorityObservation, RetainedResultClosureProofMutation,
-    WorkerPrefixDeferral,
+    ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
+    RetainedResultClosureProofMutation, WorkerPrefixDeferral,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -47,6 +47,7 @@ pub(in crate::cranelift_backend) use static_transition::{
     record_checked_ih_generated_entry_ordinary_continuation,
     record_checked_ih_generated_entry_raw_arrival, record_checked_ih_generated_entry_reached,
     record_composed_return_forward_ret_authority,
+    take_composed_return_forward_ret_population_mutation,
 };
 
 pub(super) use static_transition::build_static_continuation_fusion_plan;
