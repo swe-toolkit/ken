@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-FORWARD-RET-EDGE
 title: "Close the composed-return Tail wall by shape (a): a governed Tail result takes ONE certified forward SSA edge from the existing producer to the existing shared Ret block, bypassing the source-machine answer collapse, constructor transfer, active carried backedge, and checked fallback. The single relaxed constraint is the lossy middle; everything else (spec, kernel, ABI, runtime state) is unchanged. Flips the base-red Tail `ResourceBodyResult` `PatternMatchFailure` rows to exact `InvalidOffset` on the two `SourceFormat::Ken` witnesses."
-status: ready
+status: active
 owner: runtime
 size: L
 gate: none
@@ -12,12 +12,24 @@ github: null
 origin: "Operator ruling 2026-08-30 (this session, verbatim: \"use shape (a)\") FUNDED the shape-(a) relaxation after the constraint-differential report (docs/program/rt-composed-return-constraint-differential-report.md, merged 5b20fe84f) found BOTH native walls INCIDENTAL, not spec-mandated. The build design is the fresh operator+Architect decision the report fed; Architect ruling evt_70n2y6s9wanf9 (base origin/main 7d807a78e, tree 37da2a975) mints this fresh T1 node and closes the held authority-only build RT-COMPOSED-RETURN-PRODUCER-ORDER-BUILD (refuted/superseded without implementation). Steward-filed and released per COORDINATION section 2."
 ---
 
-> # RELEASED — lane 1, the funded shape-(a) build. `ready`.
+> # ACTIVE — lane 1, the funded shape-(a) build. D1 LANDED; D2 RELEASED. `active`.
 >
 > The operator funded shape (a); the Architect designed it (`evt_70n2y6s9wanf9`)
 > and minted this fresh node in place of the refuted authority-only build. This is
 > a T1 soundness-bearing native-lowering build; the runtime ring's standing
 > hard-stop protocol applies. A design fork HARD-STOPS to the Architect.
+>
+> **D1 (sink seam, byte-inert) MERGED** — squash `f193b074e` (2026-08-30),
+> candidate `dd0b824272`, Decision `dec_6gctzq9sann54`, gates Runtime QA
+> `evt_5synxy6g2q9yy` + Architect `evt_5svnf4fdqdes5`/`evt_70h7f8nyv3c8h`, all four
+> blobs Steward+lieutenant+Adversary verified, Adversary M8 NO OBJECTION
+> (`evt_5865012wcz8qa`: the seam is a deliberately-inert validation gate, byte-inert
+> differential proves identical executable bytes). Accepted PARTIAL — node stays
+> `active`. **D2 (authority/plan, byte-inert) RELEASED** off `f193b074e` — the exact
+> post-selection confluence/member join plus the replacement Tail plan, with
+> wrong-member/projection/source/sink controls, no live-edge claim. **D3 (atomic
+> activation) STAYS HELD** and needs its own separate explicit release after D2
+> lands; neither D1 nor D2 landing authorizes it.
 
 ## The single relaxed constraint, and what stays closed
 
