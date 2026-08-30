@@ -123,12 +123,14 @@ pub use planning::{
     with_checked_ih_generated_entry_confluence_mutation,
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_ret_authority_mutation,
+    with_composed_return_forward_ret_role_witnesses,
     with_retained_result_closure_proof_mutation, with_worker_prefix_deferrals,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
     CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
     CheckedIhGeneratedEntryObservation, ComposedReturnForwardRetAuthorityMutation,
     ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
+    ComposedReturnForwardRetRoleWitnessObservation,
     RetainedResultClosureProofMutation, WorkerPrefixDeferral,
 };
 

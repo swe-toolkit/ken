@@ -1186,6 +1186,20 @@ pub struct ComposedReturnForwardRetAuthorityObservation {
     pub return_body_block: String,
 }
 
+/// One actual consumer-call observation pairing current C with selected I and,
+/// when authority forms, the independently derived certificate coordinates E/S.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComposedReturnForwardRetRoleWitnessObservation {
+    pub current_invocation_origin: String,
+    pub current_call_origin: String,
+    pub current_callee_origin: String,
+    pub current_admission: String,
+    pub selected_source_call_identity: String,
+    pub outcome: String,
+    pub formed_coordinate: Option<ComposedReturnForwardRetCoordinateObservation>,
+}
+
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
     static GENERATED_ENTRY_CONFLUENCE_MUTATION:
@@ -1200,6 +1214,10 @@ thread_local! {
     static FORWARD_RET_AUTHORITY_APPLICATIONS: Cell<usize> = const { Cell::new(0) };
     static FORWARD_RET_AUTHORITY_POPULATION_SOURCES:
         RefCell<Vec<ContinuationCallIdentity>> = const { RefCell::new(Vec::new()) };
+    static FORWARD_RET_ROLE_WITNESS_ACTIVE: Cell<bool> = const { Cell::new(false) };
+    static FORWARD_RET_ROLE_WITNESS_OBSERVATIONS:
+        RefCell<Vec<ComposedReturnForwardRetRoleWitnessObservation>> =
+            const { RefCell::new(Vec::new()) };
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1257,6 +1275,29 @@ pub fn with_composed_return_forward_ret_authority_mutation<T>(
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+pub fn with_composed_return_forward_ret_role_witnesses<T>(
+    f: impl FnOnce() -> T,
+) -> (T, Vec<ComposedReturnForwardRetRoleWitnessObservation>) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FORWARD_RET_ROLE_WITNESS_ACTIVE.with(|active| active.set(false));
+            FORWARD_RET_ROLE_WITNESS_OBSERVATIONS
+                .with(|observations| observations.borrow_mut().clear());
+        }
+    }
+
+    FORWARD_RET_ROLE_WITNESS_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
+    FORWARD_RET_ROLE_WITNESS_ACTIVE.with(|active| active.set(true));
+    let restore = Restore;
+    let result = f();
+    let observations = FORWARD_RET_ROLE_WITNESS_OBSERVATIONS
+        .with(|observations| std::mem::take(&mut *observations.borrow_mut()));
+    drop(restore);
+    (result, observations)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
 pub fn composed_return_forward_ret_authority_mutation_is_exact() -> bool {
     FORWARD_RET_AUTHORITY_MUTATION.with(Cell::get)
         == ComposedReturnForwardRetAuthorityMutation::Exact
@@ -1303,6 +1344,33 @@ pub(in crate::cranelift_backend) fn record_composed_return_forward_ret_authority
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+fn composed_return_forward_ret_coordinate_observation(
+    proof: &CheckedIhForwardRetPlanProof,
+) -> ComposedReturnForwardRetCoordinateObservation {
+    ComposedReturnForwardRetCoordinateObservation {
+        source_call_identity: format!("{:?}", proof.source_call_identity),
+        entry_invocation_origin: format!("{:?}", proof.entry_invocation_origin),
+        entry_call_origin: format!("{:?}", proof.entry_call_origin),
+        entry_callee_origin: format!("{:?}", proof.entry_callee_origin),
+        entry_binding: format!("{:?}", proof.entry_binding),
+        entry_immediate_k_locator: format!("{:?}", proof.entry_immediate_k_locator),
+        invocation_origin: format!("{:?}", proof.invocation_origin),
+        call_origin: format!("{:?}", proof.call_origin),
+        callee_origin: format!("{:?}", proof.callee_origin),
+        binding: format!("{:?}", proof.binding),
+        selected_case_body_origin: format!("{:?}", proof.selected_case_body_origin),
+        active_frame_origin: format!("{:?}", proof.active_frame_origin),
+        ret_case_body_origin: format!("{:?}", proof.ret_case_body_origin),
+        ret_input_binder: format!(
+            "ConstructorChild {{ frame_origin: {:?}, field_position: {} }}",
+            proof.active_frame_origin, proof.ret_input_field_position
+        ),
+        direction: format!("{:?}", proof.direction),
+        delivery: format!("{:?}", proof.delivery),
+    }
+}
+
+#[cfg(feature = "px8-ds-test-support")]
 pub(in crate::cranelift_backend) fn record_composed_return_forward_ret_authority(
     proof: &CheckedIhForwardRetPlanProof,
     return_body_block: String,
@@ -1311,28 +1379,36 @@ pub(in crate::cranelift_backend) fn record_composed_return_forward_ret_authority
         observations
             .borrow_mut()
             .push(ComposedReturnForwardRetAuthorityObservation {
-                coordinate: ComposedReturnForwardRetCoordinateObservation {
-                    source_call_identity: format!("{:?}", proof.source_call_identity),
-                    entry_invocation_origin: format!("{:?}", proof.entry_invocation_origin),
-                    entry_call_origin: format!("{:?}", proof.entry_call_origin),
-                    entry_callee_origin: format!("{:?}", proof.entry_callee_origin),
-                    entry_binding: format!("{:?}", proof.entry_binding),
-                    entry_immediate_k_locator: format!("{:?}", proof.entry_immediate_k_locator),
-                    invocation_origin: format!("{:?}", proof.invocation_origin),
-                    call_origin: format!("{:?}", proof.call_origin),
-                    callee_origin: format!("{:?}", proof.callee_origin),
-                    binding: format!("{:?}", proof.binding),
-                    selected_case_body_origin: format!("{:?}", proof.selected_case_body_origin),
-                    active_frame_origin: format!("{:?}", proof.active_frame_origin),
-                    ret_case_body_origin: format!("{:?}", proof.ret_case_body_origin),
-                    ret_input_binder: format!(
-                        "ConstructorChild {{ frame_origin: {:?}, field_position: {} }}",
-                        proof.active_frame_origin, proof.ret_input_field_position
-                    ),
-                    direction: format!("{:?}", proof.direction),
-                    delivery: format!("{:?}", proof.delivery),
-                },
+                coordinate: composed_return_forward_ret_coordinate_observation(proof),
                 return_body_block,
+            });
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_composed_return_forward_ret_role_witness(
+    current_invocation_origin: StaticOriginId,
+    current_call_origin: StaticOriginId,
+    current_callee_origin: StaticOriginId,
+    current_admission: &'static str,
+    selected_source_call_identity: &ContinuationCallIdentity,
+    outcome: &'static str,
+    proof: Option<&CheckedIhForwardRetPlanProof>,
+) {
+    if !FORWARD_RET_ROLE_WITNESS_ACTIVE.with(Cell::get) {
+        return;
+    }
+    FORWARD_RET_ROLE_WITNESS_OBSERVATIONS.with(|observations| {
+        observations
+            .borrow_mut()
+            .push(ComposedReturnForwardRetRoleWitnessObservation {
+                current_invocation_origin: format!("{current_invocation_origin:?}"),
+                current_call_origin: format!("{current_call_origin:?}"),
+                current_callee_origin: format!("{current_callee_origin:?}"),
+                current_admission: current_admission.to_owned(),
+                selected_source_call_identity: format!("{selected_source_call_identity:?}"),
+                outcome: outcome.to_owned(),
+                formed_coordinate: proof.map(composed_return_forward_ret_coordinate_observation),
             });
     });
 }
