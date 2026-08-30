@@ -1,7 +1,7 @@
 ---
 id: RT-HOST-APPLICATION-TRAP-PROVENANCE-D0
 title: "Scratch-only provenance D0 (no production, no candidate, no QA, no merge): answer ONE question before any further caller-result/sink design is chosen — why does exact generated context body StaticOriginId(941) select the TRAP lane at the ResourceBodyResult match instead of producing the semantic application result? Identify the exact failing match by stable source/planner coordinates; classify the actual no-case scrutinee's semantic role and structural provenance (Host response / continuation-application result / environment material / nested declared-call result / other) from the producer, NOT from numeric value or proximity; trace it across each generated-unit boundary using the existing separate Result and Trap ABI slots (which lane written, which consumed, exact producer/consumer coords — aggregate seven-equals-seven is not pairing); establish the nearest same-match positive; run two separate scratch controls (change only the scrutinee producer to the expected constructor and require selection; suppress only the expected case and require the same no-case arm); reconcile the reference path on the identical checked program; restore the branch byte-exactly to base and return a report/digests only."
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -12,13 +12,34 @@ github: null
 origin: "Architect ruling evt_56t3wm78ax81h (thr_3ht16h248rzqk), 2026-08-30, accepting the runtime-implementer's D1 feasibility NO on RT-HOST-RESPONSE-APPLICATION-RET-BUILD (hard-stop report eed27c1451c09d2c..., probe diff 5cea81fd4d8bd9..., read log 5a1ebce449..., baseline context CLIF 3d90e7e333...). The recut proved the current product NEVER produces a caller-visible successful result for the exact continuation application: the seven CheckedHostVisContinuation applications in funcid45 (binder-zero HostResult, generated context body StaticOriginId(941), direct Computational frame 12) all trap internally — the callee selects a real typed trap lane (planned PatternMatchFailure at ResourceBodyResult) — so ApplicationResultToRet cannot be instantiated (no successful result to carry) and the late direct edge fails Cranelift dominance (inst1269 from non-dominating block5). RT-HOST-RESPONSE-APPLICATION-RET-BUILD is CLOSED as a sound NO. This scratch-only D0 answers the provenance question the NO exposed, before another production design is chosen. Steward-recut per COORDINATION section 2. Binds released base/branch 0be25235b188bc67b3f9209d1ff0b6f8fa063258, tree 769c24708fb2052c3d6e719a8adc135423c28192 (WP ref resolves exactly there, zero diff). @steward owns close/reframe/release of the D0; runtime parked until this fresh release."
 ---
 
-> # READY — SCRATCH-ONLY D0. Released to the runtime ring (lane 1). Runtime was
-> # parked at base `0be25235b`; this IS the release.
->
-> This is a MEASUREMENT node. It lands NO production, opens NO candidate, routes
-> NO QA, and needs NO Decision or merge. It returns a report plus digests, and the
-> branch is restored byte-exactly to base `0be25235b` at the end. The Architect
-> reviews the D0 report and chooses the next production design from its outcome.
+> # CLOSED — D0 COMPLETE, OUTCOME `wrong scrutinee before the match` ACCEPTED.
+> # Architect review `evt_4m8eyrrpke50k` (thr_tfcm3sp107x9, 2026-08-30).
+> #
+> # This is a MEASUREMENT node — it lands no production and is never `merged`; it
+> # returned a report and digests, and the branch was restored byte-exactly to base
+> # `0be25235b`. The runtime-implementer's report (`evt_5z6e6yge3pw9n`, SHA-256
+> # `86b978f2a61bbb...`, scratch-diff `aa939332175a...`) landed in the exhaustive
+> # outcome route **wrong scrutinee before the match**, and the Architect
+> # independently reproduced every listed evidence digest and confirmed the report
+> # sound.
+> #
+> # Finding: live match `451/450` in `funcid42` expects `ResourceBodyOk`/
+> # `ResourceBodyErr` but receives the identity-free eight-field checked-IH captured
+> # environment produced at specialization 1 / seat 671 / record 608. `funcid47`
+> # writes the distinct outer wrapper to Result+120; `funcid50` consumes Result
+> # after Trap, projects the environment child, and
+> # `call_checked_ih_transport_from_case_environment`'s `CarriedEnvironment` arm
+> # returns that child directly as the later scrutinee. Match 451 then correctly
+> # writes typed `PatternMatchFailure` 36 to Trap+80. No ABI defect, no non-error
+> # suspension — the defect is a wrong producer/transport edge before the match.
+> #
+> # Next design (Architect): a typed producer-local role split — retire the
+> # ambiguous two-role `LoweringOperand`-returning API and introduce two private
+> # compiler-local result types (`CheckedIhCapturedEnvironment` vs
+> # `CheckedIhApplicationResult`) with role-specific entry points. Do NOT globally
+> # replace the carried-environment arm. Funded as scratch-only successor
+> # **`RT-CHECKED-IH-CARRIED-ENVIRONMENT-FORCE-CALL-D1`** on `origin/main`
+> # `3d8fd27c8`. Everything below this banner is retained as chronology.
 >
 > **Why we are here.** RT-HOST-RESPONSE-APPLICATION-RET-BUILD is CLOSED as a sound
 > NO: the current product never produces a caller-visible successful result for the
