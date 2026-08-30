@@ -7,7 +7,15 @@ cd "$root"
 cat > inventory.json <<'EOF'
 {"test-count":1,"rust-suites":{"empty":{"binary-id":"fixture::empty","binary-name":"ordinary","testcases":{}},"live":{"binary-id":"fixture::live","binary-name":"ordinary","testcases":{"t":{"filter-match":{"status":"matches"}}}}}}
 EOF
-cp inventory.json unfiltered-inventory.json
+python3 - <<'PY2'
+import json
+raw=json.load(open("inventory.json"))
+raw["test-count"] = 2
+raw["rust-suites"]["native"] = {"binary-id":"fixture::native","binary-name":"rt_parity_native","testcases":{"n":{"filter-match":{"status":"matches"}}}}
+open("unfiltered-inventory.json", "w").write(json.dumps(raw))
+raw["rust-suites"]["native"]["testcases"]["n"]["filter-match"]["status"] = "mismatch"
+open("inventory.json", "w").write(json.dumps(raw))
+PY2
 cat > evidence.json <<'EOF'
 {"records":[{"test_id":"fixture::live t","seconds":1}]}
 EOF
