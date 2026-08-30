@@ -300,8 +300,9 @@ Spec: `spec/10-kernel/13-pi-sigma.md §6.2–6.3`, `14-inductive.md
 - expect: all calls **terminate** with accept/reject (no infinite loops,
   no stack overflow from recursive conversion)
 - why: the K1 type-checker is syntax-directed and conversion terminates
-  by structural decrease across all reduction forms (β/η/ι/δ). The
-  full SCT termination argument is K2c; K1's conversion is
+  by structural decrease across all reduction forms (β/η/ι/δ). K2c supplies
+  the full conversion-termination argument: SCT admission within recursive
+  groups plus the finite cross-identity δ-retry boundary. K1 conversion is
   structurally recursive and decidable on its own rules. Frame AC-7.
 
 ---

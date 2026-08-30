@@ -3,9 +3,10 @@
 Format: `../../README.md`. These pin the K2c **series-1**
 (conversion-hardening) acceptance criteria
 (`../../../docs/program/wp/K2c-conversion.md`, "Acceptance") and the soundness
-commitments from `../../../spec/10-kernel/README.md §6` (#15–16 plus the
-δ-termination / SCT gate). Series-1 scope is the type-directed conversion
-algorithm hardened to `17 §3` and the **SCT admission gate** `17 §4`. The three
+commitments from `../../../spec/10-kernel/README.md §6` (#15–16 plus
+conversion termination: finite δ retry and SCT admission). Series-1 scope is
+the type-directed conversion algorithm hardened to `17 §3` and the **SCT
+admission gate** `17 §4`. The three
 K2 obs-reduction completeness seams are **series 2** (`seed-obs-completion.md`,
 NbE-dependent); the closing section here tags them deferred so a series-1 run
 does not mistake them for gaps.
@@ -193,6 +194,60 @@ reference interpreter can ground them, rather than locked unground here.)
   eagerly δ-unfolding `ack` (which on open arguments cannot reduce and whose
   eager unfolding would diverge). The observable consequence of the lazy-δ
   discipline on equal heads: correct verdict + termination.
+
+### conversion/delta-distinct-recursive-heads-stuck (soundness)
+- spec: `17 §3.5` (distinct recursive-identity boundary), `§5` (totality)
+- given: separately admit transparent recursive definitions `map_f` and
+  `map_g` with the same type
+  `(A : Type 0) -> (B : Type 0) -> (A -> B) -> List A -> List B` and the same
+  `Nil`/`Cons` equations, except that each recursive clause calls its own
+  returned `GlobalId`; compare their types, then compare `map_f` and `map_g` at
+  that function type. Π-η supplies an open list; comparison descends through
+  the stuck `List` eliminator and reaches the two distinct self heads on its
+  fresh neutral tail.
+- expect: the types are **convertible (true)**; the values are **not convertible
+  (false)**; both queries **halt on the stated two-MiB stack**
+- promise class: **durable invariant** — intended new declarations preserve it;
+  only an explicit future equality rule could change the false verdict
+- stack instrument: run every query in a child launched with
+  `std::process::Command::env_remove("RUST_MIN_STACK")`; inside that child use
+  `std::thread::Builder::stack_size` with the named constant
+  `CONVERSION_STACK_BYTES = 2 * 1024 * 1024` (two MiB). Two MiB is chosen as
+  this contract's fixed small-thread instrument, not from a candidate pass and
+  not as a minimum-adequacy claim. The largest closed input has two `Cons`
+  cells, so the property needs no input-depth headroom; fixing the finite stack
+  makes overflow behavior deterministic instead of machine-dependent. The child
+  must exit normally with the stated verdict. Timeout, signal death, or stack
+  overflow is failure, never a false result.
+- why: source-clause isomorphism and separate SCT admission do not identify two
+  declarations. Beneath the stuck eliminator, no ι-step consumes the neutral
+  tail and no equality rule equates the distinct self `GlobalId`s. Conversion
+  must return false rather than recreate the same comparison on successively
+  fresh neutral tails. This pins a yes/no result **and** termination; a timeout,
+  stack overflow, larger stack, or timeout-as-success does not satisfy it.
+- evidence boundary: **MEASURED** is the type/value verdict pair, the two
+  closed canonical positive verdicts below, and stated two-MiB termination.
+  **CLAIMED** is rigid distinct recursive identity only at the stuck cyclic
+  boundary, without a cyclic equality rule. **THE GAP** is reachability: the
+  open fixture must first pass type conversion and then reach the two distinct
+  self heads under the neutral tail, while the closed fixtures must make
+  ordinary β/ι/δ progress before any rigid-head refusal.
+- controls: apply the **unmodified** `map_f`/`map_g` pair to identical closed
+  canonical inputs. Both `map_f Bool Bool not Nil` vs
+  `map_g Bool Bool not Nil` and the same comparison on
+  `Cons true (Cons false Nil)` are **true and halt on the stated stack**:
+  finite β/ι/δ reduction reaches the same `List Bool` constructor result before
+  the stuck recursive-identity boundary. `map_f` compared with itself at the
+  function type is also **true and halts** through equal-head spine comparison.
+  Holding types and equations fixed but replacing `map_g`'s recursive self
+  occurrence with `map_f` makes the open value comparison **true and halts**;
+  restoring `map_g`'s distinct self `GlobalId` flips only that axis to **false
+  and halts**. The existing distinct **non-recursive**
+  `delta-unfold-heads-differ` pair remains **true and halts** through its finite
+  common reduct. A separately admitted recursive function whose constructor
+  equation genuinely differs from `map_f` is **false and halts**. These controls
+  reject an over-broad rigid-head rule, an always-true relation, and an unbounded
+  cross-identity retry that never produces a verdict.
 
 ---
 
@@ -386,13 +441,15 @@ merely cited**.
 ### conversion/decidable-halts (property)
 - spec: `17 §5`; `18 §6` (decidable conversion)
 - given: every conversion and type-checking query exercised by this file and
-  `../judgments/seed-judgments.md`, run by the conformance harness
+  `../judgments/seed-judgments.md`, run by the conformance harness, including
+  `delta-distinct-recursive-heads-stuck`
 - expect: **every query halts** with a definite yes/no (or typed error) — no
   infinite loop, no semi-decision, no stack overflow
 - why: decidability is the K2c payoff and a meta-property of the whole corpus,
-  not a single case — SCT bounds δ, the core reductions are SN, so conversion
-  terminates on every well-typed input. A regression that makes any query
-  diverge breaks the "kernel is a checker, always halts" contract.
+  not a single case. SCT bounds recursive re-entry within each admitted group;
+  the distinct recursive-identity boundary stops symbolic cross-group retry;
+  and the core reductions are strongly normalizing. A regression that makes
+  any query diverge breaks the "kernel is a checker, always halts" contract.
 
 ---
 

@@ -187,8 +187,9 @@ The `_otherwise` arm is the **single place conversion is invoked during
 checking** — the algorithmic form of (Conv) (§2). It infers the term's type and
 asks `convType` (= `convert_type`, `17 §3.3`) whether the expected and inferred
 types are definitionally equal. Because conversion is **total and decidable**
-(`17 §5`, via the SCT gate `17 §4`), the switch always halts with a definite
-yes/no — there is **no third "unknown"** outcome in the kernel. A checking-mode
+(`17 §5`, via the SCT admission gate `17 §4` plus the finite δ-retry boundary
+`17 §3.5`), the switch always halts with a definite yes/no — there is **no third
+"unknown"** outcome in the kernel. A checking-mode
 proof of `Eq A a b` reduces, after the `Refl` rule above, to checking against
 the proposition `Eq A a b` (which computes by `16 §2`); since `Eq : Ω`, proof
 irrelevance (`16 §1`) means the proof *content* is never compared.
@@ -495,9 +496,9 @@ The kernel's soundness commitments (`README.md §5`) and their current status:
 | Subject reduction | **Argued** from the rules; extended to the K2c-s2 reducts (cast-at-inductive-index, J-at-dependent-motive, Type-target quotient elim — `16 §8.4`), W-style ι (`14 §9.4`), and nested lifted ι (`14 §9.5`); to be mechanized. |
 | Confluence / unique normal forms | **Argued** (standard for this calculus). |
 | Strong normalization of the core | **Argued** (β/ι/η/obs). W-style and nested lifted ι terminate by **finiteness and structural descent** (`14 §9.4`/`§9.5`), not by stuckness; the hard metatheorem overall. |
-| δ-termination → decidable checking | **By the SCT gate** (`17 §4`); the size-change principle (Lee/Jones/Ben-Amram 2001) bounds δ-unfolding (`17 §5`); tested. |
+| δ-termination → decidable checking | **By the SCT admission gate plus the finite δ-retry boundary** (`17 §3.5`, §4–§5): size change bounds recursive re-entry within one admitted group; distinct recursive identities do not gain cyclic symbolic equality. Tested. |
 | Canonicity (closed terms compute) | **Required + tested** (`16 §9`, observational). The observational reductions are now **complete** (K2c series-1+2): the three formerly sound-but-stuck seams all compute (`16 §3.2`, `§4.1`, `§5.1`). |
-| Decidable conversion | **Proven** for OTT (`TTobs`/`CICobs`, ADR 0005); Ken follows. **K2c delivers the operational decidability**: `convert` is total via the SCT gate (`17 §4`–§5), so the (Conv) mode switch (§3) always halts. |
+| Decidable conversion | **Proven** for OTT (`TTobs`/`CICobs`, ADR 0005); Ken follows. **K2c delivers operational decidability**: `convert` is total via SCT-bounded intra-group recursion and the finite cross-identity retry discipline (`17 §3.5`, §4–§5), so the (Conv) mode switch (§3) always halts. |
 | Consistency (no closed `· ⊢ p : ⊥`) | **Argued** from SN + canonicity. |
 
 "Argued" means there is a standard proof for systems of this shape
