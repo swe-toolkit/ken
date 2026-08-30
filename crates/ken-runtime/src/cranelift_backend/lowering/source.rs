@@ -4124,6 +4124,10 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         env: Vec<LoweringEnvironmentBinding>,
         control: SourceControl<'b>,
     ) -> Result<SourceCallOutcome<'b>, CraneliftBackendError> {
+        // Retain only applicability from the already-validated projection.
+        // The post-selection join must still re-derive every exact coordinate,
+        // but a Tail route may no longer turn missing proof into non-applicability.
+        let mut forward_ret_authority_required = false;
         // Total generated-entry admission, before `specialized_at` and every
         // callable arm. The one map read answers both applicability and typed
         // authority: positive `NonGoverned` membership continues unchanged;
@@ -4228,17 +4232,23 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 &projection,
                             );
                         }
+                        forward_ret_authority_required =
+                            projection.requires_forward_ret_authority();
                     }
                     #[cfg(not(feature = "px8-ds-test-support"))]
-                    self.validate_checked_ih_generated_entry_governed_arrival(
-                        &callee,
-                        &args,
-                        &env,
-                        &access,
-                        pending,
-                        callee_origin,
-                        &projection,
-                    )?;
+                    {
+                        self.validate_checked_ih_generated_entry_governed_arrival(
+                            &callee,
+                            &args,
+                            &env,
+                            &access,
+                            pending,
+                            callee_origin,
+                            &projection,
+                        )?;
+                        forward_ret_authority_required =
+                            projection.requires_forward_ret_authority();
+                    }
                 }
             }
         }
@@ -4369,7 +4379,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     // exact transport has been selected and before its call is
                     // emitted. The proof is deliberately not consumed by the
                     // returned value or any control edge in this increment.
-                    let _forward_ret_authority = match self
+                    let forward_ret_outcome = match self
                         .function_local
                         .checked_ih_generated_entry_access
                         .as_ref()
@@ -4377,7 +4387,56 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         Some(access) => {
                             self.composed_return_forward_ret_authority(access, &transport)?
                         }
-                        None => None,
+                        None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
+                    };
+                    let _forward_ret_authority = match (
+                        forward_ret_authority_required,
+                        forward_ret_outcome,
+                    ) {
+                        (true, ComposedReturnForwardRetAuthorityOutcome::Formed(authority)) => {
+                            Some(authority)
+                        }
+                        (false, ComposedReturnForwardRetAuthorityOutcome::NonApplicable) => None,
+                        #[cfg(feature = "px8-ds-test-support")]
+                        (
+                            true,
+                            ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness,
+                        ) => None,
+                        #[cfg(feature = "px8-ds-test-support")]
+                        (
+                            _,
+                            ComposedReturnForwardRetAuthorityOutcome::Duplicated(
+                                _first,
+                                _duplicate,
+                            ),
+                        ) => {
+                            return Err(unsupported(
+                                "ComposedReturnForwardRetAuthority",
+                                "a validated Tail producer-to-Ret route formed more than one post-selection authority",
+                            ));
+                        }
+                        (true, ComposedReturnForwardRetAuthorityOutcome::NonApplicable) => {
+                            return Err(unsupported(
+                                "ComposedReturnForwardRetAuthority",
+                                "a validated Tail producer-to-Ret route has no exact post-selection authority",
+                            ));
+                        }
+                        (false, ComposedReturnForwardRetAuthorityOutcome::Formed(_authority)) => {
+                            return Err(unsupported(
+                                "ComposedReturnForwardRetAuthority",
+                                "a Direct or non-governed route unexpectedly formed forward-Ret authority",
+                            ));
+                        }
+                        #[cfg(feature = "px8-ds-test-support")]
+                        (
+                            false,
+                            ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness,
+                        ) => {
+                            return Err(unsupported(
+                                "ComposedReturnForwardRetAuthority",
+                                "the byte-inert suppression arm reached a non-Tail route",
+                            ));
+                        }
                     };
                     self.pending_computational_ih_call.take();
                     let returned = self.call_checked_ih_transport_from_case_environment(

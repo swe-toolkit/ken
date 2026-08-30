@@ -12289,21 +12289,10 @@ impl<'a> Lowering<'a> {
         )
     }
 
-    /// Join one post-selection planner member proof to the unique function-local
-    /// Ret sink. The resulting authority is move-only and deliberately unused
-    /// by D2; D3 must be separately released before any returned SSA value may
-    /// consume its block.
-    pub(super) fn composed_return_forward_ret_authority(
+    fn finish_composed_return_forward_ret_authority(
         &self,
-        access: &CheckedIhGeneratedEntryAccess,
-        transport: &CheckedIhEnvironmentTransport,
-    ) -> Result<Option<ComposedReturnForwardRetAuthority>, CraneliftBackendError> {
-        let Some(proof) = self
-            .static_transition_plan
-            .checked_ih_forward_ret_plan_proof(access, transport)?
-        else {
-            return Ok(None);
-        };
+        proof: CheckedIhForwardRetPlanProof,
+    ) -> Result<ComposedReturnForwardRetAuthority, CraneliftBackendError> {
         #[cfg(feature = "px8-ds-test-support")]
         let requested_field = if composed_return_forward_ret_authority_mutation()
             == ComposedReturnForwardRetAuthorityMutation::WrongSink
@@ -12350,13 +12339,72 @@ impl<'a> Lowering<'a> {
             ));
         }
         #[cfg(feature = "px8-ds-test-support")]
-        {
-            record_composed_return_forward_ret_authority(&proof, format!("{return_body:?}"));
-        }
-        Ok(Some(ComposedReturnForwardRetAuthority {
+        record_composed_return_forward_ret_authority(&proof, format!("{return_body:?}"));
+        Ok(ComposedReturnForwardRetAuthority {
             _plan: proof,
             _return_body: return_body,
-        }))
+        })
+    }
+
+    /// Join one post-selection planner member proof to the unique function-local
+    /// Ret sink. The resulting authority is move-only and deliberately unused
+    /// by D2; D3 must be separately released before any returned SSA value may
+    /// consume its block.
+    pub(super) fn composed_return_forward_ret_authority(
+        &self,
+        access: &CheckedIhGeneratedEntryAccess,
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<ComposedReturnForwardRetAuthorityOutcome, CraneliftBackendError> {
+        let Some(proof) = self
+            .static_transition_plan
+            .checked_ih_forward_ret_plan_proof(access, transport)?
+        else {
+            return Ok(ComposedReturnForwardRetAuthorityOutcome::NonApplicable);
+        };
+        #[cfg(feature = "px8-ds-test-support")]
+        {
+            let mutation = composed_return_forward_ret_authority_mutation();
+            if mutation == ComposedReturnForwardRetAuthorityMutation::SuppressForInertness {
+                return Ok(ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness);
+            }
+            if let ComposedReturnForwardRetAuthorityMutation::RemoveTailAuthorityAt(target) =
+                mutation
+            {
+                if take_composed_return_forward_ret_population_mutation(
+                    target,
+                    proof.source_call_identity(),
+                ) {
+                    return Ok(ComposedReturnForwardRetAuthorityOutcome::NonApplicable);
+                }
+            }
+            if let ComposedReturnForwardRetAuthorityMutation::DuplicateTailAuthorityAt(target) =
+                mutation
+            {
+                if take_composed_return_forward_ret_population_mutation(
+                    target,
+                    proof.source_call_identity(),
+                ) {
+                    let first = self.finish_composed_return_forward_ret_authority(proof)?;
+                    let duplicate_proof = self
+                        .static_transition_plan
+                        .checked_ih_forward_ret_plan_proof(access, transport)?
+                        .ok_or_else(|| {
+                            unsupported(
+                                "ComposedReturnForwardRetAuthority",
+                                "the duplicate-authority control lost its exact Tail plan",
+                            )
+                        })?;
+                    let duplicate =
+                        self.finish_composed_return_forward_ret_authority(duplicate_proof)?;
+                    return Ok(ComposedReturnForwardRetAuthorityOutcome::Duplicated(
+                        first, duplicate,
+                    ));
+                }
+            }
+        }
+        Ok(ComposedReturnForwardRetAuthorityOutcome::Formed(
+            self.finish_composed_return_forward_ret_authority(proof)?,
+        ))
     }
 
     fn install_and_validate_composed_return_ret_sink(

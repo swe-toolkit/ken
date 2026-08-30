@@ -128,8 +128,8 @@ pub use planning::{
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
     CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
     CheckedIhGeneratedEntryObservation, ComposedReturnForwardRetAuthorityMutation,
-    ComposedReturnForwardRetAuthorityObservation, RetainedResultClosureProofMutation,
-    WorkerPrefixDeferral,
+    ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
+    RetainedResultClosureProofMutation, WorkerPrefixDeferral,
 };
 
 #[cfg(feature = "px8-ds-test-support")]

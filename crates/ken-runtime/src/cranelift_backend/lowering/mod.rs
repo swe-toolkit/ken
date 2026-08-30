@@ -234,6 +234,7 @@ use super::planning::{
     record_checked_ih_generated_entry_ordinary_continuation,
     record_checked_ih_generated_entry_raw_arrival,
     record_checked_ih_generated_entry_reached,
+    take_composed_return_forward_ret_population_mutation,
     CheckedIhGeneratedEntryArrivalMutation, ComposedReturnForwardRetAuthorityMutation,
 };
 pub(in crate::cranelift_backend) use super::planning::{
@@ -2780,6 +2781,21 @@ struct ActiveCarriedComputationalElimination {
 struct ComposedReturnForwardRetAuthority {
     _plan: CheckedIhForwardRetPlanProof,
     _return_body: Block,
+}
+
+/// Post-selection result of attempting to form the D2 compiler-only authority.
+/// `NonApplicable` is valid only for a Direct or non-governed route; the source
+/// consumer separately retains whether its validated projection was Tail.
+enum ComposedReturnForwardRetAuthorityOutcome {
+    NonApplicable,
+    Formed(ComposedReturnForwardRetAuthority),
+    #[cfg(feature = "px8-ds-test-support")]
+    SuppressedForInertness,
+    #[cfg(feature = "px8-ds-test-support")]
+    Duplicated(
+        ComposedReturnForwardRetAuthority,
+        ComposedReturnForwardRetAuthority,
+    ),
 }
 
 /// Compile-preserving controls for the compiler-only composed-return `Ret`
