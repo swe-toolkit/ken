@@ -134,7 +134,6 @@ PY
   done
   python3 "$repo/scripts/check-ci-shard-union.py"
 )
-exit 0
 # Old selected-list shape omitted excluded-native discovery while authority stayed fixed.
 mkdir mutation-selected-shape
 cp -a realized-shards mutation-selected-shape/
@@ -142,20 +141,23 @@ cp -a realized-shards mutation-selected-shape/
   cd mutation-selected-shape
   python3 - <<'PY'
 import json, os
-v=json.load(open('../inventory.json')); del v['rust-suites']['native']; v['test-count'] -= 1
-os.mkdir('old'); open('old/selected.json','w').write(json.dumps(v))
+v=json.load(open('../inventory.json')); os.mkdir('old')
+for n in range(1, 9):
+ v=json.load(open(f'../selected-{n}.json')); del v['rust-suites']['native']; v['test-count'] -= 1; open(f'old/selected-{n}.json','w').write(json.dumps(v))
 PY
   for n in $(seq 1 8); do
-    "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json old/selected.json
+    "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json old/selected-$n.json
     rm -rf realized-shards/realized-shard-$n; mv realized-shard-$n realized-shards/
   done
   set +e; python3 "$repo/scripts/check-ci-shard-union.py" 2>err; status=$?; set -e
   test "$status" -eq 2
   grep -Fx 'realized-shard check failed: selected listing differs from unfiltered authority' err
   for n in $(seq 1 8); do
-    python3 "$repo/scripts/ci-duration-shard.py" project-selected ../inventory.json ../filters/assignments.json "$n" selected.json
-    "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json selected.json
+    python3 "$repo/scripts/ci-duration-shard.py" project-selected ../inventory.json ../filters/assignments.json "$n" "selected-$n.json"
+    "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json selected-$n.json
     rm -rf realized-shards/realized-shard-$n; mv realized-shard-$n realized-shards/
   done
   python3 "$repo/scripts/check-ci-shard-union.py"
 )
+
+exit 0
