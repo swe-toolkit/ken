@@ -131,6 +131,12 @@ class Fixtures(unittest.TestCase):
             value["rust-suites"] = {}
             path.write_text(json.dumps(value))
         self.assert_red(empty_suites, "rust-suites must be a non-empty")
+        def non_map_testcases(root):
+            path = root / "realized-shard-1" / "inventory.json"
+            value = json.loads(path.read_text())
+            value["rust-suites"]["suite-0"]["testcases"] = []
+            path.write_text(json.dumps(value))
+        self.assert_red(non_map_testcases, "suite has no testcase map")
         def invalid_status(root):
             path = root / "realized-shard-1" / "inventory.json"
             value = json.loads(path.read_text())

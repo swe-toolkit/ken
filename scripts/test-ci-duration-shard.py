@@ -62,6 +62,16 @@ class DurationShardControls(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stderr.strip(), "filtered live inventory selected zero testcases")
 
+    def test_non_map_testcases_has_exact_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            value = {"test-count": 1, "rust-suites": {"bad": {"binary-id": "fixture::bad", "binary-name": "ordinary", "testcases": []}}}
+            (root / "inventory.json").write_text(json.dumps(value))
+            (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": "x", "seconds": 1}]}))
+            result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json"], cwd=root, text=True, stderr=subprocess.PIPE, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stderr.strip(), "nextest rust suite has no testcase map")
+
     def test_small_eligible_populations_keep_eight_bins(self):
         for size in range(1, 9):
             with tempfile.TemporaryDirectory() as temporary:
