@@ -2749,7 +2749,177 @@ fn set_trap_frame_binding_mutation(mutation: TrapFrameBindingMutation) {
     TRAP_FRAME_BINDING_MUTATION.with(|cell| cell.set(mutation));
 }
 
+/// One compiler-local destination for the exact shared `Ret` body.
+///
+/// The block handle is meaningful only inside the function currently being
+/// emitted. None of these fields enter a Ken value, runtime frame, ABI, or
+/// artifact memory.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ActiveCarriedComputationalRetSink {
+    active_frame_origin: StaticOriginId,
+    ret_case_body_origin: StaticOriginId,
+    ret_input_field_position: u32,
+    return_body: Block,
+}
 
+/// One active carried computational elimination and its optional strict `Ret`
+/// sink. The sink is installed exactly once after the shared block is created.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ActiveCarriedComputationalElimination {
+    active_frame_origin: StaticOriginId,
+    header: Block,
+    ret_sink: Option<ActiveCarriedComputationalRetSink>,
+}
+
+/// Compile-preserving controls for the compiler-only composed-return `Ret`
+/// sink seam.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ComposedReturnRetSinkMutation {
+    Exact,
+    /// Remove the whole seam, including its validator, for a byte-inertness
+    /// comparison against the pre-D1 lowering shape.
+    SuppressForInertness,
+    Missing,
+    DuplicateInstallation,
+    DuplicateActiveFrame,
+    WrongActiveFrame,
+    WrongRetBody,
+    WrongBinder,
+}
+
+/// One real strict-`Ret` sink installation observed during compilation.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComposedReturnRetSinkObservation {
+    pub defining_function: Option<u32>,
+    pub active_frame_origin: String,
+    pub header_block: String,
+    pub ret_case_body_origin: String,
+    pub ret_input_field_position: u32,
+    pub return_body_block: String,
+    pub installation_count: usize,
+    pub exact_lookup_count: usize,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static COMPOSED_RETURN_RET_SINK_MUTATION: std::cell::Cell<ComposedReturnRetSinkMutation> =
+        const { std::cell::Cell::new(ComposedReturnRetSinkMutation::Exact) };
+    static COMPOSED_RETURN_RET_SINK_OBSERVATIONS:
+        std::cell::RefCell<Vec<ComposedReturnRetSinkObservation>> =
+            const { std::cell::RefCell::new(Vec::new()) };
+    static COMPOSED_RETURN_RET_SINK_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+/// Run one compilation under a single sink-seam control and return the real
+/// population it reached. The guard restores exact behavior on unwind.
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_composed_return_ret_sink_mutation<T>(
+    mutation: ComposedReturnRetSinkMutation,
+    run: impl FnOnce() -> T,
+) -> (T, Vec<ComposedReturnRetSinkObservation>, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            COMPOSED_RETURN_RET_SINK_MUTATION
+                .with(|active| active.set(ComposedReturnRetSinkMutation::Exact));
+            COMPOSED_RETURN_RET_SINK_OBSERVATIONS
+                .with(|observations| observations.borrow_mut().clear());
+            COMPOSED_RETURN_RET_SINK_MUTATION_APPLICATIONS.with(|applications| applications.set(0));
+        }
+    }
+
+    COMPOSED_RETURN_RET_SINK_MUTATION.with(|active| active.set(mutation));
+    COMPOSED_RETURN_RET_SINK_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
+    COMPOSED_RETURN_RET_SINK_MUTATION_APPLICATIONS.with(|applications| applications.set(0));
+    let restore = Restore;
+    let result = run();
+    let observations = COMPOSED_RETURN_RET_SINK_OBSERVATIONS
+        .with(|observations| std::mem::take(&mut *observations.borrow_mut()));
+    let applications =
+        COMPOSED_RETURN_RET_SINK_MUTATION_APPLICATIONS.with(|applications| applications.replace(0));
+    drop(restore);
+    (result, observations, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn composed_return_ret_sink_mutation_is_exact() -> bool {
+    COMPOSED_RETURN_RET_SINK_MUTATION.with(std::cell::Cell::get)
+        == ComposedReturnRetSinkMutation::Exact
+        && COMPOSED_RETURN_RET_SINK_OBSERVATIONS
+            .with(|observations| observations.borrow().is_empty())
+        && COMPOSED_RETURN_RET_SINK_MUTATION_APPLICATIONS.with(std::cell::Cell::get) == 0
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn composed_return_ret_sink_mutation() -> ComposedReturnRetSinkMutation {
+    COMPOSED_RETURN_RET_SINK_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_composed_return_ret_sink_mutation_application() {
+    COMPOSED_RETURN_RET_SINK_MUTATION_APPLICATIONS.with(|applications| {
+        applications.set(
+            applications
+                .get()
+                .checked_add(1)
+                .expect("composed-return Ret-sink mutation application count exhausted"),
+        );
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_composed_return_ret_sink_installation(
+    defining_function: Option<FuncId>,
+    header: Block,
+    sink: ActiveCarriedComputationalRetSink,
+) {
+    COMPOSED_RETURN_RET_SINK_OBSERVATIONS.with(|observations| {
+        observations
+            .borrow_mut()
+            .push(ComposedReturnRetSinkObservation {
+                defining_function: defining_function.map(FuncId::as_u32),
+                active_frame_origin: format!("{:?}", sink.active_frame_origin),
+                header_block: format!("{header:?}"),
+                ret_case_body_origin: format!("{:?}", sink.ret_case_body_origin),
+                ret_input_field_position: sink.ret_input_field_position,
+                return_body_block: format!("{:?}", sink.return_body),
+                installation_count: 1,
+                exact_lookup_count: 0,
+            });
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_composed_return_ret_sink_exact_lookup(
+    defining_function: Option<FuncId>,
+    header: Block,
+    sink: ActiveCarriedComputationalRetSink,
+) {
+    COMPOSED_RETURN_RET_SINK_OBSERVATIONS.with(|observations| {
+        let mut observations = observations.borrow_mut();
+        let observation = observations
+            .iter_mut()
+            .rev()
+            .find(|observation| {
+                observation.defining_function == defining_function.map(FuncId::as_u32)
+                    && observation.active_frame_origin == format!("{:?}", sink.active_frame_origin)
+                    && observation.header_block == format!("{header:?}")
+                    && observation.ret_case_body_origin
+                        == format!("{:?}", sink.ret_case_body_origin)
+                    && observation.ret_input_field_position == sink.ret_input_field_position
+                    && observation.return_body_block == format!("{:?}", sink.return_body)
+                    && observation.exact_lookup_count < observation.installation_count
+            })
+            .expect("an exact composed-return Ret-sink lookup follows its installation");
+        observation.exact_lookup_count = observation
+            .exact_lookup_count
+            .checked_add(1)
+            .expect("composed-return Ret-sink lookup count exhausted");
+    });
+}
 
 struct Lowering<'a> {
     seed_env: &'a NativeSeedEnvironment,
@@ -2835,7 +3005,11 @@ struct Lowering<'a> {
     /// has already established a **finite acyclic carrier graph** and the call
     /// rides a **declared recursive child edge** — so its measure is strict
     /// descent in that validated graph, ⛔ never compile-time shrinkage.
-    active_carried_computational_eliminations: Vec<(StaticOriginId, cranelift_codegen::ir::Block)>,
+    /// `RT-COMPOSED-RETURN-FORWARD-RET-EDGE` D1 extends each active entry with
+    /// an optional compiler-only strict-`Ret` sink. The sink is a Cranelift
+    /// block handle scoped to this emitted function; D1 installs and validates
+    /// it but has no result consumer.
+    active_carried_computational_eliminations: Vec<ActiveCarriedComputationalElimination>,
     native_join_plan: Option<crate::NativeJoinPlanV1>,
     consumed_join_sites: BTreeSet<u64>,
     root_terminal_authority: Option<RootTerminalAnswerAuthority>,

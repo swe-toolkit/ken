@@ -12173,6 +12173,167 @@ impl<'a> Lowering<'a> {
         }
     }
 
+    fn register_composed_return_ret_sink(
+        &mut self,
+        sink: ActiveCarriedComputationalRetSink,
+    ) -> Result<(), CraneliftBackendError> {
+        let mut matches = self
+            .active_carried_computational_eliminations
+            .iter_mut()
+            .filter(|active| active.active_frame_origin == sink.active_frame_origin);
+        let Some(active) = matches.next() else {
+            return Err(unsupported(
+                "ComposedReturnRetSink",
+                "the strict Ret sink has no exact active carried frame",
+            ));
+        };
+        if matches.next().is_some() {
+            return Err(unsupported(
+                "ComposedReturnRetSink",
+                "the strict Ret sink has more than one exact active carried frame",
+            ));
+        }
+        if active.ret_sink.is_some() {
+            return Err(unsupported(
+                "ComposedReturnRetSink",
+                "the active carried frame received more than one strict Ret sink",
+            ));
+        }
+        active.ret_sink = Some(sink);
+        #[cfg(feature = "px8-ds-test-support")]
+        record_composed_return_ret_sink_installation(
+            self.defining_function_id,
+            active.header,
+            sink,
+        );
+        Ok(())
+    }
+
+    /// Resolve one strict `Ret` sink by its complete compiler-only coordinate.
+    /// This is the D1 seam only: the exact lookup validates the installed
+    /// population, but no result or control edge consumes the returned block.
+    pub(super) fn composed_return_ret_sink(
+        &self,
+        active_frame_origin: StaticOriginId,
+        ret_case_body_origin: StaticOriginId,
+        ret_input_field_position: u32,
+    ) -> Result<Block, CraneliftBackendError> {
+        let mut matches = self
+            .active_carried_computational_eliminations
+            .iter()
+            .filter(|active| active.active_frame_origin == active_frame_origin);
+        let Some(active) = matches.next() else {
+            let message = if self.active_carried_computational_eliminations.is_empty() {
+                "the strict Ret sink lookup has no active carried frame"
+            } else {
+                "the strict Ret sink lookup names a different active carried frame"
+            };
+            return Err(unsupported("ComposedReturnRetSink", message));
+        };
+        if matches.next().is_some() {
+            return Err(unsupported(
+                "ComposedReturnRetSink",
+                "the strict Ret sink lookup found more than one active carried frame",
+            ));
+        }
+        let Some(sink) = active.ret_sink else {
+            return Err(unsupported(
+                "ComposedReturnRetSink",
+                "the active carried frame has no installed strict Ret sink",
+            ));
+        };
+        if sink.active_frame_origin != active_frame_origin {
+            return Err(unsupported(
+                "ComposedReturnRetSink",
+                "the installed strict Ret sink belongs to a different active frame",
+            ));
+        }
+        if sink.ret_case_body_origin != ret_case_body_origin {
+            return Err(unsupported(
+                "ComposedReturnRetSink",
+                "the installed strict Ret sink belongs to a different Ret case body",
+            ));
+        }
+        if sink.ret_input_field_position != ret_input_field_position {
+            return Err(unsupported(
+                "ComposedReturnRetSink",
+                "the installed strict Ret sink belongs to a different Ret input binder",
+            ));
+        }
+        #[cfg(feature = "px8-ds-test-support")]
+        record_composed_return_ret_sink_exact_lookup(
+            self.defining_function_id,
+            active.header,
+            sink,
+        );
+        Ok(sink.return_body)
+    }
+
+    fn install_and_validate_composed_return_ret_sink(
+        &mut self,
+        sink: ActiveCarriedComputationalRetSink,
+    ) -> Result<(), CraneliftBackendError> {
+        #[cfg(feature = "px8-ds-test-support")]
+        {
+            use ComposedReturnRetSinkMutation as Mutation;
+
+            record_composed_return_ret_sink_mutation_application();
+            let mutation = composed_return_ret_sink_mutation();
+            if mutation == Mutation::SuppressForInertness {
+                return Ok(());
+            }
+            if mutation != Mutation::Missing {
+                self.register_composed_return_ret_sink(sink)?;
+            }
+            if mutation == Mutation::DuplicateInstallation {
+                return self.register_composed_return_ret_sink(sink);
+            }
+            if mutation == Mutation::DuplicateActiveFrame {
+                let duplicate = self
+                    .active_carried_computational_eliminations
+                    .iter()
+                    .rev()
+                    .find(|active| active.active_frame_origin == sink.active_frame_origin)
+                    .copied()
+                    .expect("the sink was installed into one exact active frame");
+                self.active_carried_computational_eliminations
+                    .push(duplicate);
+            }
+            let active_frame_origin = if mutation == Mutation::WrongActiveFrame {
+                sink.ret_case_body_origin
+            } else {
+                sink.active_frame_origin
+            };
+            let ret_case_body_origin = if mutation == Mutation::WrongRetBody {
+                sink.active_frame_origin
+            } else {
+                sink.ret_case_body_origin
+            };
+            let ret_input_field_position = if mutation == Mutation::WrongBinder {
+                sink.ret_input_field_position.wrapping_add(1)
+            } else {
+                sink.ret_input_field_position
+            };
+            self.composed_return_ret_sink(
+                active_frame_origin,
+                ret_case_body_origin,
+                ret_input_field_position,
+            )?;
+            return Ok(());
+        }
+
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        {
+            self.register_composed_return_ret_sink(sink)?;
+            self.composed_return_ret_sink(
+                sink.active_frame_origin,
+                sink.ret_case_body_origin,
+                sink.ret_input_field_position,
+            )?;
+            Ok(())
+        }
+    }
+
     /// ⭐⭐ **`D3` — `ComputationalMatch` eliminating a carried value.**
     ///
     /// Structurally the same three runtime questions as
@@ -12221,18 +12382,19 @@ impl<'a> Lowering<'a> {
         // its IH over the carried child, still puts it in `case_env`, and still
         // eliminates — everything below runs. Only re-entering *this same*
         // eliminator refuses.
-        if let Some((_, header)) = self
+        if let Some(header) = self
             .active_carried_computational_eliminations
             .iter()
             .rev()
-            .find(|(origin, _)| *origin == eliminator.static_origin)
+            .find(|active| active.active_frame_origin == eliminator.static_origin)
+            .map(|active| active.header)
         {
             #[cfg(feature = "px8-ds-test-support")]
             {
                 // Observer controls vary only these typed recorder inputs. The
                 // emitted jump below still consumes `scrutinee.word` and the
                 // eliminator's authored route.
-                let header_input = builder.block_params(*header)[0];
+                let header_input = builder.block_params(header)[0];
                 let (observed_value, observed_route) =
                     checked_ih_fresh_result_route_active_edge_observer_inputs(
                         scrutinee.word,
@@ -12242,7 +12404,7 @@ impl<'a> Lowering<'a> {
                 record_checked_ih_fresh_result_route_active_edge(
                     eliminator.static_origin,
                     observed_value,
-                    *header,
+                    header,
                     header_input,
                     observed_route,
                 );
@@ -12255,7 +12417,7 @@ impl<'a> Lowering<'a> {
             let route_control = builder.ins().iconst(types::I64, route_control_word);
             builder
                 .ins()
-                .jump(*header, &[scrutinee.word.into(), route_control.into()]);
+                .jump(header, &[scrutinee.word.into(), route_control.into()]);
             let unreachable = builder.create_block();
             builder.switch_to_block(unreachable);
             return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
@@ -12279,8 +12441,13 @@ impl<'a> Lowering<'a> {
             word: builder.block_params(header)[0],
         };
         let route_control = builder.block_params(header)[1];
-        self.active_carried_computational_eliminations
-            .push((eliminator.static_origin, header));
+        self.active_carried_computational_eliminations.push(
+            ActiveCarriedComputationalElimination {
+                active_frame_origin: eliminator.static_origin,
+                header,
+                ret_sink: None,
+            },
+        );
         let lowered = self.lower_carried_computational_match_inner(
             builder,
             scrutinee,
@@ -12290,7 +12457,7 @@ impl<'a> Lowering<'a> {
         );
         let popped = self.active_carried_computational_eliminations.pop();
         debug_assert_eq!(
-            popped,
+            popped.map(|active| (active.active_frame_origin, active.header)),
             Some((eliminator.static_origin, header)),
             "the carried elimination stack must unwind in the order it was pushed"
         );
@@ -12361,11 +12528,24 @@ impl<'a> Lowering<'a> {
         } else {
             None
         };
-        let return_body = return_case.map(|_| {
+        let return_body = if let Some((return_index, return_case)) = return_case {
+            let ret_case_body_origin = self
+                .case_body_occurrence(eliminator.static_origin, return_index, &return_case.body)?
+                .static_origin;
             let block = builder.create_block();
             builder.append_block_param(block, types::I64);
-            block
-        });
+            self.install_and_validate_composed_return_ret_sink(
+                ActiveCarriedComputationalRetSink {
+                    active_frame_origin: eliminator.static_origin,
+                    ret_case_body_origin,
+                    ret_input_field_position: 0,
+                    return_body: block,
+                },
+            )?;
+            Some(block)
+        } else {
+            None
+        };
 
         for (index, case) in eliminator.cases.iter().enumerate() {
             // ⛔ Malformed recursive positions are rejected before any code is
@@ -12679,11 +12859,12 @@ impl<'a> Lowering<'a> {
             #[cfg(feature = "px8-ds-test-support")]
             let body_origin = body.static_origin;
             #[cfg(feature = "px8-ds-test-support")]
-            if let Some((_, header)) = self
+            if let Some(header) = self
                 .active_carried_computational_eliminations
                 .iter()
                 .rev()
-                .find(|(origin, _)| *origin == eliminator.static_origin)
+                .find(|active| active.active_frame_origin == eliminator.static_origin)
+                .map(|active| active.header)
             {
                 // The alternate value is the header's existing route-control
                 // parameter and reaches only the observer call. The shared
@@ -12692,14 +12873,14 @@ impl<'a> Lowering<'a> {
                     checked_ih_fresh_result_route_ret_input_observer_inputs(
                         eliminator.static_origin,
                         body_origin,
-                        *header,
+                        header,
                         scrutinee.word,
-                        builder.block_params(*header)[1],
+                        builder.block_params(header)[1],
                     );
                 record_checked_ih_fresh_result_route_ret_input(
                     eliminator.static_origin,
                     observed_body_origin,
-                    *header,
+                    header,
                     observed_value,
                     observed_order,
                 );
