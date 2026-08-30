@@ -99,5 +99,10 @@ cp -a realized-shards mutation-content/
   "$repo/scripts/stage-ci-shard-artifact.sh" 1 unfiltered-inventory.json ../inventory.json ../selected-1.json
   rm -rf realized-shards/realized-shard-1
   mv realized-shard-1 realized-shards/
-  if python3 "$repo/scripts/check-ci-shard-union.py"; then exit 1; fi
+  set +e
+  python3 "$repo/scripts/check-ci-shard-union.py" 2>err
+  status=$?
+  set -e
+  test "$status" -eq 2
+  grep -Fx 'realized-shard check failed: unfiltered inventories differ' err
 )
