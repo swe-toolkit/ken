@@ -27,21 +27,24 @@ def listing(rows, matches):
 
 
 class Fixtures(unittest.TestCase):
-    def fixture(self):
+    def fixture(self, empty_index=None):
         temporary = tempfile.TemporaryDirectory()
         root = Path(temporary.name) / "realized-shards"
-        ordinary = [("fixture::bin", f"test_{index}") for index in range(1, 9)]
+        ordinary = [("fixture::bin", f"test_{index}") for index in range(1, 8 if empty_index else 9)]
         native = [
             (f"fixture::{name}", "native_test")
             for name in ("rt_parity_native", "px8f_buffer_native", "px8f_write_partition")
         ]
         rows = ordinary + native
-        for index, identity in enumerate(ordinary, start=1):
+        assignments = list(ordinary)
+        for index in range(1, 9):
+            identity = None if index == empty_index else assignments.pop(0)
             artifact = root / f"realized-shard-{index}"
             artifact.mkdir(parents=True)
             (artifact / "unfiltered-inventory.json").write_text(json.dumps(listing(rows, set(rows))))
             (artifact / "inventory.json").write_text(json.dumps(listing(rows, set(ordinary))))
-            (artifact / f"selected-{index}.json").write_text(json.dumps(listing(rows, {identity})))
+            selected = set() if identity is None else {identity}
+            (artifact / f"selected-{index}.json").write_text(json.dumps(listing(rows, selected)))
         return temporary
 
     def run_fixture(self, temporary):
@@ -58,6 +61,12 @@ class Fixtures(unittest.TestCase):
         with self.fixture() as temporary:
             result = self.run_fixture(temporary)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_each_empty_shard_position_is_a_valid_partition(self):
+        for index in range(1, 9):
+            with self.fixture(empty_index=index) as temporary:
+                result = self.run_fixture(temporary)
+            self.assertEqual(result.returncode, 0, f"empty shard {index}: {result.stderr}")
 
     def test_missing_or_extra_artifact_and_member_red(self):
         self.assert_red(lambda root: (root / "realized-shard-8").rename(root / "extra"), "exactly eight")
