@@ -1,14 +1,14 @@
 ---
 id: CI-SHARD-DURATION-BALANCE
 title: "Partition the test shards by measured DURATION rather than by test count, and choose the shard count from the same measurement — count partitioning produced a 3.45x spread across 8 shards, so one shard ran 18m43s while another ran 5m25s and the run paid the maximum, not the mean."
-status: active
+status: merged
 owner: verify
 size: S
 gate: none
 tier: T2
 depends_on: [CI-NATIVE-PARITY-DURATION]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3158
 origin: "Steward, 2026-08-29, from the first full-matrix run after CI-NATIVE-PARITY-DURATION D1/D2 landed (c555f843a). Measured on GitHub Actions run 33230600665, PR #3079, the CAT-DERIVED-PUB-EXPORT merge candidate. Serves the operator's standing priority-1 directive on CI duration (ideal under 10 minutes, under 20 acceptable). Steward-filed per COORDINATION section 2."
 ---
 
