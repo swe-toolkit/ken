@@ -119,7 +119,7 @@ deleting the local definition:
           };
       assert!(
           provider_level_params.is_empty(),
-          "the D1 Boolean providers must be monomorphic"
+          "group-6 providers in this control must have zero declaration-level parameters"
       );
       let prefix = format!("{module}.");
       let context = Context::new();
@@ -160,16 +160,40 @@ deleting the local definition:
   absence of equivalent locals. Differently-spelled semantic duplication remains
   the Architect catalog-factoring review's judgment surface — not decidable here.
 
-  **D2 IS NOT COVERED BY THE D1 HELPER AS WRITTEN.** D2's provider `SC.is_some`
-  is polymorphic — not the monomorphic `Bool -> Bool -> Bool` shape — so the
-  `provider_level_params.is_empty()` assertion and the `level_params.is_empty()`
-  filter do not hold. Measure `is_some`'s level/type parameters first; if it
-  carries level parameters, D2 must align level-parameter arity before comparing
-  (research advisory pitfall 6) or HARD STOP to the Architect. Do not reuse the
-  D1 monomorphic helper for D2 blindly. **If a sound closed mechanism cannot be
-  built for an increment (a legitimately-needed local is kernel-equivalent to the
-  provider, or the equivalence check has a real gap), that is a HARD STOP to the
-  Architect — never another occurrence-census or raw-`Term ==` respin.**
+  **D2 REUSES THE ZERO-DECLARATION-LEVEL HELPER UNCHANGED** (Architect ruling
+  `evt_6zvw2txpw69nm`, base `11ce6f3aa`). The earlier warning that `SC.is_some` is
+  polymorphic and escapes the helper was FALSE. `is_some`'s `(a : Type)` is a
+  TERM-level parameter, represented inside the closed declaration type/body as
+  `Pi`/`Lam`, NOT a `Decl::Transparent.level_params` binder. Both the provider
+  (`Data.Sums.Combinators.is_some`, blob `56530688`, `pub fn is_some (a : Type)
+  ...`) and the Map local (`option_is_some`, `fn option_is_some (v : Type) ...`)
+  therefore have `level_params == []` — an ordinary no-spec `fn` takes the V0
+  admission path and `declare_def(env, vec![], ty_core, body_core)`. So the
+  `provider_level_params.is_empty()` assertion does not panic, the
+  `level_params.is_empty()` filter does not skip `option_is_some`, and
+  `Context::new()` stays correct: the compared top-level terms are closed and their
+  `a`/`x` binders are internal de Bruijn binders kernel conversion handles. Do NOT
+  add symbolic level substitution or a "matching level-param context" for D2 — that
+  solves an absent population and enlarges the mechanism without increasing its
+  reach.
+
+  D2 controls (Architect `evt_6zvw2txpw69nm`): roots-load `Data.Sums.Combinators`
+  and `Data.Collections.Map`; bind the provider by exact GlobalId
+  `Data.Sums.Combinators.is_some`; baseline Map inventory empty; an exact-bodied
+  differently-named Map local REDs; a zeta-redex equivalent Map local REDs; a
+  same-typed but non-convertible local (e.g. constant `False`) stays GREEN; the
+  former global `Data.Collections.Map.option_is_some` is absent, the selective
+  import resolves to the canonical transparent provider, removing/wrong-naming the
+  import REDs, and Map's existing behavior plus zero trust delta stay green; all
+  `[higher]` Map consumers and call sites remain byte-identical.
+
+  HARD STOP: if the implementer observes a non-empty `level_params` vector for
+  either exact current declaration, that contradicts the grounded admission path
+  above — stop with the printed `Decl`, do not silently generalize. The general
+  rule also stands: if a sound closed mechanism cannot be built for an increment (a
+  legitimately-needed local is kernel-equivalent to the provider, or the
+  equivalence check has a real gap), that is a HARD STOP to the Architect — never
+  another occurrence-census or raw-`Term ==` respin.
 - **AC-SAME-BEHAVIOUR** — the consumer module elaborates to the same result
   through the imported provider as through the deleted local. Control: the
   module's existing checked declarations and any dependent headline
