@@ -1,18 +1,40 @@
 ---
 id: RT-COMPOSED-RETURN-CONSTRAINT-DIFFERENTIAL
 title: "RESEARCH REPORT (comparative, not novel research): the tail-resumptive composed return `bind t (\\x. Ret (f x))` is a simple, common construction that comparable systems lower, yet Ken's native (PX8) backend cannot. Report the EXACT Ken constraints that block shape (a) and shape (b), and how each DIFFERS from the constraint set of languages/compilers that DO support the construction — so the fix is a known constraint to relax, not an open research question."
-status: ready
+status: merged
 owner: research
 size: M
 gate: none
 tier: T1
 depends_on: []
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3122
 origin: "Operator ruling 2026-08-29 (this session), overriding the Steward's accept-the-boundary recommendation. Verbatim: a compiler which cannot support this construction is of little use; it is a simple and common construction; other systems achieve it, so it is not a deep research question. Directive: revisit shape (a) and shape (b) through the constraint DIFFERENTIAL — the constraints of Ken that prevent each shape and how they differ from the constraints of other languages that support each shape — and ask research for a report. Inputs are the two closed discovery verdicts (RT-COMPOSED-RETURN-PRODUCER-ORDER-DISCOVERY shape (a) INSUFFICIENT; RT-COMPOSED-RETURN-SHAPE-B-DISCOVERY shape (b) REFUTED axis 3) and the closed RT-COMPOSED-RETURN-PRODUCED-TRANSFER (D0b=NO, partial-order contradiction). Steward-filed per COORDINATION section 2."
 ---
 
-> # RELEASED — lane 1, the new runtime objective. Research report only. `ready`.
+> # MERGED — Steward disposition, 2026-08-30. Report landed `5b20fe84f`
+> # (PR #3122), blob-verified.
+> #
+> # The report `docs/program/rt-composed-return-constraint-differential-report.md`
+> # landed at exact blob `cb9ca0ce` (Steward M6-verified against the object
+> # store). Architect accuracy verdict `evt_58p39mcfjb82r`; terminal Decision
+> # `dec_6q4zp66yzrm0y` RESOLVED APPROVED (Architect). Steward self-published
+> # doc-only as the fallback publisher — the lieutenant was at 94% context and
+> # had correctly stopped on an unrelated CI-red (the L2 verify D1 orphan), so the
+> # report route was taken off its queue. RESULT: both shape-(a) and shape-(b)
+> # native walls are INCIDENTAL (not spec-mandated) — the spec fixes only the
+> # observable result + single tail resumption and leaves calling convention /
+> # closure representation / instruction schedule private. The blocking triple is
+> # incidental: source-machine answer collapse + generated-entry member quotient +
+> # two-word carried backedge. Two relaxation families (shape-(a): co-locate
+> # producer + Ret sink on one forward edge before answer collapse, high/not-novel;
+> # shape-(b): pair de-quotient with runtime operand availability, very-high/broad
+> # but conventional) — neither needs a spec change. Operator briefed; the
+> # fund-a-build vs hold decision on lane 1 is the operator + Architect call the
+> # report feeds. This node authorized no production/CI/PX8/build disposition.
+>
+> # RELEASED — lane 1, the new runtime objective. Research report only.
+> # (superseded by the MERGED banner above).
 >
 > The operator REJECTED accepting the native Tail composed-return wall as a
 > boundary. The construction is simple and common and comparable systems lower
