@@ -133,9 +133,10 @@ jobs:
           mkdir "realized-shard-${{ matrix.shard }}"
           cp unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json" "realized-shard-${{ matrix.shard }}/"
       - name: Test
-        run: |
-          if test -f .planned-empty; then exit 0; fi
-          cargo nextest run --workspace --locked -E "$(<duration-filters/bin-${{ matrix.shard }}.expr)"
+        run: >-
+          scripts/run-ci-shard.sh
+          "$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')"
+          "$(<duration-filters/bin-${{ matrix.shard }}.expr)"
       # nextest does not execute rustdoc tests, so run the workspace doctest
       # population once rather than once per shard.
       - name: Upload realized shard selection
