@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root=$(mktemp -d)
+trap 'rm -rf "$root"' EXIT
+mkdir "$root/bin"
+cat > "$root/bin/cargo" <<'EOF'
+#!/usr/bin/env bash
+echo "$*" >> "$LOG"
+EOF
+chmod +x "$root/bin/cargo"
+LOG="$root/log" PATH="$root/bin:$PATH" scripts/run-ci-shard.sh 0 ignored
+[[ ! -e "$root/log" ]]
+LOG="$root/log" PATH="$root/bin:$PATH" scripts/run-ci-shard.sh 1 '(binary_id(=x) & test(=y))'
+[[ $(wc -l < "$root/log") -eq 1 ]]
+grep -Fx 'nextest run --workspace --locked -E (binary_id(=x) & test(=y))' "$root/log"
+printf a > "$root/unfiltered.json"
+printf b > "$root/inventory.json"
+printf c > "$root/selected.json"
+(
+  cd "$root"
+  "$OLDPWD/scripts/stage-ci-shard-artifact.sh" 8 unfiltered.json inventory.json selected.json
+)
+test -f "$root/realized-shard-8/unfiltered.json"
+test -f "$root/realized-shard-8/inventory.json"
+test -f "$root/realized-shard-8/selected.json"

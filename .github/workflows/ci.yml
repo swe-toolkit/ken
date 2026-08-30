@@ -116,13 +116,34 @@ jobs:
       # nothing here isolates the topology as the CAUSE of the timing; see
       # docs/program/11-test-suite-and-ci-remediation.md §1f for the
       # unisolated-hypothesis framing.
+      - name: Select duration-balanced shard
+        run: |
+          cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
+          python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
+          python3 scripts/ci-duration-shard.py inventory.json docs/program/evidence/ci-shard-duration-balance-33230600665.json duration-filters
+          planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
+          if [ "$planned" -eq 0 ]; then
+            python3 scripts/ci-duration-shard.py project-empty inventory.json "selected-${{ matrix.shard }}.json"
+            touch .planned-empty
+          else
+            python3 scripts/ci-duration-shard.py project-selected inventory.json duration-filters/assignments.json "${{ matrix.shard }}" "selected-${{ matrix.shard }}.json"
+          fi
+          python3 scripts/ci-duration-shard.py validate-plan duration-filters/assignments.json "${{ matrix.shard }}" "selected-${{ matrix.shard }}.json"
+          scripts/stage-ci-shard-artifact.sh "${{ matrix.shard }}" unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json"
       - name: Test
         run: >-
-          cargo nextest run --workspace --locked
-          --partition count:${{ matrix.shard }}/8
-          -E 'not (binary(rt_parity_native) or binary(px8f_buffer_native) or binary(px8f_write_partition))'
+          scripts/run-ci-shard.sh
+          "$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')"
+          "$(<duration-filters/bin-${{ matrix.shard }}.expr)"
       # nextest does not execute rustdoc tests, so run the workspace doctest
       # population once rather than once per shard.
+      - name: Upload realized shard selection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: realized-shard-${{ matrix.shard }}
+          path: realized-shard-${{ matrix.shard }}/*
+          if-no-files-found: error
       - name: Doctests
         if: matrix.shard == 1
         run: cargo test --workspace --doc --locked
@@ -493,3 +514,16 @@ jobs:
       # line; see scripts/gen-progress.sh).
       - name: Check IMPLEMENTATION-PROGRESS.md is current
         run: scripts/gen-progress.sh --check
+
+  verify-realized-shard-union:
+    needs: test-shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: realized-shard-*
+          path: realized-shards
+      - name: Verify realized partition
+        run: python3 scripts/check-ci-shard-union.py
