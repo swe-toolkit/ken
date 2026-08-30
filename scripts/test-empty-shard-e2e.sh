@@ -33,11 +33,7 @@ python3 "$repo/scripts/ci-duration-shard.py" project-empty inventory.json "selec
 python3 "$repo/scripts/ci-duration-shard.py" validate-plan filters/assignments.json "$empty" "selected-$empty.json"
 for n in $(seq 1 8); do
   planned=$(python3 -c "import json; print(len(json.load(open('filters/assignments.json'))['bins'][$n - 1]['tests']))")
-  if [ "$planned" -eq 0 ]; then
-    python3 "$repo/scripts/ci-duration-shard.py" project-empty inventory.json "selected-$n.json"
-  else
-    cp inventory.json "selected-$n.json"
-  fi
+  python3 "$repo/scripts/ci-duration-shard.py" project-selected inventory.json filters/assignments.json "$n" "selected-$n.json"
   python3 "$repo/scripts/ci-duration-shard.py" validate-plan filters/assignments.json "$n" "selected-$n.json"
   "$repo/scripts/stage-ci-shard-artifact.sh" "$n" unfiltered-inventory.json inventory.json "selected-$n.json"
 done
