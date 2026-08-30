@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-CARRIED-ENVIRONMENT-FORCE-CALL-D1
 title: "Scratch-only D1 prototype (no candidate, no QA, no Decision, no merge): prove the typed producer-local role split that makes the checked-IH carried environment and the checked-IH application result non-interchangeable. Retire the ambiguous two-role LoweringOperand-returning API (call_checked_ih_transport_from_case_environment's CarriedEnvironment arm) and introduce two private compiler-local result types — CheckedIhCapturedEnvironment (used only by ConstructArgument) and CheckedIhApplicationResult (used only by call_lowered after the eligible pending checked-IH application and exact CheckedIhEnvironmentTransport are selected) — with role-specific entry points carrying no runtime tag, storage, or Ken-visible identity. For an already-carried environment the application entry point emits ONE exact new direct force call through call_declared_unit_target and returns only its trap-checked Result as CheckedIhApplicationResult; the environment-materialization crossing stays a no-call. Pair the new call's Result to the natural match 451 and show a real ResourceBodyOk/ResourceBodyErr selection WITHOUT synthesizing that constructor at the environment producer. Restore the branch byte-clean and return a report."
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -12,13 +12,39 @@ github: null
 origin: "Architect review evt_4m8eyrrpke50k (thr_tfcm3sp107x9, 2026-08-30), accepting the runtime-implementer's RT-HOST-APPLICATION-TRAP-PROVENANCE-D0 outcome `wrong scrutinee before the match` (report evt_5z6e6yge3pw9n, SHA-256 86b978f2a61bbb..., scratch-diff aa939332175a...). The D0 proved the live ResourceBodyResult match 451/450 in funcid42 receives the identity-free eight-field checked-IH captured environment (specialization 1, seat 671, record 608) returned inline by call_checked_ih_transport_from_case_environment's CarriedEnvironment arm — not the Host response and not the checked-IH application result. The shared untyped LoweringOperand return type makes environment material and application result interchangeable: correct for ConstructArgument (install an already-materialized environment in the ruled recursive field), wrong for call_lowered's selected checked-IH force (which needs the result of APPLYING the worker). Architect-selected repair: a typed role split at the producer-local substitution seam, funded as this scratch-only D1 before any production build. Steward-recut per COORDINATION section 2. Base origin/main 3d8fd27c8696a24d9fec254e6e520f8fef6923a2; core.rs blob eea98dc6ddb0ae2f7656b16fed7ee461b24de0a1 and source.rs blob c39f82e7854f626244b4398ba9941ae38b25485e both Steward-verified byte-identical to the reviewed base 0be25235b at this main tip. @steward owns close/reframe/release; runtime parked until this fresh D1 kick."
 ---
 
-> # READY — SCRATCH-ONLY D1. Released to the runtime ring (lane 1) on `origin/main`
-> # `3d8fd27c8`. Runtime is parked; this IS the release.
->
-> This is a PROTOTYPE node. It lands NO production, opens NO candidate, routes NO
-> QA, and needs NO Decision or merge. It may prototype ONLY the typed split, and
-> the branch is restored byte-clean at the end. The Architect reviews the D1
-> report and its scratch diff, and a YES enables a later production recut.
+> # CLOSED — D1 COMPLETE, OUTCOME **NO** ACCEPTED. Architect review
+> # `evt_7e6jprw80srj8` (thr_h4et7wgn4wkc, 2026-08-30).
+> #
+> # This is a PROTOTYPE node — it lands no production and is never `merged`; it
+> # returned a report and scratch diff, and the branch was restored byte-clean to
+> # base `774d1c90c`. The runtime-implementer's report (`evt_20kgrb6e5a28j`, SHA-256
+> # `76554fa3cca5...`, scratch-diff `992b21cd0ed4...`) is a sound **D1 NO**, which
+> # the Architect independently reproduced and confirmed.
+> #
+> # Finding: the typed split itself is correct — it compiles, emits the exact force
+> # call, and the runtime pairing is discriminating (force Result field 1 = word
+> # 4105 is exactly the scrutinee natural match 451 consumes). But the target the
+> # prior ruling selected, `transport.source_call_identity()`, is itself the
+> # captured-environment MATERIALIZER (`funcid47`/`ken_continuation_1`), not a
+> # worker-body executor — it declares `funcid43` but emits zero calls to it.
+> # Calling it again returns a second outer wrapper whose payload is another
+> # identity-free eight-field captured environment, so match 451 correctly takes
+> # trap 36. Parity stays red (native exit 1, file-before-buffer release).
+> #
+> # Architect correction: `CheckedIhEnvironmentTransport` is authority for one
+> # force-materialized environment crossing; its `source_call_identity` names that
+> # materialization, NOT worker execution. Prior selected-design point 5 is spent
+> # and withdrawn. **The typed role split REMAINS correct and mandatory** — what is
+> # missing is an independently grounded application-executor recipe, not another
+> # result type. No production recut is authorized.
+> #
+> # Next: scratch-only successor
+> # **`RT-CHECKED-IH-CARRIED-WORKER-EXECUTOR-AUTHORITY-D0`** on the same exact
+> # product blobs (base `774d1c90c`), answering whether the exact pending
+> # application at 474/473 already has a complete, unambiguous
+> # worker-execution recipe at the carried seat, distinct from
+> # `CheckedIhEnvironmentTransport`. Everything below this banner is retained as
+> # chronology; the withdrawn point-5 target is spent.
 >
 > **Why we are here.** `RT-HOST-APPLICATION-TRAP-PROVENANCE-D0` is CLOSED with the
 > accepted outcome **wrong scrutinee before the match**: the live match 451/450
