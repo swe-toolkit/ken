@@ -12,6 +12,19 @@ github: null
 origin: "Steward, 2026-08-29, filed on the CAT-BOOL-PUB-EXPORT landing (providers public at 4faa97bfb, PR #3108) so lane 3 does not idle. Group 6 membership quoted verbatim from docs/program/cat-reuse-census.md §4.4 item 6 (lines 317-320) at origin/main 4faa97bfb; the three [low] consume tags read from §3 rows 36 (Derived) and 37 (Map). The two providers CAT-BOOL-PUB-EXPORT just published (LC.bool_and, LC.bool_leq, SC.is_some) are exactly the three names group 6 consumes, so the prerequisite covers the consumers with nothing left over. Steward-filed per COORDINATION section 2."
 ---
 
+> # D2 AMENDED — Architect ruling `evt_em72d9eh6ndg`, 2026-08-30, base
+> # `0ddd49b3`. D1 landed; this amends D2's acceptance criteria only.
+> #
+> # The foundation-implementer took a valid PRE-EDIT hard stop: `AC-STANDALONE-
+> # GREEN` does not reproduce, because Map fails raw `ken check` on the untouched
+> # base with a pre-existing `UnresolvedCon list_append` (Map imports only
+> # `Core.Logic.Or`; its acceptance path is fixture-backed). The raw-standalone AC
+> # is WITHDRAWN for D2 and replaced by AC-LEGACY-CLOSURE-PRESERVED +
+> # AC-D2-DEPENDENCY-EDGE + AC-RAW-BOUNDARY-PRESERVED (see Acceptance criteria).
+> # The pre-existing Map dependency-closure defect is filed as a DISTINCT
+> # follow-on (`CAT-MAP-DEPENDENCY-CLOSURE-REPAIR`), NOT a D2 prerequisite. After
+> # this lands, the clean held D2 branch is re-released through Foundation Leader.
+
 > # AMENDED — Architect HS3 ruling `evt_3k9km6125h088`, 2026-08-29. After this
 > # lands, Foundation may respin D1 TEST-ONLY from exact `bc56f2f7`.
 >
@@ -199,26 +212,56 @@ deleting the local definition:
   module's existing checked declarations and any dependent headline
   (Derived's sort/derived string-byte headlines; Map's `Tree` map operations)
   still elaborate; a mutation that imports the WRONG provider name reddens.
-- **AC-STANDALONE-GREEN** — the consumer module still elaborates standalone
-  (exit 0) after the drain. If the import pulls the module non-standalone that is
-  a HARD STOP to the Architect, not a workaround.
+- **AC-STANDALONE-GREEN — WITHDRAWN for D2** (Architect `evt_em72d9eh6ndg`, base
+  `0ddd49b3`). The raw-standalone premise is FALSE for Map: on the untouched base,
+  `scripts/ken-cargo run -p ken-cli -- check
+  catalog/packages/Data/Collections/Map.ken.md` exits 1 with a PRE-EXISTING
+  `UnresolvedCon { name: "list_append" }` (Map imports only `Core.Logic.Or` at
+  line 80, then consumes undeclared `list_append` at 90-93), and Map's established
+  acceptance path is fixture-backed — `map_build_acceptance.rs` blob
+  `82576c772e5be8b76cc829f0ab5c2ca7948c1cab`, `mk_env` lines 38-47 preload
+  Compare/Transport/Derived/Or before elaborating the real Map source. So D2
+  CANNOT be gated on Map elaborating standalone, and "fixture green" must NOT be
+  silently substituted for it. D1 (Derived) landed under its own gates and is
+  unaffected. For D2 this AC is replaced by the three observations below.
+- **AC-LEGACY-CLOSURE-PRESERVED** (D2) — base and candidate real Map source
+  elaborate under the SAME established Map dependency fixture. Load
+  `Data.Sums.Combinators` canonically, but do NOT expose an unqualified `is_some`
+  alias outside Map's own selective import. Candidate stays behavior-green with
+  zero trust delta. This proves the migrated computation.
+- **AC-D2-DEPENDENCY-EDGE** (D2) — the candidate adds exactly ONE dependency edge:
+  Map's selective import resolves `is_some` to the exact transparent GlobalId
+  `Data.Sums.Combinators.is_some`. Removing the import or naming the wrong provider
+  must FAIL at `is_some`, and the fixture must NOT pre-bind that unqualified name.
+  The former `Data.Collections.Map.option_is_some` global is absent. This is the
+  product observation; fixture padding cannot satisfy it.
+- **AC-RAW-BOUNDARY-PRESERVED** (D2) — run the raw `ken check` command on base and
+  candidate; both must reach the SAME pre-existing first unresolved constructor
+  name `list_append` (compare variant/name, NOT source span). A new earlier failure
+  at the `Data.Sums.Combinators` import or at `is_some` is D2-caused and RED. This
+  is negative-scope evidence ONLY — do NOT call it standalone success.
 - **AC-NO-OTHER-DRAIN** (D2 only) — Map's `[higher]` boolean consumes are
   untouched; only `option_is_some` is drained. Control: those local definitions
   and their call sites are byte-unchanged.
 
 ## Reviewers
 
-Foundation QA (the census row is drained, the module stays standalone-green, and
-the same-behaviour control reddens on the wrong provider) + conformance-validator
-(the loader actually resolves the selective import to the public provider, not a
-shadowing local — this is the consumer mirror of the loader-visibility inventory
-the CV owns on the provider side). A drain that turns a consumer module
-non-standalone HARD-STOPS to the Architect.
+Foundation QA (the census row is drained; for D1 the module stays
+standalone-green, for D2 the three D2 observations hold — legacy closure preserved
+under the established fixture, the exact one-edge import/withdrawal pair, and the
+raw `list_append` boundary unworsened — and the same-behaviour control reddens on
+the wrong provider) + conformance-validator (the loader actually resolves the
+selective import to the public provider, not a shadowing local — this is the
+consumer mirror of the loader-visibility inventory the CV owns on the provider
+side). For D2, a NEW raw failure earlier than the pre-existing `list_append` (at
+the Sums import or at `is_some`) HARD-STOPS to the Architect; a consumer module
+turned non-standalone by a D1 drain still HARD-STOPS.
 
 ## Capability tier
 
 T2 — a mechanical, precedent-shaped catalog reuse drain (three sites, two files),
-reviewed differentially on census-row-drained + standalone-green, not on an
+reviewed differentially on census-row-drained (plus, for D2, the exact one-edge
+import/withdrawal and the unworsened raw `list_append` boundary), not on an
 argument. Size S (smaller than group 4's six sites / five packages).
 
 ## Sequencing
@@ -235,6 +278,15 @@ since merge-base `ba1c92214` is empty (Architect), so no rebase is justified;
 Foundation respins D1 test-only from that SHA after this amendment lands. D2
 remains unstarted until D1 closes.
 
+**Distinct follow-on, NOT a D2 prerequisite** (Architect `evt_em72d9eh6ndg`): Map
+(`Data/Collections/Map.ken.md`) does not elaborate from its own imports — it
+imports only `Core.Logic.Or` yet consumes undeclared `list_append` (and relies on
+the `map_build_acceptance.rs` fixture preloading Compare/Transport/Derived/Or). A
+Map dependency-closure repair is warranted but is pre-existing and potentially
+spans the full legacy fixture inventory. It is filed separately as
+`CAT-MAP-DEPENDENCY-CLOSURE-REPAIR` (`draft`, queued); this one-provider `is_some`
+drain must NOT be held behind it or smuggle a fix into D2.
+
 ## Symptom inventory (append one line per hard-stop; never rewrite history)
 
 ```text
@@ -243,4 +295,6 @@ remains unstarted until D1 closes.
 3. Raw `Term ==` accepted a zeta-equivalent local — keyed on representation identity.
 
 Shared predicate: each detector substituted a representation proxy for causal provider authority. The structural closure is to separate candidate-specific migration evidence, kernel-definitional anti-duplication, and any future route-authority property; never infer one from another.
+
+4. D2 pre-edit stop: AC-STANDALONE-GREEN's raw-standalone premise is false — Map fails raw `ken check` on the untouched base (pre-existing UnresolvedCon list_append) and its acceptance path is fixture-backed. Different class from 1-3: a frame premise falsified by a pre-existing consumer-module dependency defect, not a detector proxy. Fix: withdraw the raw-standalone AC for D2, gate on legacy-closure-preserved + one dependency edge + unworsened raw boundary; file the Map closure repair as a distinct follow-on.
 ```
