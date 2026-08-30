@@ -52,6 +52,14 @@ class DurationShardControls(unittest.TestCase):
         for binary in ("rt_parity_native", "px8f_buffer_native", "px8f_write_partition"):
             self.assertFalse(any(binary in item for item in filters))
 
+    def test_empty_eligible_population_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "inventory.json").write_text(json.dumps({"test-count": 0, "rust-suites": {}}))
+            (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": "x", "seconds": 1}]}))
+            result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json"], cwd=root, check=False)
+        self.assertNotEqual(result.returncode, 0)
+
     def test_small_eligible_populations_keep_eight_bins(self):
         for size in range(1, 9):
             with tempfile.TemporaryDirectory() as temporary:
@@ -66,6 +74,10 @@ class DurationShardControls(unittest.TestCase):
             bins = assignment["bins"]
             self.assertEqual(len(bins), 8)
             self.assertEqual(sum(len(item["tests"]) for item in bins), size)
+            self.assertEqual(
+                sorted(tuple(identity) for item in bins for identity in item["tests"]),
+                [("fixture::ordinary", f"test_{i}") for i in range(size)],
+            )
             self.assertEqual(sum(not item["tests"] for item in bins), 8 - size)
 
     def test_validate_plan_accepts_exact_and_rejects_dispositions(self):
