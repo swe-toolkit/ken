@@ -1,14 +1,14 @@
 ---
 id: KERNEL-CONV-RECURSIVE-HEAD-TOTALITY
 title: "Restore kernel conversion totality at the distinct recursive-head boundary — converting two separately declared, source-isomorphic recursive transparent globals under a stuck eliminator currently unfolds their distinct self GlobalIds without bound and stack-overflows, instead of returning false and halting as the landed spec §17 contract now requires. Implement the finite §3.5 cross-identity boundary (no clone-equality, bisimulation, certificate, self-id rewrite, or custom normalizer), preserving ordinary same-head recursion, finite δ, and distinct-nonrecursive common reducts, and wire the executable black-box matrix."
-status: ready
+status: merged
 owner: kernel
 size: M
 gate: none
 tier: T1
 depends_on: []
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3160
 origin: "Steward, 2026-08-30, filed on the Architect directive evt_7spzy25qqdsqx (re-confirmed evt_2q6s5215q1cth) after the Spec §17/conformance erratum LANDED (squash c2c12b090, blob-verified). The erratum specified the contract — distinct separately declared recursive self GlobalId heads under a stuck eliminator are non-convertible, observable false plus halting — and surfaced a real kernel totality bug: the current conversion diverges (stack overflow) on that case. The Architect ruled the repair a SEPARATE non-blocking follow-on to be framed after the erratum lands, and preselected no implementation technique. Steward-filed per COORDINATION section 2."
 ---
 
