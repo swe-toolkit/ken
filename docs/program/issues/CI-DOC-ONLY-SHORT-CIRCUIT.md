@@ -1,7 +1,7 @@
 ---
 id: CI-DOC-ONLY-SHORT-CIRCUIT
 title: "Detect doc-only PRs by changed-path classification and short-circuit the expensive CI matrix to a required-green pass, saving GitHub Actions compute given the doc-to-code PR ratio; any PR touching crates/catalog/spec/conformance or a CI-control file forces the full pipeline. The classifier must REPORT every required status-check context as success on the doc-only path (skipped != green under branch protection), must be PATH-based (any crates/ change, including a comment-only .rs edit, is full CI so a /// doctest is never mis-skipped), must reuse the publisher's existing --doc-only path taxonomy as a single source of truth, and must FAIL CLOSED (any error/ambiguity runs full CI)."
-status: draft
+status: ready
 owner: verify
 size: M
 gate: none
@@ -12,13 +12,19 @@ github: null
 origin: "Operator request 2026-08-30: 'can doc-only PRs be detected in CI and short-circuit to a pass? can we implement a changed-path classifier to do so? this would save significant resources for GH, given the proportion of doc-only PRs to crate/catalog PRs. note: the classifier should also include files which control CI.' Serves the operator's standing priority-1 CI-cost directive (the CI-NATIVE-PARITY-DURATION family). Sibling to CI-SHARD-DURATION-BALANCE on a distinct axis: that node reduces the DURATION of the pipeline; this node avoids RUNNING the pipeline at all on doc-only PRs. Steward-filed per COORDINATION section 2."
 ---
 
-> # DRAFT — QUEUED behind CI-SHARD-DURATION-BALANCE. Do not release yet.
+> # READY — RELEASED to the verify ring (lane 2). The queue condition is met:
+> # CI-SHARD-DURATION-BALANCE landed and closed at M7 `8b887de17` (2026-08-30).
 > #
-> # Operator, 2026-08-30: "frame it and queue it behind shard-balance." The
-> # verify ring is single-threaded (one WP at a time). Flip this `ready` and
-> # release it to the verify ring only when CI-SHARD-DURATION-BALANCE closes
-> # (lands or is otherwise disposed). Until then it is a framed backlog node, not
-> # an active claim on the lane.
+> # Operator, 2026-08-30: "frame it and queue it behind shard-balance." That node
+> # has closed, so this is now the verify ring's active node.
+> #
+> # RE-MEASURE against CURRENT main, which now INCLUDES the CI-SHARD-DURATION-
+> # BALANCE landing — the required-check topology and the CI-control file set moved.
+> # The shard fan-in the sibling node added lives under the denylist (CI-control
+> # files force full CI); confirm the exact required-context list against the
+> # current workflow before designing the reporting shape (D1). This node's own
+> # candidate touches CI-control files, so it is itself in the denylist and MUST
+> # run full CI — a doc-only short-circuit of THIS PR would be a bug.
 
 ## The waste this closes
 
