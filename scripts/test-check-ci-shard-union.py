@@ -41,10 +41,11 @@ class Fixtures(unittest.TestCase):
             identity = None if index == empty_index else assignments.pop(0)
             artifact = root / f"realized-shard-{index}"
             artifact.mkdir(parents=True)
-            (artifact / "unfiltered-inventory.json").write_text(json.dumps(listing(rows, set(rows))))
-            (artifact / "inventory.json").write_text(json.dumps(listing(rows, set(ordinary))))
             selected = set() if identity is None else {identity}
-            (artifact / f"selected-{index}.json").write_text(json.dumps(listing(rows, selected)))
+            for name, matches in (("unfiltered-inventory.json", set(rows)), ("inventory.json", set(ordinary)), (f"selected-{index}.json", selected)):
+                value = listing(rows, matches)
+                value["rust-suites"]["empty"] = {"binary-id": "fixture::empty", "binary-name": "ordinary", "testcases": {}}
+                (artifact / name).write_text(json.dumps(value))
         return temporary
 
     def run_fixture(self, temporary):
@@ -195,7 +196,9 @@ class Fixtures(unittest.TestCase):
     def test_overlap_and_union_missing_extra_red(self):
         def overlap(root):
             path = root / "realized-shard-2" / "selected-2.json"; value = json.loads(path.read_text());
-            for suite in value["rust-suites"].values(): suite["testcases"][next(iter(suite["testcases"]))]["filter-match"]["status"] = "mismatch"
+            for suite in value["rust-suites"].values():
+                if suite["testcases"]:
+                    suite["testcases"][next(iter(suite["testcases"]))]["filter-match"]["status"] = "mismatch"
             next(iter(value["rust-suites"].values()))["testcases"]["test_1"]["filter-match"]["status"] = "matches"; path.write_text(json.dumps(value))
         self.assert_red(overlap, "selections overlap")
         def union_extra(root):
