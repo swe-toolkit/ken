@@ -1025,13 +1025,16 @@ Append one line per hard stop; never rewrite history.
     producer at cursor N and the freshly minted selected continuation at N+2, so
     there is no pair at the producer to couple and no value left to carry by
     ownership.
+14. The true declared-call SSA survives only as constructor-field material while
+    `ConstructArgument` replaces the top-level `RoutedAnswer`; no natural closure
+    retains operand plus route without widening the general composed-return
+    protocol — keyed on treating SSA survival inside constructed runtime data as
+    survival of compiler-control ownership.
 15. The authority-bearing source seat is `CarriedEnvironment`/`InlineNoCall`;
     forwarding its environment word reaches the next `Result` mismatch, while the
     actual `StaticWorker` result producer is absent — keyed on static producer
     identity treated as dynamic producer occurrence. (HS15 `evt_4c1210dqzyk8t`,
-    clean stop `evt_65rzza5s5hrnw`, base `af1db1bf`. No entry 14 line exists —
-    HS14 was the clean D0 unboundable-closure stop under the shape-(a) successor
-    node; append its symptom line if the Architect supplies one.)
+    clean stop `evt_65rzza5s5hrnw`, base `af1db1bf`.)
 
 > **ENTRY 13 IS NOT A THIRTEENTH ENDPOINT GAP. THE ENDPOINT-ADDITION PREDICATE
 > STAYS TERMINAL AT ENTRY 12.** Entries 1-12 are one class — a static or local
