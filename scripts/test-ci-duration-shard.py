@@ -95,8 +95,12 @@ class DurationShardControls(unittest.TestCase):
             (root / "selected.json").write_text(json.dumps(base))
             self.assertNotEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
             (root / "assignment.json").write_text(json.dumps({"bins": [{"tests": []}]}))
-            base["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"] = "mismatch"
-            (root / "selected.json").write_text(json.dumps(base))
+            base["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"] = "matches"
+            (root / "source.json").write_text(json.dumps(base))
+            self.assertEqual(subprocess.run([sys.executable, str(SCRIPT), "project-empty", "source.json", "selected.json"], cwd=root, check=False).returncode, 0)
+            projected = json.loads((root / "selected.json").read_text())
+            self.assertEqual(projected["test-count"], 1)
+            self.assertEqual(projected["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"], "mismatch")
             self.assertEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
             base["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"] = "matches"
             (root / "selected.json").write_text(json.dumps(base))

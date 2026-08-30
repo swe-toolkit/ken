@@ -70,7 +70,16 @@ class Fixtures(unittest.TestCase):
 
     def test_empty_position_mutations_red(self):
         empty = 8
+        self.assert_red(lambda root: (root / "realized-shard-8" / "unfiltered-inventory.json").unlink(), "member is missing", empty)
+        self.assert_red(lambda root: (root / "realized-shard-8" / "inventory.json").unlink(), "member is missing", empty)
         self.assert_red(lambda root: (root / "realized-shard-8" / "selected-8.json").unlink(), "member is missing", empty)
+        def selected_truncation(root):
+            path = root / "realized-shard-8" / "selected-8.json"
+            value = json.loads(path.read_text())
+            del value["rust-suites"]["suite-8"]
+            value["test-count"] -= 1
+            path.write_text(json.dumps(value))
+        self.assert_red(selected_truncation, "selected listing differs from unfiltered authority", empty)
         def empty_match(root):
             path = root / "realized-shard-8" / "selected-8.json"
             value = json.loads(path.read_text())
