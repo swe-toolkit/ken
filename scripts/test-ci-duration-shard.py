@@ -60,12 +60,31 @@ class DurationShardControls(unittest.TestCase):
                 suites = {str(i): {"binary-id": binary_id, "binary-name": binary_name, "testcases": {testcase: {"filter-match": {"status": status}}}} for i, (binary_id, binary_name, testcase, status) in enumerate(rows)}
                 (root / "inventory.json").write_text(json.dumps({"test-count": size, "rust-suites": suites}))
                 (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": f"fixture::ordinary test_{i}", "seconds": 1} for i in range(size)]}))
-                result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json"], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+                result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json", "out"], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+                assignment = json.loads((root / "out" / "assignments.json").read_text())
             self.assertEqual(result.returncode, 0, result.stderr)
-            bins = json.loads(result.stdout)["bins"]
+            bins = assignment["bins"]
             self.assertEqual(len(bins), 8)
             self.assertEqual(sum(len(item["tests"]) for item in bins), size)
             self.assertEqual(sum(not item["tests"] for item in bins), 8 - size)
+
+    def test_validate_plan_accepts_exact_and_rejects_dispositions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            base = {"test-count": 1, "rust-suites": {"s": {"binary-id": "fixture::bin", "binary-name": "ordinary", "testcases": {"t": {"filter-match": {"status": "matches"}}}}}}
+            (root / "selected.json").write_text(json.dumps(base))
+            (root / "assignment.json").write_text(
+                json.dumps({"bins": [{"tests": [["fixture::bin", "t"]]}], "x": 1})
+            )
+            command = [sys.executable, str(SCRIPT), "validate-plan", "assignment.json", "1", "selected.json"]
+            self.assertEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
+            base["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"] = "mismatch"
+            (root / "selected.json").write_text(json.dumps(base))
+            self.assertNotEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
+            (root / "assignment.json").write_text(json.dumps({"bins": [{"tests": []}]}))
+            base["rust-suites"]["s"]["testcases"]["t"]["filter-match"]["status"] = "matches"
+            (root / "selected.json").write_text(json.dumps(base))
+            self.assertNotEqual(subprocess.run(command, cwd=root, check=False).returncode, 0)
 
 
 if __name__ == "__main__":
