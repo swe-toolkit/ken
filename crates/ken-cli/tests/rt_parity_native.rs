@@ -1754,6 +1754,274 @@ fn checked_ih_generated_entry_confluence_is_interning_and_inheritance_order_inde
     });
 }
 
+/// **Promise class: transition sentinel.** A reviewed change to the fixed
+/// read/write static occurrence graphs may replace these coordinates, but must
+/// preserve a non-degenerate sink population and per-entry uniqueness.
+///
+/// **MEASURED:** every strict-`Ret` block created while compiling the two fixed
+/// products installs one compiler-only sink and completes one exact lookup.
+/// **CLAIMED:** D1 covers the real carried strict-`Ret` population and each
+/// emitted function's active stack entry owns one sink.
+/// **THE GAP:** the fixed products instantiate multiple frames independently;
+/// the mutation controls below vary the installation and lookup operations at
+/// the production block-creation seam.
+#[test]
+fn composed_return_ret_sink_population_is_unique() {
+    in_large_stack_thread("rt-parity-composed-return-ret-sink-population", || {
+        let compile = |case: &str, entry: &str, label: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("composed-return-ret-sink-{label}"));
+            let (artifact, observations, applications) =
+                ken_runtime::with_composed_return_ret_sink_mutation(
+                    ken_runtime::ComposedReturnRetSinkMutation::Exact,
+                    || {
+                        ken_cli::build_native_program(
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_parity_composed_return_ret_sink_{label}"),
+                            root.path(),
+                        )
+                    },
+                );
+            artifact.expect("the exact D1 sink population compiles");
+            assert_eq!(
+                applications,
+                observations.len(),
+                "{case}: every reached strict-Ret seam installs one sink"
+            );
+            assert!(
+                observations.len() > 1,
+                "{case}: the fixture must instantiate more than one sink: {observations:#?}"
+            );
+            observations
+        };
+
+        let read = compile("fs-read-at-offset-single", "rt_read_offset_stage", "read");
+        let write = compile(
+            "fs-write-at-offset-single",
+            "rt_write_writable_stage",
+            "write",
+        );
+        for (label, observations, expected_count, expected_semantic_coordinates) in [
+            (
+                "read",
+                read,
+                35,
+                std::collections::BTreeSet::from([
+                    ("StaticOriginId(12)", "StaticOriginId(294)", 0),
+                    ("StaticOriginId(301)", "StaticOriginId(465)", 0),
+                    ("StaticOriginId(470)", "StaticOriginId(505)", 0),
+                    ("StaticOriginId(511)", "StaticOriginId(676)", 0),
+                    ("StaticOriginId(681)", "StaticOriginId(744)", 0),
+                ]),
+            ),
+            (
+                "write",
+                write,
+                26,
+                std::collections::BTreeSet::from([
+                    ("StaticOriginId(25)", "StaticOriginId(307)", 0),
+                    ("StaticOriginId(314)", "StaticOriginId(478)", 0),
+                    ("StaticOriginId(483)", "StaticOriginId(518)", 0),
+                    ("StaticOriginId(525)", "StaticOriginId(691)", 0),
+                    ("StaticOriginId(696)", "StaticOriginId(731)", 0),
+                    ("StaticOriginId(737)", "StaticOriginId(904)", 0),
+                    ("StaticOriginId(909)", "StaticOriginId(1053)", 0),
+                ]),
+            ),
+        ] {
+            assert_eq!(
+                observations.len(),
+                expected_count,
+                "{label}: the fixed emitted sink population changed"
+            );
+            let semantic_coordinates = observations
+                .iter()
+                .map(|row| {
+                    (
+                        row.active_frame_origin.as_str(),
+                        row.ret_case_body_origin.as_str(),
+                        row.ret_input_field_position,
+                    )
+                })
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(
+                semantic_coordinates, expected_semantic_coordinates,
+                "{label}: the fixed semantic sink population changed"
+            );
+            let function_local_keys = observations
+                .iter()
+                .map(|row| {
+                    (
+                        row.defining_function,
+                        row.active_frame_origin.as_str(),
+                        row.header_block.as_str(),
+                        row.ret_case_body_origin.as_str(),
+                        row.ret_input_field_position,
+                        row.return_body_block.as_str(),
+                    )
+                })
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(
+                function_local_keys.len(),
+                observations.len(),
+                "{label}: each function-local active stack entry must own one sink: {observations:#?}"
+            );
+            assert!(observations.iter().all(|row| {
+                row.ret_input_field_position == 0
+                    && row.installation_count == 1
+                    && row.exact_lookup_count == 1
+            }));
+        }
+        assert!(ken_runtime::composed_return_ret_sink_mutation_is_exact());
+    });
+}
+
+/// **Promise class: durable invariant.** Extensions may add strict-`Ret`
+/// frames, but missing, duplicate, and mismatched coordinates must still refuse
+/// at the D1 seam before any result consumer exists.
+///
+/// **MEASURED:** each control mutates the real installation or exact lookup at
+/// shared-block creation and the build returns the named sink-seam error.
+/// **CLAIMED:** absence, duplication, wrong active frame, wrong body, and wrong
+/// binder cannot yield a usable compiler-local block.
+/// **THE GAP:** mutation application count proves production reach; the exact
+/// error text distinguishes the intended arm from unrelated build failure.
+#[test]
+fn composed_return_ret_sink_lookup_controls_refuse() {
+    in_large_stack_thread("rt-parity-composed-return-ret-sink-controls", || {
+        use ken_runtime::ComposedReturnRetSinkMutation as Mutation;
+
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_write_writable_stage");
+        for (label, mutation, expected) in [
+            (
+                "missing",
+                Mutation::Missing,
+                "active carried frame has no installed strict Ret sink",
+            ),
+            (
+                "duplicate-installation",
+                Mutation::DuplicateInstallation,
+                "received more than one strict Ret sink",
+            ),
+            (
+                "duplicate-active-frame",
+                Mutation::DuplicateActiveFrame,
+                "lookup found more than one active carried frame",
+            ),
+            (
+                "wrong-frame",
+                Mutation::WrongActiveFrame,
+                "lookup names a different active carried frame",
+            ),
+            (
+                "wrong-body",
+                Mutation::WrongRetBody,
+                "belongs to a different Ret case body",
+            ),
+            (
+                "wrong-binder",
+                Mutation::WrongBinder,
+                "belongs to a different Ret input binder",
+            ),
+        ] {
+            let root = output_dir(&format!("composed-return-ret-sink-control-{label}"));
+            let (result, observations, applications) =
+                ken_runtime::with_composed_return_ret_sink_mutation(mutation, || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        &format!(
+                            "rt_parity_composed_return_ret_sink_control_{}",
+                            label.replace('-', "_")
+                        ),
+                        root.path(),
+                    )
+                });
+            assert!(
+                applications > 0,
+                "{label}: control missed the production seam"
+            );
+            let error = result.expect_err("a malformed D1 sink operation must refuse");
+            let rendered = format!("{error:?}");
+            assert!(
+                rendered.contains(expected),
+                "{label}: wrong refusal arm; error={rendered}; observations={observations:#?}"
+            );
+            assert!(ken_runtime::composed_return_ret_sink_mutation_is_exact());
+        }
+    });
+}
+
+/// **Promise class: durable invariant.**
+///
+/// **MEASURED:** exact D1 sink installation and complete seam suppression emit
+/// identical semantic hashes, executable hashes, and executable bytes.
+/// **CLAIMED:** the compiler-only sink record changes no ABI, call, value,
+/// result route, or emitted behavior before D3 activates a consumer.
+/// **THE GAP:** suppression removes both the install and its internal lookup;
+/// the population and refusal controls above independently establish that the
+/// exact seam is present and fail-closed.
+#[test]
+fn composed_return_ret_sink_is_byte_inert() {
+    in_large_stack_thread("rt-parity-composed-return-ret-sink-inert", || {
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+        let exact_root = output_dir("composed-return-ret-sink-inert-exact");
+        let suppressed_root = output_dir("composed-return-ret-sink-inert-suppressed");
+        let (exact, exact_rows, exact_applications) =
+            ken_runtime::with_composed_return_ret_sink_mutation(
+                ken_runtime::ComposedReturnRetSinkMutation::Exact,
+                || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        "rt_parity_composed_return_ret_sink_inert",
+                        exact_root.path(),
+                    )
+                },
+            );
+        let exact = exact.expect("exact composed-return Ret-sink artifact");
+        let (suppressed, suppressed_rows, suppressed_applications) =
+            ken_runtime::with_composed_return_ret_sink_mutation(
+                ken_runtime::ComposedReturnRetSinkMutation::SuppressForInertness,
+                || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        "rt_parity_composed_return_ret_sink_inert",
+                        suppressed_root.path(),
+                    )
+                },
+            );
+        let suppressed = suppressed.expect("suppressed composed-return Ret-sink artifact");
+
+        assert!(!exact_rows.is_empty());
+        assert!(suppressed_rows.is_empty());
+        assert_eq!(exact_applications, exact_rows.len());
+        assert_eq!(suppressed_applications, exact_applications);
+        assert_eq!(exact.plan_transport_hash, suppressed.plan_transport_hash);
+        assert_eq!(
+            exact.runtime_program.core_semantic_hash,
+            suppressed.runtime_program.core_semantic_hash
+        );
+        assert_eq!(
+            exact.runtime_program.artifact_hash,
+            suppressed.runtime_program.artifact_hash
+        );
+        assert_eq!(
+            exact.artifact.executable_hash,
+            suppressed.artifact.executable_hash
+        );
+        assert_eq!(
+            std::fs::read(&exact.artifact.executable_path).expect("exact executable bytes"),
+            std::fs::read(&suppressed.artifact.executable_path)
+                .expect("suppressed executable bytes"),
+            "the D1 sink seam must change no emitted byte"
+        );
+        assert!(ken_runtime::composed_return_ret_sink_mutation_is_exact());
+    });
+}
+
 /// **Promise class: durable invariant.**
 ///
 /// **MEASURED:** the exact inheritance-to-producer planner chain and the
