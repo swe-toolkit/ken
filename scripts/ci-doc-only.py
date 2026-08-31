@@ -6,7 +6,7 @@ import sys
 
 # These paths contain prose or agent coordination only; everything else is full CI.
 ALLOW_PREFIXES = ("docs/", "agent/", "library/")
-DENY_PREFIXES = ("crates/", "catalog/", "spec/", "conformance/", ".github/", "scripts/")
+DENY_PREFIXES = ("docs/program/evidence/", "crates/", "catalog/", "spec/", "conformance/", ".github/", "scripts/")
 
 
 def classify(paths):
