@@ -12,6 +12,43 @@ github: null
 origin: "Operator request 2026-08-30: 'can doc-only PRs be detected in CI and short-circuit to a pass? can we implement a changed-path classifier to do so? this would save significant resources for GH, given the proportion of doc-only PRs to crate/catalog PRs. note: the classifier should also include files which control CI.' Serves the operator's standing priority-1 CI-cost directive (the CI-NATIVE-PARITY-DURATION family). Sibling to CI-SHARD-DURATION-BALANCE on a distinct axis: that node reduces the DURATION of the pipeline; this node avoids RUNNING the pipeline at all on doc-only PRs. Steward-filed per COORDINATION section 2."
 ---
 
+> # OPERATOR RULING 2026-08-31 — KEEP IT SIMPLE. SHIP THE DUMB MECHANISM.
+> #
+> # Operator, verbatim: "keep it simple. this is far too complicated and beyond
+> # any CI job that I have heard of. The classifier should not introspect on the
+> # nature of the tests, guard against job/test deletion, or anything like that.
+> # It should be a simple dumb mechanism. Prune the work back to that and ship it."
+> #
+> # This ruling OVERRIDES every conflicting assurance requirement below and every
+> # review demand for a local mechanism-level proof. The deliverable is:
+> #  - a simple, dumb, PATH-based classifier: changed paths -> `doc-only` | `full`;
+> #  - `if: mode == 'full'` guards on the expensive jobs to short-circuit them;
+> #  - the four required contexts still REPORT green on doc-only (the branch-
+> #    protection "skipped != green" gotcha is real — keep that) via a lightweight
+> #    always-green arm, NOT a generated topology;
+> #  - FAIL CLOSED: only exact `doc-only` short-circuits; empty / unknown / error
+> #    -> full. One small normalization function. That is simple, not "guarding."
+> #
+> # EXPLICITLY DROPPED — do NOT build, do NOT ask for, do NOT reject a candidate
+> # for lacking:
+> #  - the generate-`ci.yml`-from-a-typed-Python-authority framework (topology
+> #    authority + `ci.yml.in` template + renderer + byte-compare drift check);
+> #  - any test that reads / parses / executes the workflow, or proves that
+> #    deleting a job / test reds (the mutation net);
+> #  - any classifier introspection on the nature of tests or jobs.
+> #
+> # VERIFICATION is proportionate and is the WHOLE proof:
+> #  - a plain classifier UNIT TEST — given these changed paths, assert the mode.
+> #    Real, but dumb; it tests the classifier, not the workflow.
+> #  - BEHAVIOR is proven where it is actually observable: publisher CI on ONE real
+> #    doc-only PR (required contexts green, expensive jobs skipped) and ONE real
+> #    code PR (full pipeline runs). The frame already says the real behavior is
+> #    "provable ONLY in CI on GitHub" — that is the acceptance evidence.
+> #
+> # Prune the in-flight candidate to this and ship the minimal PR. Everything below
+> # that conflicts is superseded: the outcome ACs stand, but their mechanism-proof
+> # controls are replaced by the verification in this banner.
+>
 > # READY — RELEASED to the verify ring (lane 2). The queue condition is met:
 > # CI-SHARD-DURATION-BALANCE landed and closed at M7 `8b887de17` (2026-08-30).
 > #
@@ -127,9 +164,11 @@ question), NOT a deliverable here.
   runs full CI (the doctest-safety case). Both must be exhibited.
 - **AC-REQUIRED-CONTEXTS-REPORTED.** The short-circuit reports EVERY required
   status-check context branch protection expects, as success — none left pending.
-  Control: enumerate the required contexts; a doc-only PR shows all green;
-  removing the reporting for one context leaves it pending and blocks the merge
-  (proving the reporting is load-bearing, not incidental).
+  Control (per the 2026-08-31 operator ruling — simplified): enumerate the
+  required contexts by reading the workflow, and confirm a real doc-only PR on
+  GitHub shows all of them green and mergeable. Do NOT prove this with a local
+  mutation net that deletes a reporting arm — that "guard against job/test
+  deletion" is exactly what the operator ruled out.
 - **AC-SKIP-SET-SAFE-SUBSET.** The classifier's short-circuit (skip) set is a
   subset of genuinely non-compiled/inert paths: every path that can carry compiled
   or executed code (anything under `crates/`, INCLUDING a comment-only `.rs`, and
@@ -154,12 +193,15 @@ question), NOT a deliverable here.
 
 ## Reviewers, sequencing, contention
 
-- **Reviewer:** independent Verify QA (all five AC controls, both arms of
-  AC-CODE-FORCES-FULL and AC-FAIL-CLOSED proven) and the Architect (the
-  required-check reporting and fail-closed correctness surface is real — this is
-  where a defect merges unvalidated code). Publisher CI is the gate; a resolved
-  merge Decision is required. No Conformance Validator (CI infrastructure, not
-  kernel/conformance).
+- **Reviewer:** independent Verify QA and the Architect, reviewing the SIMPLE
+  mechanism for correctness — the classifier's path logic, the `if:` guards, the
+  always-green required-context arm, and fail-closed normalization (only exact
+  `doc-only` short-circuits; else full). Per the 2026-08-31 operator ruling, do
+  NOT require a local mechanism-level proof, a generated-workflow authority, or a
+  workflow-introspecting mutation net; a candidate is NOT rejected for lacking
+  them. Verification is the classifier unit test plus real doc-only / code PRs on
+  GitHub (the banner). Publisher CI is the gate; a resolved merge Decision is
+  required. No Conformance Validator (CI infrastructure, not kernel/conformance).
 - **Sequencing:** QUEUED behind CI-SHARD-DURATION-BALANCE; released to the verify
   ring when that node closes. D1 is the whole node (D2 dropped by the amendment). Note the
   self-consistency check: because this node edits CI-control files, its own
