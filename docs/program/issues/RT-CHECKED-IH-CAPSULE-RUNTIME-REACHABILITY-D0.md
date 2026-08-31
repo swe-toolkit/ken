@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-CAPSULE-RUNTIME-REACHABILITY-D0
 title: "Scratch-only capsule runtime-reachability D0 (no production candidate, no QA, no Decision, no merge): the STAGED-CALL D1 proved the affine checked-IH application capsule is STATICALLY feasible across both witnesses (correct future capsule application is emitted, one raw call per capsule Function), but neither bound runtime execution REACHES it — both binaries execute an earlier ordinary sibling and take natural ResourceBodyResult trap 36/37 before the capsule call runs, so the D1 NESTED_CALL prints were CLIF-generation events, not dynamic observations. Reuse the exact D1 scratch mechanism (diff ff0a28008ea9c...) as the scaffold; add NO production candidate. For BOTH the bound read AND write parity witnesses, map source occurrence -> CLIF instruction -> machine address and install ONE discriminating runtime net (real dynamic observations, not compile-time prints) over: (1) the earliest ordinary sibling outer-context call that actually executes; (2) the capsule-specific outer Host-Vis call (read application146 / write application159); (3) capsule Function entry; (4) its application block and nested raw-worker instruction; (5) Trap-before-Result completion and capsule delivery/outer return; (6) the natural ResourceBodyResult match and typed trap. Record exact runtime hit counts, runtime HostResult/environment words, call/return order, and the FIRST unexecuted edge. Counts alone do not pair sites: identify each site from its source application and decoded callee. Discharge the two control debts the D1 could not: mutate an actual CFG predecessor edge/population (not application-block argument count), and independently mutate the PRODUCER of the downstream result coordinate; resolve control_result_ordinary_index (if redundant, remove it from the proposed production design and name the typed identity that fully determines delivery; if necessary, demonstrate its live consumer and refusal). Land in exactly one of four outcomes; for the selected outcome identify the exact planner/control relation that should own the next stage. Do NOT call the future capsule early, borrow a sibling HostResult, reinterpret the trap as suspension, or forward environment material as a result. Restore byte-clean and report."
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -12,6 +12,42 @@ github: null
 origin: "Architect ruling evt_4maaydhem9esy (thr_2mxxq9zx6ezrn, 2026-08-31), ACCEPTING the runtime-implementer's RT-CHECKED-IH-AFFINE-CAPSULE-STAGED-CALL-D1 outcome 1 NARROWLY as static staged-call feasibility (report evt_6qkn80ag2tq89, report/diff/manifest SHA-256 da5925a517a6ba185597eccda425dabb98761237490a0a86e430efed14498fb5 / ff0a28008ea9c6b4877abf6c9f86f492dc7eb7f9fbbb36f59c111bce17076123 / 543887f465145fc39eee0eb7e22d5f2980a220bbd150f47cdf3eb9034d572127). The Architect reproduced all three artifacts and all seven product blobs at pickup ad18411c712a0316a8b9d0248963c694bd53b253, tree 00fcad9b87591c982d19ceb2ac54b95de87d6b46, byte-clean, and accepted the generic static representation as feasible across both read and write (read: spec1/record608/body662 -> application146/HostResult144 -> capsule ContextId1 over outer body941 -> issued control spec3; write: unique enclosing-transport chain spec2/record719/body888 -> spec3/body1238 -> application159/HostResult157 in spec5/body1259 -> capsule ContextId2 -> issued control spec6; GeneratedContextKey a closed ordinary/capsule sum with opaque capsule IDs; read CLIF one call fn35->u0:43, write one call fn35->u0:45; 474/473 unchanged). HELD as production authority on three gaps: (1) neither runtime execution reaches the capsule path — the NESTED_CALL lines are CLIF-generation prints, both binaries execute an earlier ordinary sibling and trap 36/37 before the capsule call; (2) the predecessor mutations fail generic Cranelift block-arity validation (1 vs 3 args), proving block arity not predecessor population; (3) control_result_ordinary_index is derived/exposed but no production path reads it. The symptom moved from executor identity to runtime staging/reachability. The chain (evt_7e6jprw80srj8 force-D1 NO, evt_5tm8gbxs7584g carried-worker outcome 4, evt_6rvrzpg80c02j Host-Vis outcome 3, evt_1zpgs2h0kd74q capsule-feasibility outcome 2, evt_4eg2hgk35j4qf staged-call selection, evt_4maaydhem9esy staged-call outcome 1 accepted narrowly) shares one predicate: body 662's callable authority and its future HostResult never coexist in one compiler-local object; the staging fix mints per-path contexts so they can — this D0 measures whether the runtime ever REACHES the staged call. Base origin/main ad18411c712a0316a8b9d0248963c694bd53b253, tree 00fcad9b87591c982d19ceb2ac54b95de87d6b46; all seven reviewed product blobs (core eea98dc6, source c39f82e7, planner aggregates e7bc3628, lowering aggregates eaf1019b, calls fa010fed, units ccc6ddb2, parity test 6b2f14a7) Steward-verified identical to accepted base 0be25235b. @steward owns close/reframe/release; runtime parked until this named kick. Steward-recut per COORDINATION section 2."
 ---
 
+> # CLOSED — D0 COMPLETE, OUTCOME 1 ACCEPTED (capsule path never reached at
+> # runtime); future-endpoint authority WITHDRAWN; recut at the live Vis
+> # response/continuation boundary. Architect ruling `evt_7q7w05ag61zpw`
+> # (thr_4rmv6f973sc62, 2026-08-31).
+> #
+> # Measurement node — never `merged`; report `evt_5ke73vgnrn` (report / diff /
+> # map / manifest SHA-256 `3e4c3007d469...` / `cd5b765efa2c...` /
+> # `86968cf71ad4...` / `303d425c98b4...`) restored byte-clean at pickup
+> # `0102330ad`, tree `bf6a014f9`. The Architect reproduced all four artifacts,
+> # both dynamic traces, the first-unexecuted-edge attribution, and both
+> # control-debt mutations. Finding: read executes application138/context0 then
+> # Match451/trap36; write executes application175/context1 then Match464/trap37;
+> # applications 146/159 and every capsule instruction hit ZERO — the first
+> # missing edge PRECEDES capsule context selection. Accepted controls: the
+> # same-arity redirect-arrival CFG mutation (real edge, one-arrival closeout
+> # refuses); removal of `control_result_ordinary_index` (capsule CLIF
+> # byte-identical, redundant). NOT accepted as delivery evidence: the
+> # result-producer control mutates a cloned expected `ContinuationCallIdentity`;
+> # the detached edge is unchanged, so it proves only that comparison notices a
+> # corrupted expectation — delivery provenance stays unproven.
+> #
+> # DESIGN RULING: the future Host-Vis endpoint relation does NOT own the missing
+> # stage. `checked_ih_host_vis_endpoint` keys on a unique DOWNSTREAM
+> # same-constructor occurrence, not the source `Vis e k`. Ken's driver is
+> # `Vis e k -> apply k (H e)` exactly once, in order (spec 42-evaluation
+> # sections 6.2, 6.4), so authority belongs at the LIVE REQUEST BOUNDARY, not at
+> # an operation the continuation may later produce. The affine capsule family
+> # stays SELECTED; only its downstream-constructor issuance KEY is withdrawn.
+> # Does NOT authorize substituting app138/175's HostResult.
+> #
+> # SIXTH consecutive hard stop. Successor: scratch-only
+> # **`RT-CHECKED-IH-VIS-RESPONSE-CONTINUATION-AUTHORITY-D0`** — derive the live
+> # `ITree::Vis` from the dynamic Host-Vis application, resolve its exact binder
+> # `k` through planner authority, decide outcomes A-D. Everything below this
+> # banner is retained as chronology.
+>
 > # READY — SCRATCH-ONLY RUNTIME-REACHABILITY D0. Released to the runtime
 > # ring (lane 1) on `origin/main` `ad18411c7`. Runtime is parked; this IS the
 > # release.
