@@ -12,6 +12,24 @@ github: https://github.com/swe-toolkit/ken/pull/3195
 origin: "Steward group-5 census drain, cat-reuse-census.md §4.4 item 5, sites measured 2026-08-31 at origin/main 5083f2e46. Gated on CAT-ORD-LEQ-PUB-EXPORT (exports LC.ord_leq_at); D.eq_from_ord and D.count are already public via CAT-DERIVED-PUB-EXPORT."
 ---
 
+> # D1 (OrderedSearch) LANDED 2026-08-31 as ACCEPTED PARTIAL — node `active`, NOT
+> # `merged`; D2 (InsertionSort) is held and unstarted.
+> #
+> # D1 landed at origin/main `65bfa52db` (respin candidate 22892065c, first
+> # candidate 0f9b9746 CV-rejected on a mixed-provider evasion, recut with a
+> # universal retained-call population identity control). Steward-verified from the
+> # objects: OrderedSearch blob 4fcf97955 -> 34696428e (delete local
+> # ordered_search_leq, widen import to (Ord, ord_leq_at), repoint all 16 refs);
+> # acceptance test blob a39f8ddf -> 5a1def9e (universal population elem=2 /
+> # sorted_for_search=1 / search=22, each 4-arg order-call GlobalId == canonical LC
+> # ord_leq_at); InsertionSort base-identical 02190bc4 (D2 absent). Gates QA
+> # evt_z6vsr33vsbrq + CV evt_2r110khrpfq0s, Decision dec_5fs94zk27awax, routed
+> # evt_3awhm814yfcz1. OrderedSearch source-attestation refresh routed to Librarian.
+> # D2 release: re-measure InsertionSort at the landed SHA; element_count is
+> # RECURSIVE (distinct-head migration, NOT kernel-equivalence) and InsertionSort
+> # carries zero imports today (first-import standalone question) — a [higher]
+> # surprise is a HARD STOP to the Architect.
+>
 > # The group-5 consumer drain — SELECTIVE IMPORT, not un-shadow.
 >
 > The providers are real modules (LawfulClasses, Derived), NOT the ambient
