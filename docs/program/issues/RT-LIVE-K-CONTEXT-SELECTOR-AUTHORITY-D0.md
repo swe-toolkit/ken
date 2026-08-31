@@ -104,9 +104,14 @@ A report plus a scratch diff, source/CLIF/address maps, runtime logs, an evidenc
 manifest, and digests — restored byte-clean — handed to the Architect, who alone
 reviews it and selects or rejects a production representation. **Any result other
 than a genuinely-live A at a PROVEN-LIVE coordinate is HARD STOP 12**
-(symptom-inventory entry 12 on this node's closeout). The HS9 Research advisory
-`evt_6w61wvkzgm8aq` already binds this seam's predicate, so no new advisory is
-mandatory at HS12; the Architect decides whether a further advisory is warranted
-before selecting another technique. Runtime production stays blocked until this
-successor is ruled. Do not mint a new capsule/call, do not add a call inside
-context0, and do not add the read projection on a prior report's authority.
+(symptom-inventory entry 12 on this node's closeout). **HS12 MECHANICALLY TRIGGERS
+a mandatory §1a Research advisory** (Architect law correction evt_6x66phn564rrr):
+Architect §1a fires on the 3rd hard stop and every 3rd after — 6th, 9th, 12th —
+so on any non-A outcome the Architect FIRST posts HOLD and issues the mandatory,
+narrowly-scoped HS12 Research advisory on the exact new fork BEFORE selecting
+another technique or representation. The prior HS9 advisory `evt_6w61wvkzgm8aq` is
+INPUT to that, NOT a discharge of the distinct 12th-stop trigger. If the
+measurement returns genuinely-live A there is no HS12 and no trigger. Runtime
+production stays blocked until this successor is ruled. Do not mint a new
+capsule/call, do not add a call inside context0, and do not add the read
+projection on a prior report's authority.
