@@ -37,7 +37,11 @@ jobs:
             echo 'mode=full' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "mode=$(python3 scripts/ci-doc-only.py paths.json)" >> "$GITHUB_OUTPUT"
+          mode=full
+          if classified=$(python3 scripts/ci-doc-only.py paths.json); then
+            mode="$classified"
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
 
   # The suite is CPU-bound, not scheduling-bound. Measured on run
   # 29838398785: 1891 tests, 3893 CPU-seconds of real work, executed in 984s
