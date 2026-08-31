@@ -974,7 +974,7 @@ proof leq_complete for compare_raw
     (compare_leq_complete_when_true a leq x y (compare_bool_cases (leq y x)))
     (sym Bool (leq x y) True hxy)
 
-fn ord_leq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq x y
+pub fn ord_leq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq x y
 
 proof true_of_equal for ord_leq_at
       (a : Type) (d : Ord a) (x : a) (y : a) (p : Equal a x y)
