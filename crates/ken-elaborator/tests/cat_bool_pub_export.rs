@@ -238,12 +238,13 @@ fn published_module_surfaces(module: &str, ken_md: &str) -> BTreeSet<String> {
         .collect()
 }
 
-/// MEASURED: real selective imports of the three target operations resolve to
-/// their exact transparent provider identities, while one deliberately private
-/// operation from each provider rejects at its fully-qualified interface name.
-/// CLAIMED: the authorized visibility change preserves definition identity and
-/// the loader's selective-import boundary. THE GAP: provider package tests own
-/// computational behavior; the inventory equality below owns surface closure.
+/// MEASURED: real selective imports of the four target operations resolve to
+/// their exact transparent provider identities, while private operations from
+/// each provider and `ord_leq_at`'s attached proof reject at their qualified
+/// interface names. CLAIMED: the authorized visibility change preserves
+/// definition identity and the loader's selective-import boundary. THE GAP:
+/// provider package tests own computational behavior; the inventory equality
+/// below owns surface closure.
 #[test]
 fn boolean_provider_selective_imports_retain_provider_identities() {
     let mut env = load_module(LAWFUL);
@@ -251,24 +252,28 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
         .expect("Sums provider must roots-load beside LawfulClasses");
     let bool_and = env.globals[&format!("{LAWFUL}.bool_and")];
     let bool_leq = env.globals[&format!("{LAWFUL}.bool_leq")];
+    let ord_leq_at = env.globals[&format!("{LAWFUL}.ord_leq_at")];
     let is_some = env.globals[&format!("{SUMS}.is_some")];
-    for provider in [bool_and, bool_leq, is_some] {
+    for provider in [bool_and, bool_leq, ord_leq_at, is_some] {
         assert!(
             env.env.transparent_body(provider).is_some(),
-            "a public Boolean provider must retain its transparent body"
+            "a public Boolean or order provider must retain its transparent body"
         );
     }
 
     env.elaborate_file(
-        "import Core.Classes.LawfulClasses (bool_and, bool_leq)\n\
+        "import Core.Classes.LawfulClasses (Ord, bool_and, bool_leq, ord_leq_at)\n\
          import Data.Sums.Combinators (is_some)\n\
          fn cat_bool_pub_and (x : Bool) (y : Bool) : Bool = bool_and x y\n\
          fn cat_bool_pub_leq (x : Bool) (y : Bool) : Bool = bool_leq x y\n\
+         fn cat_ord_pub_leq_at \
+           (a : Type) (d : Ord a) (x : a) (y : a) : Bool = ord_leq_at a d x y\n\
          fn cat_bool_pub_some (x : Option Bool) : Bool = is_some Bool x",
     )
-    .expect("the three Boolean providers must be selectively importable together");
+    .expect("the Boolean and order providers must be selectively importable together");
     assert_transparent_body_mentions(&env, "cat_bool_pub_and", bool_and);
     assert_transparent_body_mentions(&env, "cat_bool_pub_leq", bool_leq);
+    assert_transparent_body_mentions(&env, "cat_ord_pub_leq_at", ord_leq_at);
     assert_transparent_body_mentions(&env, "cat_bool_pub_some", is_some);
 
     for (module, private) in [(LAWFUL, "bool_eq"), (SUMS, "get_or_else")] {
@@ -279,6 +284,19 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
             Err(other) => panic!("private import must fail as UnboundName: {other:?}"),
             Ok(_) => panic!("{module}.{private} became selectively importable"),
         }
+    }
+
+    let private_proof = module_publication_queries(LAWFUL, LAWFUL_KEN_MD)
+        .attached
+        .into_iter()
+        .find(|query| query.surface == "ord_leq_at::true_of_equal")
+        .expect("ord_leq_at's attached proof must remain in the source population");
+    match env.elaborate_file(&private_proof.source) {
+        Err(ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, format!("{LAWFUL}.ord_leq_at::true_of_equal"));
+        }
+        Err(other) => panic!("private attached proof must fail as UnboundName: {other:?}"),
+        Ok(_) => panic!("ord_leq_at::true_of_equal became loader-visible"),
     }
 }
 
@@ -305,6 +323,7 @@ fn boolean_provider_loader_visible_inventories_are_exact() {
             "leq_nat::antisym".to_owned(),
             "leq_nat::refl".to_owned(),
             "leq_nat::trans".to_owned(),
+            "ord_leq_at".to_owned(),
         ]),
         "LawfulClasses loader-visible inventory must equal its authorized surface"
     );
