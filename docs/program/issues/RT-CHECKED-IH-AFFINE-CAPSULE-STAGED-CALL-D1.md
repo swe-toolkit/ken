@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-AFFINE-CAPSULE-STAGED-CALL-D1
 title: "Scratch-only staged-call D1 (no production candidate, no QA, no Decision, no merge) for the selected affine checked-IH application capsule: implement, AS SCRATCH, the compile-time per-application-path generated-context specialization the FEASIBILITY D0 proved is required, then emit the nested body-662 call. The stop the D0 hit is structural — contexts intern/look up ONLY by (enclosing specialization, worker body), so the seven body-941 Host-Vis applications share Context0/func50 (every first parameter v10; origin144 and sibling origin153 indistinguishable; sixteen physical record-608 arrivals), and a move-only value cannot make seven caller identities or sixteen emission seams affine. Build two typed compiler-only plan objects — (1) CheckedIhApplicationCapsulePlan binding the exact source environment/worker relation, nested Host-Vis marker/application/callee/argument, destination context, and issued downstream continuation identity; (2) a closed generated-context KEY with ordinary-shared and checked-IH-capsule-path arms (the capsule arm holds an opaque capsule identity, NOT an Option/global-slot/body-key-supplement/runtime-selector) — construct them from already-issued transports, occurrence ancestry, and continuation identities (NOT constructor-name substring scans, NOT a search for match451, NOT hardcoded origin/body numbers). Prove application146 selects its capsule-specific body-941 context while every sibling selects only its own authorized context; route every exact carried-environment arrival to ONE compiler-local application block/join carrying the local environment word and HostResult as block parameters; project fields 0..7 ONCE at the join (not in sixteen predecessors); resolve the local raw target; only then mint a non-Clone/non-Copy CheckedIhApplicationAuthority and emit one body-worker call per capsule member (explicit HostResult, eight captures, no suffix, status+Trap before Result, non-trap Result becomes CheckedIhApplicationResult into the issued downstream continuation/natural match). Exercise BOTH the bound read AND write parity witnesses (never special-case read coordinates); preserve outer body-941 execution and 474/473 as an environment-only zero-call control. Land exactly one of four outcomes; outcomes 2-4 stop before a worker call. Restore byte-clean and report."
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -12,6 +12,51 @@ github: null
 origin: "Architect ruling evt_4eg2hgk35j4qf (thr_5cc5rgdvqv0fs, 2026-08-31), ACCEPTING the runtime-implementer's RT-CHECKED-IH-AFFINE-APPLICATION-CAPSULE-FEASIBILITY-D0 outcome 2 (report evt_1zpgs2h0kd74q, report/diff SHA-256 b5978f4abeac10d24def62b66464102c7640935eb8ff5c542e17673670a2fd0a / f21245de914d62bd099f8c4d99784fea754a1e31bec4482a889e98e07480a0ac): the capsule family is FEASIBLE — the planner derives one closed read-witness relation (spec1 / record608 / seat671 / body662 / RawWorker -> operation674 / Host-Vis 147/146 / callee145 / argument144 -> destination spec2 / body941 / Context0 -> issued downstream control spec3 / body452 / match451), operation ancestry discriminating (frame 12: 25 Host-Vis markers, exactly one under FSOp::ctor_488; ctor_490 selects application126) — but the present stage cannot consume it lawfully. Contexts intern/look up ONLY by (enclosing specialization, worker body): seven body-941 applications share Context0/func50 (every first parameter v10; origin144 vs sibling origin153 indistinguishable; sixteen physical record-608 arrivals). No call, no post-call controls — correct. The chain (evt_7e6jprw80srj8 force-D1 NO, evt_5tm8gbxs7584g carried-worker outcome 4, evt_6rvrzpg80c02j Host-Vis outcome 3, evt_1zpgs2h0kd74q capsule-feasibility outcome 2) shares one predicate: body 662's callable authority and its future HostResult never coexist in one compiler-local object; the staging fix mints per-path contexts so they can. Base origin/main c698779b682a56bbdc4a5ab8fd6f85f8a9be45d7, tree 05d5940b52401ab1b3dee6aada7dfaf199db59a6; all seven reviewed product blobs (core eea98dc6, source c39f82e7, planner aggregates e7bc3628, lowering aggregates eaf1019b, calls fa010fed, units ccc6ddb2, parity test 6b2f14a7) Steward-verified identical to accepted base 0be25235b. @steward owns close/reframe/release; runtime parked until this named kick. Steward-recut per COORDINATION section 2."
 ---
 
+> # CLOSED — D1 COMPLETE, OUTCOME 1 ACCEPTED NARROWLY as static staged-call
+> # feasibility; HELD as production authority. Architect ruling `evt_4maaydhem9esy`
+> # (thr_2mxxq9zx6ezrn, 2026-08-31).
+> #
+> # Measurement node — never `merged`; report `evt_6qkn80ag2tq89` (report / diff /
+> # manifest SHA-256 `da5925a517a6...` / `ff0a28008ea9c...` / `543887f46514...`)
+> # restored byte-clean at pickup `ad18411c7`, tree `00fcad9b8`. The Architect
+> # reproduced all three artifacts and all seven product blobs and ACCEPTED the
+> # static representation as FEASIBLE across BOTH read and write: generic derivation
+> # (no hardcoded fixture coordinates, no `match451` search), compile-time context
+> # specialization, target locality, one emitted raw call per capsule Function (read
+> # CLIF one `call fn35` -> `u0:43`; write one `call fn35` -> `u0:45`), and a
+> # statically well-typed result edge. Outer routes stay `GeneratedContext`; `474/473`
+> # unchanged. This establishes compile-time context specialization, target locality,
+> # operand assembly, one emitted instruction per capsule Function, and a well-typed
+> # result edge.
+> #
+> # HELD as production authority — three gaps the D1 did NOT close:
+> #  (1) Neither runtime execution REACHES the capsule path. The `RT_AFFINE_D1
+> #      NESTED_CALL` lines are printed while CLIF is generated — they are not dynamic
+> #      call observations. Both binaries execute an earlier ordinary sibling, then
+> #      produce the unchanged four-effect prefix and take natural `ResourceBodyResult`
+> #      trap 36/37 BEFORE the capsule call runs. "One response instance reaches the
+> #      join once" is unproved.
+> #  (2) The predecessor mutations do NOT mutate predecessor population:
+> #      `omit-predecessor` passes one block argument, `duplicate-predecessor` three —
+> #      both fail generic Cranelift block-arity validation. They prove the fresh
+> #      block has two parameters, NOT that every carried-environment arrival reaches
+> #      one join with none omitted or duplicated.
+> #  (3) `control_result_ordinary_index` is derived, stored, and exposed on the plan,
+> #      but no production path reads it — the result follows the current
+> #      detached-edge control because `control_identity` matches. It is redundant
+> #      (remove) or authority (consume with an independent mutation).
+> #
+> # The symptom moved from executor identity to RUNTIME STAGING/REACHABILITY: the
+> # correct future capsule application IS emitted, but an earlier ordinary context
+> # traps before the future application can run.
+> #
+> # Next: scratch-only successor
+> # **`RT-CHECKED-IH-CAPSULE-RUNTIME-REACHABILITY-D0`** on base `ad18411c7` — reuse
+> # the exact D1 scratch mechanism (diff `ff0a28008ea9c...`) as the scaffold, add NO
+> # production candidate, and install one discriminating runtime net over the
+> # six-stage read/write chain to find the first unexecuted edge. Everything below
+> # this banner is retained as chronology.
+>
 > # READY — SCRATCH-ONLY STAGED-CALL D1. Released to the runtime ring (lane 1) on
 > # `origin/main` `c698779b6`. Runtime is parked; this IS the release.
 > #
