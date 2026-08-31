@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-VIS-RESPONSE-CONTINUATION-AUTHORITY-D0
 title: "Scratch-only Vis response-continuation-authority D0 (no production candidate, no QA, no Decision, no merge): the RUNTIME-REACHABILITY D0 proved the affine checked-IH capsule is emitted but NEVER reached at runtime — read executes application138/context0 then Match451/trap36, write executes application175/context1 then Match464/trap37, and applications146/159 plus every capsule instruction hit ZERO, so the first missing edge PRECEDES capsule context selection. The Architect withdrew the future Host-Vis endpoint relation as execution authority: checked_ih_host_vis_endpoint selects a CheckedHostVisContinuation by a unique DOWNSTREAM same-constructor syntactic occurrence, not the source Vis e k relation saying which k receives the current response, and runtime falsifies it. Ken's driver is Vis e k -> apply k (H e) exactly once and in order (spec/40-runtime/42-evaluation.md sections 6.2, 6.4), so continuation authority belongs at the LIVE REQUEST BOUNDARY, never at an operation the continuation may later produce. The affine compiler-only capsule family stays SELECTED (callable recipe, ordered captures, Function-local target, one call, Trap-before-Result); only its downstream-constructor issuance KEY is withdrawn. For BOTH read and write witnesses, using NO hardcoded origins or constructor spellings: (1) from the dynamically live Host-Vis application structurally derive the enclosing ITree::Vis, its operation child, continuation child/binder k, response slot/type, and current HostResult operand — this is Vis e k, never same-constructor ancestry in a dispatcher match; (2) resolve that exact k through issued planner authority to worker closure occurrence/body/arity/ordered captures/StaticWorkerCallRoute/checked-IH record-transport/downstream consumer, never inferring from body-or-table presence, environment shape, runtime word, order, or numeric proximity; (3) produce the complete ordered response-to-successor chain from application138/175, state whether body662/body888 is immediate k, else enumerate each apply k resp and the first missing relation before 146/159, and prove whether 146/159 are selected successors, alternatives, or unrelated; (4) locate an independent definition/use pair for delivery (fixed expectation from the branch-owning Vis continuation binder or independent planner relation, actual use from the real call/branch terminator — rebuilding continuation_result_edges_owned_by from continuation_calls()/continuation_call_binding_for is NOT independent merely for being another function); (5) mutation-prove at natural seams — redirect/drop and duplicate the actual response-to-continuation successor edge/population preserving arity, and independently mutate the actual edge-producing use against unchanged binder/plan expectation or the converse (a comparison-only clone mutation is detector-side; a coherent single-authority change may remain valid; do not pin numeric coordinates); (6) preserve the accepted runtime net, effect order, traps 36/37, and the 474/473 zero-argument no-call materializer. Does NOT authorize substituting application138/175's HostResult: a current response is the capsule's argument only if the exact source Vis binding proves its k is body662/body888. Land in exactly one of four outcomes. Restore byte-clean and report generic derivation, exact rows, controls, and hashes."
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -12,6 +12,42 @@ github: null
 origin: "Architect ruling evt_7q7w05ag61zpw (thr_4rmv6f973sc62, 2026-08-31), following the HS6 Research prior-art advisory, ACCEPTING the runtime-implementer's RT-CHECKED-IH-CAPSULE-RUNTIME-REACHABILITY-D0 outcome 1 as a scratch measurement (report evt_5ke73vgnrn, report/diff/map/manifest SHA-256 3e4c3007d4695a8b729fdc997de454a059d3e2c77b14e134d155a5f9f77568e7 / cd5b765efa2cbb6ff8360bd3ec5a42e0bd9a52438031490a2e8e3fc04817da18 / 86968cf71ad4b5c615a4b11ef2b840eb7f4887e0fe8545dcb4927820b2337340 / 303d425c98b4abeaa6bbf951dd59611a4dc7f1bd071e06239049183e3db7f794). The Architect reproduced all four artifacts, both dynamic traces, the first-unexecuted-edge attribution, and both control-debt mutations at pickup 0102330ad4e13ef7b636a29411911b7d31e10407, tree bf6a014f966f883b9893a19fcf4e689be726bdbd, byte-clean. Finding: read executes application138/context0 then Match451/trap36; write application175/context1 then Match464/trap37; applications146/159 and every capsule instruction hit ZERO — the first missing edge precedes capsule context selection. Accepted controls: same-arity redirect-arrival CFG mutation (real edge, one-arrival closeout refuses); removal of control_result_ordinary_index (capsule CLIF byte-identical, redundant). NOT accepted as delivery evidence: the result-producer control mutates a cloned expected ContinuationCallIdentity (aggregates.rs:5495-5503); the detached edge is unchanged and core.rs:10430-10436 proves only comparison notices a corrupted expectation, so full control_identity stays a candidate coordinate not independently proven delivery authority. DESIGN RULING: the future Host-Vis endpoint relation is withdrawn as execution authority (checked_ih_host_vis_endpoint keys on a unique downstream same-constructor occurrence, not source Vis e k; runtime falsifies it). Ken's driver is Vis e k -> apply k (H e) once, in order (spec/40-runtime/42-evaluation.md sections 6.2, 6.4); authority belongs at the live request boundary. The affine compiler-only capsule family stays selected; only its downstream-constructor issuance key is withdrawn. SIXTH consecutive hard stop on the body-662 executor/staging question (force D1 NO evt_7e6jprw80srj8; carried-worker outcome 4 evt_5tm8gbxs7584g; Host-Vis outcome 3 evt_6rvrzpg80c02j; capsule feasibility outcome 2 evt_1zpgs2h0kd74q; staged-call static outcome 1 evt_6qkn80ag2tq89 / evt_4maaydhem9esy; runtime-reachability outcome 1 evt_5ke73vgnrn / this ruling). Shared predicate: a valid static fact repeatedly placed where the dynamic value or source-control choice that must consume it does not coexist. Base origin/main ea5cfdbc6 (advanced from 0102330ad by a doc-only L2 frame amendment only; the seven product blobs are unchanged — recheck at pickup); all seven reviewed product blobs (core eea98dc6, source c39f82e7, planner aggregates e7bc3628, lowering aggregates eaf1019b, calls fa010fed, units ccc6ddb2, parity test 6b2f14a7) Steward-verified identical to accepted base 0be25235b. @steward owns close/reframe/release; runtime parked until this named kick. Steward-recut per COORDINATION section 2."
 ---
 
+> # CLOSED 2026-08-31 — OUTCOME C ACCEPTED; THE CURRENT CAPSULE PAIRING IS
+> # CLOSED AS RUNTIME AUTHORITY. Architect ruling `evt_3hcsstqp13rxy`
+> # (thr_6cd47sjf3f32b), binding byte-clean pickup
+> # `803df26dca0206cab016366382dbd91eed5fbeb7`, tree
+> # `d884a06f3a185d93ef572f3b76ceed4d4fc96053`, and the recut artifacts
+> # report `150484ec…d20e82` / diff `cb297837…b6642f` / map `195469ef…f09a277`
+> # / evidence-manifest `ae28b81f…d5e91d6` / CLIF-manifest `6b067f4f…f5ad5d0`
+> # (25 evidence members, 32 CLIF members verify; 13-path diff clean; Architect
+> # independently ran `scripts/ken-cargo check -p ken-runtime --features
+> # px8-ds-test-support` green). ERRATUM: the recut report's line 59 carries a
+> # stale map digest — the recut map is `195469ef…f09a277`; the stale digest is
+> # withdrawn and no durable artifact may cite it.
+> #
+> # **Outcome C, both witnesses.** Read's selected response is application138
+> # into unit2/body941, then unit3/body452/Match451/trap36; write's is
+> # application175 into unit5/body1259, then unit6/body465/Match464/trap37.
+> # Applications146/159 are DIFFERENT alternatives of the same Match and hit
+> # ZERO. body662/body888 carry only upstream predeclared call identities plus
+> # environment transports; NO call emitted by the live continuation unit targets
+> # them, and environment transport is not execution control. **Therefore the
+> # capsule pairings 146→body662 and 159→body888 are WRONG for runtime control
+> # and gain NO production authority.** Do NOT retarget them to 138/175 — the
+> # live `Vis e k` binds body941/body1259, not body662/body888, and a HostResult
+> # may not be borrowed across that semantic distinction. The current capsule
+> # code remains scratch evidence only.
+> #
+> # **This completes HARD STOP 7** on the body-662 executor/staging question.
+> # The recut successor is **`RT-CHECKED-IH-LIVE-K-INNER-APPLICATION-AUTHORITY-D0`**
+> # (frame filed the same day): start INSIDE the live `k` Functions
+> # (unit2/body941, unit5/body1259) at the exact HostResult entry, enumerate the
+> # selected source-control path to the downstream result consumer, and find
+> # every checked-IH application whose binder could name the body662/body888
+> # worker. A failing or absent successor is HS8; the next Research advisory
+> # trigger remains HS9. Runtime production stays blocked until the successor is
+> # ruled. The READY banner and body below are preserved as chronology.
+>
 > # READY — SCRATCH-ONLY VIS-RESPONSE-CONTINUATION-AUTHORITY D0. Released to
 > # the runtime ring (lane 1) on `origin/main` `ea5cfdbc6`. Runtime is parked;
 > # this IS the release.
