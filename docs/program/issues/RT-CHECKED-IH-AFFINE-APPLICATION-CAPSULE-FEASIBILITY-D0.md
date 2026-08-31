@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-AFFINE-APPLICATION-CAPSULE-FEASIBILITY-D0
 title: "Scratch-only feasibility D0 (no production, no candidate, no QA, no Decision, no merge) for the selected planner-issued affine checked-IH application capsule: this is a FEASIBILITY test of the chosen representation, NOT a fourth executor-seat search. Establish, before any body-662 call, all five prerequisites of a compiler-only CheckedIhApplicationCapsulePlan that binds as one closed record — source specialization 1 / closure seat 671 / worker body 662 / declared arity one / record 608 / captures 0..7 in planner ordinal order; the exact inner RawWorker route (raw_worker_calls target resolution, no suffix); destination specialization 2 / body 941 and the full nested application path to Host-Vis 147/146; origin 144 and its destination Parameter(0) as the sole HostResult explicit argument; and the exact application-result consumer/control continuation. (1) a UNIQUE planner producer derives the complete nested relation with no lowering-time source search or body/table inference; (2) the exact destination context preserves the application path, and if shared body-941 generation erases it, identify the SMALLEST compile-time per-path specialization boundary; (3) the consuming Function can reconstruct every record-608 child once in planner ordinal order as local operands and identify origin 144's local HostResult by planned coordinate; (4) the consuming Function declares/resolves its own body-662 raw target with NO FuncRef or Cranelift operand crossing Functions; (5) one response reaches exactly one planned consumer, with suppression/duplication/sibling-substitution independently distinguishable. ONLY with all five may one scratch body-662 call be emitted (explicit HostResult first, captures 0..7 next, no suffix, raw_worker_calls target, Trap before Result, Result reaches the natural match as CheckedIhApplicationResult); else land outcome 2/3/4 and make no call or controls. Restore byte-clean and report."
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -12,6 +12,35 @@ github: null
 origin: "Architect ruling evt_9rvkwywwxms1 (thr_7f2m78epewqv1, 2026-08-30), ACCEPTING the Research prior-art advisory evt_1c6ed7gntxg9s (artifact SHA-256 981245f435868b11291ac2e26154044303a8b63120680bc798e6a23a524d374c) and SELECTING the planner-issued affine checked-IH application capsule with typed nested generated-context placement. Follows the runtime-implementer's RT-CHECKED-IH-HOST-VIS-APPLICATION-EXECUTOR-AUTHORITY-D0 outcome 3 (report evt_6rvrzpg80c02j, SHA-256 7568d07b1780ea3bd07c0ac11397fc4f4912995a08d0c9049bead1f5deb3e6b2, scratch-diff 1bf9cab156f4fb6bb369b8f58bcc9012239be8a82fdaa7c8257756a9c9435f02): application 147/146 owns a complete route only for outer body 941 / GeneratedContext / funcid50 and owns origin 144's HostResult; body 662's distinct specialization-1 RawWorker authority stays upstream; record 608 owns captures 0..7 but not callable authority; 474/473 is environment materialization; no lawful operation recovers dropped body-662 authority from declaration, body identity, target-table presence, outer route, payload shape, or captured word. The three-stop chain (evt_7e6jprw80srj8 force-D1 NO, evt_5tm8gbxs7584g carried-worker outcome 4, evt_6rvrzpg80c02j Host-Vis outcome 3) share one predicate: each attempted seat owns valid authority for an ENCLOSING operation, while body 662's own callable authority and its future HostResult never coexist in one compiler-local object. Base origin/main 0ec00c1ed8f9c11ea105895d53cdf5375d16fe18, tree 2789122d17cf3353a3a2e1f8610938218f7c6bb6; all seven reviewed product blobs (core eea98dc6, source c39f82e7, planner aggregates e7bc3628, lowering aggregates eaf1019b, calls fa010fed, units ccc6ddb2, parity test 6b2f14a7) Steward-verified identical to accepted base 0be25235b. @steward owns close/reframe/release; runtime parked until this named kick. Steward-recut per COORDINATION section 2."
 ---
 
+> # CLOSED — FEASIBILITY D0 COMPLETE, OUTCOME 2 ACCEPTED (capsule family feasible,
+> # but the present stage cannot consume it lawfully — compile-time per-path
+> # generated-context staging is required before any nested call). Architect ruling
+> # `evt_4eg2hgk35j4qf` (thr_5cc5rgdvqv0fs, 2026-08-31).
+> #
+> # Measurement node — never `merged`; report `evt_1zpgs2h0kd74q` (report/diff
+> # SHA-256 `b5978f4abeac...` / `f21245de914d...`) restored byte-clean at base
+> # `c698779b6`. The Architect reproduced all seven blobs and every digest and
+> # accepted outcome 2. Finding: the planner DOES derive one closed read-witness
+> # relation (spec1 / record608 / seat671 / body662 / RawWorker -> operation674 /
+> # Host-Vis 147/146 / callee145 / argument144 -> destination spec2 / body941 /
+> # Context0 -> issued downstream control spec3 / body452 / match451), with operation
+> # ancestry discriminating (frame 12 has 25 Host-Vis markers, exactly one under the
+> # selected FSOp::ctor_488 branch; the independent ctor_490 selects application126).
+> # But the STOP is structural: contexts intern and look up ONLY by (enclosing
+> # specialization, worker body), so seven body-941 applications share Context0 /
+> # func50 where every first parameter is v10 — origin144 and sibling origin153 are
+> # indistinguishable, and func50 has sixteen physical record608 arrivals. A
+> # move-only value cannot make seven caller identities or sixteen emission seams
+> # affine. No call, no post-call controls — correct.
+> #
+> # Next: scratch-only successor
+> # **`RT-CHECKED-IH-AFFINE-CAPSULE-STAGED-CALL-D1`** on the same base `c698779b6` —
+> # implement, as scratch, the compile-time per-path generated-context specialization
+> # that makes application146 select its own capsule-specific context, route every
+> # carried-environment arrival to ONE join, project captures once, and only then
+> # emit the nested body-662 call across BOTH read and write parity witnesses.
+> # Everything below this banner is retained as chronology.
+>
 > # READY — SCRATCH-ONLY FEASIBILITY D0. Released to the runtime ring (lane 1) on
 > # `origin/main` `0ec00c1ed`. Runtime is parked; this IS the release.
 > #
