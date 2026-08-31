@@ -1,7 +1,7 @@
 ---
 id: CAT-EXPORT-CENSUS-DERIVES-LOADER-PREDICATE
 title: "Derive the export-census population from the loader's own publication predicate instead of a parallel hand-maintained Decl match, so the exactly-six equality control cannot silently narrow as new publishable declaration kinds are added."
-status: ready
+status: closed
 owner: foundation
 size: S
 gate: none
@@ -11,6 +11,61 @@ blocks: []
 github: null
 origin: "Adversary M8 pre-publication hunt on CAT-DERIVED-PUB-EXPORT rebased 84d836e39, evt_2rnmt4yt8n6xa, 2026-08-29. Verdict CLEAN; this is the single labeled LATENT note, which does NOT reproduce at that SHA. Filed by the Steward after independently verifying both cited coordinates and enumerating the divergence."
 ---
+
+> # WITHDRAWN 2026-08-31 — BOTH OPERATIVE CLAIMS FALSE (Architect ruling).
+>
+> Closed without landing. Architect ruling `evt_mgwssa5xvckb` (grounded at base
+> `978b05dd29`, tree `0f846696…`, `modules.rs` blob `36503cf7…`, test blob
+> `624a33aa…`, Foundation `pub space` log/diff, and an independent same-base
+> `pub class ExportCensusProbe a {}` scratch run):
+>
+> **No extant `Decl` variant is omitted by `top_level_publication_queries()`
+> while being publishable by the real loader.** The classification is
+> mechanically closed at `parser.rs::pub_eligibility` with **no catch-all** — a
+> new `Decl` variant creates a compile-time classification obligation, so the
+> census cannot silently narrow. The test helper's population already equals the
+> complete current pub-eligible set (nine ordinary kinds in the direct arm,
+> `AttachedProofDecl` in its own arm).
+>
+> **The frame named the wrong authority.** `is_qualifiable` classifies
+> module-local qualification/shadowing, not publication, and two counterexamples
+> prove it cannot be the export predicate: `SpaceDecl` is `is_qualifiable==true`
+> yet `pub space` is refused (`parse_pub_decl`, and redundantly `expand_scope`'s
+> placement gate); `ClassDecl` is `is_qualifiable==false` yet a public class IS
+> published (dedicated `expand_scope` class arm). The real publication authority
+> is successful insertion via `publish_identity` into `exports_here`, persisted
+> as `ModuleState.exports[module]` after `load_unit` — the interface required by
+> `spec/30-surface/33-declarations.md §4.1`. There is no single declaration-kind
+> predicate equivalent to it.
+>
+> **The existing control is already sound.** At the same base, inserting a valid
+> `pub class ExportCensusProbe a {}` loads successfully and the existing equality
+> test ALREADY REDs (left set gains `ExportCensusProbe`). It bites on a real
+> over-export via the class arm — the arm `is_qualifiable` is false for. So there
+> is no live defect and no reproducer: `pub space` is not a valid over-export
+> mutation (accepting an earlier RED would test placement refusal, not census
+> completeness).
+>
+> **Symptom-inventory entry 1** (recorded per the ruling): SpaceDecl was treated
+> as publishable because qualification membership was mistaken for successful
+> public-placement plus export-table insertion — keyed on `is_qualifiable`
+> rather than `ModuleState.exports`. (Same static-fact-as-runtime-authority
+> family as the runtime LIVE-K chain: a taxonomy predicate mistaken for the
+> live decision.)
+>
+> **No successor node.** Optional future robustness — should it ever be wanted —
+> is honest no-live-defect structural work: drop the source-kind population
+> helper and compare the literal six directly against a narrow read-only sorted
+> view of `ModuleState.exports[DERIVED]` after roots loading; pin with an
+> accepted public form (the class above), never claimed as a regression
+> reproducer (the present test also REDs), and expose the export table, never
+> the qualification predicate. NOT framed as a node here: the `pub_eligibility`
+> no-catch-all already forecloses silent narrowing, so the constraint is not a
+> grounded live defect (§4c). Do NOT expose/copy `is_qualifiable`, alter space
+> placement, or edit the acceptance test under this node. Foundation owed no
+> product move.
+>
+> Everything below is the ORIGINAL frame, retained as the withdrawn record.
 
 > # LATENT. NOT A REGRESSION, AND NOT A REASON TO REOPEN THE PREDECESSOR.
 >
