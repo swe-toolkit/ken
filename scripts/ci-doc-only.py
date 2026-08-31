@@ -13,7 +13,7 @@ def classify(paths):
     if not paths:
         return "full"
     for path in paths:
-        if not isinstance(path, str) or not path or path.startswith("/") or ".." in path.split("/"):
+        if not isinstance(path, str) or not path or path.startswith("/") or ".." in path.split("/") or "." in path.split("/") or "" in path.split("/"):
             return "full"
         if path.startswith(DENY_PREFIXES) or not path.startswith(ALLOW_PREFIXES):
             return "full"

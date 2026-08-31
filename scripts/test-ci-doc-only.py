@@ -14,6 +14,9 @@ assert classifier(['crates/x.rs']) == 'full'
 assert classifier(['.github/workflows/ci.yml']) == 'full'
 assert classifier([]) == 'full'
 assert classifier(['docs/x.md','../ambiguous']) == 'full'
+assert classifier(['docs//x.md']) == 'full'
+assert classifier(['docs/./x.md']) == 'full'
+assert classifier(['crates/old.rs','docs/new.md']) == 'full'
 for context in REQUIRED:
     report=contexts('doc-only', [context])
     assert report[context] == 'pending' and not mergeable(report)
