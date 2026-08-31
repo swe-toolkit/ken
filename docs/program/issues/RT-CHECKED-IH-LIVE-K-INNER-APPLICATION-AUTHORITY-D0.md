@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-LIVE-K-INNER-APPLICATION-AUTHORITY-D0
 title: "Scratch-only live-k inner-application authority D0 (no production candidate, no QA, no Decision, no merge): the VIS-RESPONSE-CONTINUATION-AUTHORITY D0 proved outcome C — the live Vis e k binds the ordinary continuation Function (read application138 into unit2/body941 then unit3/body452/Match451/trap36; write application175 into unit5/body1259 then unit6/body465/Match464/trap37), applications146/159 are different alternatives of the same Match and hit ZERO, and body662/body888 carry only upstream predeclared call identities plus environment transports with NO call emitted by the live continuation unit targeting them, so the capsule pairings 146->body662 and 159->body888 are wrong for runtime control and gain no production authority; the current response HostResult may NOT be borrowed to them across that semantic distinction. This successor moves INSIDE the dynamically selected live k Functions — unit2/body941 and unit5/body1259 — to decide whether the body662/body888 executor route is reachable at all from live source control. For BOTH read and write witnesses, starting at the exact HostResult entry and the already-proven downstream calls to body452/body465, using NO body/table/shape/count/proximity inference, no environment-as-result, no synthetic success, and no early call: structurally enumerate the selected source-control path inside the live k from the HostResult entry to its downstream result consumer; on that path identify every checked computational-IH application whose binder could name the body662/body888 worker; and for each derive the source Call, binder/slot authority, explicit argument producer and type, Function-local emission owner, exact declared target route, ordered captures, and downstream result consumer. Expectation and actual supply must be INDEPENDENT: the source application's binder/slot and explicit argument demand form the fixed expectation; the real emitted call target and real argument edge form actual use. Mutate the actual target and the actual argument producer SEPARATELY against unchanged expectations; for any redirect control preserve the consumer selection key and cardinality one while replacing only the payload; drop and duplicate remain separate; prove mutation provenance and restore an independent positive. Preserve Trap-before-Result, effects, identities36/37, live applications138/175, capsule zeros, and the 474/473 zero-argument no-call materializer. Do NOT start at applications146/159 or at an environment transport, and do NOT substitute the entry HostResult. Land in exactly one of four outcomes. Restore byte-clean and report generic derivation, exact rows, controls, and hashes."
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -12,6 +12,45 @@ github: null
 origin: "Architect ruling evt_3hcsstqp13rxy (thr_6cd47sjf3f32b, 2026-08-31), ACCEPTING the runtime-implementer's RT-CHECKED-IH-VIS-RESPONSE-CONTINUATION-AUTHORITY-D0 recut as a scratch measurement with outcome C for both witnesses. The ruling binds byte-clean pickup 803df26dca0206cab016366382dbd91eed5fbeb7, tree d884a06f3a185d93ef572f3b76ceed4d4fc96053, and recut report/diff/map/evidence-manifest/CLIF-manifest SHA-256 150484ec63e14b761dce0edb2d1868906764f01087625f17369cd3e194d20e82 / cb297837cb2299439e0d7fa8632b381e67ceaa494d9b3c2d9ab0ee55bdb6642f / 195469ef20ad88c6b4ac7b81b4e34f2a8d81368b439c1b0031c121480f09a277 / ae28b81f138fa5a14e6f05ee07a16d65b2f920063f5237f2eb5e1f100d5e91d6 / 6b067f4fb9104d8d7b0cf768aa58cfa4f97d1e0dec3ca5a4233e91ca6f5ad5d0. The Architect reproduced all advertised hashes, all 25 evidence-manifest members, all 32 CLIF members, applied the 13-path diff clean, and independently ran scripts/ken-cargo check -p ken-runtime --features px8-ds-test-support green. ERRATUM (Architect): the recut report line 59 retains the stale map digest 423511c3...39c2; the recut map is 195469ef...a277 and no durable artifact may cite the stale one. Finding: outcome C — read's selected response is application138 into unit2/body941 then unit3/body452/Match451/trap36; write's is application175 into unit5/body1259 then unit6/body465/Match464/trap37; applications146/159 are different alternatives of the same Match and hit ZERO; body662/body888 have upstream predeclared call identities and environment transports but no live-continuation-unit call targets them, and environment transport is not execution control; so capsule pairings 146->body662 and 159->body888 are wrong for runtime control and gain no production authority; do NOT retarget them to 138/175. Control repair accepted: application_origin is immutable as the sole consumer selection key; redirect copies only the consumed successor payload from a structurally derived same-Match/different-alternative sibling at equal binding/candidate-unit-set/arity, cardinality one, reaching the distinct agreement refusal; drop/duplicate/actual-callee-use remain independently discriminating. This completes hard stop 7 on the body-662 executor/staging question (SEVENTH consecutive: force D1 NO evt_7e6jprw80srj8; carried-worker outcome 4 evt_5tm8gbxs7584g; Host-Vis outcome 3 evt_6rvrzpg80c02j; capsule feasibility outcome 2 evt_1zpgs2h0kd74q; staged-call static outcome 1 evt_6qkn80ag2tq89 / evt_4maaydhem9esy; runtime-reachability outcome 1 evt_5ke73vgnrn / evt_7q7w05ag61zpw; vis-response outcome C evt_3hcsstqp13rxy / this frame). Shared predicate: a valid static fact repeatedly placed where the dynamic value or source-control choice that must consume it does not coexist. A failing or absent successor is hard stop 8; the next Research advisory trigger remains hard stop 9; runtime production stays blocked until the successor is ruled. Base origin/main 0125f9608 (advanced from 803df26dc by this doc-only recut commit only; the accepted runtime-net product blobs are unchanged — recheck the seven at pickup against the accepted base, per the prior D0). @steward owns close/reframe/release; runtime parked until this named kick. Steward-recut per COORDINATION section 2."
 ---
 
+> # CLOSED 2026-08-31 — OUTCOME D ACCEPTED (HARD STOP 8); THE affine
+> # body662/body888 EXECUTOR ROUTE IS CLOSED FOR THIS DEFECT. Architect ruling
+> # `evt_5kqhv68j9bxgb` (thr_6pp5xa792rpmb), binding byte-clean pickup
+> # `8b3e2d7378073bd1e6ae628579e2081599be695f`, tree
+> # `4f44ae2f3483d621163f790c97acec9c27133e70`, and the six artifacts
+> # report `92bbf579…fb050d` / diff `911bfea4…5836b4c6` / map `c22b62b5…b348049a`
+> # / evidence-manifest `b424cece…644495fb` / marked-CLIF `c4814999…b7b338ae` /
+> # preserved-CLIF `04136635…70eec19` (34 evidence members, both 32-member CLIF
+> # manifests verify; 13-path diff clean; Architect independently ran
+> # `scripts/ken-cargo check -p ken-runtime --features px8-ds-test-support`
+> # green; marker-disabled read/write CLIF byte-identical to the accepted
+> # VIS-D0 CLIF).
+> #
+> # **Design closure.** Inside the live `k`, read selects application473
+> # (unit2/body941): it carries body662 binding/target metadata but NO explicit
+> # argument demand, producer, type, or edge, and the emitted Function declares
+> # the body662 target with ZERO calls to it. Write selects application486
+> # (unit5/body1259): its owner names body1238, NOT body888 — the body888
+> # application699 sits behind LexicalClosure1246, outside the live source-control
+> # closure, and hits zero. The seam is the nullary captured-environment
+> # materialization versus a later source `Call` applying that environment, and no
+> # such Call exists before the ordinary downstream result consumer. **Therefore
+> # no independently represented affine `(body662/body888 target, explicit
+> # argument)` application exists: the body662/body888 executor route, the
+> # future-endpoint capsule route, AND entry-HostResult substitution are all
+> # CLOSED for this defect.** Do not add an implicit call, infer an argument from
+> # arity, reify a closure, or reopen the materializer as execution control.
+> #
+> # **This completes HARD STOP 8.** The recut successor is
+> # **`RT-LIVE-K-ORDINARY-RESULT-SUPPLY-ROLE-D0`** (frame filed the same day): it
+> # LEAVES the executor axis and starts at the actual ordinary value edge now
+> # proven to run (read app473 materialization → body941 → call to body452 →
+> # Match451; write app486 → body1259 → body465 → Match464), to find where the
+> # semantic `ResourceBodyResult` is supplied. **Any successor result other than
+> # routing A is HARD STOP 9: the Architect obtains the mandatory Research prior-
+> # art advisory on the exact reported seam before selecting another technique.**
+> # Runtime production stays blocked. The READY banner and body below are
+> # preserved as chronology.
+>
 > # READY — SCRATCH-ONLY LIVE-K INNER-APPLICATION-AUTHORITY D0. Released to the
 > # runtime ring (lane 1) on `origin/main` `0125f9608`. Runtime is parked; this
 > # IS the release.
