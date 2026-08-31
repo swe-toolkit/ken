@@ -1,7 +1,7 @@
 ---
 id: CAT-EXPORT-CENSUS-DERIVES-LOADER-PREDICATE
 title: "Derive the export-census population from the loader's own publication predicate instead of a parallel hand-maintained Decl match, so the exactly-six equality control cannot silently narrow as new publishable declaration kinds are added."
-status: ready
+status: draft
 owner: foundation
 size: S
 gate: none
@@ -11,6 +11,40 @@ blocks: []
 github: null
 origin: "Adversary M8 pre-publication hunt on CAT-DERIVED-PUB-EXPORT rebased 84d836e39, evt_2rnmt4yt8n6xa, 2026-08-29. Verdict CLEAN; this is the single labeled LATENT note, which does NOT reproduce at that SHA. Filed by the Steward after independently verifying both cited coordinates and enumerating the divergence."
 ---
+
+> # PARKED 2026-08-31 — CENTRAL PREMISE REFUTED AT THE BASE.
+>
+> Foundation measured the filed base `978b05dd29` (evt_44gh32f7bwc,
+> evt_2nte0nbkcvbxj): a valid `pub space ExportCensusProbe` inserted into the
+> guarded Derived fence is rejected by `load_derived()` at the explicit
+> `UnsupportedSpacePlacement { placement: "public" }` gate in
+> `crates/ken-elaborator/src/modules.rs` **before** the census equality. Catalog
+> blob byte-restored to `300a5855d6a9d6ae62864bcd275f3c0c76f14613`; branch clean.
+>
+> ⇒ The "The defect" table below is WRONG on its load-bearing row: public
+> SpaceDecl is NOT loader-publishable — the loader rejects it at a placement
+> gate. So `pub space` is not a divergence witness, and `is_qualifiable` in
+> isolation is not the loader's publish/export authority (there is an earlier
+> placement gate). Steward disposition (frame authority):
+>
+> - **AC-SPACEDECL-VISIBLE is WITHDRAWN** — unsatisfiable as written; no
+>   `pub space` reaches the equality to redden.
+> - **The proposed D1 fix (derive the census from `is_qualifiable`) is
+>   WITHDRAWN** — `is_qualifiable` is qualification taxonomy, not the loader's
+>   real publish decision; deriving from it would over-widen the census by the
+>   very kind the loader rejects.
+> - Do NOT weaken the control to "any RED", expose/copy `is_qualifiable`, or
+>   change loader placement behavior. This is the `MEASURE ✗ LAND` conflation:
+>   a LATENT (no-live-defect) hardening was given a reddening-witness AC it can
+>   never meet.
+>
+> **Recut vs withdraw turns on one crates/ measurement routed to the Architect**
+> (evt_2qpmb7wgcqwmb): is there any extant Decl variant where
+> `top_level_publication_queries()` diverges from the loader's REAL publish
+> decision (placement gate + qualification)? If yes → recut around that real
+> witness. If no → withdraw (census and loader already agree; a by-construction
+> hardening with no live witness is not a grounded blocking node, §4c).
+> Everything below is the ORIGINAL frame, retained for the recut decision.
 
 > # LATENT. NOT A REGRESSION, AND NOT A REASON TO REOPEN THE PREDECESSOR.
 >
