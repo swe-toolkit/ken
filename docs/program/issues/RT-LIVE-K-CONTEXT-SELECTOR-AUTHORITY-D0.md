@@ -1,19 +1,59 @@
 ---
 id: RT-LIVE-K-CONTEXT-SELECTOR-AUTHORITY-D0
 title: "Scratch-only live-k context-selector authority D0 (no production candidate, QA, Decision, CI, publication, or merge): HS11 accepted that WRITE is C at the first live predecessor — live app486/u0:53 materializes body1238's environment but emits NO selector/use that enters context0/u3:57 (the u0:57 target is a declaration, not execution authority; 19 resolved FuncRefs, zero call/return uses; entry marker zero). DO NOT mint a new capsule/call: Ken ALREADY HAS a typed context-selection mechanism on the READ path — `call_declared_recursive_position_unit` resolves `CarriedInvocationCoordinates` through `carried_invocation_context` and emits `call_declared_context` (the finished READ corpus has 14 calls to context0/u0:50; WRITE has zero uses of context0/u0:57). This recut SUBSUMES against that existing mechanism and locates the phase divergence: (1) READ positive — enumerate all 14 u0:50 calls by Function identity, give each call instruction a distinct emitted/native marker, and at the selected u3:50 context entry capture the dynamic caller/return address and bind EXACTLY which call instruction entered it (entry-hit alone is not a caller proof); (2) at that exact live call bind the planner-issued `CarriedInvocationCoordinates` (continuation origin, recursive position, body origin), the resolved ContextId0, the local FuncRef, and the complete nested application occurrence path, and PROVE the emitted call consumes that exact authority — do not infer it from body identity, context presence, declaration count, or adjacency; (3) WRITE comparator — at live app486/u0:53 record the exact `PendingCheckedIhCall`, the `StaticWorkerBinding` route/body/captures, and whether any carried-invocation coordinates, context resolution, or typed selector authority is produced and consumed (the pair (specialization3, body1238) identifies the context definition but by itself authorizes no consuming call); (4) classify the FIRST divergence — no typed selector representation before emission is C at that producer/consumer boundary, a represented authority dropped/unused/wrong-target is B at its exact consumer, A requires live context entry and then live producer940; (5) control the READ authority at its NATURAL RESOLVER — drop and duplicate the exact coordinate-to-context binding population for zero/ambiguous refusal, and vary ONE coordinate holding the other two and the call site fixed for exact mismatch/no-context refusal, restoring the exact binding and live caller/context positive after each (no legal redirect subject -> CONTROL_NO_SUBJECT; do NOT substitute planner-edge mutations for an emitted selector control on WRITE when WRITE has no subject); (6) preserve the accepted READ trace and controls, per-instance markers, adjacent positives, effect order, Trap-before-Result, identities36/37, apps138/175, materializers473/486, capsule/raw zeros, the 474/473 no-call, and disabled-CLIF byte identity. Restore byte-clean; hand the report to the Architect, who alone selects or rejects a production representation. Any result other than a genuinely-live A at a PROVEN-LIVE coordinate is HARD STOP 12."
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
 tier: T1
 depends_on: []
-blocks: []
+blocks: [RT-LIVE-K-FUTURE-INPUT-OWNERSHIP-D0]
 github: null
 origin: "Architect HS11 review evt_6j7x9refa7m8x (thr_3s8jsephykzf8, 2026-08-31): MEASUREMENT ACCEPTED; WRITE is C at a live predecessor, NOT a live context entry. Binds runtime pickup 978b05dd29ab1a40cdc5b89e4410bd3928cff111 (tree 0f84669667686499db8567e1c1e3f069701191d7) and measurement head 551de80849efe38b506c70dc766a2694324b329a (tree 854ba8b536632a219dd0cf8228a960b3c5babba5); the seven named runtime blobs are identical at both coordinates and at current origin/main. The Architect reproduced all seven primary hashes (report 2307155b…18cd, scratch diff c0fa44f6…eee1, maps 2b5ed877…1e38, marker manifest 17958068…f71, Function-identity scan 7fb9a62a…75c6, read controls 9ad063fd…7a8, 96-member evidence manifest f3e4bc47…321e), verified all 96 members, applied the scratch exactly to 551de8084 (regenerated binary diff hash c0fa44f6…eee1, git diff --check clean), ran an independent `scripts/ken-cargo check -p ken-runtime --features px8-ds-test-support` green, and confirmed the disabled 10/10 read and 18/18 write CLIF corpora byte-identical to the retained clean base (both recursive diffs empty). ACCEPTED WRITE OBSERVATION: the exact live materializer is u0:53/specialization3/application486/worker closure1246/body1238; the generated context key (specialization3, body1238) resolves context0 (definition u3:57/module FuncId57, caller-local target identity u0:57); an independent finished-CLIF census reproduces 18 unique Functions, 19 FuncRefs to u0:57, and zero instruction uses/calls; live u0:53 declares fn39/u0:57/sig39 and fn41/u0:57/sig41 and uses neither; LLDB observes app486/u0:53=1, alternate app486/u0:54=0, context0/u3:57 entry=0, body465=1, Match464=1, all body979/ResultErr/InvalidOffset/producer940=0; the subordinate u0:46 census correctly includes both fn32 and fn40 in u3:57. Therefore WRITE is C at the first live predecessor — the context target declaration is only a declaration, not execution authority; the empty selector population is honest CONTROL_NO_SUBJECT and the earlier planner-edge mutations get no credit. ROUTING-HEADLINE CORRECTION (binding): context0 entry is NOT 'proven via a live incoming edge' — its marker is zero and there is no incoming selector; what is proven is that the SOURCE side of the expected edge is live and the edge is ABSENT. ACCEPTED READ CONTROLS: the detector-independence recut is valid — independently decoded owner store keyed by SSA v12498 + ss1198+8 and final carried use keyed by v11 + body452 position1 slot ss210+8; the exact (owner, final-use) matrix is baseline (1,1), owner-drop (0,1), owner-duplicate (2,1), final-drop (1,0), final-duplicate (1,2), each immediate restored (1,1); fixed completion/owner-marker/final-use-marker identities present and unchanged every run; redirect honest CONTROL_NO_SUBJECT with no response-0x1209 credit — accepting the natural READ observation only (producer705 completes 0x0305, correctly owned, nested in env 0x0e09, and the body452 position1 use forwards that env container), NOT a projection. DISPOSITION: HARD STOP 11 stands (no genuinely-live write A); no production context call, read projection, candidate, QA, Decision, CI, publication, or merge authorized; symptom entry 11 recorded on the closed CONTEXT-ENTRY node ('the live write application materializes body1238's environment, but no planner-issued context selector is consumed; context0 is declared in the live Function and remains unentered'). NEXT TECHNIQUE (Architect): do not jump from the declared u0:57 target to a new capsule or call — subsume against the existing typed context-selection mechanism on the READ path and locate the phase divergence; this recut is that bounded measurement. The HS9 Research advisory evt_6w61wvkzgm8aq covers the noncoexisting-authority predicate; stop 11 does not trigger a new mandatory advisory. Steward owns this bounded recut and Runtime release; runtime parked until this named kick. Scratch-only doc recut per COORDINATION section 2; the doc commit advances current origin/main and the accepted runtime-net product blobs are unchanged (recheck the seven at pickup 978b05dd29)."
 ---
 
-> # READY — SCRATCH-ONLY LIVE-K CONTEXT-SELECTOR AUTHORITY D0. Released to the
-> # runtime ring (lane 1). Runtime is parked; this IS the release.
+> # CLOSED 2026-08-31 — HS12 DISCHARGED by Architect post-advisory ruling
+> # `evt_5fczfzysqyca8` (thr_443f4v7keb6tg). Outcome was **B**, confirmed: the
+> # exact `StaticWorkerBinding` at live app486/u0:53 already carries typed selector
+> # authority `route=GeneratedContext` (closure1246/body1238/arity1/captures7,
+> # discharge DirectSpecializationCall, transport None), and
+> # `materialize_checked_ih_static_worker_application` reads arity/captures and
+> # returns the environment word while leaving that route UNUSED — a represented
+> # authority dropped at its exact consumer, not the absence of a representation.
+> # READ falsified the coordinate assumption: the 14 u0:50 calls split 7+7; the
+> # sole live caller (u0:48/application138/inst8121) consumes
+> # `StaticWorkerCallRoute::GeneratedContext`, and all seven `CarriedInvocation`
+> # `Coordinates` resolver calls are emitted and runtime-unhit. The mandatory §1a
+> # HS12 Research advisory (research `evt_7jm10b0q0f5ht`) confirmed the existing
+> # `StaticWorkerBinding` + `call_static_worker_with_inputs` emitter is the
+> # known-best defunctionalized-application family; no second selector is
+> # authorized. Symptom-inventory entry 12: "app486 holds a typed executable
+> # StaticWorkerBinding with route=GeneratedContext, but materialization returns
+> # only the captured environment and bypasses the route-selected emitter — the
+> # execution authority is dropped at the materialization seam before its consumer."
+> #
+> # DESIGN RULING (evt_5fczfzysqyca8): **STAGE the application; do NOT call at
+> # app486.** app486 is an environment-production/escape seat, not an execution
+> # seat — the source occurrence supplies zero explicit operands while the worker
+> # declares arity one, and `route=GeneratedContext` selects HOW a complete call
+> # executes, not the missing argument. This follows the runtime contract
+> # (`spec/40-runtime/42-evaluation.md §§6.2, 6.4`: the effect continuation is a
+> # closure `k : Resp e -> ITree ...`; the response exists only after `H e`, and
+> # `apply k resp` is performed once in tail position). The repair is a typed
+> # staged-application boundary-closure (typed `CheckedIhCapturedEnvironment` +
+> # one stable planner descriptor; only the later response-owner consumes the
+> # staged authority once through `call_static_worker_with_inputs`).
+> #
+> # SUCCESSOR: production is NOT yet authorized — the exact later response owner is
+> # unproved. The next scratch-only slice is
+> # [[RT-LIVE-K-FUTURE-INPUT-OWNERSHIP-D0]] (the future-input ownership map over
+> # the same WRITE witness). On its result: an implementation frame under this
+> # staged design, or the confident negative that the application is infeasible
+> # under the no-runtime-object constraint. This node lands NO production, opens NO
+> # PR, was NEVER merged. Original released head retained below for the record.
+> #
+> # READY (ORIGINAL) — SCRATCH-ONLY LIVE-K CONTEXT-SELECTOR AUTHORITY D0. Released
+> # to the runtime ring (lane 1). Runtime is parked; this IS the release.
 > #
 > # MEASUREMENT node. It lands NO production candidate, opens NO PR, routes NO QA,
 > # needs NO Decision or merge. It reuses the accepted runtime net at exact pickup
