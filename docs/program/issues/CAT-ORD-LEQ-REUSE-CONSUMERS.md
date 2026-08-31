@@ -13,7 +13,19 @@ origin: "Steward group-5 census drain, cat-reuse-census.md §4.4 item 5, sites m
 ---
 
 > # D1 (OrderedSearch) LANDED 2026-08-31 as ACCEPTED PARTIAL — node `active`, NOT
-> # `merged`; D2 (InsertionSort) is held and unstarted.
+> # `merged`. D2 (InsertionSort) is RELEASED and Working under Architect ruling
+> # `evt_5921k9xswdazg` (2026-08-31): the caution-2 first-import HARD STOP was
+> # adjudicated — proceed with the EXACT three operation imports as dispatched;
+> # the base `Ord` -> candidate `bool_or` raw-boundary movement is the expected
+> # class-namespace/strict-resolution boundary (loading LawfulClasses installs
+> # its public `Ord` class regardless of the selective item list; `bool_or` is an
+> # ordinary qualified provider in neither list), NOT a blocker and NOT a
+> # different component design. Record AC-RAW-BOUNDARY as the two negative
+> # coordinates (base exit-1 `UnresolvedCon Ord`, candidate exit-1 `UnresolvedCon
+> # bool_or`), never a false standalone-success; the fixture-backed 3/3 positive
+> # remains the real acceptance path. If the raw check advances BEYOND `bool_or`
+> # or succeeds without a separately authorized dependency migration, hard-stop
+> # again. D2 landing closes this node `merged`.
 > #
 > # D1 landed at origin/main `65bfa52db` (respin candidate 22892065c, first
 > # candidate 0f9b9746 CV-rejected on a mixed-provider evasion, recut with a
