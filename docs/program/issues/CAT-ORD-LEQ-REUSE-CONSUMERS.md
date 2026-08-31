@@ -1,0 +1,95 @@
+---
+id: CAT-ORD-LEQ-REUSE-CONSUMERS
+title: "Drain the group-5 ordered-list reimplementations (OrderedSearch, InsertionSort) to their canonical providers LC.ord_leq_at, D.eq_from_ord, D.count via selective import."
+status: draft
+owner: foundation
+size: M
+gate: none
+tier: T2
+depends_on: [CAT-ORD-LEQ-PUB-EXPORT]
+blocks: []
+github: null
+origin: "Steward group-5 census drain, cat-reuse-census.md §4.4 item 5, sites measured 2026-08-31 at origin/main 5083f2e46. Gated on CAT-ORD-LEQ-PUB-EXPORT (exports LC.ord_leq_at); D.eq_from_ord and D.count are already public via CAT-DERIVED-PUB-EXPORT."
+---
+
+> # The group-5 consumer drain — SELECTIVE IMPORT, not un-shadow.
+>
+> The providers are real modules (LawfulClasses, Derived), NOT the ambient
+> prelude, so this is a selective-import drain (delete the local reimplementation,
+> import the canonical symbol, repoint references) — the CAT-BOOL /
+> CAT-DERIVED-REUSE-CONSUMERS shape, not the CAT-PRELUDE un-shadow shape.
+> Gated on [[CAT-ORD-LEQ-PUB-EXPORT]] for the two `ord_leq_at` sites; the two
+> `D.*` sites need no prerequisite.
+
+## Fixed inputs (measured at origin/main `5083f2e46`; re-measure before editing)
+
+| site | file:line | current local body | canonical target |
+|---|---|---|---|
+| `ordered_search_leq` | `Algorithm/Searching/OrderedSearch.ken.md:22` | `= d.leq x y` | `LC.ord_leq_at` |
+| `ordered_leq` | `Algorithm/Sorting/InsertionSort.ken.md:14` | `= d.leq x y` | `LC.ord_leq_at` |
+| `order_eq` | `Algorithm/Sorting/InsertionSort.ken.md:16-17` | `= bool_and (ordered_leq ...) (ordered_leq ...)` | `D.eq_from_ord` |
+| `element_count` | `Algorithm/Sorting/InsertionSort.ken.md:19-26` | recursive `match` using `order_eq` | `D.count` |
+
+## Two cautions the drain turns on — read before framing a candidate
+
+1. **`element_count` is RECURSIVE, so it is a distinct rigid head from `D.count`
+   and NOT convertible by unfolding** — the exact refutation the CAT-PRELUDE
+   recut established (Architect `evt_7spzy25qqdsqx`: separately declared
+   recursive globals are non-convertible, `false` + halts). Its migration
+   evidence is candidate-specific (inventory / resolution-flip / inverse-patch),
+   the `AC-RECURSIVE-UNSHADOW-MIGRATION` shape — NEVER a kernel-equivalence
+   claim. By contrast `ordered_search_leq`, `ordered_leq` (and `order_eq`) are
+   NON-recursive transparent wrappers; they unfold definitionally to the same
+   body and are convertible, so their downstream theorems survive the repoint
+   without a migration proof. Do not conflate the two classes.
+
+2. **`InsertionSort.ken.md` has ZERO `import` declarations today** — it is
+   authored against ambient/prelude scaffolding (uses unqualified `bool_and`,
+   `Ord`, `List`, `Nat`). Adding the first selective import to a file with none
+   changes its scope resolution; re-measure standalone status and decide what
+   "standalone" even means for a fixture-backed file here, echoing the
+   ambient-scaffolding caution CAT-DERIVED-PUB-EXPORT raised. `OrderedSearch`
+   already imports `Core.Classes.LawfulClasses (Ord)` at :20, so its import edge
+   only widens.
+
+## Deliverables (one increment per consumer module, released one at a time)
+
+- **D1 — OrderedSearch.** Delete `fn ordered_search_leq`; import
+  `Core.Classes.LawfulClasses (ord_leq_at)`; repoint its callers. Non-recursive
+  wrapper, convertible; no migration proof.
+- **D2 — InsertionSort.** Delete `ordered_leq` / `order_eq` / `element_count`;
+  import `LC.ord_leq_at`, `D.eq_from_ord`, `D.count`; repoint. `element_count`
+  carries the recursive-head migration evidence (caution 1); the file's
+  first-import standalone question is caution 2.
+
+## Acceptance criteria, each with its control
+
+- **AC-CENSUS-ROW-DRAINED.** Each local reimplementation is gone and every
+  reference resolves through a selective import to the provider `GlobalId`.
+  Control: a resolution-flip probe shows the name binds to the provider, not a
+  local; the deleted local no longer resolves.
+- **AC-RECURSIVE-MIGRATION (D2 `element_count` only).** Candidate-specific
+  inventory + resolution-flip + inverse-patch evidence per the CAT-PRELUDE recut;
+  NOT a kernel-equivalence assertion.
+- **AC-DOWNSTREAM-GREEN.** Every downstream theorem that referenced a drained
+  name still elaborates (the convertible wrappers unfold; the recursive migration
+  is discharged by AC-RECURSIVE-MIGRATION). Control: elaborate the consumer
+  modules and their dependents.
+- **AC-RAW-BOUNDARY / STANDALONE.** Re-measure the consumer module standalone
+  behaviour after the import edge changes; for InsertionSort this is caution 2,
+  and a `[higher]` surprise is a HARD STOP to the Architect, not a workaround.
+- **AC-CLOSURE-TARGETS / AC-NO-REGRESSION.** Complete affected-target closure,
+  scoped by changed PATHS; `scripts/ken-cargo` only, never `--workspace`;
+  whole-suite green is CI's.
+
+## Gate and sequencing
+
+`draft` — the frame is complete, but it stays `draft` (not a pullable `ready`
+that lies about its premise) until [[CAT-ORD-LEQ-PUB-EXPORT]] merges, at which
+point the Steward flips it `ready`. Gated on that merge for the `ord_leq_at`
+sites. Released to foundation only after that lands; the Steward re-measures
+the sites and the two cautions at the merge SHA before release. On each
+candidate: fresh Foundation QA + CV on the exact SHA (Architect only if the
+recursive-head migration or a standalone surprise opens a design fork), then
+Steward M1-M4. Groups 7 and the deferred law-carrying group-1 items remain
+unmeasured and are NOT part of this drain.
