@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-31 16:15:28Z — from 506 issue file(s) in `docs/program/issues/`.
+2026-08-31 16:36:11Z — from 506 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -68,8 +68,8 @@ the committed file matches the generator's output.
 | `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | merged | foundation | M | none | — |
 | `CAT-MAP-DEPENDENCY-CLOSURE-REPAIR` | Repair the Map package's dependency closure so Data/Collections/Map.ken.md elaborates from its own declared imports rather than relying on the map_build_acceptance.rs fixture to preload Compare/Transport/Derived/Or and to resolve undeclared list_append. | draft | foundation | unsized | none | — |
 | `CAT-NAT-REUSE-CONSUMERS` | Catalog-reuse rework, first scoped batch: the nine unblocked low-risk Nat arithmetic/order consumer duplicates from the census (groups 2 and 3), across six packages — each package imports add/leq_nat/sub/min from its canonical owner and drops the local reimplementation, one independently-releasable increment per package | merged | foundation | M | none | — |
-| `CAT-ORD-LEQ-PUB-EXPORT` | Export ord_leq_at as pub from Core.Classes.LawfulClasses so the group-5 ordered-list consumers can import the canonical dictionary-projection wrapper instead of reimplementing it. | ready | foundation | S | none | — |
-| `CAT-ORD-LEQ-REUSE-CONSUMERS` | Drain the group-5 ordered-list reimplementations (OrderedSearch, InsertionSort) to their canonical providers LC.ord_leq_at, D.eq_from_ord, D.count via selective import. | draft | foundation | M | none | — |
+| `CAT-ORD-LEQ-PUB-EXPORT` | Export ord_leq_at as pub from Core.Classes.LawfulClasses so the group-5 ordered-list consumers can import the canonical dictionary-projection wrapper instead of reimplementing it. | merged | foundation | S | none | — |
+| `CAT-ORD-LEQ-REUSE-CONSUMERS` | Drain the group-5 ordered-list reimplementations (OrderedSearch, InsertionSort) to their canonical providers LC.ord_leq_at, D.eq_from_ord, D.count via selective import. | ready | foundation | M | none | — |
 | `CAT-ORD-NAT-CANONICAL-OWNER` | Migrate the canonical Ord Nat component to its defined-at home — move leq_nat (with refl/trans/antisym), total_leq_nat, the bool_or::eq_true_of_or bridge, and the sole instance Ord Nat from Data/Numeric/Nat/Order into Core/Classes/LawfulClasses, and make Order a reader-facing facade that imports and re-exports the LawfulClasses Ord surface. The atomic two-package ownership migration that resolves the OrphanInstance blocking CAT-ORDER-PUB-EXPORT. | merged | foundation | M | none | — |
 | `CAT-ORDER-PUB-EXPORT` | Bring catalog Data/Numeric/Nat/Order.ken.md to the pub-export standard — mark its declared exported operations (leq_nat, sub, min, max, compare) pub so packages can selectively import them, matching the already-compliant Arithmetic.ken.md; verify standalone elaboration and cross-package import resolution. The catalog-reuse prerequisite that unblocks CAT-GCD-REFACTOR. | merged | foundation | S | none | — |
 | `CAT-PRELUDE-REUSE-CONSUMERS` | Drain catalog-reuse census group 1 (prelude functional-floor reuse), P-provider subset only — remove three local reimplementations (Derived#map, Derived#filter, Property#gen_map_list) that shadow the ambient compiler-prelude map/filter, letting each reference fall through to the installed provider. Un-shadow, not selective import: P is [installed]/ambient, so there is NO import edge to add. Shaped on the landed CAT-BOOL/CAT-DERIVED per-package increment pattern; the source-equation-isomorphic subset of group 1, with the instance-bound and [higher]-module items deferred. Acceptance recut to a candidate-specific migration property (Architect evt_7spzy25qqdsqx on Spec evt_3z8y6pf6b6m5p): separately declared recursive heads are non-convertible, so this is not a kernel-equivalence drain. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3149 |
@@ -551,7 +551,7 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `ABI-M1` — manifest v2 — family-scoped, versioned, generated from family schemas
-- `CAT-ORD-LEQ-PUB-EXPORT` — Export ord_leq_at as pub from Core.Classes.LawfulClasses so the group-5 ordered-list consumers can import the canonical dictionary-projection wrapper instead of reimplementing it.
+- `CAT-ORD-LEQ-REUSE-CONSUMERS` — Drain the group-5 ordered-list reimplementations (OrderedSearch, InsertionSort) to their canonical providers LC.ord_leq_at, D.eq_from_ord, D.count via selective import.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
@@ -591,7 +591,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: ready)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
-- `CAT-ORD-LEQ-REUSE-CONSUMERS` blocked by `CAT-ORD-LEQ-PUB-EXPORT` (status: ready)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)

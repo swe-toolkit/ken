@@ -1,7 +1,7 @@
 ---
 id: CAT-ORD-LEQ-PUB-EXPORT
 title: "Export ord_leq_at as pub from Core.Classes.LawfulClasses so the group-5 ordered-list consumers can import the canonical dictionary-projection wrapper instead of reimplementing it."
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: none
