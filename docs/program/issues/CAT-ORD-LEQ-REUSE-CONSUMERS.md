@@ -1,7 +1,7 @@
 ---
 id: CAT-ORD-LEQ-REUSE-CONSUMERS
 title: "Drain the group-5 ordered-list reimplementations (OrderedSearch, InsertionSort) to their canonical providers LC.ord_leq_at, D.eq_from_ord, D.count via selective import."
-status: draft
+status: ready
 owner: foundation
 size: M
 gate: none
@@ -21,7 +21,7 @@ origin: "Steward group-5 census drain, cat-reuse-census.md §4.4 item 5, sites m
 > Gated on [[CAT-ORD-LEQ-PUB-EXPORT]] for the two `ord_leq_at` sites; the two
 > `D.*` sites need no prerequisite.
 
-## Fixed inputs (measured at origin/main `5083f2e46`; re-measure before editing)
+## Fixed inputs (measured at origin/main `5083f2e46`; RE-MEASURED at `551de8084` on the pub-export landing — all four sites byte-identical, InsertionSort still has zero imports; re-measure again at your build SHA)
 
 | site | file:line | current local body | canonical target |
 |---|---|---|---|
@@ -84,11 +84,11 @@ origin: "Steward group-5 census drain, cat-reuse-census.md §4.4 item 5, sites m
 
 ## Gate and sequencing
 
-`draft` — the frame is complete, but it stays `draft` (not a pullable `ready`
-that lies about its premise) until [[CAT-ORD-LEQ-PUB-EXPORT]] merges, at which
-point the Steward flips it `ready`. Gated on that merge for the `ord_leq_at`
-sites. Released to foundation only after that lands; the Steward re-measures
-the sites and the two cautions at the merge SHA before release. On each
+`ready` — [[CAT-ORD-LEQ-PUB-EXPORT]] MERGED at `551de8084` (its `ord_leq_at`
+provider is now loader-visible), so the premise is true and the Steward flipped
+this `draft` -> `ready` and re-measured the four sites and both cautions at that
+SHA before releasing to foundation (all four byte-identical; InsertionSort still
+carries zero imports). On each
 candidate: fresh Foundation QA + CV on the exact SHA (Architect only if the
 recursive-head migration or a standalone surprise opens a design fork), then
 Steward M1-M4. Groups 7 and the deferred law-carrying group-1 items remain
