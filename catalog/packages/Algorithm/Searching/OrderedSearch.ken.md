@@ -17,9 +17,7 @@ the recursively sorted tail. This is the exact invariant used by the pruning
 branch.
 
 ```ken
-import Core.Classes.LawfulClasses (Ord)
-
-fn ordered_search_leq (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq x y
+import Core.Classes.LawfulClasses (Ord, ord_leq_at)
 
 fn elem_step (tail_member : Bool) (x_before_head : Bool) (head_before_x : Bool) : Bool =
   match x_before_head {
@@ -34,11 +32,7 @@ fn elem_step (tail_member : Bool) (x_before_head : Bool) (head_before_x : Bool) 
 fn elem (a : Type) (d : Ord a) (x : a) (xs : List a) : Bool =
   match xs {
     Nil ↦ False;
-    Cons head tail ↦
-      elem_step
-        (elem a d x tail)
-        (ordered_search_leq a d x head)
-        (ordered_search_leq a d head x)
+    Cons head tail ↦ elem_step (elem a d x tail) (ord_leq_at a d x head) (ord_leq_at a d head x)
   }
 
 fn sorted_for_search (a : Type) (d : Ord a) (xs : List a) : Prop =
@@ -46,15 +40,7 @@ fn sorted_for_search (a : Type) (d : Ord a) (xs : List a) : Prop =
     Nil ↦ Top;
     Cons head tail ↦
       And
-        ((x : a)
-          → Equal
-          Bool
-          (elem a d x tail)
-          True
-          → Equal
-          Bool
-          (ordered_search_leq a d head x)
-          True)
+        ((x : a) → Equal Bool (elem a d x tail) True → Equal Bool (ord_leq_at a d head x) True)
         (sorted_for_search a d tail)
   }
 ```
@@ -155,16 +141,16 @@ fn search
     Nil ↦ λsorted. No (Equal Bool (elem a d x (Nil a)) True) (λmember. absurd member);
     Cons head tail ↦
       λsorted.
-        match ordered_search_leq a d x head eqn : x_before_head {
+        match ord_leq_at a d x head eqn : x_before_head {
           True ↦
-            match ordered_search_leq a d head x eqn : head_before_x {
+            match ord_leq_at a d head x eqn : head_before_x {
               True ↦
                 Yes
                   (Equal Bool (elem a d x (Cons a head tail)) True)
                   (elem_step_both_true
                     (elem a d x tail)
-                    (ordered_search_leq a d x head)
-                    (ordered_search_leq a d head x)
+                    (ord_leq_at a d x head)
+                    (ord_leq_at a d head x)
                     x_before_head
                     head_before_x);
               False ↦
@@ -175,8 +161,8 @@ fn search
                       tail_member =
                         elem_step_to_tail_before_head
                           (elem a d x tail)
-                          (ordered_search_leq a d x head)
-                          (ordered_search_leq a d head x)
+                          (ord_leq_at a d x head)
+                          (ord_leq_at a d head x)
                           x_before_head
                           head_before_x
                           member;
@@ -189,7 +175,7 @@ fn search
                             True
                             → Equal
                             Bool
-                            (ordered_search_leq a d head x2)
+                            (ord_leq_at a d head x2)
                             True)
                           (sorted_for_search a d tail)
                           sorted
@@ -197,7 +183,7 @@ fn search
                           tail_member
                     in
                       boolean_contradiction
-                        (ordered_search_leq a d head x)
+                        (ord_leq_at a d head x)
                         head_before_member
                         head_before_x)
             };
@@ -211,7 +197,7 @@ fn search
                   True
                   → Equal
                   Bool
-                  (ordered_search_leq a d head x2)
+                  (ord_leq_at a d head x2)
                   True)
                 (sorted_for_search a d tail)
                 sorted) {
@@ -220,8 +206,8 @@ fn search
                   (Equal Bool (elem a d x (Cons a head tail)) True)
                   (elem_step_from_tail_after_head
                     (elem a d x tail)
-                    (ordered_search_leq a d x head)
-                    (ordered_search_leq a d head x)
+                    (ord_leq_at a d x head)
+                    (ord_leq_at a d head x)
                     x_before_head
                     tail_member);
               No refute_tail ↦
@@ -231,8 +217,8 @@ fn search
                     refute_tail
                       (elem_step_to_tail_after_head
                         (elem a d x tail)
-                        (ordered_search_leq a d x head)
-                        (ordered_search_leq a d head x)
+                        (ord_leq_at a d x head)
+                        (ord_leq_at a d head x)
                         x_before_head
                         member))
             }
