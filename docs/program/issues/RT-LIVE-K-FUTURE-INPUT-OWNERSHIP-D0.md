@@ -1,7 +1,7 @@
 ---
 id: RT-LIVE-K-FUTURE-INPUT-OWNERSHIP-D0
 title: "Scratch-only live-k future-input ownership map D0 (no production candidate, QA, Decision, CI, publication, or merge): HS12 was discharged with the STAGE-THE-APPLICATION design ruling (evt_5fczfzysqyca8) — app486/u0:53 is an environment-production/escape seat, not an execution seat; the repair is a typed staged-application boundary-closure where the later response-owner consumes the staged authority ONCE through call_static_worker_with_inputs. Production is NOT yet authorized because the exact later response owner is unproved. This D0 maps, over the SAME WRITE witness (app486/u0:53, template4, StaticWorkerBinding closure1246/body1238/arity1/captures7, route GeneratedContext, discharge DirectSpecializationCall, transport None) and WITHOUT changing production, five things: (1) the exact planner/source identity of the arity-one semantic response argument and the instruction/value that supplies it; (2) the exact later Function and application occurrence that OWN that argument; (3) how app486's capture environment dominates that seat or reaches it through explicit declared parameters; (4) the existing stable planner relation, if any, joining app486/template4/closure1246/body1238/route GeneratedContext to that later seat; (5) the current-Function target declaration the existing emitter would consume there. Controls independently DROP, DUPLICATE, and VARY each join coordinate and distinguish no-relation from ambiguity (HostResult, capture words, adjacency, matching ABI shape, first/only target, body-only lookup, and runtime tags receive NO credit). OUTCOME: a unique planner-issued future response/control edge proven -> return the exact map for an implementation frame under the staged design; NO unique edge -> stop with the confident negative that the semantic application is infeasible under the no-runtime-object constraint (neither an enum nor a join may manufacture the missing authority). Any other outcome is a hard stop to the Architect. Scratch-only; reuses the accepted runtime net at pickup 978b05dd29 (recheck the seven blobs); restore byte-clean; NEVER merged."
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -12,6 +12,57 @@ github: null
 origin: "Architect HS12 post-advisory ruling evt_5fczfzysqyca8 (thr_443f4v7keb6tg, 2026-08-31), grounded on the mandatory HS12 Research advisory evt_7jm10b0q0f5ht and the HS12 hold evt_6rbxfaz48f9n2. The ruling binds released head 960263e6c888474c07609cbdfaacdd484d931307 (tree f926f8374719aad35bfe05e10ff83868c40e1b20) and accepted runtime pickup 978b05dd29ab1a40cdc5b89e4410bd3928cff111. Outcome B was confirmed at live app486/u0:53: the exact StaticWorkerBinding closure1246/body1238/arity1/captures7 carries route=GeneratedContext / discharge=DirectSpecializationCall / transport=None, and materialize_checked_ih_static_worker_application reads only arity/captures and returns the captured-environment word, leaving the route unused. RULING: STAGE the application; do NOT call at app486. app486 supplies zero explicit operands while the worker declares arity one, and route=GeneratedContext selects HOW a complete call executes, not the missing argument; per the runtime contract (spec/40-runtime/42-evaluation.md sections 6.2 and 6.4, k : Resp e -> ITree ..., response exists only after H e, apply k resp once in tail position) app486 is an environment-production/escape seat. The required representation is a typed staged-application boundary-closure: at app486 consume the checked marker into a compiler-only staged-application authority + a typed CheckedIhCapturedEnvironment (ordered captures only, no code pointer/tag/route tag/ABI discriminator/callable identity); keep ONE planner-issued stable descriptor beside it binding occurrence/template4 -> closure1246/body1238, declared arity, ordered captures, GeneratedContext route, discharge, destination owner; do NOT carry StaticWorkerBinding (function-local SSA captures) or a FuncRef across Functions — at the later owner project the environment fields under the descriptor, form a fresh current-Function binding with the preserved route, resolve that Function's own local target table; only the owner holding the planner-authorized response operand consumes the staged authority, passing exactly that one operand to call_static_worker_with_inputs (the sole owner of arity checking, capture ordering, GeneratedContext suffix, route-selected target table, call emission, Trap-before-Result); the emitter's returned result — not the environment word, not a ConsumedHere label — discharges the staged authority. call_boundary_closure_environment is precedent for descriptor-plus-environment reconstruction but is NOT the final emitter here (its unconditional worker_calls lookup would bypass StaticWorkerCallRoute). Production is blocked until this future-input ownership proof; the Architect authorizes the implementation frame only on a proven unique edge. Steward owns this D0 recut and Runtime release sequencing. Scratch-only doc recut per COORDINATION section 2; the doc commit advances current origin/main and the accepted runtime-net product blobs are unchanged (recheck the seven at pickup 978b05dd29)."
 ---
 
+> # CLOSED — TERMINAL INFEASIBILITY. The confident negative (`NO_UNIQUE_EDGE`)
+> # was returned and the Architect ACCEPTED it. This D0's "No unique edge"
+> # outcome (below) fired.
+> #
+> # **Report** (runtime-implementer `evt_7pgzcwvwrsvnp`, thr_5953, 2026-08-31):
+> # scratch-only, byte-clean at released head `e6a6c5240`, accepted pickup
+> # `978b05dd29` (seven blobs identical), 92-member evidence manifest. All five
+> # join-coordinate populations (response supplier, later owner,
+> # environment-to-owner, future relation, target-at-owner) are EMPTY; their
+> # drop/dup/vary controls are honestly `CONTROL_NO_SUBJECT` (a manufactured call
+> # or projection would falsify the question). The three extant partial
+> # populations bite as absence/ambiguity/mismatch, each with an independent
+> # byte-identical exact restore, and receive no full-edge credit.
+> #
+> # **Architect terminal ruling** (`evt_mx6scjje1yjp`, thr_5953, 2026-08-31):
+> # ACCEPT `NO_UNIQUE_EDGE`. Independently reproduced the seven blobs, the seven
+> # primary hashes, all 92 manifest entries; applied the observation-only diff to
+> # `e6a6c5240` in a detached worktree; independent Function-identity decoder
+> # confirms one u0:53 use (u3:58 fn42, one call) and 19 refs to u0:57 with zero
+> # instruction uses; LLDB binds live u0:53/app486 + unit3 result to context1,
+> # context0/u3:57 entry zero. The HS12 staged-application representation is NOT
+> # implementable on this substrate under the ruled no-runtime-object boundary:
+> # there is no existing owner at which the future `Resp e`, the preserved capture
+> # environment, and the route-selected execution authority coexist. A typed enum
+> # or join changes how an existing edge is represented; it cannot create the
+> # missing world-response control edge.
+> #
+> # **Bounded, not overstated:** this does NOT prove Ken's `Vis` semantics
+> # impossible. It proves this native representation cannot realize them WITHOUT
+> # reopening a boundary this chain excluded — either (a) a planner-owned
+> # world-response continuation path with demonstrable dynamic control ownership,
+> # or (b) admitting a runtime callable/continuation identity object. Either is a
+> # NEW ARCHITECTURE DECISION that grows the TCB — not a repair to
+> # `materialize_checked_ih_static_worker_application`, and NOT authorized here.
+> #
+> # **Chain terminus.** This is the TWELFTH and final stop of the LIVE-K
+> # result-supply D0 measurement chain (the twelve-stop history is preserved in
+> # `steward/lanes.md` lane 1 and the tracker; the per-stop symptom inventory is
+> # in the closed predecessor nodes). No production candidate, QA, Decision, CI,
+> # PR or merge follows. The accepted planned trap is PRESERVED, not repaired.
+> # Do NOT frame another local selector/materializer/capsule recut from this
+> # finding (Architect, explicit).
+> #
+> # **Disposition (Steward).** The boundary-reopen decision — whether to fund
+> # reopening the no-runtime-object boundary, and in which shape (a or b) at what
+> # TCB cost — is OPERATOR + Architect scope (grows the TCB; a scope fork the
+> # roadmap does not settle). ROUTED to the operator; runtime lane-1 is BLOCKED on
+> # that decision (operator-gated idle, NOT framing debt; no clean queued runtime
+> # filler exists). runtime-implementer restored byte-clean, holding event-driven.
+> #
+> # --- original release banner (history) ---
 > # READY — SCRATCH-ONLY LIVE-K FUTURE-INPUT OWNERSHIP MAP D0. Released to the
 > # runtime ring (lane 1). Runtime is parked; this IS the release.
 > #
