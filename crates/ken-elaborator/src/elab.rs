@@ -1510,8 +1510,9 @@ fn subst_term_generalize_many(term: &Term, subs: &[(Term, Term)]) -> Term {
     }
 }
 
-/// Whether `scrut_core` occurs as a subterm of `term` (weakening-correct via
-/// the existing generalization pass and a sentinel that cannot collide). Used to
+/// Whether `scrut_core` occurs as a subterm of `term`, via an exhaustive
+/// structural traversal. Under binders `scrut_core` is weakened with the
+/// traversed body. Used to
 /// GATE index rebasing: the scrutinee's own indices only need rebasing when the
 /// scrutinee is actually coupled to them in the goal (it appears there). When it
 /// does not appear — a result-type index unrelated to the scrutinee, e.g. Vec
