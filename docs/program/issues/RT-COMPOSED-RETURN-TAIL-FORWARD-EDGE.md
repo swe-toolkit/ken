@@ -9,7 +9,7 @@ tier: T1
 depends_on: [RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT]
 blocks: [RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT]
 github: null
-origin: "Architect component design for the operator-funded composed-return native repair, option (a)(i). RE-CUT 2026-09-01 on the Architect HS3 ruling evt_2042vywbmc063 (accepting Research advisory evt_45ky3pccsdbq6, outcome (2)), which is the authoritative mechanism contract for this node and SUPERSEDES the Tail-admission mechanism of the original PART 1/2 evt_381dzjykr4knn + PART 2/2 evt_5963far74b735 on that one axis: the old wording 'existing governed call' was too strong (the call is planner-governed as Tail source S, not governed-entry E), and the interim clause treating every current NonGoverned arrival as necessarily InlineNoCall was scoped too broadly. WP1's captured-environment / application-result type split is preserved (it fits this ruling). WP2 of the three-checkpoint ATOMIC merge unit; a HELD CHECKPOINT — no QA, Decision, publication, or merge follows it. Re-cut from clean checkpoint 39562a12b (tree 95c97bb25); d0d8ed0f6 is diagnostic evidence only. Symptom inventory folded from 13140993e3. The Steward owns the re-cut and the exact self-contained release to Runtime; each checkpoint release is the Steward's."
+origin: "Architect component design for the operator-funded composed-return native repair, option (a)(i). RE-CUT 2026-09-01 on the Architect HS3 ruling evt_2042vywbmc063 (accepting Research advisory evt_45ky3pccsdbq6, outcome (2)), which is the authoritative mechanism contract for this node and SUPERSEDES the Tail-admission mechanism of the original PART 1/2 evt_381dzjykr4knn + PART 2/2 evt_5963far74b735 on that one axis: the old wording 'existing governed call' was too strong (the call is planner-governed as Tail source S, not governed-entry E), and the interim clause treating every current NonGoverned arrival as necessarily InlineNoCall was scoped too broadly. WP1's captured-environment / application-result type split is preserved (it fits this ruling). AMENDED 2026-09-01 on the Architect HS#4 ruling evt_3pchvsvq1kjya — a GATE CORRECTION ONLY, no production representation change: the former single '28' was a reached call-event count, NOT the planner population; static P and the reached post-terminal event multiset are now pinned as SEPARATE objects (static P=14; reached multiset 30 events / 27 Tail; completed ledger 27 rows, funcid50=16/57=9/58=2). WP2 of the three-checkpoint ATOMIC merge unit; a HELD CHECKPOINT — no QA, Decision, publication, or merge follows it. Re-cut production from clean e2ada653b (the released recut, tree 8773e2df6); abe5600a8 and d0d8ed0f6 are diagnostic evidence only. Symptom inventory folded from 13140993e3. The Steward owns the re-cut and the exact self-contained release to Runtime; each checkpoint release is the Steward's."
 ---
 
 ## Symptom inventory (folded from 13140993e3)
@@ -152,36 +152,78 @@ gets `NonGoverned`, retains no projection, then forms authority from transport
 identity I at `source.rs:4435+` — that global-admission composition is what this
 re-cut replaces.
 
-## Required gate (Architect HS3 — the fixed products must report exactly)
+## Required gate (Architect HS3 + HS#4 correction — TWO SEPARATE objects)
 
-- 28 `TailProducerPending` current arrivals with C=S and E!=S, all completing
-  identity -> exact call Inst -> Trap-checked Result -> same-I authority -> exact
-  Ret argument, distributed `funcid50=17`, `funcid57=9`, `funcid58=2`;
-- 2 `GeneratedEntry/Direct` arrivals;
-- 1 `Ordinary` arrival retaining legacy behavior;
-- zero current `GovernedTail` generated-entry arrivals and zero source-machine
-  claims, both negative controls.
+The former single "28" was a reached call-event count, NOT the planner
+population. HS#4 (evt_3pchvsvq1kjya) pins the static planner relation and the
+reached post-terminal event multiset as SEPARATE objects; the completed ledger is
+27 rows. Update stale `0..28` and `17/9/2` assumptions everywhere.
 
-Pin the partition in BOTH directions and mutate: drop / duplicate a Tail phase;
-move S to Ordinary; move an Ordinary key to Tail; swap or collapse E/S; cross I;
-vary call lookup identity; permute / drop / substitute captures; substitute an
-ordinary or continuation input; drop / duplicate the call; substitute environment
-or seed for Result; pair another authority; vary Ret sink / argument; and drop
-authority consumption. Every applicable mutation must reach, red for its claimed
-reason, and restore byte-identically. The finished-CLIF closure must pair all 28
-exact call instructions, and the fixed read / write semantic products must retain
-their exact `InvalidOffset` behavior so a well-wired but semantically wrong
-response cannot pass.
+1. **Static planner-publication gate (unique-key; does NOT count repeated lowering
+   visits).** Across the fixed read/write products, P=14, partitioned:
+   - G=5 generated-entry keys: four Tail-route entries E plus one Direct entry;
+   - S_tail=4 exact Tail producer source keys S;
+   - O=5 ordinary keys.
+   Preserve exact coverage, subset closure, pairwise disjointness, E!=S for every
+   Tail route, conflicting-duplicate-S refusal, and one total lookup per reached
+   event. This static P / G / S_tail / O gate must stay green INDEPENDENTLY when
+   the dynamic count changes.
+
+2. **Reached post-terminal phase multiset = exactly 30 events:**
+   - 27 `TailProducerPending`;
+   - 2 `GeneratedEntryDirect`;
+   - 1 `Ordinary`;
+   - 0 `GeneratedEntryTail`.
+   The 27 Tail events split by source: `474/473/472 = 15`, `685/684/683 = 1`,
+   `700/699/698 = 9`, `487/486/485 = 2`.
+
+3. **Completed application ledger = exactly 27 rows**, arrival indices `0..27`
+   exclusive, distributed `funcid50=16`, `funcid57=9`, `funcid58=2`. Every row
+   owes a distinct selected identity -> exact emitted Inst -> Trap-checked Result
+   -> same-I authority -> exact Ret block, with branch argument equal to the exact
+   Result. Finished-CLIF pairing is over these 27 ACTUAL call instructions, never
+   over an unreached static key.
+
+4. **Retained negative controls / invariants:** zero source-machine claims, zero
+   `RoutedAnswer` construction after Tail authority consumption, payload-free
+   terminal `RecursiveBackedge`, and no Direct / Ordinary authority formation.
+
+5. **Terminal-control discriminator (new — proves the terminal path, not a revised
+   literal).** A compile-preserving, test-only attempt to restore the legacy
+   Continue / fallthrough after the Tail Ret must REACH the affected path, restore
+   the extra `474/473/472` visit (the removed 28th Tail event), and RED for
+   post-Ret continuation — not for an unrelated malformed fixture. The exact-27
+   positive then proves the terminal path. Restore bytes exactly.
+
+**Mutation grid (over the 27 real rows).** Pin the partition in BOTH directions
+and mutate: drop / duplicate a Tail phase; move S to Ordinary; move an Ordinary
+key to Tail; swap or collapse E/S; cross I; vary call lookup identity; permute /
+drop / substitute captures; substitute an ordinary or continuation input; drop /
+duplicate the call; substitute environment or seed for Result; pair another
+authority; vary Ret sink / argument; and drop authority consumption. Every
+applicable mutation must reach, red for its claimed reason, and restore
+byte-identically. The fixed read / write semantic products must retain their exact
+`InvalidOffset` behavior so a well-wired but semantically wrong response cannot
+pass.
+
+The 28th row is NOT a dropped pending application — it is a legacy post-terminal
+revisit that no longer reaches the phase lookup once Ret is emitted. Do NOT pad
+it, synthesize a call, continue after Ret, or attach a ledger row to an unreached
+plan member.
 
 ## Held-checkpoint discipline
 
-Held checkpoint commits only; no PR / QA / Decision / merge. Re-cut from clean
-checkpoint `39562a12b` (tree `95c97bb25`); `d0d8ed0f6` remains diagnostic evidence
-only. Preserve held WP1 mechanisms that fit this ruling; replace the failed
-global-admission composition rather than layering over it. On completing WP2's
-gate, hold locally and proceed to WP3 (`RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT`),
-which cuts the sole candidate. Any uncovered outcome is a HARD STOP to the
-Architect — not a local workaround.
+Held checkpoint commits only; no PR / QA / Decision / merge. Re-cut PRODUCTION
+from clean `e2ada653b` (the released recut, tree `8773e2df6`); `abe5600a8` (the
+HS#4 prototype) and `d0d8ed0f6` remain diagnostic evidence only. Fold only the
+count / gate correction plus the already-prototyped lawful mechanism — HS#4
+authorizes NO production representation change: the single phase table, pending
+token, exact E-I-S resolution, proof-consuming authority, call / result types,
+and Ret edge remain exactly as HS3 ruled. Preserve held WP1 mechanisms that fit;
+replace the failed global-admission composition rather than layering over it. On
+completing WP2's gate, hold locally and proceed to WP3
+(`RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT`), which cuts the sole candidate. Any
+uncovered outcome is a HARD STOP to the Architect — not a local workaround.
 
 ## Capability tier: T1
 
