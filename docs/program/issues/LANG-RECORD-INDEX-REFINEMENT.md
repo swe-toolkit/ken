@@ -1,172 +1,154 @@
 ---
 id: LANG-RECORD-INDEX-REFINEMENT
-title: "Elaborator predecessor for D2b: make generated dependent-elimination branch refinement handle a constructor-headed record index (e.g. FokMkSequent gamma delta) by forming the three transport constructors' J under an abstract index type and abstract endpoints, then applying that checked generic helper at the concrete index — the core analogue of the already-green generic fok_cong pattern. No FokDerivation re-index, no kernel/spec/trust change."
-status: ready
-owner: language
-size: M
-gate: none
+title: "D2b predecessor, RESOLVED TO A KERNEL/TCB BINDER-HYGIENE FIX: eq_at_inductive (obs.rs:228) must weaken the accumulated nested-conjunction codomain past each newly bound proof (Term::sigma(conjunct, weaken(&acc, 1))), the same de Bruijn rule eq_at_sigma already uses. The elaborator transport hypothesis is FALSIFIED by measurement and reverts. HELD for operator TCB authorization."
+status: draft
+owner: kernel
+size: S
+gate: operator
 tier: T1
 depends_on: []
 blocks: [V3-FO-EMBEDDING-ADEQUACY]
 github: null
-origin: "Steward, 2026-09-01, framing the Architect's D2b hard-stop disposition (ruling evt_68t4wwrs274nh, on the language-leader hard-stop evt_6m6bbz03qye6f). D2b (V3-FO-EMBEDDING-ADEQUACY) hard-stopped at the derivation inversion: adequacy needs to dependently eliminate FokDerivation over its compound record index FokMkSequent gamma delta, and the current match compiler cannot. The Architect independently reproduced the exact minimal failure at 70a291a96 (tree 740c5e7f4) and classified it as an ELABORATOR-ONLY predecessor — NOT a relation re-index (b) and NOT a kernel/TCB widening (c), so NO operator authorization is needed (the three-option list conflated elaborator repair with kernel enlargement; different trust layers). Steward owns the frame, sequencing, and D2b re-release. Base current origin/main 5cd4411b6; the elaborator coordinates below were located at current main and are stable vs the Architect's 740c5e7f4 measurement (the only intervening commits are doc-only). Symptom inventory folded from architect commit 21b1c477d onto the consumer node."
+origin: "Steward, 2026-09-01. Hard-stop chain on the D2b derivation inversion (V3-FO-EMBEDDING-ADEQUACY). Originally framed as an elaborator-only predecessor (the Architect's evt_68t4wwrs274nh transport-rewrite mechanism). That hypothesis was FALSIFIED by the language ring's four-probe measurement (evt_7fqdcjeh7dg63/evt_6t0tt37e7tes4): at base 4cbbdffb3 where the transport rewrite is absent, the single kernel eq_at_inductive weakening greens AC-1/AC-3/bare-control by itself — so the transport rewrite is causally irrelevant and reverts. The Architect confirmed the layer-(c) kernel/TCB disposition on all three points (evt_3f61wtca219hw). The id prefix LANG- is legacy from the elaborator-hypothesis phase; the work is now kernel-owned and operator-gated. Id retained for the V3-FO-EMBEDDING-ADEQUACY dependency edge and thread continuity."
 ---
 
-> # ELABORATOR-ONLY PREDECESSOR of D2b. The mechanism contract is the
-> # Architect's, verbatim in scope: ruling `evt_68t4wwrs274nh`. Read it before
-> # cutting anything; do NOT re-derive it here and do NOT reopen the D2b theorem.
+> # RESOLVED TO A KERNEL/TCB REPAIR — HELD FOR OPERATOR TCB AUTHORIZATION.
 > #
-> # This node MERGES (unlike the D2b held evidence). It lands the elaborator fix,
-> # then the Steward explicitly re-releases D2b. It touches the elaborator crate
-> # ONLY — `FokDerivation`, `FoKripke.ken`, `/spec`, the kernel, the prover, the
-> # trusted base, and the FO verdict are all byte-unchanged.
+> # This node does NOT merge and NOTHING is committed until the operator
+> # approves the kernel touch. The kernel test + AC fixture stay uncommitted;
+> # obs.rs is byte-restored on the held branch; D2b (V3-FO-EMBEDDING-ADEQUACY)
+> # and its evidence 70a291a96 stay held. The Steward presents the request
+> # below at the operator's 13:00 UTC return (2026-09-01).
+> #
+> # Confirmed disposition: Architect evt_3f61wtca219hw. Four-probe evidence:
+> # language-implementer evt_7fqdcjeh7dg63, language-leader evt_6t0tt37e7tes4.
 
-## The constraint (grounded, not aesthetic)
+## Operator authorization request (the decision)
 
-D2b must prove `embedding_adequacy` by structural induction on `FokIForm`, which
-requires inverting `FokDerivation (FokMkSequent gamma delta)` — a dependent
-elimination over a constructor-headed record index. Adequacy is the second of
-the two `23 §4.4` theorems route FO needs before it may return `proved`; it
-cannot be proved without this inversion, and the Architect ruled the inversion
-cannot be expressed on the current match compiler. The constraint is the spec's
-theorem obligation, not a convenience.
+**What is asked:** approve a one-line kernel/TCB completeness repair to
+`eq_at_inductive` in `crates/ken-kernel/src/obs.rs`, so the FO embedding-adequacy
+theorem can dependently eliminate a derivation over a constructor-headed record
+index. This grows nothing in the trusted base's surface; it corrects a
+mal-scoped term the kernel was already constructing. **Nothing lands before your
+approval.**
 
-## Symptom inventory (Architect)
+### Exact locus and diff
 
-A derivation family over a constructor-headed record index can be built but not
-dependently eliminated: generated refinement treats observational record
-equality as a primitive `Eq`/`J` witness after it has reduced to a Sigma of
-field equalities — keyed on the index equality's representation rather than the
-derivation relation.
+`obs.rs:228 fn eq_at_inductive` builds the per-constructor equality proposition
+as a right-nested Sigma (conjunction) over the field equalities, accumulated in
+reverse at `obs.rs:308`:
 
-## Grounded defect (Architect, measured at `70a291a96` / tree `740c5e7f4`)
+```rust
+// obs.rs:308, inside the `for j in (0..n).rev()` reverse fold
+-        acc = Term::sigma(conjunct, acc);
++        acc = Term::sigma(conjunct, weaken(&acc, 1));
+```
 
-The top-premise path is ALREADY general and is NOT the defect:
-`finish_dependent_elim` (`elab.rs:2445`) calls `synth_generated_index_evidence`
-(`:1357`), and `synth_refl_proof` (`:1327`) recursively constructs Sigma-shaped
-reflexivity. Do NOT replace that path or add a `FokSequent` special case;
-`synth_generated_index_evidence` remains the SOLE top-premise reflexivity
-producer.
+That is the entire kernel edit.
 
-The failure is later, in generated branch refinement:
+### Why it is correct (Architect-confirmed, evt_3f61wtca219hw)
 
-1. `method_index_premises` (`elab.rs:3189`) correctly issues the raw premise
-   `Equal FokSequent constructor_conclusion scrutinee_index`.
-2. `install_index_refinements` (`elab.rs:3558`) WHNFs that premise. For a Nat
-   constructor equality it obtains another primitive `Eq` after constructor
-   peeling; for `FokMkSequent`, observational equality instead becomes the Sigma
-   of the two `List` equalities, and the current fallback retains the whole
-   record endpoints.
-3. `build_sym` (`:3232`), `build_index_type_cong` (`:3268`), and
-   `build_index_omega_transport` (`:3315`) then construct `J` ALREADY specialized
-   to concrete `idx_ty = FokSequent`; `build_sym` also constructs a literal
-   specialized `Refl` base. The concrete equality has already reduced to Sigma,
-   so the direct specialized `J`/`Refl` path cannot recover the original `Eq`
-   head — which is why even a constant `Nat` result fails before its arm can use
-   `left`.
+Each `conjunct` is constructed in the caller's `ctx`. Wrapping the accumulated
+suffix `acc` as a `Sigma` codomain extends that context by one binder — the newly
+bound proof of the current conjunct. Every free caller-context index in the
+suffix must therefore move by one. `weaken` does exactly that (`shift(.., 1, 0)`:
+it moves free indices while incrementing the cutoff beneath the suffix's existing
+`Sigma` binders). Repeating it at each fold produces the required right-nested
+telescope; `strip_trailing_top` (obs.rs:316) removes only the closed unit and
+does not undo the lifts. **This is the identical binder rule `eq_at_sigma`
+already implements for its second conjunct** — the single-argument and
+non-nested cases never exercised the missing lift, which is why the bug survived.
 
-**Discriminating positive (proves this is an elaborator, not a logical/relation,
-gap).** On the SAME exact file, a theorem applying the existing generic
-`fok_cong` to `Equal FokSequent (FokMkSequent g1 d1) (FokMkSequent g2 d2)` and
-projecting `fok_seq_gamma` checks GREEN: its `J` is checked while its
-type/index are ABSTRACT, then instantiated at `FokSequent`. The current
-dependent-match producer instead specializes first and asks the primitive `J`
-path to rediscover an `Eq` after observational reduction.
+### Why it is not a soundness relaxation (Architect-confirmed)
 
-## Authorized mechanism (Architect — do not re-derive)
+Constructor identity, arity checks (obs.rs:248,261), field types, endpoint terms,
+the dependent `Cast` transport (obs.rs:296), `convert_type`, and every field `Eq`
+are **byte-identical**. The edit supplies no equality evidence and introduces no
+shortcut. It only preserves which outer variables the already-constructed
+proposition denotes, instead of letting the next proof binder capture them. The
+old term was mal-scoped; the repaired term states the intended conjunction. It is
+a **completeness** repair (the kernel wrongly rejected a well-typed nested
+elimination), not a widening that admits unequal terms.
 
-Keep the raw generated equality premise. Refactor the three generated transport
-constructors so their `J` is formed under an ABSTRACT index type and ABSTRACT
-endpoints, then apply that checked generic helper to the concrete `index_type`,
-`old_index`, `new_index`, and branch evidence:
+### Evidence (four probes, language ring)
 
-- symmetry used by the sibling convoy (`build_sym`);
-- Type-classified index congruence used by `Cast` (`build_index_type_cong`);
-- Omega-classified direct transport used by the landed Omega arm
-  (`build_index_omega_transport`).
+- **AXIS 1** — held branch `4f206f1bf` (generic transport rewrite present) + only
+  the weakening: AC-1 (record-index constant-motive match), AC-3 (D2b inversion
+  probe), and the bare-index control all GREEN.
+- **AXIS 2 (dispositive)** — base `4cbbdffb3` (transport rewrite ABSENT,
+  `elab.rs` reverted) + only the weakening: AC-1, AC-3, bare control all GREEN.
+  ⇒ the weakening fixes the record-index match ALONE; the transport rewrite never
+  fires and is causally irrelevant.
+- **BASELINE** — `4f206f1bf` WITHOUT the weakening: AC-1/AC-3 byte-identically RED.
+- **DIRECT KERNEL CONTROL** — new test
+  `crates/ken-kernel/tests/eq_at_inductive_multifield_binder.rs`: a two-field
+  single-ctor `MkPair2 : Nat -> Unit -> Pair2` with OPEN endpoints
+  under one unrelated trailing binder, and a one-field `MkOne : Nat -> One`. WITH
+  the weakening: two-field reflexive-eq-under-trailing-binder infers the nested
+  proof (OK); one-field stays well-typed (OK). WITH the old buggy `acc` restored:
+  two-field FAILS exactly as predicted; one-field OK. The one-field row staying
+  green both ways confirms the control reaches the nested-codomain case, not
+  generic reflexivity.
 
-Generate the core analogue of the already-green generic `fok_cong` pattern — NOT
-a `J` whose motive/domain has already substituted `FokSequent`. Preserve old/new
-orientation EXACTLY. The kernel re-checks the completed generic applications as
-it does today.
+### Production reach (not fixture-only)
 
-**Closure (do not special-case).** Do not special-case `FokSequent`,
-`FokMkSequent`, two fields, or `List`. The rule is: ANY single index type whose
-observational reflexive equality reduces structurally before branch refinement
-must use the same generic transport producer. The previously retained
-multi-index goal-restoration limitation stays UNSUPPORTED and is not silently
-widened by this node.
+The real `FoKripke.ken` embedding-adequacy elimination — the second of the two
+`spec 23 §4.4` theorems route FO needs before it may return `proved` — requires
+exactly this nested-codomain elimination over `FokDerivation (FokMkSequent gamma
+delta)`. This is reachable from real Ken source, not a fixture-only capability
+(Architect point 3).
 
-## Acceptance criteria (Architect's required predecessor evidence, verbatim in scope)
+## Candidate gate on approval (Architect's required gate)
 
-- **AC-1 (the reported red→green).** The exact reported record-index
-  constant-motive match (`FokDerivation (FokMkSequent gamma delta) -> Nat`,
-  exhaustive) changes from red to green. This catches the current over-eager
-  sibling-convoy construction even though the arm result is only `Nat`.
-- **AC-2 (a real consumer, using fields).** A record-indexed dependent `Omega`
-  consumer changes from red to green AND uses its constructor fields / recursive
-  evidence. A read of a helper term is NOT enough.
-- **AC-3 (the D2b probe reaches the arm body).** The held D2b inversion probe,
-  over the UNCHANGED `FokDerivation` declaration, reaches the arm body. It need
-  not finish adequacy inside this predecessor.
-- **AC-4 (causal necessity, population-side).** A population-side mutation that
-  restores the current specialized-at-concrete-index `J` producer makes BOTH
-  real consumers (AC-1, AC-2) red again; the detector and fixture stay fixed.
-- **AC-5 (orientation + field discrimination).** Wrong-direction old/new and a
-  one-field substitution each RED independently while the other record field,
-  the family, the motive, and cardinality stay fixed. A Sigma pair merely
-  existing is not acceptance evidence.
-- **AC-6 (no regression on the existing rows).** Existing Nat-index `Type` and
-  `Omega` integration rows remain green with BYTE-IDENTICAL checked-core output
-  where the new generic application is not required; no weakening of their
-  constructor-injectivity controls.
-- **AC-7 (the two-index boundary stays put).** The established two-index negative
-  remains RED at its own exact unsupported boundary (not silently widened).
-- **AC-8 (diff confinement + no-regression in CI).** The diff is confined to the
-  elaborator crate plus its focused tests/frame. `FokDerivation`, `FoKripke.ken`,
-  `/spec`, the kernel, the prover, the trusted base, and the FO verdict are
-  byte-unchanged. Whole-suite green in CI (`COORDINATION §12`); targeted local
-  validation only (`-p ken-elaborator`), never `--workspace`.
+If the operator approves, the recut lands as a **kernel candidate**, owner
+kernel, reviewed by **kernel QA + the Architect's required TCB review** on the
+exact SHA. No extra pre-authorization Adversary hop is needed to establish the
+disposition; the standing Adversary code-merge hunt attacks it independently
+(no new workflow edge).
 
-## Banned scope
+- **No-overaccept control (must be in the candidate gate).** Under the same
+  trailing binder, use the same two-field constructor with a genuinely unequal
+  later field and require its proposed whole-record equality witness to remain
+  kernel-REJECTED. Retain existing different-constructor / arity behavior.
+- **Mutation-prove the seam.** Restore `Term::sigma(conjunct, acc)`: the
+  two-field reflexive control and real AC-1/AC-3 must RED, while the one-field and
+  unequal-field controls must NOT turn into false positives; then restore bytes
+  exactly.
+- **Retain** the record-index acceptance fixture as a reaching regression for the
+  real repair. **Do not** retain the unused elaborator production mechanism.
 
-- **Re-indexing `FokDerivation`** — no Nat code for sequents, no record split
-  into `List` indices, no change to `fok_derives`/`fok_classically_valid`. That
-  compensates in the relation for an elaborator defect (and `List`-index
-  refinement is not established anyway).
-- **Any kernel / spec / trusted-base / public-Ken-relation change**, and any FO
-  `proved` flip. This is an elaborator-crate repair; the kernel re-checks the
-  output unchanged.
-- **Special-casing `FokSequent`/`FokMkSequent`/two-field/`List`**, or replacing
-  the `synth_generated_index_evidence` top-premise path.
-- **Widening the multi-index goal-restoration limitation** — it stays
-  unsupported; AC-7 pins it.
+## Transport reversion (Architect point 1)
 
-## Required reviewers
+The generic `sym`/`cong`/`subst` elaborator transport production committed at
+`4f206f1bf` is correct-but-causally-irrelevant groundwork and does NOT belong in
+this fix. Revert it. Keep only the record-index acceptance fixture.
 
-- **Architect** — required reviewer for mechanism faithfulness: the fix forms the
-  generic abstract-index `J` (the `fok_cong` analogue) and does not special-case
-  the record, `synth_generated_index_evidence` stays the sole top-premise
-  producer, and the two-index boundary is not widened.
-- **language-QA** — the normal language-ring review path.
-- **Adversary** — over-accept hunt: a generic transport producer that manufactures
-  an unsound elimination, or an AC control that is manufactured rather than
-  causal (AC-4/AC-5 must be caller-side and population-side, not detector-side).
+## What stays byte-unchanged either way
 
-## Sequencing
+`FokDerivation`, `fok_derives`/`fok_classically_valid`, `FoKripke.ken`, `/spec`,
+the prover, the public Ken relation, and the FO `proved` verdict. The only TCB
+touch is the one-line `obs.rs` weakening above.
 
-Framed and landed from current `main` (`5cd4411b6`), `depends_on: []`. On the
-candidate: Architect + language-QA + Adversary on the exact SHA, then Steward
-M1-M4, then the lieutenant. **Only after this node's exact consumer gate (AC-1..
-AC-3) is green does the Steward EXPLICITLY re-release D2b** — the held D2b
-evidence `70a291a96` (the 177-line strengthened ledger/inversion spine) is
-reusable material, not a candidate; the language ring rebases/folds it onto the
-landed elaborator fix and continues the EXACT unchanged adequacy theorem. No
-checker narrowing, relation redesign, kernel seam, or FO `proved` flip is
-authorized by this node.
+## On approval — execution order
+
+1. Revert the `4f206f1bf` transport production (retain the record-index fixture).
+2. Land the `obs.rs:308` weakening + the AC fixtures + the no-overaccept control
+   + the mutation proof, as one kernel candidate. Kernel QA + Architect TCB
+   review on the exact SHA; Steward routes (M1-M4), lieutenant executes (M5-M9).
+3. Only after that lands does the Steward EXPLICITLY re-release D2b. The held D2b
+   evidence `70a291a96` (the strengthened ledger/inversion spine) is reusable
+   material, not a candidate; the language ring rebases/folds it onto the landed
+   kernel fix and continues the EXACT unchanged adequacy theorem.
+
+## On denial
+
+D2b (V3-FO-EMBEDDING-ADEQUACY) stays blocked; FO cannot return `proved` without
+embedding-adequacy. Any alternative route (proving the elimination without the
+kernel completeness fix) needs fresh Architect framing — the measurement shows no
+elaborator-only path exists.
 
 ## Capability tier: T1
 
-A soundness-adjacent elaborator capability (dependent elimination over a compound
-record index), reviewed on the argument that the generic transport is lawful and
-does not over-accept — not a mechanical diff.
+Kernel soundness reasoning: the fix is authorized on the argument that the
+weakening is a scoping-completeness repair that does not over-accept, not a
+mechanical diff.
