@@ -1,14 +1,14 @@
 ---
 id: LANG-RECORD-INDEX-REFINEMENT
 title: "D2b predecessor, RESOLVED TO A KERNEL/TCB BINDER-HYGIENE FIX: eq_at_inductive (obs.rs:228) must weaken the accumulated nested-conjunction codomain past each newly bound proof (Term::sigma(conjunct, weaken(&acc, 1))), the same de Bruijn rule eq_at_sigma already uses. The elaborator transport hypothesis is FALSIFIED by measurement and reverts. OPERATOR-APPROVED 2026-09-01; released to the language ring as a kernel candidate under kernel QA + Architect TCB review."
-status: active
+status: merged
 owner: kernel
 size: S
 gate: operator
 tier: T1
 depends_on: []
 blocks: [V3-FO-EMBEDDING-ADEQUACY]
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3216
 origin: "Steward, 2026-09-01. Hard-stop chain on the D2b derivation inversion (V3-FO-EMBEDDING-ADEQUACY). Originally framed as an elaborator-only predecessor (the Architect's evt_68t4wwrs274nh transport-rewrite mechanism). That hypothesis was FALSIFIED by the language ring's four-probe measurement (evt_7fqdcjeh7dg63/evt_6t0tt37e7tes4): at base 4cbbdffb3 where the transport rewrite is absent, the single kernel eq_at_inductive weakening greens AC-1/AC-3/bare-control by itself — so the transport rewrite is causally irrelevant and reverts. The Architect confirmed the layer-(c) kernel/TCB disposition on all three points (evt_3f61wtca219hw). The id prefix LANG- is legacy from the elaborator-hypothesis phase; the work is now kernel-owned and operator-gated. Id retained for the V3-FO-EMBEDDING-ADEQUACY dependency edge and thread continuity."
 ---
 
