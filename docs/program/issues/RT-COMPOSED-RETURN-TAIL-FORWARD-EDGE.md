@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE
 title: "Composed-return native repair, option (a)(i) WP2 of 3 (HELD CHECKPOINT of one atomic merge unit — no independent QA/Decision/merge): add the consuming method on the move-only forward-Ret authority so TailProducerToRet branches its exact Trap-checked call-result word to the function-local shared Ret block; represent 'edge already emitted' only as compiler control; generated-entry quotient and two-word header/backedge ABI stay structurally unchanged."
-status: draft
+status: active
 owner: runtime
 size: M
 gate: none

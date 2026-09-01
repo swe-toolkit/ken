@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT
 title: "Composed-return native repair, option (a)(i) WP1 of 3 (HELD CHECKPOINT of one atomic merge unit — no independent QA/Decision/merge): split captured-environment from application-result in private compiler types, and make DirectInvocationReturn's carried-environment arm emit one declared continuation call whose Trap-checked Result is the application result (no environment-as-result). app486 and constructor materialization stay environment-only; Tail byte-identical except shared private refactoring."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
