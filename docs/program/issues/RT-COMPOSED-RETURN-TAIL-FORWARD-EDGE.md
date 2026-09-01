@@ -12,6 +12,16 @@ github: null
 origin: "Architect component design for the operator-funded composed-return native repair, option (a)(i) (PART 1/2 evt_381dzjykr4knn, PART 2/2 evt_5963far74b735, 2026-09-01). WP2 of the three-checkpoint ATOMIC merge unit; a HELD CHECKPOINT — no QA, Decision, publication, or merge follows it. Flips ready when WP1's checkpoint is reached; the Steward releases it (the WP1 landing does not authorize a start — the sequence is one ring executing WP1->WP2->WP3, but each checkpoint release is the Steward's). Bound base e6a6c5240; the Architect's two posts are the authoritative mechanism contract."
 ---
 
+## Symptom inventory
+
+1. The late Tail helper has 28 governed arrivals but all are carried
+   `InlineNoCall`, with zero static-worker call results — keyed on a later
+   selector/authority population rather than actual call-result ownership.
+2. The nominated source-machine completion/claim seam has zero attempts on both
+   fixed read/write products while the same build reaches all 28 Tail arrivals —
+   keyed on a disjoint test-object call-result population rather than the
+   governed Tail population.
+
 > # WP2 of 3 — HELD CHECKPOINT of the RT-COMPOSED-RETURN atomic merge unit.
 > # DRAFT — reached after WP1's checkpoint. Lands NOTHING on its own (no QA,
 > # Decision, PR, or merge). The sole production candidate is cut only after WP3.
