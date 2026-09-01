@@ -7,7 +7,7 @@ size: M
 gate: none
 tier: T1
 depends_on: []
-blocks: [RT-COMPOSED-RETURN-RUNTIME-CLOSURE]
+blocks: [RT-COMPOSED-RETURN-SSA-SPECIALIZATION]
 github: null
 origin: "Architect component design for the operator-funded composed-return native repair, option (a)(i) co-located forward Ret edge (PART 1/2 evt_381dzjykr4knn, PART 2/2 evt_5963far74b735, 2026-09-01), grounded on the operator funding (evt_3met6tbk5wrnd) that followed the accepted terminal NO_UNIQUE_EDGE (evt_mx6scjje1yjp). Bound base current origin/main e6a6c5240e6d74381ffcd755c60c6705f1a99501, tree 1513c8279a669225e985ee97e746c0af786021a7. This is WP1 of a three-checkpoint ATOMIC merge unit (WP1 RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT -> WP2 RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE -> WP3 RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT); the three land as ONE product candidate cut only after WP3. WP1 and WP2 are HELD CHECKPOINTS: no QA, Decision, publication, or merge follows either. Steward owns framing + release sequencing; the Architect's two posts are the authoritative mechanism contract (do NOT re-derive it here)."
 ---

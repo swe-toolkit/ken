@@ -15,14 +15,13 @@ origin: "Architect mechanism ruling evt_3j6vshm83rk5q (2026-09-01), the authorit
 > # HELD as the FALLBACK mechanism — NOT selected. The operator prefers
 > # compile-time SSA handling OVER the runtime closure (2026-09-01, correcting a
 > # Steward mis-scope of the approach fork). The runtime ring is halted and held
-> # clean at ad191d1c2. The compile-time SSA path is the PRIMARY design, routed
-> # to the Architect (evt_10dfspc3ssk5) under the condition the ruling below
-> # itself names: the planner constructively proves one fixed K per
-> # response-producing Function and carries every capture as an explicit
-> # parameter. This runtime-closure node is retained intact and becomes the
-> # fallback ONLY if the Architect finds SSA genuinely infeasible under that
-> # condition — which is a finding to route back to the operator, not a silent
-> # switch. Do not build from this node until/unless it is re-selected.
+> # clean at ad191d1c2. The compile-time SSA path is the PRIMARY design, now
+> # framed and released as RT-COMPOSED-RETURN-SSA-SPECIALIZATION (Architect
+> # ruling evt_29jfzzw9j5xjz): polyvariant compile-time response-owner
+> # specialization. Its checkpoint 1 is a feasibility ledger; this runtime-closure
+> # node is retained intact and becomes the fallback ONLY if that ledger returns
+> # a typed SsaInfeasible finding AND the operator so rules — not a silent switch.
+> # Do not build from this node until/unless it is re-selected.
 
 ## Authoritative contract
 
