@@ -2584,3 +2584,107 @@ theorem fok_checker_soundness (q : FokForm) (pi : FokCert)
           (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm)))
           pi
           accepted))
+
+-- === D2b: embedding adequacy proof (23 section 4.4) ===
+--
+-- Adequacy is soundness of the three-rule slice calculus into the ONE model
+-- named by the given (c, rho): a `FokDerivation` of `[] => [fok_embed f]` yields
+-- `fok_denote f`. Per the Architect D2b boundary (evt_34a8xp9q284k0) the proof
+-- (1) consumes EVERY `fok_classically_valid q = ‖FokDerivation (⊢ q)‖`
+-- inhabitant, including a directly constructed derivation -- it never narrows to
+-- checker-accepted or `fok_checker_soundness`-produced derivations (that theorem
+-- composes DOWNSTREAM, not inside adequacy); (2) peels the fixed closed
+-- `fok_embed` root (`FokImp fok_k_sigma (FokForallWorld force)`) once by
+-- constructor/index -- root `ImpRight` then `ForallWorldRight`; (3) recurses on a
+-- strengthened internal judgment over the single intrinsic `FokScopedIForm
+-- sigma n`; (4) keeps a position-preserving left-context ledger whose ACTIVE
+-- entries pair an exact forcing formula with a proof of the corresponding source
+-- denotation, and whose INERT entries (`fok_k_sigma`, `FokAccess`, `FokDomainA`)
+-- are never source truth; `Init` discharges a source goal only through a
+-- selected active entry (exact index + `fok_form_eq_sound`); (5) carries a
+-- functional object-eigenparameter-to-carrier assignment; freshness is used
+-- twice (anti-capture, and collision-free assignment extension), and the world
+-- and object eigen roles stay distinct though both currently carry `Nat`. The
+-- truncation is eliminated only into the `Omega`-valued denotation goal. The
+-- public statement stays exactly `fok_embedding_adequacy_statement`; it is the
+-- empty-ledger / empty-object-environment corollary.
+
+-- The functional object-parameter assignment: each live target object
+-- eigenparameter INDEX to the carrier value it denotes. Extended collision-free
+-- at each `ForallObjRight` by the eigenparameter's freshness.
+data FokAssign (a : Type) : Type 1 where {
+  FokAssignNil : FokAssign a;
+  FokAssignCons : Nat → a → FokAssign a → FokAssign a
+}
+
+-- A left-context ledger entry, standing parallel to one gamma formula.
+--   * `FokInert` carries a structural formula the translation introduces
+--     (`fok_k_sigma`, an `FokAccess`, or a `FokDomainA`); it is NEVER source
+--     truth and can only be matched by `Init` against an identical structural
+--     formula, never against a forcing goal.
+--   * `FokActive` carries a source subform `p` at its scope `m` and object env
+--     `xs`, the target `world`/`terms` indices under which it was forced, and a
+--     PROOF of `p`'s denotation. Its gamma formula is exactly
+--     `fok_w_forces world terms (fok_erase_n sigma m p)`.
+data FokLedgerEntry (sigma : FokSignature) (c : FokCarriers sigma)
+      (rho : FokAtomEnv sigma c) : Type 1 where {
+  FokInert : FokForm → FokLedgerEntry sigma c rho;
+  FokActive :
+    (m : Nat)
+    → (world : Nat)
+    → (terms : List Nat)
+    → (p : FokScopedIForm sigma m)
+    → (xs : FokObjectEnv sigma c m)
+    → fok_denote_at sigma c rho m p xs
+    → FokLedgerEntry sigma c rho
+}
+
+-- A `Type 1` cons-list of ledger entries (the entry family is `Type 1`, so the
+-- ordinary `Type 0` `List` cannot hold it, exactly as `FokObjectEnv` is its own
+-- carrier-valued list).
+data FokLedger (sigma : FokSignature) (c : FokCarriers sigma)
+      (rho : FokAtomEnv sigma c) : Type 1 where {
+  FokLedgerNil : FokLedger sigma c rho;
+  FokLedgerCons :
+    FokLedgerEntry sigma c rho → FokLedger sigma c rho → FokLedger sigma c rho
+}
+
+-- The single gamma formula an entry contributes.
+fn fok_ledger_formula (sigma : FokSignature) (c : FokCarriers sigma)
+      (rho : FokAtomEnv sigma c) (e : FokLedgerEntry sigma c rho) : FokForm =
+  match e {
+    FokInert phi ↦ phi;
+    FokActive m world terms p xs pf ↦
+      fok_w_forces world terms (fok_erase_n sigma m p)
+  }
+
+-- The concrete left context a ledger denotes, position-preserving.
+fn fok_ledger_gamma (sigma : FokSignature) (c : FokCarriers sigma)
+      (rho : FokAtomEnv sigma c) (led : FokLedger sigma c rho)
+    : List FokForm =
+  match led {
+    FokLedgerNil ↦ Nil FokForm;
+    FokLedgerCons e rest ↦
+      Cons FokForm (fok_ledger_formula sigma c rho e)
+        (fok_ledger_gamma sigma c rho rest)
+  }
+
+-- The strengthened internal judgment (representability probe -- type-former
+-- only). Given the current scope `n`, target `world`/`terms`, the ledger, the
+-- object-parameter assignment, and the intrinsic object environment `xs`, a
+-- derivation of `[ledger-gamma] => [fok_w_forces world terms (erase f)]` yields
+-- the intrinsic denotation `fok_denote_at ... n f xs`. Recursion is structural
+-- on the intrinsic `f`.
+fn fok_adequate_gen
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (n : Nat) (world : Nat) (terms : List Nat)
+      (led : FokLedger sigma c rho)
+      (assign : FokAssign (fok_sort_a sigma c))
+      (xs : FokObjectEnv sigma c n)
+      (f : FokScopedIForm sigma n)
+    : Omega =
+  FokDerivation
+    (FokMkSequent
+      (fok_ledger_gamma sigma c rho led)
+      (Cons FokForm (fok_w_forces world terms (fok_erase_n sigma n f)) (Nil FokForm)))
+  → fok_denote_at sigma c rho n f xs
