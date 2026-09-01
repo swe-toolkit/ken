@@ -1,14 +1,14 @@
 ---
 id: CAT-ORD-LEQ-REUSE-CONSUMERS
 title: "Drain the group-5 ordered-list reimplementations (OrderedSearch, InsertionSort) to their canonical providers LC.ord_leq_at, D.eq_from_ord, D.count via selective import."
-status: active
+status: merged
 owner: foundation
 size: M
 gate: none
 tier: T2
 depends_on: [CAT-ORD-LEQ-PUB-EXPORT]
 blocks: []
-github: https://github.com/swe-toolkit/ken/pull/3195
+github: https://github.com/swe-toolkit/ken/pull/3201
 origin: "Steward group-5 census drain, cat-reuse-census.md §4.4 item 5, sites measured 2026-08-31 at origin/main 5083f2e46. Gated on CAT-ORD-LEQ-PUB-EXPORT (exports LC.ord_leq_at); D.eq_from_ord and D.count are already public via CAT-DERIVED-PUB-EXPORT."
 ---
 
@@ -114,8 +114,8 @@ origin: "Steward group-5 census drain, cat-reuse-census.md §4.4 item 5, sites m
 
 ## Gate and sequencing
 
-`active` — D1 (OrderedSearch) MERGED at `65bfa52db` (PR #3195); D2
-(InsertionSort) remains held. [[CAT-ORD-LEQ-PUB-EXPORT]] was MERGED at
+`merged` — D1 (OrderedSearch) MERGED at `65bfa52db` (PR #3195); D2
+(InsertionSort) MERGED at `324e2df98` (PR #3201). [[CAT-ORD-LEQ-PUB-EXPORT]] was MERGED at
 `551de8084` (its `ord_leq_at`
 provider is now loader-visible), so the premise is true and the Steward flipped
 this `draft` -> `ready` and re-measured the four sites and both cautions at that
