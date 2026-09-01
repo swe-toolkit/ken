@@ -5,7 +5,7 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
@@ -19,7 +19,33 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
    field equalities — keyed on the index equality's representation rather than
    the derivation relation.
 
-> # D2b RE-RELEASED 2026-09-01 — both predecessors landed, consumer probe green
+> # D2b RE-FROZEN 2026-09-01 (HS3) — behind a FOURTH elaborator predecessor
+>
+> **This banner supersedes the RE-RELEASED banner below.** After the two
+> predecessors landed and D2b was re-released, the proof advanced (spine folded,
+> coherence chain, atom/forcing projections) then hit its THIRD consecutive hard
+> stop in the same dependent-index elimination class: `fok_coh_extend`, where a
+> captured `xs : FokObjectEnv … n` does not follow the constructor refinement of a
+> `FokFin` index under `match j` (implementer measurement `evt_3b9k92cmkn5zh`).
+> Mandatory hard-stop-3 Research advisory (`evt_240ycvyantgrb`) and the Architect
+> ruling (`evt_mpmnxxh42r0z`) both classify it **(a) an elaborator completeness
+> closure over the dependent context telescope — NO kernel/TCB, NO permanent
+> FoKripke source convoy.** The shared predicate across all three stops:
+> constructor index refinement is not propagated through every dependent consumer
+> (record-equality representation, then motive/goal/IH, now the captured context
+> telescope).
+>
+> **D2b is FROZEN at held checkpoint `bf8f37326` (tree `8ff4f3921`, base
+> `436ac00e9`); FO stays `Unknown`** behind the fourth predecessor
+> [[LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE]] (elaborator-only: one typed
+> branch-refinement plan transforming the transitive forward-dependency closure of
+> the local context; framed+released 2026-09-01 from the Architect mechanism
+> ruling). **Consumer gate for re-release:** after that predecessor lands, rerun
+> the exact held FoKripke consumer at `bf8f37326` WITHOUT the manual convoy; only
+> then does the Steward explicitly RE-RELEASE D2b from `bf8f37326`. No parallel
+> source repair, no kernel escalation, no D2b movement before that gate.
+>
+> # D2b RE-RELEASED 2026-09-01 — both predecessors landed, consumer probe green (history)
 >
 > **RELEASED to the language ring 2026-09-01.** Both D2b predecessors are now
 > merged: (1) [[LANG-RECORD-INDEX-REFINEMENT]] (kernel `eq_at_inductive` weaken,
