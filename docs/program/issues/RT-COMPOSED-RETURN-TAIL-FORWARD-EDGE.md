@@ -1,6 +1,6 @@
 ---
 id: RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE
-title: "HS#5: delayed-S APPLICATION mechanism REFUTED, HELD on an operator boundary decision. Composed-return native repair, option (a)(i) WP2 of 3 (HELD CHECKPOINT of one atomic merge unit — no independent QA/Decision/merge), RE-CUT on the HS3 ruling: replace the installed generated-entry admission map as the lowering selector with ONE total sealed planner phase disposition over the closed current call population P (Ordinary / GeneratedEntry / TailProducerPending), pinning C=S for the pending Tail arm; authority formation consumes the plan proof directly and is no longer a selector; generated-entry quotient and two-word header/backedge ABI stay structurally unchanged."
+title: "HS#5: delayed-S APPLICATION mechanism REFUTED; RE-SCOPED to Architect + Research to find the way through. The (a)(i) exclusions were fleet design framing, NOT operator constraints (operator clarified 2026-09-01); the only operator-owned axis is the general approach — compile-time SSA vs targeted lowering of the closure into the runtime — and BOTH are open. Composed-return native repair, option (a)(i) WP2 of 3 (HELD CHECKPOINT of one atomic merge unit — no independent QA/Decision/merge), RE-CUT on the HS3 ruling: replace the installed generated-entry admission map as the lowering selector with ONE total sealed planner phase disposition over the closed current call population P (Ordinary / GeneratedEntry / TailProducerPending), pinning C=S for the pending Tail arm; authority formation consumes the plan proof directly and is no longer a selector; generated-entry quotient and two-word header/backedge ABI stay structurally unchanged."
 status: active
 owner: runtime
 size: M
@@ -9,10 +9,10 @@ tier: T1
 depends_on: [RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT]
 blocks: [RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT]
 github: null
-origin: "Architect component design for the operator-funded composed-return native repair, option (a)(i). RE-CUT 2026-09-01 on the Architect HS3 ruling evt_2042vywbmc063 (accepting Research advisory evt_45ky3pccsdbq6, outcome (2)), which is the authoritative mechanism contract for this node and SUPERSEDES the Tail-admission mechanism of the original PART 1/2 evt_381dzjykr4knn + PART 2/2 evt_5963far74b735 on that one axis: the old wording 'existing governed call' was too strong (the call is planner-governed as Tail source S, not governed-entry E), and the interim clause treating every current NonGoverned arrival as necessarily InlineNoCall was scoped too broadly. WP1's captured-environment / application-result type split is preserved (it fits this ruling). AMENDED 2026-09-01 on the Architect HS#4 ruling evt_3pchvsvq1kjya — a GATE CORRECTION ONLY, no production representation change: the former single '28' was a reached call-event count, NOT the planner population; static P and the reached post-terminal event multiset are now pinned as SEPARATE objects (static P=14; reached multiset 30 events / 27 Tail; completed ledger 27 rows, funcid50=16/57=9/58=2). WP2 of the three-checkpoint ATOMIC merge unit; a HELD CHECKPOINT — no QA, Decision, publication, or merge follows it. Re-cut production from clean e2ada653b (the released recut, tree 8773e2df6); abe5600a8 and d0d8ed0f6 are diagnostic evidence only. Symptom inventory folded from 13140993e3. The Steward owns the re-cut and the exact self-contained release to Runtime; each checkpoint release is the Steward's. HS#5 2026-09-01 (evt_67hab6csq6mc7): the delayed-S APPLICATION mechanism is REFUTED (prior delayed-call ruling evt_71b07xx9zncy1 withdrawn on its application claim); production HELD at clean ad191d1c2 (tree 342e3b735); the mechanism sections below are retained ONLY as a static E/S/O classification + diagnostic evidence, NOT as an application mechanism; a fresh response-producer/control-boundary DESIGN FORK is routed to the operator ((a)(i) may be infeasible under its exclusions). No re-release from this ruling alone."
+origin: "Architect component design for the operator-funded composed-return native repair, option (a)(i). RE-CUT 2026-09-01 on the Architect HS3 ruling evt_2042vywbmc063 (accepting Research advisory evt_45ky3pccsdbq6, outcome (2)), which is the authoritative mechanism contract for this node and SUPERSEDES the Tail-admission mechanism of the original PART 1/2 evt_381dzjykr4knn + PART 2/2 evt_5963far74b735 on that one axis: the old wording 'existing governed call' was too strong (the call is planner-governed as Tail source S, not governed-entry E), and the interim clause treating every current NonGoverned arrival as necessarily InlineNoCall was scoped too broadly. WP1's captured-environment / application-result type split is preserved (it fits this ruling). AMENDED 2026-09-01 on the Architect HS#4 ruling evt_3pchvsvq1kjya — a GATE CORRECTION ONLY, no production representation change: the former single '28' was a reached call-event count, NOT the planner population; static P and the reached post-terminal event multiset are now pinned as SEPARATE objects (static P=14; reached multiset 30 events / 27 Tail; completed ledger 27 rows, funcid50=16/57=9/58=2). WP2 of the three-checkpoint ATOMIC merge unit; a HELD CHECKPOINT — no QA, Decision, publication, or merge follows it. Re-cut production from clean e2ada653b (the released recut, tree 8773e2df6); abe5600a8 and d0d8ed0f6 are diagnostic evidence only. Symptom inventory folded from 13140993e3. The Steward owns the re-cut and the exact self-contained release to Runtime; each checkpoint release is the Steward's. HS#5 2026-09-01 (evt_67hab6csq6mc7): the delayed-S APPLICATION mechanism is REFUTED (prior delayed-call ruling evt_71b07xx9zncy1 withdrawn on its application claim); production HELD at clean ad191d1c2 (tree 342e3b735); the mechanism sections below are retained ONLY as a static E/S/O classification + diagnostic evidence, NOT as an application mechanism; a fresh response-producer/control-boundary DESIGN FORK was routed. RE-SCOPED 2026-09-01: the operator (Pat) clarified the (a)(i) exclusions (no representation change, no runtime callable object, no new call/frame boundary, no EntryAbi/seed substitution) were fleet design framing, NOT operator constraints; the only operator-owned axis is the general approach (compile-time SSA vs targeted lowering of the closure into the runtime), and both are OPEN. Delegated to Architect + Research to find the lawful mechanism (evt_452d383h945f9); the exclusions are revisable design constraints. No re-release from a ruling alone; Runtime resumes on fresh Steward scope once the Architect returns a mechanism."
 ---
 
-## HARD STOP #5 — delayed-S application mechanism REFUTED; operator decision
+## HARD STOP #5 — delayed-S application mechanism REFUTED; RE-SCOPED to Architect + Research
 
 Architect HS#5 ruling `evt_67hab6csq6mc7`, on runtime-implementer's HS#5
 (`evt_4tj3jdqajg6cd`). **PRODUCTION IS HELD at clean `ad191d1c2` (tree
@@ -53,34 +53,41 @@ strengthens that boundary, it does not reopen environment-as-result. The HS3
 phase partition remains valid as a classification. `a9d174ccb` is diagnostic
 evidence only.
 
-## The operator boundary decision (routed; no lawful next edit under this WP)
+## RE-SCOPED — Architect + Research find the way through (the exclusions are ours, not the operator's)
 
-The next seam is OUTSIDE the fixed representation: the actual semantic response
-producer, before answer collapse. A lawful operator-funded shape-(a) path must
-select the exact static continuation while its environment is live, produce the
-actual response, apply that continuation exactly once with that response as a
-distinguished arity-one operand, then pass only that call's Result to the exact
-Ret sink — response production, capture environment, current-Function target
-authority, and Ret consumption all coexisting on ONE forward dynamic-control
-edge. No EntryAbi replay, environment/seed substitution, source-S call synthesized
-from a carried record, stored Cranelift `Value`, second selector, runtime callable
-object, or WP3 reclassification may stand in for that edge.
+**Operator correction, 2026-09-01 (Pat, at the return).** The exclusions the
+Architect and Steward had treated as walls — no representation change, no runtime
+callable object, no new call/frame boundary, no EntryAbi/seed substitution — were
+NOT operator-imposed. They were the fleet's own design framing. The operator
+specified only the general approach, and owns exactly that axis:
 
-The retained exclusions now expose a real design fork: if that producer-owned edge
-cannot be formed WITHOUT changing effect/response control or a call/frame boundary
-that the current WP forbids, then selected suboption (a)(i) is INFEASIBLE under
-those exclusions. Per the Architect, this is an operator boundary decision, not
-something to hide behind another local Tail helper.
+> compile-time SSA resolution  vs.  targeted lowering of the closure into the runtime
 
-**OPERATOR DECISION (held for the 2026-09-01 13:00 UTC return).** Name the explicit
-scope for the replacement component design — which producer/control boundary may
-change (effect/response control, or a specific call/frame boundary) — OR rule that
-(a)(i) is infeasible under its exclusions and choose a different path. The Architect
-will provide/review the replacement component design ONLY against an explicit scope
-that names which boundary may change; the current no-representation-change WP2 has
-no lawful next edit. The operator originally funded (a)(i) (`evt_3met6tbk5wrnd`)
-after the accepted terminal `NO_UNIQUE_EDGE`, so relaxing its exclusions or
-reselecting is the operator's call.
+**Both are open, and the way-through is delegated to the Architect and Research**
+(operator: "continue as necessary with research and architect to find the way
+through"). There is no held operator decision; the exclusions are revisable
+design constraints, and the Architect has latitude across the full approach fork.
+
+The lawful edge remains as HS#5 characterized it: select the exact static
+continuation while its environment is live, PRODUCE the actual response, apply the
+continuation exactly once with that response as a distinguished arity-one operand,
+then pass only that call's Result to the exact Ret sink — response production,
+captured environment, current-Function target authority, and Ret consumption all
+coexisting on ONE forward dynamic-control edge. What HS#5 proved is that no point
+reachable in compile-time SSA owns that future response (the closed
+`RT-LIVE-K-FUTURE-INPUT-OWNERSHIP-D0` negative); that edge reads as a
+runtime-side application, so the targeted-runtime-lowering approach is now on the
+table on its merits (the "no runtime callable object" exclusion no longer binds).
+
+**Routing (Steward, evt_452d383h945f9).** Architect: find the lawful mechanism
+across the SSA-vs-runtime-lowering fork; route back only a genuinely NEW
+operator-owned fork (TCB growth, a spec commitment). Research: operator-directed
+prior-art / failure-mode advisory on both approaches, especially runtime-side
+closure lowering (representation, ABI, captured-environment lifetime across the
+forward edge, re-entrancy, answer-collapse timing). Runtime ring: held clean at
+`ad191d1c2`; resumes on fresh Steward scope once the Architect returns a
+mechanism — no longer awaiting an operator boundary ruling. Origin funding of
+(a)(i): `evt_3met6tbk5wrnd`, after the accepted terminal `NO_UNIQUE_EDGE`.
 
 ## Symptom inventory (folded from 13140993e3)
 
