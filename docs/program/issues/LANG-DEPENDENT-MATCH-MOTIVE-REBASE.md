@@ -1,14 +1,14 @@
 ---
 id: LANG-DEPENDENT-MATCH-MOTIVE-REBASE
 title: "D2b elaborator-only predecessor (the inversion idiom): generic simultaneous rebasing of the dependent-match motive, the constructor expected goal, and the direct recursive IH so that BOTH the actual indices and the outer scrutinee become local indices/value. Architect ruled NO source-level escape for the FokDerivation inversion. Elaborator-only — NO kernel/TCB change; if implementation reveals a kernel/TCB touch is required (as the prior predecessor LANG-RECORD-INDEX-REFINEMENT did), STOP and route to the Steward -> operator, do NOT make a silent kernel change."
-status: active
+status: merged
 owner: language
 size: M
 gate: lang-qa+architect
 tier: T1
 depends_on: []
 blocks: [V3-FO-EMBEDDING-ADEQUACY]
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3224
 origin: "Steward, 2026-09-01. Second D2b predecessor. The first (LANG-RECORD-INDEX-REFINEMENT, kernel eq_at_inductive weaken) MERGED and cleared the record-index FokDerivation MATCH elaboration; D2b then hit a distinct blocker — the derivation INVERSION idiom (relating constructor index fields to gamma/[goal] failed across 3 approaches; language-implementer escalation evt_5m6qvgtfbfr81). The Architect ruled there is NO source-level escape (D2b-inversion ruling, thread thr_5s7mbap0049jy; language-leader to pin the exact evt in the kickoff ack), and directed a fresh elaborator-only predecessor. Request: language-leader evt_4j7hayna7t22e. D2b's Bottom/Atom/Or WIP stays held evidence only at fbfd6b6c1; D2b (V3-FO-EMBEDDING-ADEQUACY) resumes ONLY after this predecessor lands and the consumer probe is green. FO remains Unknown until then."
 ---
 
