@@ -3753,6 +3753,137 @@ struct CarriedBoundaryWord {
     word: cranelift_codegen::ir::Value,
 }
 
+/// The capture-only runtime aggregate produced for a checked-IH application.
+///
+/// This private role type deliberately has no conversion to
+/// [`CheckedIhApplicationResult`]. Although both roles contain one carrier word,
+/// only the Direct application emitter may turn the captured fields into a
+/// result by issuing the planner-selected continuation call.
+#[derive(Clone, Copy, Debug)]
+struct CheckedIhCapturedEnvironment {
+    word: CarriedBoundaryWord,
+}
+
+impl CheckedIhCapturedEnvironment {
+    fn into_operand(self) -> LoweringOperand {
+        LoweringOperand::Carried(self.word)
+    }
+}
+
+/// The Trap-checked result of one governed checked-IH continuation call.
+///
+/// Construction is confined to the declared-call consumer. In particular,
+/// there is no `From<CheckedIhCapturedEnvironment>` implementation and no
+/// shared raw-word constructor between the two semantic roles.
+#[derive(Clone, Copy, Debug)]
+struct CheckedIhApplicationResult {
+    word: CarriedBoundaryWord,
+}
+
+impl CheckedIhApplicationResult {
+    fn from_declared_call(result: LoweringOperand) -> Result<Self, CraneliftBackendError> {
+        match result {
+            LoweringOperand::Carried(word) => Ok(Self { word }),
+            LoweringOperand::Specialized(_) => Err(unsupported(
+                "CheckedIhApplicationResult",
+                "a governed checked-IH continuation call returned a specialized template instead of its Trap-checked runtime Result",
+            )),
+        }
+    }
+
+    fn into_routed_answer(self) -> RoutedAnswer {
+        RoutedAnswer::checked(LoweringOperand::Carried(self.word))
+    }
+}
+
+/// Population-side controls for the Direct checked-IH application relation.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckedIhDirectApplicationMutation {
+    Exact,
+    DropCall,
+    VaryTransportIdentity,
+    PermuteCaptures,
+    DropCapture,
+    EnvironmentForResult,
+}
+
+/// One reached Direct application, keyed by source application provenance.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CheckedIhDirectApplicationObservation {
+    pub defining_function: Option<u32>,
+    pub invocation_origin: String,
+    pub application_origin: String,
+    pub callee_origin: String,
+    pub source_call_identity: String,
+    pub capture_count: usize,
+    pub emitted_call_count: usize,
+    pub emitted_call: Option<String>,
+    pub application_result_from_call: bool,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static CHECKED_IH_DIRECT_APPLICATION_MUTATION:
+        std::cell::Cell<CheckedIhDirectApplicationMutation> =
+        const { std::cell::Cell::new(CheckedIhDirectApplicationMutation::Exact) };
+    static CHECKED_IH_DIRECT_APPLICATION_OBSERVATIONS:
+        std::cell::RefCell<Vec<CheckedIhDirectApplicationObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    static CHECKED_IH_DIRECT_APPLICATION_MUTATION_APPLICATIONS:
+        std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_direct_application_mutation<T>(
+    mutation: CheckedIhDirectApplicationMutation,
+    run: impl FnOnce() -> T,
+) -> (T, Vec<CheckedIhDirectApplicationObservation>, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CHECKED_IH_DIRECT_APPLICATION_MUTATION
+                .with(|active| active.set(CheckedIhDirectApplicationMutation::Exact));
+            CHECKED_IH_DIRECT_APPLICATION_OBSERVATIONS
+                .with(|observations| observations.borrow_mut().clear());
+            CHECKED_IH_DIRECT_APPLICATION_MUTATION_APPLICATIONS
+                .with(|applications| applications.set(0));
+        }
+    }
+    CHECKED_IH_DIRECT_APPLICATION_MUTATION.with(|active| active.set(mutation));
+    CHECKED_IH_DIRECT_APPLICATION_OBSERVATIONS
+        .with(|observations| observations.borrow_mut().clear());
+    CHECKED_IH_DIRECT_APPLICATION_MUTATION_APPLICATIONS.with(|applications| applications.set(0));
+    let restore = Restore;
+    let result = run();
+    let observations =
+        CHECKED_IH_DIRECT_APPLICATION_OBSERVATIONS.with(|held| held.borrow().clone());
+    let applications =
+        CHECKED_IH_DIRECT_APPLICATION_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    drop(restore);
+    (result, observations, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn checked_ih_direct_application_mutation_is_exact() -> bool {
+    CHECKED_IH_DIRECT_APPLICATION_MUTATION
+        .with(|active| active.get() == CheckedIhDirectApplicationMutation::Exact)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn checked_ih_direct_application_mutation() -> CheckedIhDirectApplicationMutation {
+    CHECKED_IH_DIRECT_APPLICATION_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_checked_ih_direct_application(observation: CheckedIhDirectApplicationObservation) {
+    CHECKED_IH_DIRECT_APPLICATION_MUTATION_APPLICATIONS
+        .with(|applications| applications.set(applications.get().saturating_add(1)));
+    CHECKED_IH_DIRECT_APPLICATION_OBSERVATIONS
+        .with(|observations| observations.borrow_mut().push(observation));
+}
+
 /// ⭐ **The closed PHASE sum — which phase a lowering operand is in, not what
 /// kind of value it is** (`RT-FNSPLIT-C1` `D3`).
 ///

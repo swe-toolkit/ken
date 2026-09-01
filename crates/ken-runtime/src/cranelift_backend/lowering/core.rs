@@ -7639,7 +7639,505 @@ impl<'a> Lowering<'a> {
         })
     }
 
-    pub(super) fn call_checked_ih_transport_from_case_environment(
+    /// Resolve the capture-only role at a constructor/materialization seat.
+    /// This entry point cannot return an application result or emit a
+    /// continuation call.
+    pub(super) fn checked_ih_captured_environment_from_case_environment(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        transport: &CheckedIhEnvironmentTransport,
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<CheckedIhCapturedEnvironment, CraneliftBackendError> {
+        let identity = transport.source_call_identity();
+        let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "CheckedIhCapturedEnvironment",
+                "a checked-IH environment materialization has no destination emission owner",
+            )
+        })?;
+        if destination_owner != transport.destination_owner()
+            || transport.source_specialization() != identity.target()
+        {
+            return Err(unsupported(
+                "CheckedIhCapturedEnvironment",
+                "the checked-IH environment materialization disagrees with its transport endpoints",
+            ));
+        }
+        let unit = self
+            .static_transition_plan
+            .continuation_units()?
+            .into_iter()
+            .find(|unit| unit.id() == transport.source_specialization())
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhCapturedEnvironment",
+                    "the checked-IH environment transport has no source continuation unit",
+                )
+            })?;
+        let recursive_count = unit.recursive_positions().len();
+        let field_count = unit
+            .ordinary_envelope()?
+            .iter()
+            .filter(|role| {
+                matches!(
+                    role,
+                    ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField { .. }
+                )
+            })
+            .count()
+            .checked_add(recursive_count)
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhCapturedEnvironment",
+                    "the checked-IH source constructor field count overflowed",
+                )
+            })?;
+        let selected_index = recursive_count
+            .checked_add(unit.recursive_position() as usize)
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhCapturedEnvironment",
+                    "the checked-IH selected recursive field index overflowed",
+                )
+            })?;
+        if env.len() < recursive_count.saturating_add(field_count) {
+            return Err(unsupported(
+                "CheckedIhCapturedEnvironment",
+                "the selected case environment is shorter than its IH prefix plus constructor fields",
+            ));
+        }
+        match env.get(selected_index) {
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))) => {
+                Ok(CheckedIhCapturedEnvironment { word: *word })
+            }
+            Some(LoweringEnvironmentBinding::StaticWorker(worker)) => {
+                if worker.closure_origin != transport.seat()
+                    || worker.body_origin != unit.worker_body_origin()
+                    || worker.declared_arity != unit.worker_declared_arity()
+                    || worker.captures.len() != unit.worker_capture_count()
+                {
+                    return Err(unsupported(
+                        "CheckedIhCapturedEnvironment",
+                        "the selected worker disagrees with the transport's stable closure identity",
+                    ));
+                }
+                self.emit_checked_ih_captured_environment(builder, worker)
+            }
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_))) | None => {
+                Err(unsupported(
+                    "CheckedIhCapturedEnvironment",
+                    "the selected checked-IH field holds neither its static worker nor its carried captured environment",
+                ))
+            }
+        }
+    }
+
+    /// Apply one carried Direct checked-IH environment through its exact
+    /// planner-issued continuation call. The only runtime selector is the
+    /// already-validated Direct route variant.
+    pub(super) fn call_direct_checked_ih_transport_from_case_environment(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        transport: &CheckedIhEnvironmentTransport,
+        projection: &CheckedIhGeneratedEntryProjection,
+        pending: PendingCheckedIhCall,
+        callee_origin: StaticOriginId,
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<CheckedIhApplicationResult, CraneliftBackendError> {
+        match projection.fresh_result_route() {
+            CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {}
+            CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
+                return Err(unsupported(
+                    "CheckedIhApplicationResult",
+                    "a Tail producer route reached the Direct checked-IH application emitter",
+                ));
+            }
+        }
+        if !projection.direct_source_matches_governed_arrival() {
+            return Err(unsupported(
+                "CheckedIhApplicationResult",
+                "the Direct application source record does not equal its validated governed arrival",
+            ));
+        }
+        let identity = transport.source_call_identity().clone();
+        let destination_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "CheckedIhApplicationResult",
+                "a Direct checked-IH application has no destination emission owner",
+            )
+        })?;
+        if destination_owner != transport.destination_owner()
+            || transport.source_specialization() != identity.target()
+        {
+            return Err(unsupported(
+                "CheckedIhApplicationResult",
+                "the Direct checked-IH application disagrees with its transport endpoints",
+            ));
+        }
+        let unit = self
+            .static_transition_plan
+            .continuation_units()?
+            .into_iter()
+            .find(|unit| unit.id() == transport.source_specialization())
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhApplicationResult",
+                    "the Direct transport source has no continuation unit",
+                )
+            })?;
+        let recursive_count = unit.recursive_positions().len();
+        let recursive_position = unit.recursive_position();
+        let worker_capture_count = unit.worker_capture_count();
+        let envelope = unit.ordinary_envelope()?.to_vec();
+        let continuation_inputs = unit.continuation_inputs()?.to_vec();
+        let field_count = envelope
+            .iter()
+            .filter(|role| {
+                matches!(
+                    role,
+                    ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField { .. }
+                )
+            })
+            .count()
+            .checked_add(recursive_count)
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhApplicationResult",
+                    "the Direct source constructor field count overflowed",
+                )
+            })?;
+        let field_start = recursive_count;
+        if env.len() < field_start.saturating_add(field_count) {
+            return Err(unsupported(
+                "CheckedIhApplicationResult",
+                "the Direct case environment is shorter than its IH prefix plus constructor fields",
+            ));
+        }
+        let selected_index = field_start
+            .checked_add(recursive_position as usize)
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhApplicationResult",
+                    "the Direct selected recursive field index overflowed",
+                )
+            })?;
+        let environment = match env.get(selected_index) {
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))) => {
+                CheckedIhCapturedEnvironment { word: *word }
+            }
+            Some(LoweringEnvironmentBinding::StaticWorker(_)) => {
+                return Err(unsupported(
+                    "CheckedIhApplicationResult",
+                    "a Direct application requires the carried captured environment, not a static worker",
+                ));
+            }
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_))) | None => {
+                return Err(unsupported(
+                    "CheckedIhApplicationResult",
+                    "the Direct application has no carried captured environment at its ruled recursive field",
+                ));
+            }
+        };
+
+        let record = self
+            .static_transition_plan
+            .aggregate_record_view(transport.source_record())?;
+        if record.shape() != PlannedAggregateShape::Constructor
+            || record.declared_children().map(|children| children.len())
+                != Some(worker_capture_count)
+        {
+            return Err(unsupported(
+                "CheckedIhApplicationResult",
+                "the Direct captured environment record disagrees with the planner-issued worker capture run",
+            ));
+        }
+
+        let mut captures = Vec::with_capacity(worker_capture_count);
+        for role in &envelope {
+            if let ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+                ordinal, source, ..
+            } = role
+            {
+                let ContinuationWorkerCaptureSource::Lexical(origin) = source else {
+                    return Err(unsupported(
+                        "CheckedIhApplicationResult",
+                        "a Direct worker capture has no lexical source occurrence",
+                    ));
+                };
+                let operand =
+                    self.emit_carrier_field(builder, environment.word, *ordinal as usize)?;
+                captures.push((*ordinal, *origin, operand));
+            }
+        }
+
+        #[cfg(feature = "px8-ds-test-support")]
+        let mutation = checked_ih_direct_application_mutation();
+        #[cfg(feature = "px8-ds-test-support")]
+        match mutation {
+            CheckedIhDirectApplicationMutation::PermuteCaptures => {
+                if captures.len() < 2 {
+                    return Err(unsupported(
+                        "CheckedIhApplicationResult",
+                        "the capture-permutation control found no non-degenerate Direct capture population",
+                    ));
+                }
+                captures.swap(0, 1);
+            }
+            CheckedIhDirectApplicationMutation::DropCapture => {
+                captures.pop();
+            }
+            CheckedIhDirectApplicationMutation::Exact
+            | CheckedIhDirectApplicationMutation::DropCall
+            | CheckedIhDirectApplicationMutation::VaryTransportIdentity
+            | CheckedIhDirectApplicationMutation::EnvironmentForResult => {}
+        }
+        if captures.len() != worker_capture_count {
+            #[cfg(feature = "px8-ds-test-support")]
+            record_checked_ih_direct_application(CheckedIhDirectApplicationObservation {
+                defining_function: self.defining_function_id.map(FuncId::as_u32),
+                invocation_origin: format!("{:?}", pending.invocation_origin),
+                application_origin: format!("{:?}", pending.application_origin),
+                callee_origin: format!("{callee_origin:?}"),
+                source_call_identity: format!("{identity:?}"),
+                capture_count: captures.len(),
+                emitted_call_count: 0,
+                emitted_call: None,
+                application_result_from_call: false,
+            });
+            return Err(unsupported(
+                "CheckedIhApplicationResult",
+                "the Direct captured environment has a missing planner-ordered capture",
+            ));
+        }
+        let suffix = captures
+            .iter()
+            .map(|(ordinal, origin, _)| (*ordinal, *origin))
+            .collect::<Vec<_>>();
+        if let Err(error) = self
+            .static_transition_plan
+            .validate_checked_ih_capture_suffix(transport.source_owner(), transport.seat(), &suffix)
+        {
+            #[cfg(feature = "px8-ds-test-support")]
+            record_checked_ih_direct_application(CheckedIhDirectApplicationObservation {
+                defining_function: self.defining_function_id.map(FuncId::as_u32),
+                invocation_origin: format!("{:?}", pending.invocation_origin),
+                application_origin: format!("{:?}", pending.application_origin),
+                callee_origin: format!("{callee_origin:?}"),
+                source_call_identity: format!("{identity:?}"),
+                capture_count: captures.len(),
+                emitted_call_count: 0,
+                emitted_call: None,
+                application_result_from_call: false,
+            });
+            return Err(error);
+        }
+
+        let mut captures = captures.into_iter();
+        let mut inputs = Vec::with_capacity(envelope.len() + continuation_inputs.len());
+        for role in &envelope {
+            match role {
+                ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
+                    source_position,
+                } => inputs.push(
+                    env.get(field_start + *source_position as usize)
+                        .ok_or_else(|| {
+                            unsupported(
+                                "CheckedIhApplicationResult",
+                                "a Direct nonrecursive field is outside the selected case environment",
+                            )
+                        })?
+                        .value_at("a Direct checked-IH nonrecursive field")?
+                        .clone(),
+                ),
+                ContinuationOrdinaryEnvelopeRole::WorkerCapture { ordinal, .. } => {
+                    let (projected_ordinal, _, operand) = captures.next().ok_or_else(|| {
+                        unsupported(
+                            "CheckedIhApplicationResult",
+                            "the Direct capture projection ended before its planner envelope",
+                        )
+                    })?;
+                    if projected_ordinal != *ordinal {
+                        return Err(unsupported(
+                            "CheckedIhApplicationResult",
+                            "the Direct capture projection is not in planner order",
+                        ));
+                    }
+                    inputs.push(LoweringOperand::Carried(operand));
+                }
+            }
+        }
+        if captures.next().is_some() {
+            return Err(unsupported(
+                "CheckedIhApplicationResult",
+                "the Direct capture projection exceeds its planner envelope",
+            ));
+        }
+
+        if continuation_inputs.len() != transport.continuation_input_count() {
+            return Err(unsupported(
+                "CheckedIhApplicationResult",
+                "the Direct continuation-input morphism has the wrong arity",
+            ));
+        }
+        for input in continuation_inputs {
+            let destination = transport
+                .continuation_input_index(input.ordinal, input.coordinate)
+                .ok_or_else(|| {
+                    unsupported(
+                        "CheckedIhApplicationResult",
+                        "the Direct transport has no destination for one continuation input",
+                    )
+                })?;
+            let operand = match destination {
+                CheckedIhTransportInputDestination::LexicalEnvironment(index) => env
+                    .get(index as usize)
+                    .ok_or_else(|| {
+                        unsupported(
+                            "CheckedIhApplicationResult",
+                            "a Direct lexical input is outside the selected case environment",
+                        )
+                    })?
+                    .value_at("a Direct checked-IH continuation input")?
+                    .clone(),
+                CheckedIhTransportInputDestination::EntryFrame(slot) => self
+                    .function_local
+                    .defining_abi_operands
+                    .get(slot as usize)
+                    .cloned()
+                    .ok_or_else(|| {
+                        unsupported(
+                            "CheckedIhApplicationResult",
+                            "a Direct entry-frame input is outside the current ABI frame",
+                        )
+                    })?,
+            };
+            inputs.push(operand);
+        }
+
+        #[cfg(feature = "px8-ds-test-support")]
+        let requested_identity =
+            if mutation == CheckedIhDirectApplicationMutation::VaryTransportIdentity {
+                self.function_local
+                    .continuation_calls
+                    .keys()
+                    .find(|candidate| *candidate != &identity)
+                    .cloned()
+                    .ok_or_else(|| {
+                        unsupported(
+                        "CheckedIhApplicationResult",
+                        "the transport-identity control found no neighboring declared continuation",
+                    )
+                    })?
+            } else {
+                identity.clone()
+            };
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let requested_identity = identity.clone();
+        if requested_identity != identity {
+            #[cfg(feature = "px8-ds-test-support")]
+            record_checked_ih_direct_application(CheckedIhDirectApplicationObservation {
+                defining_function: self.defining_function_id.map(FuncId::as_u32),
+                invocation_origin: format!("{:?}", pending.invocation_origin),
+                application_origin: format!("{:?}", pending.application_origin),
+                callee_origin: format!("{callee_origin:?}"),
+                source_call_identity: format!("{identity:?}"),
+                capture_count: worker_capture_count,
+                emitted_call_count: 0,
+                emitted_call: None,
+                application_result_from_call: false,
+            });
+            return Err(unsupported(
+                "CheckedIhApplicationResult",
+                "the Direct declared-call lookup varied away from the selected transport identity",
+            ));
+        }
+        let target = self
+            .function_local
+            .continuation_calls
+            .get(&requested_identity)
+            .cloned()
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhApplicationResult",
+                    "the Direct transport target was not declared into the current Function",
+                )
+            })?;
+
+        #[cfg(feature = "px8-ds-test-support")]
+        if mutation == CheckedIhDirectApplicationMutation::DropCall {
+            record_checked_ih_direct_application(CheckedIhDirectApplicationObservation {
+                defining_function: self.defining_function_id.map(FuncId::as_u32),
+                invocation_origin: format!("{:?}", pending.invocation_origin),
+                application_origin: format!("{:?}", pending.application_origin),
+                callee_origin: format!("{callee_origin:?}"),
+                source_call_identity: format!("{identity:?}"),
+                capture_count: worker_capture_count,
+                emitted_call_count: 0,
+                emitted_call: None,
+                application_result_from_call: false,
+            });
+            return Err(unsupported(
+                "CheckedIhApplicationResult",
+                "the Direct application emitted zero calls for one governed arrival",
+            ));
+        }
+
+        let (returned, call) = self.call_declared_unit_target(
+            builder,
+            target,
+            &inputs,
+            #[cfg(test)]
+            None,
+        )?;
+        self.function_local
+            .checked_ih_transport_emissions
+            .push((transport.clone(), call));
+        if !self.continuation_candidate_is_consumed(&identity) {
+            self.settle_continuation_candidate(
+                &identity,
+                super::units::CandidateDisposition::InlineNoCall,
+            )?;
+        }
+
+        #[cfg(feature = "px8-ds-test-support")]
+        if mutation == CheckedIhDirectApplicationMutation::EnvironmentForResult {
+            let _substituted = CheckedIhApplicationResult {
+                word: environment.word,
+            };
+            record_checked_ih_direct_application(CheckedIhDirectApplicationObservation {
+                defining_function: self.defining_function_id.map(FuncId::as_u32),
+                invocation_origin: format!("{:?}", pending.invocation_origin),
+                application_origin: format!("{:?}", pending.application_origin),
+                callee_origin: format!("{callee_origin:?}"),
+                source_call_identity: format!("{identity:?}"),
+                capture_count: worker_capture_count,
+                emitted_call_count: 1,
+                emitted_call: Some(format!("{call:?}")),
+                application_result_from_call: false,
+            });
+            return Err(unsupported(
+                "CheckedIhApplicationResult",
+                "the Direct application substituted its captured environment for the emitted call Result",
+            ));
+        }
+
+        let result = CheckedIhApplicationResult::from_declared_call(returned)?;
+        #[cfg(feature = "px8-ds-test-support")]
+        record_checked_ih_direct_application(CheckedIhDirectApplicationObservation {
+            defining_function: self.defining_function_id.map(FuncId::as_u32),
+            invocation_origin: format!("{:?}", pending.invocation_origin),
+            application_origin: format!("{:?}", pending.application_origin),
+            callee_origin: format!("{callee_origin:?}"),
+            source_call_identity: format!("{identity:?}"),
+            capture_count: worker_capture_count,
+            emitted_call_count: 1,
+            emitted_call: Some(format!("{call:?}")),
+            application_result_from_call: true,
+        });
+        Ok(result)
+    }
+
+    pub(super) fn call_tail_checked_ih_transport_from_case_environment(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         transport: &CheckedIhEnvironmentTransport,
@@ -7713,11 +8211,8 @@ impl<'a> Lowering<'a> {
         let selected_worker = match env.get(selected_index) {
             Some(LoweringEnvironmentBinding::StaticWorker(worker)) => worker,
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))) => {
-                // The carried computational case projected this exact recursive
-                // field from the transported producer. Its carrier word is
-                // already the sole force-materialized environment; forcing the
-                // checked IH returns it directly and emits no second call or
-                // record.
+                // Tail remains byte-identical in WP1: this is the pre-existing
+                // carried-environment result path, not Direct application.
                 if !self.continuation_candidate_is_consumed(&identity) {
                     self.settle_continuation_candidate(
                         &identity,
@@ -14084,7 +14579,7 @@ impl<'a> Lowering<'a> {
                                     &worker,
                                 )?
                             {
-                                return Ok(environment);
+                                return Ok(environment.into_operand());
                             }
                         }
                         return self.call_static_worker(

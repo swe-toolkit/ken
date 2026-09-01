@@ -86,9 +86,12 @@ pub use lowering::units::{
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::{
+    checked_ih_direct_application_mutation_is_exact,
     composed_return_ret_sink_mutation_is_exact,
+    with_checked_ih_direct_application_mutation,
     with_checked_ih_fresh_result_route_emission_observations,
     with_composed_return_ret_sink_mutation, with_px8ds_retired_flat_order,
+    CheckedIhDirectApplicationMutation, CheckedIhDirectApplicationObservation,
     CheckedIhFreshResultRouteEmissionObservation, CheckedIhFreshResultRouteObservationMutation,
     CheckedIhFreshResultRoutePairingLeg, ComposedReturnRetSinkMutation,
     ComposedReturnRetSinkObservation,

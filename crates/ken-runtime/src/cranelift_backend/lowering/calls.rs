@@ -182,7 +182,7 @@ impl<'a> Lowering<'a> {
             pending: PendingCheckedIhCall,
             disposition: CheckedApplicationDisposition,
             worker: &StaticWorkerBinding,
-        ) -> Result<Option<LoweringOperand>, CraneliftBackendError> {
+        ) -> Result<Option<CheckedIhCapturedEnvironment>, CraneliftBackendError> {
             if disposition != CheckedApplicationDisposition::ConsumedHere {
                 return Ok(None);
             }

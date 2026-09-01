@@ -1148,6 +1148,197 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
     });
 }
 
+/// **Promise class: durable invariant.** Intended planner growth may add Direct
+/// arrivals, but every such arrival must retain one source-keyed declared call
+/// and use that call's Trap-checked result rather than its capture environment.
+///
+/// **MEASURED:** the write fixture's exact governed Direct application records
+/// its invocation/call/callee provenance, a non-degenerate planner-ordered
+/// capture run, one
+/// emitted call and a call-derived result; the Tail-only read fixture records no
+/// Direct application.
+/// **CLAIMED:** Direct applies its carried environment exactly once while Tail
+/// cannot enter the Direct lookup and app486 remains an environment-only
+/// zero-call materializer.
+/// **THE GAP:** the observation is emitted at the actual declared-call seam.
+/// The population mutations below independently vary every joining operand and
+/// compare restored executable bytes.
+#[test]
+fn checked_ih_direct_application_pairs_one_declared_call_result() {
+    in_generated_entry_stack_thread("rt-parity-direct-application-pairing", || {
+        let compile = |label: &str, entry: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("direct-application-pairing-{label}"));
+            let (result, observations, applications) =
+                ken_runtime::with_checked_ih_direct_application_mutation(
+                    ken_runtime::CheckedIhDirectApplicationMutation::Exact,
+                    || {
+                        ken_cli::build_native_program(
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_parity_direct_application_pairing_{label}"),
+                            root.path(),
+                        )
+                    },
+                );
+            result.expect("the exact Direct application fixture must compile");
+            (observations, applications)
+        };
+
+        let (read, read_applications) = compile("read", "rt_read_offset_stage");
+        let (write, write_applications) = compile("write", "rt_write_writable_stage");
+        assert!(
+            read.is_empty() && read_applications == 0,
+            "the Tail-only read fixture must not enter the Direct application lookup: {read:#?}"
+        );
+        assert!(
+            !write.is_empty(),
+            "the write fixture must reach its governed Direct application"
+        );
+        assert_eq!(write_applications, write.len());
+        for row in &write {
+            assert_eq!(row.invocation_origin, "StaticOriginId(741)");
+            assert_eq!(row.application_origin, "StaticOriginId(740)");
+            assert_eq!(row.callee_origin, "StaticOriginId(739)");
+            assert!(
+                row.capture_count > 1,
+                "the capture-order control requires a non-degenerate Direct population: {row:#?}"
+            );
+            assert_eq!(row.emitted_call_count, 1);
+            assert!(row.emitted_call.is_some());
+            assert!(row.application_result_from_call);
+            assert!(
+                !row.application_origin.contains("486"),
+                "app486 remains environment-only and cannot be the Direct call seat"
+            );
+        }
+        assert!(ken_runtime::checked_ih_direct_application_mutation_is_exact());
+    });
+}
+
+/// **Promise class: durable invariant.** Every joining operand of the Direct
+/// application is population-controlled at the production seam.
+///
+/// **MEASURED:** call removal, a neighboring declared transport identity,
+/// capture permutation, capture removal and environment-for-result substitution
+/// each reach one real Direct arrival and return their exact refusal.
+/// **CLAIMED:** one validated Direct arrival can only assemble the planner-
+/// ordered capture run, select its transport's declared call once and use the
+/// emitted call's Result.
+/// **THE GAP:** each mutation moves the population-side operand named by the
+/// claim, leaves the detector fixed, proves application provenance, then an
+/// independent exact rebuild restores hashes and executable bytes to the
+/// baseline.
+#[test]
+fn checked_ih_direct_application_population_controls_refuse_and_restore() {
+    in_generated_entry_stack_thread("rt-parity-direct-application-controls", || {
+        use ken_runtime::CheckedIhDirectApplicationMutation as Mutation;
+
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_write_writable_stage");
+        let build = |label: &str, mutation: Mutation| {
+            let root = output_dir(&format!("direct-application-control-{label}"));
+            let (result, observations, applications) =
+                ken_runtime::with_checked_ih_direct_application_mutation(mutation, || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        "rt_parity_direct_application_control",
+                        root.path(),
+                    )
+                });
+            (root, result, observations, applications)
+        };
+
+        let (baseline_root, baseline, baseline_rows, baseline_applications) =
+            build("baseline", Mutation::Exact);
+        let baseline = baseline.expect("the exact Direct application must compile");
+        assert!(!baseline_rows.is_empty());
+        assert_eq!(baseline_applications, baseline_rows.len());
+        let baseline_bytes = std::fs::read(&baseline.artifact.executable_path)
+            .expect("baseline Direct executable bytes");
+        let baseline_hashes = (
+            baseline.plan_transport_hash,
+            baseline.runtime_program.core_semantic_hash,
+            baseline.runtime_program.artifact_hash,
+            baseline.artifact.executable_hash,
+        );
+
+        for (label, mutation, expected, expected_calls) in [
+            (
+                "drop-call",
+                Mutation::DropCall,
+                "Direct application emitted zero calls for one governed arrival",
+                0,
+            ),
+            (
+                "vary-transport",
+                Mutation::VaryTransportIdentity,
+                "Direct declared-call lookup varied away from the selected transport identity",
+                0,
+            ),
+            (
+                "permute-captures",
+                Mutation::PermuteCaptures,
+                "continuation call's independently assembled WorkerCapture suffix",
+                0,
+            ),
+            (
+                "drop-capture",
+                Mutation::DropCapture,
+                "Direct captured environment has a missing planner-ordered capture",
+                0,
+            ),
+            (
+                "environment-for-result",
+                Mutation::EnvironmentForResult,
+                "substituted its captured environment for the emitted call Result",
+                1,
+            ),
+        ] {
+            let (_mutated_root, mutated, rows, applications) = build(label, mutation);
+            let error = mutated.expect_err("a malformed Direct relation must refuse");
+            let rendered = format!("{error:?}");
+            assert!(
+                rendered.contains(expected),
+                "{label}: wrong refusal arm; error={rendered}; rows={rows:#?}"
+            );
+            assert_eq!(applications, 1, "{label}: mutation missed Direct");
+            assert_eq!(rows.len(), 1, "{label}: missing application provenance");
+            assert_eq!(rows[0].invocation_origin, "StaticOriginId(741)");
+            assert_eq!(rows[0].application_origin, "StaticOriginId(740)");
+            assert_eq!(rows[0].callee_origin, "StaticOriginId(739)");
+            assert_eq!(rows[0].emitted_call_count, expected_calls);
+            assert_eq!(rows[0].emitted_call.is_some(), expected_calls == 1);
+            assert!(!rows[0].application_result_from_call);
+            assert!(ken_runtime::checked_ih_direct_application_mutation_is_exact());
+
+            let (restored_root, restored, restored_rows, restored_applications) =
+                build(&format!("{label}-restored"), Mutation::Exact);
+            let restored = restored.expect("the exact Direct relation must restore");
+            assert_eq!(restored_rows, baseline_rows);
+            assert_eq!(restored_applications, baseline_applications);
+            assert_eq!(
+                (
+                    restored.plan_transport_hash,
+                    restored.runtime_program.core_semantic_hash,
+                    restored.runtime_program.artifact_hash,
+                    restored.artifact.executable_hash,
+                ),
+                baseline_hashes,
+                "{label}: exact restoration changed an artifact hash"
+            );
+            assert_eq!(
+                std::fs::read(&restored.artifact.executable_path)
+                    .expect("restored Direct executable bytes"),
+                baseline_bytes,
+                "{label}: exact restoration changed executable bytes"
+            );
+            drop(restored_root);
+        }
+        drop(baseline_root);
+    });
+}
+
 /// **Promise class: transition sentinel.** The observation is stated over the
 /// still-emitted pre-D3 edge pairing rather than fixed Cranelift block/value
 /// numbers; D3 retires this observer when it activates the new forward edge.

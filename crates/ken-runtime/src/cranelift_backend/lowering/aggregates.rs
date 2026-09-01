@@ -3804,7 +3804,7 @@ impl<'a> Lowering<'a> {
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             worker: &StaticWorkerBinding,
-        ) -> Result<LoweringOperand, CraneliftBackendError> {
+        ) -> Result<CheckedIhCapturedEnvironment, CraneliftBackendError> {
             let owner = self.defining_emission_owner.ok_or_else(|| {
                 unsupported(
                     "CheckedIhCapturedEnvironment",
@@ -3914,7 +3914,7 @@ impl<'a> Lowering<'a> {
                 };
                 self.emit_carrier_store_field(builder, word, position, child)?;
             }
-            Ok(LoweringOperand::Carried(word))
+            Ok(CheckedIhCapturedEnvironment { word })
         }
 
         /// Materialize only the positional environment of one statically
