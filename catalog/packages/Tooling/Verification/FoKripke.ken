@@ -2688,3 +2688,76 @@ fn fok_adequate_gen
       (fok_ledger_gamma sigma c rho led)
       (Cons FokForm (fok_w_forces world terms (fok_erase_n sigma n f)) (Nil FokForm)))
   → fok_denote_at sigma c rho n f xs
+
+-- === D2b: derivation inversion backbone ===
+
+fn fok_seq_gamma (s : FokSequent) : List FokForm =
+  match s {
+    FokMkSequent gamma delta ↦ gamma
+  }
+
+fn fok_seq_delta (s : FokSequent) : List FokForm =
+  match s {
+    FokMkSequent gamma delta ↦ delta
+  }
+
+-- True exactly for the goal shapes with a right-introduction rule in this slice
+-- (Imp, ForallWorld, ForallObj). Every atomlike goal -- Bottom, the three
+-- relation atoms, And, Or -- is False and can only be closed by Init.
+fn fok_has_right_intro (goal : FokForm) : Bool =
+  match goal {
+    FokBottom ↦ False;
+    FokAccess a b ↦ False;
+    FokDomainA a b ↦ False;
+    FokForcingP a b ↦ False;
+    FokAnd p q ↦ False;
+    FokOr p q ↦ False;
+    FokImp p q ↦ True;
+    FokForallWorld body ↦ True;
+    FokForallObj body ↦ True
+  }
+
+-- Projections/discriminators for `Option FokForm`, for Some-injectivity and the
+-- None/Some discrimination the inversion needs.
+fn fok_option_form_default (o : Option FokForm) : FokForm =
+  match o {
+    None ↦ FokBottom;
+    Some x ↦ x
+  }
+
+fn fok_option_form_is_some (o : Option FokForm) : Bool =
+  match o {
+    None ↦ False;
+    Some x ↦ True
+  }
+
+theorem fok_some_form_injective (a : FokForm) (b : FokForm)
+      (h : Equal (Option FokForm) (Some FokForm a) (Some FokForm b))
+    : Equal FokForm a b =
+  fok_cong (Option FokForm) FokForm
+    (Some FokForm a) (Some FokForm b) fok_option_form_default h
+
+theorem fok_none_is_not_some (b : FokForm)
+      (h : Equal (Option FokForm) (None FokForm) (Some FokForm b))
+    : Equal Bool False True =
+  fok_cong (Option FokForm) Bool
+    (None FokForm) (Some FokForm b) fok_option_form_is_some h
+
+-- A lookup into the singleton `[goal]` that returns `Some dd` forces `dd = goal`
+-- (only index 0 hits; every higher index is `None`, absurd against `Some`).
+theorem fok_nth_singleton_some (goal : FokForm) (dd : FokForm) (right : Nat)
+    : Equal (Option FokForm) (fok_nth_form (Cons FokForm goal (Nil FokForm)) right)
+        (Some FokForm dd)
+      → Equal FokForm goal dd =
+  match right {
+    Zero ↦ λh. fok_some_form_injective goal dd h;
+    Suc j ↦ λh. absurd (fok_none_is_not_some dd h)
+  }
+
+-- The Init closure witness recovered by inverting an atomlike-goal derivation.
+data FokInitWitness (gamma : List FokForm) (goal : FokForm) : Type where {
+  FokMkInitWitness :
+    (left : Nat)
+    → Equal (Option FokForm) (fok_nth_form gamma left) (Some FokForm goal)
+    → FokInitWitness gamma goal
+}
