@@ -1148,6 +1148,181 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
     });
 }
 
+/// **Promise class: transition sentinel.** A reviewed change to either fixed
+/// product's static graph may replace these dense coordinates, but must replace
+/// the complete row while retaining its singleton classification and schema.
+///
+/// **MEASURED:** the host-response side independently selects the exact
+/// `BufferAllocate` response application and response binder, while the
+/// continuation side supplies one opaque call identity, one K closure/body/
+/// context, every ordered K capture, and every enclosing continuation input.
+/// **CLAIMED:** each fixed unspecialized producer has exactly one statically
+/// attributable incoming caller edge and that edge has one complete explicit
+/// schema, so neither product reaches the zero or irreducibly-multiple arm.
+/// **THE GAP:** this checkpoint proves planner feasibility only. It emits no
+/// response-owner Function, retargets no caller, and makes no runtime-success
+/// claim; the later checkpoints own those properties.
+#[test]
+fn static_response_feasibility_ledger_closes_fixed_products() {
+    in_generated_entry_stack_thread("rt-parity-static-response-feasibility", || {
+        let compile = |label: &str, entry: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("static-response-feasibility-{label}"));
+            let (result, diagnostics) =
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        &format!("rt_parity_static_response_feasibility_{label}"),
+                        root.path(),
+                    )
+                });
+            result.expect("the fixed feasibility product must compile");
+            assert_eq!(
+                diagnostics.len(),
+                1,
+                "one compile must publish one closed plan"
+            );
+            let diagnostic = diagnostics.into_iter().next().unwrap();
+            assert_eq!(
+                diagnostic.static_response_infeasible, None,
+                "a fixed reached edge must not enter the typed infeasible arm"
+            );
+            assert_eq!(
+                diagnostic.static_response_rows.len(),
+                1,
+                "the unspecialized BufferAllocate producer must have one exact caller/K row"
+            );
+            diagnostic.static_response_rows.into_iter().next().unwrap()
+        };
+
+        let read = compile("read", "rt_read_offset_stage");
+        assert_eq!(
+            read.base_owner,
+            "Specialization(ContinuationSpecializationId(2))"
+        );
+        assert_eq!(
+            (
+                read.producer_call_origin,
+                read.response_origin,
+                read.vis_origin
+            ),
+            (138, 136, 951)
+        );
+        assert_eq!(
+            (read.k_closure_origin, read.k_body_origin, read.k_context),
+            (947, 941, 0)
+        );
+        for coordinate in [
+            "producer_construct_origin: StaticOriginId(951)",
+            "target: ContinuationSpecializationId(2)",
+            "closure_origin: StaticOriginId(947)",
+            "body_origin: StaticOriginId(941)",
+        ] {
+            assert!(
+                read.k_identity.contains(coordinate),
+                "read K identity omitted {coordinate}"
+            );
+        }
+        assert_eq!(
+            read.captures
+                .iter()
+                .map(|capture| (capture.ordinal, capture.origin, capture.producer_abi_slot))
+                .collect::<Vec<_>>(),
+            vec![
+                (0, 946, 1),
+                (1, 945, 2),
+                (2, 944, 3),
+                (3, 943, 4),
+                (4, 942, 5)
+            ]
+        );
+        assert_eq!(
+            read.continuation_inputs
+                .iter()
+                .map(|(ordinal, _, slot)| (*ordinal, *slot))
+                .collect::<Vec<_>>(),
+            vec![(0, 6), (1, 7), (2, 8), (3, 9)]
+        );
+        assert!(read.captures[0]
+            .source
+            .contains("binding_origin: StaticOriginId(951)"));
+        assert!(read.captures[1]
+            .source
+            .contains("binding_origin: StaticOriginId(964)"));
+        assert!(read.captures[2]
+            .source
+            .contains("binding_origin: StaticOriginId(965)"));
+        assert!(read.captures[3].source.contains("source_abi_position: 0"));
+        assert!(read.captures[4].source.contains("source_abi_position: 1"));
+
+        let write = compile("write", "rt_write_writable_stage");
+        assert_eq!(
+            write.base_owner,
+            "Specialization(ContinuationSpecializationId(3))"
+        );
+        assert_eq!(
+            (
+                write.producer_call_origin,
+                write.response_origin,
+                write.vis_origin
+            ),
+            (151, 149, 1250)
+        );
+        assert_eq!(
+            (write.k_closure_origin, write.k_body_origin, write.k_context),
+            (1246, 1238, 0)
+        );
+        for coordinate in [
+            "producer_construct_origin: StaticOriginId(1250)",
+            "target: ContinuationSpecializationId(3)",
+            "closure_origin: StaticOriginId(1246)",
+            "body_origin: StaticOriginId(1238)",
+        ] {
+            assert!(
+                write.k_identity.contains(coordinate),
+                "write K identity omitted {coordinate}"
+            );
+        }
+        assert_eq!(
+            write
+                .captures
+                .iter()
+                .map(|capture| (capture.ordinal, capture.origin, capture.producer_abi_slot))
+                .collect::<Vec<_>>(),
+            vec![
+                (0, 1245, 1),
+                (1, 1244, 2),
+                (2, 1243, 3),
+                (3, 1242, 4),
+                (4, 1241, 5),
+                (5, 1240, 6),
+                (6, 1239, 7),
+            ]
+        );
+        assert_eq!(
+            write
+                .continuation_inputs
+                .iter()
+                .map(|(ordinal, _, slot)| (*ordinal, *slot))
+                .collect::<Vec<_>>(),
+            vec![(0, 8), (1, 9), (2, 10), (3, 11), (4, 12), (5, 13)]
+        );
+        assert!(write.captures[0]
+            .source
+            .contains("binding_origin: StaticOriginId(1250)"));
+        for (position, capture) in write.captures.iter().enumerate().skip(1) {
+            assert!(
+                capture
+                    .source
+                    .contains(&format!("source_abi_position: {}", position - 1)),
+                "write capture {position} lost its exact entry coordinate: {capture:?}"
+            );
+        }
+    });
+}
+
+
 /// **Promise class: durable invariant.** Intended planner growth may add Direct
 /// arrivals, but every such arrival must retain one source-keyed declared call
 /// and use that call's Trap-checked result rather than its capture environment.

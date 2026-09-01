@@ -18,6 +18,7 @@ pub(in crate::cranelift_backend) use continuations::tests::contspec_activation_o
 mod effects;
 mod joins_traps;
 mod occurrences;
+mod responses;
 mod semantic_ir;
 mod units;
 
@@ -80,6 +81,11 @@ pub(in crate::cranelift_backend) use semantic_ir::{
     SynthesizedFixedConstructorRole,
 };
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
+#[allow(unused_imports)]
+pub(in crate::cranelift_backend) use responses::{
+    SsaInfeasible, StaticResponseCapture, StaticResponseContinuation,
+    StaticResponseContinuationId,
+};
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,
 };
@@ -844,7 +850,136 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'s
         }
     }
     planner.connect_declaration_calls(&declaration_entries)?;
-    planner.finish(symbols, root_ingress, functionized_units)
+    let plan = planner.finish(symbols, root_ingress, functionized_units)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    record_static_response_feasibility_diagnostic(&plan)?;
+    Ok(plan)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StaticResponseCaptureObservation {
+    pub ordinal: u32,
+    pub origin: u32,
+    pub source: String,
+    pub producer_abi_slot: u32,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StaticResponseFeasibilityObservation {
+    pub base_owner: String,
+    pub producer_call_origin: u32,
+    pub response_origin: u32,
+    pub vis_origin: u32,
+    pub k_identity: String,
+    pub k_closure_origin: u32,
+    pub k_body_origin: u32,
+    pub k_context: u32,
+    pub captures: Vec<StaticResponseCaptureObservation>,
+    pub continuation_inputs: Vec<(u32, String, u32)>,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StaticResponseInfeasibleObservation {
+    pub base_owner: String,
+    pub vis_origin: u32,
+    pub producer_call_origin: Option<u32>,
+    pub reason: String,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StaticResponseFeasibilityDiagnostic {
+    pub static_response_rows: Vec<StaticResponseFeasibilityObservation>,
+    pub static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS:
+        std::cell::RefCell<Option<Vec<StaticResponseFeasibilityDiagnostic>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_static_response_feasibility_diagnostics<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<StaticResponseFeasibilityDiagnostic>) {
+    STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
+        assert!(
+            slot.borrow().is_none(),
+            "static-response feasibility observation windows cannot nest"
+        );
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let observations = STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
+        slot.borrow_mut()
+            .take()
+            .expect("static-response feasibility observation window")
+    });
+    (result, observations)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_static_response_feasibility_diagnostic(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<(), CraneliftBackendError> {
+    let (static_response_rows, static_response_infeasible) = match plan
+        .static_response_feasibility_ledger(ken_host::HostOpV1::BufferAllocate)?
+    {
+        Ok(rows) => {
+            let observations = rows
+                .iter()
+                .map(|row| StaticResponseFeasibilityObservation {
+                    base_owner: format!("{:?}", row.base_owner()),
+                    producer_call_origin: row.producer_call_origin().0,
+                    response_origin: row.response_origin().0,
+                    vis_origin: row.vis_origin().0,
+                    k_identity: format!("{:?}", row.k_identity()),
+                    k_closure_origin: row.k_closure_origin().0,
+                    k_body_origin: row.k_body_origin().0,
+                    k_context: row.k_context().0,
+                    captures: row
+                        .captures()
+                        .iter()
+                        .map(|capture| StaticResponseCaptureObservation {
+                            ordinal: capture.ordinal(),
+                            origin: capture.origin().0,
+                            source: format!("{:?}", capture.source()),
+                            producer_abi_slot: capture.producer_abi_slot(),
+                        })
+                        .collect(),
+                    continuation_inputs: row
+                        .continuation_inputs()
+                        .iter()
+                        .map(|(ordinal, source, slot)| (*ordinal, format!("{source:?}"), *slot))
+                        .collect(),
+                })
+                .collect();
+            (observations, None)
+        }
+        Err(infeasible) => (
+            Vec::new(),
+            Some(StaticResponseInfeasibleObservation {
+                base_owner: format!("{:?}", infeasible.base_owner()),
+                vis_origin: infeasible.vis_origin().0,
+                producer_call_origin: infeasible.producer_call_origin().map(|origin| origin.0),
+                reason: infeasible.reason().to_string(),
+            }),
+        ),
+    };
+    STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
+        if let Some(rows) = slot.borrow_mut().as_mut() {
+            rows.push(StaticResponseFeasibilityDiagnostic {
+                static_response_rows,
+                static_response_infeasible,
+            });
+        }
+    });
+    Ok(())
 }
 
 /// The governed nested-bracket source shared by the planning and emission
