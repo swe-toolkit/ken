@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-01 04:31:58Z — from 511 issue file(s) in `docs/program/issues/`.
+2026-09-01 05:27:38Z — from 512 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -201,6 +201,7 @@ the committed file matches the generator's output.
 | `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` | `AC-6`'s doc says a live differential is impossible because `ElabEnv::new()` has no 'before' env -- true of an ENV-level bracket and false of a BLOCK-level one, which is the established idiom four sites away in the same crate, so the instrument the comment says does not exist is writable, id-keyed, and fails in production | merged | language | S | none | 2189 |
 | `LANG-PRELUDE-ELABORATION-DEPTH` | Elaboration has an unstated stack requirement that exceeds Rust's 2 MiB spawned-thread default: every compilation elaborates the whole prelude, `elab.rs:997` measures ~115 KiB of headroom out of 2 MiB, and thirteen sites across four crates independently bumped their thread to 256 MiB without any stated rule -- so the rest of `37 §9` is a queue of prelude additions spending a margin nobody measures and no site states | merged | language | S | none | — |
 | `LANG-REACHABILITY-SUBSUMING-ARMS` | `ReachabilityError` carries only a span, so a redundant-arm diagnostic cannot say WHICH earlier arms subsume the dead arm -- the mirror of the gap `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` closed on the exhaustiveness side, except `34 §4.2` does NOT mandate it, so this is ergonomics and must not be filed or read as a conformance obligation | merged | language | M | none | — |
+| `LANG-RECORD-INDEX-REFINEMENT` | Elaborator predecessor for D2b: make generated dependent-elimination branch refinement handle a constructor-headed record index (e.g. FokMkSequent gamma delta) by forming the three transport constructors' J under an abstract index type and abstract endpoints, then applying that checked generic helper at the concrete index — the core analogue of the already-green generic fok_cong pattern. No FokDerivation re-index, no kernel/spec/trust change. | ready | language | M | none | — |
 | `LANG-RECORD-STACK-OVERFLOW` | The record-literal surface work aborts a real `ken-cli` native compilation with a stack overflow -- `mrc_4a_cross_crate_census_and_its_controls` SIGABRTs at every SHA of the arc including the one carrying the 143-line stack rework, so the rework is not the repair; the arc's own depth fixture never detected it because it builds match arms with `=>`, which is not a Ken token | merged | language | M | none | — |
 | `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` | The doc comment justifying LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT's -3120 saving says the pow10 cascade's arms are all bare literals, which the generator refutes -- only the True arms are, every False arm is the next nested match, and the innermost is an application; the conclusion survives, the recorded reason does not, and it misleads in both directions | merged | language | S | none | 2195 |
 | `LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN` | Ken's SCT termination checker traces a structural decrease only through a direct pattern match feeding the recursive call, so factoring a shared guard into a non-recursive helper reds NotTerminating -- forcing duplication at exactly the sites a checker wants one guard | draft | language | S | none | — |
@@ -560,6 +561,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
+- `LANG-RECORD-INDEX-REFINEMENT` — Elaborator predecessor for D2b: make generated dependent-elimination branch refinement handle a constructor-headed record index (e.g. FokMkSequent gamma delta) by forming the three transport constructors' J under an abstract index type and abstract endpoints, then applying that checked generic helper at the concrete index — the core analogue of the already-green generic fok_cong pattern. No FokDerivation re-index, no kernel/spec/trust change.
 - `LANG-SYMBOLIC-OPERATOR-NAMES` — `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
@@ -616,6 +618,7 @@ is itself not yet `merged`/`closed`:
 - `RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE` blocked by `RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
+- `V3-FO-EMBEDDING-ADEQUACY` blocked by `LANG-RECORD-INDEX-REFINEMENT` (status: ready)
 
 ## Gate progress
 
