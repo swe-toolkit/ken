@@ -294,6 +294,9 @@ impl<'src> Planner<'src> {
                 continuation_specialization_calls: Vec::new(),
                 required_consumer_projections: BTreeMap::new(),
                 continuation_contexts: Vec::new(),
+                static_response_continuations: Vec::new(),
+                static_response_plan_installed: false,
+                static_response_infeasible: None,
                 // Empty by construction: the planner has no oriented plan, so a
                 // fusion identity cannot exist yet. `D2f`'s post-planner
                 // installer is the only writer.
@@ -1199,12 +1202,23 @@ impl<'src> Planner<'src> {
             &mut self.plan.abi,
             &self.plan.continuation_specializations,
         )?;
+        // CP2 installs the complete response demand population into the SAME
+        // ordinary context identity plane, after causal specialization planning
+        // has closed but before any context ABI exists. The scratch causal ABI
+        // below is an independent prefix oracle: appending response-only keys
+        // must leave every prior descriptor, slot, input and affinity byte
+        // unchanged, not merely leave the context count plausible.
+        let causal_contexts = self.plan.continuation_contexts.clone();
+        self.plan.install_static_response_context_plan()?;
+        let mut causal_abi = self.plan.abi.clone();
+        install_continuation_context_abi(&mut causal_abi, &causal_contexts)?;
         // `D5a`: the generated contexts' own ABI, in its own arenas. ⛔ Installed
         // AFTER the specialization ABI and into separate vectors, never appended
         // to `continuation_descriptors` -- that population is exactly the
         // continuation-callee partition, and admitting a caller-side context
         // there would make one identity domain readable as the other.
         install_continuation_context_abi(&mut self.plan.abi, &self.plan.continuation_contexts)?;
+        validate_causal_context_abi_prefix(&self.plan.abi, &causal_abi)?;
         // `D3b` STAGE 2 — every context id now exists, so every structural frame
         // requirement can be resolved to exactly one identity.
         //
@@ -1314,6 +1328,33 @@ impl<'src> StaticTransitionPlan<'src> {
             body_occurrence: planned.occurrence,
         });
     }
+}
+
+/// Prove that adding response-issued contexts appended to, rather than rebuilt,
+/// every causal context ABI arena. Comparing the complete causal-only arenas to
+/// exact installed prefixes covers descriptor IDs and byte layout together.
+fn validate_causal_context_abi_prefix(
+    installed: &AbiPlane,
+    causal: &AbiPlane,
+) -> Result<(), CraneliftBackendError> {
+    let descriptors = installed
+        .context_descriptors
+        .get(..causal.context_descriptors.len());
+    let slots = installed.context_slots.get(..causal.context_slots.len());
+    let inputs = installed.context_inputs.get(..causal.context_inputs.len());
+    let affinities = installed
+        .context_affinities
+        .get(..causal.context_affinities.len());
+    if descriptors != Some(causal.context_descriptors.as_slice())
+        || slots != Some(causal.context_slots.as_slice())
+        || inputs != Some(causal.context_inputs.as_slice())
+        || affinities != Some(causal.context_affinities.as_slice())
+    {
+        return Err(planner_error(
+            "installing response contexts changed a causal context ABI prefix",
+        ));
+    }
+    Ok(())
 }
 
 fn runtime_expr_tag(expr: &RuntimeExpr) -> u32 {

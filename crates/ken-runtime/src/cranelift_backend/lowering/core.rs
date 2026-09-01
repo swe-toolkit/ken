@@ -8933,7 +8933,17 @@ impl<'a> Lowering<'a> {
         } else {
             required_consumer
         };
-        if let Some(required) = required_consumer {
+        // CP2: a statically selected response caller keeps this exact funnel and
+        // operand assembly but targets its response-owner declaration instead of
+        // taking the required-consumer inline path. The opaque identity is the
+        // selector; no operation tag, closure, environment or runtime route is
+        // consulted here. Non-response identities retain the byte-for-behaviour
+        // required-consumer path below.
+        if let Some(required) = required_consumer.filter(|_| {
+            !self
+                .static_transition_plan
+                .is_static_response_selected_caller(identity)
+        }) {
             let answer = self.realize_required_consumer_locally(
                 builder,
                 identity,

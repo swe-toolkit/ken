@@ -276,7 +276,9 @@ pub(in crate::cranelift_backend) use super::planning::{
     AggregateOccurrenceId, PlannedAggregateAllocation, PlannedAggregateShape,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,
-    JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
+    JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
+    StaticResponseOwnerId, StaticResponseOwnerSpecialization,
+    StaticTransitionPlan,
     verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
@@ -7169,7 +7171,7 @@ impl<'a> Lowering<'a> {
     /// For every causal token this function emitted a call for, prove
     ///
     /// ```text
-    /// bundle.continuation(identity.target())  ==  callee decoded from the CLIF
+    /// resolved_continuation_call_target(identity) == callee decoded from CLIF
     /// ```
     ///
     /// **The two sides come from different producers.** The left is the
@@ -7199,13 +7201,11 @@ impl<'a> Lowering<'a> {
     ) -> Result<(), CraneliftBackendError> {
         let mut expected_by_callee: BTreeMap<FuncId, usize> = BTreeMap::new();
         for (identity, inst) in &self.function_local.continuation_emissions {
-            let planned = bundle.continuation(identity.target()).ok_or_else(|| {
-                backend_module(
-                    "an emitted causal token names a specialization that was never \
-                     forward-declared"
-                        .to_string(),
-                )
-            })?;
+            let planned = units::resolved_continuation_call_target(
+                &self.static_transition_plan,
+                bundle,
+                identity,
+            )?;
             let emitted = Self::decode_direct_callee(func, *inst)?;
             if emitted != planned {
                 return Err(backend_module(format!(
@@ -7228,14 +7228,11 @@ impl<'a> Lowering<'a> {
                         .to_string(),
                 ));
             }
-            let planned = bundle
-                .continuation(transport.source_specialization())
-                .ok_or_else(|| {
-                    backend_module(
-                        "a checked-IH transport source specialization was never forward-declared"
-                            .to_string(),
-                    )
-                })?;
+            let planned = units::resolved_continuation_call_target(
+                &self.static_transition_plan,
+                bundle,
+                transport.source_call_identity(),
+            )?;
             let emitted = Self::decode_direct_callee(func, *inst)?;
             if emitted != planned {
                 return Err(backend_module(
@@ -7270,6 +7267,7 @@ impl<'a> Lowering<'a> {
             })?;
             specialization_callees.insert(id);
         }
+        specialization_callees.extend(bundle.response_targets());
         // ⛔ Not a fast path around the check: with no planned specialization
         // there is no callee the scan could recognise, and the loop above has
         // already rejected any recorded emission naming one -- so `expected` is

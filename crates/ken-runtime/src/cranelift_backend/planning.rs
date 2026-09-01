@@ -42,7 +42,7 @@ pub use static_transition::{
     ComposedReturnForwardRetRoleWitnessObservation,
     RetainedResultClosureProofMutation, StaticResponseCaptureObservation,
     StaticResponseContextDemandMutation, StaticResponseFeasibilityDiagnostic,
-    StaticResponseFeasibilityObservation,
+    StaticResponseFeasibilityObservation, StaticResponseOwnerObservation,
     StaticResponseInfeasibleObservation, WorkerPrefixDeferral,
 };
 
@@ -144,7 +144,7 @@ pub(super) use static_transition::{
     ContinuationAvailabilityViews, ContinuationEnvironmentClaim, ContinuationFrameIdentity,
     ContinuationSourceCoordinate,
     ContinuationSourceSlotAuthority,
-    ContinuationSpecializationId,
+    ContinuationSpecializationId, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout reaches
     // lowering's test targets so its control can compare the authority against
     // the prefix production actually assembled, rather than against its own

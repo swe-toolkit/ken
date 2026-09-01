@@ -84,7 +84,8 @@ pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
     SsaInfeasible, StaticResponseCapture, StaticResponseContextDemand,
-    StaticResponseContinuation, StaticResponseContinuationId,
+    StaticResponseContinuation, StaticResponseContinuationId, StaticResponseOwnerId,
+    StaticResponseOwnerSpecialization,
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use responses::{
@@ -559,9 +560,22 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// call identity, never by specialization identity or function provenance.
     required_consumer_projections:
         BTreeMap<ContinuationCallIdentity, RequiredConsumerProjection>,
-    /// `RT-DECL-CLOSURE-PORT` `D5a`. The generated producer execution contexts,
-    /// derived after the specialization fixed point closes.
+    /// `RT-DECL-CLOSURE-PORT` `D5a`. The generated producer execution contexts.
+    /// Causal-call demands retain the exact prefix produced by specialization
+    /// planning; validated static-response demands append through the same
+    /// `(specialization, worker body)` interner before this population's ABI is
+    /// installed.
     continuation_contexts: Vec<PlannedContinuationContext>,
+    /// Every validated response edge resolved through the installed union
+    /// context population. Empty exactly when `static_response_infeasible` is
+    /// populated or the complete response population is empty.
+    static_response_continuations: Vec<StaticResponseContinuation>,
+    /// Distinguishes a lawfully empty installed response population from the
+    /// pre-install draft state; neither row count nor infeasibility can do so.
+    static_response_plan_installed: bool,
+    /// The typed fail-closed result for a genuinely opaque/dynamic response K
+    /// or a source that cannot be expressed in the existing typed schema.
+    static_response_infeasible: Option<SsaInfeasible>,
     /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`. The interned fusion identity
     /// plane, **installed after planning rather than during it**.
     ///
@@ -903,11 +917,27 @@ pub struct StaticResponseInfeasibleObservation {
 
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StaticResponseOwnerObservation {
+    pub owner: u32,
+    pub base_owner: String,
+    pub response: u32,
+    pub selected_caller: String,
+    pub k_context: u32,
+    pub context_was_preexisting: bool,
+    pub parameters: u32,
+    pub captures: u32,
+    pub frame_bytes: u32,
+    pub slots: Vec<(String, u32)>,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StaticResponseFeasibilityDiagnostic {
     pub static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub all_static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
+    pub static_response_owners: Vec<StaticResponseOwnerObservation>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -996,6 +1026,28 @@ fn record_static_response_feasibility_diagnostic(
     );
     let (all_static_response_rows, all_static_response_infeasible) =
         observe(plan.static_response_feasibility_ledger_all()?);
+    let static_response_owners = match plan.static_response_owner_specializations()? {
+        Ok(owners) => owners
+            .iter()
+            .map(|owner| StaticResponseOwnerObservation {
+                owner: owner.id().ordinal(),
+                base_owner: format!("{:?}", owner.base_owner()),
+                response: owner.response().ordinal(),
+                selected_caller: format!("{:?}", owner.selected_caller()),
+                k_context: owner.k_context().0,
+                context_was_preexisting: owner.context_was_preexisting(),
+                parameters: owner.header().parameters,
+                captures: owner.header().captures,
+                frame_bytes: owner.header().frame_bytes,
+                slots: owner
+                    .slots()
+                    .iter()
+                    .map(|slot| (format!("{:?}", slot.kind), slot.ordinal))
+                    .collect(),
+            })
+            .collect(),
+        Err(_) => Vec::new(),
+    };
     STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
         if let Some(rows) = slot.borrow_mut().as_mut() {
             rows.push(StaticResponseFeasibilityDiagnostic {
@@ -1003,6 +1055,7 @@ fn record_static_response_feasibility_diagnostic(
                 static_response_infeasible,
                 all_static_response_rows,
                 all_static_response_infeasible,
+                static_response_owners,
             });
         }
     });

@@ -8,6 +8,7 @@
 
 use std::collections::BTreeMap;
 
+use super::abi::{AbiFrameHeader, AbiSlot, AbiSlotKind};
 use super::continuations::{
     continuation_owner_entry_sources, generated_context_parameters,
     walk_continuation_value_environment, ContinuationCallIdentity, ContinuationContextId,
@@ -27,6 +28,10 @@ impl StaticResponseContinuationId {
         Ok(Self(u32::try_from(position).map_err(|_| {
             planner_capacity_error("static response continuation identity exhausted")
         })?))
+    }
+
+    pub(in crate::cranelift_backend) fn ordinal(self) -> u32 {
+        self.0
     }
 }
 
@@ -209,6 +214,74 @@ impl StaticResponseContinuation {
         &self,
     ) -> &[(u32, ContinuationSourceCoordinate, u32)] {
         &self.continuation_inputs
+    }
+}
+
+/// Identity of one compile-time response-owner function. This domain is
+/// deliberately non-convertible to continuation/context identities: an owner
+/// implements one selected incoming edge and later calls a K context; it is not
+/// a second spelling for either endpoint.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct StaticResponseOwnerId(u32);
+
+impl StaticResponseOwnerId {
+    fn from_position(position: usize) -> Result<Self, CraneliftBackendError> {
+        Ok(Self(u32::try_from(position).map_err(|_| {
+            planner_capacity_error("static response owner identity exhausted")
+        })?))
+    }
+
+    pub(in crate::cranelift_backend) fn ordinal(self) -> u32 {
+        self.0
+    }
+}
+
+/// The forward-declaration and selected-caller contract for one response owner.
+/// Its activation ABI is exactly the selected K specialization ABI; CP2 adds no
+/// closure, selector, environment aggregate, tag, or runtime route.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct StaticResponseOwnerSpecialization {
+    id: StaticResponseOwnerId,
+    base_owner: ContinuationEmissionOwner,
+    response: StaticResponseContinuationId,
+    selected_caller: ContinuationCallIdentity,
+    k_context: ContinuationContextId,
+    context_was_preexisting: bool,
+    header: AbiFrameHeader,
+    slots: Vec<AbiSlot>,
+}
+
+impl StaticResponseOwnerSpecialization {
+    pub(in crate::cranelift_backend) fn id(&self) -> StaticResponseOwnerId {
+        self.id
+    }
+
+    pub(in crate::cranelift_backend) fn base_owner(&self) -> ContinuationEmissionOwner {
+        self.base_owner
+    }
+
+    pub(in crate::cranelift_backend) fn response(&self) -> StaticResponseContinuationId {
+        self.response
+    }
+
+    pub(in crate::cranelift_backend) fn selected_caller(&self) -> &ContinuationCallIdentity {
+        &self.selected_caller
+    }
+
+    pub(in crate::cranelift_backend) fn k_context(&self) -> ContinuationContextId {
+        self.k_context
+    }
+
+    pub(in crate::cranelift_backend) fn context_was_preexisting(&self) -> bool {
+        self.context_was_preexisting
+    }
+
+    pub(in crate::cranelift_backend) fn header(&self) -> AbiFrameHeader {
+        self.header
+    }
+
+    pub(in crate::cranelift_backend) fn slots(&self) -> &[AbiSlot] {
+        &self.slots
     }
 }
 
@@ -540,6 +613,7 @@ impl StaticTransitionPlan<'_> {
     fn static_response_context_demands_filtered(
         &self,
         operation: Option<HostOpV1>,
+        apply_mutation: bool,
     ) -> Result<Result<Vec<StaticResponseContextDemand>, SsaInfeasible>, CraneliftBackendError>
     {
         let routes = host_response_routes(self)?;
@@ -586,7 +660,7 @@ impl StaticTransitionPlan<'_> {
             }
             for unit in matching {
                 let base_owner = ContinuationEmissionOwner::Specialization(unit.id());
-                let continuation_inputs = unit.continuation_inputs()?;
+                let continuation_inputs = unit.prefinalization_continuation_inputs()?;
                 let infeasible = |reason| {
                     SsaInfeasible::at_vis(
                         base_owner,
@@ -674,7 +748,7 @@ impl StaticTransitionPlan<'_> {
                     worker: unit.key.worker.clone(),
                     captures,
                     continuation_inputs: continuation_inputs
-                        .into_iter()
+                        .iter()
                         .map(|input| (input.ordinal, input.coordinate, input.ordinary_abi_position))
                         .collect(),
                     context_inputs: unit.key.continuation_inputs.clone(),
@@ -693,16 +767,17 @@ impl StaticTransitionPlan<'_> {
         }
         let expected_demands = demands.clone();
         #[cfg(feature = "px8-ds-test-support")]
-        if operation.is_none() {
+        if operation.is_none() && apply_mutation {
             if let Some(mutation) =
                 STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(std::cell::Cell::get)
             {
                 let mut target = None;
                 for (position, demand) in demands.iter().enumerate() {
-                    if self
-                        .continuation_context_for(demand.k_specialization, demand.k_body_origin)?
-                        .is_none()
-                    {
+                    let context_preexists = self.continuation_contexts.iter().any(|context| {
+                        context.enclosing_specialization == demand.k_specialization
+                            && context.worker_body_origin == demand.k_body_origin
+                    });
+                    if !context_preexists {
                         target = Some(position);
                         break;
                     }
@@ -762,6 +837,7 @@ impl StaticTransitionPlan<'_> {
         demands.dedup();
         #[cfg(feature = "px8-ds-test-support")]
         if operation.is_none()
+            && apply_mutation
             && STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(std::cell::Cell::get)
                 == Some(StaticResponseContextDemandMutation::VaryContinuationInputSource)
         {
@@ -784,13 +860,14 @@ impl StaticTransitionPlan<'_> {
     /// scratch planner population. Existing planned contexts remain the exact
     /// prefix, so their identities and schemas cannot be renumbered by a
     /// response edge; the installed ABI descriptors on immutable `self` are
-    /// untouched. The returned population is planner evidence only at CP1: it
-    /// is not installed, so lowering cannot declare or enter a new Function.
+    /// untouched. This scratch population is validated before CP2 moves it into
+    /// the plan; it is never itself visible to lowering.
     fn response_context_union(
         &self,
+        causal_contexts: &[PlannedContinuationContext],
         demands: &[StaticResponseContextDemand],
     ) -> Result<(Vec<PlannedContinuationContext>, usize), CraneliftBackendError> {
-        let mut contexts = self.continuation_contexts.clone();
+        let mut contexts = causal_contexts.to_vec();
         let preexisting_count = contexts.len();
         let mut interned = BTreeMap::new();
         for (position, context) in contexts.iter().enumerate() {
@@ -853,7 +930,7 @@ impl StaticTransitionPlan<'_> {
             });
             interned.insert(key, contexts.len() - 1);
         }
-        if contexts.get(..preexisting_count) != Some(self.continuation_contexts.as_slice()) {
+        if contexts.get(..preexisting_count) != Some(causal_contexts) {
             return Err(planner_error(
                 "appending response context demands changed a causal context identity or schema",
             ));
@@ -864,8 +941,9 @@ impl StaticTransitionPlan<'_> {
     fn resolve_static_response_context_demands(
         &self,
         demands: Vec<StaticResponseContextDemand>,
+        contexts: &[PlannedContinuationContext],
+        preexisting_count: usize,
     ) -> Result<Vec<StaticResponseContinuation>, CraneliftBackendError> {
-        let (contexts, preexisting_count) = self.response_context_union(&demands)?;
         let mut resolved = Vec::with_capacity(demands.len());
         for demand in demands {
             let mut found = None;
@@ -906,15 +984,120 @@ impl StaticTransitionPlan<'_> {
         Ok(resolved)
     }
 
+    /// Install the complete validated response demand population into the
+    /// ordinary generated-context identity plane.
+    ///
+    /// This runs exactly once after causal specialization planning closes and
+    /// before any context ABI is installed. A typed SSA refusal publishes no
+    /// partial response rows and leaves the causal context population intact.
+    pub(super) fn install_static_response_context_plan(
+        &mut self,
+    ) -> Result<(), CraneliftBackendError> {
+        if self.static_response_plan_installed {
+            return Err(planner_error(
+                "the static response context plan may be installed exactly once",
+            ));
+        }
+        let demands = match self.static_response_context_demands_filtered(None, true)? {
+            Ok(demands) => demands,
+            Err(infeasible) => {
+                self.static_response_infeasible = Some(infeasible);
+                self.static_response_plan_installed = true;
+                return Ok(());
+            }
+        };
+        let causal_contexts = self.continuation_contexts.clone();
+        let (contexts, preexisting_count) =
+            self.response_context_union(&causal_contexts, &demands)?;
+        let rows = self.resolve_static_response_context_demands(
+            demands,
+            &contexts,
+            preexisting_count,
+        )?;
+        self.continuation_contexts = contexts;
+        self.static_response_continuations = rows;
+        self.static_response_plan_installed = true;
+        Ok(())
+    }
+
+    /// Re-derive the post-install response plane from the independently derived
+    /// causal prefix. This is the final-plan validator's response half; it keeps
+    /// the old specialization derivation exact over its own prefix rather than
+    /// weakening that validator to accept an arbitrary context suffix.
+    pub(super) fn validate_static_response_context_plan(
+        &self,
+        causal_contexts: &[PlannedContinuationContext],
+    ) -> Result<(), CraneliftBackendError> {
+        if !self.static_response_plan_installed {
+            return Err(planner_error(
+                "the final plan carries no installed static response context plan",
+            ));
+        }
+        let demands = match self.static_response_context_demands_filtered(None, false)? {
+            Ok(demands) => demands,
+            Err(infeasible) => {
+                let mut landed_contexts = self.continuation_contexts.clone();
+                for context in &mut landed_contexts {
+                    context.finalized_availability.clear();
+                }
+                if self.static_response_infeasible.as_ref() != Some(&infeasible)
+                    || !self.static_response_continuations.is_empty()
+                    || landed_contexts != causal_contexts
+                {
+                    return Err(planner_error(
+                        "the installed typed SSA refusal disagrees with its complete re-derivation",
+                    ));
+                }
+                return Ok(());
+            }
+        };
+        if self.static_response_infeasible.is_some() {
+            return Err(planner_error(
+                "a feasible response derivation retained a stale typed SSA refusal",
+            ));
+        }
+        let (mut expected_contexts, preexisting_count) =
+            self.response_context_union(causal_contexts, &demands)?;
+        let expected_rows = self.resolve_static_response_context_demands(
+            demands,
+            &expected_contexts,
+            preexisting_count,
+        )?;
+        for context in &mut expected_contexts {
+            context.finalized_availability.clear();
+        }
+        let mut landed_contexts = self.continuation_contexts.clone();
+        for context in &mut landed_contexts {
+            context.finalized_availability.clear();
+        }
+        if landed_contexts != expected_contexts
+            || self.static_response_continuations != expected_rows
+        {
+            return Err(planner_error(
+                "the installed response context/continuation plane is not its exact closed derivation",
+            ));
+        }
+        Ok(())
+    }
+
     fn static_response_feasibility_ledger_filtered(
         &self,
         operation: Option<HostOpV1>,
     ) -> Result<Result<Vec<StaticResponseContinuation>, SsaInfeasible>, CraneliftBackendError> {
-        let demands = match self.static_response_context_demands_filtered(operation)? {
-            Ok(demands) => demands,
-            Err(infeasible) => return Ok(Err(infeasible)),
-        };
-        Ok(Ok(self.resolve_static_response_context_demands(demands)?))
+        if !self.static_response_plan_installed {
+            return Err(planner_error(
+                "the static response feasibility ledger was read before installation",
+            ));
+        }
+        if let Some(infeasible) = &self.static_response_infeasible {
+            return Ok(Err(infeasible.clone()));
+        }
+        Ok(Ok(self
+            .static_response_continuations
+            .iter()
+            .filter(|row| operation.map_or(true, |operation| row.operation == operation))
+            .cloned()
+            .collect()))
     }
 
     pub(in crate::cranelift_backend) fn static_response_feasibility_ledger(
@@ -928,6 +1111,164 @@ impl StaticTransitionPlan<'_> {
         &self,
     ) -> Result<Result<Vec<StaticResponseContinuation>, SsaInfeasible>, CraneliftBackendError> {
         self.static_response_feasibility_ledger_filtered(None)
+    }
+
+    /// Whether this exact opaque causal edge is selected to enter a compile-time
+    /// response owner instead of realizing its required consumer inline.
+    pub(in crate::cranelift_backend) fn is_static_response_selected_caller(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> bool {
+        self.static_response_continuations
+            .iter()
+            .any(|row| row.k_identity() == identity)
+    }
+
+    /// Seal every installed response row as one forward-declared response-owner
+    /// contract and validate its selected caller against the unchanged K ABI.
+    pub(in crate::cranelift_backend) fn static_response_owner_specializations(
+        &self,
+    ) -> Result<
+        Result<Vec<StaticResponseOwnerSpecialization>, SsaInfeasible>,
+        CraneliftBackendError,
+    > {
+        let rows = match self.static_response_feasibility_ledger_all()? {
+            Ok(rows) => rows,
+            Err(infeasible) => return Ok(Err(infeasible)),
+        };
+        let ordinary_callers = self.ordinary_continuation_call_identities()?;
+        let units = self.continuation_units()?;
+        let mut selected_callers = std::collections::BTreeSet::new();
+        let mut owners = Vec::with_capacity(rows.len());
+        for row in rows {
+            if !ordinary_callers.contains(row.k_identity()) {
+                return Ok(Err(SsaInfeasible::at_vis(
+                    row.base_owner(),
+                    row.vis_origin(),
+                    Some(row.producer_call_origin()),
+                    "the selected incoming caller is not an ordinary callable continuation edge",
+                )
+                .with_k(
+                    row.operation(),
+                    row.k_closure_origin(),
+                    row.k_body_origin(),
+                    row.captures().len(),
+                    row.continuation_inputs().len(),
+                )));
+            }
+            if !selected_callers.insert(row.k_identity().clone()) {
+                return Ok(Err(SsaInfeasible::at_vis(
+                    row.base_owner(),
+                    row.vis_origin(),
+                    Some(row.producer_call_origin()),
+                    "two response owners claim one selected incoming caller",
+                )
+                .with_k(
+                    row.operation(),
+                    row.k_closure_origin(),
+                    row.k_body_origin(),
+                    row.captures().len(),
+                    row.continuation_inputs().len(),
+                )));
+            }
+            if row.base_owner()
+                != ContinuationEmissionOwner::Specialization(row.k_specialization())
+            {
+                return Err(planner_error(
+                    "a static response row's emission owner disagrees with its K specialization",
+                ));
+            }
+            let unit = units
+                .iter()
+                .find(|unit| unit.id() == row.k_specialization())
+                .ok_or_else(|| {
+                    planner_error("a static response row's K has no specialization ABI")
+                })?;
+            let slots = unit.slots().to_vec();
+            let header = unit.header();
+            let (offsets, frame_bytes) = super::abi::slot_offsets(&slots)?;
+            if offsets.len() != slots.len() || frame_bytes != header.frame_bytes {
+                return Err(planner_error(
+                    "a response-owner slot walk disagrees with its selected K header",
+                ));
+            }
+            for capture in row.captures() {
+                let Some(slot) = slots.get(capture.producer_abi_slot() as usize) else {
+                    return Ok(Err(SsaInfeasible::at_vis(
+                        row.base_owner(),
+                        row.vis_origin(),
+                        Some(row.producer_call_origin()),
+                        "a K capture has no explicit response-owner Parameter slot",
+                    )
+                    .with_k(
+                        row.operation(),
+                        row.k_closure_origin(),
+                        row.k_body_origin(),
+                        row.captures().len(),
+                        row.continuation_inputs().len(),
+                    )));
+                };
+                if slot.kind != AbiSlotKind::Parameter || slot.ordinal != capture.producer_abi_slot()
+                {
+                    return Ok(Err(SsaInfeasible::at_vis(
+                        row.base_owner(),
+                        row.vis_origin(),
+                        Some(row.producer_call_origin()),
+                        "a K capture disagrees with its explicit response-owner Parameter slot",
+                    )
+                    .with_k(
+                        row.operation(),
+                        row.k_closure_origin(),
+                        row.k_body_origin(),
+                        row.captures().len(),
+                        row.continuation_inputs().len(),
+                    )));
+                }
+            }
+            for (ordinal, _, abi_slot) in row.continuation_inputs() {
+                let Some(slot) = slots.get(*abi_slot as usize) else {
+                    return Ok(Err(SsaInfeasible::at_vis(
+                        row.base_owner(),
+                        row.vis_origin(),
+                        Some(row.producer_call_origin()),
+                        "a continuation input has no explicit response-owner Capture slot",
+                    )
+                    .with_k(
+                        row.operation(),
+                        row.k_closure_origin(),
+                        row.k_body_origin(),
+                        row.captures().len(),
+                        row.continuation_inputs().len(),
+                    )));
+                };
+                if slot.kind != AbiSlotKind::Capture || slot.ordinal != *ordinal {
+                    return Ok(Err(SsaInfeasible::at_vis(
+                        row.base_owner(),
+                        row.vis_origin(),
+                        Some(row.producer_call_origin()),
+                        "a continuation input disagrees with its explicit response-owner Capture slot",
+                    )
+                    .with_k(
+                        row.operation(),
+                        row.k_closure_origin(),
+                        row.k_body_origin(),
+                        row.captures().len(),
+                        row.continuation_inputs().len(),
+                    )));
+                }
+            }
+            owners.push(StaticResponseOwnerSpecialization {
+                id: StaticResponseOwnerId::from_position(owners.len())?,
+                base_owner: row.base_owner(),
+                response: row.id(),
+                selected_caller: row.k_identity().clone(),
+                k_context: row.k_context(),
+                context_was_preexisting: row.context_was_preexisting(),
+                header,
+                slots,
+            });
+        }
+        Ok(Ok(owners))
     }
 }
 

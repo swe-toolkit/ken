@@ -1159,8 +1159,9 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
 /// SSA infeasibility. Every fixed row has one explicit capture/input schema and
 /// resolves by `(ContinuationSpecializationId, worker body)` after old context
 /// identities are preserved as the union prefix.
-/// **THE GAP:** corrected CP1 is planner evidence only. It emits no response
-/// owner, retargets no caller, and does not select the runtime-closure fallback.
+/// **THE GAP:** CP2 installs and forward-declares the response-owner population
+/// and retargets selected callers, but does not yet define the response seam or
+/// call the K context from an owner body. Runtime closure remains unselected.
 #[test]
 fn static_response_context_demand_ledger_closes_fixed_products() {
     in_generated_entry_stack_thread("rt-parity-static-response-demand", || {
@@ -1197,6 +1198,45 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
                 vec![buffer],
                 "the filtered row must be the same authority as the all-producer row"
             );
+            assert_eq!(
+                diagnostic.static_response_owners.len(),
+                diagnostic.all_static_response_rows.len(),
+                "each feasible response row owns one forward declaration"
+            );
+            for (ordinal, (owner, row)) in diagnostic
+                .static_response_owners
+                .iter()
+                .zip(&diagnostic.all_static_response_rows)
+                .enumerate()
+            {
+                assert_eq!(owner.owner as usize, ordinal);
+                assert_eq!(owner.response as usize, ordinal);
+                assert_eq!(owner.base_owner, row.base_owner);
+                assert_eq!(owner.selected_caller, row.k_identity);
+                assert_eq!(owner.k_context, row.k_context);
+                assert_eq!(owner.context_was_preexisting, row.context_was_preexisting);
+                assert_eq!(owner.parameters as usize, 1 + row.captures.len());
+                assert_eq!(owner.captures as usize, row.continuation_inputs.len());
+                assert_eq!(
+                    owner.slots.len(),
+                    owner.parameters as usize + owner.captures as usize + 4
+                );
+                for (position, (kind, slot_ordinal)) in owner.slots.iter().enumerate() {
+                    let expected = if position < owner.parameters as usize {
+                        ("Parameter", position as u32)
+                    } else if position < (owner.parameters + owner.captures) as usize {
+                        ("Capture", position as u32 - owner.parameters)
+                    } else {
+                        (
+                            ["Result", "Control", "Trap", "Store"]
+                                [position - (owner.parameters + owner.captures) as usize],
+                            0,
+                        )
+                    };
+                    assert_eq!((kind.as_str(), *slot_ordinal), expected);
+                }
+                assert!(owner.frame_bytes > 0);
+            }
             diagnostic
         };
 
@@ -1450,6 +1490,64 @@ fn static_response_context_demand_controls_reach_and_restore() {
 
         let (restored_result, restored) = compile("restored");
         restored_result.expect("response-demand controls must restore");
+        assert_eq!(restored, baseline);
+    });
+}
+
+/// **Promise class: transition sentinel.** CP3 will define the response-owner
+/// bodies but must retain this exact selected-caller retarget and its whole-
+/// artifact entry proof.
+///
+/// **MEASURED:** each typed response owner is reached by at least one finished-
+/// CLIF direct call whose decoded target is that owner declaration.
+/// **CLAIMED:** a forward declaration does not discharge CP2; restoring the
+/// selected caller's old K target leaves the owner unentered and must fail.
+/// **THE GAP:** this checkpoint does not inspect or define the response-owner
+/// body. CP3 owns its host response and K-context call seam.
+#[test]
+fn static_response_selected_caller_retarget_reaches_and_restores() {
+    use ken_runtime::StaticResponseCallerRetargetMutation as Mutation;
+
+    in_generated_entry_stack_thread("rt-parity-static-response-retarget", || {
+        let source =
+            RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+        let compile = |label: &str| {
+            let root = output_dir(&format!("static-response-retarget-{label}"));
+            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    &format!("rt_parity_static_response_retarget_{label}"),
+                    root.path(),
+                )
+            })
+        };
+
+        let (baseline_result, baseline) = compile("baseline");
+        baseline_result.expect("the exact response-owner retarget must compile");
+        assert_eq!(baseline.len(), 1);
+        assert!(!baseline[0].static_response_owners.is_empty());
+
+        let ((mutated_result, mutated_diagnostic), applications) =
+            ken_runtime::with_static_response_caller_retarget_mutation(
+                Mutation::RestoreSelectedKTarget,
+                || compile("restore-k"),
+            );
+        assert!(applications > 0, "the retarget mutation did not reach");
+        let error = mutated_result.expect_err("restoring K must leave an owner unentered");
+        assert!(
+            format!("{error:?}")
+                .contains("a forward-declared response owner has no verified selected incoming call"),
+            "the retarget mutation failed for a different reason: {error:?}"
+        );
+        assert_eq!(
+            mutated_diagnostic, baseline,
+            "caller retargeting must not alter the typed planner ledger"
+        );
+        assert!(ken_runtime::static_response_caller_retarget_mutation_is_exact());
+
+        let (restored_result, restored) = compile("restored");
+        restored_result.expect("the response-owner retarget must restore");
         assert_eq!(restored, baseline);
     });
 }

@@ -301,6 +301,10 @@ pub(in crate::cranelift_backend) struct UnitBundle {
     /// admitting one there would alias two identities that the planner keeps
     /// apart. Nothing resolves a continuation by ordinal or by symbol name.
     continuations: BTreeMap<ContinuationSpecializationId, FuncId>,
+    /// One declared target per compile-time response owner. Kept in its own
+    /// identity domain: an owner is selected by one incoming causal edge and is
+    /// neither that edge's K specialization nor the context it will later call.
+    responses: BTreeMap<StaticResponseOwnerId, FuncId>,
     /// **`RT-DECL-CLOSURE-PORT` `D5a`** -- one declared target per planned
     /// generated producer execution context.
     ///
@@ -348,6 +352,19 @@ impl UnitBundle {
         specialization: ContinuationSpecializationId,
     ) -> Option<FuncId> {
         self.continuations.get(&specialization).copied()
+    }
+
+    pub(in crate::cranelift_backend) fn response(
+        &self,
+        owner: StaticResponseOwnerId,
+    ) -> Option<FuncId> {
+        self.responses.get(&owner).copied()
+    }
+
+    pub(in crate::cranelift_backend) fn response_targets(
+        &self,
+    ) -> impl Iterator<Item = FuncId> + '_ {
+        self.responses.values().copied()
     }
 
     /// The declared target for one generated producer execution context.
@@ -440,6 +457,48 @@ pub fn with_retained_unit_call_target_mutation<T>(
 pub fn retained_unit_call_target_mutation_is_exact() -> bool {
     RETAINED_UNIT_CALL_TARGET_MUTATION.with(std::cell::Cell::get)
         == RetainedUnitCallTargetMutation::Exact
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StaticResponseCallerRetargetMutation {
+    RestoreSelectedKTarget,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static STATIC_RESPONSE_CALLER_RETARGET_MUTATION:
+        std::cell::Cell<Option<StaticResponseCallerRetargetMutation>> =
+            const { std::cell::Cell::new(None) };
+    static STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_static_response_caller_retarget_mutation<T>(
+    mutation: StaticResponseCallerRetargetMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(|slot| slot.set(None));
+        }
+    }
+    STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(|slot| {
+        assert_eq!(slot.replace(Some(mutation)), None);
+    });
+    STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(|count| count.set(0));
+    let _restore = Restore;
+    let result = operation();
+    let applications =
+        STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn static_response_caller_retarget_mutation_is_exact() -> bool {
+    STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get).is_none()
 }
 
 #[derive(Clone)]
@@ -1333,6 +1392,30 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             ));
         }
     }
+    // CP2 forward-declares one response owner per fully validated response row.
+    // Every owner keeps the unit signature and is selected by exactly one
+    // existing causal caller; a later checkpoint defines its response seam.
+    let response_owners = plan
+        .static_response_owner_specializations()?
+        .map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(),
+                infeasible.reason(),
+            ))
+        })?;
+    let mut responses = BTreeMap::new();
+    for owner in &response_owners {
+        let name = format!("ken_static_response_{}", owner.id().ordinal());
+        let id = module
+            .declare_function(&name, Linkage::Local, &sig)
+            .map_err(|err| backend_module(err.to_string()))?;
+        if responses.insert(owner.id(), id).is_some() {
+            return Err(backend_module(
+                "two response-owner descriptors claim one response-owner identity".to_string(),
+            ));
+        }
+    }
     // `RT-DECL-CLOSURE-PORT` `D5a` -- forward-declare one target per planned
     // generated producer execution context, in the same pre-definition pass and
     // for the same reason: a context is called from the enclosing
@@ -1376,6 +1459,7 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
     Ok(UnitBundle {
         functions,
         continuations,
+        responses,
         contexts,
         fusions,
     })
@@ -1392,6 +1476,81 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
 /// The join is by the identity's `target()` alone. ⛔ Nothing here parses a
 /// symbol name, indexes by ordinal, or aliases a `ContinuationSpecializationId`
 /// to a `PredeclaredFunctionId` — a missing target rejects.
+fn selected_response_owner_target(
+    plan: &StaticTransitionPlan<'_>,
+    bundle: &UnitBundle,
+    identity: &ContinuationCallIdentity,
+) -> Result<Option<FuncId>, CraneliftBackendError> {
+    let owners = plan
+        .static_response_owner_specializations()?
+        .map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(),
+                infeasible.reason(),
+            ))
+        })?;
+    owners
+        .iter()
+        .find(|owner| owner.selected_caller() == identity)
+        .map(|owner| {
+            bundle.response(owner.id()).ok_or_else(|| {
+                backend_module(
+                    "a selected response caller names an owner that was never forward-declared"
+                        .to_string(),
+                )
+            })
+        })
+        .transpose()
+}
+
+pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
+    plan: &StaticTransitionPlan<'_>,
+    bundle: &UnitBundle,
+    identity: &ContinuationCallIdentity,
+) -> Result<FuncId, CraneliftBackendError> {
+    if let Some(response) = selected_response_owner_target(plan, bundle, identity)? {
+        #[cfg(feature = "px8-ds-test-support")]
+        if STATIC_RESPONSE_CALLER_RETARGET_MUTATION
+            .with(std::cell::Cell::get)
+            == Some(StaticResponseCallerRetargetMutation::RestoreSelectedKTarget)
+        {
+            STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS
+                .with(|count| count.set(count.get() + 1));
+            return bundle.continuation(identity.target()).ok_or_else(|| {
+                backend_module(
+                    "the response-caller mutation found no original K declaration".to_string(),
+                )
+            });
+        }
+        return Ok(response);
+    }
+    bundle.continuation(identity.target()).ok_or_else(|| {
+        backend_module(
+            "a projected causal identity names a continuation specialization that was never \
+             forward-declared"
+                .to_string(),
+        )
+    })
+}
+
+fn verified_response_owner_calls<'a>(
+    plan: &StaticTransitionPlan<'_>,
+    bundle: &UnitBundle,
+    calls: impl IntoIterator<Item = &'a ContinuationCallIdentity>,
+) -> Result<Vec<ContinuationCallIdentity>, CraneliftBackendError> {
+    let mut verified = Vec::new();
+    for identity in calls {
+        let Some(expected) = selected_response_owner_target(plan, bundle, identity)? else {
+            continue;
+        };
+        if resolved_continuation_call_target(plan, bundle, identity)? == expected {
+            verified.push(identity.clone());
+        }
+    }
+    Ok(verified)
+}
+
 pub(in crate::cranelift_backend) fn resolve_continuation_targets(
     plan: &StaticTransitionPlan<'_>,
     bundle: &UnitBundle,
@@ -1405,13 +1564,7 @@ pub(in crate::cranelift_backend) fn resolve_continuation_targets(
     // absent. Narrowing the INPUT is what keeps that refusal meaningful for the
     // ordinary population instead of weakening it to tolerate an absence.
     for identity in plan.ordinary_continuation_call_identities()? {
-        let target = bundle.continuation(identity.target()).ok_or_else(|| {
-            backend_module(
-                "a projected causal identity names a continuation specialization that was never \
-                 forward-declared"
-                    .to_string(),
-            )
-        })?;
+        let target = resolved_continuation_call_target(plan, bundle, &identity)?;
         if resolved.insert(identity, target).is_some() {
             return Err(backend_module(
                 "two projected causal identities collide; the planner mints one call token per \
@@ -3560,10 +3713,26 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 emission_owner,
             )?;
         }
+        let response_owner_calls = verified_response_owner_calls(
+            &compiler.static_transition_plan,
+            bundle,
+            compiler
+                .function_local
+                .continuation_emissions
+                .keys()
+                .chain(
+                    compiler
+                        .function_local
+                        .checked_ih_transport_emissions
+                        .iter()
+                        .map(|(transport, _)| transport.source_call_identity()),
+                ),
+        )?;
         if let Some(ledger) = compiler.continuation_claims.as_mut() {
             ledger.record_emitted(
                 compiler.function_local.continuation_emissions.keys().cloned(),
             )?;
+            ledger.record_response_owner_calls(response_owner_calls);
         }
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
@@ -4168,10 +4337,26 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 causal_owner,
             )?;
         }
+        let response_owner_calls = verified_response_owner_calls(
+            &compiler.static_transition_plan,
+            bundle,
+            compiler
+                .function_local
+                .continuation_emissions
+                .keys()
+                .chain(
+                    compiler
+                        .function_local
+                        .checked_ih_transport_emissions
+                        .iter()
+                        .map(|(transport, _)| transport.source_call_identity()),
+                ),
+        )?;
         if let Some(ledger) = compiler.continuation_claims.as_mut() {
             ledger.record_emitted(
                 compiler.function_local.continuation_emissions.keys().cloned(),
             )?;
+            ledger.record_response_owner_calls(response_owner_calls);
         }
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
@@ -4606,6 +4791,10 @@ pub(super) struct ContinuationClaimLedger {
     /// accumulated across all generated functions after each one's CLIF has been
     /// checked.
     emitted: BTreeSet<ContinuationCallIdentity>,
+    /// Every response-selected incoming edge whose direct call was decoded and
+    /// matched after finished CLIF, including checked-IH transport calls that
+    /// lawfully remain outside the ordinary direct/composed discharge partition.
+    response_owner_calls: BTreeMap<ContinuationCallIdentity, usize>,
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8k`** -- every identity discharged by a
     /// VERIFIED composed source-continuation consumption, accumulated across
     /// every generated function after each one's CLIF has been checked.
@@ -5054,6 +5243,7 @@ impl ContinuationClaimLedger {
             planned,
             declared: BTreeSet::new(),
             emitted: BTreeSet::new(),
+            response_owner_calls: BTreeMap::new(),
             composed: BTreeSet::new(),
         })
     }
@@ -5093,6 +5283,15 @@ impl ContinuationClaimLedger {
             }
         }
         Ok(())
+    }
+
+    fn record_response_owner_calls(
+        &mut self,
+        calls: impl IntoIterator<Item = ContinuationCallIdentity>,
+    ) {
+        for identity in calls {
+            *self.response_owner_calls.entry(identity).or_default() += 1;
+        }
     }
 
     /// **`D8k`** -- record the causal tokens one generated function discharged
@@ -5293,6 +5492,69 @@ impl ContinuationClaimLedger {
     /// Declaration is bulk over planned by `D8k`'s own design, so narrowing
     /// those two would refuse every artifact with an `InlineNoCall` candidate
     /// for the opposite reason.
+    /// Every response owner must be entered by its exact selected causal caller,
+    /// and every response-issued context key must therefore have at least one
+    /// such verified direct call. A forward declaration alone never satisfies
+    /// this gate.
+    fn validate_response_owner_call_coverage(
+        &self,
+        plan: &StaticTransitionPlan<'_>,
+        dispositions: &BTreeMap<ContinuationCallIdentity, CandidateDisposition>,
+    ) -> Result<(), CraneliftBackendError> {
+        let owners = plan
+            .static_response_owner_specializations()?
+            .map_err(|infeasible| {
+                backend_module(format!(
+                    "compile-time response specialization is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ))
+            })?;
+        let required_new_contexts = plan
+            .static_response_feasibility_ledger_all()?
+            .map_err(|infeasible| {
+                backend_module(format!(
+                    "compile-time response specialization is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ))
+            })?
+            .into_iter()
+            .filter(|row| !row.context_was_preexisting())
+            .map(|row| row.k_context())
+            .collect::<BTreeSet<_>>();
+        let mut called_new_contexts = BTreeSet::new();
+        for owner in owners {
+            if !self.response_owner_calls.contains_key(owner.selected_caller()) {
+                return Err(backend_module(format!(
+                    "a forward-declared response owner has no verified selected incoming call: \
+                     owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}",
+                    owner.id(),
+                    owner.k_context(),
+                    owner.context_was_preexisting(),
+                    owner.selected_caller(),
+                    dispositions.get(owner.selected_caller()),
+                )));
+            }
+            if self.composed.contains(owner.selected_caller()) {
+                return Err(backend_module(
+                    "a selected response caller was both directly retargeted and compositionally consumed"
+                        .to_string(),
+                ));
+            }
+            if !owner.context_was_preexisting() {
+                called_new_contexts.insert(owner.k_context());
+            }
+        }
+        if called_new_contexts != required_new_contexts {
+            return Err(backend_module(
+                "the response-issued context population is not covered by selected response-owner calls"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     pub(super) fn close(
         self,
         call_obligations: &BTreeSet<ContinuationCallIdentity>,
@@ -5943,6 +6205,14 @@ pub(super) fn close_continuation_claim_ledger(
                 acc
             });
     });
+    compiler
+        .continuation_claims
+        .as_ref()
+        .ok_or_else(|| backend_module("the continuation claim ledger went missing".to_string()))?
+        .validate_response_owner_call_coverage(
+            &compiler.static_transition_plan,
+            &candidates.settled,
+        )?;
     // `D2` — the order, and it is the mechanism rather than a style choice.
     // Totality and disjointness FIRST, then the derived subset, then the
     // unchanged equality over it.
@@ -6889,10 +7159,26 @@ fn define_unit_body<M: Module>(
         != ContinuationEmissionMutation::SuppressEmissionAccumulation;
     #[cfg(not(test))]
     let accumulate = true;
+    let response_owner_calls = verified_response_owner_calls(
+        &compiler.static_transition_plan,
+        bundle,
+        compiler
+            .function_local
+            .continuation_emissions
+            .keys()
+            .chain(
+                compiler
+                    .function_local
+                    .checked_ih_transport_emissions
+                    .iter()
+                    .map(|(transport, _)| transport.source_call_identity()),
+            ),
+    )?;
     if let Some(ledger) = compiler.continuation_claims.as_mut() {
         if accumulate {
             ledger.record_emitted(compiler.function_local.continuation_emissions.keys().cloned())?;
         }
+        ledger.record_response_owner_calls(response_owner_calls);
     }
     verify_cranelift_function(&func, module.isa())?;
     compiler.commit_aggregate_events()?;
