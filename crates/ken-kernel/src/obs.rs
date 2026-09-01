@@ -305,7 +305,15 @@ fn eq_at_inductive(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term
             Box::new(lhs),
             Box::new(b_bar[j].clone()),
         );
-        acc = Term::sigma(conjunct, acc);
+        // `conjunct` and the accumulated suffix `acc` are both built in the
+        // caller's `ctx`. Making `acc` the CODOMAIN of this Σ extends that
+        // context by one binder — the proof of `conjunct` — so every free
+        // caller-context index in `acc` must move by one. This is the same
+        // binder rule `eq_at_sigma` applies to its second conjunct
+        // (`weaken(&second, 1)`); omitting it lets the next proof binder
+        // capture a later field's outer references (visible only on a
+        // ≥2-field constructor with open endpoints under a trailing binder).
+        acc = Term::sigma(conjunct, weaken(&acc, 1));
     }
     Some(strip_trailing_top(acc))
 }
