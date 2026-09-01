@@ -572,6 +572,10 @@ fn assert_narrowed_alike(
     assert_eq!(interpreted.terminal_error, None, "{case}: interpreter");
     assert_eq!(native.terminal_error, None, "{case}: native");
     assert_eq!(
+        native.effect_trace, interpreted.effect_trace,
+        "{case}: complete ordered effects, requests, outcomes, and resource provenance must agree",
+    );
+    assert_eq!(
         interpreted.terminal_exit, native.terminal_exit,
         "{case}: terminal exit class must agree across executors"
     );
@@ -685,56 +689,6 @@ fn buffer_allocate_malformed_capacity_narrows_to_invalid_bounds() {
 }
 
 // -- FsReadAt ------------------------------------------------------------
-
-/// Transition sentinel. MEASURED: the exact checked-source InvalidOffset
-/// witness crosses the repaired private route lane and reaches the named
-/// ResourceBodyResult fail-closed frontier with recoverable planner provenance.
-/// CLAIMED: D1 no longer terminates at the earlier ITree default. THE GAP: the
-/// ResourceBodyResult default is not final behavior and this test intentionally
-/// retires when RT-RESULT-CONTINUATION-BINDING-PROVENANCE replaces it with the
-/// durable nonignored InvalidOffset product witness.
-#[test]
-fn fs_read_at_malformed_offset_reaches_resource_body_result_frontier() {
-    in_large_stack_thread("rt-parity-read-offset-provenance", || {
-        let Differential { native, .. } =
-            differential("fs-read-at-offset-provenance", "rt_read_offset_stage");
-        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-            native.terminal_error.as_ref()
-        else {
-            panic!("native witness must report typed planner trap provenance: {native:?}");
-        };
-        assert!(
-            provenance.planned_identity > 0,
-            "identity zero is reserved for no trap"
-        );
-        assert_eq!(
-            provenance.trap.code,
-            ken_runtime::RuntimeTrapCode::PatternMatchFailure
-        );
-        assert_eq!(
-            provenance.trap.message,
-            "no runtime match case selected for \
-             decl:rt_parity_fs_read_at_offset_provenance::ResourceBodyResult"
-        );
-        let stderr = String::from_utf8_lossy(&native.stderr);
-        assert!(stderr.contains("PatternMatchFailure"));
-        assert!(stderr.contains(&provenance.trap.message));
-        assert!(!stderr.contains("unknown terminal sentinel"));
-        assert_eq!(
-            native
-                .effect_trace
-                .iter()
-                .map(|event| event.operation)
-                .collect::<Vec<_>>(),
-            vec![
-                ken_runtime::HostOpV1::FsOpen,
-                ken_runtime::HostOpV1::BufferAllocate,
-                ken_runtime::HostOpV1::ResourceRelease,
-                ken_runtime::HostOpV1::ResourceRelease,
-            ]
-        );
-    });
-}
 
 #[test]
 fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
@@ -3444,17 +3398,6 @@ const D1_ROUTE_CONTROL_CHILD: &str = "KEN_RT_ITREE_D1_ROUTE_CONTROL_CHILD";
 fn assert_d1_route_control_child() {
     let mode = std::env::var(D1_ROUTE_CONTROL_CHILD).expect("D1 child mode");
     let (case, entry, expected_family, expected_effects) = match mode.as_str() {
-        "exact-write" => (
-            "fs-write-at-offset-single",
-            "rt_write_writable_stage",
-            "ResourceBodyResult",
-            vec![
-                ken_runtime::HostOpV1::FsOpen,
-                ken_runtime::HostOpV1::FsOpen,
-                ken_runtime::HostOpV1::ResourceRelease,
-                ken_runtime::HostOpV1::ResourceRelease,
-            ],
-        ),
         "drop-read" | "unknown-read" | "direct-read" => (
             "fs-read-at-offset-single",
             "rt_read_offset_stage",
@@ -3519,17 +3462,16 @@ fn assert_d1_route_control_child() {
     );
 }
 
-// Durable invariant. MEASURED: isolated child compiles of both admitted full
-// programs replace the active checked edge's control with Direct and return to
+// Durable invariant. MEASURED: isolated mutation children replace each named
+// active checked edge's control with Direct and return to
 // the exact ITree default; an unknown active control also defaults; malformed
 // initial Direct control cannot shadow an ordinary case; and a real
 // recursor-layer Direct producer defaults unless that same edge is misrouted
 // Checked. CLAIMED: both header edges consume only their exact route control,
 // ordinary cases precede fallback, and all out-of-domain controls fail closed.
 // THE GAP: these are test-support mutations at frame 1, not production route
-// authority; the unmutated transitional witness above records the later
-// ResourceBodyResult frontier and D2 owns final InvalidOffset behavior.
-d1_route_case!(d1_route_control_exact_write, "exact-write", None, None);
+// authority; the durable read/write InvalidOffset products below own the
+// unmutated behavior.
 d1_route_case!(d1_route_control_drop_read, "drop-read", Some("active-checked-to-direct"), None);
 d1_route_case!(d1_route_control_drop_write, "drop-write", Some("active-checked-to-direct"), None);
 d1_route_case!(d1_route_control_unknown_read, "unknown-read", Some("active-checked-to-unknown"), None);
@@ -3537,8 +3479,10 @@ d1_route_case!(d1_route_control_ordinary_read, "ordinary-read", Some("initial-di
 d1_route_case!(d1_route_control_direct_read, "direct-read", None, Some("drop-checked-frame-1"));
 d1_route_case!(d1_route_control_misroute_direct_read, "misroute-direct-read", Some("active-direct-to-checked"), Some("drop-checked-frame-1"));
 
+/// Durable invariant: a statically specialized read response preserves the
+/// complete ordered effect/provenance trace and exposes exact InvalidOffset
+/// without dispatching the malformed FsReadAt request.
 #[test]
-#[ignore = "post-M6 runtime parity debt: native construction completes, but execution traps on a malformed ExitCode::Failure payload instead of observing InvalidOffset"]
 fn fs_read_at_malformed_offset_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-read-offset", || {
         assert_narrowed_alike(
@@ -3612,30 +3556,10 @@ fn fs_read_at_malformed_offset_without_read_right_narrows_to_invalid_offset() {
 //
 // Their coverage is the interpreter-level dispatch test, not this differential.
 
-// Ignored pending RT-CLOSURE-BOUNDARY-LANE.
-//
-// Observed signature, exactly:
-//   Closure: a closure cannot cross the boundary: it is runtime-local and
-//     live-domain only, and it has no durable lane
-//
-// Owner node: RT-CLOSURE-BOUNDARY-LANE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// This is the CLOSURE lane, not the byte-span seat that owns the four
-// px4b-adjacent rt_parity rows. Its own nearest sibling
-// fs_write_at_malformed_offset_without_write_right_... refuses on the
-// byte-span seat. Two rows, near-identical names, different owners.
-// The refusal surfaces on the helper thread 'rt-parity-write-offset'; this
-// test thread then fails only with the wrapper
-//   RT-PARITY fixture thread: Any { .. }
-// which carries no signature of its own. The signature above is the
-// real cause.
-// Annotation only -- test body and expectations are unchanged.
+/// Durable invariant: a statically specialized write response preserves the
+/// complete ordered effect/provenance trace and exposes exact InvalidOffset
+/// without dispatching the malformed FsWriteAt request.
 #[test]
-#[ignore = "RT-CLOSURE-BOUNDARY-LANE: a runtime-local closure has no durable lane across the boundary; fails at base 21fd46dc"]
 fn fs_write_at_malformed_offset_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-write-offset", || {
         assert_narrowed_alike(

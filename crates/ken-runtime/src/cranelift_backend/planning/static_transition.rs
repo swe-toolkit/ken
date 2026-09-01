@@ -84,7 +84,8 @@ pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
     SsaInfeasible, StaticResponseCapture, StaticResponseContextDemand,
-    StaticResponseContinuation, StaticResponseContinuationId, StaticResponseOwnerId,
+    StaticResponseContinuation, StaticResponseContinuationId, StaticResponseEffectInput,
+    StaticResponseEnvironmentBinding, StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization,
 };
 #[cfg(feature = "px8-ds-test-support")]
@@ -719,6 +720,18 @@ fn inline_synthesized_seat_emission_owners(
         if occurrence_subtree_contains(plan, body, seat)? {
             owners.push(ContinuationEmissionOwner::Specialization(unit.id()));
         }
+    }
+    if plan.static_response_plan_installed {
+        let responses = match plan.static_response_feasibility_ledger_all()? {
+            Ok(responses) => responses,
+            Err(_) => Vec::new(),
+        };
+        owners.extend(
+            responses
+                .into_iter()
+                .filter(|response| response.effect_origin() == seat)
+                .map(|response| response.base_owner()),
+        );
     }
     owners.sort();
     owners.dedup();

@@ -2764,6 +2764,13 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 unit_bundle,
                 call_edges,
             )?;
+            super::units::define_static_response_owner_bodies(
+                &mut module,
+                &mut compiler,
+                helpers,
+                unit_bundle,
+                call_edges,
+            )?;
             compiler.require_complete_join_plan_consumption()?;
             compiler.require_complete_dynamic_splice_edge_consumption()?;
             super::units::define_root_adapter(
@@ -13888,6 +13895,15 @@ impl<'a> Lowering<'a> {
                 self.finish_planned_join(builder, merge, &join_plan, merge_kind, "If")
             }
             RuntimeExpr::Construct { constructor, args } => {
+                if self.function_local.static_response_owner.is_none()
+                    && self
+                        .static_transition_plan
+                        .is_static_response_operation_root(static_origin)
+                {
+                    return Ok(LoweringOperand::Specialized(
+                        Lowered::StaticResponseDeferred,
+                    ));
+                }
                 #[cfg(test)]
                 crate::cranelift_backend::lowering::record_d2k_owner_event(
                     crate::cranelift_backend::lowering::D2kOwnerEvent::ConstructEntered {

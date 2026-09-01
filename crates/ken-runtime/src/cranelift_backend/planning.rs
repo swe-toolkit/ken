@@ -144,7 +144,9 @@ pub(super) use static_transition::{
     ContinuationAvailabilityViews, ContinuationEnvironmentClaim, ContinuationFrameIdentity,
     ContinuationSourceCoordinate,
     ContinuationSourceSlotAuthority,
-    ContinuationSpecializationId, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
+    ContinuationSpecializationId, StaticResponseContinuation, StaticResponseEffectInput,
+    StaticResponseEnvironmentBinding, StaticResponseFrameSource, StaticResponseOwnerId,
+    StaticResponseOwnerSpecialization,
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout reaches
     // lowering's test targets so its control can compare the authority against
     // the prefix production actually assembled, rather than against its own

@@ -6,17 +6,19 @@
 //! at the planner-issued continuation specialization and retains its worker,
 //! context, captures, continuation inputs, and opaque call identity.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::abi::{AbiFrameHeader, AbiSlot, AbiSlotKind};
 use super::continuations::{
     continuation_owner_entry_sources, generated_context_parameters,
-    walk_continuation_value_environment, ContinuationCallIdentity, ContinuationContextId,
+    walk_continuation_value_environment, ContinuationCallIdentity,
+    ContinuationContextId,
     ContinuationEmissionOwner, ContinuationInputProjection, ContinuationSourceCoordinate,
     ContinuationSpecializationId, ContinuationValueSourceAuthority,
     ContinuationWorkerCaptureSource, ContinuationWorkerProvenance, PlannedContinuationContext,
 };
 use super::occurrences::StaticOriginId;
+use super::semantic_ir::ConstructorIdentity;
 use super::{planner_capacity_error, planner_error, CraneliftBackendError, StaticTransitionPlan};
 use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol};
 
@@ -68,18 +70,64 @@ impl StaticResponseCapture {
 /// worker and continuation-input fields are cloned from the already-validated K
 /// specialization solely so union interning can reject a same-key schema
 /// disagreement before assigning an ordinary [`ContinuationContextId`].
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum StaticResponseFrameSource {
+    Parameter(u32),
+    Capture(u32),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct StaticResponseEnvironmentBinding {
+    source: ContinuationSourceCoordinate,
+    frame_source: StaticResponseFrameSource,
+}
+
+impl StaticResponseEnvironmentBinding {
+    pub(in crate::cranelift_backend) fn source(&self) -> ContinuationSourceCoordinate {
+        self.source
+    }
+
+    pub(in crate::cranelift_backend) fn frame_source(&self) -> StaticResponseFrameSource {
+        self.frame_source
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum StaticResponseEffectInput {
+    Frame(StaticResponseEnvironmentBinding),
+    /// The exact `buffer_nat_to_int` normalization inside a static FsWriteAt
+    /// request. The owner reads the already-validated span field directly;
+    /// this is not a general admission of carried Nat constructor matching.
+    BoundedNatToInt {
+        span: StaticResponseEnvironmentBinding,
+        span_identity: ConstructorIdentity,
+    },
+    /// An operation argument lowered from its retained source occurrence using
+    /// only the explicitly mapped owner-frame environment.
+    OperationArgument {
+        origin: StaticOriginId,
+        environment: Vec<StaticResponseEnvironmentBinding>,
+    },
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct StaticResponseContextDemand {
     id: StaticResponseContinuationId,
     base_owner: ContinuationEmissionOwner,
     producer_call_origin: StaticOriginId,
     response_origin: StaticOriginId,
+    effect_origin: StaticOriginId,
+    operation_root_origin: StaticOriginId,
+    effect_source_owner: super::units::PredeclaredFunctionId,
+    operation_source_owner: super::units::PredeclaredFunctionId,
+    effect_environment: Vec<StaticResponseEffectInput>,
     vis_origin: StaticOriginId,
     operation: HostOpV1,
     k_identity: ContinuationCallIdentity,
     k_specialization: ContinuationSpecializationId,
     k_closure_origin: StaticOriginId,
     k_body_origin: StaticOriginId,
+    k_ret_identity: ConstructorIdentity,
     raw_owner: super::units::PredeclaredFunctionId,
     worker: ContinuationWorkerProvenance,
     captures: Vec<StaticResponseCapture>,
@@ -104,6 +152,28 @@ impl StaticResponseContextDemand {
         self.response_origin
     }
 
+    pub(in crate::cranelift_backend) fn effect_origin(&self) -> StaticOriginId {
+        self.effect_origin
+    }
+
+    pub(in crate::cranelift_backend) fn effect_source_owner(
+        &self,
+    ) -> super::units::PredeclaredFunctionId {
+        self.effect_source_owner
+    }
+
+    pub(in crate::cranelift_backend) fn operation_source_owner(
+        &self,
+    ) -> super::units::PredeclaredFunctionId {
+        self.operation_source_owner
+    }
+
+    pub(in crate::cranelift_backend) fn effect_environment(
+        &self,
+    ) -> &[StaticResponseEffectInput] {
+        &self.effect_environment
+    }
+
     pub(in crate::cranelift_backend) fn vis_origin(&self) -> StaticOriginId {
         self.vis_origin
     }
@@ -128,6 +198,10 @@ impl StaticResponseContextDemand {
         self.k_body_origin
     }
 
+    pub(in crate::cranelift_backend) fn k_ret_identity(&self) -> ConstructorIdentity {
+        self.k_ret_identity
+    }
+
     pub(in crate::cranelift_backend) fn captures(&self) -> &[StaticResponseCapture] {
         &self.captures
     }
@@ -145,12 +219,18 @@ pub(in crate::cranelift_backend) struct StaticResponseContinuation {
     base_owner: ContinuationEmissionOwner,
     producer_call_origin: StaticOriginId,
     response_origin: StaticOriginId,
+    effect_origin: StaticOriginId,
+    operation_root_origin: StaticOriginId,
+    effect_source_owner: super::units::PredeclaredFunctionId,
+    operation_source_owner: super::units::PredeclaredFunctionId,
+    effect_environment: Vec<StaticResponseEffectInput>,
     vis_origin: StaticOriginId,
     operation: HostOpV1,
     k_identity: ContinuationCallIdentity,
     k_specialization: ContinuationSpecializationId,
     k_closure_origin: StaticOriginId,
     k_body_origin: StaticOriginId,
+    k_ret_identity: ConstructorIdentity,
     k_context: ContinuationContextId,
     context_was_preexisting: bool,
     captures: Vec<StaticResponseCapture>,
@@ -174,6 +254,28 @@ impl StaticResponseContinuation {
         self.response_origin
     }
 
+    pub(in crate::cranelift_backend) fn effect_origin(&self) -> StaticOriginId {
+        self.effect_origin
+    }
+
+    pub(in crate::cranelift_backend) fn effect_source_owner(
+        &self,
+    ) -> super::units::PredeclaredFunctionId {
+        self.effect_source_owner
+    }
+
+    pub(in crate::cranelift_backend) fn operation_source_owner(
+        &self,
+    ) -> super::units::PredeclaredFunctionId {
+        self.operation_source_owner
+    }
+
+    pub(in crate::cranelift_backend) fn effect_environment(
+        &self,
+    ) -> &[StaticResponseEffectInput] {
+        &self.effect_environment
+    }
+
     pub(in crate::cranelift_backend) fn vis_origin(&self) -> StaticOriginId {
         self.vis_origin
     }
@@ -196,6 +298,10 @@ impl StaticResponseContinuation {
 
     pub(in crate::cranelift_backend) fn k_body_origin(&self) -> StaticOriginId {
         self.k_body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn k_ret_identity(&self) -> ConstructorIdentity {
+        self.k_ret_identity
     }
 
     pub(in crate::cranelift_backend) fn k_context(&self) -> ContinuationContextId {
@@ -282,6 +388,12 @@ impl StaticResponseOwnerSpecialization {
 
     pub(in crate::cranelift_backend) fn slots(&self) -> &[AbiSlot] {
         &self.slots
+    }
+
+    pub(in crate::cranelift_backend) fn slot_offsets(
+        &self,
+    ) -> Result<(Vec<u32>, u32), CraneliftBackendError> {
+        super::abi::slot_offsets(&self.slots)
     }
 }
 
@@ -423,6 +535,7 @@ impl SsaInfeasible {
 #[derive(Clone, Copy)]
 struct HostResponseRoute {
     operation: HostOpV1,
+    effect_origin: StaticOriginId,
     producer_call_origin: StaticOriginId,
     response_origin: StaticOriginId,
 }
@@ -499,6 +612,7 @@ fn host_response_routes(
             };
             let route = HostResponseRoute {
                 operation: *operation,
+                effect_origin,
                 producer_call_origin,
                 response_origin,
             };
@@ -516,7 +630,7 @@ fn selected_host_response_route(
     plan: &StaticTransitionPlan<'_>,
     operation_origin: StaticOriginId,
     routes: &BTreeMap<RuntimeSymbol, HostResponseRoute>,
-) -> Result<Option<HostResponseRoute>, CraneliftBackendError> {
+) -> Result<Option<(HostResponseRoute, StaticOriginId)>, CraneliftBackendError> {
     let mut selected = None;
     let mut pending = vec![operation_origin];
     while let Some(origin) = pending.pop() {
@@ -527,7 +641,7 @@ fn selected_host_response_route(
                         "one Vis operation subtree selects more than one host response producer",
                     ));
                 }
-                selected = Some(route);
+                selected = Some((route, origin));
             }
         }
         pending.extend(plan.semantic.child_origins(origin)?.iter().copied());
@@ -602,6 +716,423 @@ fn exact_capture_source(
     Ok(Ok(sources[0].coordinate))
 }
 
+fn exact_response_ret_identity(
+    plan: &StaticTransitionPlan<'_>,
+    continuation_origin: StaticOriginId,
+) -> Result<Result<ConstructorIdentity, &'static str>, CraneliftBackendError> {
+    let RuntimeExpr::ComputationalMatch { cases, .. } =
+        plan.planned_occurrence_expr(continuation_origin)?
+    else {
+        return Ok(Err(
+            "the static response continuation is not an ITree computational eliminator",
+        ));
+    };
+    let matches = cases
+        .iter()
+        .enumerate()
+        .filter(|(_, case)| {
+            case.constructor.as_str().ends_with("::ITree::Ret")
+                && case.argument_binders == 1
+                && case.recursive_positions.is_empty()
+        })
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    if matches.len() != 1 {
+        return Ok(Err(
+            "the static response continuation has no exact one-parameter Ret case",
+        ));
+    }
+    Ok(Ok(
+        plan.semantic
+            .case_constructor_identity(continuation_origin, matches[0])?,
+    ))
+}
+
+fn free_environment_indices(
+    expr: &RuntimeExpr,
+    depth: u32,
+    free: &mut BTreeSet<u32>,
+) -> Result<(), CraneliftBackendError> {
+    let visit = |expr, depth, free: &mut BTreeSet<u32>| {
+        free_environment_indices(expr, depth, free)
+    };
+    match expr {
+        RuntimeExpr::CheckedJoinSite { body, .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => {
+            visit(body, depth, free)?;
+        }
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Trap(_) => {}
+        RuntimeExpr::Var(index) => {
+            if *index >= depth {
+                free.insert(index - depth);
+            }
+        }
+        RuntimeExpr::Let { value, body } => {
+            visit(value, depth, free)?;
+            visit(
+                body,
+                depth
+                    .checked_add(1)
+                    .ok_or_else(|| planner_capacity_error("response expression depth exhausted"))?,
+                free,
+            )?;
+        }
+        RuntimeExpr::If {
+            scrutinee,
+            then_expr,
+            else_expr,
+        } => {
+            visit(scrutinee, depth, free)?;
+            visit(then_expr, depth, free)?;
+            visit(else_expr, depth, free)?;
+        }
+        RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => {
+            for arg in args {
+                visit(arg, depth, free)?;
+            }
+        }
+        RuntimeExpr::Match {
+            scrutinee, cases, ..
+        } => {
+            visit(scrutinee, depth, free)?;
+            for case in cases {
+                let binders = u32::try_from(case.binders).map_err(|_| {
+                    planner_capacity_error("response match binder depth exhausted")
+                })?;
+                visit(
+                    &case.body,
+                    depth.checked_add(binders).ok_or_else(|| {
+                        planner_capacity_error("response match depth exhausted")
+                    })?,
+                    free,
+                )?;
+            }
+        }
+        RuntimeExpr::ComputationalMatch {
+            scrutinee, cases, ..
+        } => {
+            visit(scrutinee, depth, free)?;
+            for case in cases {
+                let binders = case
+                    .argument_binders
+                    .checked_add(case.recursive_positions.len())
+                    .ok_or_else(|| {
+                        planner_capacity_error("response computational binder depth exhausted")
+                    })?;
+                let binders = u32::try_from(binders).map_err(|_| {
+                    planner_capacity_error("response computational binder depth exhausted")
+                })?;
+                visit(
+                    &case.body,
+                    depth.checked_add(binders).ok_or_else(|| {
+                        planner_capacity_error("response computational depth exhausted")
+                    })?,
+                    free,
+                )?;
+            }
+        }
+        RuntimeExpr::Record { fields } => {
+            for (_, value) in fields {
+                visit(value, depth, free)?;
+            }
+        }
+        RuntimeExpr::Project { record, .. } => visit(record, depth, free)?,
+        RuntimeExpr::Closure { .. } => {}
+        RuntimeExpr::LexicalClosure { captures, .. } => {
+            for capture in captures {
+                visit(capture, depth, free)?;
+            }
+        }
+        RuntimeExpr::Call { callee, args } => {
+            visit(callee, depth, free)?;
+            for arg in args {
+                visit(arg, depth, free)?;
+            }
+        }
+        RuntimeExpr::Effect {
+            capability, args, ..
+        } => {
+            if let Some(capability) = capability {
+                visit(&capability.value, depth, free)?;
+            }
+            for arg in args {
+                visit(arg, depth, free)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn frame_binding_for_source(
+    source: ContinuationSourceCoordinate,
+    available: &[(ContinuationSourceCoordinate, StaticResponseFrameSource)],
+) -> Option<StaticResponseEnvironmentBinding> {
+    available
+        .iter()
+        .find(|(candidate, _)| *candidate == source)
+        .map(|(_, frame_source)| StaticResponseEnvironmentBinding {
+            source,
+            frame_source: *frame_source,
+        })
+}
+
+fn static_response_argument_environment(
+    plan: &StaticTransitionPlan<'_>,
+    owner: super::units::PredeclaredFunctionId,
+    origin: StaticOriginId,
+    expr: &RuntimeExpr,
+    available: &[(ContinuationSourceCoordinate, StaticResponseFrameSource)],
+) -> Result<Result<Vec<StaticResponseEnvironmentBinding>, &'static str>, CraneliftBackendError> {
+    let mut free = BTreeSet::new();
+    free_environment_indices(expr, 0, &mut free)?;
+    let Some(maximum) = free.iter().next_back().copied() else {
+        return Ok(Ok(Vec::new()));
+    };
+    let source_root = super::continuations::continuation_owner_source_root(plan, owner)?;
+    let entry_environment = continuation_owner_entry_sources(plan, owner)?
+        .into_iter()
+        .map(ContinuationValueSourceAuthority::source)
+        .collect::<Vec<_>>();
+    let (_, reached) =
+        walk_continuation_value_environment(plan, source_root, origin, &entry_environment)?;
+    let reached = reached.ok_or_else(|| {
+        planner_error("a static response argument is outside its source owner subtree")
+    })?;
+    let mut environment = Vec::new();
+    for index in 0..=maximum {
+        let authority = reached.get(index as usize).ok_or_else(|| {
+            planner_error("a static response argument indexes outside its source environment")
+        })?;
+        let ContinuationValueSourceAuthority::Closed(sources) = authority else {
+            return Ok(Err(
+                "a static response argument has an open source authority",
+            ));
+        };
+        if sources.len() != 1 {
+            return Ok(Err(
+                "a static response argument has an ambiguous source coordinate",
+            ));
+        }
+        let Some(binding) = frame_binding_for_source(sources[0].coordinate, available) else {
+            return Ok(Err(
+                "a static response argument has no explicit owner-frame input",
+            ));
+        };
+        environment.push(binding);
+    }
+    Ok(Ok(environment))
+}
+
+fn is_exact_bounded_nat_to_int(expr: &RuntimeExpr) -> bool {
+    let RuntimeExpr::Call {
+        callee,
+        args: outer_args,
+    } = expr
+    else {
+        return false;
+    };
+    let RuntimeExpr::LexicalClosure { params, body, .. } = callee.as_ref() else {
+        return false;
+    };
+    if params.len() != 1 || outer_args.len() != 1 {
+        return false;
+    }
+    let RuntimeExpr::Match {
+        scrutinee,
+        cases: span_cases,
+        ..
+    } = &outer_args[0]
+    else {
+        return false;
+    };
+    if !matches!(scrutinee.as_ref(), RuntimeExpr::Var(0))
+        || span_cases.len() != 1
+        || span_cases[0].binders != 3
+        || !span_cases[0]
+            .constructor
+            .as_str()
+            .contains("::BufferSpan::")
+        || !matches!(span_cases[0].body, RuntimeExpr::Var(2))
+    {
+        return false;
+    }
+    let RuntimeExpr::Match { cases, .. } = body.as_ref() else {
+        return false;
+    };
+    let zero = cases.iter().find(|case| {
+        case.constructor.as_str().ends_with("::Nat::Zero")
+            && case.binders == 0
+            && matches!(case.body, RuntimeExpr::Value(crate::RuntimeValue::Int(crate::RuntimeIntV1::Small(0))))
+    });
+    let suc = cases.iter().find(|case| {
+        case.constructor.as_str().ends_with("::Nat::Suc") && case.binders == 1
+    });
+    if zero.is_none() || suc.is_none() || cases.len() != 2 {
+        return false;
+    }
+    let RuntimeExpr::PrimitiveCall {
+        primitive,
+        args: suc_args,
+    } = &suc.expect("one Suc case").body
+    else {
+        return false;
+    };
+    if primitive.symbol.as_str() != "add_int" || suc_args.len() != 2 {
+        return false;
+    }
+    matches!(
+        suc_args.as_slice(),
+        [
+            RuntimeExpr::Call {
+                callee,
+                args: recursive_args,
+            },
+            RuntimeExpr::Value(crate::RuntimeValue::Int(crate::RuntimeIntV1::Small(1))),
+        ] if matches!(callee.as_ref(), RuntimeExpr::DeclarationRef { symbol } if symbol.as_str().ends_with("::buffer_nat_to_int"))
+            && matches!(recursive_args.as_slice(), [RuntimeExpr::Var(0)])
+    )
+}
+
+fn static_response_effect_environment(
+    plan: &StaticTransitionPlan<'_>,
+    owner: super::units::PredeclaredFunctionId,
+    effect_origin: StaticOriginId,
+    actual_operation_origin: StaticOriginId,
+    captures: &[StaticResponseCapture],
+    continuation_inputs: &[ContinuationInputProjection],
+) -> Result<Result<Vec<StaticResponseEffectInput>, &'static str>, CraneliftBackendError> {
+    let source_root = super::continuations::continuation_owner_source_root(plan, owner)?;
+    let entry_environment = continuation_owner_entry_sources(plan, owner)?
+        .into_iter()
+        .map(ContinuationValueSourceAuthority::source)
+        .collect::<Vec<_>>();
+    let (_, reached) = walk_continuation_value_environment(
+        plan,
+        source_root,
+        effect_origin,
+        &entry_environment,
+    )?;
+    let reached = reached.ok_or_else(|| {
+        planner_error("a static response effect is outside its source owner subtree")
+    })?;
+    let mut available = captures
+        .iter()
+        .map(|capture| {
+            (
+                capture.source,
+                StaticResponseFrameSource::Parameter(capture.producer_abi_slot),
+            )
+        })
+        .chain(continuation_inputs.iter().map(|input| {
+            (
+                input.coordinate,
+                StaticResponseFrameSource::Capture(input.ordinal),
+            )
+        }))
+        .collect::<Vec<_>>();
+    available.sort_by_key(|(source, frame_source)| (*source, *frame_source));
+    available.dedup();
+
+    let actual_source_owner = plan
+        .semantic
+        .function_owner(actual_operation_origin)?
+        .ok_or_else(|| planner_error("a selected response operation has no source owner"))?;
+    let RuntimeExpr::Construct {
+        args: actual_arguments,
+        ..
+    } = plan.planned_occurrence_expr(actual_operation_origin)?
+    else {
+        return Ok(Err(
+            "the selected response operation is not a static constructor",
+        ));
+    };
+    let mut actual_argument_inputs = Vec::with_capacity(actual_arguments.len());
+    for (ordinal, argument) in actual_arguments.iter().enumerate() {
+        let argument_origin = plan.semantic.child_origin(actual_operation_origin, ordinal)?;
+        let environment = match static_response_argument_environment(
+            plan,
+            actual_source_owner,
+            argument_origin,
+            argument,
+            &available,
+        )? {
+            Ok(environment) => environment,
+            Err(reason) => return Ok(Err(reason)),
+        };
+        if is_exact_bounded_nat_to_int(argument) {
+            let span = environment.first().cloned().ok_or_else(|| {
+                planner_error("the exact BoundedNat conversion has no span environment input")
+            })?;
+            let span_match_origin = plan.semantic.child_origin(argument_origin, 1)?;
+            actual_argument_inputs.push(StaticResponseEffectInput::BoundedNatToInt {
+                span,
+                span_identity: plan
+                    .semantic
+                    .case_constructor_identity(span_match_origin, 0)?,
+            });
+        } else {
+            actual_argument_inputs.push(StaticResponseEffectInput::OperationArgument {
+                origin: argument_origin,
+                environment,
+            });
+        }
+    }
+
+    let mut free = BTreeSet::new();
+    free_environment_indices(plan.planned_occurrence_expr(effect_origin)?, 0, &mut free)?;
+    let Some(maximum) = free.iter().next_back().copied() else {
+        return Ok(Ok(Vec::new()));
+    };
+    let mut bindings = Vec::with_capacity(maximum as usize + 1);
+    for index in 0..=maximum {
+        let authority = reached.get(index as usize).ok_or_else(|| {
+            planner_error("a host response effect indexes outside its source environment")
+        })?;
+        let ContinuationValueSourceAuthority::Closed(sources) = authority else {
+            return Ok(Err(
+                "the host response effect environment has an open source authority",
+            ));
+        };
+        if sources.len() != 1 {
+            return Ok(Err(
+                "the host response effect environment has an ambiguous source coordinate",
+            ));
+        }
+        let source = sources[0].coordinate;
+        let input = match source {
+            ContinuationSourceCoordinate::ProducerLocal { binding, .. }
+                if binding.binding_owner == owner =>
+            {
+                actual_argument_inputs
+                    .get(binding.binding_ordinal as usize)
+                    .cloned()
+                    .ok_or_else(|| {
+                        planner_error(
+                            "a host response case binder exceeds the selected operation fields",
+                        )
+                    })?
+            }
+            ContinuationSourceCoordinate::EntryAbi { .. }
+            | ContinuationSourceCoordinate::ProducerLocal { .. } => {
+                let Some(binding) = frame_binding_for_source(source, &available) else {
+                    return Ok(Err(
+                        "the host response effect environment has no explicit owner-frame input",
+                    ));
+                };
+                StaticResponseEffectInput::Frame(binding)
+            }
+        };
+        bindings.push(input);
+    }
+    Ok(Ok(bindings))
+}
+
 impl StaticTransitionPlan<'_> {
     /// Derive and fully validate every statically attributable response demand.
     ///
@@ -628,20 +1159,35 @@ impl StaticTransitionPlan<'_> {
             }
             let vis_origin = occurrence.static_origin;
             let operation_origin = self.semantic.child_origin(vis_origin, 0)?;
-            let Some(route) = selected_host_response_route(self, operation_origin, &routes)? else {
+            let Some((route, selected_operation_origin)) =
+                selected_host_response_route(self, operation_origin, &routes)?
+            else {
                 continue;
             };
             if operation.is_some_and(|operation| route.operation != operation) {
                 continue;
             }
-            response_vis.push((vis_origin, route));
+            response_vis.push((
+                vis_origin,
+                operation_origin,
+                selected_operation_origin,
+                route,
+            ));
         }
-        response_vis.sort_by_key(|(vis_origin, route)| {
-            (route.producer_call_origin, *vis_origin, route.operation)
-        });
+        response_vis.sort_by_key(
+            |(vis_origin, operation_origin, selected_operation_origin, route)| {
+                (
+                    route.producer_call_origin,
+                    *vis_origin,
+                    *operation_origin,
+                    *selected_operation_origin,
+                    route.operation,
+                )
+            },
+        );
 
         let mut demands = Vec::new();
-        for (vis_origin, route) in response_vis {
+        for (vis_origin, operation_root_origin, selected_operation_origin, route) in response_vis {
             let matching = units
                 .iter()
                 .filter(|unit| unit.producer_construct_origin() == vis_origin)
@@ -688,6 +1234,13 @@ impl StaticTransitionPlan<'_> {
                             "a static response producer's own edge has no continuation call identity",
                         )
                     })?;
+                let k_ret_identity = match exact_response_ret_identity(
+                    self,
+                    unit.continuation_origin(),
+                )? {
+                    Ok(identity) => identity,
+                    Err(reason) => return Ok(Err(infeasible(reason))),
+                };
                 let envelope = unit.ordinary_envelope()?;
                 let mut captures = Vec::new();
                 for (position, member) in envelope.iter().enumerate() {
@@ -733,17 +1286,48 @@ impl StaticTransitionPlan<'_> {
                     .ok_or_else(|| {
                         planner_error("a response K worker body has no predeclared source owner")
                     })?;
+                let effect_source_owner = self
+                    .semantic
+                    .function_owner(route.effect_origin)?
+                    .ok_or_else(|| {
+                        planner_error("a static response effect has no predeclared source owner")
+                    })?;
+                let operation_source_owner = self
+                    .semantic
+                    .function_owner(selected_operation_origin)?
+                    .ok_or_else(|| {
+                        planner_error(
+                            "a selected response operation has no predeclared source owner",
+                        )
+                    })?;
+                let effect_environment = match static_response_effect_environment(
+                    self,
+                    effect_source_owner,
+                    route.effect_origin,
+                    selected_operation_origin,
+                    &captures,
+                    &continuation_inputs,
+                )? {
+                    Ok(environment) => environment,
+                    Err(reason) => return Ok(Err(infeasible(reason))),
+                };
                 demands.push(StaticResponseContextDemand {
                     id: StaticResponseContinuationId::from_position(demands.len())?,
                     base_owner,
                     producer_call_origin: route.producer_call_origin,
                     response_origin: route.response_origin,
+                    effect_origin: route.effect_origin,
+                    operation_root_origin,
+                    effect_source_owner,
+                    operation_source_owner,
+                    effect_environment,
                     vis_origin,
                     operation: route.operation,
                     k_identity,
                     k_specialization: unit.id(),
                     k_closure_origin: unit.worker_closure_origin(),
                     k_body_origin: unit.worker_body_origin(),
+                    k_ret_identity,
                     raw_owner,
                     worker: unit.key.worker.clone(),
                     captures,
@@ -969,12 +1553,18 @@ impl StaticTransitionPlan<'_> {
                 base_owner: demand.base_owner,
                 producer_call_origin: demand.producer_call_origin,
                 response_origin: demand.response_origin,
+                effect_origin: demand.effect_origin,
+                operation_root_origin: demand.operation_root_origin,
+                effect_source_owner: demand.effect_source_owner,
+                operation_source_owner: demand.operation_source_owner,
+                effect_environment: demand.effect_environment,
                 vis_origin: demand.vis_origin,
                 operation: demand.operation,
                 k_identity: demand.k_identity,
                 k_specialization: demand.k_specialization,
                 k_closure_origin: demand.k_closure_origin,
                 k_body_origin: demand.k_body_origin,
+                k_ret_identity: demand.k_ret_identity,
                 k_context,
                 context_was_preexisting: position < preexisting_count,
                 captures: demand.captures,
@@ -1111,6 +1701,24 @@ impl StaticTransitionPlan<'_> {
         &self,
     ) -> Result<Result<Vec<StaticResponseContinuation>, SsaInfeasible>, CraneliftBackendError> {
         self.static_response_feasibility_ledger_filtered(None)
+    }
+
+    pub(in crate::cranelift_backend) fn is_static_response_effect(
+        &self,
+        effect_origin: StaticOriginId,
+    ) -> bool {
+        self.static_response_continuations
+            .iter()
+            .any(|row| row.effect_origin() == effect_origin)
+    }
+
+    pub(in crate::cranelift_backend) fn is_static_response_operation_root(
+        &self,
+        origin: StaticOriginId,
+    ) -> bool {
+        self.static_response_continuations
+            .iter()
+            .any(|row| row.operation_root_origin == origin)
     }
 
     /// Whether this exact opaque causal edge is selected to enter a compile-time

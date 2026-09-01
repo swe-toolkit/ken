@@ -277,8 +277,9 @@ pub(in crate::cranelift_backend) use super::planning::{
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
-    StaticResponseOwnerId, StaticResponseOwnerSpecialization,
-    StaticTransitionPlan,
+    StaticResponseContinuation, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
+    StaticResponseFrameSource, StaticResponseOwnerId,
+    StaticResponseOwnerSpecialization, StaticTransitionPlan,
     verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
@@ -951,6 +952,7 @@ impl ArtifactHelpers<'_> {
             raw_worker_calls: BTreeMap::new(),
             worker_templates: BTreeMap::new(),
             context_calls: BTreeMap::new(),
+            static_response_owner: None,
             defining_abi_operands: Vec::new(),
             #[cfg(test)]
             defining_abi_slot_kinds: Vec::new(),
@@ -1178,6 +1180,7 @@ struct FunctionLocalRefs {
     /// binding from body origin" the ruling forbids. Minted per function; no
     /// `FuncRef` crosses a function.
     context_calls: BTreeMap<ContinuationContextId, units::DeclaredUnitCall>,
+    static_response_owner: Option<StaticResponseOwnerId>,
     /// **`RT-DECL-CLOSURE-PORT` `D5a` checkpoint 4 step 1b** -- this function's
     /// own ABI-slot operands, indexed by ABI position.
     ///
@@ -3432,6 +3435,11 @@ enum Lowered {
         err_constructor: String,
         ok_constructor: String,
     },
+    /// Compile-only marker for source work relocated into a statically selected
+    /// response owner. Generated-unit crossings write an inert zero into the
+    /// operation slot, and the owner never loads that slot; no tag, selector, or
+    /// response value is encoded in it.
+    StaticResponseDeferred,
     DynamicConstructor(DynamicConstructorV1),
     Bytes(Vec<u8>),
     BorrowedNativeValue {
@@ -6023,6 +6031,7 @@ fn d9_collect(
         // comment above states as a boundary rather than hiding.
         Lowered::Bytes(_)
         | Lowered::String(_)
+        | Lowered::StaticResponseDeferred
         | Lowered::RecursiveBackedge
         | Lowered::Trap(_) => {}
     }
@@ -6976,6 +6985,14 @@ impl<'a> Lowering<'a> {
         );
         match input {
             LoweringOperand::Carried(word) => Ok(LoweringOperand::Carried(word)),
+            LoweringOperand::Specialized(Lowered::StaticResponseDeferred) => {
+                // The selected owner reconstructs the operation solely from its
+                // typed response plan and mapped captures. This word occupies the
+                // unchanged ABI slot en route and is never inspected or decoded.
+                Ok(LoweringOperand::Carried(CarriedBoundaryWord {
+                    word: builder.ins().iconst(types::I64, 0),
+                }))
+            }
             LoweringOperand::Specialized(value) => {
                 let value = self.unit_boundary_environment_record(value)?;
                 Ok(LoweringOperand::Carried(
@@ -8008,6 +8025,7 @@ impl Lowered {
                 | Lowered::BorrowedNativeValue { .. }
                 | Lowered::BorrowedOption { .. }
                 | Lowered::String(_)
+                | Lowered::StaticResponseDeferred
                 | Lowered::ComputationalRecursorClosure { .. }
                 | Lowered::RecursiveBackedge
                 | Lowered::Trap(_) => None,
@@ -13160,6 +13178,7 @@ impl<'a> Lowering<'a> {
             | Lowered::BoundedNat(_)
             | Lowered::StructuralNat(_)
             | Lowered::HostResult { .. }
+            | Lowered::StaticResponseDeferred
             | Lowered::DynamicConstructor(_) => Err(unsupported(
                 "Result",
                 "borrowed ingress values cannot escape the native call",
@@ -13235,6 +13254,7 @@ fn lowered_value_kind(value: &Lowered) -> &'static str {
         Lowered::StructuralNat(_) => "StructuralNat",
         Lowered::ResponseBytes { .. } => "ResponseBytes",
         Lowered::HostResult { .. } => "HostResult",
+        Lowered::StaticResponseDeferred => "StaticResponseDeferred",
         Lowered::DynamicConstructor(_) => "DynamicConstructor",
         Lowered::Bytes(_) => "Bytes",
         Lowered::BorrowedNativeValue { .. } => "BorrowedNativeValue",

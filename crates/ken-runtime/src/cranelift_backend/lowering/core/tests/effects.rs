@@ -101,6 +101,7 @@ fn run_checked_bounded_nat_fixture(
             defining_abi_operands: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),
+            static_response_owner: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
             constructed_context_frame: None,

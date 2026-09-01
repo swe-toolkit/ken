@@ -1857,6 +1857,11 @@ impl<'a> Lowering<'a> {
                         })?;
                         let word = match value {
                             LoweringOperand::Carried(word) => word.word,
+                            LoweringOperand::Specialized(Lowered::StaticResponseDeferred) => {
+                                // Same inert slot transport as `carry_call_input`.
+                                // The response owner never loads parameter zero.
+                                builder.ins().iconst(types::I64, 0)
+                            }
                             LoweringOperand::Specialized(value) => {
                                 // ⚠ **`target.origin` is the CALLEE's scheduling
                                 // entry**, and what still arrives specialized here

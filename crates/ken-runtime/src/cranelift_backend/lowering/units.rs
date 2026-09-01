@@ -1392,9 +1392,9 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             ));
         }
     }
-    // CP2 forward-declares one response owner per fully validated response row.
-    // Every owner keeps the unit signature and is selected by exactly one
-    // existing causal caller; a later checkpoint defines its response seam.
+    // One response owner per fully validated response row, forward-declared
+    // before the CP3 body pass defines its host seam and exact K-context call.
+    // Every owner keeps the unit signature and one selected causal caller.
     let response_owners = plan
         .static_response_owner_specializations()?
         .map_err(|infeasible| {
@@ -2470,6 +2470,471 @@ pub(super) fn lower_continuation_selected_case_body(
     let lowered = compiler.lower_expr(builder, body, &env)?;
 
     Ok(lowered)
+}
+
+/// Define the specialized owner at the host-response seam, then call its exact
+/// K execution context with the validated response as operand zero.
+///
+/// The host-effect lowering is emitted directly into each owner Function. No
+/// shared HostResult helper function or runtime selector exists: the planner's
+/// typed response row chooses the effect occurrence, explicit frame inputs, and
+/// one context target before code generation.
+pub(super) fn define_static_response_owner_bodies<M: Module>(
+    module: &mut M,
+    compiler: &mut Lowering<'_>,
+    helpers: ArtifactHelpers<'_>,
+    bundle: &UnitBundle,
+    call_edges: &CallEdgeTargets,
+) -> Result<usize, CraneliftBackendError> {
+    let rows = compiler
+        .static_transition_plan
+        .static_response_feasibility_ledger_all()?
+        .map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(),
+                infeasible.reason(),
+            ))
+        })?;
+    let owners = compiler
+        .static_transition_plan
+        .static_response_owner_specializations()?
+        .map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(),
+                infeasible.reason(),
+            ))
+        })?;
+    if owners.len() != rows.len() {
+        return Err(backend_module(
+            "the response-owner definition population disagrees with the validated response rows"
+                .to_string(),
+        ));
+    }
+
+    struct OwnedResponseEmission {
+        owner: StaticResponseOwnerSpecialization,
+        row: StaticResponseContinuation,
+        effect: RuntimeExpr,
+        operation_arguments: BTreeMap<StaticOriginId, RuntimeExpr>,
+        offsets: Vec<u32>,
+    }
+    let mut emissions = Vec::with_capacity(owners.len());
+    for (owner, row) in owners.into_iter().zip(rows) {
+        if owner.response() != row.id()
+            || owner.base_owner() != row.base_owner()
+            || owner.selected_caller() != row.k_identity()
+            || owner.k_context() != row.k_context()
+        {
+            return Err(backend_module(
+                "a response-owner definition disagrees with its validated response row"
+                    .to_string(),
+            ));
+        }
+        let effect = compiler
+            .retained_body_occurrence(row.effect_origin())?
+            .expr
+            .clone();
+        let RuntimeExpr::Effect { operation, .. } = &effect else {
+            return Err(backend_module(
+                "a static response row's effect origin no longer names an Effect".to_string(),
+            ));
+        };
+        if *operation != row.operation() {
+            return Err(backend_module(
+                "a static response row's effect occurrence changed operation".to_string(),
+            ));
+        }
+        let mut operation_arguments = BTreeMap::new();
+        for input in row.effect_environment() {
+            if let StaticResponseEffectInput::OperationArgument { origin, .. } = input {
+                operation_arguments.entry(*origin).or_insert(
+                    compiler
+                        .retained_body_occurrence(*origin)?
+                        .expr
+                        .clone(),
+                );
+            }
+        }
+        let (offsets, frame_bytes) = owner.slot_offsets()?;
+        if frame_bytes != owner.header().frame_bytes {
+            return Err(backend_module(
+                "a response-owner frame size disagrees with its slot run".to_string(),
+            ));
+        }
+        emissions.push(OwnedResponseEmission {
+            owner,
+            row,
+            effect,
+            operation_arguments,
+            offsets,
+        });
+    }
+
+    let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
+    let mut defined = 0usize;
+    for emission in emissions {
+        let id = bundle.response(emission.owner.id()).ok_or_else(|| {
+            backend_module("a response owner was never forward-declared".to_string())
+        })?;
+        let slots = emission.owner.slots();
+        let offsets = emission.offsets.as_slice();
+        if slots.len() != offsets.len() {
+            return Err(backend_module(
+                "a response-owner slot run disagrees with its offset walk".to_string(),
+            ));
+        }
+        let parameter_count = slots
+            .iter()
+            .filter(|slot| slot.kind == AbiSlotKind::Parameter)
+            .count();
+        let capture_count = slots
+            .iter()
+            .filter(|slot| slot.kind == AbiSlotKind::Capture)
+            .count();
+        if parameter_count != emission.row.captures().len() + 1
+            || capture_count != emission.row.continuation_inputs().len()
+            || u32::try_from(parameter_count).ok() != Some(emission.owner.header().parameters)
+            || u32::try_from(capture_count).ok() != Some(emission.owner.header().captures)
+        {
+            return Err(backend_module(
+                "a response-owner frame does not partition as operation plus K captures plus continuation inputs"
+                    .to_string(),
+            ));
+        }
+        let result_offset = slots
+            .iter()
+            .zip(offsets)
+            .find(|(slot, _)| slot.kind == AbiSlotKind::Result)
+            .map(|(_, offset)| *offset)
+            .ok_or_else(|| {
+                backend_module("response-owner frame declares no result slot".to_string())
+            })?;
+        let trap_offset = slots
+            .iter()
+            .zip(offsets)
+            .find(|(slot, _)| slot.kind == AbiSlotKind::Trap)
+            .map(|(_, offset)| *offset)
+            .ok_or_else(|| {
+                backend_module("response-owner frame declares no trap slot".to_string())
+            })?;
+
+        compiler.open_aggregate_events(id)?;
+        let sig = unit_signature(module);
+        let mut func = Function::with_name_signature(UserFuncName::user(5, id.as_u32()), sig);
+        let mut function_local = helpers.declare_in_func(module, &mut func, None);
+        let declared_calls = call_edges.declare_in_func(
+            emission.row.operation_source_owner(),
+            module,
+            &mut func,
+        )?;
+        function_local.unit_calls = declared_calls.static_bodies;
+        call_edges.declare_retained_body_targets_in_func(
+            emission.row.operation_source_owner(),
+            module,
+            &mut func,
+            &mut function_local.unit_calls,
+        )?;
+        function_local.declaration_calls = declared_calls.declarations;
+        function_local.worker_calls = worker_targets.declare_in_func(module, &mut func);
+        function_local.raw_worker_calls = function_local.worker_calls.clone();
+        function_local.worker_templates = worker_targets.templates().clone();
+        let exact_context = declare_response_context_call_in_func(
+            module,
+            &mut func,
+            &compiler.static_transition_plan,
+            bundle,
+            emission.owner.k_context(),
+        )?;
+        function_local
+            .context_calls
+            .insert(emission.owner.k_context(), exact_context.clone());
+        let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
+        let ambient = AmbientBodyAuthority::bind(
+            compiler,
+            emission.owner.base_owner(),
+            emission.row.effect_source_owner(),
+        );
+        let mut func_ctx = FunctionBuilderContext::new();
+        {
+            let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
+            let entry = builder.create_block();
+            builder.append_block_params_for_function_params(entry);
+            builder.switch_to_block(entry);
+            let envelope = builder.block_params(entry)[0];
+            let frame = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                envelope,
+                crate::activation_services::UNIT_CALL_FRAME_SLOTS,
+            );
+            let host_dispatch_context = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                envelope,
+                crate::activation_services::UNIT_CALL_FRAME_HOST_DISPATCH_CONTEXT,
+            );
+            let services = builder.block_params(entry)[1];
+            let native_int_arena = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                services,
+                crate::activation_services::SERVICES_NATIVE_INT_ARENA,
+            );
+            Lowering::require_nonzero(&mut builder, native_int_arena);
+            let boundary_arena = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                services,
+                crate::activation_services::SERVICES_BOUNDARY_ARENA,
+            );
+            Lowering::require_nonzero(&mut builder, boundary_arena);
+            function_local.host_dispatch_context = Some(host_dispatch_context);
+            function_local.native_int_arena = Some(native_int_arena);
+            function_local.boundary_arena = Some(boundary_arena);
+            function_local.services_pointer = Some(services);
+            function_local.bind_unit_trap_frame(
+                frame,
+                i32::try_from(trap_offset).map_err(|_| {
+                    backend_module("response-owner trap slot offset exceeds range".to_string())
+                })?,
+            )?;
+
+            let mut frame_inputs = BTreeMap::new();
+            let mut descriptor_inputs = Vec::new();
+            for (slot, offset) in slots.iter().zip(offsets) {
+                let frame_source = match slot.kind {
+                    AbiSlotKind::Parameter if slot.ordinal == 0 => None,
+                    AbiSlotKind::Parameter => {
+                        Some(StaticResponseFrameSource::Parameter(slot.ordinal))
+                    }
+                    AbiSlotKind::Capture => Some(StaticResponseFrameSource::Capture(slot.ordinal)),
+                    AbiSlotKind::Control
+                    | AbiSlotKind::Store
+                    | AbiSlotKind::Trap
+                    | AbiSlotKind::Result => None,
+                };
+                let Some(frame_source) = frame_source else {
+                    continue;
+                };
+                let offset = i32::try_from(*offset).map_err(|_| {
+                    backend_module("response-owner input slot offset exceeds range".to_string())
+                })?;
+                let operand = LoweringOperand::Carried(CarriedBoundaryWord {
+                    word: builder.ins().load(types::I64, MemFlags::trusted(), frame, offset),
+                });
+                if frame_inputs.insert(frame_source, operand.clone()).is_some() {
+                    return Err(backend_module(
+                        "a response-owner frame repeats one typed input slot".to_string(),
+                    ));
+                }
+                descriptor_inputs.push(operand);
+            }
+            function_local.defining_abi_operands = descriptor_inputs;
+            function_local.static_response_owner = Some(emission.owner.id());
+            compiler.function_local = function_local;
+
+            let frame_operand = |binding: &StaticResponseEnvironmentBinding| {
+                frame_inputs
+                    .get(&binding.frame_source())
+                    .cloned()
+                    .ok_or_else(|| {
+                        backend_module(format!(
+                            "the response environment source {:?} names absent frame input {:?}",
+                            binding.source(),
+                            binding.frame_source(),
+                        ))
+                    })
+            };
+            let mut lowered_arguments = BTreeMap::new();
+            let mut effect_environment = Vec::with_capacity(
+                emission.row.effect_environment().len(),
+            );
+            for input in emission.row.effect_environment() {
+                let operand = match input {
+                    StaticResponseEffectInput::Frame(binding) => frame_operand(binding)?,
+                    StaticResponseEffectInput::BoundedNatToInt {
+                        span,
+                        span_identity,
+                    } => {
+                        let span = match frame_operand(span)? {
+                            LoweringOperand::Carried(word) => word,
+                            LoweringOperand::Specialized(_) => {
+                                return Err(backend_module(
+                                    "a response BoundedNat conversion span is not carried"
+                                        .to_string(),
+                                ));
+                            }
+                        };
+                        let tag = compiler.emit_carrier_tag(&mut builder, span)?;
+                        let expected = i64::try_from(span_identity.tag_abi_word()?).map_err(|_| {
+                            backend_module(
+                                "response span identity exceeds the runtime tag word".to_string(),
+                            )
+                        })?;
+                        Lowering::require_i64(&mut builder, tag, expected);
+                        let fields = compiler.emit_carrier_field_count(&mut builder, span)?;
+                        Lowering::require_i64(&mut builder, fields, 3);
+                        let length = compiler.emit_carrier_field(&mut builder, span, 2)?;
+                        let length_tag = builder.ins().band_imm(
+                            length.word,
+                            crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+                        );
+                        Lowering::require_i64(
+                            &mut builder,
+                            length_tag,
+                            crate::boundary_value::BoundaryTag::ImmediateBoundedNat as i64,
+                        );
+                        let value = builder.ins().ushr_imm(
+                            length.word,
+                            i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
+                        );
+                        LoweringOperand::Specialized(
+                            compiler.lower_dynamic_small_int(&mut builder, value),
+                        )
+                    }
+                    StaticResponseEffectInput::OperationArgument {
+                        origin,
+                        environment,
+                    } => {
+                        if let Some(lowered) = lowered_arguments.get(origin).cloned() {
+                            lowered
+                        } else {
+                            let argument = emission.operation_arguments.get(origin).ok_or_else(|| {
+                                backend_module(
+                                    "a mapped response operation argument has no retained source expression"
+                                        .to_string(),
+                                )
+                            })?;
+                            let argument_environment = environment
+                                .iter()
+                                .map(|binding| {
+                                    frame_operand(binding)
+                                        .map(LoweringEnvironmentBinding::Value)
+                                })
+                                .collect::<Result<Vec<_>, _>>()?;
+                            let lowered = compiler.lower_expr(
+                                &mut builder,
+                                SourceOccurrence {
+                                    expr: argument,
+                                    static_origin: *origin,
+                                },
+                                &argument_environment,
+                            )?;
+                            if lowered_arguments.insert(*origin, lowered.clone()).is_some() {
+                                return Err(backend_module(
+                                    "one response operation argument was lowered twice".to_string(),
+                                ));
+                            }
+                            lowered
+                        }
+                    }
+                };
+                effect_environment.push(LoweringEnvironmentBinding::Value(operand));
+            }
+
+            let response = compiler.lower_expr(
+                &mut builder,
+                SourceOccurrence {
+                    expr: &emission.effect,
+                    static_origin: emission.row.effect_origin(),
+                },
+                &effect_environment,
+            )?;
+            if !matches!(response, LoweringOperand::Specialized(Lowered::HostResult { .. })) {
+                return Err(backend_module(
+                    "a specialized response owner did not materialize an exact HostResult"
+                        .to_string(),
+                ));
+            }
+
+            let mut context_inputs = Vec::with_capacity(
+                1 + emission.row.captures().len()
+                    + emission.row.continuation_inputs().len(),
+            );
+            context_inputs.push(response);
+            for capture in emission.row.captures() {
+                context_inputs.push(
+                    frame_inputs
+                        .get(&StaticResponseFrameSource::Parameter(
+                            capture.producer_abi_slot(),
+                        ))
+                        .cloned()
+                        .ok_or_else(|| {
+                            backend_module(
+                                "a response K capture names an absent owner Parameter slot"
+                                    .to_string(),
+                            )
+                        })?,
+                );
+            }
+            for (ordinal, _, _) in emission.row.continuation_inputs() {
+                context_inputs.push(
+                    frame_inputs
+                        .get(&StaticResponseFrameSource::Capture(*ordinal))
+                        .cloned()
+                        .ok_or_else(|| {
+                            backend_module(
+                                "a response continuation input names an absent owner Capture slot"
+                                    .to_string(),
+                            )
+                        })?,
+                );
+            }
+            let (returned, _call) = compiler.call_declared_unit_target(
+                &mut builder,
+                exact_context,
+                &context_inputs,
+                #[cfg(test)]
+                None,
+            )?;
+            let returned = match returned {
+                LoweringOperand::Carried(word) => word,
+                LoweringOperand::Specialized(_) => {
+                    return Err(backend_module(
+                        "a response K context returned a specialized template instead of its Trap-checked runtime Result"
+                            .to_string(),
+                    ));
+                }
+            };
+            let ret_tag = compiler.emit_carrier_tag(&mut builder, returned)?;
+            let expected_ret = i64::try_from(emission.row.k_ret_identity().tag_abi_word()?)
+                .map_err(|_| {
+                    backend_module("response Ret identity exceeds the runtime tag word".to_string())
+                })?;
+            Lowering::require_i64(&mut builder, ret_tag, expected_ret);
+            let ret_fields = compiler.emit_carrier_field_count(&mut builder, returned)?;
+            Lowering::require_i64(&mut builder, ret_fields, 1);
+            let application = CheckedIhApplicationResult::from_declared_call(
+                LoweringOperand::Carried(returned),
+            )?;
+            let result_offset = i32::try_from(result_offset).map_err(|_| {
+                backend_module("response-owner result slot offset exceeds range".to_string())
+            })?;
+            builder.ins().store(
+                MemFlags::trusted(),
+                application.word.word,
+                frame,
+                result_offset,
+            );
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().return_(&[zero]);
+            builder.seal_all_blocks();
+            builder.finalize();
+        }
+        ambient.release(compiler);
+        frame_scope.close(compiler)?;
+        verify_cranelift_function(&func, module.isa())?;
+        compiler.commit_aggregate_events()?;
+        let mut ctx = module.make_context();
+        std::mem::swap(&mut ctx.func, &mut func);
+        module
+            .define_function(id, &mut ctx)
+            .map_err(|error| backend_module(error.to_string()))?;
+        defined += 1;
+    }
+    Ok(defined)
 }
 
 /// **`RT-CONTSPEC-ACTIVATE` `D2` — define each declared continuation target
@@ -6355,6 +6820,36 @@ pub(in crate::cranelift_backend) fn reset_capacity_phase_dispatch() {
 /// ⛔ Keyed by the planner's `ContinuationContextId`, never by the body origin
 /// the context executes -- that key is what would let a consumer resolve a
 /// context from a body origin, which is the reconstruction the ruling forbids.
+fn declare_response_context_call_in_func<M: Module>(
+    module: &mut M,
+    func: &mut Function,
+    plan: &StaticTransitionPlan<'_>,
+    bundle: &UnitBundle,
+    id: ContinuationContextId,
+) -> Result<DeclaredUnitCall, CraneliftBackendError> {
+    let context = plan
+        .continuation_contexts()?
+        .into_iter()
+        .find(|context| context.id() == id)
+        .ok_or_else(|| {
+            backend_module(
+                "a response owner names no installed continuation context".to_string(),
+            )
+        })?;
+    let target = bundle.context(id).ok_or_else(|| {
+        backend_module("a response context was never forward-declared".to_string())
+    })?;
+    let (offsets, _frame_bytes) = context.slot_offsets()?;
+    Ok(DeclaredUnitCall {
+        function: module.declare_func_in_func(target, func),
+        origin: context.worker_body_origin(),
+        call_site_origin: context.worker_body_origin(),
+        header: context.header(),
+        slots: context.slots().to_vec(),
+        offsets,
+    })
+}
+
 pub(in crate::cranelift_backend) fn declare_context_calls_in_func<M: Module>(
     module: &mut M,
     func: &mut Function,
