@@ -18,6 +18,80 @@ The Architect mechanism ruling **`evt_29jfzzw9j5xjz`** is the authoritative,
 byte-level contract. This node folds its structure, types, and controls for
 release; where any detail here is thinner, the ruling governs. Do not re-derive.
 
+## AMENDMENT — context-demand extension (Architect evt_4ta6cchxvjrrt); CP1 CORRECTED
+
+The CP1 `SsaInfeasible` on both FsReadAt rows was a PHASE-ORDERING artifact, not
+genuine infeasibility, and does NOT go to the operator. `intern_generated_contexts`
+at the held checkpoint interned contexts only from the pre-existing
+`PlannedContinuationSpecializationCall` (old-caller) population; the response-owner
+call does not exist yet, so `continuation_context_for(...)` answered "was some old
+caller already enough to mint this target?" — the zero is over the old caller
+population, not over K or its ABI inputs. The two FsReadAt rows are SINGLETON-K
+rows; the already-issued `PlannedContinuationContext` contract is exactly the
+missing target shape (Parameter run = raw K arity + K captures; Capture run = the
+K specialization's ordered continuation inputs). No new runtime representation or
+ABI family.
+
+Extend the SSA planner:
+
+1. Split response planning into a PRE-CONTEXT DEMAND phase and a POST-CONTEXT
+   RESOLUTION phase. Pre-context derives every response producer/K row from the
+   semantic graph + the just-built continuation specialization/call population and
+   finishes capture/source validation (a count is not enough).
+2. Add a typed `StaticResponseContextDemand` keyed by the existing pair
+   `(K ContinuationSpecializationId, k_body_origin)`, carrying the response row
+   identity for closure checking — NOT a second context-identity domain or a
+   response-specific ABI kind.
+3. Intern ordinary `PlannedContinuationContext`s from the UNION of existing
+   causal-call demands + response demands: intern the existing call population
+   FIRST (preserving existing context IDs), then append new unique response keys
+   in deterministic response-row order. Same key reuses one context; same key with
+   disagreeing worker/input schema is a planner error.
+4. Build/install/finalize the existing context ABI from the K specialization's own
+   `worker` + `continuation_inputs` authorities — do NOT reconstruct schema from
+   response syntax.
+5. Resolve each response demand by exact key to the now-issued
+   `ContinuationContextId`, then publish `StaticResponseContinuation`. A missing
+   context is now a planner population-closure ERROR, not `SsaInfeasible`.
+6. Keep `SsaInfeasible` ONLY for the real semantic arms: an incoming edge carries
+   multiple/opaque K values, or a K capture/input cannot be expressed as one
+   explicit static frame source. Continue the all-producer walk PAST the FsReadAt
+   rows (later rows are not assumed feasible).
+
+Still compile-time SSA/lambda lifting: Function identity fixes K; response +
+captures/inputs stay explicit slots; the call target stays an ordinary
+`ContinuationContextId`. No K tag / closure word / environment aggregate / apply
+dispatcher / code pointer / runtime selector; no public ABI change; no kernel
+change; no spec commitment — NO new operator fork.
+
+Checkpoint correction (supersedes the "Deliverable" list below where they differ):
+
+- **CP1** completes only when the full read/write all-producer population has
+  EITHER a fully-validated context demand for every singleton-K row OR a real
+  typed dynamic/non-expressible `SsaInfeasible`. "No context existed before the
+  new edge" is NO LONGER an infeasible arm.
+- **CP2** interns the union context population, installs its existing ABI,
+  forward-declares response owners, statically retargets exact callers.
+- **CP3** defines the response owner and emits the exact context call after
+  validation.
+- No emitted context discharges reachability by declaration; at the atomic tip
+  every newly demand-issued context must have >=1 selected response-owner call
+  (delete it -> population-closure gate reds).
+
+Added controls (with the existing mutation grid): READ demand key
+`Specialization(0)` / body `766`, WRITE `Specialization(0)` / body `1075` — both
+resolve to planner-issued contexts and the all-producer walk continues; delete
+only the response demand -> FsReadAt row reds before emission; duplicate demand ->
+one context, not two; vary body / K identity / capture source / continuation-input
+source -> reject the disagreement; prove existing causal-call context IDs +
+descriptors unchanged when response demands are appended; remove/retarget the sole
+response-owner call -> reject declared-but-unentered; call raw worker -> reject
+wrong ABI; RETAIN a genuine dynamic-K row that returns typed `SsaInfeasible` (so
+this extension does not make the fallback arm unreachable).
+
+Held checkpoint `48fa6c9d6` remains evidence, not a candidate; `dac8edab`
+diagnostic only.
+
 ## The mechanism
 
 Select **polyvariant, compile-time response-owner specialization**. For every
@@ -139,12 +213,17 @@ only from that call. Raw `HostResult` may not leave; only K Result reaches Ret.
 Built on one branch from the clean held checkpoint `ad191d1c2`. **No QA,
 Decision, publication, or merge before the atomic tip.**
 
-1. **Static feasibility ledger ONLY.** Publish every producer/caller-edge → exact
-   K/schema row for both fixed products, grouped zero / one / multiple per
-   unspecialized producer. **No production emission yet.** A **zero** or an
-   **irreducibly multiple** reached row is a HARD STOP to Architect/Steward (the
-   `SsaInfeasible` finding the Steward routes to the operator). This checkpoint
-   is the feasibility gate — the whole SSA path's viability is decided here.
+1. **Static feasibility ledger + context-demand validation (CORRECTED — see the
+   AMENDMENT above).** Publish every producer/caller-edge → exact K/schema row for
+   both fixed products. For every SINGLETON-K row, derive and fully validate its
+   typed context DEMAND (capture/source validation, not a count). **No production
+   emission yet.** CP1 completes only when the full all-producer population has
+   either a validated context demand for every singleton-K row OR a real typed
+   dynamic/non-expressible `SsaInfeasible` (multiple/opaque K, or a capture/input
+   not expressible as one explicit static frame source). "No context existed
+   before the new edge" is NOT infeasible — it is a demand to intern at CP2. ONLY
+   a real dynamic/non-expressible `SsaInfeasible` is the hard stop the Steward
+   routes to the operator.
 2. **Typed specialization population** — fixed-point/SCC closure, explicit ABI
    slots, forward declarations, caller retargeting. Prove every emitted
    specialization has at least one selected incoming caller; a
