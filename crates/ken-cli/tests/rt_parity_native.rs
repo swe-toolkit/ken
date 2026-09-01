@@ -1148,242 +1148,311 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
     });
 }
 
-/// **Promise class: transition sentinel.** A reviewed change to either fixed
-/// product's static graph may replace these dense coordinates, but must replace
-/// the complete row while retaining its singleton classification and schema.
+/// **Promise class: transition sentinel.** A reviewed graph change may replace
+/// these dense coordinates, but must replace the complete response-producer
+/// ledger and retain one fully validated context demand per singleton K row.
 ///
-/// **MEASURED:** the `BufferAllocate` edge in each fixed product is singleton
-/// and complete, but the all-producer walk reaches an earlier `FsReadAt` K with
-/// no generated context target: read `Vis798` and write `Vis1107`.
-/// **CLAIMED:** the required context-call SSA mechanism is infeasible for both
-/// fixed products and returns the exact typed `SsaInfeasible` edge rather than
-/// selecting the later singleton or falling back to a raw worker.
-/// **THE GAP:** this checkpoint is planner evidence only. It emits no
-/// response-owner Function, retargets no caller, and does not select the held
-/// runtime-closure fallback.
+/// **MEASURED:** the read product has four response rows and the write product
+/// has seven. Their earlier `FsReadAt` rows require new contexts while the later
+/// `BufferAllocate` rows reuse causal context zero.
+/// **CLAIMED:** absence from the old-caller context population is a demand, not
+/// SSA infeasibility. Every fixed row has one explicit capture/input schema and
+/// resolves by `(ContinuationSpecializationId, worker body)` after old context
+/// identities are preserved as the union prefix.
+/// **THE GAP:** corrected CP1 is planner evidence only. It emits no response
+/// owner, retargets no caller, and does not select the runtime-closure fallback.
 #[test]
-fn static_response_feasibility_ledger_stops_on_contextless_fixed_edges() {
-    in_generated_entry_stack_thread("rt-parity-static-response-feasibility", || {
+fn static_response_context_demand_ledger_closes_fixed_products() {
+    in_generated_entry_stack_thread("rt-parity-static-response-demand", || {
         let compile = |label: &str, entry: &str| {
             let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
-            let root = output_dir(&format!("static-response-feasibility-{label}"));
+            let root = output_dir(&format!("static-response-demand-{label}"));
             let (result, diagnostics) =
                 ken_runtime::with_static_response_feasibility_diagnostics(|| {
                     ken_cli::build_native_program(
                         &source,
                         ken_cli::SourceFormat::Ken,
-                        &format!("rt_parity_static_response_feasibility_{label}"),
+                        &format!("rt_parity_static_response_demand_{label}"),
                         root.path(),
                     )
                 });
-            result.expect("the fixed feasibility product must compile");
-            assert_eq!(
-                diagnostics.len(),
-                1,
-                "one compile must publish one closed plan"
-            );
+            result.expect("the fixed response-demand product must compile");
+            assert_eq!(diagnostics.len(), 1, "one compile publishes one plan");
             let diagnostic = diagnostics.into_iter().next().unwrap();
-            assert_eq!(
-                diagnostic.static_response_infeasible, None,
-                "a fixed reached edge must not enter the typed infeasible arm"
-            );
+            assert_eq!(diagnostic.static_response_infeasible, None);
+            assert_eq!(diagnostic.all_static_response_infeasible, None);
             assert_eq!(
                 diagnostic.static_response_rows.len(),
                 1,
-                "the unspecialized BufferAllocate producer must have one exact caller/K row"
+                "one BufferAllocate response row is expected"
             );
-            assert!(
-                diagnostic.all_static_response_rows.is_empty(),
-                "the fail-fast all-producer walk must not publish a feasible prefix as a closed ledger"
+            let buffer = &diagnostic.static_response_rows[0];
+            assert_eq!(buffer.operation, "BufferAllocate");
+            assert_eq!(
+                diagnostic
+                    .all_static_response_rows
+                    .iter()
+                    .filter(|row| row.operation == "BufferAllocate")
+                    .collect::<Vec<_>>(),
+                vec![buffer],
+                "the filtered row must be the same authority as the all-producer row"
             );
-            let infeasible = diagnostic
-                .all_static_response_infeasible
-                .expect("the fixed product must return its exact typed infeasible edge");
-            (
-                diagnostic.static_response_rows.into_iter().next().unwrap(),
-                infeasible,
-            )
+            diagnostic
         };
 
-        let (read, read_infeasible) = compile("read", "rt_read_offset_stage");
-        assert_eq!(
-            read.base_owner,
-            "Specialization(ContinuationSpecializationId(2))"
-        );
-        assert_eq!(
-            (
-                read.producer_call_origin,
-                read.response_origin,
-                read.vis_origin
-            ),
-            (138, 136, 951)
-        );
-        assert_eq!(
-            (read.k_closure_origin, read.k_body_origin, read.k_context),
-            (947, 941, 0)
-        );
-        for coordinate in [
-            "producer_construct_origin: StaticOriginId(951)",
-            "target: ContinuationSpecializationId(2)",
-            "closure_origin: StaticOriginId(947)",
-            "body_origin: StaticOriginId(941)",
-        ] {
-            assert!(
-                read.k_identity.contains(coordinate),
-                "read K identity omitted {coordinate}"
-            );
+        let read = compile("read", "rt_read_offset_stage");
+        let write = compile("write", "rt_write_writable_stage");
+        fn summary(
+            diagnostic: &ken_runtime::StaticResponseFeasibilityDiagnostic,
+        ) -> Vec<(&str, u32, u32, u32, u32, u32, u32, u32, bool, usize, usize)> {
+            diagnostic
+                .all_static_response_rows
+                .iter()
+                .map(|row| {
+                    (
+                        row.operation.as_str(),
+                        row.producer_call_origin,
+                        row.response_origin,
+                        row.vis_origin,
+                        row.k_specialization,
+                        row.k_closure_origin,
+                        row.k_body_origin,
+                        row.k_context,
+                        row.context_was_preexisting,
+                        row.captures.len(),
+                        row.continuation_inputs.len(),
+                    )
+                })
+                .collect::<Vec<_>>()
         }
         assert_eq!(
-            read.captures
-                .iter()
-                .map(|capture| (capture.ordinal, capture.origin, capture.producer_abi_slot))
-                .collect::<Vec<_>>(),
+            summary(&read),
             vec![
-                (0, 946, 1),
-                (1, 945, 2),
-                (2, 944, 3),
-                (3, 943, 4),
-                (4, 942, 5)
+                ("FsReadAt", 126, 124, 798, 0, 776, 766, 1, false, 9, 7),
+                ("BufferAllocate", 138, 136, 951, 2, 947, 941, 0, true, 5, 4),
+                (
+                    "ResourceRelease",
+                    146,
+                    144,
+                    465,
+                    3,
+                    460,
+                    452,
+                    2,
+                    false,
+                    7,
+                    2
+                ),
+                (
+                    "ResourceRelease",
+                    146,
+                    144,
+                    676,
+                    1,
+                    671,
+                    662,
+                    3,
+                    false,
+                    8,
+                    6
+                ),
             ]
         );
         assert_eq!(
-            read.continuation_inputs
-                .iter()
-                .map(|(ordinal, _, slot)| (*ordinal, *slot))
-                .collect::<Vec<_>>(),
-            vec![(0, 6), (1, 7), (2, 8), (3, 9)]
-        );
-        assert!(read.captures[0]
-            .source
-            .contains("binding_origin: StaticOriginId(951)"));
-        assert!(read.captures[1]
-            .source
-            .contains("binding_origin: StaticOriginId(964)"));
-        assert!(read.captures[2]
-            .source
-            .contains("binding_origin: StaticOriginId(965)"));
-        assert!(read.captures[3].source.contains("source_abi_position: 0"));
-        assert!(read.captures[4].source.contains("source_abi_position: 1"));
-
-        assert_eq!(
-            (
-                read_infeasible.base_owner.as_str(),
-                read_infeasible.vis_origin,
-                read_infeasible.producer_call_origin,
-                read_infeasible.operation.as_deref(),
-                read_infeasible.k_closure_origin,
-                read_infeasible.k_body_origin,
-                read_infeasible.k_capture_count,
-                read_infeasible.continuation_input_count,
-            ),
-            (
-                "Specialization(ContinuationSpecializationId(0))",
-                798,
-                Some(126),
-                Some("FsReadAt"),
-                Some(776),
-                Some(766),
-                Some(9),
-                Some(7),
-            )
-        );
-        assert_eq!(
-            read_infeasible.reason,
-            "the statically selected K has no generated context target"
-        );
-
-        let (write, write_infeasible) = compile("write", "rt_write_writable_stage");
-        assert_eq!(
-            write.base_owner,
-            "Specialization(ContinuationSpecializationId(3))"
-        );
-        assert_eq!(
-            (
-                write.producer_call_origin,
-                write.response_origin,
-                write.vis_origin
-            ),
-            (151, 149, 1250)
-        );
-        assert_eq!(
-            (write.k_closure_origin, write.k_body_origin, write.k_context),
-            (1246, 1238, 0)
-        );
-        for coordinate in [
-            "producer_construct_origin: StaticOriginId(1250)",
-            "target: ContinuationSpecializationId(3)",
-            "closure_origin: StaticOriginId(1246)",
-            "body_origin: StaticOriginId(1238)",
-        ] {
-            assert!(
-                write.k_identity.contains(coordinate),
-                "write K identity omitted {coordinate}"
-            );
-        }
-        assert_eq!(
-            write
-                .captures
-                .iter()
-                .map(|capture| (capture.ordinal, capture.origin, capture.producer_abi_slot))
-                .collect::<Vec<_>>(),
+            summary(&write),
             vec![
-                (0, 1245, 1),
-                (1, 1244, 2),
-                (2, 1243, 3),
-                (3, 1242, 4),
-                (4, 1241, 5),
-                (5, 1240, 6),
-                (6, 1239, 7),
+                ("FsWriteAt", 126, 124, 1043, 1, 993, 979, 2, false, 13, 9),
+                ("FsReadAt", 139, 137, 1107, 0, 1087, 1075, 3, false, 11, 9),
+                (
+                    "BufferAllocate",
+                    151,
+                    149,
+                    1250,
+                    3,
+                    1246,
+                    1238,
+                    0,
+                    true,
+                    7,
+                    6
+                ),
+                (
+                    "ResourceRelease",
+                    159,
+                    157,
+                    478,
+                    6,
+                    473,
+                    465,
+                    4,
+                    false,
+                    7,
+                    2
+                ),
+                (
+                    "ResourceRelease",
+                    159,
+                    157,
+                    691,
+                    4,
+                    686,
+                    676,
+                    5,
+                    false,
+                    9,
+                    6
+                ),
+                (
+                    "ResourceRelease",
+                    159,
+                    157,
+                    904,
+                    2,
+                    899,
+                    888,
+                    6,
+                    false,
+                    10,
+                    8
+                ),
+                ("FsOpen", 175, 173, 1273, 5, 1265, 1259, 1, true, 5, 4),
             ]
         );
-        assert_eq!(
-            write
-                .continuation_inputs
-                .iter()
-                .map(|(ordinal, _, slot)| (*ordinal, *slot))
-                .collect::<Vec<_>>(),
-            vec![(0, 8), (1, 9), (2, 10), (3, 11), (4, 12), (5, 13)]
-        );
-        assert!(write.captures[0]
-            .source
-            .contains("binding_origin: StaticOriginId(1250)"));
-        for (position, capture) in write.captures.iter().enumerate().skip(1) {
-            assert!(
-                capture
-                    .source
-                    .contains(&format!("source_abi_position: {}", position - 1)),
-                "write capture {position} lost its exact entry coordinate: {capture:?}"
-            );
+
+        for diagnostic in [&read, &write] {
+            let mut contexts = std::collections::BTreeMap::new();
+            for row in &diagnostic.all_static_response_rows {
+                assert_eq!(
+                    row.base_owner,
+                    format!(
+                        "Specialization(ContinuationSpecializationId({}))",
+                        row.k_specialization
+                    )
+                );
+                for exact in [
+                    format!(
+                        "producer_construct_origin: StaticOriginId({})",
+                        row.vis_origin
+                    ),
+                    format!(
+                        "target: ContinuationSpecializationId({})",
+                        row.k_specialization
+                    ),
+                    format!("closure_origin: StaticOriginId({})", row.k_closure_origin),
+                    format!("body_origin: StaticOriginId({})", row.k_body_origin),
+                ] {
+                    assert!(
+                        row.k_identity.contains(&exact),
+                        "K identity omitted {exact}"
+                    );
+                }
+                assert_eq!(
+                    contexts.insert((row.k_specialization, row.k_body_origin), row.k_context),
+                    None,
+                    "these fixed products contain no duplicate K demand key"
+                );
+                for (ordinal, capture) in row.captures.iter().enumerate() {
+                    assert_eq!(capture.ordinal as usize, ordinal);
+                    assert_eq!(capture.origin, row.k_closure_origin - 1 - ordinal as u32);
+                    assert_eq!(capture.producer_abi_slot, 1 + ordinal as u32);
+                    assert!(
+                        capture.source.starts_with("ProducerLocal {")
+                            || capture.source.starts_with("EntryAbi {")
+                    );
+                }
+                for (ordinal, source, slot) in &row.continuation_inputs {
+                    assert_eq!(*ordinal as usize + 1 + row.captures.len(), *slot as usize);
+                    assert!(
+                        source.starts_with("ProducerLocal {") || source.starts_with("EntryAbi {")
+                    );
+                }
+            }
         }
-        assert_eq!(
-            (
-                write_infeasible.base_owner.as_str(),
-                write_infeasible.vis_origin,
-                write_infeasible.producer_call_origin,
-                write_infeasible.operation.as_deref(),
-                write_infeasible.k_closure_origin,
-                write_infeasible.k_body_origin,
-                write_infeasible.k_capture_count,
-                write_infeasible.continuation_input_count,
-            ),
-            (
-                "Specialization(ContinuationSpecializationId(0))",
-                1107,
-                Some(139),
-                Some("FsReadAt"),
-                Some(1087),
-                Some(1075),
-                Some(11),
-                Some(9),
-            )
-        );
-        assert_eq!(
-            write_infeasible.reason,
-            "the statically selected K has no generated context target"
-        );
     });
 }
 
+/// The demand mutation changes the population the union interner receives.
+/// Every negative reaches once and fails before emission; exact duplication is
+/// idempotent and leaves both the ledger and assigned context identities equal
+/// to the unmutated compile.
+#[test]
+fn static_response_context_demand_controls_reach_and_restore() {
+    use ken_runtime::StaticResponseContextDemandMutation as Mutation;
+
+    in_generated_entry_stack_thread("rt-parity-static-response-demand-controls", || {
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+        let compile = |label: &str| {
+            let root = output_dir(&format!("static-response-demand-control-{label}"));
+            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    &format!("rt_parity_static_response_demand_control_{label}"),
+                    root.path(),
+                )
+            })
+        };
+        let (baseline_result, baseline) = compile("baseline");
+        baseline_result.expect("baseline response-demand compile");
+        assert_eq!(baseline.len(), 1);
+
+        for (label, mutation, expected) in [
+            (
+                "delete",
+                Mutation::DeleteResponseOnlyDemand,
+                "does not cover every derived response row",
+            ),
+            (
+                "vary-k",
+                Mutation::VaryKSpecialization,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "vary-body",
+                Mutation::VaryKBody,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "vary-capture",
+                Mutation::VaryCaptureSource,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "vary-input",
+                Mutation::VaryContinuationInputSource,
+                "disagrees with its K worker or input schema",
+            ),
+        ] {
+            let ((result, diagnostics), applications) =
+                ken_runtime::with_static_response_context_demand_mutation(mutation, || {
+                    compile(label)
+                });
+            assert_eq!(applications, 1, "{label} did not reach its demand");
+            let error = result.expect_err("the reaching demand mutation must red");
+            assert!(
+                format!("{error:?}").contains(expected),
+                "{label} failed for a different reason: {error:?}"
+            );
+            assert!(
+                diagnostics.is_empty(),
+                "a red plan must not publish a ledger"
+            );
+        }
+
+        let ((duplicate_result, duplicate), applications) =
+            ken_runtime::with_static_response_context_demand_mutation(
+                Mutation::DuplicateResponseOnlyDemand,
+                || compile("duplicate"),
+            );
+        duplicate_result.expect("an exact duplicate demand must reuse one context");
+        assert_eq!(applications, 1);
+        assert_eq!(duplicate, baseline);
+
+        let (restored_result, restored) = compile("restored");
+        restored_result.expect("response-demand controls must restore");
+        assert_eq!(restored, baseline);
+    });
+}
 
 /// **Promise class: durable invariant.** Intended planner growth may add Direct
 /// arrivals, but every such arrival must retain one source-keyed declared call

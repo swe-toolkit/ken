@@ -83,8 +83,12 @@ pub(in crate::cranelift_backend) use semantic_ir::{
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
-    SsaInfeasible, StaticResponseCapture, StaticResponseContinuation,
-    StaticResponseContinuationId,
+    SsaInfeasible, StaticResponseCapture, StaticResponseContextDemand,
+    StaticResponseContinuation, StaticResponseContinuationId,
+};
+#[cfg(feature = "px8-ds-test-support")]
+pub use responses::{
+    with_static_response_context_demand_mutation, StaticResponseContextDemandMutation,
 };
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,
@@ -872,10 +876,13 @@ pub struct StaticResponseFeasibilityObservation {
     pub producer_call_origin: u32,
     pub response_origin: u32,
     pub vis_origin: u32,
+    pub operation: String,
     pub k_identity: String,
+    pub k_specialization: u32,
     pub k_closure_origin: u32,
     pub k_body_origin: u32,
     pub k_context: u32,
+    pub context_was_preexisting: bool,
     pub captures: Vec<StaticResponseCaptureObservation>,
     pub continuation_inputs: Vec<(u32, String, u32)>,
 }
@@ -943,10 +950,13 @@ fn record_static_response_feasibility_diagnostic(
                     producer_call_origin: row.producer_call_origin().0,
                     response_origin: row.response_origin().0,
                     vis_origin: row.vis_origin().0,
+                    operation: format!("{:?}", row.operation()),
                     k_identity: format!("{:?}", row.k_identity()),
+                    k_specialization: row.k_specialization().0,
                     k_closure_origin: row.k_closure_origin().0,
                     k_body_origin: row.k_body_origin().0,
                     k_context: row.k_context().0,
+                    context_was_preexisting: row.context_was_preexisting(),
                     captures: row
                         .captures()
                         .iter()
