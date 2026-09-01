@@ -5,11 +5,44 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
+
+## Symptom inventory
+
+1. A derivation family over a constructor-headed record index can be built but
+   not dependently eliminated: generated refinement treats observational record
+   equality as a primitive `Eq`/`J` witness after it has reduced to a Sigma of
+   field equalities — keyed on the index equality's representation rather than
+   the derivation relation.
+
+> # D2b HELD 2026-09-01 behind an ELABORATOR predecessor (record-index inversion)
+>
+> **This banner supersedes the D2a-outcome status: D2a is DONE and the statement
+> survives verbatim, but D2b hard-stopped at the derivation inversion.**
+>
+> Proving adequacy requires dependently eliminating `FokDerivation` over its
+> compound record index `FokMkSequent gamma delta`. The current match compiler
+> cannot: generated branch refinement treats observational record equality as a
+> primitive `Eq`/`J` after it has reduced to a Sigma of field equalities. Six
+> encodings fail (compound index, equality convoy as arg/param, projection
+> equalities, separate-field/List equalities). Held green evidence `70a291a96`
+> (177-line strengthened ledger/inversion spine) is reusable D2b material, NOT a
+> candidate.
+>
+> **Architect ruling `evt_68t4wwrs274nh`: this is an ELABORATOR-ONLY predecessor,
+> NOT a relation re-index (b) and NOT a kernel/TCB widening (c).** No operator
+> authorization needed. The fix is [[LANG-RECORD-INDEX-REFINEMENT]] (framed and
+> landed from current main); D2b holds behind it. **Do NOT re-index
+> `FokDerivation`, add a Nat code for sequents, split the record into List
+> indices, or touch `fok_derives`/`fok_classically_valid`** — that would
+> compensate in the relation for an elaborator defect. The D2b theorem statement
+> is UNCHANGED. Only after the predecessor's exact consumer gate is green does
+> the Steward explicitly RE-RELEASE D2b; the ring then rebases/folds the held
+> spine and continues the exact unchanged theorem.
 
 > # D2 RECUT 2026-08-27 — THE LANDED D1 STATEMENT IS REFUTED
 >
