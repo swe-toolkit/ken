@@ -11,29 +11,21 @@ algorithm and its proofs use the same ordering evidence.
 both sides, where equality is induced by the lawful total order.
 
 ```ken
-fn ordered_leq (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq x y
+import Core.Classes.LawfulClasses (ord_leq_at)
 
-fn order_eq (a : Type) (d : Ord a) (x : a) (y : a) : Bool =
-  bool_and (ordered_leq a d x y) (ordered_leq a d y x)
-
-fn element_count (a : Type) (d : Ord a) (q : a) (xs : List a) : Nat =
-  match xs {
-    Nil ↦ Zero;
-    Cons h t ↦
-      match order_eq a d q h {
-        True ↦ Suc (element_count a d q t);
-        False ↦ element_count a d q t
-      }
-  }
+import Data.Collections.Derived (count, eq_from_ord)
 
 fn permutation (a : Type) (d : Ord a) (xs : List a) (ys : List a) : Prop =
-  (q : a) → Equal Nat (element_count a d q xs) (element_count a d q ys)
+  (q : a)
+    → Equal Nat
+    (count a (eq_from_ord a (ord_leq_at a d)) q xs)
+    (count a (eq_from_ord a (ord_leq_at a d)) q ys)
 
 fn insert (a : Type) (d : Ord a) (x : a) (xs : List a) : List a =
   match xs {
     Nil ↦ Cons a x (Nil a);
     Cons h t ↦
-      match ordered_leq a d x h {
+      match ord_leq_at a d x h {
         True ↦ Cons a x (Cons a h t);
         False ↦ Cons a h (insert a d x t)
       }
@@ -57,49 +49,49 @@ moves an element past a head that was not already before it.
 fn head_ordered (a : Type) (d : Ord a) (x : a) (xs : List a) : Prop =
   match xs {
     Nil ↦ Top;
-    Cons h t ↦ Equal Bool (ordered_leq a d x h) True
+    Cons h t ↦ Equal Bool (ord_leq_at a d x h) True
   }
 
 theorem sorted_cons
       (a : Type) (d : Ord a) (x : a) (xs : List a)
-    : is_sorted a (ordered_leq a d) xs
+    : is_sorted a (ord_leq_at a d) xs
       → head_ordered a d x xs
-      → is_sorted a (ordered_leq a d) (Cons a x xs) =
+      → is_sorted a (ord_leq_at a d) (Cons a x xs) =
   match xs {
     Nil ↦ λsorted_xs. λhead_before. Proved;
     Cons h t ↦
       λsorted_xs.
         λhead_before.
           and_intro
-            (Equal Bool (ordered_leq a d x h) True)
-            (is_sorted a (ordered_leq a d) (Cons a h t))
+            (Equal Bool (ord_leq_at a d x h) True)
+            (is_sorted a (ord_leq_at a d) (Cons a h t))
             head_before
             sorted_xs
   }
 
 theorem sorted_tail
       (a : Type) (d : Ord a) (x : a) (xs : List a)
-    : is_sorted a (ordered_leq a d) (Cons a x xs) → is_sorted a (ordered_leq a d) xs =
+    : is_sorted a (ord_leq_at a d) (Cons a x xs) → is_sorted a (ord_leq_at a d) xs =
   match xs {
     Nil ↦ λsorted_cons. Proved;
     Cons h t ↦
       λsorted_cons.
         and_snd
-          (Equal Bool (ordered_leq a d x h) True)
-          (is_sorted a (ordered_leq a d) (Cons a h t))
+          (Equal Bool (ord_leq_at a d x h) True)
+          (is_sorted a (ord_leq_at a d) (Cons a h t))
           sorted_cons
   }
 
 theorem sorted_head
       (a : Type) (d : Ord a) (x : a) (xs : List a)
-    : is_sorted a (ordered_leq a d) (Cons a x xs) → head_ordered a d x xs =
+    : is_sorted a (ord_leq_at a d) (Cons a x xs) → head_ordered a d x xs =
   match xs {
     Nil ↦ λsorted_cons. Proved;
     Cons h t ↦
       λsorted_cons.
         and_fst
-          (Equal Bool (ordered_leq a d x h) True)
-          (is_sorted a (ordered_leq a d) (Cons a h t))
+          (Equal Bool (ord_leq_at a d x h) True)
+          (is_sorted a (ord_leq_at a d) (Cons a h t))
           sorted_cons
   }
 
@@ -108,19 +100,19 @@ theorem leq_right_of_left_false
       (d : Ord a)
       (x : a)
       (y : a)
-      (left_false : Equal Bool (ordered_leq a d x y) False)
-    : Equal Bool (ordered_leq a d y x) True =
-  J (λleft _. Equal Bool (bool_or left (ordered_leq a d y x)) True) (d.total x y) left_false
+      (left_false : Equal Bool (ord_leq_at a d x y) False)
+    : Equal Bool (ord_leq_at a d y x) True =
+  J (λleft _. Equal Bool (bool_or left (ord_leq_at a d y x)) True) (d.total x y) left_false
 
 theorem head_ordered_after_insert
       (a : Type) (d : Ord a) (h : a) (x : a) (xs : List a)
-    : Equal Bool (ordered_leq a d h x) True
+    : Equal Bool (ord_leq_at a d h x) True
       → head_ordered a d h xs
       → head_ordered a d h (insert a d x xs) =
   match xs {
     Nil ↦ λh_before_x. λh_before_xs. h_before_x;
     Cons y ys ↦
-      match ordered_leq a d x y eqn : comparison {
+      match ord_leq_at a d x y eqn : comparison {
         True ↦
           λh_before_x.
             λh_before_xs.
@@ -135,7 +127,7 @@ theorem head_ordered_after_insert
                       False ↦ Cons a y (insert a d x ys)
                     }))
                 h_before_x
-                (sym Bool (ordered_leq a d x y) True comparison);
+                (sym Bool (ord_leq_at a d x y) True comparison);
         False ↦
           λh_before_x.
             λh_before_xs.
@@ -150,30 +142,30 @@ theorem head_ordered_after_insert
                       False ↦ Cons a y (insert a d x ys)
                     }))
                 h_before_xs
-                (sym Bool (ordered_leq a d x y) False comparison)
+                (sym Bool (ord_leq_at a d x y) False comparison)
       }
   }
 
 proof sorted for insert
       (a : Type) (d : Ord a) (x : a) (xs : List a)
-    : is_sorted a (ordered_leq a d) xs → is_sorted a (ordered_leq a d) (insert a d x xs) =
+    : is_sorted a (ord_leq_at a d) xs → is_sorted a (ord_leq_at a d) (insert a d x xs) =
   match xs {
     Nil ↦ λsorted_xs. Proved;
     Cons h t ↦
-      match ordered_leq a d x h eqn : comparison {
+      match ord_leq_at a d x h eqn : comparison {
         True ↦
           λsorted_xs.
             J
               (λdecision _.
                 is_sorted
                   a
-                  (ordered_leq a d)
+                  (ord_leq_at a d)
                   (match decision {
                     True ↦ Cons a x (Cons a h t);
                     False ↦ Cons a h (insert a d x t)
                   }))
               (sorted_cons a d x (Cons a h t) sorted_xs comparison)
-              (sym Bool (ordered_leq a d x h) True comparison);
+              (sym Bool (ord_leq_at a d x h) True comparison);
         False ↦
           λsorted_xs.
             let
@@ -196,19 +188,19 @@ proof sorted for insert
                 (λdecision _.
                   is_sorted
                     a
-                    (ordered_leq a d)
+                    (ord_leq_at a d)
                     (match decision {
                       True ↦ Cons a x (Cons a h t);
                       False ↦ Cons a h (insert a d x t)
                     }))
                 branch_is_sorted
-                (sym Bool (ordered_leq a d x h) False comparison)
+                (sym Bool (ord_leq_at a d x h) False comparison)
       }
   }
 
 proof sorted for sort
       (a : Type) (d : Ord a) (xs : List a)
-    : is_sorted a (ordered_leq a d) (sort a d xs) =
+    : is_sorted a (ord_leq_at a d) (sort a d xs) =
   match xs {
     Nil ↦ Proved;
     Cons h t ↦ insert::sorted a d h (sort a d t) (sort::sorted a d t)
@@ -229,39 +221,50 @@ theorem count_cons_cong
       (h : a)
       (xs : List a)
       (ys : List a)
-      (counts_equal : Equal Nat (element_count a d q xs) (element_count a d q ys))
-    : Equal Nat (element_count a d q (Cons a h xs)) (element_count a d q (Cons a h ys)) =
-  match order_eq a d q h eqn : occurrence {
+      (counts_equal : Equal
+        Nat
+        (count a (eq_from_ord a (ord_leq_at a d)) q xs)
+        (count a (eq_from_ord a (ord_leq_at a d)) q ys))
+    : Equal Nat
+        (count a (eq_from_ord a (ord_leq_at a d)) q (Cons a h xs))
+        (count a (eq_from_ord a (ord_leq_at a d)) q (Cons a h ys)) =
+  match eq_from_ord a (ord_leq_at a d) q h eqn : occurrence {
     True ↦
       J
         (λdecision _.
           Equal
             Nat
             (match decision {
-              True ↦ Suc (element_count a d q xs);
-              False ↦ element_count a d q xs
+              True ↦ Suc (count a (eq_from_ord a (ord_leq_at a d)) q xs);
+              False ↦ count a (eq_from_ord a (ord_leq_at a d)) q xs
             })
             (match decision {
-              True ↦ Suc (element_count a d q ys);
-              False ↦ element_count a d q ys
+              True ↦ Suc (count a (eq_from_ord a (ord_leq_at a d)) q ys);
+              False ↦ count a (eq_from_ord a (ord_leq_at a d)) q ys
             }))
-        (cong Nat Nat (element_count a d q xs) (element_count a d q ys) Suc counts_equal)
-        (sym Bool (order_eq a d q h) True occurrence);
+        (cong
+          Nat
+          Nat
+          (count a (eq_from_ord a (ord_leq_at a d)) q xs)
+          (count a (eq_from_ord a (ord_leq_at a d)) q ys)
+          Suc
+          counts_equal)
+        (sym Bool (eq_from_ord a (ord_leq_at a d) q h) True occurrence);
     False ↦
       J
         (λdecision _.
           Equal
             Nat
             (match decision {
-              True ↦ Suc (element_count a d q xs);
-              False ↦ element_count a d q xs
+              True ↦ Suc (count a (eq_from_ord a (ord_leq_at a d)) q xs);
+              False ↦ count a (eq_from_ord a (ord_leq_at a d)) q xs
             })
             (match decision {
-              True ↦ Suc (element_count a d q ys);
-              False ↦ element_count a d q ys
+              True ↦ Suc (count a (eq_from_ord a (ord_leq_at a d)) q ys);
+              False ↦ count a (eq_from_ord a (ord_leq_at a d)) q ys
             }))
         counts_equal
-        (sym Bool (order_eq a d q h) False occurrence)
+        (sym Bool (eq_from_ord a (ord_leq_at a d) q h) False occurrence)
   }
 
 fn count_after_two (tail_count : Nat) (first_occurs : Bool) (second_occurs : Bool) : Nat =
@@ -300,33 +303,38 @@ theorem count_swap_decisions
 theorem count_cons_swap
       (a : Type) (d : Ord a) (q : a) (x : a) (y : a) (xs : List a)
     : Equal Nat
-        (element_count a d q (Cons a x (Cons a y xs)))
-        (element_count a d q (Cons a y (Cons a x xs))) =
-  count_swap_decisions (element_count a d q xs) (order_eq a d q x) (order_eq a d q y)
+        (count a (eq_from_ord a (ord_leq_at a d)) q (Cons a x (Cons a y xs)))
+        (count a (eq_from_ord a (ord_leq_at a d)) q (Cons a y (Cons a x xs))) =
+  count_swap_decisions
+    (count a (eq_from_ord a (ord_leq_at a d)) q xs)
+    (eq_from_ord a (ord_leq_at a d) q x)
+    (eq_from_ord a (ord_leq_at a d) q y)
 
 proof count for insert
       (a : Type) (d : Ord a) (x : a) (xs : List a) (q : a)
-    : Equal Nat (element_count a d q (Cons a x xs)) (element_count a d q (insert a d x xs)) =
+    : Equal Nat
+        (count a (eq_from_ord a (ord_leq_at a d)) q (Cons a x xs))
+        (count a (eq_from_ord a (ord_leq_at a d)) q (insert a d x xs)) =
   match xs {
     Nil ↦ Refl;
     Cons h t ↦
-      match ordered_leq a d x h eqn : comparison {
+      match ord_leq_at a d x h eqn : comparison {
         True ↦
           J
             (λdecision _.
               Equal
                 Nat
-                (element_count a d q (Cons a x (Cons a h t)))
-                (element_count
+                (count a (eq_from_ord a (ord_leq_at a d)) q (Cons a x (Cons a h t)))
+                (count
                   a
-                  d
+                  (eq_from_ord a (ord_leq_at a d))
                   q
                   (match decision {
                     True ↦ Cons a x (Cons a h t);
                     False ↦ Cons a h (insert a d x t)
                   })))
             Refl
-            (sym Bool (ordered_leq a d x h) True comparison);
+            (sym Bool (ord_leq_at a d x h) True comparison);
         False ↦
           let
             swapped_count = count_cons_swap a d q x h t;
@@ -336,9 +344,9 @@ proof count for insert
             branch_count =
               trans
                 Nat
-                (element_count a d q (Cons a x (Cons a h t)))
-                (element_count a d q (Cons a h (Cons a x t)))
-                (element_count a d q (Cons a h (insert a d x t)))
+                (count a (eq_from_ord a (ord_leq_at a d)) q (Cons a x (Cons a h t)))
+                (count a (eq_from_ord a (ord_leq_at a d)) q (Cons a h (Cons a x t)))
+                (count a (eq_from_ord a (ord_leq_at a d)) q (Cons a h (insert a d x t)))
                 swapped_count
                 inserted_count
           in
@@ -346,17 +354,17 @@ proof count for insert
               (λdecision _.
                 Equal
                   Nat
-                  (element_count a d q (Cons a x (Cons a h t)))
-                  (element_count
+                  (count a (eq_from_ord a (ord_leq_at a d)) q (Cons a x (Cons a h t)))
+                  (count
                     a
-                    d
+                    (eq_from_ord a (ord_leq_at a d))
                     q
                     (match decision {
                       True ↦ Cons a x (Cons a h t);
                       False ↦ Cons a h (insert a d x t)
                     })))
               branch_count
-              (sym Bool (ordered_leq a d x h) False comparison)
+              (sym Bool (ord_leq_at a d x h) False comparison)
       }
   }
 
@@ -373,9 +381,10 @@ proof permutation for sort
     Cons h t ↦
       λq.
         let
-          original_count = element_count a d q (Cons a h t);
-          tail_sorted_count = element_count a d q (Cons a h (sort a d t));
-          final_count = element_count a d q (insert a d h (sort a d t));
+          original_count = count a (eq_from_ord a (ord_leq_at a d)) q (Cons a h t);
+          tail_sorted_count =
+            count a (eq_from_ord a (ord_leq_at a d)) q (Cons a h (sort a d t));
+          final_count = count a (eq_from_ord a (ord_leq_at a d)) q (insert a d h (sort a d t));
           tail_counts_equal =
             count_cons_cong a d q h t (sort a d t) (sort::permutation a d t q);
           insertion_counts_equal = insert::count a d h (sort a d t) q
