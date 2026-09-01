@@ -1371,79 +1371,104 @@ fn synth_generated_index_evidence(
 
 /// Replace an occurrence of `target` with `u` while preserving the surrounding
 /// context exactly. Under binders both `target` and `u` are weakened, so the
-/// match is against the same outer term as seen from the deeper scope.
+/// match is against the same outer term as seen from the deeper scope. A thin
+/// wrapper over the parallel `subst_term_generalize_many`.
 fn subst_term_generalize(term: &Term, target: &Term, u: &Term) -> Term {
-    if term == target {
-        return u.clone();
+    subst_term_generalize_many(term, &[(target.clone(), u.clone())])
+}
+
+/// PARALLEL generalization: replace each `target` in `subs` with its paired `u`,
+/// simultaneously — no replacement's output is re-scanned for another target.
+/// Under binders every target and every replacement is weakened together, so
+/// each match is against the same outer term as seen from the deeper scope.
+///
+/// This is the Architect's simultaneous rebasing primitive
+/// (LANG-DEPENDENT-MATCH-MOTIVE-REBASE): when a dependent match generalizes its
+/// scrutinee, the scrutinee's OWN indices must be rebased in lockstep with it,
+/// or a goal that couples the two (`fin_to_nat nn i`, `i : FokFin nn`) keeps the
+/// outer actual index `nn` while the abstracted scrutinee has the local index —
+/// an index-family de Bruijn mismatch. Doing them one at a time is unsound here:
+/// a later substitution could re-hit an earlier replacement's output. The
+/// single-target `subst_term_generalize` is the degenerate one-pair case and is
+/// behaviourally identical to before.
+fn subst_term_generalize_many(term: &Term, subs: &[(Term, Term)]) -> Term {
+    for (target, u) in subs {
+        if term == target {
+            return u.clone();
+        }
     }
 
-    let under = |t: &Term| -> Term { weaken(t, 1) };
+    let under = |subs: &[(Term, Term)]| -> Vec<(Term, Term)> {
+        subs.iter()
+            .map(|(t, u)| (weaken(t, 1), weaken(u, 1)))
+            .collect()
+    };
     match term {
         Term::Pi(a, b) => Term::pi(
-            subst_term_generalize(a, target, u),
-            subst_term_generalize(b, &under(target), &under(u)),
+            subst_term_generalize_many(a, subs),
+            subst_term_generalize_many(b, &under(subs)),
         ),
         Term::Lam(a, t) => Term::lam(
-            subst_term_generalize(a, target, u),
-            subst_term_generalize(t, &under(target), &under(u)),
+            subst_term_generalize_many(a, subs),
+            subst_term_generalize_many(t, &under(subs)),
         ),
         Term::Sigma(a, b) => Term::sigma(
-            subst_term_generalize(a, target, u),
-            subst_term_generalize(b, &under(target), &under(u)),
+            subst_term_generalize_many(a, subs),
+            subst_term_generalize_many(b, &under(subs)),
         ),
         Term::Let { ty, val, body } => Term::Let {
-            ty: Box::new(subst_term_generalize(ty, target, u)),
-            val: Box::new(subst_term_generalize(val, target, u)),
-            body: Box::new(subst_term_generalize(body, &under(target), &under(u))),
+            ty: Box::new(subst_term_generalize_many(ty, subs)),
+            val: Box::new(subst_term_generalize_many(val, subs)),
+            body: Box::new(subst_term_generalize_many(body, &under(subs))),
         },
         Term::App(f, a) => Term::app(
-            subst_term_generalize(f, target, u),
-            subst_term_generalize(a, target, u),
+            subst_term_generalize_many(f, subs),
+            subst_term_generalize_many(a, subs),
         ),
         Term::Pair(a, b) => Term::pair(
-            subst_term_generalize(a, target, u),
-            subst_term_generalize(b, target, u),
+            subst_term_generalize_many(a, subs),
+            subst_term_generalize_many(b, subs),
         ),
-        Term::Proj1(p) => Term::proj1(subst_term_generalize(p, target, u)),
-        Term::Proj2(p) => Term::proj2(subst_term_generalize(p, target, u)),
+        Term::Proj1(p) => Term::proj1(subst_term_generalize_many(p, subs)),
+        Term::Proj2(p) => Term::proj2(subst_term_generalize_many(p, subs)),
         Term::Ascript(t, a) => Term::Ascript(
-            Box::new(subst_term_generalize(t, target, u)),
-            Box::new(subst_term_generalize(a, target, u)),
+            Box::new(subst_term_generalize_many(t, subs)),
+            Box::new(subst_term_generalize_many(a, subs)),
         ),
         Term::Eq(a, t, u2) => Term::Eq(
-            Box::new(subst_term_generalize(a, target, u)),
-            Box::new(subst_term_generalize(t, target, u)),
-            Box::new(subst_term_generalize(u2, target, u)),
+            Box::new(subst_term_generalize_many(a, subs)),
+            Box::new(subst_term_generalize_many(t, subs)),
+            Box::new(subst_term_generalize_many(u2, subs)),
         ),
         Term::Cast(a, b, e, t) => Term::Cast(
-            Box::new(subst_term_generalize(a, target, u)),
-            Box::new(subst_term_generalize(b, target, u)),
-            Box::new(subst_term_generalize(e, target, u)),
-            Box::new(subst_term_generalize(t, target, u)),
+            Box::new(subst_term_generalize_many(a, subs)),
+            Box::new(subst_term_generalize_many(b, subs)),
+            Box::new(subst_term_generalize_many(e, subs)),
+            Box::new(subst_term_generalize_many(t, subs)),
         ),
         Term::J(ml, d2, e) => Term::J(
-            Box::new(subst_term_generalize(ml, target, u)),
-            Box::new(subst_term_generalize(d2, target, u)),
-            Box::new(subst_term_generalize(e, target, u)),
+            Box::new(subst_term_generalize_many(ml, subs)),
+            Box::new(subst_term_generalize_many(d2, subs)),
+            Box::new(subst_term_generalize_many(e, subs)),
         ),
         Term::Quot(a, r) => Term::Quot(
-            Box::new(subst_term_generalize(a, target, u)),
-            Box::new(subst_term_generalize(r, target, u)),
+            Box::new(subst_term_generalize_many(a, subs)),
+            Box::new(subst_term_generalize_many(r, subs)),
         ),
-        Term::QuotClass(t) => Term::QuotClass(Box::new(subst_term_generalize(t, target, u))),
-        Term::Trunc(a) => Term::Trunc(Box::new(subst_term_generalize(a, target, u))),
-        Term::TruncProj(t) => Term::TruncProj(Box::new(subst_term_generalize(t, target, u))),
-        Term::Refl(t) => Term::Refl(Box::new(subst_term_generalize(t, target, u))),
+        Term::QuotClass(t) => Term::QuotClass(Box::new(subst_term_generalize_many(t, subs))),
+        Term::Trunc(a) => Term::Trunc(Box::new(subst_term_generalize_many(a, subs))),
+        Term::TruncProj(t) => Term::TruncProj(Box::new(subst_term_generalize_many(t, subs))),
+        Term::Refl(t) => Term::Refl(Box::new(subst_term_generalize_many(t, subs))),
         Term::QuotElim {
             motive,
             method,
             respect,
             scrut,
         } => Term::QuotElim {
-            motive: Box::new(subst_term_generalize(motive, target, u)),
-            method: Box::new(subst_term_generalize(method, target, u)),
-            respect: Box::new(subst_term_generalize(respect, target, u)),
-            scrut: Box::new(subst_term_generalize(scrut, target, u)),
+            motive: Box::new(subst_term_generalize_many(motive, subs)),
+            method: Box::new(subst_term_generalize_many(method, subs)),
+            respect: Box::new(subst_term_generalize_many(respect, subs)),
+            scrut: Box::new(subst_term_generalize_many(scrut, subs)),
         },
         Term::Elim {
             fam,
@@ -1458,22 +1483,22 @@ fn subst_term_generalize(term: &Term, target: &Term, u: &Term) -> Term {
             level_args: level_args.clone(),
             params: params
                 .iter()
-                .map(|p| subst_term_generalize(p, target, u))
+                .map(|p| subst_term_generalize_many(p, subs))
                 .collect(),
-            motive: Box::new(subst_term_generalize(motive, target, u)),
+            motive: Box::new(subst_term_generalize_many(motive, subs)),
             methods: methods
                 .iter()
-                .map(|m| subst_term_generalize(m, target, u))
+                .map(|m| subst_term_generalize_many(m, subs))
                 .collect(),
             indices: indices
                 .iter()
-                .map(|i| subst_term_generalize(i, target, u))
+                .map(|i| subst_term_generalize_many(i, subs))
                 .collect(),
-            scrut: Box::new(subst_term_generalize(scrut, target, u)),
+            scrut: Box::new(subst_term_generalize_many(scrut, subs)),
         },
         Term::Absurd(motive, proof) => Term::Absurd(
-            Box::new(subst_term_generalize(motive, target, u)),
-            Box::new(subst_term_generalize(proof, target, u)),
+            Box::new(subst_term_generalize_many(motive, subs)),
+            Box::new(subst_term_generalize_many(proof, subs)),
         ),
         Term::Type(_)
         | Term::Omega(_)
@@ -1483,6 +1508,118 @@ fn subst_term_generalize(term: &Term, target: &Term, u: &Term) -> Term {
         | Term::Constructor { .. }
         | Term::IntLit(_) => term.clone(),
     }
+}
+
+/// Whether `scrut_core` occurs as a subterm of `term`, via an exhaustive
+/// structural traversal. Under binders `scrut_core` is weakened with the
+/// traversed body. Used to
+/// GATE index rebasing: the scrutinee's own indices only need rebasing when the
+/// scrutinee is actually coupled to them in the goal (it appears there). When it
+/// does not appear — a result-type index unrelated to the scrutinee, e.g. Vec
+/// `map`/`zip_with`'s `Vec b n`, or a whole-index motive that mentions only the
+/// index — rebasing the index term would over-generalize a coincidentally-equal
+/// occurrence and corrupt the goal.
+fn scrut_occurs(term: &Term, scrut_core: &Term) -> bool {
+    if term == scrut_core {
+        return true;
+    }
+    let under = |t: &Term| -> Term { weaken(t, 1) };
+    match term {
+        Term::Pi(a, b) | Term::Sigma(a, b) => {
+            scrut_occurs(a, scrut_core) || scrut_occurs(b, &under(scrut_core))
+        }
+        Term::Lam(a, t) => scrut_occurs(a, scrut_core) || scrut_occurs(t, &under(scrut_core)),
+        Term::Let { ty, val, body } => {
+            scrut_occurs(ty, scrut_core)
+                || scrut_occurs(val, scrut_core)
+                || scrut_occurs(body, &under(scrut_core))
+        }
+        Term::App(f, a) | Term::Pair(f, a) => {
+            scrut_occurs(f, scrut_core) || scrut_occurs(a, scrut_core)
+        }
+        Term::Proj1(p) | Term::Proj2(p) | Term::QuotClass(p) | Term::Trunc(p)
+        | Term::TruncProj(p) | Term::Refl(p) => scrut_occurs(p, scrut_core),
+        Term::Ascript(t, a) | Term::Quot(t, a) | Term::Absurd(t, a) => {
+            scrut_occurs(t, scrut_core) || scrut_occurs(a, scrut_core)
+        }
+        Term::Eq(a, t, u) | Term::J(a, t, u) => {
+            scrut_occurs(a, scrut_core)
+                || scrut_occurs(t, scrut_core)
+                || scrut_occurs(u, scrut_core)
+        }
+        Term::Cast(a, b, e, t) => {
+            scrut_occurs(a, scrut_core)
+                || scrut_occurs(b, scrut_core)
+                || scrut_occurs(e, scrut_core)
+                || scrut_occurs(t, scrut_core)
+        }
+        Term::QuotElim {
+            motive,
+            method,
+            respect,
+            scrut,
+        } => {
+            scrut_occurs(motive, scrut_core)
+                || scrut_occurs(method, scrut_core)
+                || scrut_occurs(respect, scrut_core)
+                || scrut_occurs(scrut, scrut_core)
+        }
+        Term::Elim {
+            params,
+            motive,
+            methods,
+            indices,
+            scrut,
+            ..
+        } => {
+            params.iter().any(|p| scrut_occurs(p, scrut_core))
+                || scrut_occurs(motive, scrut_core)
+                || methods.iter().any(|mth| scrut_occurs(mth, scrut_core))
+                || indices.iter().any(|i| scrut_occurs(i, scrut_core))
+                || scrut_occurs(scrut, scrut_core)
+        }
+        Term::Type(_)
+        | Term::Omega(_)
+        | Term::Var(_)
+        | Term::Const { .. }
+        | Term::IndFormer { .. }
+        | Term::Constructor { .. }
+        | Term::IntLit(_) => false,
+    }
+}
+
+/// Build the parallel rebase pairs shared by all three dependent-match sites
+/// (motive construction, constructor `expected_here`, direct-recursive IH): the
+/// scrutinee paired with its LOCAL form, and — ONLY when the scrutinee is
+/// coupled to its indices in `expected` — each actual scrutinee index paired
+/// with its LOCAL index. Targets are weakened by `depth` (the binders `expected`
+/// is being lifted under at that site); the local replacements are already
+/// stated at that depth. Applying these TOGETHER via `subst_term_generalize_many`
+/// is the Architect invariant (LANG-DEPENDENT-MATCH-MOTIVE-REBASE):
+/// `P(actual_indices, outer_scrutinee)` becomes `P(local_indices,
+/// local_scrutinee)` in one parallel pass, so a goal coupling the scrutinee to
+/// its own index (`fin_to_nat nn i`) stays well-typed once the scrutinee is
+/// abstracted, while an uncoupled goal keeps its original scrutinee-only pass.
+fn dependent_rebase_subs(
+    scrut_core: &Term,
+    scrut_indices: &[Term],
+    depth: i64,
+    local_indices: &[Term],
+    local_scrut: &Term,
+    expected: &Term,
+) -> Vec<(Term, Term)> {
+    debug_assert_eq!(scrut_indices.len(), local_indices.len());
+    let mut subs: Vec<(Term, Term)> = Vec::with_capacity(scrut_indices.len() + 1);
+    if scrut_occurs(expected, scrut_core) {
+        subs.extend(
+            scrut_indices
+                .iter()
+                .zip(local_indices)
+                .map(|(actual, local)| (weaken(actual, depth), local.clone())),
+        );
+    }
+    subs.push((weaken(scrut_core, depth), local_scrut.clone()));
+    subs
 }
 
 /// Reduce transparent branch goals enough to expose constructor-local matches
@@ -2395,11 +2532,6 @@ fn wrap_dependent_method_ihs(
         let nb = branching_tel.len();
         let ih_ty = if nb == 0 {
             let field_var = Term::var(n - 1 - pos);
-            let ih_body = subst_term_generalize(
-                &weaken(expected, n as i64),
-                &weaken(scrut_core, n as i64),
-                &field_var,
-            );
             let ih_indices: Vec<Term> = idxs
                 .iter()
                 .map(|t| {
@@ -2410,6 +2542,17 @@ fn wrap_dependent_method_ihs(
                     )
                 })
                 .collect();
+            let ih_body = subst_term_generalize_many(
+                &weaken(expected, n as i64),
+                &dependent_rebase_subs(
+                    scrut_core,
+                    scrut_indices,
+                    n as i64,
+                    &ih_indices,
+                    &field_var,
+                    expected,
+                ),
+            );
             let ih_premises =
                 method_index_premises(ind, params_terms, &ih_indices, scrut_indices, n);
             wrap_premise_pis(ih_body, &ih_premises)
@@ -2607,11 +2750,23 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     // of branch-local equalities `Eq I_j i_j i0_j -> ...`; the completed elim is
     // applied to `Refl` at the actual scrutinee indices after construction.
     let motive_base_depth = n_i + 1;
-    let mut motive_user_body = subst_term_generalize(
-        &weaken(expected, motive_base_depth as i64),
-        &weaken(&scrut_core, motive_base_depth as i64),
+    // Rebase the scrutinee AND its actual indices together (Architect invariant,
+    // LANG-DEPENDENT-MATCH-MOTIVE-REBASE): the abstracted scrutinee gets the
+    // local index binders (i_j = Var(n_i - j)) alongside scrutinee = Var(0), so a
+    // goal coupling the scrutinee to its own index (`fin_to_nat nn i`) stays
+    // well-typed under the motive's binder telescope instead of keeping the outer
+    // actual index. Degenerates to the old scrutinee-only pass when n_i = 0.
+    let motive_local_indices: Vec<Term> = (0..n_i).map(|j| Term::var(n_i - j)).collect();
+    let motive_rebase = dependent_rebase_subs(
+        &scrut_core,
+        &scrut_indices,
+        motive_base_depth as i64,
+        &motive_local_indices,
         &Term::var(0),
+        expected,
     );
+    let mut motive_user_body =
+        subst_term_generalize_many(&weaken(expected, motive_base_depth as i64), &motive_rebase);
     let hidden_group_result_refinement = MAY_REFINE_GROUP_RESULT
         && ind.indices.is_empty()
         // The matched carrier must itself be an index domain of the result
@@ -2751,10 +2906,16 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             concrete = Term::app(concrete, Term::var(j));
         }
         let target_indices = ctor_target_indices(ctor, &ind, &params_terms, n);
-        let expected_here = subst_term_generalize(
+        let expected_here = subst_term_generalize_many(
             &weaken(expected, n as i64),
-            &weaken(&scrut_core, n as i64),
-            &concrete,
+            &dependent_rebase_subs(
+                &scrut_core,
+                &scrut_indices,
+                n as i64,
+                &target_indices,
+                &concrete,
+                expected,
+            ),
         );
         let mut premise_domains =
             method_index_premises(&ind, &params_terms, &target_indices, &scrut_indices, n);
