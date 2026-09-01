@@ -1,7 +1,7 @@
 ---
 id: V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY
 title: "The FoKripke checker_soundness mutual-recursion clique's real termination is not a single structural size-change thread on its declared parameters under the current size_rel abstraction -- it fails by ROTATION (the bare-Var matched-field descent arrives in one slot while the outgoing edge decreases from another) -- so full SCT admission of the real consumer needs an UPSTREAM resolution (re-elaborate the soundness recursion to one structural thread; preferred, no TCB), with a narrow size_rel completeness fix or a richer measure as operator-gated conditional arms; this is the real AC-CONSUMER home V3-FO-CHECKER-SOUNDNESS D3 waits on, distinct from the arity fix (KERNEL-SCT-TELESCOPE-CANON) and from any Cast/J or lexicographic-SCT node"
-status: active
+status: closed
 owner: language
 size: L
 gate: none
@@ -10,6 +10,30 @@ blocks: [V3-FO-CHECKER-SOUNDNESS]
 github: null
 origin: "Steward, 2026-08-22, executing the Architect's KERNEL-SCT D1 final ruling (evt_1gtmndpzh3xda) as corrected (evt_134z6mr80ymqp). The route-A arity fix (KERNEL-SCT-TELESCOPE-CANON) is correct and landing, but the D1 measurement on the exact FoKripke consumer (a84d71005 rebased onto 93d82a398) refuted the premise that arity was the whole SCT-pass gate: the real clique fails by ROTATION under the current size_rel abstraction, a measured size-change-abstraction gap the Architect routed to the language/spec enclave (owner of the proof's termination structure) with three exhaustive outcomes. This node is the real AC-CONSUMER's home and the successor V3-FO-CHECKER-SOUNDNESS.depends_on re-points onto -- NOT the helper-return documentation node and NOT a kernel node. Steward-filed per COORDINATION section 2. Estimated capability tier: T1 (open expressibility / proof-termination-structure question; if it lands on a kernel size_rel touch, that is soundness-bearing TCB work)."
 ---
+
+> # CLOSED 2026-09-01 — SUBSUMED by the landed checker path (D0 residual consumed)
+>
+> **This banner supersedes everything below.** The D0 rotation fork this node
+> was cut to rule resolved as **arm (a) UPSTREAM (no TCB)**: the FoKripke
+> `checker_soundness` recursion was restructured to a single structural thread
+> upstream, and [[V3-FO-CHECKER-SOUNDNESS]] — the target this node `blocks:` —
+> **MERGED** on that resolution. No narrow `size_rel` fix (arm (b)) and no
+> richer measure (arm (c)) was ever taken, so no TCB authorization was owed and
+> none is owed now. The `AC-CONSUMER` buildability gate this node held was
+> discharged by that landing.
+>
+> **No independent remaining deliverable in this node's stated scope**
+> (language-leader confirm `evt_4edsjagepvxk0`, 2026-09-01, on the Steward's
+> stale-active check). Closed as status hygiene, not new work.
+>
+> **The two non-blocking internal-Or follow-ups at the bottom (comment refresh +
+> the FO-checker abstract-Or reconcile soundness-design decision) are PARKED and
+> UN-FRAMED.** They did not gate NODE B and do not gate the FO route; if still
+> wanted they are a separate frame, decided with the enclave when the FO lane
+> next has room — not carried by this closed node.
+>
+> The FO/Kripke soundness completion continues at
+> [[V3-FO-EMBEDDING-ADEQUACY]] (D2a re-measure → D2b prove), the live lane-2 WP.
 
 > # AUTHORIZED as the FoKripke SCT-pass residual home -- Architect final ruling (evt_1gtmndpzh3xda) + correction (evt_134z6mr80ymqp), 2026-08-22
 >
