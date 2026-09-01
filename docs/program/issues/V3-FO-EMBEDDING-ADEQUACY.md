@@ -19,7 +19,23 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
    field equalities — keyed on the index equality's representation rather than
    the derivation relation.
 
-> # D2b UNBLOCKED 2026-09-01 — kernel predecessor MERGED; RE-RELEASED to the language ring
+> # D2b RE-RELEASED 2026-09-01 — both predecessors landed, consumer probe green
+>
+> **RELEASED to the language ring 2026-09-01.** Both D2b predecessors are now
+> merged: (1) [[LANG-RECORD-INDEX-REFINEMENT]] (kernel `eq_at_inductive` weaken,
+> PR #3216) cleared the record-index MATCH elaboration; (2)
+> [[LANG-DEPENDENT-MATCH-MOTIVE-REBASE]] (elaborator-only simultaneous rebasing of
+> motive + constructor goal + direct IH) landed as `1189aa3a74bc21ba4d6377f73ee4ccb4c7e14544`
+> on `main` `6c4fbfa8c` (PR #3224, node `merged`; both elaborator blobs
+> byte-identical to reviewed `a3ded668d`). The exact consumer probe is GREEN on the
+> merged tree: `ken-elaborator --test dependent_match_motive_rebase_acceptance`
+> = 4 passed, 0 failed. The ring now rebases/folds the held spine `70a291a96` and
+> continues the EXACT unchanged adequacy theorem from `main` `6c4fbfa8c`. The
+> constraints below still bind (do NOT re-index `FokDerivation`, add a Nat sequent
+> code, split the record into List indices, or touch
+> `fok_derives`/`fok_classically_valid`).
+>
+> # D2b UNBLOCKED 2026-09-01 — kernel predecessor MERGED (history)
 >
 > **This banner supersedes the D2a-outcome status: D2a is DONE and the statement
 > survives verbatim, but D2b hard-stopped at the derivation inversion.**
