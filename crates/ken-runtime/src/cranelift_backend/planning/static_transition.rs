@@ -886,6 +886,11 @@ pub struct StaticResponseInfeasibleObservation {
     pub base_owner: String,
     pub vis_origin: u32,
     pub producer_call_origin: Option<u32>,
+    pub operation: Option<String>,
+    pub k_closure_origin: Option<u32>,
+    pub k_body_origin: Option<u32>,
+    pub k_capture_count: Option<usize>,
+    pub continuation_input_count: Option<usize>,
     pub reason: String,
 }
 
@@ -894,6 +899,8 @@ pub struct StaticResponseInfeasibleObservation {
 pub struct StaticResponseFeasibilityDiagnostic {
     pub static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
+    pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
+    pub all_static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -927,9 +934,7 @@ pub fn with_static_response_feasibility_diagnostics<T>(
 fn record_static_response_feasibility_diagnostic(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<(), CraneliftBackendError> {
-    let (static_response_rows, static_response_infeasible) = match plan
-        .static_response_feasibility_ledger(ken_host::HostOpV1::BufferAllocate)?
-    {
+    let observe = |result: Result<Vec<StaticResponseContinuation>, SsaInfeasible>| match result {
         Ok(rows) => {
             let observations = rows
                 .iter()
@@ -967,15 +972,27 @@ fn record_static_response_feasibility_diagnostic(
                 base_owner: format!("{:?}", infeasible.base_owner()),
                 vis_origin: infeasible.vis_origin().0,
                 producer_call_origin: infeasible.producer_call_origin().map(|origin| origin.0),
+                operation: infeasible.operation().map(|operation| format!("{operation:?}")),
+                k_closure_origin: infeasible.k_closure_origin().map(|origin| origin.0),
+                k_body_origin: infeasible.k_body_origin().map(|origin| origin.0),
+                k_capture_count: infeasible.k_capture_count(),
+                continuation_input_count: infeasible.continuation_input_count(),
                 reason: infeasible.reason().to_string(),
             }),
         ),
     };
+    let (static_response_rows, static_response_infeasible) = observe(
+        plan.static_response_feasibility_ledger(ken_host::HostOpV1::BufferAllocate)?,
+    );
+    let (all_static_response_rows, all_static_response_infeasible) =
+        observe(plan.static_response_feasibility_ledger_all()?);
     STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
         if let Some(rows) = slot.borrow_mut().as_mut() {
             rows.push(StaticResponseFeasibilityDiagnostic {
                 static_response_rows,
                 static_response_infeasible,
+                all_static_response_rows,
+                all_static_response_infeasible,
             });
         }
     });

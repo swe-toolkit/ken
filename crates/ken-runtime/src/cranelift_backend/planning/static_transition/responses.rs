@@ -123,6 +123,11 @@ pub(in crate::cranelift_backend) struct SsaInfeasible {
     base_owner: ContinuationEmissionOwner,
     vis_origin: StaticOriginId,
     producer_call_origin: Option<StaticOriginId>,
+    operation: Option<HostOpV1>,
+    k_closure_origin: Option<StaticOriginId>,
+    k_body_origin: Option<StaticOriginId>,
+    k_capture_count: Option<usize>,
+    continuation_input_count: Option<usize>,
     reason: &'static str,
 }
 
@@ -137,8 +142,29 @@ impl SsaInfeasible {
             base_owner,
             vis_origin,
             producer_call_origin,
+            operation: None,
+            k_closure_origin: None,
+            k_body_origin: None,
+            k_capture_count: None,
+            continuation_input_count: None,
             reason,
         }
+    }
+
+    fn with_k(
+        mut self,
+        operation: HostOpV1,
+        k_closure_origin: StaticOriginId,
+        k_body_origin: StaticOriginId,
+        k_capture_count: usize,
+        continuation_input_count: usize,
+    ) -> Self {
+        self.operation = Some(operation);
+        self.k_closure_origin = Some(k_closure_origin);
+        self.k_body_origin = Some(k_body_origin);
+        self.k_capture_count = Some(k_capture_count);
+        self.continuation_input_count = Some(continuation_input_count);
+        self
     }
 
     pub(in crate::cranelift_backend) fn base_owner(&self) -> ContinuationEmissionOwner {
@@ -151,6 +177,26 @@ impl SsaInfeasible {
 
     pub(in crate::cranelift_backend) fn producer_call_origin(&self) -> Option<StaticOriginId> {
         self.producer_call_origin
+    }
+
+    pub(in crate::cranelift_backend) fn operation(&self) -> Option<HostOpV1> {
+        self.operation
+    }
+
+    pub(in crate::cranelift_backend) fn k_closure_origin(&self) -> Option<StaticOriginId> {
+        self.k_closure_origin
+    }
+
+    pub(in crate::cranelift_backend) fn k_body_origin(&self) -> Option<StaticOriginId> {
+        self.k_body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn k_capture_count(&self) -> Option<usize> {
+        self.k_capture_count
+    }
+
+    pub(in crate::cranelift_backend) fn continuation_input_count(&self) -> Option<usize> {
+        self.continuation_input_count
     }
 
     pub(in crate::cranelift_backend) fn reason(&self) -> &'static str {
@@ -311,9 +357,9 @@ impl StaticTransitionPlan<'_> {
     /// The outer `Result` is plan integrity. The inner `Result` is the SSA
     /// feasibility trichotomy's dynamic/ambiguous arm and carries the exact
     /// producer edge that prevents compile-time specialization.
-    pub(in crate::cranelift_backend) fn static_response_feasibility_ledger(
+    fn static_response_feasibility_ledger_filtered(
         &self,
-        operation: HostOpV1,
+        operation: Option<HostOpV1>,
     ) -> Result<Result<Vec<StaticResponseContinuation>, SsaInfeasible>, CraneliftBackendError> {
         let routes = host_response_routes(self)?;
         let mut rows = Vec::new();
@@ -331,7 +377,7 @@ impl StaticTransitionPlan<'_> {
             let Some(route) = selected_host_response_route(self, operation_origin, &routes)? else {
                 continue;
             };
-            if route.operation != operation {
+            if operation.is_some_and(|operation| route.operation != operation) {
                 continue;
             }
             let base_owner = ContinuationEmissionOwner::Specialization(unit.id());
@@ -343,6 +389,13 @@ impl StaticTransitionPlan<'_> {
                     vis_origin,
                     Some(route.producer_call_origin),
                     "the statically selected K has no generated context target",
+                )
+                .with_k(
+                    route.operation,
+                    unit.worker_closure_origin(),
+                    unit.worker_body_origin(),
+                    unit.worker_capture_count(),
+                    unit.continuation_inputs()?.len(),
                 )));
             };
             let k_identity = self
@@ -436,5 +489,18 @@ impl StaticTransitionPlan<'_> {
             row.id = StaticResponseContinuationId::from_position(position)?;
         }
         Ok(Ok(rows))
+    }
+
+    pub(in crate::cranelift_backend) fn static_response_feasibility_ledger(
+        &self,
+        operation: HostOpV1,
+    ) -> Result<Result<Vec<StaticResponseContinuation>, SsaInfeasible>, CraneliftBackendError> {
+        self.static_response_feasibility_ledger_filtered(Some(operation))
+    }
+
+    pub(in crate::cranelift_backend) fn static_response_feasibility_ledger_all(
+        &self,
+    ) -> Result<Result<Vec<StaticResponseContinuation>, SsaInfeasible>, CraneliftBackendError> {
+        self.static_response_feasibility_ledger_filtered(None)
     }
 }

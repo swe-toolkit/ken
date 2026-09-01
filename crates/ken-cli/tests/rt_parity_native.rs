@@ -1152,18 +1152,17 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
 /// product's static graph may replace these dense coordinates, but must replace
 /// the complete row while retaining its singleton classification and schema.
 ///
-/// **MEASURED:** the host-response side independently selects the exact
-/// `BufferAllocate` response application and response binder, while the
-/// continuation side supplies one opaque call identity, one K closure/body/
-/// context, every ordered K capture, and every enclosing continuation input.
-/// **CLAIMED:** each fixed unspecialized producer has exactly one statically
-/// attributable incoming caller edge and that edge has one complete explicit
-/// schema, so neither product reaches the zero or irreducibly-multiple arm.
-/// **THE GAP:** this checkpoint proves planner feasibility only. It emits no
-/// response-owner Function, retargets no caller, and makes no runtime-success
-/// claim; the later checkpoints own those properties.
+/// **MEASURED:** the `BufferAllocate` edge in each fixed product is singleton
+/// and complete, but the all-producer walk reaches an earlier `FsReadAt` K with
+/// no generated context target: read `Vis798` and write `Vis1107`.
+/// **CLAIMED:** the required context-call SSA mechanism is infeasible for both
+/// fixed products and returns the exact typed `SsaInfeasible` edge rather than
+/// selecting the later singleton or falling back to a raw worker.
+/// **THE GAP:** this checkpoint is planner evidence only. It emits no
+/// response-owner Function, retargets no caller, and does not select the held
+/// runtime-closure fallback.
 #[test]
-fn static_response_feasibility_ledger_closes_fixed_products() {
+fn static_response_feasibility_ledger_stops_on_contextless_fixed_edges() {
     in_generated_entry_stack_thread("rt-parity-static-response-feasibility", || {
         let compile = |label: &str, entry: &str| {
             let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
@@ -1193,10 +1192,20 @@ fn static_response_feasibility_ledger_closes_fixed_products() {
                 1,
                 "the unspecialized BufferAllocate producer must have one exact caller/K row"
             );
-            diagnostic.static_response_rows.into_iter().next().unwrap()
+            assert!(
+                diagnostic.all_static_response_rows.is_empty(),
+                "the fail-fast all-producer walk must not publish a feasible prefix as a closed ledger"
+            );
+            let infeasible = diagnostic
+                .all_static_response_infeasible
+                .expect("the fixed product must return its exact typed infeasible edge");
+            (
+                diagnostic.static_response_rows.into_iter().next().unwrap(),
+                infeasible,
+            )
         };
 
-        let read = compile("read", "rt_read_offset_stage");
+        let (read, read_infeasible) = compile("read", "rt_read_offset_stage");
         assert_eq!(
             read.base_owner,
             "Specialization(ContinuationSpecializationId(2))"
@@ -1256,7 +1265,34 @@ fn static_response_feasibility_ledger_closes_fixed_products() {
         assert!(read.captures[3].source.contains("source_abi_position: 0"));
         assert!(read.captures[4].source.contains("source_abi_position: 1"));
 
-        let write = compile("write", "rt_write_writable_stage");
+        assert_eq!(
+            (
+                read_infeasible.base_owner.as_str(),
+                read_infeasible.vis_origin,
+                read_infeasible.producer_call_origin,
+                read_infeasible.operation.as_deref(),
+                read_infeasible.k_closure_origin,
+                read_infeasible.k_body_origin,
+                read_infeasible.k_capture_count,
+                read_infeasible.continuation_input_count,
+            ),
+            (
+                "Specialization(ContinuationSpecializationId(0))",
+                798,
+                Some(126),
+                Some("FsReadAt"),
+                Some(776),
+                Some(766),
+                Some(9),
+                Some(7),
+            )
+        );
+        assert_eq!(
+            read_infeasible.reason,
+            "the statically selected K has no generated context target"
+        );
+
+        let (write, write_infeasible) = compile("write", "rt_write_writable_stage");
         assert_eq!(
             write.base_owner,
             "Specialization(ContinuationSpecializationId(3))"
@@ -1319,6 +1355,32 @@ fn static_response_feasibility_ledger_closes_fixed_products() {
                 "write capture {position} lost its exact entry coordinate: {capture:?}"
             );
         }
+        assert_eq!(
+            (
+                write_infeasible.base_owner.as_str(),
+                write_infeasible.vis_origin,
+                write_infeasible.producer_call_origin,
+                write_infeasible.operation.as_deref(),
+                write_infeasible.k_closure_origin,
+                write_infeasible.k_body_origin,
+                write_infeasible.k_capture_count,
+                write_infeasible.continuation_input_count,
+            ),
+            (
+                "Specialization(ContinuationSpecializationId(0))",
+                1107,
+                Some(139),
+                Some("FsReadAt"),
+                Some(1087),
+                Some(1075),
+                Some(11),
+                Some(9),
+            )
+        );
+        assert_eq!(
+            write_infeasible.reason,
+            "the statically selected K has no generated context target"
+        );
     });
 }
 
