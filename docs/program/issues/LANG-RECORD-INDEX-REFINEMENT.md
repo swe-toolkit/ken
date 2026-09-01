@@ -1,7 +1,7 @@
 ---
 id: LANG-RECORD-INDEX-REFINEMENT
-title: "D2b predecessor, RESOLVED TO A KERNEL/TCB BINDER-HYGIENE FIX: eq_at_inductive (obs.rs:228) must weaken the accumulated nested-conjunction codomain past each newly bound proof (Term::sigma(conjunct, weaken(&acc, 1))), the same de Bruijn rule eq_at_sigma already uses. The elaborator transport hypothesis is FALSIFIED by measurement and reverts. HELD for operator TCB authorization."
-status: draft
+title: "D2b predecessor, RESOLVED TO A KERNEL/TCB BINDER-HYGIENE FIX: eq_at_inductive (obs.rs:228) must weaken the accumulated nested-conjunction codomain past each newly bound proof (Term::sigma(conjunct, weaken(&acc, 1))), the same de Bruijn rule eq_at_sigma already uses. The elaborator transport hypothesis is FALSIFIED by measurement and reverts. OPERATOR-APPROVED 2026-09-01; released to the language ring as a kernel candidate under kernel QA + Architect TCB review."
+status: active
 owner: kernel
 size: S
 gate: operator
@@ -12,13 +12,15 @@ github: null
 origin: "Steward, 2026-09-01. Hard-stop chain on the D2b derivation inversion (V3-FO-EMBEDDING-ADEQUACY). Originally framed as an elaborator-only predecessor (the Architect's evt_68t4wwrs274nh transport-rewrite mechanism). That hypothesis was FALSIFIED by the language ring's four-probe measurement (evt_7fqdcjeh7dg63/evt_6t0tt37e7tes4): at base 4cbbdffb3 where the transport rewrite is absent, the single kernel eq_at_inductive weakening greens AC-1/AC-3/bare-control by itself — so the transport rewrite is causally irrelevant and reverts. The Architect confirmed the layer-(c) kernel/TCB disposition on all three points (evt_3f61wtca219hw). The id prefix LANG- is legacy from the elaborator-hypothesis phase; the work is now kernel-owned and operator-gated. Id retained for the V3-FO-EMBEDDING-ADEQUACY dependency edge and thread continuity."
 ---
 
-> # RESOLVED TO A KERNEL/TCB REPAIR — HELD FOR OPERATOR TCB AUTHORIZATION.
-> #
-> # This node does NOT merge and NOTHING is committed until the operator
-> # approves the kernel touch. The kernel test + AC fixture stay uncommitted;
-> # obs.rs is byte-restored on the held branch; D2b (V3-FO-EMBEDDING-ADEQUACY)
-> # and its evidence 70a291a96 stay held. The Steward presents the request
-> # below at the operator's 13:00 UTC return (2026-09-01).
+> # OPERATOR-APPROVED 2026-09-01 (Pat, at the 13:00 UTC return). The kernel/TCB
+> # completeness repair is authorized. The candidate is now RELEASED to the
+> # language ring (it holds the proven material and reverts its own transport
+> # rewrite); the one-line obs.rs:308 weakening + AC fixtures + no-overaccept
+> # control + mutation proof land as ONE kernel candidate under kernel QA + the
+> # Architect's required TCB review on the exact SHA. Steward routes (M1-M4),
+> # lieutenant executes (M5-M9). Only after it lands does the Steward EXPLICITLY
+> # re-release D2b (V3-FO-EMBEDDING-ADEQUACY); held evidence 70a291a96 folds onto
+> # the landed fix.
 > #
 > # Confirmed disposition: Architect evt_3f61wtca219hw. Four-probe evidence:
 > # language-implementer evt_7fqdcjeh7dg63, language-leader evt_6t0tt37e7tes4.
