@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-RUNTIME-CLOSURE
-title: "Composed-return native repair — TARGETED INVOCATION-OWNED RUNTIME CLOSURE (Architect mechanism ruling evt_3j6vshm83rk5q). ONE atomic runtime-closure repair from the clean held checkpoint ad191d1c2, REPLACING the refuted delayed-SSA route; four internal checkpoints, gated + merged ONCE at the atomic tip (Runtime QA + Architect on the exact SHA). Adds an internal InvocationClosure boundary tag + a one-shot live-closure descriptor and a response-seam apply; NO kernel primitive, NO spec commitment, NO public callable ABI — it implements normative spec 42 §6.2 (Vis e k -> apply k (H e)), 41 §2.1 (ordinary live-domain closures), 45 §3 (native function lowering)."
-status: active
+title: "HELD as FALLBACK — the operator prefers compile-time SSA handling OVER the runtime closure (2026-09-01); this runtime-closure mechanism is retained as the fallback ONLY if the compile-time SSA path proves infeasible under its condition (planner proves one fixed K per response-producing Function). NOT the selected mechanism. Composed-return native repair — TARGETED INVOCATION-OWNED RUNTIME CLOSURE (Architect mechanism ruling evt_3j6vshm83rk5q). ONE atomic runtime-closure repair from the clean held checkpoint ad191d1c2, REPLACING the refuted delayed-SSA route; four internal checkpoints, gated + merged ONCE at the atomic tip (Runtime QA + Architect on the exact SHA). Adds an internal InvocationClosure boundary tag + a one-shot live-closure descriptor and a response-seam apply; NO kernel primitive, NO spec commitment, NO public callable ABI — it implements normative spec 42 §6.2 (Vis e k -> apply k (H e)), 41 §2.1 (ordinary live-domain closures), 45 §3 (native function lowering)."
+status: draft
 owner: runtime
 size: L
 gate: runtime-qa+architect
@@ -11,6 +11,18 @@ blocks: []
 github: null
 origin: "Architect mechanism ruling evt_3j6vshm83rk5q (2026-09-01), the authoritative byte-level contract for this repair; do NOT re-derive it, fold and cite it. Issued under the operator re-scope: the (a)(i) exclusions were fleet design framing, not operator constraints (operator clarified 2026-09-01), and the operator opened the general approach (compile-time SSA vs targeted lowering of the closure into the runtime) and delegated the way-through to Architect + Research (Steward re-scope evt_452d383h945f9; Research advisory SHA-256 66c858f2e7dc51b089cba26c87725b1c80d1258ec882cd7da29c68670affafb1). The Architect selected targeted runtime lowering and confirmed it opens NO new operator fork (no kernel primitive, spec commitment, public callable ABI, equality, persistence, or cross-domain behavior), so the Steward frames and releases it — not an operator gate. Bound base = the clean held checkpoint ad191d1c29af288b059bbb00c1b573c3c4356ab3, tree 342e3b735 (carries WP1's preserved environment/result role split). Diagnostic only, not production: a9d174ccb2941e3a0d05c5cc158417e46c5077ec (tree fc37564dc), row dump SHA-256 cc09b264dedda250e126cbc3a5dde80c6cb217cea08008171e09ea481121a3fc. This node REPLACES the refuted delayed-SSA route: RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE (WP2, mechanism refuted at HS#5 evt_67hab6csq6mc7) and RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT (WP3, old closeout) are superseded and closed as diagnostic evidence; initial-development replacement applies, no parallel routes. WP1 RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT is PRESERVED as the base asset in ad191d1c2 and is the depends_on predecessor. Origin funding evt_3met6tbk5wrnd after accepted terminal NO_UNIQUE_EDGE evt_mx6scjje1yjp."
 ---
+
+> # HELD as the FALLBACK mechanism — NOT selected. The operator prefers
+> # compile-time SSA handling OVER the runtime closure (2026-09-01, correcting a
+> # Steward mis-scope of the approach fork). The runtime ring is halted and held
+> # clean at ad191d1c2. The compile-time SSA path is the PRIMARY design, routed
+> # to the Architect (evt_10dfspc3ssk5) under the condition the ruling below
+> # itself names: the planner constructively proves one fixed K per
+> # response-producing Function and carries every capture as an explicit
+> # parameter. This runtime-closure node is retained intact and becomes the
+> # fallback ONLY if the Architect finds SSA genuinely infeasible under that
+> # condition — which is a finding to route back to the operator, not a silent
+> # switch. Do not build from this node until/unless it is re-selected.
 
 ## Authoritative contract
 
