@@ -19,7 +19,7 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
    field equalities — keyed on the index equality's representation rather than
    the derivation relation.
 
-> # D2b HELD 2026-09-01 behind an ELABORATOR predecessor (record-index inversion)
+> # D2b UNBLOCKED 2026-09-01 — kernel predecessor MERGED; RE-RELEASED to the language ring
 >
 > **This banner supersedes the D2a-outcome status: D2a is DONE and the statement
 > survives verbatim, but D2b hard-stopped at the derivation inversion.**
@@ -33,10 +33,15 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > (177-line strengthened ledger/inversion spine) is reusable D2b material, NOT a
 > candidate.
 >
-> **Architect ruling `evt_68t4wwrs274nh`: this is an ELABORATOR-ONLY predecessor,
-> NOT a relation re-index (b) and NOT a kernel/TCB widening (c).** No operator
-> authorization needed. The fix is [[LANG-RECORD-INDEX-REFINEMENT]] (framed and
-> landed from current main); D2b holds behind it. **Do NOT re-index
+> **UPDATE 2026-09-01: the ELABORATOR-only hypothesis (Architect
+> `evt_68t4wwrs274nh`) was FALSIFIED by four-probe measurement.** The real fix
+> was a one-line kernel/TCB binder-hygiene COMPLETENESS repair in
+> `eq_at_inductive` (`obs.rs` `weaken(&acc, 1)`), Architect-confirmed layer (c)
+> as completeness-not-soundness (`evt_3f61wtca219hw`), operator-APPROVED, and now
+> MERGED via [[LANG-RECORD-INDEX-REFINEMENT]] (on main at `ab28450fa` /
+> `5b7466ce2`, PR #3216). D2b is UNBLOCKED and re-released; the held evidence
+> `70a291a96` (177-line strengthened ledger/inversion spine) folds onto the
+> landed kernel fix and the ring continues the EXACT unchanged adequacy theorem. **Do NOT re-index
 > `FokDerivation`, add a Nat code for sequents, split the record into List
 > indices, or touch `fok_derives`/`fok_classically_valid`** — that would
 > compensate in the relation for an elaborator defect. The D2b theorem statement
