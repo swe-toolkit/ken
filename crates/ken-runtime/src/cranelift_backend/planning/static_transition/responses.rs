@@ -2084,6 +2084,63 @@ impl StaticTransitionPlan<'_> {
             .any(|row| row.k_identity() == identity)
     }
 
+    /// The complete Deferred residual population (recut amendment
+    /// `evt_4ar3rxzrra5v4`), for congruence proofs and control fixtures.
+    pub(in crate::cranelift_backend) fn static_response_deferred(&self) -> &[DeferredResponseRow] {
+        &self.static_response_deferred
+    }
+
+    /// The classify verdict for a response `Vis` keyed by its operation-root
+    /// origin (recut amendment `evt_4ar3rxzrra5v4`). `Specialized` when a
+    /// specialized continuation row owns the origin, `Deferred` when the residual
+    /// population does, `None` when the origin is not a response operation root.
+    /// Consumed by the lowering production site as a TOTAL match (§7): adding a
+    /// `ResponseDisposition` variant reddens the build there.
+    pub(in crate::cranelift_backend) fn response_disposition_at_operation_root(
+        &self,
+        origin: StaticOriginId,
+    ) -> Option<ResponseDisposition> {
+        if self
+            .static_response_continuations
+            .iter()
+            .any(|row| row.operation_root_origin == origin)
+        {
+            Some(ResponseDisposition::Specialized)
+        } else if self
+            .static_response_deferred
+            .iter()
+            .any(|row| row.operation_root_origin == origin)
+        {
+            Some(ResponseDisposition::Deferred)
+        } else {
+            None
+        }
+    }
+
+    /// The classify verdict for a response `Vis` keyed by its host-effect origin
+    /// (the effects production seat), same contract as
+    /// [`Self::response_disposition_at_operation_root`].
+    pub(in crate::cranelift_backend) fn response_disposition_at_effect(
+        &self,
+        effect_origin: StaticOriginId,
+    ) -> Option<ResponseDisposition> {
+        if self
+            .static_response_continuations
+            .iter()
+            .any(|row| row.effect_origin() == effect_origin)
+        {
+            Some(ResponseDisposition::Specialized)
+        } else if self
+            .static_response_deferred
+            .iter()
+            .any(|row| row.effect_origin() == effect_origin)
+        {
+            Some(ResponseDisposition::Deferred)
+        } else {
+            None
+        }
+    }
+
     /// Seal every installed response row as one forward-declared response-owner
     /// contract and validate its selected caller against the unchanged K ABI.
     pub(in crate::cranelift_backend) fn static_response_owner_specializations(

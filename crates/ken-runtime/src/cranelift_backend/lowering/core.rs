@@ -13913,14 +13913,32 @@ impl<'a> Lowering<'a> {
                 self.finish_planned_join(builder, merge, &join_plan, merge_kind, "If")
             }
             RuntimeExpr::Construct { constructor, args } => {
-                if self.function_local.static_response_owner.is_none()
-                    && self
-                        .static_transition_plan
-                        .is_static_response_operation_root(static_origin)
+                // Recut §7 total match (AC-2) over the response classify verdict.
+                // No catch-all: adding a ResponseDisposition variant reddens the
+                // build here.
+                use crate::cranelift_backend::planning::ResponseDisposition;
+                match self
+                    .static_transition_plan
+                    .response_disposition_at_operation_root(static_origin)
                 {
-                    return Ok(LoweringOperand::Specialized(
-                        Lowered::StaticResponseDeferred,
-                    ));
+                    // A Specialized response's operation root lowered OUTSIDE its
+                    // owner is compiler control: emit the placeholder, consumed
+                    // when the caller is retargeted to the owner.
+                    Some(ResponseDisposition::Specialized)
+                        if self.function_local.static_response_owner.is_none() =>
+                    {
+                        return Ok(LoweringOperand::Specialized(
+                            Lowered::StaticResponseDeferred,
+                        ));
+                    }
+                    // Deferred (R3): the residual falls through to the ordinary
+                    // Construct arm below -- main's pre-WP lowering, the exact path
+                    // that compiled and ran at 4a088d8aa, no placeholder/owner. A
+                    // Specialized root INSIDE its owner and a non-response Construct
+                    // also lower normally.
+                    Some(ResponseDisposition::Specialized)
+                    | Some(ResponseDisposition::Deferred)
+                    | None => {}
                 }
                 #[cfg(test)]
                 crate::cranelift_backend::lowering::record_d2k_owner_event(
