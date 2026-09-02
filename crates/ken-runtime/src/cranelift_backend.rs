@@ -82,8 +82,10 @@ pub(crate) use artifact::api::{
 pub use lowering::units::{
     retained_unit_call_target_mutation_is_exact,
     static_response_caller_retarget_mutation_is_exact,
+    static_response_owner_body_mutation_is_exact,
     with_retained_unit_call_target_mutation, with_static_response_caller_retarget_mutation,
-    RetainedUnitCallTargetMutation, StaticResponseCallerRetargetMutation,
+    with_static_response_owner_body_mutation, RetainedUnitCallTargetMutation,
+    StaticResponseCallerRetargetMutation, StaticResponseOwnerBodyMutation,
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::{
@@ -129,6 +131,7 @@ pub use planning::{
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses,
     with_retained_result_closure_proof_mutation,
+    static_response_context_demand_mutation_is_exact,
     with_static_response_context_demand_mutation,
     with_static_response_feasibility_diagnostics, with_worker_prefix_deferrals,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,

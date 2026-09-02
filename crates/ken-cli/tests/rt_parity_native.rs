@@ -1108,14 +1108,15 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
 ///
 /// **MEASURED:** the read product has four response rows and the write product
 /// has seven. Their earlier `FsReadAt` rows require new contexts while the later
-/// `BufferAllocate` rows reuse causal context zero.
+/// `BufferAllocate` rows reuse causal context zero; every row has one exact
+/// owner ABI and selected caller.
 /// **CLAIMED:** absence from the old-caller context population is a demand, not
 /// SSA infeasibility. Every fixed row has one explicit capture/input schema and
 /// resolves by `(ContinuationSpecializationId, worker body)` after old context
 /// identities are preserved as the union prefix.
-/// **THE GAP:** CP2 installs and forward-declares the response-owner population
-/// and retargets selected callers, but does not yet define the response seam or
-/// call the K context from an owner body. Runtime closure remains unselected.
+/// **THE GAP:** this fixture observes planning and ABI identity. Finished owner
+/// body, exact context-call/Ret closure, and runtime InvalidOffset behavior are
+/// independently pinned below. Runtime closure remains unselected.
 #[test]
 fn static_response_context_demand_ledger_closes_fixed_products() {
     in_generated_entry_stack_thread("rt-parity-static-response-demand", || {
@@ -1377,17 +1378,21 @@ fn static_response_context_demand_controls_reach_and_restore() {
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
         let compile = |label: &str| {
             let root = output_dir(&format!("static-response-demand-control-{label}"));
-            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+            let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
                 ken_cli::build_native_program(
                     &source,
                     ken_cli::SourceFormat::Ken,
-                    &format!("rt_parity_static_response_demand_control_{label}"),
+                    "rt_parity_static_response_demand_control",
                     root.path(),
                 )
-            })
+            });
+            (root, observed)
         };
-        let (baseline_result, baseline) = compile("baseline");
-        baseline_result.expect("baseline response-demand compile");
+        let (baseline_root, (baseline_result, baseline)) = compile("baseline");
+        let baseline_result = baseline_result.expect("baseline response-demand compile");
+        let baseline_hash = baseline_result.artifact.executable_hash;
+        let baseline_bytes = std::fs::read(&baseline_result.artifact.executable_path)
+            .expect("baseline response-demand executable bytes");
         assert_eq!(baseline.len(), 1);
 
         for (label, mutation, expected) in [
@@ -1417,7 +1422,7 @@ fn static_response_context_demand_controls_reach_and_restore() {
                 "disagrees with its K worker or input schema",
             ),
         ] {
-            let ((result, diagnostics), applications) =
+            let ((_mutated_root, (result, diagnostics)), applications) =
                 ken_runtime::with_static_response_context_demand_mutation(mutation, || {
                     compile(label)
                 });
@@ -1431,33 +1436,276 @@ fn static_response_context_demand_controls_reach_and_restore() {
                 diagnostics.is_empty(),
                 "a red plan must not publish a ledger"
             );
+            assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+            let (restored_root, (restored_result, restored)) =
+                compile(&format!("{label}-restored"));
+            let restored_result =
+                restored_result.expect("the exact response demand must restore");
+            assert_eq!(restored, baseline);
+            assert_eq!(restored_result.artifact.executable_hash, baseline_hash);
+            assert_eq!(
+                std::fs::read(&restored_result.artifact.executable_path)
+                    .expect("per-control restored response-demand bytes"),
+                baseline_bytes,
+                "{label}: exact byte restoration failed"
+            );
+            drop(restored_root);
         }
 
-        let ((duplicate_result, duplicate), applications) =
+        let ((duplicate_root, (duplicate_result, duplicate)), applications) =
             ken_runtime::with_static_response_context_demand_mutation(
                 Mutation::DuplicateResponseOnlyDemand,
                 || compile("duplicate"),
             );
-        duplicate_result.expect("an exact duplicate demand must reuse one context");
+        let duplicate_result =
+            duplicate_result.expect("an exact duplicate demand must reuse one context");
         assert_eq!(applications, 1);
         assert_eq!(duplicate, baseline);
-
-        let (restored_result, restored) = compile("restored");
-        restored_result.expect("response-demand controls must restore");
-        assert_eq!(restored, baseline);
+        assert_eq!(duplicate_result.artifact.executable_hash, baseline_hash);
+        assert_eq!(
+            std::fs::read(&duplicate_result.artifact.executable_path)
+                .expect("idempotent duplicate executable bytes"),
+            baseline_bytes
+        );
+        assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+        drop((duplicate_root, baseline_root));
     });
 }
 
-/// **Promise class: transition sentinel.** CP3 will define the response-owner
-/// bodies but must retain this exact selected-caller retarget and its whole-
-/// artifact entry proof.
+/// **Promise class: durable invariant.** The complete producer/K relation is
+/// affine by response-row identity, preserves distinct K keys for a shared
+/// producer, and retains every capture/input coordinate in exact order.
 ///
-/// **MEASURED:** each typed response owner is reached by at least one finished-
-/// CLIF direct call whose decoded target is that owner declaration.
-/// **CLAIMED:** a forward declaration does not discharge CP2; restoring the
-/// selected caller's old K target leaves the owner unentered and must fail.
-/// **THE GAP:** this checkpoint does not inspect or define the response-owner
-/// body. CP3 owns its host response and K-context call seam.
+/// **MEASURED:** row drop/duplicate/vary, K-key merge, three response-authority
+/// substitutions, and independent drop/permute/vary of every fixed READ and
+/// WRITE capture/input each reach the closed demand validator and red. The
+/// fixed ledgers also contain shared producers whose distinct K callers select
+/// distinct owners.
+/// **CLAIMED:** context interning cannot launder a malformed producer/K row or
+/// an incomplete explicit input run.
+/// **THE GAP:** exact duplicate context demand reuse is separately pinned by
+/// `static_response_context_demand_controls_reach_and_restore`; this test moves
+/// producer rows and each element of their typed population instead.
+#[test]
+fn static_response_full_demand_population_controls_reach_red_and_restore() {
+    use ken_runtime::StaticResponseContextDemandMutation as Mutation;
+
+    in_generated_entry_stack_thread("rt-parity-static-response-full-grid", || {
+        let compile = |entry: &str, label: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("static-response-full-grid-{entry}-{label}"));
+            let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    &format!("rt_parity_static_response_full_grid_{entry}"),
+                    root.path(),
+                )
+            });
+            (root, observed)
+        };
+        let (read_root, (read_result, read)) = compile("rt_read_offset_stage", "baseline");
+        let read_result = read_result.expect("the exact READ response population compiles");
+        let read_bytes = std::fs::read(&read_result.artifact.executable_path)
+            .expect("READ response-grid executable bytes");
+        let read_hash = read_result.artifact.executable_hash;
+        let (write_root, (write_result, write)) =
+            compile("rt_write_writable_stage", "baseline");
+        let write_result = write_result.expect("the exact WRITE response population compiles");
+        let write_bytes = std::fs::read(&write_result.artifact.executable_path)
+            .expect("WRITE response-grid executable bytes");
+        let write_hash = write_result.artifact.executable_hash;
+        assert_eq!(read.len(), 1);
+        assert_eq!(write.len(), 1);
+
+        for (diagnostic, producer, expected_members) in [
+            (&read[0], 146, 2usize),
+            (&write[0], 159, 3usize),
+        ] {
+            let rows = diagnostic
+                .all_static_response_rows
+                .iter()
+                .filter(|row| row.producer_call_origin == producer)
+                .collect::<Vec<_>>();
+            assert_eq!(rows.len(), expected_members);
+            assert_eq!(
+                rows.iter()
+                    .map(|row| (row.k_specialization, row.k_body_origin))
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                expected_members,
+                "shared producer {producer} merged distinct K keys"
+            );
+            assert_eq!(
+                rows.iter()
+                    .map(|row| &row.k_identity)
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                expected_members,
+                "shared producer {producer} merged distinct incoming callers"
+            );
+            for row in rows {
+                assert_eq!(
+                    diagnostic
+                        .static_response_owners
+                        .iter()
+                        .filter(|owner| owner.selected_caller == row.k_identity)
+                        .count(),
+                    1,
+                    "shared producer {producer} did not split this K into one owner"
+                );
+            }
+        }
+
+        for (label, mutation, expected) in [
+            (
+                "drop-row",
+                Mutation::DropProducerKRow,
+                "does not cover every derived response row",
+            ),
+            (
+                "duplicate-row",
+                Mutation::DuplicateProducerKRow,
+                "names no derived response row",
+            ),
+            (
+                "vary-row",
+                Mutation::VaryProducerKRow,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "merge-k",
+                Mutation::MergeTwoKKeys,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "response-operation",
+                Mutation::SubstituteResponseWithOperation,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "response-prior",
+                Mutation::SubstituteResponseWithPriorResponse,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "response-app-env",
+                Mutation::SubstituteResponseWithApplicationEnvironment,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "causal-prefix",
+                Mutation::VaryCausalContextPrefix,
+                "appending response context demands changed a causal context identity or schema",
+            ),
+        ] {
+            let ((_root, (result, diagnostics)), applications) =
+                ken_runtime::with_static_response_context_demand_mutation(mutation, || {
+                    compile("rt_read_offset_stage", label)
+                });
+            assert_eq!(applications, 1, "{label}: mutation did not reach");
+            let error = result.expect_err("a malformed producer/K row must red");
+            assert!(
+                format!("{error:?}").contains(expected),
+                "{label}: wrong refusal: {error:?}"
+            );
+            assert!(diagnostics.is_empty(), "{label}: red plan published rows");
+            assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+            let (restored_root, (restored, restored_rows)) =
+                compile("rt_read_offset_stage", &format!("{label}-restored"));
+            let restored = restored.expect("the exact READ demand population must restore");
+            assert_eq!(restored_rows, read, "{label}: restored rows changed");
+            assert_eq!(restored.artifact.executable_hash, read_hash);
+            assert_eq!(
+                std::fs::read(&restored.artifact.executable_path)
+                    .expect("per-control restored READ executable bytes"),
+                read_bytes,
+                "{label}: exact byte restoration failed"
+            );
+            drop(restored_root);
+        }
+
+        for (entry, population, cases) in [
+            (
+                "rt_read_offset_stage",
+                (29usize, 19usize),
+                [
+                    ("drop-capture", Mutation::DropEveryCapture, 29usize),
+                    ("permute-capture", Mutation::PermuteEveryCapture, 29usize),
+                    ("vary-capture", Mutation::VaryEveryCapture, 29usize),
+                    ("drop-input", Mutation::DropEveryContinuationInput, 19usize),
+                    ("permute-input", Mutation::PermuteEveryContinuationInput, 19usize),
+                    ("vary-input", Mutation::VaryEveryContinuationInput, 19usize),
+                ],
+            ),
+            (
+                "rt_write_writable_stage",
+                (62usize, 44usize),
+                [
+                    ("drop-capture", Mutation::DropEveryCapture, 62usize),
+                    ("permute-capture", Mutation::PermuteEveryCapture, 62usize),
+                    ("vary-capture", Mutation::VaryEveryCapture, 62usize),
+                    ("drop-input", Mutation::DropEveryContinuationInput, 44usize),
+                    ("permute-input", Mutation::PermuteEveryContinuationInput, 44usize),
+                    ("vary-input", Mutation::VaryEveryContinuationInput, 44usize),
+                ],
+            ),
+        ] {
+            assert!(population.0 > 0 && population.1 > 0);
+            for (label, mutation, expected_applications) in cases {
+                let ((_root, (result, diagnostics)), applications) =
+                    ken_runtime::with_static_response_context_demand_mutation(mutation, || {
+                        compile(entry, label)
+                    });
+                assert_eq!(
+                    applications, expected_applications,
+                    "{entry}/{label}: not every element reached independently"
+                );
+                let error = result.expect_err("a malformed explicit input run must red");
+                assert!(
+                    format!("{error:?}")
+                        .contains("disagrees with its fully validated response row"),
+                    "{entry}/{label}: wrong refusal: {error:?}"
+                );
+                assert!(diagnostics.is_empty(), "{entry}/{label}: red plan published rows");
+                assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+                let (restored_root, (restored, restored_rows)) =
+                    compile(entry, &format!("{label}-restored"));
+                let restored = restored.expect("the exact input population must restore");
+                let (baseline_rows, baseline_hash, baseline_bytes) =
+                    if entry == "rt_read_offset_stage" {
+                        (&read, read_hash, &read_bytes)
+                    } else {
+                        (&write, write_hash, &write_bytes)
+                    };
+                assert_eq!(&restored_rows, baseline_rows);
+                assert_eq!(restored.artifact.executable_hash, baseline_hash);
+                assert_eq!(
+                    &std::fs::read(&restored.artifact.executable_path)
+                        .expect("per-control restored input-grid executable bytes"),
+                    baseline_bytes,
+                    "{entry}/{label}: exact byte restoration failed"
+                );
+                drop(restored_root);
+            }
+        }
+
+        assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+        drop((write_root, read_root));
+    });
+}
+
+/// **Promise class: durable invariant.** Every specialized response owner has
+/// exactly one planner-selected incoming identity and at least one decoded
+/// finished-CLIF caller targeting that owner.
+///
+/// **MEASURED:** removing the incoming edge, restoring its unspecialized K
+/// target, or retargeting it to a different response owner each reaches and
+/// leaves the exact owner unentered.
+/// **CLAIMED:** neither declaration nor another owner's call can discharge the
+/// selected incoming-caller relation.
+/// **THE GAP:** the controls mutate the real resolution population and the
+/// unchanged whole-artifact coverage ledger supplies the refusal.
 #[test]
 fn static_response_selected_caller_retarget_reaches_and_restores() {
     use ken_runtime::StaticResponseCallerRetargetMutation as Mutation;
@@ -1467,42 +1715,274 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
             RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
         let compile = |label: &str| {
             let root = output_dir(&format!("static-response-retarget-{label}"));
-            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+            let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
                 ken_cli::build_native_program(
                     &source,
                     ken_cli::SourceFormat::Ken,
-                    &format!("rt_parity_static_response_retarget_{label}"),
+                    "rt_parity_static_response_retarget",
                     root.path(),
                 )
-            })
+            });
+            (root, observed)
         };
 
-        let (baseline_result, baseline) = compile("baseline");
-        baseline_result.expect("the exact response-owner retarget must compile");
+        let (baseline_root, (baseline_result, baseline)) = compile("baseline");
+        let baseline_result =
+            baseline_result.expect("the exact response-owner retarget must compile");
+        let baseline_hash = baseline_result.artifact.executable_hash;
+        let baseline_bytes = std::fs::read(&baseline_result.artifact.executable_path)
+            .expect("baseline response-retarget executable bytes");
         assert_eq!(baseline.len(), 1);
         assert!(!baseline[0].static_response_owners.is_empty());
 
-        let ((mutated_result, mutated_diagnostic), applications) =
-            ken_runtime::with_static_response_caller_retarget_mutation(
+        for (label, mutation, expected) in [
+            (
+                "restore-k",
                 Mutation::RestoreSelectedKTarget,
-                || compile("restore-k"),
+                "a forward-declared response owner has no verified selected incoming call",
+            ),
+            (
+                "remove",
+                Mutation::RemoveSelectedCaller,
+                "removed one selected incoming caller",
+            ),
+            (
+                "retarget-owner",
+                Mutation::RetargetToDifferentResponseOwner,
+                "a forward-declared response owner has no verified selected incoming call",
+            ),
+        ] {
+            let ((_mutated_root, (mutated_result, mutated_diagnostic)), applications) =
+                ken_runtime::with_static_response_caller_retarget_mutation(mutation, || {
+                    compile(label)
+                });
+            assert!(applications > 0, "{label}: caller mutation did not reach");
+            let error = mutated_result.expect_err("a caller mutation must leave an owner unentered");
+            assert!(
+                format!("{error:?}").contains(expected),
+                "{label}: caller mutation failed for a different reason: {error:?}"
             );
-        assert!(applications > 0, "the retarget mutation did not reach");
-        let error = mutated_result.expect_err("restoring K must leave an owner unentered");
-        assert!(
-            format!("{error:?}")
-                .contains("a forward-declared response owner has no verified selected incoming call"),
-            "the retarget mutation failed for a different reason: {error:?}"
-        );
-        assert_eq!(
-            mutated_diagnostic, baseline,
-            "caller retargeting must not alter the typed planner ledger"
-        );
-        assert!(ken_runtime::static_response_caller_retarget_mutation_is_exact());
+            assert_eq!(
+                mutated_diagnostic, baseline,
+                "{label}: caller mutation altered the typed planner ledger"
+            );
+            assert!(ken_runtime::static_response_caller_retarget_mutation_is_exact());
+            let (restored_root, (restored_result, restored)) =
+                compile(&format!("{label}-restored"));
+            let restored_result =
+                restored_result.expect("the response-owner retarget must restore");
+            assert_eq!(restored, baseline);
+            assert_eq!(restored_result.artifact.executable_hash, baseline_hash);
+            assert_eq!(
+                std::fs::read(&restored_result.artifact.executable_path)
+                    .expect("per-control restored response-retarget bytes"),
+                baseline_bytes,
+                "{label}: exact byte restoration failed"
+            );
+            drop(restored_root);
+        }
+        drop(baseline_root);
+    });
+}
 
-        let (restored_result, restored) = compile("restored");
-        restored_result.expect("the response-owner retarget must restore");
-        assert_eq!(restored, baseline);
+/// **Promise class: durable invariant.** A specialized response-owner body
+/// emits exactly one finished-CLIF call to its exact K context, after host
+/// validation and before exact Ret collapse, with status and Trap checked before
+/// Result. Only that K-call Result reaches the owner Result slot.
+///
+/// **MEASURED:** context-zero/raw-worker substitution, three wrong response
+/// authorities, raw HostResult escape, K-call omission/duplication/reordering,
+/// Trap bypass, and Ret variation each alter one real emitted owner and red in
+/// the unchanged finished-function verifier. Exact rebuilds restore diagnostics,
+/// hashes, and executable bytes for both fixed products.
+/// **CLAIMED:** declaration shape cannot stand in for the emitted owner/context/
+/// call/Ret relation, and no response/control/environment value can escape in
+/// place of the Trap-checked K result.
+/// **THE GAP:** the verifier decodes direct callees and reads instruction/value
+/// order from finalized CLIF; response provenance itself remains the typed
+/// owner-local construction that the three substitution controls vary.
+#[test]
+fn static_response_owner_body_controls_reach_red_and_restore() {
+    use ken_runtime::StaticResponseOwnerBodyMutation as Mutation;
+
+    in_generated_entry_stack_thread("rt-parity-static-response-owner-grid", || {
+        let compile = |entry: &str, label: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("static-response-owner-grid-{entry}-{label}"));
+            let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    &format!("rt_parity_static_response_owner_grid_{entry}"),
+                    root.path(),
+                )
+            });
+            (root, observed)
+        };
+        let (read_root, (read_result, read_rows)) =
+            compile("rt_read_offset_stage", "baseline");
+        let read_result = read_result.expect("the exact READ response owners compile");
+        let read_bytes = std::fs::read(&read_result.artifact.executable_path)
+            .expect("READ response-owner executable bytes");
+        let read_hashes = (
+            read_result.plan_transport_hash,
+            read_result.runtime_program.core_semantic_hash,
+            read_result.runtime_program.artifact_hash,
+            read_result.artifact.executable_hash,
+        );
+        let (write_root, (write_result, write_rows)) =
+            compile("rt_write_writable_stage", "baseline");
+        let write_result = write_result.expect("the exact WRITE response owners compile");
+        let write_bytes = std::fs::read(&write_result.artifact.executable_path)
+            .expect("WRITE response-owner executable bytes");
+        let write_hashes = (
+            write_result.plan_transport_hash,
+            write_result.runtime_program.core_semantic_hash,
+            write_result.runtime_program.artifact_hash,
+            write_result.artifact.executable_hash,
+        );
+        let app486 = write_rows[0]
+            .all_static_response_rows
+            .iter()
+            .filter(|row| row.operation == "BufferAllocate")
+            .collect::<Vec<_>>();
+        assert_eq!(app486.len(), 1);
+        assert_eq!(
+            (app486[0].k_closure_origin, app486[0].k_body_origin),
+            (1246, 1238),
+            "the application-environment control must target app486's exact K"
+        );
+
+        for (label, entry, mutation, expected) in [
+            (
+                "context-zero",
+                "rt_read_offset_stage",
+                Mutation::SubstituteContextZero,
+                "called a context or raw worker other than its exact K context",
+            ),
+            (
+                "response-operation",
+                "rt_read_offset_stage",
+                Mutation::ResponseWithOperation,
+                "substituted operation, prior-response, or application-environment authority",
+            ),
+            (
+                "response-prior",
+                "rt_read_offset_stage",
+                Mutation::ResponseWithPriorResponse,
+                "substituted operation, prior-response, or application-environment authority",
+            ),
+            (
+                "response-app486-environment",
+                "rt_write_writable_stage",
+                Mutation::ResponseWithApplicationEnvironment,
+                "substituted operation, prior-response, or application-environment authority",
+            ),
+            (
+                "raw-host-result",
+                "rt_read_offset_stage",
+                Mutation::RawHostResultEscape,
+                "raw HostResult or non-K value escape",
+            ),
+            (
+                "raw-worker",
+                "rt_read_offset_stage",
+                Mutation::CallRawWorker,
+                "called a context or raw worker other than its exact K context",
+            ),
+            (
+                "omit-k-call",
+                "rt_read_offset_stage",
+                Mutation::OmitKCall,
+                "emitted 0 K calls instead of exactly one",
+            ),
+            (
+                "duplicate-k-call",
+                "rt_read_offset_stage",
+                Mutation::DuplicateKCall,
+                "emitted 2 K calls instead of exactly one",
+            ),
+            (
+                "before-host-validation",
+                "rt_read_offset_stage",
+                Mutation::CallBeforeHostValidation,
+                "called K before host response validation completed",
+            ),
+            (
+                "after-answer-collapse",
+                "rt_read_offset_stage",
+                Mutation::CallAfterAnswerCollapse,
+                "called K after its answer was already collapsed",
+            ),
+            (
+                "trap-bypass",
+                "rt_read_offset_stage",
+                Mutation::BypassTrapBeforeResult,
+                "without the status then Trap-before-Result branches",
+            ),
+            (
+                "vary-ret",
+                "rt_read_offset_stage",
+                Mutation::VaryRet,
+                "validated a Ret identity other than its exact K Ret",
+            ),
+            (
+                "omit-owner-definition",
+                "rt_read_offset_stage",
+                Mutation::OmitOwnerDefinition,
+                "the response-owner body population is incomplete",
+            ),
+        ] {
+            let ((_root, (result, diagnostics)), applications) =
+                ken_runtime::with_static_response_owner_body_mutation(mutation, || {
+                    compile(entry, label)
+                });
+            assert_eq!(applications, 1, "{label}: owner mutation did not reach");
+            let error = result.expect_err("a malformed response-owner body must red");
+            assert!(
+                format!("{error:?}").contains(expected),
+                "{label}: wrong finished-body refusal: {error:?}"
+            );
+            let baseline = if entry == "rt_read_offset_stage" {
+                &read_rows
+            } else {
+                &write_rows
+            };
+            assert_eq!(
+                &diagnostics, baseline,
+                "{label}: body mutation changed the typed planner population"
+            );
+            assert!(ken_runtime::static_response_owner_body_mutation_is_exact());
+            let (restored_root, (restored, restored_rows)) =
+                compile(entry, &format!("{label}-restored"));
+            let restored = restored.expect("the exact response-owner body must restore");
+            let (baseline_rows, baseline_hashes, baseline_bytes) =
+                if entry == "rt_read_offset_stage" {
+                    (&read_rows, read_hashes, &read_bytes)
+                } else {
+                    (&write_rows, write_hashes, &write_bytes)
+                };
+            assert_eq!(&restored_rows, baseline_rows);
+            assert_eq!(
+                (
+                    restored.plan_transport_hash,
+                    restored.runtime_program.core_semantic_hash,
+                    restored.runtime_program.artifact_hash,
+                    restored.artifact.executable_hash,
+                ),
+                baseline_hashes,
+                "{label}: restored owner artifact hashes changed"
+            );
+            assert_eq!(
+                &std::fs::read(&restored.artifact.executable_path)
+                    .expect("per-control restored response-owner bytes"),
+                baseline_bytes,
+                "{label}: exact byte restoration failed"
+            );
+            drop(restored_root);
+        }
+
+        drop((write_root, read_root));
     });
 }
 

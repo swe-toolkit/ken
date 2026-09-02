@@ -2764,13 +2764,31 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 unit_bundle,
                 call_edges,
             )?;
-            super::units::define_static_response_owner_bodies(
-                &mut module,
-                &mut compiler,
-                helpers,
-                unit_bundle,
-                call_edges,
-            )?;
+            let expected_response_owners = compiler
+                .static_transition_plan
+                .static_response_owner_specializations()?
+                .map_err(|infeasible| {
+                    backend_module(format!(
+                        "compile-time response specialization is infeasible at {:?}: {}",
+                        infeasible.vis_origin(),
+                        infeasible.reason(),
+                    ))
+                })?
+                .len();
+            let defined_response_owners =
+                super::units::define_static_response_owner_bodies(
+                    &mut module,
+                    &mut compiler,
+                    helpers,
+                    unit_bundle,
+                    call_edges,
+                )?;
+            if defined_response_owners != expected_response_owners {
+                return Err(backend_module(format!(
+                    "the response-owner body population is incomplete: expected \
+                     {expected_response_owners}, defined {defined_response_owners}",
+                )));
+            }
             compiler.require_complete_join_plan_consumption()?;
             compiler.require_complete_dynamic_splice_edge_consumption()?;
             super::units::define_root_adapter(

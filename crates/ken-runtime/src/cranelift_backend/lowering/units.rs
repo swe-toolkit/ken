@@ -463,6 +463,29 @@ pub fn retained_unit_call_target_mutation_is_exact() -> bool {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StaticResponseCallerRetargetMutation {
     RestoreSelectedKTarget,
+    RemoveSelectedCaller,
+    RetargetToDifferentResponseOwner,
+}
+
+/// Population-side mutations at the specialized response-owner body seam.
+/// Each variant changes one emitted relation while leaving the typed plan
+/// intact, so the finished-function verifier must reject it.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StaticResponseOwnerBodyMutation {
+    SubstituteContextZero,
+    ResponseWithOperation,
+    ResponseWithPriorResponse,
+    ResponseWithApplicationEnvironment,
+    RawHostResultEscape,
+    CallRawWorker,
+    OmitKCall,
+    DuplicateKCall,
+    CallBeforeHostValidation,
+    CallAfterAnswerCollapse,
+    BypassTrapBeforeResult,
+    VaryRet,
+    OmitOwnerDefinition,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -471,6 +494,11 @@ thread_local! {
         std::cell::Cell<Option<StaticResponseCallerRetargetMutation>> =
             const { std::cell::Cell::new(None) };
     static STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static STATIC_RESPONSE_OWNER_BODY_MUTATION:
+        std::cell::Cell<Option<StaticResponseOwnerBodyMutation>> =
+        const { std::cell::Cell::new(None) };
+    static STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
 }
 
@@ -499,6 +527,49 @@ pub fn with_static_response_caller_retarget_mutation<T>(
 #[cfg(feature = "px8-ds-test-support")]
 pub fn static_response_caller_retarget_mutation_is_exact() -> bool {
     STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get).is_none()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_static_response_owner_body_mutation<T>(
+    mutation: StaticResponseOwnerBodyMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            STATIC_RESPONSE_OWNER_BODY_MUTATION.with(|slot| slot.set(None));
+        }
+    }
+    STATIC_RESPONSE_OWNER_BODY_MUTATION.with(|slot| {
+        assert_eq!(slot.replace(Some(mutation)), None);
+    });
+    STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let _restore = Restore;
+    let result = operation();
+    let applications =
+        STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn static_response_owner_body_mutation_is_exact() -> bool {
+    STATIC_RESPONSE_OWNER_BODY_MUTATION.with(std::cell::Cell::get).is_none()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn claim_static_response_owner_body_mutation(
+    predicate: impl FnOnce(StaticResponseOwnerBodyMutation) -> bool,
+) -> Option<StaticResponseOwnerBodyMutation> {
+    STATIC_RESPONSE_OWNER_BODY_MUTATION.with(|slot| {
+        let mutation = slot.get()?;
+        let already_applied = STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS
+            .with(|count| count.get() != 0);
+        if already_applied || !predicate(mutation) {
+            return None;
+        }
+        STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(|count| count.set(1));
+        Some(mutation)
+    })
 }
 
 #[derive(Clone)]
@@ -1511,17 +1582,53 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
 ) -> Result<FuncId, CraneliftBackendError> {
     if let Some(response) = selected_response_owner_target(plan, bundle, identity)? {
         #[cfg(feature = "px8-ds-test-support")]
-        if STATIC_RESPONSE_CALLER_RETARGET_MUTATION
+        if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION
             .with(std::cell::Cell::get)
-            == Some(StaticResponseCallerRetargetMutation::RestoreSelectedKTarget)
         {
             STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS
                 .with(|count| count.set(count.get() + 1));
-            return bundle.continuation(identity.target()).ok_or_else(|| {
-                backend_module(
-                    "the response-caller mutation found no original K declaration".to_string(),
-                )
-            });
+            return match mutation {
+                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget => bundle
+                    .continuation(identity.target())
+                    .ok_or_else(|| {
+                        backend_module(
+                            "the response-caller mutation found no original K declaration"
+                                .to_string(),
+                        )
+                    }),
+                StaticResponseCallerRetargetMutation::RemoveSelectedCaller => Err(
+                    backend_module(
+                        "the response-caller mutation removed one selected incoming caller"
+                            .to_string(),
+                    ),
+                ),
+                StaticResponseCallerRetargetMutation::RetargetToDifferentResponseOwner => {
+                    let owners = plan
+                        .static_response_owner_specializations()?
+                        .map_err(|infeasible| {
+                            backend_module(format!(
+                                "compile-time response specialization is infeasible at {:?}: {}",
+                                infeasible.vis_origin(),
+                                infeasible.reason(),
+                            ))
+                        })?;
+                    let substitute = owners
+                        .iter()
+                        .find(|owner| owner.selected_caller() != identity)
+                        .ok_or_else(|| {
+                            backend_module(
+                                "the response-caller retarget control found no different owner"
+                                    .to_string(),
+                            )
+                        })?;
+                    bundle.response(substitute.id()).ok_or_else(|| {
+                        backend_module(
+                            "the response-caller retarget control found no declared substitute"
+                                .to_string(),
+                        )
+                    })
+                }
+            };
         }
         return Ok(response);
     }
@@ -2472,6 +2579,141 @@ pub(super) fn lower_continuation_selected_case_body(
     Ok(lowered)
 }
 
+struct StaticResponseFinishedBody {
+    context_calls: Vec<cranelift_codegen::ir::Inst>,
+    host_validation_end: cranelift_codegen::ir::Inst,
+    ret_validation_end: cranelift_codegen::ir::Inst,
+    result_store: cranelift_codegen::ir::Inst,
+    returned_word: cranelift_codegen::ir::Value,
+    response_is_current_host_result: bool,
+    ret_abi_word: u64,
+}
+
+/// Validate the response-owner relation from the finished Function rather than
+/// from the declarations handed to its builder. The exact call target, call
+/// cardinality, validation order, Trap-before-Result branch count, and the SSA
+/// value stored to Result are all read back from finalized CLIF.
+fn verify_static_response_finished_body(
+    func: &Function,
+    expected_context: FuncId,
+    expected_ret_abi_word: u64,
+    facts: &StaticResponseFinishedBody,
+) -> Result<(), CraneliftBackendError> {
+    let positions = func
+        .layout
+        .blocks()
+        .flat_map(|block| func.layout.block_insts(block))
+        .enumerate()
+        .map(|(position, inst)| (inst, position))
+        .collect::<BTreeMap<_, _>>();
+    let position = |inst| {
+        positions.get(&inst).copied().ok_or_else(|| {
+            backend_module(
+                "a response-owner finished-body witness names no finished CLIF instruction"
+                    .to_string(),
+            )
+        })
+    };
+    if facts.context_calls.len() != 1 {
+        return Err(backend_module(format!(
+            "a response owner emitted {} K calls instead of exactly one",
+            facts.context_calls.len(),
+        )));
+    }
+    let call = facts.context_calls[0];
+    if Lowering::decode_direct_callee(func, call)? != expected_context {
+        return Err(backend_module(
+            "a response owner called a context or raw worker other than its exact K context"
+                .to_string(),
+        ));
+    }
+    let finished_exact_calls = func
+        .layout
+        .blocks()
+        .flat_map(|block| func.layout.block_insts(block))
+        .filter(|inst| {
+            matches!(
+                func.dfg.insts[*inst],
+                cranelift_codegen::ir::InstructionData::Call { .. }
+            ) && Lowering::decode_direct_callee(func, *inst).ok() == Some(expected_context)
+        })
+        .count();
+    if finished_exact_calls != 1 {
+        return Err(backend_module(format!(
+            "finished CLIF contains {finished_exact_calls} exact K-context calls instead of one",
+        )));
+    }
+    let call_position = position(call)?;
+    if call_position <= position(facts.host_validation_end)? {
+        return Err(backend_module(
+            "a response owner called K before host response validation completed".to_string(),
+        ));
+    }
+    let result_store_position = position(facts.result_store)?;
+    if call_position >= result_store_position {
+        return Err(backend_module(
+            "a response owner called K after its answer was already collapsed".to_string(),
+        ));
+    }
+    if result_store_position <= position(facts.ret_validation_end)? {
+        return Err(backend_module(
+            "a response owner collapsed its answer before exact Ret validation completed"
+                .to_string(),
+        ));
+    }
+    let stored = func
+        .dfg
+        .inst_args(facts.result_store)
+        .first()
+        .copied()
+        .ok_or_else(|| {
+            backend_module("a response-owner Result store has no value operand".to_string())
+        })?;
+    if stored != facts.returned_word {
+        return Err(backend_module(
+            "a response owner let a raw HostResult or non-K value escape to Result".to_string(),
+        ));
+    }
+    if !facts.response_is_current_host_result {
+        return Err(backend_module(
+            "a response owner substituted operation, prior-response, or application-environment authority for the current HostResult"
+                .to_string(),
+        ));
+    }
+    if facts.ret_abi_word != expected_ret_abi_word {
+        return Err(backend_module(
+            "a response owner validated a Ret identity other than its exact K Ret".to_string(),
+        ));
+    }
+    let returned_inst = match func.dfg.value_def(facts.returned_word) {
+        cranelift_codegen::ir::ValueDef::Result(inst, _) => inst,
+        _ => {
+            return Err(backend_module(
+                "a response K Result is not defined by one finished CLIF instruction".to_string(),
+            ));
+        }
+    };
+    let returned_position = position(returned_inst)?;
+    let trap_branches = func
+        .layout
+        .blocks()
+        .flat_map(|block| func.layout.block_insts(block))
+        .filter(|inst| {
+            let p = positions[inst];
+            p > call_position
+                && p < returned_position
+                && func.dfg.insts[*inst].opcode() == cranelift_codegen::ir::Opcode::Brif
+        })
+        .count();
+    if trap_branches < 2 {
+        return Err(backend_module(
+            "a response K call read Result without the status then Trap-before-Result branches"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Define the specialized owner at the host-response seam, then call its exact
 /// K execution context with the validated response as operand zero.
 ///
@@ -2640,7 +2882,89 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         function_local.worker_calls = worker_targets.declare_in_func(module, &mut func);
         function_local.raw_worker_calls = function_local.worker_calls.clone();
         function_local.worker_templates = worker_targets.templates().clone();
-        let exact_context = declare_response_context_call_in_func(
+        let expected_context_target = bundle
+            .context(emission.owner.k_context())
+            .ok_or_else(|| {
+                backend_module("a response owner's exact K context was never declared".to_string())
+            })?;
+        #[cfg(feature = "px8-ds-test-support")]
+        let body_mutation = claim_static_response_owner_body_mutation(
+            |mutation| match mutation {
+                StaticResponseOwnerBodyMutation::SubstituteContextZero => compiler
+                    .static_transition_plan
+                    .continuation_contexts()
+                    .is_ok_and(|contexts| {
+                        contexts.first().is_some_and(|context| {
+                            context.id() != emission.owner.k_context()
+                        })
+                    }),
+                StaticResponseOwnerBodyMutation::ResponseWithPriorResponse => {
+                    emission.owner.id().ordinal() > 0
+                }
+                StaticResponseOwnerBodyMutation::ResponseWithApplicationEnvironment => {
+                    emission.row.operation() == crate::HostOpV1::BufferAllocate
+                        && emission.owner.header().parameters > 1
+                }
+                _ => true,
+            },
+        );
+        #[cfg(feature = "px8-ds-test-support")]
+        let selected_context = match body_mutation {
+            Some(StaticResponseOwnerBodyMutation::SubstituteContextZero) => {
+                let first = compiler
+                    .static_transition_plan
+                    .continuation_contexts()?
+                    .first()
+                    .map(|context| context.id())
+                    .ok_or_else(|| {
+                        backend_module(
+                            "the context-zero response mutation found no installed context"
+                                .to_string(),
+                        )
+                    })?;
+                let target = bundle.context(first).ok_or_else(|| {
+                    backend_module(
+                        "the context-zero response mutation found no declared target".to_string(),
+                    )
+                })?;
+                let mut call = declare_response_context_call_in_func(
+                    module,
+                    &mut func,
+                    &compiler.static_transition_plan,
+                    bundle,
+                    emission.owner.k_context(),
+                )?;
+                call.function = module.declare_func_in_func(target, &mut func);
+                call
+            }
+            Some(StaticResponseOwnerBodyMutation::CallRawWorker) => {
+                let target = bundle
+                    .continuation(emission.row.k_specialization())
+                    .ok_or_else(|| {
+                        backend_module(
+                            "the raw-worker response mutation found no K worker declaration"
+                                .to_string(),
+                        )
+                    })?;
+                DeclaredUnitCall {
+                    function: module.declare_func_in_func(target, &mut func),
+                    origin: emission.row.k_body_origin(),
+                    call_site_origin: emission.row.k_body_origin(),
+                    header: emission.owner.header(),
+                    slots: emission.owner.slots().to_vec(),
+                    offsets: emission.offsets.clone(),
+                }
+            }
+            _ => declare_response_context_call_in_func(
+                module,
+                &mut func,
+                &compiler.static_transition_plan,
+                bundle,
+                emission.owner.k_context(),
+            )?,
+        };
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let selected_context = declare_response_context_call_in_func(
             module,
             &mut func,
             &compiler.static_transition_plan,
@@ -2649,7 +2973,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         )?;
         function_local
             .context_calls
-            .insert(emission.owner.k_context(), exact_context.clone());
+            .insert(emission.owner.k_context(), selected_context.clone());
         let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
         let ambient = AmbientBodyAuthority::bind(
             compiler,
@@ -2657,6 +2981,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             emission.row.effect_source_owner(),
         );
         let mut func_ctx = FunctionBuilderContext::new();
+        let finished_body;
         {
             let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
             let entry = builder.create_block();
@@ -2747,6 +3072,60 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                         ))
                     })
             };
+            let mut context_suffix = Vec::with_capacity(
+                emission.row.captures().len()
+                    + emission.row.continuation_inputs().len(),
+            );
+            for capture in emission.row.captures() {
+                context_suffix.push(
+                    frame_inputs
+                        .get(&StaticResponseFrameSource::Parameter(
+                            capture.producer_abi_slot(),
+                        ))
+                        .cloned()
+                        .ok_or_else(|| {
+                            backend_module(
+                                "a response K capture names an absent owner Parameter slot"
+                                    .to_string(),
+                            )
+                        })?,
+                );
+            }
+            for (ordinal, _, _) in emission.row.continuation_inputs() {
+                context_suffix.push(
+                    frame_inputs
+                        .get(&StaticResponseFrameSource::Capture(*ordinal))
+                        .cloned()
+                        .ok_or_else(|| {
+                            backend_module(
+                                "a response continuation input names an absent owner Capture slot"
+                                    .to_string(),
+                            )
+                        })?,
+                );
+            }
+            let mut context_calls = Vec::new();
+            let mut early_returned = None;
+            #[cfg(feature = "px8-ds-test-support")]
+            if body_mutation
+                == Some(StaticResponseOwnerBodyMutation::CallBeforeHostValidation)
+            {
+                let mut inputs = Vec::with_capacity(1 + context_suffix.len());
+                inputs.push(LoweringOperand::Specialized(
+                    Lowered::StaticResponseDeferred,
+                ));
+                inputs.extend(context_suffix.iter().cloned());
+                let (returned, call) = compiler.call_declared_unit_target(
+                    &mut builder,
+                    selected_context.clone(),
+                    &inputs,
+                    #[cfg(test)]
+                    None,
+                )?;
+                context_calls.push(call);
+                early_returned = Some(returned);
+            }
+
             let mut lowered_arguments = BTreeMap::new();
             let mut effect_environment = Vec::with_capacity(
                 emission.row.effect_environment().len(),
@@ -2848,48 +3227,157 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                         .to_string(),
                 ));
             }
+            let host_validation_block = builder.current_block().ok_or_else(|| {
+                backend_module(
+                    "host response validation left no active response-owner block".to_string(),
+                )
+            })?;
+            let host_validation_end = builder
+                .func
+                .layout
+                .last_inst(host_validation_block)
+                .ok_or_else(|| {
+                    backend_module(
+                        "host response validation emitted no finished instruction".to_string(),
+                    )
+                })?;
+            #[cfg(feature = "px8-ds-test-support")]
+            let raw_host_result_escape = if body_mutation
+                == Some(StaticResponseOwnerBodyMutation::RawHostResultEscape)
+            {
+                let LoweringOperand::Specialized(value) = &response else {
+                    unreachable!("the HostResult shape was checked above")
+                };
+                Some(compiler.transfer_unit_result_into_carrier(
+                    &mut builder,
+                    emission.row.effect_origin(),
+                    value,
+                )?)
+            } else {
+                None
+            };
 
-            let mut context_inputs = Vec::with_capacity(
-                1 + emission.row.captures().len()
-                    + emission.row.continuation_inputs().len(),
-            );
-            context_inputs.push(response);
-            for capture in emission.row.captures() {
-                context_inputs.push(
-                    frame_inputs
-                        .get(&StaticResponseFrameSource::Parameter(
-                            capture.producer_abi_slot(),
-                        ))
+            let mut response_input = response;
+            let mut response_is_current_host_result = true;
+            #[cfg(feature = "px8-ds-test-support")]
+            match body_mutation {
+                Some(StaticResponseOwnerBodyMutation::ResponseWithOperation) => {
+                    response_input = LoweringOperand::Specialized(
+                        Lowered::StaticResponseDeferred,
+                    );
+                    response_is_current_host_result = false;
+                }
+                Some(StaticResponseOwnerBodyMutation::ResponseWithPriorResponse) => {
+                    response_input = frame_inputs
+                        .iter()
+                        .find(|(source, _)| {
+                            matches!(source, StaticResponseFrameSource::Capture(_))
+                        })
+                        .map(|(_, operand)| operand.clone())
+                        .ok_or_else(|| {
+                            backend_module(
+                                "the prior-response substitution found no carried prior lane"
+                                    .to_string(),
+                            )
+                        })?;
+                    response_is_current_host_result = false;
+                }
+                Some(StaticResponseOwnerBodyMutation::ResponseWithApplicationEnvironment) => {
+                    response_input = frame_inputs
+                        .get(&StaticResponseFrameSource::Parameter(1))
                         .cloned()
                         .ok_or_else(|| {
                             backend_module(
-                                "a response K capture names an absent owner Parameter slot"
+                                "the application-environment substitution found no app capture"
                                     .to_string(),
                             )
-                        })?,
-                );
+                        })?;
+                    response_is_current_host_result = false;
+                }
+                _ => {}
             }
-            for (ordinal, _, _) in emission.row.continuation_inputs() {
-                context_inputs.push(
-                    frame_inputs
-                        .get(&StaticResponseFrameSource::Capture(*ordinal))
-                        .cloned()
-                        .ok_or_else(|| {
-                            backend_module(
-                                "a response continuation input names an absent owner Capture slot"
-                                    .to_string(),
-                            )
-                        })?,
-                );
+
+            let mut context_inputs = Vec::with_capacity(1 + context_suffix.len());
+            context_inputs.push(response_input);
+            context_inputs.extend(context_suffix.iter().cloned());
+            let result_offset = i32::try_from(result_offset).map_err(|_| {
+                backend_module("response-owner result slot offset exceeds range".to_string())
+            })?;
+            let mut result_store = None;
+            #[cfg(feature = "px8-ds-test-support")]
+            if body_mutation
+                == Some(StaticResponseOwnerBodyMutation::CallAfterAnswerCollapse)
+            {
+                let collapsed = builder.ins().iconst(types::I64, 0);
+                result_store = Some(builder.ins().store(
+                    MemFlags::trusted(),
+                    collapsed,
+                    frame,
+                    result_offset,
+                ));
             }
-            let (returned, _call) = compiler.call_declared_unit_target(
-                &mut builder,
-                exact_context,
-                &context_inputs,
-                #[cfg(test)]
-                None,
-            )?;
-            let returned = match returned {
+            let returned_operand = if let Some(returned) = early_returned {
+                returned
+            } else {
+                #[cfg(feature = "px8-ds-test-support")]
+                if body_mutation == Some(StaticResponseOwnerBodyMutation::OmitKCall) {
+                    LoweringOperand::Carried(CarriedBoundaryWord {
+                        word: builder.ins().iconst(types::I64, 0),
+                    })
+                } else {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if body_mutation
+                        == Some(StaticResponseOwnerBodyMutation::BypassTrapBeforeResult)
+                    {
+                        super::calls::set_trap_caller_protocol_mutation(
+                            super::calls::TrapCallerProtocolMutation::ReadResultBeforeTrap,
+                        );
+                    }
+                    let result = compiler.call_declared_unit_target(
+                        &mut builder,
+                        selected_context.clone(),
+                        &context_inputs,
+                        #[cfg(test)]
+                        None,
+                    );
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if body_mutation
+                        == Some(StaticResponseOwnerBodyMutation::BypassTrapBeforeResult)
+                    {
+                        super::calls::set_trap_caller_protocol_mutation(
+                            super::calls::TrapCallerProtocolMutation::Exact,
+                        );
+                    }
+                    let (returned, call) = result?;
+                    context_calls.push(call);
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if body_mutation == Some(StaticResponseOwnerBodyMutation::DuplicateKCall) {
+                        let (_duplicate_result, duplicate_call) =
+                            compiler.call_declared_unit_target(
+                                &mut builder,
+                                selected_context.clone(),
+                                &context_inputs,
+                                #[cfg(test)]
+                                None,
+                            )?;
+                        context_calls.push(duplicate_call);
+                    }
+                    returned
+                }
+                #[cfg(not(feature = "px8-ds-test-support"))]
+                {
+                    let (returned, call) = compiler.call_declared_unit_target(
+                        &mut builder,
+                        selected_context.clone(),
+                        &context_inputs,
+                        #[cfg(test)]
+                        None,
+                    )?;
+                    context_calls.push(call);
+                    returned
+                }
+            };
+            let returned = match returned_operand {
                 LoweringOperand::Carried(word) => word,
                 LoweringOperand::Specialized(_) => {
                     return Err(backend_module(
@@ -2898,35 +3386,82 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     ));
                 }
             };
+            let exact_ret_abi_word = emission.row.k_ret_identity().tag_abi_word()?;
+            #[cfg(feature = "px8-ds-test-support")]
+            let ret_abi_word = if body_mutation
+                == Some(StaticResponseOwnerBodyMutation::VaryRet)
+            {
+                exact_ret_abi_word.checked_add(1).ok_or_else(|| {
+                    backend_module("the response Ret mutation exhausted the ABI word".to_string())
+                })?
+            } else {
+                exact_ret_abi_word
+            };
+            #[cfg(not(feature = "px8-ds-test-support"))]
+            let ret_abi_word = exact_ret_abi_word;
             let ret_tag = compiler.emit_carrier_tag(&mut builder, returned)?;
-            let expected_ret = i64::try_from(emission.row.k_ret_identity().tag_abi_word()?)
-                .map_err(|_| {
-                    backend_module("response Ret identity exceeds the runtime tag word".to_string())
-                })?;
+            let expected_ret = i64::try_from(ret_abi_word).map_err(|_| {
+                backend_module("response Ret identity exceeds the runtime tag word".to_string())
+            })?;
             Lowering::require_i64(&mut builder, ret_tag, expected_ret);
             let ret_fields = compiler.emit_carrier_field_count(&mut builder, returned)?;
             Lowering::require_i64(&mut builder, ret_fields, 1);
+            let ret_validation_end = builder
+                .func
+                .layout
+                .blocks()
+                .filter_map(|block| builder.func.layout.last_inst(block))
+                .last()
+                .ok_or_else(|| {
+                    backend_module("response Ret validation emitted no instruction".to_string())
+                })?;
             let application = CheckedIhApplicationResult::from_declared_call(
                 LoweringOperand::Carried(returned),
             )?;
-            let result_offset = i32::try_from(result_offset).map_err(|_| {
-                backend_module("response-owner result slot offset exceeds range".to_string())
-            })?;
-            builder.ins().store(
-                MemFlags::trusted(),
-                application.word.word,
-                frame,
-                result_offset,
-            );
+            let result_store = match result_store {
+                Some(store) => store,
+                None => {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    let result_word = raw_host_result_escape
+                        .map_or(application.word.word, |word| word.word);
+                    #[cfg(not(feature = "px8-ds-test-support"))]
+                    let result_word = application.word.word;
+                    builder.ins().store(
+                        MemFlags::trusted(),
+                        result_word,
+                        frame,
+                        result_offset,
+                    )
+                }
+            };
             let zero = builder.ins().iconst(types::I64, 0);
             builder.ins().return_(&[zero]);
             builder.seal_all_blocks();
+            finished_body = StaticResponseFinishedBody {
+                context_calls,
+                host_validation_end,
+                ret_validation_end,
+                result_store,
+                returned_word: application.word.word,
+                response_is_current_host_result,
+                ret_abi_word,
+            };
             builder.finalize();
         }
         ambient.release(compiler);
         frame_scope.close(compiler)?;
         verify_cranelift_function(&func, module.isa())?;
+        verify_static_response_finished_body(
+            &func,
+            expected_context_target,
+            emission.row.k_ret_identity().tag_abi_word()?,
+            &finished_body,
+        )?;
         compiler.commit_aggregate_events()?;
+        #[cfg(feature = "px8-ds-test-support")]
+        if body_mutation == Some(StaticResponseOwnerBodyMutation::OmitOwnerDefinition) {
+            continue;
+        }
         let mut ctx = module.make_context();
         std::mem::swap(&mut ctx.func, &mut func);
         module

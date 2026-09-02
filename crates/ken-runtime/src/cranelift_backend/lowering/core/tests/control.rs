@@ -2844,6 +2844,15 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_definitions: 0,
         },
         Census {
+            file: "planning/static_transition/responses.rs",
+            source: include_str!("../../../planning/static_transition/responses.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
+        Census {
             file: "planning/static_transition/semantic_ir.rs",
             source: include_str!("../../../planning/static_transition/semantic_ir.rs"),
             builders: 0,
@@ -2905,11 +2914,10 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             // The row moved while the emitter itself is **un-wired**
             // (`D2F_EMITTER_ARMED`): the pass is compiled and reachable but
             // installs no plane, so it defines zero functions on every current
-            // compile. That is exactly why this row cannot be read as an
-            // emitted-unit count — it counts builder SITES in this file, and
-            // `UnitBundle::len` is the number it cannot see.
-            builders: 5,
-            definitions: 5,
+            // compile. The sixth site defines the validated static response
+            // owners. This row still counts builder SITES, never emitted units.
+            builders: 6,
+            definitions: 6,
             // Three declaration sites: the emittable unit bundle,
             // `RT-CONTSPEC-ACTIVATE` `D2`'s forward declaration of one target
             // per planned continuation specialization, and `D5a`'s forward
@@ -2919,7 +2927,7 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             // the fourth, in the same up-front bundle pass and for the same
             // reason: a target called from a body defined below must exist
             // before that body is built.
-            declarations: 4,
+            declarations: 5,
             data_declarations: 0,
             data_definitions: 0,
         },
@@ -3593,6 +3601,10 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
         include_str!("../../../planning/static_transition/occurrences.rs"),
     ),
     (
+        "planning/static_transition/responses.rs",
+        include_str!("../../../planning/static_transition/responses.rs"),
+    ),
+    (
         "planning/static_transition/semantic_ir.rs",
         include_str!("../../../planning/static_transition/semantic_ir.rs"),
     ),
@@ -3749,6 +3761,7 @@ fn the_backend_production_surface_inventory_is_closed() {
             // (StaticOriginId + records + validations + read views), factored
             // into its own domain module.
             ("planning/static_transition.rs", "occurrences"),
+            ("planning/static_transition.rs", "responses"),
             ("planning/static_transition.rs", "semantic_ir"),
             // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — the Emittable* vocabulary and
             // the StaticTransitionPlan projections that derive it, factored into

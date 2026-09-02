@@ -1890,11 +1890,11 @@ mod tests {
         use std::collections::BTreeSet;
 
         let cells = BoundaryInput::all();
-        // The product is closed and finite: 21 variants x 2 magnitudes x 3
+        // The product is closed and finite: every variant x 2 magnitudes x 3
         // reachabilities x 2 producers.
         assert_eq!(
             cells.len(),
-            21 * 2 * 3 * 2,
+            LoweredVariant::ALL.len() * 2 * 3 * 2,
             "AC-10: the cell product has moved"
         );
         assert_eq!(
@@ -2149,7 +2149,7 @@ mod tests {
     /// fields. A hand-maintained matrix can drift from the production enums; this
     /// cannot, because there is no matrix to maintain.
     ///
-    /// ⚠ MEASURED: for all 252 cells, every phase the outcome's class requires is
+    /// ⚠ MEASURED: for every derived cell, each required outcome phase is
     /// bound to a named production anchor, and every phase it does not require is
     /// `StructurallyAbsent`. CLAIMED: every admitted partition has one total
     /// executable lifecycle. THE GAP: that each anchor **is** the production item it
@@ -2163,7 +2163,7 @@ mod tests {
         // Positive control FIRST: an empty sweep satisfies every `for` below.
         assert_eq!(
             cells.len(),
-            21 * 2 * 3 * 2,
+            LoweredVariant::ALL.len() * 2 * 3 * 2,
             "RECUT 2: the cell product moved, so this sweep is not over the partition"
         );
 

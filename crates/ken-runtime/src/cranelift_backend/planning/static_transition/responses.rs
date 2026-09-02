@@ -419,6 +419,20 @@ pub enum StaticResponseContextDemandMutation {
     VaryKBody,
     VaryCaptureSource,
     VaryContinuationInputSource,
+    DropProducerKRow,
+    DuplicateProducerKRow,
+    VaryProducerKRow,
+    MergeTwoKKeys,
+    SubstituteResponseWithOperation,
+    SubstituteResponseWithPriorResponse,
+    SubstituteResponseWithApplicationEnvironment,
+    DropEveryCapture,
+    PermuteEveryCapture,
+    VaryEveryCapture,
+    DropEveryContinuationInput,
+    PermuteEveryContinuationInput,
+    VaryEveryContinuationInput,
+    VaryCausalContextPrefix,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -452,6 +466,11 @@ pub fn with_static_response_context_demand_mutation<T>(
         );
     });
     (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn static_response_context_demand_mutation_is_exact() -> bool {
+    STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(|slot| slot.get().is_none())
 }
 
 impl SsaInfeasible {
@@ -1371,12 +1390,19 @@ impl StaticTransitionPlan<'_> {
                         "the response-demand mutation found no response-only context demand",
                     )
                 })?;
+                let mut applications = 1usize;
                 match mutation {
-                    StaticResponseContextDemandMutation::DeleteResponseOnlyDemand => {
+                    StaticResponseContextDemandMutation::DeleteResponseOnlyDemand
+                    | StaticResponseContextDemandMutation::DropProducerKRow => {
                         demands.remove(target);
                     }
                     StaticResponseContextDemandMutation::DuplicateResponseOnlyDemand => {
                         demands.insert(target + 1, demands[target].clone());
+                    }
+                    StaticResponseContextDemandMutation::DuplicateProducerKRow => {
+                        let mut duplicate = demands[target].clone();
+                        duplicate.id = StaticResponseContinuationId::from_position(demands.len())?;
+                        demands.insert(target + 1, duplicate);
                     }
                     StaticResponseContextDemandMutation::VaryKSpecialization => {
                         demands[target].k_specialization.0 = demands[target]
@@ -1400,6 +1426,66 @@ impl StaticTransitionPlan<'_> {
                                 )
                             })?;
                     }
+                    StaticResponseContextDemandMutation::VaryProducerKRow => {
+                        demands[target].producer_call_origin.0 = demands[target]
+                            .producer_call_origin
+                            .0
+                            .checked_add(1)
+                            .ok_or_else(|| {
+                                planner_capacity_error(
+                                    "response-demand producer mutation identity exhausted",
+                                )
+                            })?;
+                    }
+                    StaticResponseContextDemandMutation::MergeTwoKKeys => {
+                        let pair = demands
+                            .iter()
+                            .enumerate()
+                            .find_map(|(left, first)| {
+                                demands.iter().enumerate().find_map(|(right, second)| {
+                                    (left != right
+                                        && first.producer_call_origin
+                                            == second.producer_call_origin
+                                        && (first.k_specialization, first.k_body_origin)
+                                            != (second.k_specialization, second.k_body_origin))
+                                        .then_some((left, right))
+                                })
+                            })
+                            .ok_or_else(|| {
+                                planner_error(
+                                    "the two-K merge mutation found no shared producer",
+                                )
+                            })?;
+                        demands[pair.1].k_specialization = demands[pair.0].k_specialization;
+                        demands[pair.1].k_body_origin = demands[pair.0].k_body_origin;
+                    }
+                    StaticResponseContextDemandMutation::SubstituteResponseWithOperation => {
+                        demands[target].response_origin = demands[target].operation_root_origin;
+                    }
+                    StaticResponseContextDemandMutation::SubstituteResponseWithPriorResponse => {
+                        let current = demands
+                            .iter()
+                            .position(|demand| demand.id.ordinal() > 0)
+                            .ok_or_else(|| {
+                                planner_error(
+                                    "the prior-response mutation found no later response row",
+                                )
+                            })?;
+                        demands[current].response_origin =
+                            demands[current - 1].response_origin;
+                    }
+                    StaticResponseContextDemandMutation::SubstituteResponseWithApplicationEnvironment => {
+                        let environment = demands[target]
+                            .captures
+                            .first()
+                            .map(|capture| capture.origin)
+                            .ok_or_else(|| {
+                                planner_error(
+                                    "the application-environment mutation found no K capture",
+                                )
+                            })?;
+                        demands[target].response_origin = environment;
+                    }
                     StaticResponseContextDemandMutation::VaryCaptureSource => {
                         if demands[target].captures.len() < 2 {
                             return Err(planner_error(
@@ -1411,9 +1497,106 @@ impl StaticTransitionPlan<'_> {
                         demands[target].captures[1].source = first;
                     }
                     StaticResponseContextDemandMutation::VaryContinuationInputSource => {}
+                    StaticResponseContextDemandMutation::VaryCausalContextPrefix => {
+                        applications = 0;
+                    }
+                    StaticResponseContextDemandMutation::DropEveryCapture
+                    | StaticResponseContextDemandMutation::PermuteEveryCapture
+                    | StaticResponseContextDemandMutation::VaryEveryCapture => {
+                        let mut first_mutated = None;
+                        applications = 0;
+                        for (row, demand) in expected_demands.iter().enumerate() {
+                            if demand.captures.is_empty() {
+                                return Err(planner_error(
+                                    "the every-capture control reached an empty capture run",
+                                ));
+                            }
+                            for capture in 0..demand.captures.len() {
+                                let mut probe = expected_demands.clone();
+                                match mutation {
+                                    StaticResponseContextDemandMutation::DropEveryCapture => {
+                                        probe[row].captures.remove(capture);
+                                    }
+                                    StaticResponseContextDemandMutation::PermuteEveryCapture => {
+                                        let other = (capture + 1) % probe[row].captures.len();
+                                        probe[row].captures.swap(capture, other);
+                                    }
+                                    StaticResponseContextDemandMutation::VaryEveryCapture => {
+                                        let other = (capture + 1) % probe[row].captures.len();
+                                        probe[row].captures[capture].source =
+                                            probe[row].captures[other].source;
+                                    }
+                                    _ => unreachable!(),
+                                }
+                                if validate_static_response_demand_closure(
+                                    &expected_demands,
+                                    &probe,
+                                )
+                                .is_ok()
+                                {
+                                    return Err(planner_error(
+                                        "an independent capture mutation did not red its row",
+                                    ));
+                                }
+                                first_mutated.get_or_insert(probe);
+                                applications += 1;
+                            }
+                        }
+                        demands = first_mutated.ok_or_else(|| {
+                            planner_error("the every-capture control reached no capture")
+                        })?;
+                    }
+                    StaticResponseContextDemandMutation::DropEveryContinuationInput
+                    | StaticResponseContextDemandMutation::PermuteEveryContinuationInput
+                    | StaticResponseContextDemandMutation::VaryEveryContinuationInput => {
+                        let mut first_mutated = None;
+                        applications = 0;
+                        for (row, demand) in expected_demands.iter().enumerate() {
+                            if demand.continuation_inputs.is_empty() {
+                                return Err(planner_error(
+                                    "the every-input control reached an empty input run",
+                                ));
+                            }
+                            for input in 0..demand.continuation_inputs.len() {
+                                let mut probe = expected_demands.clone();
+                                match mutation {
+                                    StaticResponseContextDemandMutation::DropEveryContinuationInput => {
+                                        probe[row].continuation_inputs.remove(input);
+                                    }
+                                    StaticResponseContextDemandMutation::PermuteEveryContinuationInput => {
+                                        let other =
+                                            (input + 1) % probe[row].continuation_inputs.len();
+                                        probe[row].continuation_inputs.swap(input, other);
+                                    }
+                                    StaticResponseContextDemandMutation::VaryEveryContinuationInput => {
+                                        let other =
+                                            (input + 1) % probe[row].continuation_inputs.len();
+                                        probe[row].continuation_inputs[input].1 =
+                                            probe[row].continuation_inputs[other].1;
+                                    }
+                                    _ => unreachable!(),
+                                }
+                                if validate_static_response_demand_closure(
+                                    &expected_demands,
+                                    &probe,
+                                )
+                                .is_ok()
+                                {
+                                    return Err(planner_error(
+                                        "an independent continuation-input mutation did not red its row",
+                                    ));
+                                }
+                                first_mutated.get_or_insert(probe);
+                                applications += 1;
+                            }
+                        }
+                        demands = first_mutated.ok_or_else(|| {
+                            planner_error("the every-input control reached no input")
+                        })?;
+                    }
                 }
                 STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION_APPLICATIONS
-                    .with(|count| count.set(count.get() + 1));
+                    .with(|count| count.set(count.get() + applications));
             }
         }
         validate_static_response_demand_closure(&expected_demands, &demands)?;
@@ -1513,6 +1696,30 @@ impl StaticTransitionPlan<'_> {
                 captures: unit.key.continuation_inputs.clone(),
             });
             interned.insert(key, contexts.len() - 1);
+        }
+        #[cfg(feature = "px8-ds-test-support")]
+        if STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(std::cell::Cell::get)
+            == Some(StaticResponseContextDemandMutation::VaryCausalContextPrefix)
+            && STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION_APPLICATIONS
+                .with(std::cell::Cell::get)
+                == 0
+        {
+            let prefix = contexts.first_mut().ok_or_else(|| {
+                planner_error(
+                    "the causal-prefix mutation found no pre-existing context",
+                )
+            })?;
+            prefix.worker_body_origin.0 = prefix
+                .worker_body_origin
+                .0
+                .checked_add(1)
+                .ok_or_else(|| {
+                    planner_capacity_error(
+                        "the causal-prefix mutation exhausted the body origin",
+                    )
+                })?;
+            STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION_APPLICATIONS
+                .with(|count| count.set(1));
         }
         if contexts.get(..preexisting_count) != Some(causal_contexts) {
             return Err(planner_error(
