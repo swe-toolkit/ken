@@ -543,6 +543,40 @@ pub fn static_response_context_demand_mutation_is_exact() -> bool {
     STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(|slot| slot.get().is_none())
 }
 
+/// AC-7 mutation hook (Architect ruling `evt_37dx1wqamabg`). When set, `classify`
+/// FORCE-classifies a P2 residual (a response whose selected caller is a
+/// checked-IH environment transport source, which never retargets to a real
+/// call) as Specialized instead of Deferred -- injecting the FM1 error at the
+/// production/planning site. The forced Specialized owner is forward-declared but
+/// its transport caller is never consumed, so the EXISTING pin
+/// `validate_response_owner_call_coverage` must redden downstream. This is the
+/// mutation-provenance proof that that pin bites a CLASSIFY error (mutate at the
+/// production site, watch the guard redden), discharging AC-7 without a redundant
+/// second assertion. It is NOT a soundness change: production never sets it.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static FORCE_SPECIALIZE_DEFERRED_RESPONSE: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_force_specialize_deferred_response<T>(operation: impl FnOnce() -> T) -> T {
+    FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(|slot| {
+        assert!(
+            !slot.replace(true),
+            "force-specialize-deferred-response mutations cannot nest"
+        );
+    });
+    let result = operation();
+    FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(|slot| slot.set(false));
+    result
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn force_specialize_deferred_response_is_exact() -> bool {
+    FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(|slot| !slot.get())
+}
+
 impl SsaInfeasible {
     fn at_vis(
         base_owner: ContinuationEmissionOwner,
@@ -1384,7 +1418,17 @@ impl StaticTransitionPlan<'_> {
                 // operation root / effect fall through to main's pre-WP lowering.
                 // AC-7 pins this planning verdict against the lowering
                 // CandidateDisposition.
-                if transport_sources.contains(&k_identity) {
+                // AC-7 mutation: when the force-specialize hook is set, SKIP the
+                // Deferred classification so this transport-caller response is
+                // built as a Specialized demand instead -- injecting the FM1 error
+                // (a forward-declared owner whose caller is never consumed) that
+                // validate_response_owner_call_coverage must catch downstream.
+                #[cfg(feature = "px8-ds-test-support")]
+                let force_specialize =
+                    FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(std::cell::Cell::get);
+                #[cfg(not(feature = "px8-ds-test-support"))]
+                let force_specialize = false;
+                if !force_specialize && transport_sources.contains(&k_identity) {
                     deferred.push(DeferredResponseRow {
                         vis_origin,
                         operation_root_origin,

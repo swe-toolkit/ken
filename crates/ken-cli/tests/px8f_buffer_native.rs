@@ -694,13 +694,18 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 .map(|row| row.vis_origin)
                 .collect();
 
-            // AC-1 congruence: no response Vis is classified BOTH Specialized and
-            // Deferred (the two populations partition the response-Vis set).
-            assert!(
-                specialized_vis.is_disjoint(&deferred_vis),
-                "a response Vis was classified both Specialized and Deferred: \
-                 specialized={specialized_vis:?} deferred={deferred_vis:?}"
-            );
+            // AC-1 congruence is enforced STRUCTURALLY, not by a vis-level
+            // disjointness assertion here: classify (static_response_context_demands
+            // _filtered) puts every response Vis-with-host-route into a demand
+            // (Specialized) or a deferred row (P1/P2) or a whole-plan SsaInfeasible
+            // -- no fourth "unclassified" path -- and the §7 total match over
+            // Option<ResponseDisposition> at each production seat compiles only if
+            // every variant is handled (AC-2). The None case is verified to mean
+            // exclusively "not a static-response Vis" (Architect ruling
+            // evt_37dx1wqamabg). Vis-level disjointness is deliberately NOT
+            // asserted: a single multi-K producer may carry one Specialized K and
+            // one Deferred (transport) K, so one vis_origin legitimately appears in
+            // both sets; the partition is per-(Vis,K), not per-Vis.
 
             // AC-4 mixed: both colours coexist in this one unit -- a genuine
             // polyvariant witness. (Discriminating: a single-colour program cannot
@@ -721,4 +726,66 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
         .expect("spawn large-stack classify-mixed probe")
         .join()
         .expect("classify-mixed probe thread");
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. Recut AC-7 -- the classify-vs-lowering
+/// soundness pin, discharged by MUTATION PROVENANCE rather than a redundant new
+/// assertion (Architect ruling evt_37dx1wqamabg). `validate_response_owner_call_
+/// coverage` (units.rs) is AC-7's enforcer; this proves it BITES a classify error.
+/// Force-classifying the writeAll transport-caller (Deferred/P2) response as
+/// Specialized forward-declares an owner whose selected caller is a transport
+/// source that is never consumed -- exactly the FM1 leak (HS3-a/HS3-b) -- so the
+/// existing coverage pin must red. It restores clean (compiles) when the hook is
+/// off, confirming the mutation is scoped and the positive path is intact.
+#[test]
+fn force_specializing_a_deferred_response_reds_the_owner_call_coverage_pin() {
+    std::thread::Builder::new()
+        .name("px8f-ac7-force-specialize".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(|| {
+            // Positive control: without the mutation the deferred-frontier writeAll
+            // compiles (the Deferred residual routes to main lowering).
+            let clean_dir = tempfile::Builder::new()
+                .prefix("ken-px8f-ac7-clean-")
+                .tempdir()
+                .unwrap();
+            ken_cli::build_native_program(
+                WRITE_ALL,
+                ken_cli::SourceFormat::Ken,
+                "px8f_write_all_ac7_clean",
+                clean_dir.path(),
+            )
+            .expect("writeAll compiles when the Deferred residual is classified correctly");
+
+            // Mutation at the production/planning site: force the transport-caller
+            // Deferred response to Specialized.
+            let mut_dir = tempfile::Builder::new()
+                .prefix("ken-px8f-ac7-forced-")
+                .tempdir()
+                .unwrap();
+            let forced = ken_runtime::with_force_specialize_deferred_response(|| {
+                ken_cli::build_native_program(
+                    WRITE_ALL,
+                    ken_cli::SourceFormat::Ken,
+                    "px8f_write_all_ac7_forced",
+                    mut_dir.path(),
+                )
+            });
+            let error = forced
+                .expect_err("force-specializing a transport-caller response must not compile");
+            let rendered = format!("{error:?}");
+            assert!(
+                rendered.contains("has no verified selected incoming call"),
+                "AC-7: the forced Specialized owner's unconsumed transport caller must \
+                 red validate_response_owner_call_coverage; got:\n{rendered}"
+            );
+            assert!(
+                ken_runtime::force_specialize_deferred_response_is_exact(),
+                "the force-specialize hook did not restore after its window"
+            );
+        })
+        .expect("spawn large-stack AC-7 probe")
+        .join()
+        .expect("AC-7 probe thread");
 }
