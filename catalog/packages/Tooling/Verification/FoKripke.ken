@@ -2786,7 +2786,7 @@ theorem fok_absurd_right_intro (goal : FokForm) (shape : FokForm)
 -- impossible here -- its `delta[right]` shape (via `fok_nth_singleton_some`)
 -- would force the goal to be Imp / ForallWorld / ForallObj, contradicting the
 -- atomlike hypothesis.
-theorem fok_invert_atomlike (gamma : List FokForm) (goal : FokForm)
+fn fok_invert_atomlike (gamma : List FokForm) (goal : FokForm)
       (h_atom : Equal Bool (fok_has_right_intro goal) False)
       (d : FokDerivation (FokMkSequent gamma (Cons FokForm goal (Nil FokForm))))
     : FokInitWitness gamma goal =
