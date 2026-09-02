@@ -1607,10 +1607,18 @@ fn dependent_rebase_subs(
     local_indices: &[Term],
     local_scrut: &Term,
     expected: &Term,
+    // Force the index rebase even when the scrutinee itself does not occur in the
+    // goal. A non-empty context-telescope convoy couples the scrutinee's index to
+    // the goal THROUGH a captured binder (`Equal (Env n) xs xs`, where `xs` is
+    // convoyed): the index must then rebase to the local binder in lockstep with
+    // the convoy, or the goal's own `n` and the convoy binder's index diverge.
+    // When the convoy is empty this stays the scrutinee-occurrence gate that keeps
+    // uncoupled goals (Vec `map`/`zip_with`) on their exact original pass.
+    force: bool,
 ) -> Vec<(Term, Term)> {
     debug_assert_eq!(scrut_indices.len(), local_indices.len());
     let mut subs: Vec<(Term, Term)> = Vec::with_capacity(scrut_indices.len() + 1);
-    if scrut_occurs(expected, scrut_core) {
+    if force || scrut_occurs(expected, scrut_core) {
         subs.extend(
             scrut_indices
                 .iter()
@@ -2627,6 +2635,7 @@ fn wrap_dependent_method_ihs(
                     &ih_indices,
                     &field_var,
                     expected,
+                    context_convoy.iter().any(|e| scrut_occurs(expected, &Term::var(e.var))),
                 ),
             );
             // The direct IH is `motive` applied to the recursive field at
@@ -2854,6 +2863,11 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     // well-typed under the motive's binder telescope instead of keeping the outer
     // actual index. Degenerates to the old scrutinee-only pass when n_i = 0.
     let motive_local_indices: Vec<Term> = (0..n_i).map(|j| Term::var(n_i - j)).collect();
+    // The ambient-context convoy is computed here (before the motive rebase) so
+    // its presence can force the goal's own index rebase (see `dependent_rebase_
+    // subs`'s `force`). Its members are generalized into the motive codomain below.
+    let context_convoy =
+        compute_context_convoy(&cx.ctx, &scrut_core, &scrut_indices, &cx.match_field_regions);
     let motive_rebase = dependent_rebase_subs(
         &scrut_core,
         &scrut_indices,
@@ -2861,39 +2875,71 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         &motive_local_indices,
         &Term::var(0),
         expected,
+        context_convoy.iter().any(|e| scrut_occurs(expected, &Term::var(e.var))),
     );
     let mut motive_user_body =
         subst_term_generalize_many(&weaken(expected, motive_base_depth as i64), &motive_rebase);
     // Context-telescope convoy (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE):
     // the ordered forward-dependency closure of ambient bindings whose type the
-    // index refinement changes travels WITH the scrutinee as a motive-codomain
-    // telescope, so a captured `xs : Env n` follows the constructor's index in
-    // every method and is reconstructed at the actual indices after the Elim.
-    // This REPLACES capability 2 (the sibling-outer-binding scan) of
-    // install_index_refinements. Empty when nothing captures the index (uncoupled
-    // Vec `map`, whose scrutinee IS the env) — then the old scrutinee-only shape.
-    let context_convoy =
-        compute_context_convoy(&cx.ctx, &scrut_core, &scrut_indices, &cx.match_field_regions);
-    // Generalize the convoy into the motive codomain, innermost binding first,
-    // each wrapped OUTSIDE, so the telescope order matches the ambient order
-    // (`xs'` outer, `h' : P xs'` inner). Binder types are rebased by the same
-    // root pairs (index -> local); the goal's ambient reference becomes the
-    // binder. Only existing kernel evidence — the Elim itself validates the shape.
-    for (k, entry) in context_convoy.iter().enumerate() {
-        let cur_depth = motive_base_depth + k;
-        let mut ty_subs: Vec<(Term, Term)> = Vec::with_capacity(scrut_indices.len() + 1);
-        for (j, actual) in scrut_indices.iter().enumerate() {
-            ty_subs.push((weaken(actual, cur_depth as i64), Term::var(n_i - j + k)));
+    // index refinement changes (`context_convoy`, computed above) travels WITH the
+    // scrutinee as a motive-codomain telescope, so a captured `xs : Env n` follows
+    // the constructor's index in every method and is reconstructed at the actual
+    // indices after the Elim. This REPLACES capability 2 (the sibling-outer-binding
+    // scan) of install_index_refinements. Empty when nothing captures the index
+    // (uncoupled Vec `map`, whose scrutinee IS the env) — then the old
+    // scrutinee-only shape.
+    // Generalize the convoy into the motive codomain as one telescope, ambient
+    // order preserved (`xs'` outer, `h' : P xs'` inner). Each binder type is
+    // rebased by the root pairs (scrutinee index -> LOCAL index at the base motive
+    // frame, scrutinee -> the scrutinee binder) and threads every OTHER convoy
+    // binder through its sentinel; the goal's ambient reference becomes its
+    // binder's sentinel. `wrap_premise_pis_finalized` relocates every sentinel to
+    // its real de Bruijn position in both the goal (codomain) and each binder type
+    // (a transitive `h : Wit n xs` naming the outer `xs`), and shifts each type's
+    // free references by its telescope position. A single depth-fixed
+    // `subst_term_generalize` per binder would misplace an ambient reference that
+    // an earlier-built binder type nests at a different depth. Only the Elim
+    // itself, kernel-validated, certifies the assembled shape.
+    let convoy_count = context_convoy.len();
+    if convoy_count > 0 {
+        // Sentinel per entry, keyed by telescope slot: innermost-first entry `i`
+        // sits at slot `convoy_count - 1 - i` (goal-nearest binder = slot 0).
+        let sentinels: Vec<Term> = (0..convoy_count)
+            .map(|i| Term::var(INDEX_REFINEMENT_SENTINEL_BASE + (convoy_count - 1 - i)))
+            .collect();
+        let mut cv_types_inner_first: Vec<Term> = Vec::with_capacity(convoy_count);
+        for (i, entry) in context_convoy.iter().enumerate() {
+            let mut ty_subs: Vec<(Term, Term)> =
+                Vec::with_capacity(scrut_indices.len() + convoy_count);
+            for (j, actual) in scrut_indices.iter().enumerate() {
+                ty_subs.push((weaken(actual, motive_base_depth as i64), Term::var(n_i - j)));
+            }
+            ty_subs.push((weaken(&scrut_core, motive_base_depth as i64), Term::var(0)));
+            for (k, e2) in context_convoy.iter().enumerate() {
+                if k != i {
+                    ty_subs.push((
+                        Term::var(e2.var + motive_base_depth),
+                        sentinels[k].clone(),
+                    ));
+                }
+            }
+            cv_types_inner_first.push(subst_term_generalize_many(
+                &weaken(&entry.ambient_ty, motive_base_depth as i64),
+                &ty_subs,
+            ));
         }
-        ty_subs.push((weaken(&scrut_core, cur_depth as i64), Term::var(k)));
-        let ty_rebased =
-            subst_term_generalize_many(&weaken(&entry.ambient_ty, cur_depth as i64), &ty_subs);
-        let abstracted = subst_term_generalize(
-            &weaken(&motive_user_body, 1),
-            &Term::var(entry.var + cur_depth + 1),
-            &Term::var(0),
-        );
-        motive_user_body = Term::pi(ty_rebased, abstracted);
+        for (i, entry) in context_convoy.iter().enumerate() {
+            motive_user_body = subst_term_generalize(
+                &motive_user_body,
+                &Term::var(entry.var + motive_base_depth),
+                &sentinels[i],
+            );
+        }
+        let mut convoy_premises: Vec<Term> = Vec::with_capacity(convoy_count);
+        for i in (0..convoy_count).rev() {
+            convoy_premises.push(cv_types_inner_first[i].clone());
+        }
+        motive_user_body = wrap_premise_pis_finalized(motive_user_body, &convoy_premises);
     }
     let hidden_group_result_refinement = MAY_REFINE_GROUP_RESULT
         && ind.indices.is_empty()
@@ -3043,6 +3089,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 &target_indices,
                 &concrete,
                 expected,
+                context_convoy.iter().any(|e| scrut_occurs(expected, &Term::var(e.var))),
             ),
         );
         let mut premise_domains =
@@ -3059,47 +3106,48 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         let n_idx_premises = premise_domains.len();
         let mut convoy_refinements: Vec<(usize, Term, Term)> = Vec::new();
         {
-            // Build ctor-refined types innermost-first so an inner binder can
-            // thread outer binders it depends on, then append outermost-first.
-            let mut built: Vec<(usize, Term)> = Vec::new(); // (ambient var, its sentinel)
-            let mut ctor_types_inner_first: Vec<Term> = Vec::new();
-            for entry in context_convoy.iter() {
-                let mut ty_subs: Vec<(Term, Term)> = Vec::with_capacity(scrut_indices.len() + 1);
+            let c = context_convoy.len();
+            // Sentinel per convoy entry, keyed by telescope slot (innermost-first
+            // entry `i` lands at slot `n_idx_premises + (c-1-i)`; see
+            // `build_convoy_refined_type`).
+            let sentinels: Vec<Term> = (0..c)
+                .map(|i| Term::var(INDEX_REFINEMENT_SENTINEL_BASE + n_idx_premises + (c - 1 - i)))
+                .collect();
+            // Each convoy binding's constructor-refined type, threading the index
+            // refinement, the scrutinee core, and every OTHER convoy binder (an
+            // entry names only outer convoy binders; all-but-self is an
+            // order-independent superset that covers the transitive case).
+            let mut ctor_types_inner_first: Vec<Term> = Vec::with_capacity(c);
+            for (i, entry) in context_convoy.iter().enumerate() {
+                let mut ty_subs: Vec<(Term, Term)> =
+                    Vec::with_capacity(scrut_indices.len() + c);
                 for (j, actual) in scrut_indices.iter().enumerate() {
                     ty_subs.push((weaken(actual, n as i64), target_indices[j].clone()));
                 }
                 ty_subs.push((weaken(&scrut_core, n as i64), concrete.clone()));
-                for (av, sent) in &built {
-                    ty_subs.push((Term::var(av + n), sent.clone()));
+                for (k, e2) in context_convoy.iter().enumerate() {
+                    if k != i {
+                        ty_subs.push((Term::var(e2.var + n), sentinels[k].clone()));
+                    }
                 }
-                let ctor_ty =
-                    subst_term_generalize_many(&weaken(&entry.ambient_ty, n as i64), &ty_subs);
-                ctor_types_inner_first.push(ctor_ty.clone());
-                // This convoy binder's slot in premise_domains (appended
-                // outermost-first below): the innermost-first index `i` maps to
-                // append position `c-1-i`, so slot = n_idx_premises + (c-1-i).
-                built.push((entry.var, Term::var(0))); // placeholder sentinel, fixed below
+                ctor_types_inner_first.push(subst_term_generalize_many(
+                    &weaken(&entry.ambient_ty, n as i64),
+                    &ty_subs,
+                ));
             }
-            let c = context_convoy.len();
-            // Assign real sentinels now that `c` is known, and record refinements.
-            let mut sentinels: Vec<Term> = Vec::with_capacity(c);
+            // Redirect the goal's ambient references AND record the body redirects.
             for (i, entry) in context_convoy.iter().enumerate() {
-                let slot = n_idx_premises + (c - 1 - i);
-                let sentinel = Term::var(INDEX_REFINEMENT_SENTINEL_BASE + slot);
-                sentinels.push(sentinel.clone());
-                // Redirect this binding's body reference AND the goal to the binder.
-                let ctor_ty = ctor_types_inner_first[i].clone();
-                // Re-thread earlier-binder placeholders in ctor_ty with real sentinels.
-                let mut fix: Vec<(Term, Term)> = Vec::new();
-                for (k, e2) in context_convoy.iter().enumerate().take(i) {
-                    fix.push((Term::var(e2.var + n), sentinels[k].clone()));
-                }
-                let ctor_ty = subst_term_generalize_many(&ctor_ty, &fix);
                 let bottom_pos = cx.ctx.len() - 1 - (entry.var + n);
-                convoy_refinements.push((bottom_pos, sentinel.clone(), ctor_ty));
-                // Rewrite the goal's ambient reference to this binder's sentinel.
-                expected_here =
-                    subst_term_generalize(&expected_here, &Term::var(entry.var + n), &sentinel);
+                convoy_refinements.push((
+                    bottom_pos,
+                    sentinels[i].clone(),
+                    ctor_types_inner_first[i].clone(),
+                ));
+                expected_here = subst_term_generalize(
+                    &expected_here,
+                    &Term::var(entry.var + n),
+                    &sentinels[i],
+                );
             }
             // Append ctor-refined types outermost-first (reverse of innermost-first).
             for i in (0..c).rev() {
@@ -3251,16 +3299,18 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 // natural type uses the ctor's own index directly.
                 let attempt = check(cx, &arm.body, &expected_here_unrefined, &arm.span).and_then(
                     |body_core_checked| {
-                        let finalized = finalize_refined_body(&body_core_checked, 0, premise_count);
-                        let wrapped = wrap_premise_lams_from_full(finalized, &premise_domains);
-                        // Wrap the goal type with the SAME convention as the body
-                        // (finalize + from_full, no codomain weaken) so a convoy
-                        // binder the goal references relocates to the same index in
-                        // both. `finalize_refined_body` is a no-op modulo the
-                        // premise_count shift when the goal carries no sentinel, so
-                        // this equals `wrap_premise_pis` on the non-convoy path.
-                        let wrapped_ty = wrap_premise_pis_from_full(
-                            finalize_refined_body(&expected_here_unrefined, 0, premise_count),
+                        // Finalizing wrappers relocate index-refinement sentinels
+                        // in the codomain AND in each premise domain, so a
+                        // transitive convoy premise that names an earlier convoy
+                        // binder resolves correctly. Body and goal type use the
+                        // same wrapper, so a convoy binder the goal references
+                        // lands at the same de Bruijn index in both. Degenerates
+                        // to the plain `from_full` wrap when no sentinel is
+                        // present (the non-convoy path).
+                        let wrapped =
+                            wrap_premise_lams_finalized(body_core_checked.clone(), &premise_domains);
+                        let wrapped_ty = wrap_premise_pis_finalized(
+                            expected_here_unrefined.clone(),
                             &premise_domains,
                         );
                         let zonked_wrapped = cx.metas.zonk_term(&wrapped);
@@ -3301,8 +3351,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     cx.var_refinements.remove(&pos);
                 }
                 cx.match_field_regions.pop();
-                let finalized = finalize_refined_body(&body_core, 0, premise_count);
-                wrap_premise_lams_from_full(finalized, &premise_domains)
+                wrap_premise_lams_finalized(body_core, &premise_domains)
             }
         } else {
             let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &expected_here);
@@ -4224,6 +4273,33 @@ fn wrap_premise_pis_from_full(body: Term, premises: &[Term]) -> Term {
     term
 }
 
+/// Wrap `body` in the premise telescope, relocating index-refinement sentinels
+/// throughout via `finalize_refined_body` — in the codomain AND in each premise
+/// DOMAIN. A transitive context-telescope convoy premise's type references an
+/// EARLIER convoy binder (`h : Wit n xs` names the `xs` binder), emitted as a
+/// sentinel; a premise domain at position `i` sits under `i` binders, so
+/// `finalize_refined_body(premise[i], 0, i)` relocates its sentinels to the real
+/// binders and shifts its field references by `i` — exactly the shift
+/// `weaken(_, i)` performs for the sentinel-free premises, so this degenerates
+/// to `wrap_premise_{pis,lams}_from_full` when no premise carries a sentinel.
+fn wrap_premise_lams_finalized(body: Term, premises: &[Term]) -> Term {
+    let total = premises.len();
+    let mut term = finalize_refined_body(&body, 0, total);
+    for i in (0..total).rev() {
+        term = Term::lam(finalize_refined_body(&premises[i], 0, i), term);
+    }
+    term
+}
+
+fn wrap_premise_pis_finalized(body: Term, premises: &[Term]) -> Term {
+    let total = premises.len();
+    let mut term = finalize_refined_body(&body, 0, total);
+    for i in (0..total).rev() {
+        term = Term::pi(finalize_refined_body(&premises[i], 0, i), term);
+    }
+    term
+}
+
 /// Build the constructor-refined motive-application type
 /// `Π(index-premises). Π(context-telescope convoy). base_body[amb := binder]`,
 /// as a self-contained type at the `n`-deep field context. This is the shared
@@ -4250,30 +4326,41 @@ fn build_convoy_refined_type(
         method_index_premises(ind, params_terms, refined_indices, scrut_indices, n);
     let n_idx = premises.len();
     let c = context_convoy.len();
-    let mut body = base_body;
-    let mut sentinels: Vec<Term> = Vec::with_capacity(c);
+    // Sentinel per convoy entry, keyed by its telescope SLOT. `context_convoy` is
+    // innermost-first, and the convoy is appended outermost-first below, so the
+    // innermost-first entry `i` lands at slot `n_idx + (c-1-i)`.
+    let sentinels: Vec<Term> = (0..c)
+        .map(|i| Term::var(INDEX_REFINEMENT_SENTINEL_BASE + n_idx + (c - 1 - i)))
+        .collect();
+    // Each convoy binding's constructor-refined type: rebase the scrutinee's
+    // indices and core, and redirect EVERY OTHER convoy binder to its sentinel.
+    // A binding's type can reference only OUTER bindings, so it names only other
+    // convoy binders (never itself); threading all-but-self is a harmless
+    // superset that is order-independent (fixes the transitive `h : Wit n xs`,
+    // where `h` is innermost yet depends on the outer `xs`).
     let mut ctor_types_inner_first: Vec<Term> = Vec::with_capacity(c);
     for (i, entry) in context_convoy.iter().enumerate() {
-        let slot = n_idx + (c - 1 - i);
-        let sentinel = Term::var(INDEX_REFINEMENT_SENTINEL_BASE + slot);
-        let mut subs: Vec<(Term, Term)> = Vec::with_capacity(scrut_indices.len() + 1 + i);
+        let mut subs: Vec<(Term, Term)> = Vec::with_capacity(scrut_indices.len() + c);
         for (j, actual) in scrut_indices.iter().enumerate() {
             subs.push((weaken(actual, n as i64), refined_indices[j].clone()));
         }
         subs.push((weaken(scrut_core, n as i64), refined_core.clone()));
-        for (k, e2) in context_convoy.iter().enumerate().take(i) {
-            subs.push((Term::var(e2.var + n), sentinels[k].clone()));
+        for (k, e2) in context_convoy.iter().enumerate() {
+            if k != i {
+                subs.push((Term::var(e2.var + n), sentinels[k].clone()));
+            }
         }
-        let ctor_ty = subst_term_generalize_many(&weaken(&entry.ambient_ty, n as i64), &subs);
-        ctor_types_inner_first.push(ctor_ty);
-        body = subst_term_generalize(&body, &Term::var(entry.var + n), &sentinel);
-        sentinels.push(sentinel);
+        ctor_types_inner_first
+            .push(subst_term_generalize_many(&weaken(&entry.ambient_ty, n as i64), &subs));
+    }
+    let mut body = base_body;
+    for (i, entry) in context_convoy.iter().enumerate() {
+        body = subst_term_generalize(&body, &Term::var(entry.var + n), &sentinels[i]);
     }
     for i in (0..c).rev() {
         premises.push(ctor_types_inner_first[i].clone());
     }
-    let total = premises.len();
-    wrap_premise_pis_from_full(finalize_refined_body(&body, 0, total), &premises)
+    wrap_premise_pis_finalized(body, &premises)
 }
 
 fn synthesize_omitted_index_method(

@@ -36,6 +36,19 @@ fn fin_env() -> ElabEnv {
     env
 }
 
+/// Extends [`fin_env`] with a witness family `Wit a n e` indexed by BOTH the
+/// length `n` and the `Env a n` value `e`, so a captured `h : Wit a n xs` depends
+/// transitively on the captured `xs : Env a n`.
+fn fin_env_wit() -> ElabEnv {
+    let mut env = fin_env();
+    env.elaborate_decl(
+        "data Wit (a : Type) : (n : Nat) -> Env a n -> Type where { \
+           MkWit : (n : Nat) -> (e : Env a n) -> Wit a n e }",
+    )
+    .expect("Wit");
+    env
+}
+
 #[test]
 fn captured_env_follows_fin_index_refinement_under_match() {
     // THE RED SHAPE (evt_3b9k92cmkn5zh, generic): the captured ambient
@@ -50,4 +63,37 @@ fn captured_env_follows_fin_index_refinement_under_match() {
            FS m k ↦ Refl }",
     )
     .expect("the captured-env telescope must follow the Fin refinement");
+}
+
+#[test]
+fn captured_env_index_couples_goal_type_argument() {
+    // The goal's TYPE argument names the index directly (`Equal (Env a n) xs
+    // xs`): the captured `xs`'s refined type and the goal's own `n` must refine
+    // in lockstep. Without the convoy forcing the goal's index rebase (the
+    // scrutinee `j` does not itself occur here), `xs`'s binder index and the
+    // goal's `Env a n` diverge and the arm reddens on the convoy class.
+    let mut env = fin_env();
+    env.elaborate_decl(
+        "theorem env_refl (a : Type) (n : Nat) (xs : Env a n) (j : Fin n) \
+           : Equal (Env a n) xs xs = \
+         match j { FZ m ↦ Refl; FS m k ↦ Refl }",
+    )
+    .expect("the captured env's type must follow its own index refinement");
+}
+
+#[test]
+fn transitive_closure_follows_index_refinement() {
+    // THE TRANSITIVE SHAPE: the captured tail is `xs : Env a n`, then
+    // `h : Wit a n xs` depending on BOTH the index and the earlier captured
+    // `xs`. Both must travel as ONE telescope through the `Fin n` refinement of
+    // `match j`, with `h`'s binder type naming `xs`'s binder (not the ambient
+    // `xs`). This exercises the inter-convoy threading (c > 1) in the motive,
+    // the constructor goal, and the recursive-FS direct IH.
+    let mut env = fin_env_wit();
+    env.elaborate_decl(
+        "theorem wit_refl (a : Type) (n : Nat) (xs : Env a n) (h : Wit a n xs) \
+           (j : Fin n) : Equal (Wit a n xs) h h = \
+         match j { FZ m ↦ Refl; FS m k ↦ Refl }",
+    )
+    .expect("the transitive Wit/Env telescope must follow the Fin refinement");
 }
