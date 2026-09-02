@@ -2066,10 +2066,9 @@ impl StaticTransitionPlan<'_> {
             // AC-7 mutation: when the force-specialize hook is set, a transport
             // caller is NOT deferred but built as a Specialized owner instead --
             // injecting the FM1 error (a forward-declared owner whose caller is
-            // never consumed) that `validate_response_owner_call_coverage` must
-            // catch. The hook is NOT apply_mutation-gated: it applies identically
-            // at install-phase-B and at the validator's re-derivation, so it does
-            // NOT trip the closed-derivation validator (which is exactly what
+            // never consumed). The hook is NOT apply_mutation-gated: it applies
+            // identically at install-phase-B and at the validator's re-derivation,
+            // so it does NOT trip the closed-derivation validator (which is what
             // distinguishes it from the apply_mutation-gated demand mutations).
             #[cfg(feature = "px8-ds-test-support")]
             let force_specialize = FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(std::cell::Cell::get);
@@ -2086,6 +2085,34 @@ impl StaticTransitionPlan<'_> {
             } else {
                 specialized.push(demand);
             }
+        }
+        // (ii) HS6 owner-coverage ROUTING (Architect ruling evt_2980vtzybp6bj). A
+        // Specialized owner whose selected caller is a checked-IH transport source
+        // is, by construction, an owner with NO verified selected incoming call --
+        // a transport source never retargets to a real owner call. In a REAL
+        // compile this is unreachable: the loop above defers every transport
+        // source, so `specialized` never contains one (the gate: owner assignment
+        // is `!in transport_sources`, and force_specialize is a test-only hook,
+        // default false). It arises ONLY under AC-7's force injection. Catch it
+        // HERE, at planning, with the owner-coverage validator's own message, so
+        // the force-injected abnormal state reds at its INTENDED validator rather
+        // than transitively tripping the internal aggregate_ownership lifetime-meet
+        // invariant (closure.rs:2091) first -- failure-mode routing, HS6#1. This
+        // does NOT weaken that internal invariant for real compiles (it never
+        // fires there, since this red pre-empts the force state and no real
+        // compile produces the coexistence). See AC-7
+        // (force_specializing_a_deferred_response_reds_the_owner_call_coverage_pin)
+        // and lowering's validate_response_owner_call_coverage (the standing guard).
+        if let Some(forced) = specialized
+            .iter()
+            .find(|demand| transport_sources.contains(&demand.k_identity))
+        {
+            return Err(planner_error(format!(
+                "a forward-declared response owner has no verified selected incoming call: its \
+                 selected caller {:?} is a checked-IH environment transport source, which never \
+                 retargets to a real owner call (RECUT 2 HS6 owner-coverage routing; force-only)",
+                forced.k_identity,
+            )));
         }
         specialized.sort_by_key(|demand| {
             (
