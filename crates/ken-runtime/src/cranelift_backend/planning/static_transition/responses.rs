@@ -365,6 +365,14 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct DeferredResponseRow {
     vis_origin: StaticOriginId,
+    /// The producer call origin this Deferred residual belongs to (P1: the route's
+    /// producer edge; P2: the demand's). Carried so the fan-out-accounting control
+    /// can group the deferred residual by producer -- the RECUT 2 HS6 (ii)-redesign
+    /// re-targets that invariant onto the Deferred population (Architect
+    /// evt_2fk574v1cb3b1), where the shared-producer multi-K witness now lives
+    /// (the transport-deferred ResourceRelease pairs). Deterministic from the
+    /// causal route/demand, so the closed-derivation validator is unaffected.
+    producer_call_origin: StaticOriginId,
     operation_root_origin: StaticOriginId,
     effect_origin: StaticOriginId,
     operation: HostOpV1,
@@ -374,6 +382,10 @@ pub(in crate::cranelift_backend) struct DeferredResponseRow {
 impl DeferredResponseRow {
     pub(in crate::cranelift_backend) fn vis_origin(&self) -> StaticOriginId {
         self.vis_origin
+    }
+
+    pub(in crate::cranelift_backend) fn producer_call_origin(&self) -> StaticOriginId {
+        self.producer_call_origin
     }
 
     pub(in crate::cranelift_backend) fn operation_root_origin(&self) -> StaticOriginId {
@@ -1387,6 +1399,7 @@ impl StaticTransitionPlan<'_> {
                 // operation root / effect fall through to main's pre-WP lowering.
                 deferred.push(DeferredResponseRow {
                     vis_origin,
+                    producer_call_origin: route.producer_call_origin,
                     operation_root_origin,
                     effect_origin: route.effect_origin,
                     operation: route.operation,
@@ -2077,6 +2090,7 @@ impl StaticTransitionPlan<'_> {
             if !force_specialize && transport_sources.contains(&demand.k_identity) {
                 deferred.push(DeferredResponseRow {
                     vis_origin: demand.vis_origin,
+                    producer_call_origin: demand.producer_call_origin,
                     operation_root_origin: demand.operation_root_origin,
                     effect_origin: demand.effect_origin,
                     operation: demand.operation,

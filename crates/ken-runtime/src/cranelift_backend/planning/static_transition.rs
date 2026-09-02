@@ -970,6 +970,12 @@ pub struct StaticResponseOwnerObservation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeferredResponseObservation {
     pub vis_origin: u32,
+    /// The producer call origin this Deferred residual belongs to. Lets a control
+    /// group the Deferred population by shared producer (RECUT 2 HS6 (ii)-redesign:
+    /// the fan-out-accounting invariant re-targeted onto the Deferred side, where
+    /// the shared-producer multi-K witness -- the transport-deferred ResourceRelease
+    /// pairs -- now lives).
+    pub producer_call_origin: u32,
     pub operation_root_origin: u32,
     pub effect_origin: u32,
     pub operation: String,
@@ -1104,6 +1110,7 @@ fn record_static_response_feasibility_diagnostic(
         .iter()
         .map(|row| DeferredResponseObservation {
             vis_origin: row.vis_origin().0,
+            producer_call_origin: row.producer_call_origin().0,
             operation_root_origin: row.operation_root_origin().0,
             effect_origin: row.effect_origin().0,
             operation: format!("{:?}", row.operation()),
