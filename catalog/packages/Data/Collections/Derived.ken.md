@@ -135,6 +135,18 @@ or postulated law is added. `take_drop_decomposition`, `map_length`, and
 comparator/Iff statement is pinned — no bare `Prop`-returning wrapper is
 shipped for it prematurely.
 
+Migrated here per the attached-proof ownership rule — an attached proof
+`f::law` belongs to the module that defines `f` — the three `list_append`
+monoid laws `left_unit`/`assoc`/`right_unit` are proved beside `list_append`
+as well, so every `Monoid (List a)` instance cites the one canonical
+function-level proof. Left unit is definitional: `list_append (Nil a) x`
+iota-reduces to `x`, so the goal stays `Eq`-shaped and closes by `Refl`.
+Assoc is induction on the first list — base reduces both sides to the neutral
+`list_append a ys zs` (`Refl`), step lifts the tail IH under `Cons a h` with
+`cong`. Right unit is induction on the list — base reduces both sides to the
+constructor `Nil a`, which observationally collapses to `Top` and closes by
+`Proved`; step is `cong` under `Cons a h` on the tail IH.
+
 ```ken
 fn mem (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Bool =
   match xs {
@@ -169,6 +181,44 @@ theorem take_drop_decomposition
             (Cons a h)
             (take_drop_decomposition a m t)
       }
+  }
+
+pub proof left_unit for list_append
+      (a : Type) (xs : List a)
+    : Equal (List a) (list_append a (Nil a) xs) xs =
+  Refl
+
+pub proof assoc for list_append
+      (a : Type) (xs : List a) (ys : List a) (zs : List a)
+    : Equal
+        (List a)
+        (list_append a (list_append a xs ys) zs)
+        (list_append a xs (list_append a ys zs)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons h t ↦
+      cong
+        (List a)
+        (List a)
+        (list_append a (list_append a t ys) zs)
+        (list_append a t (list_append a ys zs))
+        (Cons a h)
+        ((proof assoc for list_append) a t ys zs)
+  }
+
+pub proof right_unit for list_append
+      (a : Type) (xs : List a)
+    : Equal (List a) (list_append a xs (Nil a)) xs =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦
+      cong
+        (List a)
+        (List a)
+        (list_append a t (Nil a))
+        t
+        (Cons a h)
+        ((proof right_unit for list_append) a t)
   }
 
 theorem map_length
