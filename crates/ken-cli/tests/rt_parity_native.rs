@@ -175,27 +175,10 @@ proc rt_read_offset_stage (cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-(withBuffer AFull Unit Unit (1 : Int) rt_body_ok)
-(\gate. rt_read_offset_branch cap gate)
-
-proc rt_read_offset_branch (cap : Cap AFull)
-  (gate : Result ResourceError (ResourceBracketResult Unit Unit))
-  : HostIO AFull ExitCode visits [FS] =
-  match gate {
-Ok bracket |-> bind (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-  (withResource AFull Unit Unit cap (bytes_encode "source")
-    ResourceRead rt_read_offset_file)
-  (\outcome. rt_bracket_done outcome);
-Err error |-> bind (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-  (withResource AFull Unit Unit cap (bytes_encode "source")
-    ResourceRead rt_read_offset_file)
-  (\outcome. rt_bracket_done outcome)
-  }
+(Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+(withResource AFull Unit Unit cap (bytes_encode "source")
+  ResourceRead rt_read_offset_file)
+(\outcome. rt_bracket_done outcome)
 
 proc rt_read_window_body (file : Resource FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
@@ -707,6 +690,56 @@ fn buffer_allocate_malformed_capacity_narrows_to_invalid_bounds() {
 
 // -- FsReadAt ------------------------------------------------------------
 
+/// Transition sentinel. MEASURED: the exact checked-source InvalidOffset
+/// witness crosses the repaired private route lane and reaches the named
+/// ResourceBodyResult fail-closed frontier with recoverable planner provenance.
+/// CLAIMED: D1 no longer terminates at the earlier ITree default. THE GAP: the
+/// ResourceBodyResult default is not final behavior and this test intentionally
+/// retires when RT-RESULT-CONTINUATION-BINDING-PROVENANCE replaces it with the
+/// durable nonignored InvalidOffset product witness.
+#[test]
+fn fs_read_at_malformed_offset_reaches_resource_body_result_frontier() {
+    in_large_stack_thread("rt-parity-read-offset-provenance", || {
+        let Differential { native, .. } =
+            differential("fs-read-at-offset-provenance", "rt_read_offset_stage");
+        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+            native.terminal_error.as_ref()
+        else {
+            panic!("native witness must report typed planner trap provenance: {native:?}");
+        };
+        assert!(
+            provenance.planned_identity > 0,
+            "identity zero is reserved for no trap"
+        );
+        assert_eq!(
+            provenance.trap.code,
+            ken_runtime::RuntimeTrapCode::PatternMatchFailure
+        );
+        assert_eq!(
+            provenance.trap.message,
+            "no runtime match case selected for \
+             decl:rt_parity_fs_read_at_offset_provenance::ResourceBodyResult"
+        );
+        let stderr = String::from_utf8_lossy(&native.stderr);
+        assert!(stderr.contains("PatternMatchFailure"));
+        assert!(stderr.contains(&provenance.trap.message));
+        assert!(!stderr.contains("unknown terminal sentinel"));
+        assert_eq!(
+            native
+                .effect_trace
+                .iter()
+                .map(|event| event.operation)
+                .collect::<Vec<_>>(),
+            vec![
+                ken_runtime::HostOpV1::FsOpen,
+                ken_runtime::HostOpV1::BufferAllocate,
+                ken_runtime::HostOpV1::ResourceRelease,
+                ken_runtime::HostOpV1::ResourceRelease,
+            ]
+        );
+    });
+}
+
 #[test]
 fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
     in_large_stack_thread("rt-parity-continuation-inheritance", || {
@@ -1161,9 +1194,9 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
             // -- phase B's own correctness label, assigned ONLY to a transport source,
             // so it independently proves "correctly deferred" over the fixture-known
             // population (not derived from what the code emitted). No exact count is
-            // pinned: the read product now carries two brackets (the added
-            // non-transport owner) -> two BufferAllocate, and the write product's
-            // closure-boundary BufferAllocate K is transport-deferred.
+            // pinned (HS7 fallback reverted the added owner, so the read product now
+            // carries its single withBuffer bracket's BufferAllocate); the write
+            // product's closure-boundary BufferAllocate K is transport-deferred.
             let specialized_buffer = &diagnostic.static_response_rows;
             let all_buffer = diagnostic
                 .all_static_response_rows
@@ -1740,27 +1773,30 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
         assert_eq!(baseline.len(), 1);
         assert!(!baseline[0].static_response_owners.is_empty());
 
-        // RECUT 2 HS6 (A-full)-refined PRECONDITION (Architect evt_4kqz8awr6sg1n).
-        // The RetargetToDifferentResponseOwner control needs >= 2 distinct
-        // Specialized owners (distinct selected callers) to retarget between. The
-        // recut correctly defers transport-source members, which can shrink this
-        // fixture's Specialized owner population -- so assert the precondition
-        // EXPLICITLY. If the fixture still supplies >= 2, the mutation exercises
-        // the real red below; if it does NOT, this reds with a diagnosed message
-        // (a fixture-owner follow-up: supply a stable non-transport-source owner),
-        // never a silent vacuous pass nor the cryptic "found no different owner".
+        // RECUT 2 HS7 FALLBACK (Architect evt_73r305aqtchgw; Steward scope confirm
+        // evt_7xjkcw0tqnxj0). The >= 2-Specialized-owner arm
+        // (RetargetToDifferentResponseOwner, which retargets BETWEEN two owners) is
+        // RETIRED on non-constructibility grounds: for the rt_read_offset fixture
+        // family no compilable Ken program yields >= 2 Specialized response owners.
+        // Sequencing makes the link continuation capture cap (WorkerCapture, not
+        // Specialized); a 2-arm branch forces both recursion-bearing arm-frames into
+        // one oriented segment (shared-parent segment inheritance,
+        // erasure.rs:1252-1296) so their checked endpoints do not compose (the
+        // program fails to compile). NOT a universal non-existence claim over all
+        // programs. The surviving single-owner controls (RestoreSelectedKTarget,
+        // RemoveSelectedCaller) retarget onto the single-owner population; assert the
+        // >= 1 precondition EXPLICITLY so a 0-owner degenerate reds with a diagnosed
+        // message, never a silent vacuous pass.
         let distinct_specialized_callers = baseline[0]
             .static_response_owners
             .iter()
             .map(|owner| &owner.selected_caller)
             .collect::<std::collections::BTreeSet<_>>();
         assert!(
-            distinct_specialized_callers.len() >= 2,
-            "retarget precondition unmet: the read fixture supplies only {} distinct \
-             Specialized owner(s) after transport-source deferral; \
-             RetargetToDifferentResponseOwner needs >= 2. Fixture-owner follow-up: add a \
-             stable non-transport-source owner to rt_read_offset_stage.",
-            distinct_specialized_callers.len()
+            !distinct_specialized_callers.is_empty(),
+            "retarget precondition unmet: the read fixture supplies no Specialized \
+             owner after transport-source deferral; the single-owner caller controls \
+             need >= 1."
         );
 
         for (label, mutation, expected) in [
@@ -1773,11 +1809,6 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
                 "remove",
                 Mutation::RemoveSelectedCaller,
                 "removed one selected incoming caller",
-            ),
-            (
-                "retarget-owner",
-                Mutation::RetargetToDifferentResponseOwner,
-                "a forward-declared response owner has no verified selected incoming call",
             ),
         ] {
             let ((_mutated_root, (mutated_result, mutated_diagnostic)), applications) =
@@ -4271,15 +4302,20 @@ const OPTION2_UNRELATED_OWNER_CHILD: &str = "KEN_RT_OPTION2_UNRELATED_OWNER_CHIL
 #[cfg(target_os = "linux")]
 fn assert_option2_unrelated_owner_child() {
     let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
-    // RECUT 2 HS6 (A-full)-refined PRECONDITION (Architect evt_4kqz8awr6sg1n). The
-    // CONCRETE SubstituteUnrelatedOwnerRoot arm needs the read fixture to carry
-    // real Specialized owners to substitute between (writeAll already degraded to
-    // the 0-owner empty-traversal degenerate under the recut, which is why this
-    // uses the read stage). The recut also defers transport sources in the read
-    // path, so assert the precondition EXPLICITLY: if the fixture still supplies
-    // >= 2 Specialized owners the mutation exercises the concrete red below; if
-    // not, this reds with a diagnosed message rather than a cryptic expect_err
-    // failure or a silent fallback to the empty-traversal degenerate.
+    // RECUT 2 HS7 FALLBACK (Architect evt_73r305aqtchgw; Steward scope confirm
+    // evt_7xjkcw0tqnxj0). The CONCRETE SubstituteUnrelatedOwnerRoot arm is a
+    // single-owner substitution -- it substitutes an unrelated legal static-body
+    // owner as the retained-unit traversal root (see this test's doc), so it needs
+    // >= 1 Specialized owner, NOT >= 2. The prior >= 2 precondition was the retired
+    // branching's over-provisioning: for the rt_read_offset fixture family no
+    // compilable Ken program yields >= 2 Specialized owners (sequencing captures cap
+    // -> not Specialized; a 2-arm branch's recursion-bearing arm-frames collide in
+    // one oriented segment via shared-parent inheritance -> checked endpoints do not
+    // compose, erasure.rs:1252-1296). The read stage's single Specialized owner
+    // drives the concrete substitution; writeAll degraded to the 0-owner
+    // empty-traversal degenerate under the recut, which is why this uses the read
+    // stage. Assert the >= 1 precondition EXPLICITLY so a 0-owner degenerate reds
+    // with a diagnosed message rather than a silent fallback to that degenerate.
     {
         let precondition_root = output_dir("option2-unrelated-owner-precondition");
         let (_precondition_result, precondition_diag) =
@@ -4296,11 +4332,10 @@ fn assert_option2_unrelated_owner_child() {
             .map(|diagnostic| diagnostic.static_response_owners.len())
             .unwrap_or(0);
         assert!(
-            owners >= 2,
-            "option-2 precondition unmet: the read fixture supplies only {owners} Specialized \
-             owner(s) after transport-source deferral; the concrete unrelated-owner substitution \
-             needs >= 2. Fixture-owner follow-up: add a stable non-transport-source owner to \
-             rt_read_offset_stage."
+            owners >= 1,
+            "option-2 precondition unmet: the read fixture supplies no Specialized \
+             owner ({owners}) after transport-source deferral; the concrete \
+             unrelated-owner substitution needs >= 1."
         );
     }
     let root = output_dir("option2-unrelated-owner-root");
