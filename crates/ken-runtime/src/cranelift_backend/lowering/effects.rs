@@ -2197,14 +2197,30 @@ impl<'a> Lowering<'a> {
         static_origin: StaticOriginId,
         env: &[LoweringEnvironmentBinding],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
-        if self.function_local.static_response_owner.is_none()
-            && self
-                .static_transition_plan
-                .is_static_response_effect(static_origin)
+        // Recut §7 total match (AC-2) over the response classify verdict. No
+        // catch-all: adding a ResponseDisposition variant reddens the build here.
+        use crate::cranelift_backend::planning::ResponseDisposition;
+        match self
+            .static_transition_plan
+            .response_disposition_at_effect(static_origin)
         {
-            return Ok(LoweringOperand::Specialized(
-                Lowered::StaticResponseDeferred,
-            ));
+            // A Specialized response's host effect lowered OUTSIDE its owner is
+            // compiler control: emit the placeholder, consumed when the caller is
+            // retargeted to the owner.
+            Some(ResponseDisposition::Specialized)
+                if self.function_local.static_response_owner.is_none() =>
+            {
+                return Ok(LoweringOperand::Specialized(
+                    Lowered::StaticResponseDeferred,
+                ));
+            }
+            // Deferred (R3): the residual falls through to the ordinary host-effect
+            // lowering below -- main's pre-WP path (4a088d8aa), no placeholder/owner.
+            // A Specialized effect INSIDE its owner and a non-response effect also
+            // lower normally.
+            Some(ResponseDisposition::Specialized)
+            | Some(ResponseDisposition::Deferred)
+            | None => {}
         }
         if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation) {
             // `RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the SECOND refusal site, and
