@@ -9,14 +9,159 @@ tier: T1
 depends_on: [RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT]
 blocks: []
 github: null
-origin: "Architect mechanism ruling evt_29jfzzw9j5xjz (2026-09-01), the authoritative byte-level contract; do NOT re-derive it, fold and cite it. Issued under the operator preference for compile-time SSA handling OVER the runtime closure (2026-09-01, correcting a Steward mis-scope of the approach fork; Steward direction correction evt_10dfspc3ssk5). Research extension advisory SHA-256 19bc67e5dada7cbac4445875cdcfd5ab079aecb3bc56b6df712696bcd296f3c1. The Architect confirmed this SSA path opens NO new operator fork (no public ABI change — unit_signature stays (frame_ptr, services_ptr) -> i64; no kernel primitive; no spec commitment), so the Steward frames and releases it. Bound base = the clean held checkpoint ad191d1c29af288b059bbb00c1b573c3c4356ab3, tree 342e3b735 (carries WP1's preserved environment/result role split, and BoundaryClosureEnvironment / ContinuationCallIdentity.worker as the body/arity/capture-schema authorities). The invocation-owned runtime closure (RT-COMPOSED-RETURN-RUNTIME-CLOSURE, ruling evt_3j6vshm83rk5q) remains the FALLBACK, held draft, selected ONLY if this SSA path returns SsaInfeasible and the operator so rules; it is NOT built in parallel. Halted runtime-closure scratch aee8c9408c986bb946d228069a5104c70db84ea4 is evidence only. WP1 RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT preserved as the base asset and depends_on predecessor; the delayed-SSA WP2/WP3 (RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE, RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT) stay closed. Origin funding evt_3met6tbk5wrnd after accepted terminal NO_UNIQUE_EDGE evt_mx6scjje1yjp."
+origin: "RECUT 2026-09-02 (HS3 structural closure, Architect ruling evt_5yjjsrhpmt204 on research advisory evt_3z83vwpenscft): the absence-based decline is replaced by a first-class Deferred residual (classify->Disposition=Specialized|Deferred{payload}, total-match every stage, §7 sealed-enum no catch-all); the proved Specialized path is retained; base cut fresh from origin/main 4a088d8aa; ACs 1-6 in the RECUT body section; HS3 discharged (next HS6). Prior origin: Architect mechanism ruling evt_29jfzzw9j5xjz (2026-09-01), the authoritative byte-level contract for the Specialized path; do NOT re-derive it, fold and cite it. Issued under the operator preference for compile-time SSA handling OVER the runtime closure (2026-09-01, correcting a Steward mis-scope of the approach fork; Steward direction correction evt_10dfspc3ssk5). Research extension advisory SHA-256 19bc67e5dada7cbac4445875cdcfd5ab079aecb3bc56b6df712696bcd296f3c1. The Architect confirmed this SSA path opens NO new operator fork (no public ABI change — unit_signature stays (frame_ptr, services_ptr) -> i64; no kernel primitive; no spec commitment), so the Steward frames and releases it. Bound base = the clean held checkpoint ad191d1c29af288b059bbb00c1b573c3c4356ab3, tree 342e3b735 (carries WP1's preserved environment/result role split, and BoundaryClosureEnvironment / ContinuationCallIdentity.worker as the body/arity/capture-schema authorities). The invocation-owned runtime closure (RT-COMPOSED-RETURN-RUNTIME-CLOSURE, ruling evt_3j6vshm83rk5q) remains the FALLBACK, held draft, selected ONLY if this SSA path returns SsaInfeasible and the operator so rules; it is NOT built in parallel. Halted runtime-closure scratch aee8c9408c986bb946d228069a5104c70db84ea4 is evidence only. WP1 RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT preserved as the base asset and depends_on predecessor; the delayed-SSA WP2/WP3 (RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE, RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT) stay closed. Origin funding evt_3met6tbk5wrnd after accepted terminal NO_UNIQUE_EDGE evt_mx6scjje1yjp."
 ---
 
-## Authoritative contract
+## RECUT — HS3 structural closure: first-class Deferred residual (Architect ruling evt_5yjjsrhpmt204)
+
+**This section is the CURRENT governing contract and supersedes the mechanism
+below wherever they conflict.** It is the Architect's HS3 structural-closure
+ruling (`evt_5yjjsrhpmt204`, 2026-09-02), issued on the research prior-art
+advisory (`evt_3z83vwpenscft`, SHA-256
+370795b09f783f52d3650a2888e96c2ee4b14c7f2ce7e6039bf726b0af3b576e — advisory
+only, the call is the Architect's). It RETIRES the point-fix chain: no further
+patch to the absence-based decline. The everything-below-here detail on the
+**Specialized** path is RETAINED and remains authoritative for that path; only
+the **decline / residual** handling is replaced.
+
+### Why the recut (the hard-stop chain, one predicate)
+
+Three CI-reds on the px8f/rt_parity native population, each a real distinct
+defect, all one predicate: the deferred/declined response `Vis` was modeled as
+an **absence** (no demand, no owner, empty set, a bare `continue`) that each
+downstream stage had to independently reconstruct and route to main's lowering.
+Each point-fix un-masked the next consumer:
+
+- HS1 (Q1): demand filter ABORTS a declined deferred-frontier `Vis`
+  (`SsaInfeasible` -> fatal backend abort).
+- HS2 (found 0): the px8-ds mutation helper requires an owner and finds zero for
+  a fully-fallback program (test-support-only, production-inert).
+- HS3-a (`rt_resource_release_carried_observe`): a forward-declared response
+  owner has no verified selected incoming call (`disposition=None`).
+- HS3-b (`writeAll`): `unsupported runtime-IR lowering: StaticResponseDeferred`
+  — a deferred host response is compiler control with no supported lowering arm.
+
+A census/grep cannot close this — it failed twice. The tell: HS3-b names
+`StaticResponseDeferred`, a runtime-IR variant that **already exists** — so
+"deferred" is partially first-class but not exhaustively handled.
+
+### Mechanism — reify the specialize/residualize partition, classify ONCE
+
+Compute a positive two-valued classification on the response IR, once, consumed
+by total matches everywhere:
+
+```rust
+classify : ResponseVis -> Disposition          // one pass; positive verdict
+lower    : Disposition  -> RuntimeIR            // total match, NO `_ =>`
+
+enum Disposition {
+    Specialized { owner, captures, k_route, .. }, // the proved path, unchanged
+    Deferred    { payload },                      // routes to main's pre-WP lowering
+}
+```
+
+- `classify` is the EXISTING feasibility ledger EXTENDED to emit a populated
+  `Deferred{..}` instead of an empty complement / no-owner / `None`. The ledger
+  already computes the Specialized side soundly; the whole defect is that its
+  residual output today is the absent complement rather than a constructed object.
+- `Deferred` is a constructor of the SAME sealed sum the already-half-born
+  `StaticResponseDeferred` (HS3-b) belongs to. Promote it to a FULL peer at every
+  stage: planning/classify, forward-declaration, caller-edge verification,
+  retained-unit declaration, runtime-IR lowering. Each stage matches
+  `Disposition` with **no catch-all**, so an unhandled stage is a Rust COMPILE
+  error (COORDINATION §7 sealed-enum), not a CI-red. This converts "a census must
+  find every consumer" into "the type enumerates the consumers for you" — the
+  reason the census failed twice and a sealed variant cannot.
+
+### Three binding requirements (each kills one symptom face)
+
+- **R1 — REACHABILITY IS ORTHOGONAL TO COLOR.** Demand/reachability and
+  Specialized-vs-Deferred are separate analyses; a `Vis` can be reached AND
+  Deferred (the normal residual). HS1 conflated "no static demand" with "not
+  present" and aborted. A reached-but-Deferred `Vis` is expected and MUST pass to
+  residual lowering, never abort.
+- **R2 — CLASSIFY ONCE, ON THE OBJECT.** The verdict lives on the IR object as a
+  constructor, not re-derived from local negative evidence at each consumer. This
+  removes the reconstruct-obligation from every stage simultaneously — it is the
+  closure, and it is why HS2 (found 0) and HS3-a (`disposition=None`) both vanish
+  rather than getting a third and fourth patch.
+- **R3 — THE RESIDUAL CARRIES ITS PAYLOAD.** HS3-b is a tag with no
+  payload-carrying case, so lowering has nowhere to send it. `Deferred{payload}`
+  carries exactly the data to route to main's existing pre-WP lowering (the path
+  that compiled and ran at `4a088d8aa`), so its lowering arm is a real
+  translation, not an unsupported stub.
+
+### Boundary — DO NOT VIOLATE D0 (evt_29jfzzw9j5xjz)
+
+The sealed-tag + total-match STRUCTURE is for the **Deferred** case ONLY. The
+Specialized population stays exactly as proved (the mechanism below): direct
+calls to the exact K context, the finished-CLIF read-back
+(`verify_static_response_finished_body`), NO runtime selector / K tag /
+environment aggregate / closure word / shared apply. A tagged variant carrying an
+environment is the closure-conversion form D0 excluded; it must never touch the
+Specialized side. Only `Deferred` is tagged, and `Deferred` lowers to the
+pre-existing main path, which introduces no selector.
+
+### Retain vs replace
+
+- **RETAIN** everything proved: the feasibility ledger's Specialized-side
+  computation, the finished-CLIF `Ret`/`Trap` read-back, and the Q1/Q2
+  Specialized logic — all correctly reviewed, none is the defect. The entire
+  Specialized-path detail below this section is retained and authoritative.
+- **REPLACE** only the absence-based decline: Q1's `continue`, HS2's
+  empty-substitute, and every stage's implicit "no owner => fall through" become
+  one populated `Deferred` threaded by total matches.
+
+### Acceptance criteria — the totality proof (carry ALL SIX)
+
+1. **Congruence before the passes run.** Every `ResponseVis` receives exactly one
+   of Specialized/Deferred; no third "unclassified" leak. Assert exhaustiveness of
+   `classify`.
+2. **Per-stage §7 control.** At EACH stage, deleting/adding a `Disposition`
+   variant reddens the Rust build — a compile-time pin per stage, not a runtime
+   test. This is the closure's own proof that no stage silently drops the residual.
+3. **Positive Deferred program.** The `writeAll` deferred-frontier fixture (the
+   `4a088d8aa` shape) COMPILES and RUNS through main lowering with UNCHANGED
+   effect order — a real "still compiles+runs" positive control.
+4. **Mixed program.** One unit carrying BOTH colors (a Specialized response and a
+   Deferred response together). Polyvariance is only real when both coexist; a
+   single-color program cannot discriminate genuine threading from a flag.
+5. **Specialized-through-Deferred-arm control.** A test that REDS if a Specialized
+   response ever flows through the Deferred lowering arm — proving the proved path
+   is untouched and the D0 boundary holds.
+6. **CI-native whole-binary population green on the exact SHA:**
+   `px8f_buffer_native`, `rt_parity_native` all shards,
+   `rt_resource_release_carried_observe`, all 8 test shards — the authoritative
+   close that caught HS1/HS2/HS3.
+
+Also fold in the **deferred option-2 coverage fixture** (`evt_55jt2yydg0661`)
+while the response-IR is being restructured — it is the same surface.
+
+### Scope, gates, base
+
+- **Scope:** elaboration/backend only (`crates/ken-runtime`). NO kernel, TCB,
+  `/spec`, or `/conformance` change; research confirmed no operator escalation on
+  the mechanism.
+- **Base / fixed inputs:** cut fresh from `origin/main` **`4a088d8aa`** (the
+  pre-WP baseline where the node is held and the `writeAll` deferred-frontier
+  program compiled and ran). This supersedes the stale `ad191d1c2` base cited
+  below.
+- **Candidate is NEW with fresh gates:** Architect soundness + runtime-QA +
+  CI-native on the exact SHA. NO prior approval carries. On a gated candidate:
+  Steward M1-M4 -> lieutenant M5-M9. Node stays HELD at the pre-WP baseline until
+  the recut lands.
+- **§1a bookkeeping:** HS3 is DISCHARGED by this ruling; the next re-trigger is
+  HS6.
+
+## Authoritative contract (Specialized-path detail — RETAINED under the recut above)
 
 The Architect mechanism ruling **`evt_29jfzzw9j5xjz`** is the authoritative,
-byte-level contract. This node folds its structure, types, and controls for
-release; where any detail here is thinner, the ruling governs. Do not re-derive.
+byte-level contract **for the Specialized path**. This node folds its structure,
+types, and controls for release; where any detail here is thinner, the ruling
+governs. Do not re-derive. The **decline / residual** handling in the sections
+below is SUPERSEDED by the RECUT above (first-class `Deferred`); the Specialized
+mechanism, representation, feasibility trichotomy, emission seam, and Specialized
+controls remain in force.
 
 ## AMENDMENT — context-demand extension (Architect evt_4ta6cchxvjrrt); CP1 CORRECTED
 
