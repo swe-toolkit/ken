@@ -8,91 +8,79 @@
 use ken_elaborator::{ElabEnv, ElabError};
 
 #[test]
-fn generated_record_index_reflexivity_closes_nested_top_field() {
-    // Promise class: durable invariant. Future observational equality changes
-    // may alter the nesting, but generated reflexive index evidence must remain
-    // closed under every Eq/Sigma/Top child it produces.
-    // MEASURED: a real dependent match over a record index whose closed List
-    // field makes recursive observational equality reach Top inside Sigma.
-    // CLAIMED: generated index evidence handles Eq/Sigma/Top uniformly at all
-    // nesting depths. THE GAP: the fixture relies on the record/List equality
-    // reduction path continuing to expose the nested Top; restoring the old
-    // recursive calls is the causality control for that exact path.
+fn generated_record_index_reflexivity_closes_top_second_child() {
+    // Promise class: durable invariant. Generated reflexive index evidence must
+    // remain closed under every Eq/Sigma/Top child it produces.
+    // MEASURED: a real dependent match whose record equality has a variable Nat
+    // first child (still Eq) and a closed True/True second child (Top).
+    // CLAIMED: generated evidence dispatches the Sigma codomain through
+    // Eq/Sigma/Top. THE GAP: restoring only the second old recursive call is the
+    // independent causality mutation for this fixture.
     let mut env = ElabEnv::new().expect("base env");
-    env.elaborate_decl("data GenSeq = GenMkSeq (List Nat) (List Nat)")
+    env.elaborate_decl("data GenSeq = GenMkSeq Nat Bool")
         .expect("GenSeq");
     env.elaborate_decl(
         "data GenDerivation : GenSeq -> Type where { \
-           GenDeriv : (gamma : List Nat) -> \
-             GenDerivation \
-               (GenMkSeq gamma (Cons Nat Zero (Nil Nat))) \
+           GenDeriv : (index : Nat) -> GenDerivation (GenMkSeq index True) \
          }",
     )
     .expect("GenDerivation");
     env.elaborate_decl(
-        "data GenWitness (gamma : List Nat) : Type where { \
-           GenMkWitness : GenWitness gamma \
+        "data GenWitness (index : Nat) : Type where { \
+           GenMkWitness : GenWitness index \
          }",
     )
     .expect("GenWitness");
 
     env.elaborate_decl(
-        "fn generated_nested_top \
-           (gamma : List Nat) \
-           (derivation : GenDerivation \
-             (GenMkSeq gamma (Cons Nat Zero (Nil Nat)))) \
-           : GenWitness gamma = \
+        "fn generated_top_second \
+           (index : Nat) \
+           (derivation : GenDerivation (GenMkSeq index True)) \
+           : GenWitness index = \
          match derivation { \
-           GenDeriv actual_gamma ↦ GenMkWitness gamma \
+           GenDeriv actual_index ↦ GenMkWitness index \
          }",
     )
-    .expect(
-        "generated reflexive record-index evidence must close when a nested \
-         closed List equality reduces to Top",
-    );
+    .expect("generated evidence must close when the Sigma second child is Top");
 }
 
 #[test]
-fn generated_record_index_reflexivity_closes_nested_top_first_field() {
+fn generated_record_index_reflexivity_closes_top_first_child() {
     // Promise class: durable invariant. The first and second Sigma children are
-    // independent recursive dispatch sites; this fixture puts the closed List
-    // equality in the first field, complementing the second-field fixture above.
-    // MEASURED: a real dependent match whose first record field equality WHNFs
-    // to Top while the result depends on the variable second field. CLAIMED:
-    // generated evidence dispatches its first Sigma child through Eq/Sigma/Top.
-    // THE GAP: restoring only the first old recursive call is the independent
-    // causality mutation for this fixture.
+    // independent recursive dispatch sites; this fixture complements the
+    // second-child case above.
+    // MEASURED: a real dependent match whose record equality has a closed
+    // True/True first child (Top) and a variable Nat second child (still Eq).
+    // CLAIMED: generated evidence dispatches its first Sigma child through
+    // Eq/Sigma/Top. THE GAP: restoring only the first old recursive call is the
+    // independent causality mutation for this fixture.
     let mut env = ElabEnv::new().expect("base env");
-    env.elaborate_decl("data GenFirstSeq = GenFirstMkSeq (List Nat) (List Nat)")
+    env.elaborate_decl("data GenFirstSeq = GenFirstMkSeq Bool Nat")
         .expect("GenFirstSeq");
     env.elaborate_decl(
         "data GenFirstDerivation : GenFirstSeq -> Type where { \
-           GenFirstDeriv : (delta : List Nat) -> \
-             GenFirstDerivation (GenFirstMkSeq (Nil Nat) delta) \
+           GenFirstDeriv : (index : Nat) -> \
+             GenFirstDerivation (GenFirstMkSeq True index) \
          }",
     )
     .expect("GenFirstDerivation");
     env.elaborate_decl(
-        "data GenFirstWitness (delta : List Nat) : Type where { \
-           GenFirstMkWitness : GenFirstWitness delta \
+        "data GenFirstWitness (index : Nat) : Type where { \
+           GenFirstMkWitness : GenFirstWitness index \
          }",
     )
     .expect("GenFirstWitness");
 
     env.elaborate_decl(
-        "fn generated_nested_top_first \
-           (delta : List Nat) \
-           (derivation : GenFirstDerivation \
-             (GenFirstMkSeq (Nil Nat) delta)) \
-           : GenFirstWitness delta = \
+        "fn generated_top_first \
+           (index : Nat) \
+           (derivation : GenFirstDerivation (GenFirstMkSeq True index)) \
+           : GenFirstWitness index = \
          match derivation { \
-           GenFirstDeriv actual_delta ↦ GenFirstMkWitness delta \
+           GenFirstDeriv actual_index ↦ GenFirstMkWitness index \
          }",
     )
-    .expect(
-        "generated reflexive record-index evidence must close when its first \
-         field's closed List equality reduces to Top",
-    );
+    .expect("generated evidence must close when the Sigma first child is Top");
 }
 
 #[test]
