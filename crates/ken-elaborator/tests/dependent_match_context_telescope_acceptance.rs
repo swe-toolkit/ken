@@ -43,6 +43,40 @@ fn spine_last_arg(t: &Term) -> Option<&Term> {
     }
 }
 
+/// The family-former `GlobalId` at the head of each `Term::Lam` DOMAIN reachable
+/// by peeling `Lam`/`Pi` layers from `t` (used to prove a method reproduces the
+/// convoy binders in its own telescope).
+fn lam_domain_family_heads(t: &Term) -> Vec<Option<GlobalId>> {
+    let mut heads = Vec::new();
+    let mut cur = t;
+    loop {
+        match cur {
+            Term::Lam(dom, body) | Term::Pi(dom, body) => {
+                heads.push(spine_head_id(dom));
+                cur = body.as_ref();
+            }
+            _ => break,
+        }
+    }
+    heads
+}
+
+/// Walk a `Pi` telescope until a domain's spine head is `fam`; return the pair
+/// (that domain, the codomain under it). Panics if `fam` never appears.
+fn telescope_find<'a>(mut t: &'a Term, fam: GlobalId) -> (&'a Term, &'a Term) {
+    loop {
+        match t {
+            Term::Pi(dom, cod) => {
+                if spine_head_id(dom) == Some(fam) {
+                    return (dom.as_ref(), cod.as_ref());
+                }
+                t = cod.as_ref();
+            }
+            other => panic!("family {fam:?} not found in the telescope; reached {other:?}"),
+        }
+    }
+}
+
 /// Base env with a fresh generic index-refining family `Fin`, a length-indexed
 /// `Env`, and a total `elookup` — NO Fok names.
 fn fin_env() -> ElabEnv {
@@ -193,83 +227,110 @@ fn dependent_let_convoy_member_positive() {
 }
 
 #[test]
-fn motive_generalizes_transitive_convoy_as_telescope() {
-    // AST telescope inspection: the transitive convoy is realized as a genuine
-    // Π-telescope in the elaborated motive codomain — `λidx.λscrut. Π(xs' :
-    // Env a idx). Π(h' : Wit a idx xs'). goal` — and the INNER binder's type
-    // names the OUTER binder (`Var 0`), not the ambient `xs`. This is a real
-    // fact about the `Term::Elim`, not merely "the kernel accepted it": a
-    // consistently-applied-but-wrong substitution could pass the kernel while
-    // NOT threading the closure as one telescope.
-    let mut env = fin_env_wit();
+fn elim_carries_convoy_telescope_in_motive_methods_and_application() {
+    // AST inspection of the three-deep convoy across ALL of the elaborated
+    // `Term::Elim`: (1) the motive codomain is a Π-telescope xs'/h'/z' with each
+    // inner binder naming its outer neighbour (`Var 0`); (2) EVERY method
+    // reproduces that xs'/h'/z' telescope; (3) the final application feeds the
+    // ambient actuals `xs`, `h`, `z` back in that order. A consistently-applied-
+    // but-wrong substitution could pass the kernel while failing any of these.
+    let mut env = fin_env_fam();
     let id = env
         .elaborate_decl(
-            "theorem twit_ast (a : Type) (n : Nat) (xs : Env a n) (h : Wit a n xs) \
-               (j : Fin n) : Equal (Wit a n xs) h h = \
+            "theorem fam_refl (a : Type) (n : Nat) (xs : Env a n) (h : Wit a n xs) \
+               (z : Fam a n xs h) (j : Fin n) : Equal (Fam a n xs h) z z = \
              match j { FZ m ↦ Refl; FS m k ↦ Refl }",
         )
-        .expect("twit_ast elaborates and kernel-checks");
+        .expect("fam_refl elaborates and kernel-checks");
     let body = env
         .env
         .transparent_body(id)
-        .expect("twit_ast is transparent")
+        .expect("fam_refl is transparent")
         .1;
-    // Peel the theorem's parameter lambdas, then the eliminator's own
-    // application spine (the completed Elim is applied to `Refl` at the actual
-    // indices and to the convoy's ambient actuals) to reach the `Term::Elim`.
+    let env_id = env.globals["Env"];
+    let wit_id = env.globals["Wit"];
+    let fam_id = env.globals["Fam"];
+
+    // Peel the 6 parameter lambdas (a, n, xs, h, z, j), then collect the
+    // eliminator's application spine to reach `Term::Elim`.
     let mut inner = &body;
     while let Term::Lam(_, b) = inner {
         inner = b;
     }
-    while let Term::App(f, _) = inner {
-        inner = f.as_ref();
+    let mut app_args: Vec<&Term> = Vec::new();
+    let mut head = inner;
+    while let Term::App(f, a) = head {
+        app_args.push(a.as_ref());
+        head = f.as_ref();
     }
-    let motive = match inner {
-        Term::Elim { fam, motive, .. } => {
+    app_args.reverse();
+    let (motive, methods) = match head {
+        Term::Elim { fam, motive, methods, .. } => {
             assert_eq!(*fam, env.globals["Fin"], "must eliminate over Fin");
-            motive.as_ref()
+            (motive.as_ref(), methods)
         }
         other => panic!("the match must lower to a real Term::Elim, got {other:?}"),
     };
-    // The motive is emitted as an ascription `(λidx.λscrut. … : Π…)`; unwrap it.
+
+    // (3) FINAL APPLICATION ORDER. After the leading index-eq `Refl` premise the
+    // eliminator is applied to the ambient convoy actuals in dependency order.
+    // Ambient de Bruijn after the 6 param lambdas: xs=3, h=2, z=1.
+    let na = app_args.len();
+    assert!(na >= 3, "expected the three convoy actuals among the applications");
+    assert!(
+        matches!(app_args[na - 3], Term::Var(3)),
+        "outer convoy actual must be `xs` (@3): {:?}",
+        app_args[na - 3]
+    );
+    assert!(
+        matches!(app_args[na - 2], Term::Var(2)),
+        "middle convoy actual must be `h` (@2): {:?}",
+        app_args[na - 2]
+    );
+    assert!(
+        matches!(app_args[na - 1], Term::Var(1)),
+        "inner convoy actual must be `z` (@1): {:?}",
+        app_args[na - 1]
+    );
+
+    // (1) MOTIVE TELESCOPE. Unwrap the ascription, peel idx+scrut, then find the
+    // xs'(Env) binder; h'(Wit) immediately follows and names it (Var 0); z'(Fam)
+    // follows h' and names it (Var 0) — the chained one-telescope threading.
     let motive = match motive {
         Term::Ascript(t, _) => t.as_ref(),
         t => t,
     };
-    // motive = λidx.λscrut. Π(index-eq premise). Π(xs' : Env a idx).
-    //          Π(h' : Wit a idx xs'). goal — walk the telescope past the
-    //          scrutinee binders and the index premises to the Env convoy binder.
-    let mut m = peel_lams(motive, 2);
-    loop {
-        let (dom, cod) = match m {
-            Term::Pi(a, b) => (a.as_ref(), b.as_ref()),
-            other => panic!(
-                "the Env convoy binder must appear in the motive telescope, got {other:?}"
-            ),
-        };
-        if spine_head_id(dom) == Some(env.globals["Env"]) {
-            // The NEXT binder is the transitive `h'`, Wit-typed, and its type
-            // must name THIS Env binder (de Bruijn Var 0) — the signature of one
-            // well-typed telescope substitution, not the ambient `xs`.
-            let wit_dom = match cod {
-                Term::Pi(a, _) => a.as_ref(),
-                other => panic!(
-                    "the Env convoy binder must be followed by the transitive Wit binder, \
-                     got {other:?}"
-                ),
-            };
-            assert_eq!(
-                spine_head_id(wit_dom),
-                Some(env.globals["Wit"]),
-                "the inner convoy binder must be Wit-typed (the captured `h`), got {wit_dom:?}"
-            );
+    let telescope = peel_lams(motive, 2);
+    let (_env_dom, after_env) = telescope_find(telescope, env_id);
+    let (wit_dom, after_wit) = match after_env {
+        Term::Pi(a, b) => (a.as_ref(), b.as_ref()),
+        o => panic!("Env binder must be followed by the Wit binder, got {o:?}"),
+    };
+    assert_eq!(spine_head_id(wit_dom), Some(wit_id), "second binder is Wit (`h'`)");
+    assert!(
+        matches!(spine_last_arg(wit_dom), Some(Term::Var(0))),
+        "Wit binder must name the outer Env binder (Var 0): {wit_dom:?}"
+    );
+    let fam_dom = match after_wit {
+        Term::Pi(a, _) => a.as_ref(),
+        o => panic!("Wit binder must be followed by the Fam binder, got {o:?}"),
+    };
+    assert_eq!(spine_head_id(fam_dom), Some(fam_id), "third binder is Fam (`z'`)");
+    assert!(
+        matches!(spine_last_arg(fam_dom), Some(Term::Var(0))),
+        "Fam binder must name the outer Wit binder (Var 0): {fam_dom:?}"
+    );
+
+    // (2) EVERY METHOD reproduces the xs'/h'/z' convoy telescope in its own
+    // binder chain (not just the motive).
+    assert_eq!(methods.len(), 2, "Fin has exactly two constructors");
+    for (i, method) in methods.iter().enumerate() {
+        let heads = lam_domain_family_heads(method);
+        for (name, fam) in [("Env", env_id), ("Wit", wit_id), ("Fam", fam_id)] {
             assert!(
-                matches!(spine_last_arg(wit_dom), Some(Term::Var(0))),
-                "the inner convoy binder's type must reference the OUTER convoy binder \
-                 (Var 0) — one-telescope threading — got {wit_dom:?}"
+                heads.contains(&Some(fam)),
+                "method {i} must reproduce the {name} convoy binder; domain heads: {heads:?}"
             );
-            return;
         }
-        m = cod;
     }
 }
