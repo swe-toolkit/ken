@@ -32,7 +32,7 @@
 
 use super::*;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "px8-ds-test-support"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum TrapCallerProtocolMutation {
     Exact,
@@ -60,10 +60,14 @@ thread_local! {
         const { std::cell::Cell::new(0) };
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "px8-ds-test-support"))]
 thread_local! {
     static TRAP_CALLER_PROTOCOL_MUTATION: std::cell::Cell<TrapCallerProtocolMutation> =
         const { std::cell::Cell::new(TrapCallerProtocolMutation::Exact) };
+}
+
+#[cfg(test)]
+thread_local! {
     /// **`RT-DECL-CLOSURE-PORT` `D5` — every declaration-owned unit call this
     /// thread actually emitted**, as `(reference occurrence, target origin,
     /// emitted callee)`.
@@ -118,7 +122,7 @@ pub(in crate::cranelift_backend) fn d5_emitted_declaration_calls()
     D5_EMITTED_DECLARATION_CALLS.with(|calls| calls.borrow().clone())
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "px8-ds-test-support"))]
 pub(super) fn set_trap_caller_protocol_mutation(mutation: TrapCallerProtocolMutation) {
     TRAP_CALLER_PROTOCOL_MUTATION.with(|cell| cell.set(mutation));
 }
@@ -182,7 +186,7 @@ impl<'a> Lowering<'a> {
             pending: PendingCheckedIhCall,
             disposition: CheckedApplicationDisposition,
             worker: &StaticWorkerBinding,
-        ) -> Result<Option<LoweringOperand>, CraneliftBackendError> {
+        ) -> Result<Option<CheckedIhCapturedEnvironment>, CraneliftBackendError> {
             if disposition != CheckedApplicationDisposition::ConsumedHere {
                 return Ok(None);
             }
@@ -1857,6 +1861,11 @@ impl<'a> Lowering<'a> {
                         })?;
                         let word = match value {
                             LoweringOperand::Carried(word) => word.word,
+                            LoweringOperand::Specialized(Lowered::StaticResponseDeferred) => {
+                                // Same inert slot transport as `carry_call_input`.
+                                // The response owner never loads parameter zero.
+                                builder.ins().iconst(types::I64, 0)
+                            }
                             LoweringOperand::Specialized(value) => {
                                 // ⚠ **`target.origin` is the CALLEE's scheduling
                                 // entry**, and what still arrives specialized here
@@ -1917,7 +1926,7 @@ impl<'a> Lowering<'a> {
                         builder.ins().stack_store(zero, payload, offset);
                     }
                     AbiSlotKind::Trap => {
-                        #[cfg(test)]
+                        #[cfg(any(test, feature = "px8-ds-test-support"))]
                         let zero = match TRAP_CALLER_PROTOCOL_MUTATION
                             .with(std::cell::Cell::get)
                         {
@@ -1929,13 +1938,13 @@ impl<'a> Lowering<'a> {
                                 builder.ins().iconst(types::I64, 0)
                             }
                         };
-                        #[cfg(not(test))]
+                        #[cfg(not(any(test, feature = "px8-ds-test-support")))]
                         let zero = builder.ins().iconst(types::I64, 0);
                         builder.ins().stack_store(zero, payload, offset);
                         trap_offset = Some(offset);
                     }
                     AbiSlotKind::Result => {
-                        #[cfg(test)]
+                        #[cfg(any(test, feature = "px8-ds-test-support"))]
                         if TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get)
                             == TrapCallerProtocolMutation::ReadResultBeforeTrap
                         {
@@ -2047,7 +2056,7 @@ impl<'a> Lowering<'a> {
             let result_offset = result_offset.ok_or_else(|| {
                 backend_module("callee frame declares no result slot".to_string())
             })?;
-            #[cfg(test)]
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
             if TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get)
                 == TrapCallerProtocolMutation::ReadResultBeforeTrap
             {

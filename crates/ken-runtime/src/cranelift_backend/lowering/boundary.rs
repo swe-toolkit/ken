@@ -43,7 +43,7 @@ pub(in crate::cranelift_backend) enum BoundaryTransferInvokingSite {
 /// ⭐ So the disposition is a function of **this** — the tag alone — and the tag
 /// set is enumerable. `Lowered::variant` and
 /// `LoweredVariant::boundary_disposition` are both `match`es with **no `_`
-/// arm**, so a 22nd `Lowered` variant is a compile error in both.
+/// arm**, so a 23rd `Lowered` variant is a compile error in both.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) enum LoweredVariant {
     Int,
@@ -55,6 +55,7 @@ pub(in crate::cranelift_backend) enum LoweredVariant {
     StructuralNat,
     ResponseBytes,
     HostResult,
+    StaticResponseDeferred,
     DynamicConstructor,
     Bytes,
     BorrowedNativeValue,
@@ -71,7 +72,7 @@ pub(in crate::cranelift_backend) enum LoweredVariant {
 
 impl LoweredVariant {
     /// Every variant, in declaration order.
-    pub(in crate::cranelift_backend) const ALL: [LoweredVariant; 21] = [
+    pub(in crate::cranelift_backend) const ALL: [LoweredVariant; 22] = [
         LoweredVariant::Int,
         LoweredVariant::Bool,
         LoweredVariant::ProcessExitStatus,
@@ -81,6 +82,7 @@ impl LoweredVariant {
         LoweredVariant::StructuralNat,
         LoweredVariant::ResponseBytes,
         LoweredVariant::HostResult,
+        LoweredVariant::StaticResponseDeferred,
         LoweredVariant::DynamicConstructor,
         LoweredVariant::Bytes,
         LoweredVariant::BorrowedNativeValue,
@@ -109,6 +111,7 @@ impl Lowered {
             Lowered::StructuralNat(_) => LoweredVariant::StructuralNat,
             Lowered::ResponseBytes { .. } => LoweredVariant::ResponseBytes,
             Lowered::HostResult { .. } => LoweredVariant::HostResult,
+            Lowered::StaticResponseDeferred => LoweredVariant::StaticResponseDeferred,
             Lowered::DynamicConstructor(_) => LoweredVariant::DynamicConstructor,
             Lowered::Bytes(_) => LoweredVariant::Bytes,
             Lowered::BorrowedNativeValue { .. } => LoweredVariant::BorrowedNativeValue,
@@ -932,7 +935,7 @@ impl BoundaryOutcome {
 /// `#10` evidence measured 41 source-valued transfers and 26-of-154 aggregate
 /// root results; those numbers are *corroboration*. The proof is
 /// [`Lowered::boundary_disposition`]'s exhaustive, wildcard-free `match` over
-/// the 21 landed variants: a 22nd variant is a **compile error** until someone
+/// the 22 landed variants: a 23rd variant is a **compile error** until someone
 /// dispositions it, never a silent default into `ValueWord`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum BoundaryDisposition {
@@ -988,7 +991,7 @@ impl Lowered {
     /// ⇒ Admissibility is a property of the **graph**, not of the root.
     ///
     /// ⛔ **Total and wildcard-free by construction.** Every variant is named,
-    /// so a 22nd `Lowered` inhabitant is a compile error here as well as in
+    /// so a 23rd `Lowered` inhabitant is a compile error here as well as in
     /// `variant()` — a new carrier of children cannot be added without deciding
     /// whether it can hide a closure.
     ///
@@ -1049,6 +1052,10 @@ impl Lowered {
                 "ComputationalMatch",
                 "a computational recursor closure names an in-flight activation, \
                  not a transferable value",
+            )),
+            Lowered::StaticResponseDeferred => Err(unsupported(
+                "StaticResponseDeferred",
+                "a deferred host response is compiler control and can only enter its exact response owner",
             )),
 
             // ── recursive carriers: recurse into EVERY child position ─────
@@ -1281,6 +1288,9 @@ impl LoweredVariant {
                 why: "a computational recursor closure names an in-flight activation, \
                       not a transferable value",
             },
+            LoweredVariant::StaticResponseDeferred => FailClosedForbidden {
+                why: "a deferred host response is compiler control and can only enter its exact response owner",
+            },
 
             // ─── protocol-only ───────────────────────────────────────────
             LoweredVariant::RecursiveBackedge => ProtocolOnly {
@@ -1405,7 +1415,7 @@ mod tests {
     //
     // **MEASURED:** the `boundary_disposition` region of `lowering/mod.rs` contains
     // no `_ =>` arm and names all 21 `Lowered` variants.
-    // **CLAIMED:** adding a 22nd variant is a COMPILE ERROR, so the transfer
+    // **CLAIMED:** adding a 23rd variant is a COMPILE ERROR, so the transfer
     // population is closed structurally rather than by the `#10` histogram.
     // **THE GAP:** the compiler already guarantees exhaustiveness — what it cannot
     // guarantee is that nobody *silences* it. A `_ =>` arm would make a new variant
@@ -1462,7 +1472,7 @@ mod tests {
             );
         }
 
-        // Every one of the 21 landed variants is named. Pinned as the ALLOWED
+        // Every one of the 22 landed variants is named. Pinned as the ALLOWED
         // inventory: a variant renamed or removed reddens here with its own name in
         // the message, where a bare count would only say that something moved.
         for variant in [
@@ -1724,7 +1734,7 @@ mod tests {
     /// whole partition. That is the vacuity route `AC-10` exists to close, and no
     /// amount of "no `_` arm" detects it.
     ///
-    /// ⚠ MEASURED: the policy of every one of the 21 variant **tags**. CLAIMED:
+    /// ⚠ MEASURED: the policy of every one of the 22 variant **tags**. CLAIMED:
     /// each variant has exactly one of five policies. THE GAP: that a policy is a
     /// claim about the *variant* and not about a sampled value — closed structurally
     /// rather than asserted, because `boundary_disposition` now takes
@@ -1734,7 +1744,7 @@ mod tests {
         use std::collections::{BTreeMap, BTreeSet};
 
         // ⛔ The sweep is over the tag set, so it is TOTAL by construction — there
-        // are no 21 values to build and therefore no sampling to get wrong.
+        // are no 22 values to build and therefore no sampling to get wrong.
         let assigned: BTreeMap<LoweredVariant, StaticEncodingPolicy> = LoweredVariant::ALL
             .iter()
             .map(|variant| (*variant, variant.boundary_disposition().policy()))
@@ -1746,7 +1756,7 @@ mod tests {
         );
         assert_eq!(
             assigned.len(),
-            21,
+            22,
             "AC-3: the landed variant count has moved"
         );
 
@@ -1880,11 +1890,11 @@ mod tests {
         use std::collections::BTreeSet;
 
         let cells = BoundaryInput::all();
-        // The product is closed and finite: 21 variants x 2 magnitudes x 3
+        // The product is closed and finite: every variant x 2 magnitudes x 3
         // reachabilities x 2 producers.
         assert_eq!(
             cells.len(),
-            21 * 2 * 3 * 2,
+            LoweredVariant::ALL.len() * 2 * 3 * 2,
             "AC-10: the cell product has moved"
         );
         assert_eq!(
@@ -2139,7 +2149,7 @@ mod tests {
     /// fields. A hand-maintained matrix can drift from the production enums; this
     /// cannot, because there is no matrix to maintain.
     ///
-    /// ⚠ MEASURED: for all 252 cells, every phase the outcome's class requires is
+    /// ⚠ MEASURED: for every derived cell, each required outcome phase is
     /// bound to a named production anchor, and every phase it does not require is
     /// `StructurallyAbsent`. CLAIMED: every admitted partition has one total
     /// executable lifecycle. THE GAP: that each anchor **is** the production item it
@@ -2153,7 +2163,7 @@ mod tests {
         // Positive control FIRST: an empty sweep satisfies every `for` below.
         assert_eq!(
             cells.len(),
-            21 * 2 * 3 * 2,
+            LoweredVariant::ALL.len() * 2 * 3 * 2,
             "RECUT 2: the cell product moved, so this sweep is not over the partition"
         );
 

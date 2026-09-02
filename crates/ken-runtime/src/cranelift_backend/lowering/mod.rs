@@ -276,7 +276,10 @@ pub(in crate::cranelift_backend) use super::planning::{
     AggregateOccurrenceId, PlannedAggregateAllocation, PlannedAggregateShape,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,
-    JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
+    JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
+    StaticResponseContinuation, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
+    StaticResponseFrameSource, StaticResponseOwnerId,
+    StaticResponseOwnerSpecialization, StaticTransitionPlan,
     verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
@@ -949,6 +952,7 @@ impl ArtifactHelpers<'_> {
             raw_worker_calls: BTreeMap::new(),
             worker_templates: BTreeMap::new(),
             context_calls: BTreeMap::new(),
+            static_response_owner: None,
             defining_abi_operands: Vec::new(),
             #[cfg(test)]
             defining_abi_slot_kinds: Vec::new(),
@@ -1176,6 +1180,7 @@ struct FunctionLocalRefs {
     /// binding from body origin" the ruling forbids. Minted per function; no
     /// `FuncRef` crosses a function.
     context_calls: BTreeMap<ContinuationContextId, units::DeclaredUnitCall>,
+    static_response_owner: Option<StaticResponseOwnerId>,
     /// **`RT-DECL-CLOSURE-PORT` `D5a` checkpoint 4 step 1b** -- this function's
     /// own ABI-slot operands, indexed by ABI position.
     ///
@@ -3430,6 +3435,11 @@ enum Lowered {
         err_constructor: String,
         ok_constructor: String,
     },
+    /// Compile-only marker for source work relocated into a statically selected
+    /// response owner. Generated-unit crossings write an inert zero into the
+    /// operation slot, and the owner never loads that slot; no tag, selector, or
+    /// response value is encoded in it.
+    StaticResponseDeferred,
     DynamicConstructor(DynamicConstructorV1),
     Bytes(Vec<u8>),
     BorrowedNativeValue {
@@ -3751,6 +3761,137 @@ struct BoundaryCarrierRefs {
 #[derive(Clone, Copy, Debug)]
 struct CarriedBoundaryWord {
     word: cranelift_codegen::ir::Value,
+}
+
+/// The capture-only runtime aggregate produced for a checked-IH application.
+///
+/// This private role type deliberately has no conversion to
+/// [`CheckedIhApplicationResult`]. Although both roles contain one carrier word,
+/// only the Direct application emitter may turn the captured fields into a
+/// result by issuing the planner-selected continuation call.
+#[derive(Clone, Copy, Debug)]
+struct CheckedIhCapturedEnvironment {
+    word: CarriedBoundaryWord,
+}
+
+impl CheckedIhCapturedEnvironment {
+    fn into_operand(self) -> LoweringOperand {
+        LoweringOperand::Carried(self.word)
+    }
+}
+
+/// The Trap-checked result of one governed checked-IH continuation call.
+///
+/// Construction is confined to the declared-call consumer. In particular,
+/// there is no `From<CheckedIhCapturedEnvironment>` implementation and no
+/// shared raw-word constructor between the two semantic roles.
+#[derive(Clone, Copy, Debug)]
+struct CheckedIhApplicationResult {
+    word: CarriedBoundaryWord,
+}
+
+impl CheckedIhApplicationResult {
+    fn from_declared_call(result: LoweringOperand) -> Result<Self, CraneliftBackendError> {
+        match result {
+            LoweringOperand::Carried(word) => Ok(Self { word }),
+            LoweringOperand::Specialized(_) => Err(unsupported(
+                "CheckedIhApplicationResult",
+                "a governed checked-IH continuation call returned a specialized template instead of its Trap-checked runtime Result",
+            )),
+        }
+    }
+
+    fn into_routed_answer(self) -> RoutedAnswer {
+        RoutedAnswer::checked(LoweringOperand::Carried(self.word))
+    }
+}
+
+/// Population-side controls for the Direct checked-IH application relation.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckedIhDirectApplicationMutation {
+    Exact,
+    DropCall,
+    VaryTransportIdentity,
+    PermuteCaptures,
+    DropCapture,
+    EnvironmentForResult,
+}
+
+/// One reached Direct application, keyed by source application provenance.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CheckedIhDirectApplicationObservation {
+    pub defining_function: Option<u32>,
+    pub invocation_origin: String,
+    pub application_origin: String,
+    pub callee_origin: String,
+    pub source_call_identity: String,
+    pub capture_count: usize,
+    pub emitted_call_count: usize,
+    pub emitted_call: Option<String>,
+    pub application_result_from_call: bool,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static CHECKED_IH_DIRECT_APPLICATION_MUTATION:
+        std::cell::Cell<CheckedIhDirectApplicationMutation> =
+        const { std::cell::Cell::new(CheckedIhDirectApplicationMutation::Exact) };
+    static CHECKED_IH_DIRECT_APPLICATION_OBSERVATIONS:
+        std::cell::RefCell<Vec<CheckedIhDirectApplicationObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    static CHECKED_IH_DIRECT_APPLICATION_MUTATION_APPLICATIONS:
+        std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_checked_ih_direct_application_mutation<T>(
+    mutation: CheckedIhDirectApplicationMutation,
+    run: impl FnOnce() -> T,
+) -> (T, Vec<CheckedIhDirectApplicationObservation>, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CHECKED_IH_DIRECT_APPLICATION_MUTATION
+                .with(|active| active.set(CheckedIhDirectApplicationMutation::Exact));
+            CHECKED_IH_DIRECT_APPLICATION_OBSERVATIONS
+                .with(|observations| observations.borrow_mut().clear());
+            CHECKED_IH_DIRECT_APPLICATION_MUTATION_APPLICATIONS
+                .with(|applications| applications.set(0));
+        }
+    }
+    CHECKED_IH_DIRECT_APPLICATION_MUTATION.with(|active| active.set(mutation));
+    CHECKED_IH_DIRECT_APPLICATION_OBSERVATIONS
+        .with(|observations| observations.borrow_mut().clear());
+    CHECKED_IH_DIRECT_APPLICATION_MUTATION_APPLICATIONS.with(|applications| applications.set(0));
+    let restore = Restore;
+    let result = run();
+    let observations =
+        CHECKED_IH_DIRECT_APPLICATION_OBSERVATIONS.with(|held| held.borrow().clone());
+    let applications =
+        CHECKED_IH_DIRECT_APPLICATION_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    drop(restore);
+    (result, observations, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn checked_ih_direct_application_mutation_is_exact() -> bool {
+    CHECKED_IH_DIRECT_APPLICATION_MUTATION
+        .with(|active| active.get() == CheckedIhDirectApplicationMutation::Exact)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn checked_ih_direct_application_mutation() -> CheckedIhDirectApplicationMutation {
+    CHECKED_IH_DIRECT_APPLICATION_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_checked_ih_direct_application(observation: CheckedIhDirectApplicationObservation) {
+    CHECKED_IH_DIRECT_APPLICATION_MUTATION_APPLICATIONS
+        .with(|applications| applications.set(applications.get().saturating_add(1)));
+    CHECKED_IH_DIRECT_APPLICATION_OBSERVATIONS
+        .with(|observations| observations.borrow_mut().push(observation));
 }
 
 /// ⭐ **The closed PHASE sum — which phase a lowering operand is in, not what
@@ -5890,6 +6031,7 @@ fn d9_collect(
         // comment above states as a boundary rather than hiding.
         Lowered::Bytes(_)
         | Lowered::String(_)
+        | Lowered::StaticResponseDeferred
         | Lowered::RecursiveBackedge
         | Lowered::Trap(_) => {}
     }
@@ -6843,6 +6985,14 @@ impl<'a> Lowering<'a> {
         );
         match input {
             LoweringOperand::Carried(word) => Ok(LoweringOperand::Carried(word)),
+            LoweringOperand::Specialized(Lowered::StaticResponseDeferred) => {
+                // The selected owner reconstructs the operation solely from its
+                // typed response plan and mapped captures. This word occupies the
+                // unchanged ABI slot en route and is never inspected or decoded.
+                Ok(LoweringOperand::Carried(CarriedBoundaryWord {
+                    word: builder.ins().iconst(types::I64, 0),
+                }))
+            }
             LoweringOperand::Specialized(value) => {
                 let value = self.unit_boundary_environment_record(value)?;
                 Ok(LoweringOperand::Carried(
@@ -7038,7 +7188,7 @@ impl<'a> Lowering<'a> {
     /// For every causal token this function emitted a call for, prove
     ///
     /// ```text
-    /// bundle.continuation(identity.target())  ==  callee decoded from the CLIF
+    /// resolved_continuation_call_target(identity) == callee decoded from CLIF
     /// ```
     ///
     /// **The two sides come from different producers.** The left is the
@@ -7068,13 +7218,11 @@ impl<'a> Lowering<'a> {
     ) -> Result<(), CraneliftBackendError> {
         let mut expected_by_callee: BTreeMap<FuncId, usize> = BTreeMap::new();
         for (identity, inst) in &self.function_local.continuation_emissions {
-            let planned = bundle.continuation(identity.target()).ok_or_else(|| {
-                backend_module(
-                    "an emitted causal token names a specialization that was never \
-                     forward-declared"
-                        .to_string(),
-                )
-            })?;
+            let planned = units::resolved_continuation_call_target(
+                &self.static_transition_plan,
+                bundle,
+                identity,
+            )?;
             let emitted = Self::decode_direct_callee(func, *inst)?;
             if emitted != planned {
                 return Err(backend_module(format!(
@@ -7097,14 +7245,11 @@ impl<'a> Lowering<'a> {
                         .to_string(),
                 ));
             }
-            let planned = bundle
-                .continuation(transport.source_specialization())
-                .ok_or_else(|| {
-                    backend_module(
-                        "a checked-IH transport source specialization was never forward-declared"
-                            .to_string(),
-                    )
-                })?;
+            let planned = units::resolved_continuation_call_target(
+                &self.static_transition_plan,
+                bundle,
+                transport.source_call_identity(),
+            )?;
             let emitted = Self::decode_direct_callee(func, *inst)?;
             if emitted != planned {
                 return Err(backend_module(
@@ -7139,6 +7284,7 @@ impl<'a> Lowering<'a> {
             })?;
             specialization_callees.insert(id);
         }
+        specialization_callees.extend(bundle.response_targets());
         // ⛔ Not a fast path around the check: with no planned specialization
         // there is no callee the scan could recognise, and the loop above has
         // already rejected any recorded emission naming one -- so `expected` is
@@ -7879,6 +8025,7 @@ impl Lowered {
                 | Lowered::BorrowedNativeValue { .. }
                 | Lowered::BorrowedOption { .. }
                 | Lowered::String(_)
+                | Lowered::StaticResponseDeferred
                 | Lowered::ComputationalRecursorClosure { .. }
                 | Lowered::RecursiveBackedge
                 | Lowered::Trap(_) => None,
@@ -13031,6 +13178,7 @@ impl<'a> Lowering<'a> {
             | Lowered::BoundedNat(_)
             | Lowered::StructuralNat(_)
             | Lowered::HostResult { .. }
+            | Lowered::StaticResponseDeferred
             | Lowered::DynamicConstructor(_) => Err(unsupported(
                 "Result",
                 "borrowed ingress values cannot escape the native call",
@@ -13106,6 +13254,7 @@ fn lowered_value_kind(value: &Lowered) -> &'static str {
         Lowered::StructuralNat(_) => "StructuralNat",
         Lowered::ResponseBytes { .. } => "ResponseBytes",
         Lowered::HostResult { .. } => "HostResult",
+        Lowered::StaticResponseDeferred => "StaticResponseDeferred",
         Lowered::DynamicConstructor(_) => "DynamicConstructor",
         Lowered::Bytes(_) => "Bytes",
         Lowered::BorrowedNativeValue { .. } => "BorrowedNativeValue",
