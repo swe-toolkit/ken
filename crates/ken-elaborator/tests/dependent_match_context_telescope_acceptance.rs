@@ -43,22 +43,39 @@ fn spine_last_arg(t: &Term) -> Option<&Term> {
     }
 }
 
-/// The family-former `GlobalId` at the head of each `Term::Lam` DOMAIN reachable
-/// by peeling `Lam`/`Pi` layers from `t` (used to prove a method reproduces the
-/// convoy binders in its own telescope).
-fn lam_domain_family_heads(t: &Term) -> Vec<Option<GlobalId>> {
-    let mut heads = Vec::new();
+/// The `Term::Lam`/`Term::Pi` DOMAIN terms reachable by peeling binder layers
+/// from `t`, in order (used to inspect a method's own binder telescope
+/// POSITIONALLY, so the convoy binders' order and dependent references are
+/// checked, not mere family-head membership).
+fn lam_pi_domains(t: &Term) -> Vec<&Term> {
+    let mut doms = Vec::new();
     let mut cur = t;
     loop {
         match cur {
             Term::Lam(dom, body) | Term::Pi(dom, body) => {
-                heads.push(spine_head_id(dom));
+                doms.push(dom.as_ref());
                 cur = body.as_ref();
             }
             _ => break,
         }
     }
-    heads
+    doms
+}
+
+/// The application-spine argument `k` positions from the end (`k = 0` is the last
+/// applied argument, `k = 1` the one before it).
+fn spine_arg_from_end(t: &Term, k: usize) -> Option<&Term> {
+    let mut cur = t;
+    for _ in 0..k {
+        cur = match cur {
+            Term::App(f, _) => f.as_ref(),
+            _ => return None,
+        };
+    }
+    match cur {
+        Term::App(_, arg) => Some(arg.as_ref()),
+        _ => None,
+    }
 }
 
 /// Walk a `Pi` telescope until a domain's spine head is `fam`; return the pair
@@ -322,15 +339,50 @@ fn elim_carries_convoy_telescope_in_motive_methods_and_application() {
     );
 
     // (2) EVERY METHOD reproduces the xs'/h'/z' convoy telescope in its own
-    // binder chain (not just the motive).
+    // binder chain, IN ORDER, with the dependent references — not mere family-
+    // head membership (a membership check accepts Fam/Wit/Env, duplicates, or
+    // separated occurrences; a detector-side `doms.reverse()` must red this).
+    // Traverse each method's binders past its fields / IHs / constructor+index
+    // premises to the FIRST Env convoy binder; the next two binders must be Wit
+    // then Fam, Wit naming the immediately preceding Env (Var 0), and Fam naming
+    // the immediately preceding Wit (Var 0) AND the outer Env (Var 1).
     assert_eq!(methods.len(), 2, "Fin has exactly two constructors");
     for (i, method) in methods.iter().enumerate() {
-        let heads = lam_domain_family_heads(method);
-        for (name, fam) in [("Env", env_id), ("Wit", wit_id), ("Fam", fam_id)] {
-            assert!(
-                heads.contains(&Some(fam)),
-                "method {i} must reproduce the {name} convoy binder; domain heads: {heads:?}"
-            );
-        }
+        let doms = lam_pi_domains(method);
+        let env_pos = doms
+            .iter()
+            .position(|d| spine_head_id(d) == Some(env_id))
+            .unwrap_or_else(|| panic!("method {i}: no Env convoy binder in its telescope"));
+        assert!(
+            env_pos + 2 < doms.len(),
+            "method {i}: the Env convoy binder must be followed by two more binders"
+        );
+        let wit_dom = doms[env_pos + 1];
+        let fam_dom = doms[env_pos + 2];
+        assert_eq!(
+            spine_head_id(wit_dom),
+            Some(wit_id),
+            "method {i}: the binder immediately after Env must be Wit, got {wit_dom:?}"
+        );
+        assert!(
+            matches!(spine_last_arg(wit_dom), Some(Term::Var(0))),
+            "method {i}: the Wit binder must name the immediately preceding Env binder \
+             (Var 0), got {wit_dom:?}"
+        );
+        assert_eq!(
+            spine_head_id(fam_dom),
+            Some(fam_id),
+            "method {i}: the binder immediately after Wit must be Fam, got {fam_dom:?}"
+        );
+        assert!(
+            matches!(spine_last_arg(fam_dom), Some(Term::Var(0))),
+            "method {i}: the Fam binder must name the immediately preceding Wit binder \
+             (Var 0), got {fam_dom:?}"
+        );
+        assert!(
+            matches!(spine_arg_from_end(fam_dom, 1), Some(Term::Var(1))),
+            "method {i}: the Fam binder must also name the outer Env binder (Var 1), \
+             got {fam_dom:?}"
+        );
     }
 }
