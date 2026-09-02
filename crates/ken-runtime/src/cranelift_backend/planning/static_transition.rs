@@ -87,6 +87,7 @@ pub(in crate::cranelift_backend) use responses::{
     StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
     StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
+    StaticResponsePhaseA,
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use responses::{
@@ -590,6 +591,13 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// placeholder; its operation root and host effect fall through to main's
     /// pre-WP lowering (R3).
     static_response_deferred: Vec<DeferredResponseRow>,
+    /// Phase-A carry of the two-phase response context install (RECUT 2, HS5):
+    /// the owner-less demand + P1 population minted at install
+    /// (construction.rs:1213), consumed by
+    /// `install_static_response_context_plan_phase_b` post-:1251. `Some` after
+    /// phase A on a feasible plane; `None` before phase A, after phase B (taken),
+    /// or on an opaque-K refusal (which sets `static_response_infeasible` instead).
+    static_response_phase_a: Option<StaticResponsePhaseA>,
     /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`. The interned fusion identity
     /// plane, **installed after planning rather than during it**.
     ///

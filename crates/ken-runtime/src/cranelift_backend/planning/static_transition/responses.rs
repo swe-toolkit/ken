@@ -393,6 +393,20 @@ impl DeferredResponseRow {
     }
 }
 
+/// Phase-A carry of the two-phase response context install (RECUT 2, HS5). Built
+/// by [`StaticTransitionPlan::install_static_response_context_plan`] at
+/// construction.rs:1213 and consumed by
+/// [`StaticTransitionPlan::install_static_response_context_plan_phase_b`]
+/// post-:1251. `demands` is the whole has-K-unit population (owner-additive, no
+/// Specialized/Deferred split yet); `deferred` holds P1 only; `preexisting_count`
+/// is the causal context prefix length that phase B's owner resolution needs.
+#[derive(Clone, Debug)]
+pub(in crate::cranelift_backend) struct StaticResponsePhaseA {
+    demands: Vec<StaticResponseContextDemand>,
+    preexisting_count: usize,
+    deferred: Vec<DeferredResponseRow>,
+}
+
 /// Identity of one compile-time response-owner function. This domain is
 /// deliberately non-convertible to continuation/context identities: an owner
 /// implements one selected incoming edge and later calls a K context; it is not
@@ -1322,14 +1336,21 @@ impl StaticTransitionPlan<'_> {
         );
 
         let mut demands = Vec::new();
-        // The complete Deferred residual (recut amendment evt_4ar3rxzrra5v4):
-        // P1 (no continuation unit) captured here, P2 (unit present but an
-        // unconsumed transport caller) captured inside the unit loop. Populated,
-        // never an absence, so classify is congruent with `demands` over the full
-        // response-Vis population (AC-1) and every consumer reconciles the
-        // residual by total match (R2).
+        // PHASE A (RECUT 2, HS5 two-phase, Architect evt_7eh84c8n6w08e). This
+        // pass runs at install (construction.rs:1213), BEFORE aggregate_ownership
+        // and the transport records exist, so it CANNOT yet decide P2
+        // (transport-caller) membership -- that fact is genuinely post-install
+        // (the z1315 cycle). Phase A therefore builds a context demand for EVERY
+        // has-K-unit member (owner-additive: the whole P2-union-Specialized
+        // context-entry domain) and captures ONLY P1 (no continuation unit) as a
+        // Deferred residual here. The Specialized/P2 split and owner assignment
+        // happen in phase B (`static_response_phase_b_split`, post-:1251), where
+        // the record-derived transport set is final. Congruence over the full
+        // response-Vis population (AC-1) and total-match reconciliation (R2/§7)
+        // hold across the two phases: phase A's demand domain is has-K-unit, phase
+        // B's disposition domain is the whole population (P1 sealed via its own
+        // Deferred arm).
         let mut deferred: Vec<DeferredResponseRow> = Vec::new();
-        let transport_sources = self.checked_ih_environment_transport_source_identities();
         for (vis_origin, operation_root_origin, selected_operation_origin, route, k_is_opaque) in
             response_vis
         {
@@ -1403,41 +1424,14 @@ impl StaticTransitionPlan<'_> {
                             "a static response producer's own edge has no continuation call identity",
                         )
                     })?;
-                // P2 (recut amendment evt_4ar3rxzrra5v4; discriminator answer (b),
-                // grounded). A continuation unit exists, but if the selected
-                // caller is a checked-IH environment transport source it settles
-                // TransportDormant at lowering (never retargeted to a real call) --
-                // the present-but-unconsumed placeholder that leaked as HS3-b (same
-                // root as HS3-a disposition=None). "Consumed" is thus decided ONCE
-                // here at planning (R2) from a planning-available fact: membership
-                // in `checked_ih_environment_transport_source_identities()` (the
-                // transport sources are validated to the D3 CheckedIhCapturedEnvironment
-                // role -- proven equal to non-consumption for this case, not a mere
-                // proxy). Classify it Deferred: build no demand, so no owner and no
-                // StaticResponseDeferred placeholder are ever emitted for it; its
-                // operation root / effect fall through to main's pre-WP lowering.
-                // AC-7 pins this planning verdict against the lowering
-                // CandidateDisposition.
-                // AC-7 mutation: when the force-specialize hook is set, SKIP the
-                // Deferred classification so this transport-caller response is
-                // built as a Specialized demand instead -- injecting the FM1 error
-                // (a forward-declared owner whose caller is never consumed) that
-                // validate_response_owner_call_coverage must catch downstream.
-                #[cfg(feature = "px8-ds-test-support")]
-                let force_specialize =
-                    FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(std::cell::Cell::get);
-                #[cfg(not(feature = "px8-ds-test-support"))]
-                let force_specialize = false;
-                if !force_specialize && transport_sources.contains(&k_identity) {
-                    deferred.push(DeferredResponseRow {
-                        vis_origin,
-                        operation_root_origin,
-                        effect_origin: route.effect_origin,
-                        operation: route.operation,
-                        sub_case: DeferredResponseSubCase::UnconsumedTransportCaller,
-                    });
-                    continue;
-                }
+                // Phase A builds a demand for this has-K-unit member
+                // UNCONDITIONALLY (owner-additive). Whether it becomes Specialized
+                // (owner assigned) or P2-Deferred (a checked-IH environment
+                // transport caller, which never retargets to a real call -- the
+                // HS3-b leak shape) is decided in phase B from the post-:1251
+                // record-derived transport set, keyed on this demand's `k_identity`.
+                // See `static_response_phase_b_split`; AC-7's force-specialize hook
+                // also lives there now.
                 let k_ret_identity = match exact_response_ret_identity(
                     self,
                     unit.continuation_origin(),
@@ -1967,47 +1961,153 @@ impl StaticTransitionPlan<'_> {
         Ok(resolved)
     }
 
-    /// Install the complete validated response demand population into the
-    /// ordinary generated-context identity plane.
-    ///
-    /// This runs exactly once after causal specialization planning closes and
-    /// before any context ABI is installed. A typed SSA refusal publishes no
-    /// partial response rows and leaves the causal context population intact.
+    /// PHASE A of the two-phase response context install (RECUT 2, HS5, Architect
+    /// evt_7eh84c8n6w08e). Runs once at construction.rs:1213, after causal
+    /// specialization planning closes and BEFORE the context ABI (:1221) and
+    /// before `aggregate_ownership`/transports (:1249/:1251) exist. It mints
+    /// owner-LESS `PlannedContinuationContext` entries over the whole has-K-unit
+    /// population (owner-additive) so the context ABI covers them, and captures
+    /// P1 (no continuation unit). It assigns NO owners and installs NO
+    /// Specialized/Deferred split -- that is genuinely post-install and is done in
+    /// [`Self::install_static_response_context_plan_phase_b`]. A typed SSA refusal
+    /// (opaque/dynamic K) publishes no partial rows and leaves the causal context
+    /// population intact.
     pub(super) fn install_static_response_context_plan(
         &mut self,
     ) -> Result<(), CraneliftBackendError> {
-        if self.static_response_plan_installed {
+        if self.static_response_plan_installed
+            || self.static_response_phase_a.is_some()
+            || self.static_response_infeasible.is_some()
+        {
             return Err(planner_error(
-                "the static response context plan may be installed exactly once",
+                "the static response context plan phase A may run exactly once",
             ));
         }
         let (demands, deferred) = match self.static_response_context_demands_filtered(None, true)? {
             Ok(classified) => classified,
             Err(infeasible) => {
                 self.static_response_infeasible = Some(infeasible);
-                self.static_response_plan_installed = true;
                 return Ok(());
             }
         };
         let causal_contexts = self.continuation_contexts.clone();
         let (contexts, preexisting_count) =
             self.response_context_union(&causal_contexts, &demands)?;
-        let rows = self.resolve_static_response_context_demands(
-            demands,
-            &contexts,
-            preexisting_count,
-        )?;
         self.continuation_contexts = contexts;
+        self.static_response_phase_a = Some(StaticResponsePhaseA {
+            demands,
+            preexisting_count,
+            deferred,
+        });
+        Ok(())
+    }
+
+    /// PHASE B of the two-phase response context install (RECUT 2, HS5). Runs once
+    /// after construction.rs:1251, where `aggregate_ownership` and the transport
+    /// records are final, so the exact record-derived transport-source set -- the
+    /// real Deferred/Specialized discriminator (a coordinate-run source WITH a
+    /// transport destination) -- exists. It splits phase A's has-K-unit demands
+    /// into Specialized (owner assigned) and P2 (unconsumed transport caller, no
+    /// owner), records P1 UNION P2 as the complete Deferred residual, and seals
+    /// the install. Owner-ADDITIVE: phase A's context entries are never retracted.
+    pub(super) fn install_static_response_context_plan_phase_b(
+        &mut self,
+    ) -> Result<(), CraneliftBackendError> {
+        if self.static_response_plan_installed {
+            return Err(planner_error(
+                "the static response context plan phase B may run exactly once",
+            ));
+        }
+        if self.static_response_infeasible.is_some() {
+            // Phase A refused the whole plane on an opaque/dynamic K; there is no
+            // Specialized/Deferred population to split. Seal the install.
+            self.static_response_plan_installed = true;
+            return Ok(());
+        }
+        let phase_a = self.static_response_phase_a.take().ok_or_else(|| {
+            planner_error(
+                "the static response context plan phase B ran before phase A installed the demands",
+            )
+        })?;
+        let (specialized, mut deferred) =
+            self.static_response_phase_b_split(phase_a.demands)?;
+        deferred.extend(phase_a.deferred);
+        deferred.sort_by_key(|row| (row.vis_origin, row.operation_root_origin, row.operation));
+        let contexts = self.continuation_contexts.clone();
+        let rows = self.resolve_static_response_context_demands(
+            specialized,
+            &contexts,
+            phase_a.preexisting_count,
+        )?;
         self.static_response_continuations = rows;
         self.static_response_deferred = deferred;
         self.static_response_plan_installed = true;
         Ok(())
     }
 
-    /// Re-derive the post-install response plane from the independently derived
-    /// causal prefix. This is the final-plan validator's response half; it keeps
-    /// the old specialization derivation exact over its own prefix rather than
-    /// weakening that validator to accept an arbitrary context suffix.
+    /// The phase-B Deferred/Specialized split (RECUT 2, HS5). Given phase A's
+    /// whole has-K-unit demand population, key each demand's `k_identity` against
+    /// the record-derived transport-source set (final post-:1251): a transport
+    /// source is P2-Deferred (an unconsumed transport caller, never retargeted to
+    /// a real owner call -- the HS3-b leak shape); everything else is Specialized.
+    /// The Specialized subset is re-sorted and re-numbered contiguously, so the
+    /// owner-row identities are exactly the single-phase result over that subset.
+    /// This read is closed for the validator: it depends only on the finalized
+    /// transport records, identical at install-phase-B and at validation.
+    fn static_response_phase_b_split(
+        &self,
+        demands: Vec<StaticResponseContextDemand>,
+    ) -> Result<(Vec<StaticResponseContextDemand>, Vec<DeferredResponseRow>), CraneliftBackendError>
+    {
+        let transport_sources = self.checked_ih_environment_transport_source_identities();
+        let mut specialized = Vec::new();
+        let mut deferred = Vec::new();
+        for demand in demands {
+            // AC-7 mutation: when the force-specialize hook is set, a transport
+            // caller is NOT deferred but built as a Specialized owner instead --
+            // injecting the FM1 error (a forward-declared owner whose caller is
+            // never consumed) that `validate_response_owner_call_coverage` must
+            // catch. The hook is NOT apply_mutation-gated: it applies identically
+            // at install-phase-B and at the validator's re-derivation, so it does
+            // NOT trip the closed-derivation validator (which is exactly what
+            // distinguishes it from the apply_mutation-gated demand mutations).
+            #[cfg(feature = "px8-ds-test-support")]
+            let force_specialize = FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(std::cell::Cell::get);
+            #[cfg(not(feature = "px8-ds-test-support"))]
+            let force_specialize = false;
+            if !force_specialize && transport_sources.contains(&demand.k_identity) {
+                deferred.push(DeferredResponseRow {
+                    vis_origin: demand.vis_origin,
+                    operation_root_origin: demand.operation_root_origin,
+                    effect_origin: demand.effect_origin,
+                    operation: demand.operation,
+                    sub_case: DeferredResponseSubCase::UnconsumedTransportCaller,
+                });
+            } else {
+                specialized.push(demand);
+            }
+        }
+        specialized.sort_by_key(|demand| {
+            (
+                demand.producer_call_origin,
+                demand.vis_origin,
+                demand.k_identity.clone(),
+            )
+        });
+        for (position, demand) in specialized.iter_mut().enumerate() {
+            demand.id = StaticResponseContinuationId::from_position(position)?;
+        }
+        Ok((specialized, deferred))
+    }
+
+    /// Re-derive the complete post-install response plane from the two phases'
+    /// own inputs and assert byte-equality with what was installed -- the
+    /// closed-derivation invariant (RECUT 2, HS5, AC-9). Phase A is re-derived
+    /// from the causal-prefix context population (the argument); phase B's
+    /// Specialized/Deferred split is re-derived from the SAME finalized post-:1251
+    /// transport records the install read, so both halves are closed by
+    /// same-state re-derivation and a phase-unstable or over-admitting input can
+    /// no longer pass.
     pub(super) fn validate_static_response_context_plan(
         &self,
         causal_contexts: &[PlannedContinuationContext],
@@ -2017,34 +2117,42 @@ impl StaticTransitionPlan<'_> {
                 "the final plan carries no installed static response context plan",
             ));
         }
-        let (demands, deferred) = match self.static_response_context_demands_filtered(None, false)? {
-            Ok(classified) => classified,
-            Err(infeasible) => {
-                let mut landed_contexts = self.continuation_contexts.clone();
-                for context in &mut landed_contexts {
-                    context.finalized_availability.clear();
+        let (demands, p1_deferred) =
+            match self.static_response_context_demands_filtered(None, false)? {
+                Ok(classified) => classified,
+                Err(infeasible) => {
+                    let mut landed_contexts = self.continuation_contexts.clone();
+                    for context in &mut landed_contexts {
+                        context.finalized_availability.clear();
+                    }
+                    if self.static_response_infeasible.as_ref() != Some(&infeasible)
+                        || !self.static_response_continuations.is_empty()
+                        || !self.static_response_deferred.is_empty()
+                        || landed_contexts != causal_contexts
+                    {
+                        return Err(planner_error(
+                            "the installed typed SSA refusal disagrees with its complete re-derivation",
+                        ));
+                    }
+                    return Ok(());
                 }
-                if self.static_response_infeasible.as_ref() != Some(&infeasible)
-                    || !self.static_response_continuations.is_empty()
-                    || !self.static_response_deferred.is_empty()
-                    || landed_contexts != causal_contexts
-                {
-                    return Err(planner_error(
-                        "the installed typed SSA refusal disagrees with its complete re-derivation",
-                    ));
-                }
-                return Ok(());
-            }
-        };
+            };
         if self.static_response_infeasible.is_some() {
             return Err(planner_error(
                 "a feasible response derivation retained a stale typed SSA refusal",
             ));
         }
+        // Phase A re-derivation: the owner-less context-entry plane over has-K-unit.
         let (mut expected_contexts, preexisting_count) =
             self.response_context_union(causal_contexts, &demands)?;
+        // Phase B re-derivation: split the same demands by the same finalized
+        // transport records; Specialized get owners, P1 UNION P2 is the residual.
+        let (specialized, mut expected_deferred) = self.static_response_phase_b_split(demands)?;
+        expected_deferred.extend(p1_deferred);
+        expected_deferred
+            .sort_by_key(|row| (row.vis_origin, row.operation_root_origin, row.operation));
         let expected_rows = self.resolve_static_response_context_demands(
-            demands,
+            specialized,
             &expected_contexts,
             preexisting_count,
         )?;
@@ -2057,7 +2165,7 @@ impl StaticTransitionPlan<'_> {
         }
         if landed_contexts != expected_contexts
             || self.static_response_continuations != expected_rows
-            || self.static_response_deferred != deferred
+            || self.static_response_deferred != expected_deferred
         {
             return Err(planner_error(
                 "the installed response context/continuation plane is not its exact closed derivation",

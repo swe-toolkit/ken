@@ -298,6 +298,7 @@ impl<'src> Planner<'src> {
                 static_response_plan_installed: false,
                 static_response_infeasible: None,
                 static_response_deferred: Vec::new(),
+                static_response_phase_a: None,
                 // Empty by construction: the planner has no oriented plan, so a
                 // fusion identity cannot exist yet. `D2f`'s post-planner
                 // installer is the only writer.
@@ -1254,6 +1255,15 @@ impl<'src> Planner<'src> {
             &self.plan,
             &self.plan.checked_ih_environment_transports,
         )?;
+        // PHASE B of the response context install (RECUT 2, HS5, Architect
+        // evt_7eh84c8n6w08e). aggregate_ownership and the transport records are
+        // now final, so the exact record-derived transport-source set -- the real
+        // Deferred/Specialized discriminator -- exists. Phase A (:1213) minted the
+        // owner-less context entries the context ABI (:1221) already covers; this
+        // assigns owners to Specialized and seals the P1 UNION P2 residual. The
+        // determination is genuinely post-install (the z1315 cycle), so it cannot
+        // run at :1213; owner-additive, so phase A's entries are untouched.
+        self.plan.install_static_response_context_plan_phase_b()?;
         self.plan.checked_ih_continuation_inheritances =
             build_checked_ih_continuation_inheritances(&self.plan)?;
         #[cfg(feature = "px8-ds-test-support")]
