@@ -676,10 +676,10 @@ impl CallEdgeTargets {
     }
 
     #[cfg(feature = "px8-ds-test-support")]
-    fn sole_unrelated_static_body_owner(
+    fn substitute_unrelated_owner_roots(
         &self,
         root: PredeclaredFunctionId,
-    ) -> Result<PredeclaredFunctionId, CraneliftBackendError> {
+    ) -> Result<Vec<PredeclaredFunctionId>, CraneliftBackendError> {
         let mut pending = vec![root];
         let mut reachable = BTreeSet::new();
         while let Some(owner) = pending.pop() {
@@ -694,8 +694,9 @@ impl CallEdgeTargets {
         }
 
         // Select by the typed graph relation, never by an id, iteration order,
-        // retained-body shape, or a later lookup miss. Requiring exactly one
-        // candidate makes ambiguity a refusal rather than a preference.
+        // retained-body shape, or a later lookup miss. More than one candidate is
+        // ambiguity and stays a refusal (choosing by preference or order is
+        // forbidden).
         let candidates = self
             .edges
             .iter()
@@ -704,22 +705,45 @@ impl CallEdgeTargets {
                     .then_some(*owner)
             })
             .collect::<BTreeSet<_>>();
-        if candidates.len() != 1 {
-            return Err(backend_module(format!(
-                "retained-unit root control requires exactly one unrelated legal static-body \
-                 owner, found {}",
-                candidates.len()
-            )));
+        match candidates.len() {
+            0 => {
+                // RT-SSA HS2 relocation (Architect re-rule evt_2427xbynt1d2e /
+                // evt_73h2ayt1acw9). A program whose every composed-return response
+                // fell back to main lowering (the deferred D3 frontier, e.g.
+                // checked writeAll) has NO specialization owner, so there is no
+                // unrelated legal static-body owner to substitute. That is the
+                // correct arm-(b) consequence of the Q1 fall-through, not a
+                // production defect (this helper is px8-ds-test-support only). The
+                // mutation is still exercised as its limiting case: an empty
+                // traversal root is the maximally-unrelated substitute, and it
+                // leaves the retained body with no graph-derived call target in the
+                // generated unit exactly as a concrete unrelated root would (the
+                // rejection fires downstream in `call_declared_unit`, byte-identical
+                // to the sibling suppress-graph-claims control). It is NOT a bare
+                // skip: the retained-body-target rejection is still proven.
+                eprintln!(
+                    "retained-unit root control replaced checked root {root:?} with an empty \
+                     traversal: no unrelated legal static-body owner exists (every composed \
+                     response fell back to main lowering)"
+                );
+                Ok(Vec::new())
+            }
+            1 => {
+                let unrelated = candidates
+                    .into_iter()
+                    .next()
+                    .expect("the singleton unrelated-owner set is nonempty");
+                eprintln!(
+                    "retained-unit root control replaced checked root {root:?} with unrelated \
+                     legal static-body owner {unrelated:?}"
+                );
+                Ok(vec![unrelated])
+            }
+            found => Err(backend_module(format!(
+                "retained-unit root control requires at most one unrelated legal static-body \
+                 owner, found {found}"
+            ))),
         }
-        let unrelated = candidates
-            .into_iter()
-            .next()
-            .expect("the singleton unrelated-owner set is nonempty");
-        eprintln!(
-            "retained-unit root control replaced checked root {root:?} with unrelated legal \
-             static-body owner {unrelated:?}"
-        );
-        Ok(unrelated)
     }
 
     /// Declare the exact static-body graph targets transitively reachable from
@@ -746,7 +770,7 @@ impl CallEdgeTargets {
         #[cfg(feature = "px8-ds-test-support")]
         let traversal_roots = match RETAINED_UNIT_CALL_TARGET_MUTATION.with(std::cell::Cell::get) {
             RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot => {
-                vec![self.sole_unrelated_static_body_owner(root)?]
+                self.substitute_unrelated_owner_roots(root)?
             }
             _ => vec![root],
         };
