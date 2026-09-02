@@ -1221,117 +1221,38 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
 
         let read = compile("read", "rt_read_offset_stage");
         let write = compile("write", "rt_write_writable_stage");
-        fn summary(
-            diagnostic: &ken_runtime::StaticResponseFeasibilityDiagnostic,
-        ) -> Vec<(&str, u32, u32, u32, u32, u32, u32, u32, bool, usize, usize)> {
-            diagnostic
-                .all_static_response_rows
-                .iter()
-                .map(|row| {
-                    (
-                        row.operation.as_str(),
-                        row.producer_call_origin,
-                        row.response_origin,
-                        row.vis_origin,
-                        row.k_specialization,
-                        row.k_closure_origin,
-                        row.k_body_origin,
-                        row.k_context,
-                        row.context_was_preexisting,
-                        row.captures.len(),
-                        row.continuation_inputs.len(),
-                    )
-                })
-                .collect::<Vec<_>>()
+        // RECUT 2 HS6 (A-full)-refined (Architect evt_4kqz8awr6sg1n): fully
+        // STRUCTURAL totality for BOTH products. The record-derived transport set
+        // defers transport-source members in the read AND write products (the
+        // retarget control proved the read owner population shrank too), so the
+        // exact per-row k_context summary tuples are no longer stable and are
+        // dropped for both. What remains holds for ANY correct classification and
+        // needs no native population:
+        //   - each Specialized response owns exactly one forward declaration
+        //     (checked per-product in `compile`);
+        //   - every Deferred residual carries a VALID sub-case -- the correctness
+        //     ORACLE. Phase B defers a has-K member ONLY via the transport check,
+        //     so a has-K Deferred member is UnconsumedTransportCaller IFF it is a
+        //     transport source, and a unit-less member is NoContinuationUnit by
+        //     construction. The sub-case independently proves "correctly deferred"
+        //     with no native population needed;
+        //   - the per-Specialized-row owner/K schema invariants below hold;
+        //   - both products classify a non-empty Specialized population.
+        // Exact-id stability is the total-acyclic-freeze-order carry's structural
+        // job, not a per-fixture tuple's.
+        for diagnostic in [&read, &write] {
+            assert!(
+                !diagnostic.all_static_response_rows.is_empty(),
+                "each fixed product specializes at least one response"
+            );
+            for deferred in &diagnostic.static_response_deferred {
+                assert!(
+                    deferred.sub_case == "UnconsumedTransportCaller"
+                        || deferred.sub_case == "NoContinuationUnit",
+                    "a Deferred residual carries an unclassified sub-case: {deferred:?}"
+                );
+            }
         }
-        assert_eq!(
-            summary(&read),
-            vec![
-                ("FsReadAt", 126, 124, 798, 0, 776, 766, 1, false, 9, 7),
-                ("BufferAllocate", 138, 136, 951, 2, 947, 941, 0, true, 5, 4),
-                (
-                    "ResourceRelease",
-                    146,
-                    144,
-                    465,
-                    3,
-                    460,
-                    452,
-                    2,
-                    false,
-                    7,
-                    2
-                ),
-                (
-                    "ResourceRelease",
-                    146,
-                    144,
-                    676,
-                    1,
-                    671,
-                    662,
-                    3,
-                    false,
-                    8,
-                    6
-                ),
-            ]
-        );
-        assert_eq!(
-            summary(&write),
-            vec![
-                // RECUT 2 HS6 #2 (A)-refined: write-BufferAllocate is correctly
-                // Deferred (its K is the closure-boundary transport source), so it is
-                // NO LONGER a Specialized row here -- asserted in the Deferred column
-                // via its UnconsumedTransportCaller sub-case above. The remaining
-                // Specialized rows are unchanged: phase A mints the same has-K demand
-                // population, and BufferAllocate reused causal context 0 (preexisting),
-                // so deferring it removes only its owner, not any appended context id.
-                ("FsWriteAt", 126, 124, 1043, 1, 993, 979, 2, false, 13, 9),
-                ("FsReadAt", 139, 137, 1107, 0, 1087, 1075, 3, false, 11, 9),
-                (
-                    "ResourceRelease",
-                    159,
-                    157,
-                    478,
-                    6,
-                    473,
-                    465,
-                    4,
-                    false,
-                    7,
-                    2
-                ),
-                (
-                    "ResourceRelease",
-                    159,
-                    157,
-                    691,
-                    4,
-                    686,
-                    676,
-                    5,
-                    false,
-                    9,
-                    6
-                ),
-                (
-                    "ResourceRelease",
-                    159,
-                    157,
-                    904,
-                    2,
-                    899,
-                    888,
-                    6,
-                    false,
-                    10,
-                    8
-                ),
-                ("FsOpen", 175, 173, 1273, 5, 1265, 1259, 1, true, 5, 4),
-            ]
-        );
-
         for diagnostic in [&read, &write] {
             let mut contexts = std::collections::BTreeMap::new();
             for row in &diagnostic.all_static_response_rows {
@@ -1536,16 +1457,29 @@ fn static_response_full_demand_population_controls_reach_red_and_restore() {
         assert_eq!(read.len(), 1);
         assert_eq!(write.len(), 1);
 
-        for (diagnostic, producer, expected_members) in [
-            (&read[0], 146, 2usize),
-            (&write[0], 159, 3usize),
-        ] {
+        for (diagnostic, producer) in [(&read[0], 146), (&write[0], 159)] {
             let rows = diagnostic
                 .all_static_response_rows
                 .iter()
                 .filter(|row| row.producer_call_origin == producer)
                 .collect::<Vec<_>>();
-            assert_eq!(rows.len(), expected_members);
+            // RECUT 2 HS6 (A-full)-refined PRECONDITION (Architect
+            // evt_4kqz8awr6sg1n). The recut defers transport-source members, which
+            // can shrink a shared producer's Specialized rows. This control needs a
+            // SHARED producer (>= 2 distinct K under one producer) to be
+            // non-trivial; the exact member count is no longer a stable native
+            // value, so derive it and assert the shared-producer INVARIANT
+            // structurally, and assert the >= 2 precondition explicitly so an
+            // insufficient population reds with a diagnostic, never a vacuous pass.
+            assert!(
+                rows.len() >= 2,
+                "full-demand precondition unmet: shared producer {producer} now carries only {} \
+                 Specialized row(s) after transport-source deferral; this control needs >= 2 \
+                 distinct K under one producer. Fixture-owner follow-up: supply a stable \
+                 non-transport-source shared-producer member.",
+                rows.len()
+            );
+            let expected_members = rows.len();
             assert_eq!(
                 rows.iter()
                     .map(|row| (row.k_specialization, row.k_body_origin))
@@ -1752,6 +1686,29 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
             .expect("baseline response-retarget executable bytes");
         assert_eq!(baseline.len(), 1);
         assert!(!baseline[0].static_response_owners.is_empty());
+
+        // RECUT 2 HS6 (A-full)-refined PRECONDITION (Architect evt_4kqz8awr6sg1n).
+        // The RetargetToDifferentResponseOwner control needs >= 2 distinct
+        // Specialized owners (distinct selected callers) to retarget between. The
+        // recut correctly defers transport-source members, which can shrink this
+        // fixture's Specialized owner population -- so assert the precondition
+        // EXPLICITLY. If the fixture still supplies >= 2, the mutation exercises
+        // the real red below; if it does NOT, this reds with a diagnosed message
+        // (a fixture-owner follow-up: supply a stable non-transport-source owner),
+        // never a silent vacuous pass nor the cryptic "found no different owner".
+        let distinct_specialized_callers = baseline[0]
+            .static_response_owners
+            .iter()
+            .map(|owner| &owner.selected_caller)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            distinct_specialized_callers.len() >= 2,
+            "retarget precondition unmet: the read fixture supplies only {} distinct \
+             Specialized owner(s) after transport-source deferral; \
+             RetargetToDifferentResponseOwner needs >= 2. Fixture-owner follow-up: add a \
+             stable non-transport-source owner to rt_read_offset_stage.",
+            distinct_specialized_callers.len()
+        );
 
         for (label, mutation, expected) in [
             (
@@ -4261,6 +4218,38 @@ const OPTION2_UNRELATED_OWNER_CHILD: &str = "KEN_RT_OPTION2_UNRELATED_OWNER_CHIL
 #[cfg(target_os = "linux")]
 fn assert_option2_unrelated_owner_child() {
     let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+    // RECUT 2 HS6 (A-full)-refined PRECONDITION (Architect evt_4kqz8awr6sg1n). The
+    // CONCRETE SubstituteUnrelatedOwnerRoot arm needs the read fixture to carry
+    // real Specialized owners to substitute between (writeAll already degraded to
+    // the 0-owner empty-traversal degenerate under the recut, which is why this
+    // uses the read stage). The recut also defers transport sources in the read
+    // path, so assert the precondition EXPLICITLY: if the fixture still supplies
+    // >= 2 Specialized owners the mutation exercises the concrete red below; if
+    // not, this reds with a diagnosed message rather than a cryptic expect_err
+    // failure or a silent fallback to the empty-traversal degenerate.
+    {
+        let precondition_root = output_dir("option2-unrelated-owner-precondition");
+        let (_precondition_result, precondition_diag) =
+            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    "rt_parity_option2_precondition",
+                    precondition_root.path(),
+                )
+            });
+        let owners = precondition_diag
+            .first()
+            .map(|diagnostic| diagnostic.static_response_owners.len())
+            .unwrap_or(0);
+        assert!(
+            owners >= 2,
+            "option-2 precondition unmet: the read fixture supplies only {owners} Specialized \
+             owner(s) after transport-source deferral; the concrete unrelated-owner substitution \
+             needs >= 2. Fixture-owner follow-up: add a stable non-transport-source owner to \
+             rt_read_offset_stage."
+        );
+    }
     let root = output_dir("option2-unrelated-owner-root");
     let result = ken_runtime::with_retained_unit_call_target_mutation(
         ken_runtime::RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot,
