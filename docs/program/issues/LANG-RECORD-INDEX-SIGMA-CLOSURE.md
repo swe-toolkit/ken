@@ -69,23 +69,36 @@ elaborator-only, `gate: none`, no operator authorization, no TCB touch.
 
 ## Deliverables (structural closure, Architect disposition evt_2ptgr3f2ef7c4)
 
-1. **Fix `install_index_refinements`** to recursively project the
-   Sigma-decomposed record-index equality into per-component refinements — the
-   consumption-side mirror of the predecessor's uniform `{Eq, Sigma, Top}`
-   descent on the synthesis side. When the index equality WHNFs to a `Sigma` of
-   component equalities, peel it and install each component refinement
-   (`gamma -> g0`, `[goal] -> d0`, ...) recursively, rather than falling through
-   on non-`Eq`.
-2. **AUDIT every consumer** of a record-index / dependent-match index equality in
-   the elaborator for the same `Eq`-only-no-`Sigma`-decomposition shape (the
-   index-refinement + motive-rebasing paths: grep for `Term::Eq` peeling that
-   lacks a `Sigma` arm), and close them uniformly. The three right-intro methods
-   are the already-visible latent instances; the audit finds any others so a
-   third stop does not recur.
-3. **A regression fixture per closed consumer** — the acceptance shape the
-   just-landed predecessor established: a dependent-match whose record index
-   reduces through a `Sigma` and previously false-rejected on the missing
-   component refinement now elaborates.
+1. **Implement ONE shared Sigma-projection walker and apply it at BOTH confirmed
+   record-index consumers.** The walker is the consumption-side mirror of the
+   predecessor's uniform `{Eq, Sigma, Top}` descent: `Eq` -> project the leaf
+   refinement; `Sigma` -> recursively project both components via `Proj1`/`Proj2`;
+   `Top` -> no leaves; **any other shape (including `Pi` under `Sigma`) -> atomic
+   fail-closed rejection** (never a silent fall-through to the unreduced
+   whole-record triple). Project from the producer's preserved raw-`Eq` premise
+   sentinel (the producer keeps one raw `Eq` premise binder per declared index),
+   NOT by flattening method arguments. The two confirmed consumers that need it
+   (language-leader pre-stage evt_2qaczkndnpzm4, grounded at landed `569712a4`):
+   **`install_index_refinements`** (the HS2 site) and **`refine_branch_goal`** —
+   both peel `Term::Eq` and fall through on the `Sigma`.
+2. **AUDIT + CLASSIFY every consumer** of a record-index / dependent-match index
+   equality in the elaborator for the same `Eq`-only-no-`Sigma`-decomposition
+   shape (grep the index-refinement + motive-rebasing paths for `Term::Eq`
+   peeling that lacks a `Sigma` arm). Each consumer resolves to exactly one of:
+   already Sigma-decomposing, needs the walker (fix), or demonstrably out of
+   scope (cited). **`install_hidden_result_variable_refinements` is an explicit
+   must-classify target** — it consumes a SEPARATE hidden whole-scrutinee
+   equation (not `method_index_premise_pairs`) outside the indexed FokDerivation
+   producer path and may carry a parallel record-`Sigma` limitation. The audit
+   either fixes it with the shared walker (if it has the gap on a reachable
+   record-shaped scrutinee equation) or records it EXCLUDED with a cited reason
+   and its current private test home — NOT silently implied (Steward disposition,
+   answering the leader's frame question). All other surface `Refl`/`J` sites are
+   author-facing or leaf-only and are out of scope.
+3. **The regression net** (language-leader pre-stage, ready): first-component
+   install red, second-component goal-refinement red, whole-record `J` red, and
+   direct recursive-IH `Sigma`-discharge green — one fixture per closed consumer,
+   the acceptance shape the just-landed predecessor established.
 
 No FoKripke source workaround (D2b's banned-source-compensation constraint). The
 `fok_invert_atomlike: theorem -> fn` correction stays on the held D2b branch.
@@ -101,9 +114,14 @@ No FoKripke source workaround (D2b's banned-source-compensation constraint). The
 - **AC-CLASS-CLOSED (the audit, predicate not roster).** Every elaborator
   consumer of a record-index / dependent-match index equality that peels the
   `Eq` head handles the `Sigma`-decomposition uniformly — no consumer falls
-  through on the Sigma to an unreduced whole-record triple. The three right-intro
-  methods are covered; the audit certifies no remaining Eq-only consumer. A
-  surviving Eq-only consumer is a defect, not a deferral.
+  through on the Sigma to an unreduced whole-record triple. The two confirmed
+  consumers (`install_index_refinements`, `refine_branch_goal`) are fixed via the
+  shared walker; the audit returns an explicit verdict for EACH remaining
+  consumer (Sigma-decomposing / fixed / cited-excluded), with
+  `install_hidden_result_variable_refinements` named among them. A surviving
+  unclassified Eq-only consumer is a defect, not a deferral; a cited exclusion
+  (out-of-class or unreachable, with its test home) is a valid audit outcome, a
+  silent omission is not.
 - **AC-NO-OVERACCEPT (soundness on the record).** The generated-elim assembled
   term remains `kernel_infer`-re-derived (`elab.rs:4785` net unchanged); an
   installed refinement that does not correspond to a real component equality is
