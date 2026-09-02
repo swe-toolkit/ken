@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT
-title: "Composed-return native repair, option (a)(i) WP3 of 3 (cuts the SOLE production candidate from WP1+WP2+WP3): complete the Ret-binder/capture/body edge if WP2's shared block parameter does not already supply it; add per-variant per-arrival application/result/Ret-input pairing with exactly-once closure; retire only superseded environment/seed-as-result claims; the candidate flips base-red ResourceBodyResult PatternMatchFailure to exact InvalidOffset on fs-read/write-at-offset, then Runtime QA + Architect on the exact SHA."
-status: draft
+title: "CLOSED — SUPERSEDED by RT-COMPOSED-RETURN-RUNTIME-CLOSURE (Architect runtime-closure mechanism evt_3j6vshm83rk5q); this delayed-SSA closeout does NOT run — the sole production candidate is now cut at the runtime-closure atomic tip. Composed-return native repair, option (a)(i) WP3 of 3 (cuts the SOLE production candidate from WP1+WP2+WP3): complete the Ret-binder/capture/body edge if WP2's shared block parameter does not already supply it; add per-variant per-arrival application/result/Ret-input pairing with exactly-once closure; retire only superseded environment/seed-as-result claims; the candidate flips base-red ResourceBodyResult PatternMatchFailure to exact InvalidOffset on fs-read/write-at-offset, then Runtime QA + Architect on the exact SHA."
+status: closed
 owner: runtime
 size: M
 gate: runtime-qa+architect
@@ -12,6 +12,13 @@ github: null
 origin: "Architect component design for the operator-funded composed-return native repair, option (a)(i) (PART 1/2 evt_381dzjykr4knn, PART 2/2 evt_5963far74b735, 2026-09-01). WP3 of the three-checkpoint ATOMIC merge unit: it cuts the SOLE production candidate from WP1+WP2+WP3. Flips ready when WP2's checkpoint is reached; the Steward releases it. This is the ONLY node of the three that gates and merges (Runtime QA + Architect on the exact SHA, then Steward M1-M4, then lieutenant). Semantic target: flip base-red ResourceBodyResult PatternMatchFailure -> exact InvalidOffset on the fs-read-at-offset / fs-write-at-offset witnesses. Bound base e6a6c5240."
 ---
 
+> # CLOSED — SUPERSEDED by `RT-COMPOSED-RETURN-RUNTIME-CLOSURE`. The delayed-SSA
+> # route (WP2) it was the closeout for was refuted at HS#5; the Architect's
+> # runtime-closure mechanism (`evt_3j6vshm83rk5q`) replaces the whole route and
+> # cuts the sole candidate at its own atomic tip. This closeout does not run;
+> # the semantic-landing intent below is preserved for reference. Initial-
+> # development replacement: no parallel routes.
+> #
 > # WP3 of 3 — THE SEMANTIC LANDING. Cuts the SOLE production candidate from
 > # WP1+WP2+WP3. DRAFT — reached after WP2's checkpoint.
 > #

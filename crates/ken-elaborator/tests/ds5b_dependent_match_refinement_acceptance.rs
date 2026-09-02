@@ -577,36 +577,33 @@ fn intervening_let_fresh_binder_fails_invariantly_across_all_three_bases() {
 /// **This fixture's `k` is a DIRECT ALIAS of the enclosing match's own
 /// peeled field** (`let k : Vec Nat m = xs`, `m`/`xs` both already bound
 /// by `VCons m a xs`), consumed by passing `k` -- not `xs` -- as the
-/// recursive call's argument. Measured: it GETS PAST
-/// `refine_branch_goal` cleanly and reaches the KERNEL, where the
-/// rejection CLASS is GUARD-DEPENDENT:
+/// recursive call's argument. It is a dependent-`let` alias of a captured
+/// field, resolved under the enclosing match's index refinement.
 ///
-/// - **shipped region set**: `KernelRejected
-///   TypeMismatch`, `expected ((Dg574 Dg67) @9), found ((Dg574 Dg67) @4)`
-///   -- the same convoy-class signature as the predecessor node's own `D1`
-///   (`@9` vs `@4`).
-/// - **prohibited positional floor** (`if abs_pos >= 3`, temporarily
-///   applied and reverted, NOT committed -- a source mutation the shipped
-///   tree cannot express as a runtime toggle): `KernelRejected
-///   NotTerminating("SCT: idempotent self-loop has no strictly-decreasing
-///   parameter")` -- a completely different rejection CLASS, from the SCT
-///   gate rather than the type checker.
+/// **RE-MEASURED after `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE`.**
+/// Historically the shipped region-set guard rejected this at the KERNEL
+/// with `TypeMismatch`, `expected ((Dg574 Dg67) @9), found ((Dg574 Dg67)
+/// @4)` -- and that doc explicitly recorded it as "the same convoy-class
+/// signature" (`@9` vs `@4`) as the predecessor node's `D1`. That
+/// `@9`/`@4` mismatch WAS the sibling-convoy defect: the aliased `k :
+/// Vec Nat m`, captured across the nested `match w`, was not carried
+/// through the index refinement as one telescope, so its type landed at
+/// the wrong index. The context-telescope rebase closes exactly that gap,
+/// so the dependent-`let` alias now type-checks and the program gets PAST
+/// the type checker -- this fixture is now a dependent-`let`-alias
+/// POSITIVE at the convoy/type layer.
 ///
-/// **Neither guard makes this program elaborate.** The claim this fixture
-/// carries is narrower and different: the two guards reach DIFFERENT
-/// failure classes on the identical program, which is itself evidence the
-/// guards behave differently here (unlike the withdrawn `D2` pair from the
-/// predecessor node, where the floor and the region set were
-/// indistinguishable). This is NOT a discharge of that withdrawal -- it is
-/// a separate, later-discovered discriminating shape, filed to this node
-/// rather than reopening the predecessor's.
-///
-/// **These are two distinct pre-existing gaps, not one.** Diagnosing which
-/// (if either) shares a root cause with the other is this node's `D2`,
-/// not this commit's -- `D2`/`D3` remain out of scope here (Steward
-/// release, merge-closeout only).
+/// The program is STILL rejected, now by the SCT gate:
+/// `KernelRejected NotTerminating("SCT: idempotent self-loop has no
+/// strictly-decreasing parameter")`. That is a genuinely DIFFERENT,
+/// pre-existing gap: passing the `let`-bound alias `k` (rather than the
+/// peeled field `xs`) hides the structural descent from size-change
+/// termination, which is opaque to `let` aliases. Closing the type-level
+/// convoy gap merely uncovered it -- the same class the prohibited
+/// positional floor already reached here historically. The termination gap
+/// is out of scope for this node (Steward release / merge-closeout only).
 #[test]
-fn interleaved_let_alias_of_enclosing_field_rejects_differently_under_region_set() {
+fn interleaved_let_alias_of_enclosing_field_rejects_after_convoy_closes_type_gap() {
     let mut env = vec_env();
     elab_ok(
         &mut env,
@@ -627,24 +624,23 @@ fn interleaved_let_alias_of_enclosing_field_rejects_differently_under_region_set
          }",
     );
     match &err {
-        // The `@9`/`@4` positional literals asserted here previously added
-        // no discriminating power beyond the error CLASS check below:
-        // the prohibited positional floor rejects with `NotTerminating`,
-        // which lands in the `other =>` arm, so a disjoint error class
-        // already separates the two guards. The literals also matched too
-        // loosely against neighbours (`@4` matches `@40`/`@43`) while
-        // being too brittle against any unrelated binder-structure shift.
-        // A one-armed control over two disjoint error classes is a
-        // complete control -- deleted rather than "completed."
+        // Post-`LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE`: the convoy
+        // now carries the aliased `k : Vec Nat m` through the nested
+        // `match w` index refinement, so the historical `@9`/`@4`
+        // convoy-class `TypeMismatch` is GONE and this dependent-`let`
+        // alias type-checks. The residual rejection is the pre-existing SCT
+        // termination gap (the `let`-bound alias hides the structural
+        // descent). Assert on the error CLASS only -- the SCT message text
+        // is not this control's subject.
         ElabError::KernelRejected {
-            error: KernelError::TypeMismatch { .. },
+            error: KernelError::NotTerminating(_),
             ..
         } => {}
         other => panic!(
-            "expected the measured shipped-region-set rejection (a \
-             kernel TypeMismatch) -- got a \
-             different error, which means this fixture's guard-dependent \
-             behaviour needs re-measuring: {other:?}"
+            "expected the SCT NotTerminating rejection that remains once the \
+             context-telescope rebase closes the convoy-class type gap -- got \
+             a different error, which means this fixture's behaviour needs \
+             re-measuring: {other:?}"
         ),
     }
 }

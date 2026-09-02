@@ -553,6 +553,32 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Migrated to declared imports by CAT-LAWFULFUNCTORS-STANDALONE-IMPORT
+            // (list_append attached-proof migration): its strict-floor baseline
+            // now loads, so it leaves the baseline-red residual set and enters
+            // the ambient-passthrough census with its remaining floor deps.
+            "Core.Classes.LawfulFunctors".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Core.Logic.Compare".to_string(),
             ["And", "Equal", "Proved", "and_intro"]
                 .into_iter()
@@ -717,7 +743,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Capability.Process.Arguments",
         "Capability.System.IO",
         "Core.Classes.EffectfulClasses",
-        "Core.Classes.LawfulFunctors",
         "Data.Binary.BytesKeys",
         "Data.Collections.Map",
         "Data.Collections.NonEmpty",
