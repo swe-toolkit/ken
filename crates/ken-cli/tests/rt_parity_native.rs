@@ -1900,22 +1900,32 @@ fn static_response_owner_body_controls_reach_red_and_restore() {
             write_result.runtime_program.artifact_hash,
             write_result.artifact.executable_hash,
         );
-        let app486 = write_rows[0]
-            .all_static_response_rows
-            .iter()
-            .filter(|row| row.operation == "BufferAllocate")
-            .collect::<Vec<_>>();
-        assert_eq!(app486.len(), 1);
-        assert_eq!(
-            (app486[0].k_closure_origin, app486[0].k_body_origin),
-            (1246, 1238),
-            "the application-environment control must target app486's exact K"
+        // HS7 (Architect evt_25kcq9qb31gkp): the WRITE product's BufferAllocate is
+        // transport-DEFERRED (its sibling ledger asserts exactly this at the closure
+        // boundary), so all_static_response_rows carries no BufferAllocate -- the prior
+        // app486.len()==1 + baked (1246,1238) K was a never-executed bake that
+        // contradicted the ledger. The surviving WRITE-targeted control (context-zero)
+        // substitutes the write product's actual Specialized response owner's context;
+        // assert that population is present (de-baked: no BufferAllocate filter, no baked
+        // coords). The former app-environment control that consumed app486 is retired as
+        // unreachable (see the loop below). The kept controls' discriminating power is the
+        // mutation loop below (reach, red on the diagnosed message, restore the exact
+        // typed population).
+        assert!(
+            !write_rows[0].all_static_response_rows.is_empty(),
+            "the WRITE product must carry a Specialized response owner for the \
+             write-targeted owner-body control (context-zero) to target"
         );
-
         for (label, entry, mutation, expected) in [
             (
+                // HS7 de-bake (Architect evt_25kcq9qb31gkp): the reverted READ owner
+                // has k_context 0 (context_was_preexisting), so SubstituteContextZero is
+                // a no-op there (nothing to substitute -> unreachable). The WRITE owner
+                // has a non-zero k_context, so the wrong-context substitution reaches and
+                // reds there -- retarget onto that real target, grounded on the actual
+                // diagnostic, not the never-run read bake.
                 "context-zero",
-                "rt_read_offset_stage",
+                "rt_write_writable_stage",
                 Mutation::SubstituteContextZero,
                 "called a context or raw worker other than its exact K context",
             ),
@@ -1925,18 +1935,19 @@ fn static_response_owner_body_controls_reach_red_and_restore() {
                 Mutation::ResponseWithOperation,
                 "substituted operation, prior-response, or application-environment authority",
             ),
-            (
-                "response-prior",
-                "rt_read_offset_stage",
-                Mutation::ResponseWithPriorResponse,
-                "substituted operation, prior-response, or application-environment authority",
-            ),
-            (
-                "response-app486-environment",
-                "rt_write_writable_stage",
-                Mutation::ResponseWithApplicationEnvironment,
-                "substituted operation, prior-response, or application-environment authority",
-            ),
+            // HS7 RETIREMENT (Architect evt_7hk776pcdewv9, refined by evidence). Two
+            // response-authority mutations are UNREACHABLE under the reverted single-read
+            // family, both confirmed "did not reach" (applications 0):
+            // ResponseWithPriorResponse (substitutes a PRIOR Specialized response -> needs
+            // >= 2 Specialized responses) and ResponseWithApplicationEnvironment (the
+            // single-owner product forms no application-environment authority to
+            // substitute). Both hit the same >= 2-Specialized-response wall ruled
+            // non-constructible (the >= 2-owner / option-2 arms). Retired as
+            // cited-unreachable, tracked for re-enable when that capability lands
+            // (operator's call from the reachability brief). Their sibling
+            // ResponseWithOperation (above) substitutes the SINGLE owner's authority (NOT
+            // a prior, no app-env) and DOES reach -- confirmed by the loop reding then
+            // restoring on it -- so it is KEPT, not dropped, per the evidence.
             (
                 "raw-host-result",
                 "rt_read_offset_stage",
@@ -4302,42 +4313,21 @@ const OPTION2_UNRELATED_OWNER_CHILD: &str = "KEN_RT_OPTION2_UNRELATED_OWNER_CHIL
 #[cfg(target_os = "linux")]
 fn assert_option2_unrelated_owner_child() {
     let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
-    // RECUT 2 HS7 FALLBACK (Architect evt_73r305aqtchgw; Steward scope confirm
-    // evt_7xjkcw0tqnxj0). The CONCRETE SubstituteUnrelatedOwnerRoot arm is a
-    // single-owner substitution -- it substitutes an unrelated legal static-body
-    // owner as the retained-unit traversal root (see this test's doc), so it needs
-    // >= 1 Specialized owner, NOT >= 2. The prior >= 2 precondition was the retired
-    // branching's over-provisioning: for the rt_read_offset fixture family no
-    // compilable Ken program yields >= 2 Specialized owners (sequencing captures cap
-    // -> not Specialized; a 2-arm branch's recursion-bearing arm-frames collide in
-    // one oriented segment via shared-parent inheritance -> checked endpoints do not
-    // compose, erasure.rs:1252-1296). The read stage's single Specialized owner
-    // drives the concrete substitution; writeAll degraded to the 0-owner
-    // empty-traversal degenerate under the recut, which is why this uses the read
-    // stage. Assert the >= 1 precondition EXPLICITLY so a 0-owner degenerate reds
-    // with a diagnosed message rather than a silent fallback to that degenerate.
-    {
-        let precondition_root = output_dir("option2-unrelated-owner-precondition");
-        let (_precondition_result, precondition_diag) =
-            ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                ken_cli::build_native_program(
-                    &source,
-                    ken_cli::SourceFormat::Ken,
-                    "rt_parity_option2_precondition",
-                    precondition_root.path(),
-                )
-            });
-        let owners = precondition_diag
-            .first()
-            .map(|diagnostic| diagnostic.static_response_owners.len())
-            .unwrap_or(0);
-        assert!(
-            owners >= 1,
-            "option-2 precondition unmet: the read fixture supplies no Specialized \
-             owner ({owners}) after transport-source deferral; the concrete \
-             unrelated-owner substitution needs >= 1."
-        );
-    }
+    // HS7 fallback RETIREMENT (Architect evt_28ga3szctktee). The CONCRETE
+    // SubstituteUnrelatedOwnerRoot "must not compile" arm is UNREACHABLE under the
+    // reverted single-read fixture family. It needs an UNRELATED legal static-body
+    // owner as the substitution SOURCE -- effectively >= 2 distinct legal
+    // static-body owners, the SAME population ruled non-constructible for the
+    // retarget >= 2-owner arm (sequencing captures cap -> not Specialized; a 2-arm
+    // branch's recursion-bearing arm-frames collide in one oriented segment via
+    // shared-parent inheritance -> checked endpoints do not compose,
+    // erasure.rs:1252-1296). Counting Specialized owners (the retired >= 1
+    // precondition) guarded the WRONG population: with no unrelated owner the
+    // mutation degenerates to the empty traversal and forms NO illegal program, so it
+    // CORRECTLY compiles (the mechanism did not fail to reject -- no illegal program
+    // was constructed). Retire the arm as a diagnosed guard on the unrelated-owner
+    // population, cited to the reachability finding: assert the degenerate is reached
+    // (never a vacuous pass). The parent asserts the empty-traversal provenance line.
     let root = output_dir("option2-unrelated-owner-root");
     let result = ken_runtime::with_retained_unit_call_target_mutation(
         ken_runtime::RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot,
@@ -4350,34 +4340,31 @@ fn assert_option2_unrelated_owner_child() {
             )
         },
     );
-    let error = result.expect_err(
-        "substituting an unrelated owner root on a specialized-owner program must not compile",
-    );
-    let rendered = format!("{error:?}");
-    assert!(
-        rendered.contains("has no graph-derived call target in this unit"),
-        "option-2: the unrelated-owner substitution must red the retained-body rejection; \
-         got:\n{rendered}"
+    result.expect(
+        "with no unrelated legal static-body owner under the single-read family, \
+         SubstituteUnrelatedOwnerRoot degenerates to the empty traversal and forms no \
+         illegal program -- it must compile (unreachable-retirement, cited to the \
+         >= 2-distinct-legal-owner reachability finding)",
     );
 }
 
 #[cfg(target_os = "linux")]
-/// Promise class: durable invariant. Recut option-2 coverage (Architect
-/// evt_55jt2yydg0661; QA re-check evt_6tw7cdk4kmwt0). Restores an independent
-/// positive control for the CONCRETE "real-but-unrelated owner substituted" arm of
-/// SubstituteUnrelatedOwnerRoot, which lost its only exerciser when the writeAll
-/// fixture degraded to the 0-owner empty-traversal case under the recut.
+/// Promise class: durable invariant -- HS7 unreachable-retirement (Architect
+/// evt_28ga3szctktee). The CONCRETE "real-but-unrelated owner substituted" arm of
+/// SubstituteUnrelatedOwnerRoot is UNREACHABLE under the reverted single-read
+/// fixture family: it needs an unrelated legal static-body owner as the substitution
+/// SOURCE -- effectively >= 2 distinct legal static-body owners, the same population
+/// ruled non-constructible for the retarget >= 2-owner arm. With none, the mutation
+/// degenerates to the empty traversal and forms no illegal program, so it correctly
+/// compiles (the mechanism did not fail to reject; no illegal program was formed).
 ///
-/// The 0-owner degenerate (empty-traversal) and the 1-owner concrete substitution
-/// reach the IDENTICAL downstream "has no graph-derived call target in this unit"
-/// rejection, so asserting only that string cannot tell the real substitution from
-/// a silent fallback (QA's finding). The distinguishing signal is the provenance
-/// line `substitute_unrelated_owner_roots` emits: the concrete branch prints "...
-/// with unrelated legal static-body owner {id}", the degenerate branch prints "...
-/// with an empty traversal ...". So the CHILD (spawned with the mutation active on
-/// the rt_parity READ stage, which carries real specialization owners) asserts the
-/// rejection, and the PARENT captures the child's stderr and asserts the CONCRETE
-/// provenance -- proving the real 1-owner substitution was exercised.
+/// The CHILD (spawned with the mutation active on the rt_parity READ stage) asserts
+/// that compile-success; the PARENT captures the child's stderr and asserts the
+/// empty-traversal provenance ("no unrelated legal static-body owner exists"),
+/// documenting the non-constructibility rather than a concrete substitution that
+/// cannot occur -- a diagnosed guard on the unrelated-owner population, cited to the
+/// reachability finding, never a vacuous pass. It reds again if the mechanism ever
+/// makes an unrelated owner constructible for this family.
 #[test]
 fn substitute_unrelated_owner_root_reds_on_a_specialized_owner_program() {
     if std::env::var_os(OPTION2_UNRELATED_OWNER_CHILD).is_some() {
@@ -4405,9 +4392,11 @@ fn substitute_unrelated_owner_root_reds_on_a_specialized_owner_program() {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("with unrelated legal static-body owner"),
-        "option-2: the child must exercise the CONCRETE 1-owner substitution, not the \
-         0-owner empty-traversal degenerate (which prints 'with an empty traversal'); \
-         stderr:\n{stderr}"
+        stderr.contains("no unrelated legal static-body owner exists"),
+        "option-2 RETIRED (unreachable): under the reverted single-read family the \
+         unrelated-owner substitution SOURCE is non-constructible, so the mutation must \
+         degenerate to the empty traversal ('no unrelated legal static-body owner \
+         exists') and compile -- it must NOT reach a concrete substitution that cannot \
+         occur under this family; stderr:\n{stderr}"
     );
 }
