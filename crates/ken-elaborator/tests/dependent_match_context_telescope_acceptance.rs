@@ -82,6 +82,19 @@ fn fin_env_wit() -> ElabEnv {
     env
 }
 
+/// Extends [`fin_env_wit`] with a third family `Fam a n e w` indexed by the
+/// length, the `Env`, AND the `Wit` — so a captured `z : Fam a n xs h` depends
+/// on all of the length, the captured `xs`, and the captured `h`.
+fn fin_env_fam() -> ElabEnv {
+    let mut env = fin_env_wit();
+    env.elaborate_decl(
+        "data Fam (a : Type) : (n : Nat) -> (e : Env a n) -> Wit a n e -> Type where { \
+           MkFam : (n : Nat) -> (e : Env a n) -> (w : Wit a n e) -> Fam a n e w }",
+    )
+    .expect("Fam");
+    env
+}
+
 #[test]
 fn captured_env_follows_fin_index_refinement_under_match() {
     // THE RED SHAPE (evt_3b9k92cmkn5zh, generic): the captured ambient
@@ -129,6 +142,37 @@ fn transitive_closure_follows_index_refinement() {
          match j { FZ m ↦ Refl; FS m k ↦ Refl }",
     )
     .expect("the transitive Wit/Env telescope must follow the Fin refinement");
+}
+
+#[test]
+fn three_deep_transitive_closure_follows_index_refinement() {
+    // The WP's full transitive shape: the captured tail is `xs : Env a n`, then
+    // `h : Wit a n xs`, then `z : Fam a n xs h` — each depending on the index
+    // AND every earlier captured binder. All three must travel as ONE ordered
+    // telescope through the `Fin n` refinement of `match j`.
+    let mut env = fin_env_fam();
+    env.elaborate_decl(
+        "theorem fam_refl (a : Type) (n : Nat) (xs : Env a n) (h : Wit a n xs) \
+           (z : Fam a n xs h) (j : Fin n) : Equal (Fam a n xs h) z z = \
+         match j { FZ m ↦ Refl; FS m k ↦ Refl }",
+    )
+    .expect("the three-deep Fam/Wit/Env telescope must follow the Fin refinement");
+}
+
+#[test]
+fn dependent_let_convoy_member_positive() {
+    // Dependent-let boundary (positive): a `let`-bound alias of a captured
+    // ambient binding, itself index-dependent, must convoy correctly through the
+    // refinement. `ys : Env a n = xs` aliases the captured `xs`, and the goal is
+    // stated over `ys`, so the convoy must carry the let-bound member.
+    let mut env = fin_env();
+    env.elaborate_decl(
+        "theorem let_alias_refl (a : Type) (n : Nat) (xs : Env a n) (j : Fin n) \
+           : Equal (Env a n) xs xs = \
+         let ys : Env a n = xs in \
+         match j { FZ m ↦ Refl; FS m k ↦ Refl }",
+    )
+    .expect("a dependent let-bound convoy member must follow the refinement");
 }
 
 #[test]
