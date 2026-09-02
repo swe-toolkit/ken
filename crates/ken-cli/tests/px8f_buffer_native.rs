@@ -645,3 +645,80 @@ fn run_linked_checked_write_all() {
         b"abcdef"
     );
 }
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. Recut AC-1 (congruence) + AC-4 (mixed
+/// both-colors) + the AC-3 compile half. The checked `writeAll` fixture carries
+/// BOTH a Specialized response (its read producer's response) and a Deferred
+/// response (its write producer's deferred-frontier response). `classify` assigns
+/// every response `Vis` exactly one colour -- no `vis_origin` appears in both the
+/// Specialized rows and the Deferred residual -- and both colours coexist in one
+/// unit, so the polyvariant threading is genuine rather than a single-colour flag.
+/// The program COMPILES under the recut: the Deferred residual routes to main's
+/// pre-WP lowering instead of aborting object emission (HS3-b closed).
+#[test]
+fn write_all_classifies_mixed_specialized_and_deferred_responses() {
+    std::thread::Builder::new()
+        .name("px8f-classify-mixed".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(|| {
+            let dir = tempfile::Builder::new()
+                .prefix("ken-px8f-classify-mixed-")
+                .tempdir()
+                .unwrap();
+            let (result, diagnostics) =
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    ken_cli::build_native_program(
+                        WRITE_ALL,
+                        ken_cli::SourceFormat::Ken,
+                        "px8f_write_all_classify_mixed",
+                        dir.path(),
+                    )
+                });
+            // AC-3 (compile half): the deferred-frontier writeAll program compiles;
+            // the Deferred residual is routed, not aborted.
+            result.expect("the checked writeAll fixture compiles under the recut");
+            assert_eq!(diagnostics.len(), 1, "one compile publishes one plan");
+            let diagnostic = diagnostics.into_iter().next().unwrap();
+            assert_eq!(diagnostic.static_response_infeasible, None);
+            assert_eq!(diagnostic.all_static_response_infeasible, None);
+
+            let specialized_vis: std::collections::BTreeSet<u32> = diagnostic
+                .all_static_response_rows
+                .iter()
+                .map(|row| row.vis_origin)
+                .collect();
+            let deferred_vis: std::collections::BTreeSet<u32> = diagnostic
+                .static_response_deferred
+                .iter()
+                .map(|row| row.vis_origin)
+                .collect();
+
+            // AC-1 congruence: no response Vis is classified BOTH Specialized and
+            // Deferred (the two populations partition the response-Vis set).
+            assert!(
+                specialized_vis.is_disjoint(&deferred_vis),
+                "a response Vis was classified both Specialized and Deferred: \
+                 specialized={specialized_vis:?} deferred={deferred_vis:?}"
+            );
+
+            // AC-4 mixed: both colours coexist in this one unit -- a genuine
+            // polyvariant witness. (Discriminating: a single-colour program cannot
+            // tell real threading from a flag.)
+            assert!(
+                !specialized_vis.is_empty(),
+                "the mixed fixture must carry at least one Specialized response; \
+                 rows={:?}",
+                diagnostic.all_static_response_rows
+            );
+            assert!(
+                !deferred_vis.is_empty(),
+                "the mixed fixture must carry at least one Deferred response; \
+                 deferred={:?}",
+                diagnostic.static_response_deferred
+            );
+        })
+        .expect("spawn large-stack classify-mixed probe")
+        .join()
+        .expect("classify-mixed probe thread");
+}
