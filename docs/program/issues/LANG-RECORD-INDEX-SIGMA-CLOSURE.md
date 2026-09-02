@@ -1,7 +1,7 @@
 ---
 id: LANG-RECORD-INDEX-SIGMA-CLOSURE
 title: "D2b predecessor #2 (elaborator structural closure): record-index-equality CONSUMERS in the elaborator handle the Eq head but not its observational Sigma-decomposition. install_index_refinements peels only Term::Eq and falls through on the Sigma-shaped record-index equality, installing no per-component refinement (gamma->g0), so a dependent-inversion body needs fok_nth_form @14 (outer gamma) where the constructor-declared type says @10 (local g0). Fix the consumer to recursively project the Sigma into per-component refinements, AUDIT every such consumer for the same Eq-only gap, and close the class with a per-site regression fixture. Section-1b predicate named by the Architect (evt_2ptgr3f2ef7c4)."
-status: draft
+status: ready
 owner: language
 size: M
 gate: none

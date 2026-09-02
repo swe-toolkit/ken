@@ -1,7 +1,7 @@
 ---
 id: LANG-GENERATED-INDEX-EVIDENCE-CLOSURE
 title: "D2b predecessor (elaborator-only): close the generated-index reflexive-evidence terminal-vocabulary stratification — Top is admitted only at the outer entry (synth_generated_index_evidence) and not inside the Sigma recursion (synth_refl_proof), so a reflexive record index that reduces through a Sigma to a nested closed-equal field (WHNF Top) is false-rejected with `Refl expects an Eq-shaped goal`. Route the Sigma recursion through the Top-aware entry so {Eq, Sigma, Top} dispatch uniformly at every nesting depth."
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
