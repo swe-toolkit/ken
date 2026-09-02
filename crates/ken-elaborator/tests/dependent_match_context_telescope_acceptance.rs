@@ -160,6 +160,23 @@ fn three_deep_transitive_closure_follows_index_refinement() {
 }
 
 #[test]
+fn indirect_dependency_closure_via_predicate_param() {
+    // Architect counterexample (evt_1r1jwkm9ctpk8): `h : p xs` depends on the
+    // captured `xs` (and `p`), which depend on the index `n`, but h's OWN type
+    // names neither `n` nor the scrutinee — only `p` and `xs`. The dependency
+    // closure must therefore be computed OUTERMOST-first (so `xs`/`p` enter the
+    // set before `h` is tested); an innermost-first walk drops `h` and reddens
+    // with `TypeMismatch { expected: (@1 @0), found: (@8 @7) }`.
+    let mut env = fin_env();
+    env.elaborate_decl(
+        "theorem param_pred_refl (a : Type) (n : Nat) (p : (e : Env a n) -> Type) \
+           (xs : Env a n) (h : p xs) (j : Fin n) : Equal (p xs) h h = \
+         match j { FZ m ↦ Refl; FS m k ↦ Refl }",
+    )
+    .expect("an indirect (non-index-repeating) dependency must still convoy");
+}
+
+#[test]
 fn dependent_let_convoy_member_positive() {
     // Dependent-let boundary (positive): a `let`-bound alias of a captured
     // ambient binding, itself index-dependent, must convoy correctly through the
