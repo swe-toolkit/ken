@@ -1329,7 +1329,20 @@ impl StaticTransitionPlan<'_> {
         // response-Vis population (AC-1) and every consumer reconciles the
         // residual by total match (R2).
         let mut deferred: Vec<DeferredResponseRow> = Vec::new();
-        let transport_sources = self.checked_ih_environment_transport_source_identities();
+        // HS5 closed-derivation (Architect ruling evt_2wjjtkc0n0mv3): the P2
+        // discriminator reads the CAUSAL transport-source set, not the
+        // record-derived one. The records are built post-install
+        // (construction.rs:1251), so reading them here -- at install, where this
+        // classify runs -- saw an empty set, while the validator's re-derivation
+        // saw the populated set, and the plane-closure invariant fired. The causal
+        // set is derived from `checked_ih_coordinate_run` + `continuation_call_
+        // binding_for` over `continuation_units()`, none of which read
+        // `aggregate_ownership`/`continuation_contexts`/`finalized_availability`;
+        // it is therefore byte-identical at install and at validation, closing the
+        // derivation. See
+        // `checked_ih_environment_transport_source_call_identities` for the full
+        // closedness argument.
+        let transport_sources = self.checked_ih_environment_transport_source_call_identities()?;
         for (vis_origin, operation_root_origin, selected_operation_origin, route, k_is_opaque) in
             response_vis
         {
@@ -1409,11 +1422,16 @@ impl StaticTransitionPlan<'_> {
                 // TransportDormant at lowering (never retargeted to a real call) --
                 // the present-but-unconsumed placeholder that leaked as HS3-b (same
                 // root as HS3-a disposition=None). "Consumed" is thus decided ONCE
-                // here at planning (R2) from a planning-available fact: membership
-                // in `checked_ih_environment_transport_source_identities()` (the
-                // transport sources are validated to the D3 CheckedIhCapturedEnvironment
-                // role -- proven equal to non-consumption for this case, not a mere
-                // proxy). Classify it Deferred: build no demand, so no owner and no
+                // here at planning (R2) from a planning-available, causal-prefix-pure
+                // fact: membership in
+                // `checked_ih_environment_transport_source_call_identities()` (the
+                // transport sources are admitted through the D3
+                // CheckedIhCapturedEnvironment coordinate run -- proven equal to
+                // non-consumption for this case, not a mere proxy; a transport
+                // caller is never retargeted to a real owner call, so causal
+                // admission is the precise P2 membership regardless of whether the
+                // source acquires a post-install destination record). Classify it
+                // Deferred: build no demand, so no owner and no
                 // StaticResponseDeferred placeholder are ever emitted for it; its
                 // operation root / effect fall through to main's pre-WP lowering.
                 // AC-7 pins this planning verdict against the lowering

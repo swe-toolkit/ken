@@ -3891,6 +3891,13 @@ impl StaticTransitionPlan<'_> {
         Ok(Some(transport))
     }
 
+    /// The transport-source identities of the BUILT records (post-install,
+    /// record-derived): the sources that acquired at least one transport
+    /// destination edge. This is the SUBSET the lowering consumers read (they run
+    /// after the record build). It is deliberately NOT the response classify's P2
+    /// basis -- see
+    /// [`Self::checked_ih_environment_transport_source_call_identities`] for the
+    /// causal superset and why the two differ.
     pub(in crate::cranelift_backend) fn checked_ih_environment_transport_source_identities(
         &self,
     ) -> BTreeSet<ContinuationCallIdentity> {
@@ -3898,6 +3905,59 @@ impl StaticTransitionPlan<'_> {
             .iter()
             .map(|transport| transport.source_call_identity.clone())
             .collect()
+    }
+
+    /// The transport-source call identities derived from the CAUSAL PREFIX alone
+    /// -- the closed-derivation basis the response classify's P2 discriminator
+    /// reads at install (`RT-COMPOSED-RETURN-SSA` HS5; Architect ruling
+    /// evt_2wjjtkc0n0mv3).
+    ///
+    /// A continuation unit is a checked-IH environment transport SOURCE exactly
+    /// when [`checked_ih_coordinate_run`] admits it (a ruled ordinary envelope
+    /// with a worker-capture run -- which reads only the unit's envelope
+    /// `key`/`header`/`slots`), and its identity is
+    /// [`Self::continuation_call_binding_for`] on the unit's own producer edge
+    /// (which reads only `continuation_calls`). Neither input reads
+    /// `aggregate_ownership`, `continuation_contexts`, nor `finalized_availability`,
+    /// and the continuation-unit population itself is fixed by
+    /// `continuation_specializations` + the continuation-specialization ABI, both
+    /// installed BEFORE `install_static_response_context_plan`. Therefore this set
+    /// is BYTE-IDENTICAL when computed at install (`apply_mutation=true`,
+    /// pre-install `continuation_contexts`) and at
+    /// `validate_static_response_context_plan` (`apply_mutation=false`,
+    /// post-install) -- the exact closedness the response-plane invariant
+    /// requires, and which the record-derived set above cannot provide (the
+    /// records are built post-install, at construction.rs:1251).
+    ///
+    /// This is the SINGLE membership derivation: the post-install record build
+    /// [`build_checked_ih_environment_transports`] admits its sources through the
+    /// SAME [`checked_ih_coordinate_run`] gate, and its records' source
+    /// identities are asserted to be a subset of this set. Destination resolution
+    /// (which admitted sources acquire a transport record) is environment
+    /// routing, orthogonal to P2 owner-call consumption: a transport caller is
+    /// never retargeted to a real owner call, so every causally-admitted source
+    /// is a P2 Deferral whether or not it routes to a destination. Hence this
+    /// causal set is the precise P2 membership, and the record-derived set is a
+    /// (possibly proper) subset used only by the post-install lowering consumers.
+    pub(in crate::cranelift_backend) fn checked_ih_environment_transport_source_call_identities(
+        &self,
+    ) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        let units = self.continuation_units()?;
+        let mut identities = BTreeSet::new();
+        for source in &units {
+            if checked_ih_coordinate_run(source)?.is_none() {
+                continue;
+            }
+            if let Some(identity) = self.continuation_call_binding_for(
+                source.producer_construct_origin(),
+                source.continuation_origin(),
+                source.producer_alternative(),
+                source.recursive_position(),
+            )? {
+                identities.insert(identity);
+            }
+        }
+        Ok(identities)
     }
 
     pub(in crate::cranelift_backend) fn checked_ih_environment_transport_source(
@@ -4988,6 +5048,24 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
         return Err(planner_error(
             "the checked-IH transport derivation issued one two-endpoint edge twice",
         ));
+    }
+    // HS5 one-source-of-truth (Architect ruling evt_2wjjtkc0n0mv3): every record
+    // source is admitted through the SAME causal membership gate the response
+    // classify's P2 discriminator reads at install, so the built record source
+    // set is a subset of the causal transport-source identities. This holds by
+    // construction (a record source has already passed `checked_ih_coordinate_run`
+    // and `continuation_call_binding_for` above), so a violation is derivation
+    // drift between the two consumers of the one membership predicate, not a
+    // program fact -- a planner invariant failure.
+    let causal_sources = plan.checked_ih_environment_transport_source_call_identities()?;
+    for transport in &transports {
+        if !causal_sources.contains(&transport.source_call_identity) {
+            return Err(planner_error(
+                "a checked-IH transport record's source is absent from the causal \
+                 transport-source membership; the record build and the response P2 \
+                 discriminator have drifted",
+            ));
+        }
     }
     Ok(transports)
 }
