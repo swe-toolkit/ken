@@ -530,11 +530,6 @@ enum Disposition {
     },
 }
 
-const BOUNDARY_CARRIER: Disposition = Disposition::Refuses {
-    key: "a carried recursive hypothesis is an eliminated value",
-    retired_by: "the BoundaryCarrier need-directed-projection fold",
-};
-
 /// Refused by ELABORATION, before any lowering runs. It is in this population
 /// because the population is the admissible entries, not the entries that reach
 /// the backend, and dropping it would have made the census silently narrower
@@ -545,7 +540,11 @@ const ELABORATION_MISMATCH: Disposition = Disposition::Refuses {
 };
 
 const EXPECTED: &[(&str, Disposition)] = &[
-    ("rt_allocate_stage", BOUNDARY_CARRIER),
+    // RECUT 2 HS6 #4 (currency, Architect evt_2980vtzybp6bj): the recut retired
+    // this row's blocker (the BoundaryCarrier need-directed-projection fold), so
+    // the stage now lowers and completes. Was Disposition::Refuses{ key: "a
+    // carried recursive hypothesis is an eliminated value" }.
+    ("rt_allocate_stage", Disposition::Completes),
     ("rt_cap41_endpoint_stage", Disposition::Completes),
     ("rt_cap41_offset_endpoint_stage", Disposition::Completes),
     ("rt_cap41_offset_out_of_range_stage", Disposition::Completes),
