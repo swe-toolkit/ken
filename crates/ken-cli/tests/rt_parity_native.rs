@@ -178,6 +178,15 @@ proc rt_read_offset_stage (cap : Cap AFull)
 (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
 (withResource AFull Unit Unit cap (bytes_encode "source")
   ResourceRead rt_read_offset_file)
+(\_first. rt_read_offset_second cap)
+
+proc rt_read_offset_second (cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+(Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+(withResource AFull Unit Unit cap (bytes_encode "source")
+  ResourceRead rt_read_offset_file)
 (\outcome. rt_bracket_done outcome)
 
 proc rt_read_window_body (file : Resource FsHandle) (buffer : BufferHandle)
@@ -1137,44 +1146,49 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
             let diagnostic = diagnostics.into_iter().next().unwrap();
             assert_eq!(diagnostic.static_response_infeasible, None);
             assert_eq!(diagnostic.all_static_response_infeasible, None);
-            // RECUT 2 HS6 #2 (A)-refined (Architect evt_27hj9nxevvjyr): TOTALITY +
-            // sub-case oracle. The BufferAllocate response is in EXACTLY ONE column.
-            // The read product specializes it (owner + ABI, pinned below); the write
-            // product's BufferAllocate K is the closure-boundary transport source, so
-            // the recut correctly DEFERS it. The sub-case UnconsumedTransportCaller is
-            // phase B's own correctness label (assigned ONLY to a transport source),
-            // so it is the classification's correctness oracle over the fixture-known
-            // population -- not a value derived from what the code emitted. The
-            // Deferred member's context id is deliberately NOT pinned: it is the one
-            // native value that would otherwise be an ungrounded guess.
+            // RECUT 2 HS6 (A-full)-refined (Architect evt_27hj9nxevvjyr /
+            // evt_2fk574v1cb3b1): TOTALITY + sub-case oracle, COUNT-AGNOSTIC. Every
+            // BufferAllocate response is in exactly one column (Specialized xor
+            // Deferred); every Deferred one carries sub_case UnconsumedTransportCaller
+            // -- phase B's own correctness label, assigned ONLY to a transport source,
+            // so it independently proves "correctly deferred" over the fixture-known
+            // population (not derived from what the code emitted). No exact count is
+            // pinned: the read product now carries two brackets (the added
+            // non-transport owner) -> two BufferAllocate, and the write product's
+            // closure-boundary BufferAllocate K is transport-deferred.
             let specialized_buffer = &diagnostic.static_response_rows;
+            let all_buffer = diagnostic
+                .all_static_response_rows
+                .iter()
+                .filter(|row| row.operation == "BufferAllocate")
+                .collect::<Vec<_>>();
             let deferred_buffer = diagnostic
                 .static_response_deferred
                 .iter()
                 .filter(|row| row.operation == "BufferAllocate")
                 .collect::<Vec<_>>();
-            assert_eq!(
-                specialized_buffer.len() + deferred_buffer.len(),
-                1,
-                "exactly one BufferAllocate response, in exactly one column \
+            assert!(
+                specialized_buffer.len() + deferred_buffer.len() >= 1,
+                "the fixed product carries at least one BufferAllocate response \
                  (Specialized={specialized_buffer:?}, Deferred={deferred_buffer:?})",
             );
-            if let Some(buffer) = specialized_buffer.first() {
+            assert_eq!(
+                specialized_buffer.len(),
+                all_buffer.len(),
+                "the BufferAllocate-filtered ledger must equal the all-producer BufferAllocate rows"
+            );
+            for buffer in specialized_buffer {
                 assert_eq!(buffer.operation, "BufferAllocate");
-                assert_eq!(
-                    diagnostic
-                        .all_static_response_rows
-                        .iter()
-                        .filter(|row| row.operation == "BufferAllocate")
-                        .collect::<Vec<_>>(),
-                    vec![buffer],
-                    "the filtered row must be the same authority as the all-producer row"
+                assert!(
+                    all_buffer.contains(&buffer),
+                    "a filtered BufferAllocate row is absent from the all-producer set"
                 );
-            } else {
+            }
+            for deferred in &deferred_buffer {
                 assert_eq!(
-                    deferred_buffer[0].sub_case, "UnconsumedTransportCaller",
-                    "write-BufferAllocate's K is a checked-IH environment transport source, so \
-                     the recut correctly Defers it (the (a) correctness oracle)"
+                    deferred.sub_case, "UnconsumedTransportCaller",
+                    "a Deferred BufferAllocate is a transport-caller residual (the (a) oracle): \
+                     {deferred:?}"
                 );
             }
             assert_eq!(
@@ -1457,55 +1471,63 @@ fn static_response_full_demand_population_controls_reach_red_and_restore() {
         assert_eq!(read.len(), 1);
         assert_eq!(write.len(), 1);
 
-        for (diagnostic, producer) in [(&read[0], 146), (&write[0], 159)] {
-            let rows = diagnostic
-                .all_static_response_rows
+        // RECUT 2 HS6 (ii)-REDESIGN (Architect evt_2fk574v1cb3b1). The
+        // owner-splitting-under-a-shared-SPECIALIZED-producer requirement is
+        // DROPPED: post-recut that population (the ResourceRelease pairs) is
+        // transport-carried and correctly Deferred, so it is witnessless on the
+        // Specialized side (the fallback firing, precisely -- not a bare retire).
+        // The REAL property it protected -- a shared producer's distinct K are
+        // DISTINCT demand rows (not merged), correctly routed -- is RE-TARGETED
+        // onto the DEFERRED population, where the shared-producer multi-K witness
+        // now lives (the transport-deferred ResourceRelease pair: read producer
+        // 146, write 159). The producer is selected STRUCTURALLY (the one carrying
+        // >= 2 Deferred rows), not by the recut-invalidated baked id (part 2 /
+        // de-bake), so no native id is baked back and no future reclassification
+        // re-breaks it.
+        for diagnostic in [&read[0], &write[0]] {
+            let mut by_producer: std::collections::BTreeMap<u32, Vec<_>> =
+                std::collections::BTreeMap::new();
+            for row in &diagnostic.static_response_deferred {
+                by_producer
+                    .entry(row.producer_call_origin)
+                    .or_default()
+                    .push(row);
+            }
+            let fan_outs = by_producer
                 .iter()
-                .filter(|row| row.producer_call_origin == producer)
+                .filter(|(_, rows)| rows.len() >= 2)
                 .collect::<Vec<_>>();
-            // RECUT 2 HS6 (A-full)-refined PRECONDITION (Architect
-            // evt_4kqz8awr6sg1n). The recut defers transport-source members, which
-            // can shrink a shared producer's Specialized rows. This control needs a
-            // SHARED producer (>= 2 distinct K under one producer) to be
-            // non-trivial; the exact member count is no longer a stable native
-            // value, so derive it and assert the shared-producer INVARIANT
-            // structurally, and assert the >= 2 precondition explicitly so an
-            // insufficient population reds with a diagnostic, never a vacuous pass.
             assert!(
-                rows.len() >= 2,
-                "full-demand precondition unmet: shared producer {producer} now carries only {} \
-                 Specialized row(s) after transport-source deferral; this control needs >= 2 \
-                 distinct K under one producer. Fixture-owner follow-up: supply a stable \
-                 non-transport-source shared-producer member.",
-                rows.len()
+                !fan_outs.is_empty(),
+                "full-demand fan-out witness missing: no producer carries >= 2 Deferred rows in \
+                 this product after the recut. The shared-producer fan-out invariant is \
+                 re-targeted onto the Deferred population (the transport-deferred ResourceRelease \
+                 pairs); if none survives, the fan-out witness itself is unobservable -- a \
+                 diagnostic-reachability finding, not a fixture edit. Deferred: {:?}",
+                diagnostic.static_response_deferred
             );
-            let expected_members = rows.len();
-            assert_eq!(
-                rows.iter()
-                    .map(|row| (row.k_specialization, row.k_body_origin))
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .len(),
-                expected_members,
-                "shared producer {producer} merged distinct K keys"
-            );
-            assert_eq!(
-                rows.iter()
-                    .map(|row| &row.k_identity)
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .len(),
-                expected_members,
-                "shared producer {producer} merged distinct incoming callers"
-            );
-            for row in rows {
+            for (producer, fan_out) in fan_outs {
+                // Distinct K: the shared producer's fan-out members are distinct
+                // demand rows (keyed on vis_origin), never merged into one.
                 assert_eq!(
-                    diagnostic
-                        .static_response_owners
+                    fan_out
                         .iter()
-                        .filter(|owner| owner.selected_caller == row.k_identity)
-                        .count(),
-                    1,
-                    "shared producer {producer} did not split this K into one owner"
+                        .map(|row| row.vis_origin)
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len(),
+                    fan_out.len(),
+                    "shared producer {producer} merged distinct K into one Deferred row"
                 );
+                // Correct routing: every fan-out member is a P2 transport-caller
+                // residual (the ruled reason this population is Deferred, not
+                // Specialized).
+                for row in fan_out {
+                    assert_eq!(
+                        row.sub_case, "UnconsumedTransportCaller",
+                        "shared producer {producer}'s fan-out member is not a transport-caller \
+                         residual: {row:?}"
+                    );
+                }
             }
         }
 
