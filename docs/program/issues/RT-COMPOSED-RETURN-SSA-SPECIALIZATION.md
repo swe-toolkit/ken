@@ -151,13 +151,18 @@ fs-only red would conflate a rider-red with a mechanism-red and burn a SHA on a
 bet that cannot be checked locally (native OOMs).
 
 #3 rides as a SEPARATE follow-up un-ignore on the SAME branch AFTER the
-mechanism greens, and the population MUST BE RE-READ on the fresh base
-`4e5481c57`, not settled from old logs. **BASE DRIFT (Architect
-evt_1enehr9nxkjz9): on 4e5481c57 the fs_*_narrows `#[ignore]` reasons CHANGED**
-(both now "post-M6 ... InvalidBounds/InvalidOffset"; RT-CLOSURE-BOUNDARY-LANE
-gone). The base moved under the fixtures, so the e193dc631-era #3 attribution
-AND runtime-leader's read/write-differ elimination (`evt_1fb7kkw4bbxv5`) do NOT
-carry — measure on the built recut, never inherit. Two measurements:
+mechanism greens, measured three-way on the BUILT recut (positive (a)/(b)
+instrumentation rides the candidate; do not declare from static reads).
+ATTRIBUTION: H_over (over-admission) is strongly indicated and STANDS
+(runtime-leader `evt_1fb7kkw4bbxv5`) — the current PatternMatchFailure /
+ResourceBodyResult signature is IDENTICAL across the two `fs_*_narrows` fixtures
+that carried two DIFFERENT historical `#[ignore]` debts; two different old debts
+do not converge to one signature, so H_debt-reappearance is refuted. This is
+INDIRECT (negative-half elimination); the POSITIVE (a) instrumentation rides the
+candidate. NOTE: an earlier revision of this frame claimed the fs_*_narrows
+`#[ignore]` text drifted on 4e5481c57 — that was a RETRACTED grep-artifact
+(implementer `evt_4ey9qwc18kfj9`, Architect concurred `evt_2yw2ptn6hj5rk`);
+there was NO base drift and the elimination above carries. Two measurements:
 
 - **(a)** fs_read/write's response is in (S_causal minus S_record) — instrument
   the recut classify, re-read on 4e5481c57.
@@ -226,9 +231,9 @@ Retain the HS3-recut ACs 1-7 for the Specialized path. Add:
   ships WITHOUT the fs_*_narrows un-ignores (partial-WP, §8); its acceptance is
   AC-1..9 + AC-7 backstop + AC-NO-REGRESSION. #3 rides as a separate follow-up
   un-ignore on the same branch after the mechanism greens, three-way measured on
-  4e5481c57 (re-read the population; the e193dc631-era attribution does not
-  carry): (a)&&(b) folds the un-ignore in, else split. Not a gate on the
-  mechanism's release.
+  the built recut (the e193dc631-era H_over elimination carries; positive (a)/(b)
+  ride the candidate): (a)&&(b) folds the un-ignore in, else split. Not a gate on
+  the mechanism's release.
 - **AC-NO-REGRESSION.** Green across the transport-source population in CI (px8f
   + rt_parity native shards), not just the modeled owner-call fixtures. Targeted
   `scripts/ken-cargo` locally; whole-suite is CI's.
