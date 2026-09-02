@@ -4235,30 +4235,82 @@ fn buffer_freeze_malformed_span_is_unconstructible_at_the_landed_surface() {
 /// static-body owner is substituted as the retained-unit traversal root and the
 /// retained body reaches its "has no graph-derived call target in this unit"
 /// rejection from a genuine unrelated root, not the degenerate empty one.
+#[cfg(target_os = "linux")]
+const OPTION2_UNRELATED_OWNER_CHILD: &str = "KEN_RT_OPTION2_UNRELATED_OWNER_CHILD";
+
+#[cfg(target_os = "linux")]
+fn assert_option2_unrelated_owner_child() {
+    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+    let root = output_dir("option2-unrelated-owner-root");
+    let result = ken_runtime::with_retained_unit_call_target_mutation(
+        ken_runtime::RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot,
+        || {
+            ken_cli::build_native_program(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                "rt_parity_option2_unrelated_owner",
+                root.path(),
+            )
+        },
+    );
+    let error = result.expect_err(
+        "substituting an unrelated owner root on a specialized-owner program must not compile",
+    );
+    let rendered = format!("{error:?}");
+    assert!(
+        rendered.contains("has no graph-derived call target in this unit"),
+        "option-2: the unrelated-owner substitution must red the retained-body rejection; \
+         got:\n{rendered}"
+    );
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. Recut option-2 coverage (Architect
+/// evt_55jt2yydg0661; QA re-check evt_6tw7cdk4kmwt0). Restores an independent
+/// positive control for the CONCRETE "real-but-unrelated owner substituted" arm of
+/// SubstituteUnrelatedOwnerRoot, which lost its only exerciser when the writeAll
+/// fixture degraded to the 0-owner empty-traversal case under the recut.
+///
+/// The 0-owner degenerate (empty-traversal) and the 1-owner concrete substitution
+/// reach the IDENTICAL downstream "has no graph-derived call target in this unit"
+/// rejection, so asserting only that string cannot tell the real substitution from
+/// a silent fallback (QA's finding). The distinguishing signal is the provenance
+/// line `substitute_unrelated_owner_roots` emits: the concrete branch prints "...
+/// with unrelated legal static-body owner {id}", the degenerate branch prints "...
+/// with an empty traversal ...". So the CHILD (spawned with the mutation active on
+/// the rt_parity READ stage, which carries real specialization owners) asserts the
+/// rejection, and the PARENT captures the child's stderr and asserts the CONCRETE
+/// provenance -- proving the real 1-owner substitution was exercised.
 #[test]
 fn substitute_unrelated_owner_root_reds_on_a_specialized_owner_program() {
-    in_generated_entry_stack_thread("rt-parity-option2-unrelated-owner", || {
-        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
-        let root = output_dir("option2-unrelated-owner-root");
-        let result = ken_runtime::with_retained_unit_call_target_mutation(
-            ken_runtime::RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot,
-            || {
-                ken_cli::build_native_program(
-                    &source,
-                    ken_cli::SourceFormat::Ken,
-                    "rt_parity_option2_unrelated_owner",
-                    root.path(),
-                )
-            },
+    if std::env::var_os(OPTION2_UNRELATED_OWNER_CHILD).is_some() {
+        in_generated_entry_stack_thread(
+            "rt-parity-option2-unrelated-owner-child",
+            assert_option2_unrelated_owner_child,
         );
-        let error = result.expect_err(
-            "substituting an unrelated owner root on a specialized-owner program must not compile",
-        );
-        let rendered = format!("{error:?}");
-        assert!(
-            rendered.contains("has no graph-derived call target in this unit"),
-            "option-2: the concrete unrelated-owner substitution must red the retained-body \
-             rejection on a program with real specialization owners; got:\n{rendered}"
-        );
-    });
+        return;
+    }
+    let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args([
+            "--exact",
+            "substitute_unrelated_owner_root_reds_on_a_specialized_owner_program",
+            "--nocapture",
+        ])
+        .env(OPTION2_UNRELATED_OWNER_CHILD, "1")
+        .env_remove("RUST_MIN_STACK")
+        .output()
+        .expect("spawn option-2 unrelated-owner child");
+    assert!(
+        output.status.success(),
+        "option-2 child failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("with unrelated legal static-body owner"),
+        "option-2: the child must exercise the CONCRETE 1-owner substitution, not the \
+         0-owner empty-traversal degenerate (which prints 'with an empty traversal'); \
+         stderr:\n{stderr}"
+    );
 }
