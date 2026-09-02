@@ -4221,3 +4221,44 @@ fn buffer_freeze_malformed_span_is_unconstructible_at_the_landed_surface() {
     elaborates("MkBufferWindow (sub_int 0 1) (1 : Int)", "BufferWindow")
         .expect("control: the public window constructor elaborates from source");
 }
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. Recut option-2 coverage
+/// (Architect evt_55jt2yydg0661). The concrete "real-but-unrelated owner
+/// substituted" arm of the SubstituteUnrelatedOwnerRoot mutation lost its only
+/// exerciser under the recut: its sole prior host (the px8f writeAll fixture)
+/// degraded to the empty-traversal 0-owner case (writeAll's responses are now all
+/// Deferred), so every writeAll unrelated-owner-root run duplicates
+/// suppress-graph-claims and the distinct real-owner substitution went uncovered.
+/// This drives the SAME existing mutation against a program that carries real
+/// specialization owners (the rt_parity READ stage), so a concrete unrelated legal
+/// static-body owner is substituted as the retained-unit traversal root and the
+/// retained body reaches its "has no graph-derived call target in this unit"
+/// rejection from a genuine unrelated root, not the degenerate empty one.
+#[test]
+fn substitute_unrelated_owner_root_reds_on_a_specialized_owner_program() {
+    in_generated_entry_stack_thread("rt-parity-option2-unrelated-owner", || {
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+        let root = output_dir("option2-unrelated-owner-root");
+        let result = ken_runtime::with_retained_unit_call_target_mutation(
+            ken_runtime::RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot,
+            || {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    "rt_parity_option2_unrelated_owner",
+                    root.path(),
+                )
+            },
+        );
+        let error = result.expect_err(
+            "substituting an unrelated owner root on a specialized-owner program must not compile",
+        );
+        let rendered = format!("{error:?}");
+        assert!(
+            rendered.contains("has no graph-derived call target in this unit"),
+            "option-2: the concrete unrelated-owner substitution must red the retained-body \
+             rejection on a program with real specialization owners; got:\n{rendered}"
+        );
+    });
+}
