@@ -4045,65 +4045,29 @@ fn install_index_refinements(
             }
         }
 
-        // Capability 2 REPLACED by the context-telescope convoy
-        // (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE): the ordered ambient
-        // closure is now generalized into the motive codomain and redirected via
-        // convoy binders in `check_match_dependent_mode`, not re-typed one binding
-        // at a time here. The per-binding sibling-Cast scan below is disabled.
-        if false && outer_scope_depth > 0 {
+        // Capability 2's per-binding sibling-Cast retyping is REPLACED by the
+        // context-telescope convoy (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-
+        // REBASE): the ordered ambient closure is generalized into the motive
+        // codomain and redirected via convoy binders in
+        // `check_match_dependent_mode`, not re-typed one binding at a time here.
+        // What REMAINS is the decision-5 FAIL-CLOSED guard: an index whose own
+        // type is not classified by a `Type` universe (an Omega-classified index)
+        // must be rejected before any sibling is refined, rather than silently
+        // convoyed. The convoy path depends on this guard firing per arm — it is
+        // not superseded by the kernel's later Elim check, which would surface a
+        // worse diagnostic for the same reject.
+        if outer_scope_depth > 0 {
             let peel_level_ty = kernel_infer(cx.env, &zonked_ctx, &peel_ty).map_err(|e| {
                 ElabError::Internal(format!(
                     "index refinement: could not classify an index type: {e:?}"
                 ))
             })?;
-            let peel_level = match whnf(cx.env, &zonked_ctx, &peel_level_ty) {
-                Term::Type(l) => l,
+            match whnf(cx.env, &zonked_ctx, &peel_level_ty) {
+                Term::Type(_) => {}
                 other => {
                     return Err(ElabError::Internal(format!(
                         "index refinement: index type is not classified by a Type universe, found {other:?}"
                     )))
-                }
-            };
-            for abs_pos in 0..outer_scope_depth {
-                // `abs_pos` is a bottom-relative position (`bottom_pos ==
-                // abs_pos`, established below). A position inside an
-                // enclosing match's own field region is a field THAT match
-                // bound, not a genuine outer (pre-existing) binder -- skip
-                // it. Provenance, not position: `match_field_regions` tracks
-                // membership directly, so a genuine outer binder pushed
-                // above an enclosing match's fields (e.g. across a `let`)
-                // is never caught by this skip (`LANG-CONVOY-MATCH-FIELD-
-                // PROVENANCE`).
-                if cx.match_field_regions.iter().any(|r| r.contains(&abs_pos)) {
-                    continue;
-                }
-                let outer_idx = cx.ctx.len() - 1 - abs_pos;
-                let outer_ty = cx.metas.zonk_term(&weaken(
-                    cx.ctx.lookup(outer_idx).expect("outer position in range"),
-                    (outer_idx as i64) + 1,
-                ));
-                let h_sym = build_sym(
-                    cx.env,
-                    &zonked_ctx,
-                    &peel_ty,
-                    peel_level.clone(),
-                    &a2,
-                    h_sentinel.clone(),
-                );
-                if let Some((cast, new_ty)) = try_reindex_cast(
-                    cx.env,
-                    &zonked_ctx,
-                    &peel_ty,
-                    &b2,
-                    &a2,
-                    &outer_ty,
-                    Term::var(outer_idx),
-                    h_sym,
-                )? {
-                    let bottom_pos = cx.ctx.len() - 1 - outer_idx;
-                    cx.var_refinements
-                        .insert(bottom_pos, (cast, new_ty, cx.ctx.len()));
-                    installed.push(bottom_pos);
                 }
             }
         }
