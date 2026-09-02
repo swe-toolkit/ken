@@ -323,6 +323,76 @@ impl StaticResponseContinuation {
     }
 }
 
+/// The classify verdict for one response `ITree::Vis` occurrence (recut
+/// `evt_5yjjsrhpmt204` + amendment `evt_4ar3rxzrra5v4`). Computed ONCE at
+/// planning (R2) and consumed by total matches at every downstream stage, so a
+/// stage that fails to reconcile the residual is a Rust compile error
+/// (COORDINATION §7), never a CI-red. `Specialized` is the proved path
+/// (P0 = a continuation unit AND a selected caller that will be consumed as a
+/// real `DirectCall`/`ComposedCall`); `Deferred` is the complete residual
+/// (P1 ∪ P2). D0 holds: only `Deferred` is tagged; the Specialized side is
+/// unchanged.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum ResponseDisposition {
+    Specialized,
+    Deferred,
+}
+
+/// Which residual sub-case a `Deferred` response is, kept for congruence
+/// evidence (AC-1) and control fixtures — never a routing key (both sub-cases
+/// route identically to main's pre-WP lowering).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
+    /// P1 — no continuation unit for this `Vis` (`matching.is_empty()`): the
+    /// `1229` absent complement Q1 declined. There is no static continuation to
+    /// name and no owner; main already lowers the `Vis` construct.
+    NoContinuationUnit,
+    /// P2 — a continuation unit exists, but the selected caller is a checked-IH
+    /// environment transport source (settles `TransportDormant`, never
+    /// retargeted to a real call): the HS3-a/HS3-b present-but-unconsumed
+    /// placeholder, now classified `Deferred` up front so no owner and no
+    /// `StaticResponseDeferred` placeholder are ever emitted for it.
+    UnconsumedTransportCaller,
+}
+
+/// One response `Vis` classified `Deferred` (recut amendment
+/// `evt_4ar3rxzrra5v4`). It acquires no response owner and no
+/// `StaticResponseDeferred` placeholder; its operation root and host effect fall
+/// through to main's pre-WP lowering (R3). The row is POPULATED (never an
+/// absence), so `classify` is congruent (AC-1) and every consumer reconciles the
+/// residual by total match rather than reconstructing it from local negative
+/// evidence (R2).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct DeferredResponseRow {
+    vis_origin: StaticOriginId,
+    operation_root_origin: StaticOriginId,
+    effect_origin: StaticOriginId,
+    operation: HostOpV1,
+    sub_case: DeferredResponseSubCase,
+}
+
+impl DeferredResponseRow {
+    pub(in crate::cranelift_backend) fn vis_origin(&self) -> StaticOriginId {
+        self.vis_origin
+    }
+
+    pub(in crate::cranelift_backend) fn operation_root_origin(&self) -> StaticOriginId {
+        self.operation_root_origin
+    }
+
+    pub(in crate::cranelift_backend) fn effect_origin(&self) -> StaticOriginId {
+        self.effect_origin
+    }
+
+    pub(in crate::cranelift_backend) fn operation(&self) -> HostOpV1 {
+        self.operation
+    }
+
+    pub(in crate::cranelift_backend) fn sub_case(&self) -> DeferredResponseSubCase {
+        self.sub_case
+    }
+}
+
 /// Identity of one compile-time response-owner function. This domain is
 /// deliberately non-convertible to continuation/context identities: an owner
 /// implements one selected incoming edge and later calls a K context; it is not
@@ -1160,12 +1230,15 @@ impl StaticTransitionPlan<'_> {
     /// a lawful context demand, so that question belongs to the union interner
     /// below. The outer `Result` is plan integrity; the inner `Result` retains
     /// only the SSA trichotomy's genuinely dynamic or non-expressible arm.
+    #[allow(clippy::type_complexity)]
     fn static_response_context_demands_filtered(
         &self,
         operation: Option<HostOpV1>,
         apply_mutation: bool,
-    ) -> Result<Result<Vec<StaticResponseContextDemand>, SsaInfeasible>, CraneliftBackendError>
-    {
+    ) -> Result<
+        Result<(Vec<StaticResponseContextDemand>, Vec<DeferredResponseRow>), SsaInfeasible>,
+        CraneliftBackendError,
+    > {
         let routes = host_response_routes(self)?;
         let units = self.continuation_units()?;
         let mut response_vis = Vec::new();
@@ -1215,6 +1288,14 @@ impl StaticTransitionPlan<'_> {
         );
 
         let mut demands = Vec::new();
+        // The complete Deferred residual (recut amendment evt_4ar3rxzrra5v4):
+        // P1 (no continuation unit) captured here, P2 (unit present but an
+        // unconsumed transport caller) captured inside the unit loop. Populated,
+        // never an absence, so classify is congruent with `demands` over the full
+        // response-Vis population (AC-1) and every consumer reconciles the
+        // residual by total match (R2).
+        let mut deferred: Vec<DeferredResponseRow> = Vec::new();
+        let transport_sources = self.checked_ih_environment_transport_source_identities();
         for (vis_origin, operation_root_origin, selected_operation_origin, route, k_is_opaque) in
             response_vis
         {
@@ -1240,19 +1321,22 @@ impl StaticTransitionPlan<'_> {
                     )
                     .with_operation(route.operation)));
                 }
-                // Category (ii): a real static continuation this WP does not yet
-                // specialize (e.g. the deferred D3 CheckedIhCapturedEnvironment
-                // frontier). The SSA-specialization pass is an additive,
-                // behavior-preserving overlay -- main already lowers this Vis
-                // construct (it compiled and reached its runtime frontier before
-                // this WP existed), so decline the edge and emit no demand rather
-                // than aborting object emission. With no demand this Vis is absent
-                // from `static_response_continuations`, so every
-                // `is_static_response_*` predicate returns false for it and
-                // lowering routes it through the pre-existing (main) path,
-                // byte-for-behavior identical to main. No continuation unit was
-                // ever created for this Vis (matching is empty), so the pass has
-                // not diverted or consumed the edge before declining it.
+                // P1 (recut amendment evt_4ar3rxzrra5v4): no continuation unit
+                // exists for this Vis (the 1229 residual). A real static
+                // continuation this WP does not specialize; main already lowers
+                // the Vis construct (it compiled and reached its runtime frontier
+                // before this WP), so it is Deferred, not an abort. Capture it as
+                // a populated residual row (not a bare skip): no demand is built,
+                // so it is absent from `static_response_continuations` -- every
+                // `is_static_response_*` predicate is false for it and its
+                // operation root / effect fall through to main's pre-WP lowering.
+                deferred.push(DeferredResponseRow {
+                    vis_origin,
+                    operation_root_origin,
+                    effect_origin: route.effect_origin,
+                    operation: route.operation,
+                    sub_case: DeferredResponseSubCase::NoContinuationUnit,
+                });
                 continue;
             }
             for unit in matching {
@@ -1285,6 +1369,31 @@ impl StaticTransitionPlan<'_> {
                             "a static response producer's own edge has no continuation call identity",
                         )
                     })?;
+                // P2 (recut amendment evt_4ar3rxzrra5v4; discriminator answer (b),
+                // grounded). A continuation unit exists, but if the selected
+                // caller is a checked-IH environment transport source it settles
+                // TransportDormant at lowering (never retargeted to a real call) --
+                // the present-but-unconsumed placeholder that leaked as HS3-b (same
+                // root as HS3-a disposition=None). "Consumed" is thus decided ONCE
+                // here at planning (R2) from a planning-available fact: membership
+                // in `checked_ih_environment_transport_source_identities()` (the
+                // transport sources are validated to the D3 CheckedIhCapturedEnvironment
+                // role -- proven equal to non-consumption for this case, not a mere
+                // proxy). Classify it Deferred: build no demand, so no owner and no
+                // StaticResponseDeferred placeholder are ever emitted for it; its
+                // operation root / effect fall through to main's pre-WP lowering.
+                // AC-7 pins this planning verdict against the lowering
+                // CandidateDisposition.
+                if transport_sources.contains(&k_identity) {
+                    deferred.push(DeferredResponseRow {
+                        vis_origin,
+                        operation_root_origin,
+                        effect_origin: route.effect_origin,
+                        operation: route.operation,
+                        sub_case: DeferredResponseSubCase::UnconsumedTransportCaller,
+                    });
+                    continue;
+                }
                 let k_ret_identity = match exact_response_ret_identity(
                     self,
                     unit.continuation_origin(),
@@ -1652,7 +1761,8 @@ impl StaticTransitionPlan<'_> {
             target.context_inputs[0].coordinate = target.context_inputs[1].coordinate;
             target.context_inputs[1].coordinate = first;
         }
-        Ok(Ok(demands))
+        deferred.sort_by_key(|row| (row.vis_origin, row.operation_root_origin, row.operation));
+        Ok(Ok((demands, deferred)))
     }
 
     /// Intern the union of old causal-call contexts and response demands into a
@@ -1827,8 +1937,8 @@ impl StaticTransitionPlan<'_> {
                 "the static response context plan may be installed exactly once",
             ));
         }
-        let demands = match self.static_response_context_demands_filtered(None, true)? {
-            Ok(demands) => demands,
+        let (demands, deferred) = match self.static_response_context_demands_filtered(None, true)? {
+            Ok(classified) => classified,
             Err(infeasible) => {
                 self.static_response_infeasible = Some(infeasible);
                 self.static_response_plan_installed = true;
@@ -1845,6 +1955,7 @@ impl StaticTransitionPlan<'_> {
         )?;
         self.continuation_contexts = contexts;
         self.static_response_continuations = rows;
+        self.static_response_deferred = deferred;
         self.static_response_plan_installed = true;
         Ok(())
     }
@@ -1862,8 +1973,8 @@ impl StaticTransitionPlan<'_> {
                 "the final plan carries no installed static response context plan",
             ));
         }
-        let demands = match self.static_response_context_demands_filtered(None, false)? {
-            Ok(demands) => demands,
+        let (demands, deferred) = match self.static_response_context_demands_filtered(None, false)? {
+            Ok(classified) => classified,
             Err(infeasible) => {
                 let mut landed_contexts = self.continuation_contexts.clone();
                 for context in &mut landed_contexts {
@@ -1871,6 +1982,7 @@ impl StaticTransitionPlan<'_> {
                 }
                 if self.static_response_infeasible.as_ref() != Some(&infeasible)
                     || !self.static_response_continuations.is_empty()
+                    || !self.static_response_deferred.is_empty()
                     || landed_contexts != causal_contexts
                 {
                     return Err(planner_error(
@@ -1901,6 +2013,7 @@ impl StaticTransitionPlan<'_> {
         }
         if landed_contexts != expected_contexts
             || self.static_response_continuations != expected_rows
+            || self.static_response_deferred != deferred
         {
             return Err(planner_error(
                 "the installed response context/continuation plane is not its exact closed derivation",

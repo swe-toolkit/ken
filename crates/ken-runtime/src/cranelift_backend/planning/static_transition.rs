@@ -83,10 +83,10 @@ pub(in crate::cranelift_backend) use semantic_ir::{
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
-    SsaInfeasible, StaticResponseCapture, StaticResponseContextDemand,
-    StaticResponseContinuation, StaticResponseContinuationId, StaticResponseEffectInput,
-    StaticResponseEnvironmentBinding, StaticResponseFrameSource, StaticResponseOwnerId,
-    StaticResponseOwnerSpecialization,
+    DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
+    StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
+    StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
+    StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use responses::{
@@ -578,6 +578,17 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// The typed fail-closed result for a genuinely opaque/dynamic response K
     /// or a source that cannot be expressed in the existing typed schema.
     static_response_infeasible: Option<SsaInfeasible>,
+    /// The complete `Deferred` residual population (recut amendment
+    /// `evt_4ar3rxzrra5v4`): every response `Vis` that is NOT specialized —
+    /// P1 (no continuation unit) ∪ P2 (unit present but the selected caller is a
+    /// checked-IH environment transport source that never retargets to a real
+    /// call). Populated (never an absence) so `classify` is congruent with
+    /// `static_response_continuations` over the full response-`Vis` population and
+    /// every downstream stage reconciles the residual by total match (R2/§7).
+    /// A `Deferred` response acquires no owner and no `StaticResponseDeferred`
+    /// placeholder; its operation root and host effect fall through to main's
+    /// pre-WP lowering (R3).
+    static_response_deferred: Vec<DeferredResponseRow>,
     /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`. The interned fusion identity
     /// plane, **installed after planning rather than during it**.
     ///
