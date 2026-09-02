@@ -1,171 +1,251 @@
 ---
 id: CAT-LAWFULFUNCTORS-STANDALONE-IMPORT
-title: "Bring Core/Classes/LawfulFunctors.ken.md to standalone-clean by adding the single missing import of list_append from Data.Collections.Derived — the provider is now pub and standalone-clean, no cycle, no chained prerequisite, so this removes LawfulFunctors from the census standalone-failure set with one import line. It does NOT do the deferred law-carrying list_map/list_foldr reuse migration."
-status: ready
+title: "Migrate the three orphan list_append proofs (assoc/left_unit/right_unit) from Core/Classes/LawfulFunctors into Data/Collections/Derived, the module that defines list_append, per Architect ruling evt_7khknqydxxd93. An attached proof f::law is part of f's definitional surface and can be soundly owned only by f's module; proving it elsewhere is an orphan attachment that resolves under full-catalog load but goes UnboundName under selective/standalone import. LawfulFunctors keeps its co-located bool_and/list_map/option_map proofs and gains the real standalone imports it owes; EffectfulClasses's prose owner-attribution is re-pointed to Derived. Carries the campaign rule for every future orphan attached proof."
+status: active
 owner: foundation
-size: S
+size: M
 gate: none
 tier: T2
 depends_on: [CAT-DERIVED-PUB-EXPORT]
 blocks: []
 github: null
-origin: "Steward, 2026-09-02, on an operator-concurred framing of the LawfulFunctors standalone/ownership repair. The catalog-reuse census (docs/program/cat-reuse-census.md) row LF marks Core.Classes.LawfulFunctors [higher]: standalone rejects UnresolvedCon list_append at 4204..4215. A Steward measurement (subagent, 2026-09-02) established the failure shape is the SIMPLEST one — a pure missing import, not an ownership wall: LawfulFunctors uses list_append with neither a local definition nor an import, relying on ambient full-catalog scaffolding to resolve it, so in isolation it becomes UnresolvedCon. The provider Data.Collections.Derived.list_append is now pub (CAT-DERIVED-PUB-EXPORT MERGED; Derived.ken.md:77) and census row D is [ok] standalone exit 0 with no provider ownership error; Derived does not import LawfulFunctors, so importing it introduces no cycle. list_append is the SOLE unresolved symbol (every other used helper is defined locally in the file). Repair = one import line, identical to the landed precedent Parsing.ken.md:42. Steward-filed per COORDINATION section 2."
+origin: "Steward RECUT 2026-09-02 of the CAT-LAWFULFUNCTORS-STANDALONE-IMPORT hard stop, per Architect ruling evt_7khknqydxxd93 (thread thr_a8wy366qdepf). The original single-import framing was FALSIFIED by the foundation ring's D0/D1: adding `import Data.Collections.Derived (list_append)` resolves list_append but exposes UnboundName Data.Collections.Derived.list_append::assoc — an attached-proof ownership split. The Architect ruled it an orphan attached proof (the direct analogue of an orphan instance): list_append::{assoc,left_unit,right_unit} are proved IN LawfulFunctors but attach to list_append, which is defined in Derived. Ruling: reject the cross-module attachment-carry mechanism (option b, elaborator/TCB-enlarging, reintroduces the incoherence one level up); adopt option (a) executed as (c) — a migration the Steward recuts moving the three proofs into Derived. The laws are laws-with-the-function (their statements use only List/Nil/Cons, list_append, Equal/Refl/Proved, cong — nothing from Semigroup/Monoid), so Derived is the correct owner. Layering-clean: Derived is the lower layer (imports only Core.Logic.*, never Core.Classes) and its §4 already hosts proofs using Equal/Refl/Proved/cong."
 ---
 
-> # OWNERSHIP AXIS MEASURED ABSENT — THIS IS A MISSING IMPORT, NOT A MIGRATION
+> # RECUT: THIS IS AN ATTACHED-PROOF MIGRATION, NOT AN IMPORT REPAIR
 >
-> The operator's framing named a "standalone/ownership repair." **The ownership
-> axis was measured and it is clean.** Unlike `Nat.Order` (census component `N`,
-> which carries an orphan `Ord Nat` instance and a foreign attached
-> `bool_or::eq_true_of_or`, and must move atomically to its class owner), the
-> LawfulFunctors failure is a pure resolution gap:
+> The original frame asserted an "ownership axis measured absent / single import
+> / sole symbol." **That was FALSIFIED and is void.** The initial measurement
+> inherited the elaborator's fail-fast blind spot: elaboration halts at the
+> first `UnresolvedCon` (`list_append`) and never reaches the attached-proof
+> references behind it, so "list_append is the sole unresolved symbol" was true
+> only because the run stopped early. `"not flagged" != "resolved".`
 >
-> - The provider `Data.Collections.Derived.list_append` is already `pub`
->   (`Derived.ken.md:77`) and its module is `[ok]` standalone (census row `D`:
->   `standalone exit 0; no provider ownership error`).
-> - `Derived` does not import `LawfulFunctors` (no reverse edge) — importing it
->   introduces **no cycle**.
-> - `list_append` is the SOLE unresolved symbol; every other helper the module
->   uses (`idf`, `comp`, `bool_and`, `list_map`, `list_foldr`, `option_map`,
->   `option_foldr`, `monoid_mempty`, `fold_map_step`, `list_to_list`) is defined
->   locally in the same file.
->
-> **So the repair is one import line and the node is S/T2, not a T1 migration.**
-> If D0 re-measures at the release SHA and finds an ownership error or a second
-> unresolved symbol, that is a HARD STOP to Steward + Architect — it would mean
-> the module is not what this measurement found, exactly as `Order`'s split was
-> earned. Do not patch a second symbol through under an import-repair frame.
+> The real defect, ruled by the Architect (`evt_7khknqydxxd93`): the proofs
+> `list_append::{assoc,left_unit,right_unit}` are proved in
+> `Core.Classes.LawfulFunctors` (`:99/:104/:122` at `4ab87564f`) but attach to
+> `list_append`, which is defined in `Data.Collections.Derived` (`:514`). **An
+> attached proof `f::law` is part of `f`'s definitional surface and can be
+> soundly owned only by the module that defines `f`** — the direct analogue of
+> an orphan instance. Its resolution depends on the LOAD SET, not the import
+> graph reachable from the reference, which is why it binds under full-catalog
+> load and goes `UnboundName` under selective import.
 
-> # THE LAW-CARRYING REUSE MIGRATION IS OUT OF SCOPE (deferred behind a ruling)
+> # CAMPAIGN RULE (carried by this node, governs the whole catalog-reuse effort)
 >
-> Census row 28 proposes reusing `list_map→Prelude.map`, `list_foldr→Prelude.fold`
-> and `bool_and→LawfulClasses.bool_and` inside this file. **Those are currently
-> LOCALLY DEFINED, so they cause no unresolved error and are NOT standalone
-> blockers.** The `list_map`/`list_foldr` half is a law-carrying substitution
-> across distinct rigid heads (non-convertible), which the Steward has DEFERRED
-> behind an Architect ruling. **Do not do that migration here.** This node adds
-> the one missing import and nothing else; the private `comp` def is left
-> untouched.
+> **An attached proof `f::law` MUST be defined in the module that defines `f`.**
+> Wherever "standalone-from-declared-imports" meets a module proving laws about a
+> function owned elsewhere, MIGRATE the orphan proof to the function's module —
+> never build a cross-module attachment-carry. Ownership is fixed by what the
+> law's STATEMENT is written in and what it depends on, never by which class
+> consumes it:
+>
+> - A law stated in the function's own vocabulary, needing nothing from the
+>   class layer, is a LAW-WITH-THE-FUNCTION: it lives in the function's defining
+>   module, and every structure cites the one canonical proof.
+> - A law that is a coherence obligation between the function and a specific
+>   class/instance — its statement mentions `Monoid.mempty`, `fold_map`, a
+>   dictionary — is a LAW-WITH-THE-STRUCTURE and lives with the instance/class.
+>
+> `list_append::{assoc,left_unit,right_unit}` are laws-with-the-function
+> (statements use only `List`/`Nil`/`Cons`, `list_append`, `Equal`/`Refl`/
+> `Proved`, `cong`). Derived owns them. The class fields `Semigroup.assoc` /
+> `Monoid.assoc` are stated over `op`; the instances discharge them by pointing
+> at the function-level proof — the function-level proof is the reusable
+> artifact, the class field is only wiring.
 
 ## Symptom inventory
 
 Append one line per hard stop; never rewrite history.
 
+- 2026-09-02 HARD STOP (foundation ring, evt_2qmg983kg3j34 / evt_1jam36cz3bwr8),
+  routed to Steward + Architect (evt_56d9nsv2yxeze). The single import does NOT
+  achieve standalone-clean. D0 (no import): `UnresolvedCon list_append` (4204..4215).
+  D1 (+`import Data.Collections.Derived (list_append)`): list_append resolves but a
+  NEW `UnboundName Data.Collections.Derived.list_append::assoc` (4723..4752) appears
+  — set went {list_append} -> {list_append::assoc}, not -> {}. MECHANISM: the
+  FUNCTION list_append is Derived-owned, but its LAWS
+  `list_append::assoc/::left_unit/::right_unit` are proved IN this module
+  (:99/:104/:122) and consumed cross-module (EffectfulClasses.ken.md). Under
+  full-catalog load the attachment binds; under selective import the qualified
+  proof name is unbound. An attached-proof ownership split, not a pure import.
+  STEWARD FRAME DEFECT: this node's "ownership axis measured absent" and "single
+  import / sole symbol" were FALSIFIED — the initial measurement inherited the
+  elaborator's fail-fast blind spot (halt at the first `UnresolvedCon` never
+  reached the attached-proof references behind it; "not flagged" != "resolved").
+- 2026-09-02 RECUT (Steward, per Architect ruling evt_7khknqydxxd93). Reject the
+  cross-module attachment-carry (option b); adopt (a)-as-(c): migrate the three
+  orphan proofs into Derived. Objective/Deliverables/ACs below are re-authored
+  and OPERATIVE as of this recut. The prior single-import Objective/ACs are void.
+
 ## Objective
 
-Make `catalog/packages/Core/Classes/LawfulFunctors.ken.md` elaborate standalone
-at Omega by adding the single missing import that resolves `list_append` to the
-now-public `Data.Collections.Derived.list_append`, removing the module from the
-census §4.3 standalone-failure set.
+Make `Core/Classes/LawfulFunctors.ken.md` and `Data/Collections/Derived.ken.md`
+each elaborate standalone-from-declared-imports at Omega, by relocating the three
+orphan `list_append` proofs to their sound owner and supplying LawfulFunctors the
+real imports it owes. Corpus stays green under full-catalog load throughout.
 
 ## Fixed inputs
 
-Measured by the Steward at `origin/main`
-`e93210c423e2988639fb3627e5487b73433711d5`. **Line numbers below are a
-markdown-stripped ken-source offset (`4204..4215`) and physical prose lines; D0
-re-establishes the code use sites at the release SHA — reproduce them, do not
+Measured by the Steward at `origin/main` `4ab87564f` (the ring's hold SHA and the
+Architect's ground-check base). **Line numbers are markdown-source physical
+lines; D0 re-establishes every site at the release SHA — reproduce, do not
 trust these.**
 
-CURRENT-TREE, verified at `e93210c4`:
-
-- `Data.Collections.Derived.list_append` is `pub`: `Derived.ken.md:77`,
-  `pub fn list_append (a : Type) (xs : List a) (ys : List a) : List a = …`.
-  Oracle: `git grep -nE '^\s*pub fn list_append' origin/main -- <Derived>`.
-- `LawfulFunctors.ken.md` has **no `import` statement**. Oracle:
-  `grep -c '^import' <LawfulFunctors>` returns 0.
-- The landed spelling to copy is `import Data.Collections.Derived (list_append)`,
-  exactly as `Capability/Parsing/Parsing.ken.md:42`. **Copy the landed
-  precedent, not spec prose.**
-
-INHERITED from the census at its evidence base, NOT re-verified by the Steward:
-census row `LF` records `[higher]` — `standalone rejects UnresolvedCon
-list_append at 4204..4215`. **This is what D0 reproduces before repairing and
-confirms cleared after.**
+- `Data.Collections.Derived` defines `fn list_append` at `Derived.ken.md:514`
+  (`fn list_append (a : Type) (xs : List a) (ys : List a) : List a = …`). D1
+  (foundation-implementer, 4ab87564f) established that
+  `import Data.Collections.Derived (list_append)` resolves `list_append` from a
+  standalone importer — so the function is reachable by selective import at the
+  tip. **D0 confirms reachability at the release SHA and reports whether a
+  pub-export edit is required (the census had claimed pub; the current
+  declaration carries no `pub` keyword).**
+- Derived's §4 "Laws & proofs" (`Derived.ken.md:564`) already hosts proofs using
+  `Equal`/`Refl` (`:622`)/`Proved` (`:700`)/`cong` (`:627`) — so the equality and
+  transport vocabulary the three proofs need is ALREADY in Derived's scope. D1
+  confirms; add an equality-type import only if the build shows one missing.
+- The three proofs to move, verbatim, are `LawfulFunctors.ken.md:99-135`
+  (`proof left_unit for list_append` :99, `proof assoc for list_append` :104,
+  `proof right_unit for list_append` :122). Their bodies use only
+  `List`/`Nil`/`Cons`, `list_append`, `Equal`/`Refl`/`Proved`, `cong`.
+- LawfulFunctors's two instances that consume them: `instance Semigroup (List
+  Nat)` (`:137`, `assoc = proof assoc for list_append Nat`) and `instance Monoid
+  (List a)` (`:142`, `assoc`/`left_unit`/`right_unit = proof … for list_append a`).
+- LawfulFunctors has **no `import` statement** at the tip
+  (`grep -c '^import' <LawfulFunctors>` = 0). Its co-located, CORRECT proofs that
+  STAY (attached to functions this module owns): `bool_and` (`:173`), `list_map`
+  (`:260`), and its other co-located proofs. D0 enumerates the full stay-set.
+- EffectfulClasses consumers of the moved proofs:
+  - CODE (unqualified attachment spelling `proof X for list_append`), at
+    `:499/:535/:579/:585/:597/:646/:661` — these resolve by attachment/load-set
+    and, once the proofs live beside `list_append` in Derived, continue to
+    resolve under full-catalog load with NO edit. D0 confirms.
+  - PROSE ownership mis-attribution: `:567` names
+    `(Core/Classes/LawfulFunctors.ken)` as the owner of `list_append::right_unit`.
+    D0 enumerates every such prose attribution; each is re-pointed to Derived.
 
 ## Deliverables
 
-- **D0 — measure before changing anything.** At the release SHA, reproduce the
-  standalone failure: `LawfulFunctors.ken.md` in isolation rejects with exactly
-  `UnresolvedCon list_append` and **no other** unresolved symbol or ownership
-  error. **A D0 that finds a second unresolved symbol, an ownership error, or a
-  cycle from the import is a HARD STOP to Steward + Architect** — it means the
-  module is a migration, not an import repair.
-- **D1 — add the single import line** `import Data.Collections.Derived
-  (list_append)`, in the module's first `ken` code block, using the landed
-  `Parsing.ken.md:42` spelling. Change nothing else — no local def removed, no
-  reuse substitution, `comp` untouched.
+- **D0 — measure before changing anything, at the release SHA.** Build ken-cli
+  fresh. (1) Reproduce the standalone `LawfulFunctors` failure and record the
+  FULL unresolved-symbol evolution as imports are added one at a time — do NOT
+  trust a single fail-fast reading; the elaborator halts at the first
+  `UnresolvedCon`, so iterate until the set stabilises. (2) Confirm `list_append`
+  reachability from a standalone importer and report whether a `pub` export edit
+  on `Derived.ken.md:514` is required. (3) Enumerate every EffectfulClasses
+  reference to the moved proofs, classified code vs prose. (4) Record the
+  full-catalog-green baseline. **A D0 finding that own-module attached proofs do
+  NOT travel with a selective `import Data.Collections.Derived (list_append)` —
+  i.e. LawfulFunctors's instances cannot cite the moved proofs without an
+  explicit attached-name import the surface does not support — is a HARD STOP to
+  Steward: that is the open sub-question below, a MODULAR language-surface
+  question routed to Spec/Language, not something to invent a workaround for.**
+- **D1 — move the three proofs into Derived §4, verbatim.** Relocate
+  `proof left_unit/assoc/right_unit for list_append` (LawfulFunctors :99-136)
+  into `Data/Collections/Derived.ken.md` §4, co-located with `fn list_append`.
+  Change nothing in the proof bodies. Verify Derived elaborates them, producing
+  `Data.Collections.Derived.list_append::{left_unit,assoc,right_unit}`. Add an
+  equality-type import to Derived ONLY if D0/build shows one missing (its §4
+  already hosts such proofs, so expect none).
+- **D2 — LawfulFunctors cites the moved proofs and gains its real standalone
+  imports.** Re-point the `Semigroup (List Nat)` and `Monoid (List a)` instances
+  to the Derived-owned proofs, using the spelling D0 established the surface
+  supports (see the open sub-question — this is measured, not guessed). Then add
+  the standalone imports LawfulFunctors actually owes for `list_append` and every
+  other non-local symbol its remaining content uses (the real owners of `List`/
+  `Option`/`Equal`/`Refl`/`Proved`/`cong`, etc., as D0's iterated census names
+  them). The co-located `bool_and`/`list_map`/`option_map` proofs STAY untouched.
+- **D3 — re-point the EffectfulClasses prose owner-attribution.** For every prose
+  reference D0 enumerated that names `Core/Classes/LawfulFunctors.ken` as the
+  owner of `list_append::*` (confirmed at `:567`), change the owner to
+  `Data.Collections.Derived`. The CODE consumers (`proof X for list_append`) are
+  NOT edited — confirm by build they still resolve by attachment under
+  full-catalog load.
+- **D4 — report the open sub-question's answer.** State, from the D0/D1 build,
+  which case holds: (i) `import Data.Collections.Derived (list_append)` brings
+  `list_append::assoc` etc. into scope automatically (own-module attachments
+  travel with the function ⇒ this migration is pure catalog data movement, no
+  language change), or (ii) attached names must be listed explicitly ⇒ a distinct
+  modular language-surface question for Spec/Language. This is a REPORT
+  deliverable, and case (ii) is the D0 hard stop above.
 
 ## Acceptance criteria, each with its control
 
-- **AC-STANDALONE.** `LawfulFunctors.ken.md` elaborates standalone at Omega with
-  no `UnresolvedCon` and no ownership rejection. Control: the standalone check is
-  run on the module in isolation (not inside a consumer's closure), and D0's
-  pre-repair run showing the `UnresolvedCon list_append` failure is the paired
-  negative — the same check must FAIL before D1 and PASS after.
-- **AC-IMPORT-RESOLVES.** The added import resolves `list_append` to the
-  `Data.Collections.Derived` definition's `GlobalId`. Control: the resolution is
-  read from the loader/elaborator, and a probe that deletes the import must
-  reintroduce the exact `UnresolvedCon list_append` — an import witness that
-  passes with the line removed is measuring nothing.
-- **AC-SOLE-SYMBOL.** No symbol other than `list_append` becomes newly resolved
-  or newly unresolved by this change. Control: a before/after unresolved-symbol
-  census over the module shows the set went from `{list_append}` to `{}` and no
-  other entry moved. This is the guard against silently repairing a second gap
-  under the frame.
-- **AC-NO-COMPUTATIONAL-CHANGE.** Only an import line is added; no function body,
-  instance, or proof in the module changes. Control: a differential over the
-  module's definitions showing them byte-unchanged except the inserted import.
-- **AC-CLOSURE-TARGETS.** Re-run the COMPLETE AFFECTED-TARGET CLOSURE, not the
-  diff-touched set: every target that loads any module whose closure this
-  increment changes, whether or not the increment touches its file. Control: name
-  the closure and show the target set was derived from it. Adding an import edge
-  changes `LawfulFunctors`'s closure, so any fixture loading `LawfulFunctors` (or
-  a module that loads it) is in scope even though only one file is edited.
+- **AC-DERIVED-STANDALONE.** `Derived.ken.md` elaborates standalone-from-declared
+  -imports at Omega, now including
+  `list_append::{left_unit,assoc,right_unit}`. Control: standalone check on
+  Derived in isolation; the three proof `GlobalId`s are present in its
+  elaboration output and absent before D1.
+- **AC-LAWFULFUNCTORS-STANDALONE.** `LawfulFunctors.ken.md` elaborates standalone
+  -from-declared-imports at Omega with no `UnresolvedCon` and no `UnboundName`.
+  Control: standalone check in isolation; D0's iterated pre-migration census
+  (which must show the orphan `list_append::assoc` unbound under a bare
+  single-import) is the paired negative — the same check FAILS at D0 and PASSES
+  after D2.
+- **AC-PROOFS-VERBATIM.** The three moved proof bodies are byte-identical to
+  their LawfulFunctors originals (only their module home changed). Control: a
+  differential of the moved text against `LawfulFunctors.ken.md:99-136` at the
+  base SHA shows zero body change.
+- **AC-INSTANCES-CITE-DERIVED.** LawfulFunctors's `Semigroup`/`Monoid` instances
+  discharge `assoc`/`left_unit`/`right_unit` by citing the Derived-owned proofs,
+  via the surface spelling D0 established. Control: the instances elaborate
+  standalone; deleting the citing import reintroduces exactly the
+  `list_append::*` `UnboundName`.
+- **AC-EFFECTFULCLASSES-GREEN.** EffectfulClasses elaborates unchanged in CODE;
+  every prose owner-attribution of `list_append::*` names Derived, none names
+  LawfulFunctors. Control: a grep for `LawfulFunctors` as owner of `list_append`
+  returns zero; the module's code diff is empty.
+- **AC-NO-ORPHAN-REMAINS.** No module proves an attached `f::law` for a function
+  it does not define, for `list_append`. Control: after D1, `list_append::*`
+  proofs exist ONLY in Derived; a census of `proof … for list_append` definition
+  sites returns Derived alone.
+- **AC-FULL-CATALOG-GREEN.** Whole-catalog elaboration stays green throughout
+  (full-catalog load is the invariant the corpus ships on). Control: the
+  full-catalog check is green at the base SHA and green after D3.
 - **AC-NO-REGRESSION.** Whole-suite green in CI. Local targeted only, via
   `scripts/ken-cargo -p <crate>`, never `--workspace`.
 
-## What this unblocks, and what it does NOT close
+## What this unblocks, and what it does NOT change
 
-Removes `Core.Classes.LawfulFunctors` from the census §4.3 standalone-failure
-set, making it a usable standalone-clean module — the prerequisite for any
-consumer that imports from `LawfulFunctors`.
+Removes the orphan attached-proof from the catalog: `LawfulFunctors` and
+`Derived` both become standalone-from-declared-imports clean for the
+`list_append` laws, and the campaign gains its standing fix for every future
+orphan attached proof.
 
-**It does NOT do the census row-28 reuse migration** (`list_map→Prelude.map`,
-`list_foldr→Prelude.fold`, `bool_and→LawfulClasses.bool_and`). Those symbols are
-locally defined and cause no unresolved error; the law-carrying half is deferred
-behind an Architect ruling. **Do not extend this node to touch them.**
-
-## Note on ambient-resolved primitives (not a gap)
-
-`cong` is used in the module (transport) without a local def and without an
-import, yet the census does not flag it: the standalone elaborator resolves
-transport primitives (`cong`/`sym`/`trans`) ambiently. It is therefore NOT a gap
-under the current elaborator and is out of scope here. If a future node tightens
-ambient resolution, `cong` is the one symbol besides `list_append` that is
-neither locally defined nor imported — worth a one-line confirmation then, not
-now.
+- **No kernel/TCB/spec/conformance change is authorized** (Architect,
+  evt_7khknqydxxd93). This is catalog data movement plus import wiring.
+- **It does NOT do the census row-28 reuse migration** (`list_map→Prelude.map`,
+  `list_foldr→Prelude.fold`, `bool_and→LawfulClasses.bool_and`). Those symbols
+  are locally defined, cause no unresolved error, and the law-carrying half is
+  deferred behind a separate Architect ruling. Do not touch them here.
+- **Option (b) — a cross-module attachment-carrying import — is OFF THE TABLE**
+  (rejected on coherence + subsume-don't-proliferate). Do not build it, and do
+  not queue operator sign-off for it.
 
 ## Contention check
 
-Touches only `catalog/packages/Core/Classes/LawfulFunctors.ken.md` (one added
-line). No other lane touches this file; the provider `Derived.ken.md` is already
-merged and is not edited here. No `crates/` change beyond test-fixture closure;
-no `/spec`, no kernel/TCB.
+Touches `catalog/packages/Data/Collections/Derived.ken.md` (add three proofs),
+`catalog/packages/Core/Classes/LawfulFunctors.ken.md` (remove three proofs, add
+imports, re-point two instances), and `catalog/packages/Core/Classes/
+EffectfulClasses.ken.md` (prose owner-attribution only). No other lane touches
+these files. Test-fixture closure only in `crates/`; no `/spec`, no kernel/TCB.
+`Derived` is the lower layer (imports only `Core.Logic.*`, never `Core.Classes`),
+so moving proofs INTO it introduces no cycle.
 
 ## Reviewers
 
-foundation-qa (the module elaborates standalone, the import resolves to the
-`Derived` `GlobalId`, no computational change, the sole-symbol guard holds) +
-conformance-validator (catalog implementation standard compliance). A genuine
-design/spec gap — an ownership error surfacing at D0, or a second unresolved
-symbol — HARD-STOPS to spec/Architect; a gap finding is the payoff.
+foundation-qa (the three proofs elaborate in Derived, both modules standalone
+-clean, instances cite the Derived proofs, proofs byte-verbatim, no orphan
+remains, full-catalog green) + conformance-validator (catalog implementation
+standard compliance). The open sub-question's answer (D4) routes to Steward; if
+it is case (ii), the Steward routes the language-surface question to
+Spec/Language — it is NOT a foundation-QA gate.
 
 ## Sequencing
 
-Lane-3 (foundation). `ready` on release: the provider half `CAT-DERIVED-PUB-EXPORT`
-is MERGED (so `depends_on` is satisfied), the file has no contention, and the
-repair is a single import line proven by the `Parsing.ken.md:42` precedent. D0
-re-measures at the release SHA. Tier T2 — applying a landed capability (selective
-import of a pub provider) to one more catalog module, reviewed on the standalone
-check and the import-resolution witness. If D0 surfaces an ownership or
-second-symbol gap it escalates to T1 spec/Architect via hard stop.
+Lane-3 (foundation). `active` on this recut: the provider `Derived` is merged and
+already hosts §4 proofs, the migration is Architect-specified verbatim movement +
+import wiring, and the ring is holding clean at `4ab87564f`. D0 re-measures at the
+release SHA and hard-stops to Steward if own-module attachments do not travel with
+the function (the language-surface case). Tier T2 — a defined migration with its
+design front-loaded by the ruling; the reasoning that earned it is already spent.
