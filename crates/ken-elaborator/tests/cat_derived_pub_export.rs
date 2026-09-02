@@ -1,8 +1,12 @@
 //! CAT-DERIVED-PUB-EXPORT acceptance controls.
 //!
 //! Promise class: durable invariants. The six public collection operations
-//! retain their `Data.Collections.Derived` identities, while the verified-sort
-//! carrier and operations remain private.
+//! retain their `Data.Collections.Derived` identities, and the three migrated
+//! `list_append` monoid-law attached proofs (`list_append::{left_unit, assoc,
+//! right_unit}`, relocated from `Core.Classes.LawfulFunctors` per the
+//! attached-proof ownership rule so a selective importer can cite them) are
+//! published beside `list_append`, while the verified-sort carrier and
+//! operations remain private.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -189,10 +193,12 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// publishable top-level definition is visible, including attached proofs via
 /// their imported subjects; the successful set is compared with an independent
 /// literal contract set. CLAIMED: Derived's complete loader-visible export
-/// surface is exactly the six authorized operations. THE GAP: none within the
-/// loader's publication forms represented by Derived's parsed declarations.
+/// surface is exactly the six authorized operations plus the three `list_append`
+/// monoid-law attached proofs migrated in from LawfulFunctors. THE GAP: none
+/// within the loader's publication forms represented by Derived's parsed
+/// declarations.
 #[test]
-fn derived_loader_publishes_exactly_the_six_authorized_top_level_definitions() {
+fn derived_loader_publishes_exactly_its_authorized_export_surface() {
     let mut env = load_derived();
     let published = top_level_publication_queries()
         .into_iter()
@@ -222,8 +228,12 @@ fn derived_loader_publishes_exactly_the_six_authorized_top_level_definitions() {
             "eq_from_ord".to_owned(),
             "length".to_owned(),
             "list_append".to_owned(),
+            "list_append::assoc".to_owned(),
+            "list_append::left_unit".to_owned(),
+            "list_append::right_unit".to_owned(),
             "reverse".to_owned(),
         ]),
-        "the roots loader must publish exactly Derived's six authorized operations"
+        "the roots loader must publish exactly Derived's authorized export surface: \
+         the six operations plus the three migrated list_append monoid-law proofs"
     );
 }
