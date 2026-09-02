@@ -1346,9 +1346,9 @@ fn synth_refl_proof(
             }
         }
         Term::Sigma(dom, cod) => {
-            let fst = synth_refl_proof(env, ctx, &dom, span)?;
+            let fst = synth_generated_index_evidence(env, ctx, &dom, span)?;
             let snd_ty = subst0(&cod, &fst);
-            let snd = synth_refl_proof(env, ctx, &snd_ty, span)?;
+            let snd = synth_generated_index_evidence(env, ctx, &snd_ty, span)?;
             Ok(Term::pair(fst, snd))
         }
         _ => Err(ElabError::TypeMismatch {
