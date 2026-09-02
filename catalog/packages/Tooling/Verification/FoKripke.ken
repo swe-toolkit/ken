@@ -2761,3 +2761,56 @@ data FokInitWitness (gamma : List FokForm) (goal : FokForm) : Type where {
     → Equal (Option FokForm) (fok_nth_form gamma left) (Some FokForm goal)
     → FokInitWitness gamma goal
 }
+
+-- Generic equality symmetry / transitivity (J one-liners) used by the inversion.
+theorem fok_eq_sym (a : Type) (x : a) (y : a) (h : Equal a x y) : Equal a y x =
+  J (λy2 _. Equal a y2 x) Refl h
+
+theorem fok_eq_trans (a : Type) (x : a) (y : a) (z : a)
+      (h1 : Equal a x y) (h2 : Equal a y z) : Equal a x z =
+  J (λz2 _. Equal a x z2) h1 h2
+
+-- A right-intro goal SHAPE contradicts an atomlike hypothesis: for Imp /
+-- ForallWorld / ForallObj, `fok_has_right_intro shape` reduces to `True`, so
+-- `False = has_right_intro shape` is `Equal Bool False True`.
+theorem fok_absurd_right_intro (goal : FokForm) (shape : FokForm)
+      (h_atom : Equal Bool (fok_has_right_intro goal) False)
+      (heq : Equal FokForm goal shape)
+    : Equal Bool False (fok_has_right_intro shape) =
+  fok_eq_trans Bool False (fok_has_right_intro goal) (fok_has_right_intro shape)
+    (fok_eq_sym Bool (fok_has_right_intro goal) False h_atom)
+    (fok_cong FokForm Bool goal shape fok_has_right_intro heq)
+
+-- Invert a derivation of an atomlike (no-right-intro) SINGLETON goal: only Init
+-- can close it, yielding the Init closure witness. Each right-intro rule is
+-- impossible here -- its `delta[right]` shape (via `fok_nth_singleton_some`)
+-- would force the goal to be Imp / ForallWorld / ForallObj, contradicting the
+-- atomlike hypothesis.
+theorem fok_invert_atomlike (gamma : List FokForm) (goal : FokForm)
+      (h_atom : Equal Bool (fok_has_right_intro goal) False)
+      (d : FokDerivation (FokMkSequent gamma (Cons FokForm goal (Nil FokForm))))
+    : FokInitWitness gamma goal =
+  match d {
+    FokDerivInit g0 d0 left right g dd h_g h_d h_eq ↦
+      FokMkInitWitness gamma goal left
+        (fok_eq_trans (Option FokForm)
+          (fok_nth_form gamma left) (Some FokForm g) (Some FokForm goal)
+          h_g
+          (fok_cong FokForm (Option FokForm) g goal (λx. Some FokForm x)
+            (fok_eq_trans FokForm g dd goal
+              (fok_form_eq_sound g dd h_eq)
+              (fok_eq_sym FokForm goal dd
+                (fok_nth_singleton_some goal dd right h_d)))));
+    FokDerivImpRight g0 d0 right p q h_d prem ↦
+      fok_false_elim (FokInitWitness gamma goal)
+        (fok_absurd_right_intro goal (FokImp p q) h_atom
+          (fok_nth_singleton_some goal (FokImp p q) right h_d));
+    FokDerivForallWorldRight g0 d0 right eigen body h_d h_fresh prem ↦
+      fok_false_elim (FokInitWitness gamma goal)
+        (fok_absurd_right_intro goal (FokForallWorld body) h_atom
+          (fok_nth_singleton_some goal (FokForallWorld body) right h_d));
+    FokDerivForallObjRight g0 d0 right eigen body h_d h_fresh prem ↦
+      fok_false_elim (FokInitWitness gamma goal)
+        (fok_absurd_right_intro goal (FokForallObj body) h_atom
+          (fok_nth_singleton_some goal (FokForallObj body) right h_d))
+  }
