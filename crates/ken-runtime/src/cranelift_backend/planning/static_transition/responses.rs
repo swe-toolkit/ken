@@ -377,6 +377,16 @@ pub(in crate::cranelift_backend) struct DeferredResponseRow {
     effect_origin: StaticOriginId,
     operation: HostOpV1,
     sub_case: DeferredResponseSubCase,
+    /// The K's capture and continuation-input counts (P2: from the demand; P1:
+    /// zero -- no continuation unit). Carried so the capture/input census control
+    /// can cross-check the DropEvery{Capture,Input} mutation's `applications`
+    /// against the FULL has-K-unit demand population (Specialized rows expose their
+    /// own counts; the P2 Deferred demands' counts live only here). RECUT 2 HS6
+    /// (ii)-redesign 2nd extension (Architect evt_bk6vky2pkncy). Deterministic from
+    /// the demand -> outcome-neutral to the closed-derivation validator (the sort
+    /// key omits it, unique vis_origin keeps the sort total).
+    capture_count: usize,
+    continuation_input_count: usize,
 }
 
 impl DeferredResponseRow {
@@ -386,6 +396,14 @@ impl DeferredResponseRow {
 
     pub(in crate::cranelift_backend) fn producer_call_origin(&self) -> StaticOriginId {
         self.producer_call_origin
+    }
+
+    pub(in crate::cranelift_backend) fn capture_count(&self) -> usize {
+        self.capture_count
+    }
+
+    pub(in crate::cranelift_backend) fn continuation_input_count(&self) -> usize {
+        self.continuation_input_count
     }
 
     pub(in crate::cranelift_backend) fn operation_root_origin(&self) -> StaticOriginId {
@@ -1404,6 +1422,10 @@ impl StaticTransitionPlan<'_> {
                     effect_origin: route.effect_origin,
                     operation: route.operation,
                     sub_case: DeferredResponseSubCase::NoContinuationUnit,
+                    // P1 has no continuation unit -> no captures/inputs. Excluded
+                    // from the census population (no demand), so zero is exact.
+                    capture_count: 0,
+                    continuation_input_count: 0,
                 });
                 continue;
             }
@@ -2095,6 +2117,10 @@ impl StaticTransitionPlan<'_> {
                     effect_origin: demand.effect_origin,
                     operation: demand.operation,
                     sub_case: DeferredResponseSubCase::UnconsumedTransportCaller,
+                    // P2's demand carries the K's captures/inputs -- the census's
+                    // only view of this transport-deferred member's counts.
+                    capture_count: demand.captures.len(),
+                    continuation_input_count: demand.continuation_inputs.len(),
                 });
             } else {
                 specialized.push(demand);
