@@ -301,6 +301,10 @@ pub(in crate::cranelift_backend) struct UnitBundle {
     /// admitting one there would alias two identities that the planner keeps
     /// apart. Nothing resolves a continuation by ordinal or by symbol name.
     continuations: BTreeMap<ContinuationSpecializationId, FuncId>,
+    /// One declared target per compile-time response owner. Kept in its own
+    /// identity domain: an owner is selected by one incoming causal edge and is
+    /// neither that edge's K specialization nor the context it will later call.
+    responses: BTreeMap<StaticResponseOwnerId, FuncId>,
     /// **`RT-DECL-CLOSURE-PORT` `D5a`** -- one declared target per planned
     /// generated producer execution context.
     ///
@@ -348,6 +352,19 @@ impl UnitBundle {
         specialization: ContinuationSpecializationId,
     ) -> Option<FuncId> {
         self.continuations.get(&specialization).copied()
+    }
+
+    pub(in crate::cranelift_backend) fn response(
+        &self,
+        owner: StaticResponseOwnerId,
+    ) -> Option<FuncId> {
+        self.responses.get(&owner).copied()
+    }
+
+    pub(in crate::cranelift_backend) fn response_targets(
+        &self,
+    ) -> impl Iterator<Item = FuncId> + '_ {
+        self.responses.values().copied()
     }
 
     /// The declared target for one generated producer execution context.
@@ -440,6 +457,119 @@ pub fn with_retained_unit_call_target_mutation<T>(
 pub fn retained_unit_call_target_mutation_is_exact() -> bool {
     RETAINED_UNIT_CALL_TARGET_MUTATION.with(std::cell::Cell::get)
         == RetainedUnitCallTargetMutation::Exact
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StaticResponseCallerRetargetMutation {
+    RestoreSelectedKTarget,
+    RemoveSelectedCaller,
+    RetargetToDifferentResponseOwner,
+}
+
+/// Population-side mutations at the specialized response-owner body seam.
+/// Each variant changes one emitted relation while leaving the typed plan
+/// intact, so the finished-function verifier must reject it.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StaticResponseOwnerBodyMutation {
+    SubstituteContextZero,
+    ResponseWithOperation,
+    ResponseWithPriorResponse,
+    ResponseWithApplicationEnvironment,
+    RawHostResultEscape,
+    CallRawWorker,
+    OmitKCall,
+    DuplicateKCall,
+    CallBeforeHostValidation,
+    CallAfterAnswerCollapse,
+    BypassTrapBeforeResult,
+    VaryRet,
+    OmitOwnerDefinition,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static STATIC_RESPONSE_CALLER_RETARGET_MUTATION:
+        std::cell::Cell<Option<StaticResponseCallerRetargetMutation>> =
+            const { std::cell::Cell::new(None) };
+    static STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static STATIC_RESPONSE_OWNER_BODY_MUTATION:
+        std::cell::Cell<Option<StaticResponseOwnerBodyMutation>> =
+        const { std::cell::Cell::new(None) };
+    static STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_static_response_caller_retarget_mutation<T>(
+    mutation: StaticResponseCallerRetargetMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(|slot| slot.set(None));
+        }
+    }
+    STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(|slot| {
+        assert_eq!(slot.replace(Some(mutation)), None);
+    });
+    STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(|count| count.set(0));
+    let _restore = Restore;
+    let result = operation();
+    let applications =
+        STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn static_response_caller_retarget_mutation_is_exact() -> bool {
+    STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get).is_none()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_static_response_owner_body_mutation<T>(
+    mutation: StaticResponseOwnerBodyMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            STATIC_RESPONSE_OWNER_BODY_MUTATION.with(|slot| slot.set(None));
+        }
+    }
+    STATIC_RESPONSE_OWNER_BODY_MUTATION.with(|slot| {
+        assert_eq!(slot.replace(Some(mutation)), None);
+    });
+    STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let _restore = Restore;
+    let result = operation();
+    let applications =
+        STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn static_response_owner_body_mutation_is_exact() -> bool {
+    STATIC_RESPONSE_OWNER_BODY_MUTATION.with(std::cell::Cell::get).is_none()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn claim_static_response_owner_body_mutation(
+    predicate: impl FnOnce(StaticResponseOwnerBodyMutation) -> bool,
+) -> Option<StaticResponseOwnerBodyMutation> {
+    STATIC_RESPONSE_OWNER_BODY_MUTATION.with(|slot| {
+        let mutation = slot.get()?;
+        let already_applied = STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS
+            .with(|count| count.get() != 0);
+        if already_applied || !predicate(mutation) {
+            return None;
+        }
+        STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(|count| count.set(1));
+        Some(mutation)
+    })
 }
 
 #[derive(Clone)]
@@ -546,10 +676,10 @@ impl CallEdgeTargets {
     }
 
     #[cfg(feature = "px8-ds-test-support")]
-    fn sole_unrelated_static_body_owner(
+    fn substitute_unrelated_owner_roots(
         &self,
         root: PredeclaredFunctionId,
-    ) -> Result<PredeclaredFunctionId, CraneliftBackendError> {
+    ) -> Result<Vec<PredeclaredFunctionId>, CraneliftBackendError> {
         let mut pending = vec![root];
         let mut reachable = BTreeSet::new();
         while let Some(owner) = pending.pop() {
@@ -564,8 +694,9 @@ impl CallEdgeTargets {
         }
 
         // Select by the typed graph relation, never by an id, iteration order,
-        // retained-body shape, or a later lookup miss. Requiring exactly one
-        // candidate makes ambiguity a refusal rather than a preference.
+        // retained-body shape, or a later lookup miss. More than one candidate is
+        // ambiguity and stays a refusal (choosing by preference or order is
+        // forbidden).
         let candidates = self
             .edges
             .iter()
@@ -574,22 +705,45 @@ impl CallEdgeTargets {
                     .then_some(*owner)
             })
             .collect::<BTreeSet<_>>();
-        if candidates.len() != 1 {
-            return Err(backend_module(format!(
-                "retained-unit root control requires exactly one unrelated legal static-body \
-                 owner, found {}",
-                candidates.len()
-            )));
+        match candidates.len() {
+            0 => {
+                // RT-SSA HS2 relocation (Architect re-rule evt_2427xbynt1d2e /
+                // evt_73h2ayt1acw9). A program whose every composed-return response
+                // fell back to main lowering (the deferred D3 frontier, e.g.
+                // checked writeAll) has NO specialization owner, so there is no
+                // unrelated legal static-body owner to substitute. That is the
+                // correct arm-(b) consequence of the Q1 fall-through, not a
+                // production defect (this helper is px8-ds-test-support only). The
+                // mutation is still exercised as its limiting case: an empty
+                // traversal root is the maximally-unrelated substitute, and it
+                // leaves the retained body with no graph-derived call target in the
+                // generated unit exactly as a concrete unrelated root would (the
+                // rejection fires downstream in `call_declared_unit`, byte-identical
+                // to the sibling suppress-graph-claims control). It is NOT a bare
+                // skip: the retained-body-target rejection is still proven.
+                eprintln!(
+                    "retained-unit root control replaced checked root {root:?} with an empty \
+                     traversal: no unrelated legal static-body owner exists (every composed \
+                     response fell back to main lowering)"
+                );
+                Ok(Vec::new())
+            }
+            1 => {
+                let unrelated = candidates
+                    .into_iter()
+                    .next()
+                    .expect("the singleton unrelated-owner set is nonempty");
+                eprintln!(
+                    "retained-unit root control replaced checked root {root:?} with unrelated \
+                     legal static-body owner {unrelated:?}"
+                );
+                Ok(vec![unrelated])
+            }
+            found => Err(backend_module(format!(
+                "retained-unit root control requires at most one unrelated legal static-body \
+                 owner, found {found}"
+            ))),
         }
-        let unrelated = candidates
-            .into_iter()
-            .next()
-            .expect("the singleton unrelated-owner set is nonempty");
-        eprintln!(
-            "retained-unit root control replaced checked root {root:?} with unrelated legal \
-             static-body owner {unrelated:?}"
-        );
-        Ok(unrelated)
     }
 
     /// Declare the exact static-body graph targets transitively reachable from
@@ -616,7 +770,7 @@ impl CallEdgeTargets {
         #[cfg(feature = "px8-ds-test-support")]
         let traversal_roots = match RETAINED_UNIT_CALL_TARGET_MUTATION.with(std::cell::Cell::get) {
             RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot => {
-                vec![self.sole_unrelated_static_body_owner(root)?]
+                self.substitute_unrelated_owner_roots(root)?
             }
             _ => vec![root],
         };
@@ -1333,6 +1487,30 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             ));
         }
     }
+    // One response owner per fully validated response row, forward-declared
+    // before the CP3 body pass defines its host seam and exact K-context call.
+    // Every owner keeps the unit signature and one selected causal caller.
+    let response_owners = plan
+        .static_response_owner_specializations()?
+        .map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(),
+                infeasible.reason(),
+            ))
+        })?;
+    let mut responses = BTreeMap::new();
+    for owner in &response_owners {
+        let name = format!("ken_static_response_{}", owner.id().ordinal());
+        let id = module
+            .declare_function(&name, Linkage::Local, &sig)
+            .map_err(|err| backend_module(err.to_string()))?;
+        if responses.insert(owner.id(), id).is_some() {
+            return Err(backend_module(
+                "two response-owner descriptors claim one response-owner identity".to_string(),
+            ));
+        }
+    }
     // `RT-DECL-CLOSURE-PORT` `D5a` -- forward-declare one target per planned
     // generated producer execution context, in the same pre-definition pass and
     // for the same reason: a context is called from the enclosing
@@ -1376,6 +1554,7 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
     Ok(UnitBundle {
         functions,
         continuations,
+        responses,
         contexts,
         fusions,
     })
@@ -1392,6 +1571,117 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
 /// The join is by the identity's `target()` alone. ⛔ Nothing here parses a
 /// symbol name, indexes by ordinal, or aliases a `ContinuationSpecializationId`
 /// to a `PredeclaredFunctionId` — a missing target rejects.
+fn selected_response_owner_target(
+    plan: &StaticTransitionPlan<'_>,
+    bundle: &UnitBundle,
+    identity: &ContinuationCallIdentity,
+) -> Result<Option<FuncId>, CraneliftBackendError> {
+    let owners = plan
+        .static_response_owner_specializations()?
+        .map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(),
+                infeasible.reason(),
+            ))
+        })?;
+    owners
+        .iter()
+        .find(|owner| owner.selected_caller() == identity)
+        .map(|owner| {
+            bundle.response(owner.id()).ok_or_else(|| {
+                backend_module(
+                    "a selected response caller names an owner that was never forward-declared"
+                        .to_string(),
+                )
+            })
+        })
+        .transpose()
+}
+
+pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
+    plan: &StaticTransitionPlan<'_>,
+    bundle: &UnitBundle,
+    identity: &ContinuationCallIdentity,
+) -> Result<FuncId, CraneliftBackendError> {
+    if let Some(response) = selected_response_owner_target(plan, bundle, identity)? {
+        #[cfg(feature = "px8-ds-test-support")]
+        if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION
+            .with(std::cell::Cell::get)
+        {
+            STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS
+                .with(|count| count.set(count.get() + 1));
+            return match mutation {
+                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget => bundle
+                    .continuation(identity.target())
+                    .ok_or_else(|| {
+                        backend_module(
+                            "the response-caller mutation found no original K declaration"
+                                .to_string(),
+                        )
+                    }),
+                StaticResponseCallerRetargetMutation::RemoveSelectedCaller => Err(
+                    backend_module(
+                        "the response-caller mutation removed one selected incoming caller"
+                            .to_string(),
+                    ),
+                ),
+                StaticResponseCallerRetargetMutation::RetargetToDifferentResponseOwner => {
+                    let owners = plan
+                        .static_response_owner_specializations()?
+                        .map_err(|infeasible| {
+                            backend_module(format!(
+                                "compile-time response specialization is infeasible at {:?}: {}",
+                                infeasible.vis_origin(),
+                                infeasible.reason(),
+                            ))
+                        })?;
+                    let substitute = owners
+                        .iter()
+                        .find(|owner| owner.selected_caller() != identity)
+                        .ok_or_else(|| {
+                            backend_module(
+                                "the response-caller retarget control found no different owner"
+                                    .to_string(),
+                            )
+                        })?;
+                    bundle.response(substitute.id()).ok_or_else(|| {
+                        backend_module(
+                            "the response-caller retarget control found no declared substitute"
+                                .to_string(),
+                        )
+                    })
+                }
+            };
+        }
+        return Ok(response);
+    }
+    bundle.continuation(identity.target()).ok_or_else(|| {
+        backend_module(
+            "a projected causal identity names a continuation specialization that was never \
+             forward-declared"
+                .to_string(),
+        )
+    })
+}
+
+fn verified_response_owner_calls<'a>(
+    plan: &StaticTransitionPlan<'_>,
+    bundle: &UnitBundle,
+    calls: impl IntoIterator<Item = &'a ContinuationCallIdentity>,
+) -> Result<Vec<ContinuationCallIdentity>, CraneliftBackendError> {
+    let mut verified = Vec::new();
+    for identity in calls {
+        let Some(expected) = selected_response_owner_target(plan, bundle, identity)? else {
+            continue;
+        };
+        if resolved_continuation_call_target(plan, bundle, identity)? == expected {
+            verified.push(identity.clone());
+        }
+    }
+    Ok(verified)
+}
+
 pub(in crate::cranelift_backend) fn resolve_continuation_targets(
     plan: &StaticTransitionPlan<'_>,
     bundle: &UnitBundle,
@@ -1405,13 +1695,7 @@ pub(in crate::cranelift_backend) fn resolve_continuation_targets(
     // absent. Narrowing the INPUT is what keeps that refusal meaningful for the
     // ordinary population instead of weakening it to tolerate an absence.
     for identity in plan.ordinary_continuation_call_identities()? {
-        let target = bundle.continuation(identity.target()).ok_or_else(|| {
-            backend_module(
-                "a projected causal identity names a continuation specialization that was never \
-                 forward-declared"
-                    .to_string(),
-            )
-        })?;
+        let target = resolved_continuation_call_target(plan, bundle, &identity)?;
         if resolved.insert(identity, target).is_some() {
             return Err(backend_module(
                 "two projected causal identities collide; the planner mints one call token per \
@@ -2317,6 +2601,899 @@ pub(super) fn lower_continuation_selected_case_body(
     let lowered = compiler.lower_expr(builder, body, &env)?;
 
     Ok(lowered)
+}
+
+struct StaticResponseFinishedBody {
+    context_calls: Vec<cranelift_codegen::ir::Inst>,
+    host_validation_end: cranelift_codegen::ir::Inst,
+    ret_validation_end: cranelift_codegen::ir::Inst,
+    result_store: cranelift_codegen::ir::Inst,
+    returned_word: cranelift_codegen::ir::Value,
+    response_is_current_host_result: bool,
+    ret_abi_word: u64,
+}
+
+/// Validate the response-owner relation from the finished Function rather than
+/// from the declarations handed to its builder. The exact call target, call
+/// cardinality, validation order, Trap-before-Result branch count, and the SSA
+/// value stored to Result are all read back from finalized CLIF.
+fn verify_static_response_finished_body(
+    func: &Function,
+    expected_context: FuncId,
+    expected_ret_abi_word: u64,
+    facts: &StaticResponseFinishedBody,
+) -> Result<(), CraneliftBackendError> {
+    let positions = func
+        .layout
+        .blocks()
+        .flat_map(|block| func.layout.block_insts(block))
+        .enumerate()
+        .map(|(position, inst)| (inst, position))
+        .collect::<BTreeMap<_, _>>();
+    let position = |inst| {
+        positions.get(&inst).copied().ok_or_else(|| {
+            backend_module(
+                "a response-owner finished-body witness names no finished CLIF instruction"
+                    .to_string(),
+            )
+        })
+    };
+    if facts.context_calls.len() != 1 {
+        return Err(backend_module(format!(
+            "a response owner emitted {} K calls instead of exactly one",
+            facts.context_calls.len(),
+        )));
+    }
+    let call = facts.context_calls[0];
+    if Lowering::decode_direct_callee(func, call)? != expected_context {
+        return Err(backend_module(
+            "a response owner called a context or raw worker other than its exact K context"
+                .to_string(),
+        ));
+    }
+    let finished_exact_calls = func
+        .layout
+        .blocks()
+        .flat_map(|block| func.layout.block_insts(block))
+        .filter(|inst| {
+            matches!(
+                func.dfg.insts[*inst],
+                cranelift_codegen::ir::InstructionData::Call { .. }
+            ) && Lowering::decode_direct_callee(func, *inst).ok() == Some(expected_context)
+        })
+        .count();
+    if finished_exact_calls != 1 {
+        return Err(backend_module(format!(
+            "finished CLIF contains {finished_exact_calls} exact K-context calls instead of one",
+        )));
+    }
+    let call_position = position(call)?;
+    if call_position <= position(facts.host_validation_end)? {
+        return Err(backend_module(
+            "a response owner called K before host response validation completed".to_string(),
+        ));
+    }
+    let result_store_position = position(facts.result_store)?;
+    if call_position >= result_store_position {
+        return Err(backend_module(
+            "a response owner called K after its answer was already collapsed".to_string(),
+        ));
+    }
+    if result_store_position <= position(facts.ret_validation_end)? {
+        return Err(backend_module(
+            "a response owner collapsed its answer before exact Ret validation completed"
+                .to_string(),
+        ));
+    }
+    let stored = func
+        .dfg
+        .inst_args(facts.result_store)
+        .first()
+        .copied()
+        .ok_or_else(|| {
+            backend_module("a response-owner Result store has no value operand".to_string())
+        })?;
+    if stored != facts.returned_word {
+        return Err(backend_module(
+            "a response owner let a raw HostResult or non-K value escape to Result".to_string(),
+        ));
+    }
+    if !facts.response_is_current_host_result {
+        return Err(backend_module(
+            "a response owner substituted operation, prior-response, or application-environment authority for the current HostResult"
+                .to_string(),
+        ));
+    }
+    if facts.ret_abi_word != expected_ret_abi_word {
+        return Err(backend_module(
+            "a response owner validated a Ret identity other than its exact K Ret".to_string(),
+        ));
+    }
+    let returned_inst = match func.dfg.value_def(facts.returned_word) {
+        cranelift_codegen::ir::ValueDef::Result(inst, _) => inst,
+        _ => {
+            return Err(backend_module(
+                "a response K Result is not defined by one finished CLIF instruction".to_string(),
+            ));
+        }
+    };
+    let returned_position = position(returned_inst)?;
+    let trap_branches = func
+        .layout
+        .blocks()
+        .flat_map(|block| func.layout.block_insts(block))
+        .filter(|inst| {
+            let p = positions[inst];
+            p > call_position
+                && p < returned_position
+                && func.dfg.insts[*inst].opcode() == cranelift_codegen::ir::Opcode::Brif
+        })
+        .count();
+    if trap_branches < 2 {
+        return Err(backend_module(
+            "a response K call read Result without the status then Trap-before-Result branches"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Define the specialized owner at the host-response seam, then call its exact
+/// K execution context with the validated response as operand zero.
+///
+/// The host-effect lowering is emitted directly into each owner Function. No
+/// shared HostResult helper function or runtime selector exists: the planner's
+/// typed response row chooses the effect occurrence, explicit frame inputs, and
+/// one context target before code generation.
+pub(super) fn define_static_response_owner_bodies<M: Module>(
+    module: &mut M,
+    compiler: &mut Lowering<'_>,
+    helpers: ArtifactHelpers<'_>,
+    bundle: &UnitBundle,
+    call_edges: &CallEdgeTargets,
+) -> Result<usize, CraneliftBackendError> {
+    let rows = compiler
+        .static_transition_plan
+        .static_response_feasibility_ledger_all()?
+        .map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(),
+                infeasible.reason(),
+            ))
+        })?;
+    let owners = compiler
+        .static_transition_plan
+        .static_response_owner_specializations()?
+        .map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(),
+                infeasible.reason(),
+            ))
+        })?;
+    if owners.len() != rows.len() {
+        return Err(backend_module(
+            "the response-owner definition population disagrees with the validated response rows"
+                .to_string(),
+        ));
+    }
+
+    struct OwnedResponseEmission {
+        owner: StaticResponseOwnerSpecialization,
+        row: StaticResponseContinuation,
+        effect: RuntimeExpr,
+        operation_arguments: BTreeMap<StaticOriginId, RuntimeExpr>,
+        offsets: Vec<u32>,
+    }
+    let mut emissions = Vec::with_capacity(owners.len());
+    for (owner, row) in owners.into_iter().zip(rows) {
+        if owner.response() != row.id()
+            || owner.base_owner() != row.base_owner()
+            || owner.selected_caller() != row.k_identity()
+            || owner.k_context() != row.k_context()
+        {
+            return Err(backend_module(
+                "a response-owner definition disagrees with its validated response row"
+                    .to_string(),
+            ));
+        }
+        let effect = compiler
+            .retained_body_occurrence(row.effect_origin())?
+            .expr
+            .clone();
+        let RuntimeExpr::Effect { operation, .. } = &effect else {
+            return Err(backend_module(
+                "a static response row's effect origin no longer names an Effect".to_string(),
+            ));
+        };
+        if *operation != row.operation() {
+            return Err(backend_module(
+                "a static response row's effect occurrence changed operation".to_string(),
+            ));
+        }
+        let mut operation_arguments = BTreeMap::new();
+        for input in row.effect_environment() {
+            if let StaticResponseEffectInput::OperationArgument { origin, .. } = input {
+                operation_arguments.entry(*origin).or_insert(
+                    compiler
+                        .retained_body_occurrence(*origin)?
+                        .expr
+                        .clone(),
+                );
+            }
+        }
+        let (offsets, frame_bytes) = owner.slot_offsets()?;
+        if frame_bytes != owner.header().frame_bytes {
+            return Err(backend_module(
+                "a response-owner frame size disagrees with its slot run".to_string(),
+            ));
+        }
+        emissions.push(OwnedResponseEmission {
+            owner,
+            row,
+            effect,
+            operation_arguments,
+            offsets,
+        });
+    }
+
+    let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
+    let mut defined = 0usize;
+    for emission in emissions {
+        let id = bundle.response(emission.owner.id()).ok_or_else(|| {
+            backend_module("a response owner was never forward-declared".to_string())
+        })?;
+        let slots = emission.owner.slots();
+        let offsets = emission.offsets.as_slice();
+        if slots.len() != offsets.len() {
+            return Err(backend_module(
+                "a response-owner slot run disagrees with its offset walk".to_string(),
+            ));
+        }
+        let parameter_count = slots
+            .iter()
+            .filter(|slot| slot.kind == AbiSlotKind::Parameter)
+            .count();
+        let capture_count = slots
+            .iter()
+            .filter(|slot| slot.kind == AbiSlotKind::Capture)
+            .count();
+        if parameter_count != emission.row.captures().len() + 1
+            || capture_count != emission.row.continuation_inputs().len()
+            || u32::try_from(parameter_count).ok() != Some(emission.owner.header().parameters)
+            || u32::try_from(capture_count).ok() != Some(emission.owner.header().captures)
+        {
+            return Err(backend_module(
+                "a response-owner frame does not partition as operation plus K captures plus continuation inputs"
+                    .to_string(),
+            ));
+        }
+        let result_offset = slots
+            .iter()
+            .zip(offsets)
+            .find(|(slot, _)| slot.kind == AbiSlotKind::Result)
+            .map(|(_, offset)| *offset)
+            .ok_or_else(|| {
+                backend_module("response-owner frame declares no result slot".to_string())
+            })?;
+        let trap_offset = slots
+            .iter()
+            .zip(offsets)
+            .find(|(slot, _)| slot.kind == AbiSlotKind::Trap)
+            .map(|(_, offset)| *offset)
+            .ok_or_else(|| {
+                backend_module("response-owner frame declares no trap slot".to_string())
+            })?;
+
+        compiler.open_aggregate_events(id)?;
+        let sig = unit_signature(module);
+        let mut func = Function::with_name_signature(UserFuncName::user(5, id.as_u32()), sig);
+        let mut function_local = helpers.declare_in_func(module, &mut func, None);
+        let declared_calls = call_edges.declare_in_func(
+            emission.row.operation_source_owner(),
+            module,
+            &mut func,
+        )?;
+        function_local.unit_calls = declared_calls.static_bodies;
+        call_edges.declare_retained_body_targets_in_func(
+            emission.row.operation_source_owner(),
+            module,
+            &mut func,
+            &mut function_local.unit_calls,
+        )?;
+        function_local.declaration_calls = declared_calls.declarations;
+        function_local.worker_calls = worker_targets.declare_in_func(module, &mut func);
+        function_local.raw_worker_calls = function_local.worker_calls.clone();
+        function_local.worker_templates = worker_targets.templates().clone();
+        let expected_context_target = bundle
+            .context(emission.owner.k_context())
+            .ok_or_else(|| {
+                backend_module("a response owner's exact K context was never declared".to_string())
+            })?;
+        #[cfg(feature = "px8-ds-test-support")]
+        let body_mutation = claim_static_response_owner_body_mutation(
+            |mutation| match mutation {
+                StaticResponseOwnerBodyMutation::SubstituteContextZero => compiler
+                    .static_transition_plan
+                    .continuation_contexts()
+                    .is_ok_and(|contexts| {
+                        contexts.first().is_some_and(|context| {
+                            context.id() != emission.owner.k_context()
+                        })
+                    }),
+                StaticResponseOwnerBodyMutation::ResponseWithPriorResponse => {
+                    emission.owner.id().ordinal() > 0
+                }
+                StaticResponseOwnerBodyMutation::ResponseWithApplicationEnvironment => {
+                    emission.row.operation() == crate::HostOpV1::BufferAllocate
+                        && emission.owner.header().parameters > 1
+                }
+                _ => true,
+            },
+        );
+        #[cfg(feature = "px8-ds-test-support")]
+        let selected_context = match body_mutation {
+            Some(StaticResponseOwnerBodyMutation::SubstituteContextZero) => {
+                let first = compiler
+                    .static_transition_plan
+                    .continuation_contexts()?
+                    .first()
+                    .map(|context| context.id())
+                    .ok_or_else(|| {
+                        backend_module(
+                            "the context-zero response mutation found no installed context"
+                                .to_string(),
+                        )
+                    })?;
+                let target = bundle.context(first).ok_or_else(|| {
+                    backend_module(
+                        "the context-zero response mutation found no declared target".to_string(),
+                    )
+                })?;
+                let mut call = declare_response_context_call_in_func(
+                    module,
+                    &mut func,
+                    &compiler.static_transition_plan,
+                    bundle,
+                    emission.owner.k_context(),
+                )?;
+                call.function = module.declare_func_in_func(target, &mut func);
+                call
+            }
+            Some(StaticResponseOwnerBodyMutation::CallRawWorker) => {
+                let target = bundle
+                    .continuation(emission.row.k_specialization())
+                    .ok_or_else(|| {
+                        backend_module(
+                            "the raw-worker response mutation found no K worker declaration"
+                                .to_string(),
+                        )
+                    })?;
+                DeclaredUnitCall {
+                    function: module.declare_func_in_func(target, &mut func),
+                    origin: emission.row.k_body_origin(),
+                    call_site_origin: emission.row.k_body_origin(),
+                    header: emission.owner.header(),
+                    slots: emission.owner.slots().to_vec(),
+                    offsets: emission.offsets.clone(),
+                }
+            }
+            _ => declare_response_context_call_in_func(
+                module,
+                &mut func,
+                &compiler.static_transition_plan,
+                bundle,
+                emission.owner.k_context(),
+            )?,
+        };
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let selected_context = declare_response_context_call_in_func(
+            module,
+            &mut func,
+            &compiler.static_transition_plan,
+            bundle,
+            emission.owner.k_context(),
+        )?;
+        function_local
+            .context_calls
+            .insert(emission.owner.k_context(), selected_context.clone());
+        let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
+        let ambient = AmbientBodyAuthority::bind(
+            compiler,
+            emission.owner.base_owner(),
+            emission.row.effect_source_owner(),
+        );
+        let mut func_ctx = FunctionBuilderContext::new();
+        let finished_body;
+        {
+            let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
+            let entry = builder.create_block();
+            builder.append_block_params_for_function_params(entry);
+            builder.switch_to_block(entry);
+            let envelope = builder.block_params(entry)[0];
+            let frame = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                envelope,
+                crate::activation_services::UNIT_CALL_FRAME_SLOTS,
+            );
+            let host_dispatch_context = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                envelope,
+                crate::activation_services::UNIT_CALL_FRAME_HOST_DISPATCH_CONTEXT,
+            );
+            let services = builder.block_params(entry)[1];
+            let native_int_arena = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                services,
+                crate::activation_services::SERVICES_NATIVE_INT_ARENA,
+            );
+            Lowering::require_nonzero(&mut builder, native_int_arena);
+            let boundary_arena = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                services,
+                crate::activation_services::SERVICES_BOUNDARY_ARENA,
+            );
+            Lowering::require_nonzero(&mut builder, boundary_arena);
+            function_local.host_dispatch_context = Some(host_dispatch_context);
+            function_local.native_int_arena = Some(native_int_arena);
+            function_local.boundary_arena = Some(boundary_arena);
+            function_local.services_pointer = Some(services);
+            function_local.bind_unit_trap_frame(
+                frame,
+                i32::try_from(trap_offset).map_err(|_| {
+                    backend_module("response-owner trap slot offset exceeds range".to_string())
+                })?,
+            )?;
+
+            let mut frame_inputs = BTreeMap::new();
+            let mut descriptor_inputs = Vec::new();
+            for (slot, offset) in slots.iter().zip(offsets) {
+                let frame_source = match slot.kind {
+                    AbiSlotKind::Parameter if slot.ordinal == 0 => None,
+                    AbiSlotKind::Parameter => {
+                        Some(StaticResponseFrameSource::Parameter(slot.ordinal))
+                    }
+                    AbiSlotKind::Capture => Some(StaticResponseFrameSource::Capture(slot.ordinal)),
+                    AbiSlotKind::Control
+                    | AbiSlotKind::Store
+                    | AbiSlotKind::Trap
+                    | AbiSlotKind::Result => None,
+                };
+                let Some(frame_source) = frame_source else {
+                    continue;
+                };
+                let offset = i32::try_from(*offset).map_err(|_| {
+                    backend_module("response-owner input slot offset exceeds range".to_string())
+                })?;
+                let operand = LoweringOperand::Carried(CarriedBoundaryWord {
+                    word: builder.ins().load(types::I64, MemFlags::trusted(), frame, offset),
+                });
+                if frame_inputs.insert(frame_source, operand.clone()).is_some() {
+                    return Err(backend_module(
+                        "a response-owner frame repeats one typed input slot".to_string(),
+                    ));
+                }
+                descriptor_inputs.push(operand);
+            }
+            function_local.defining_abi_operands = descriptor_inputs;
+            function_local.static_response_owner = Some(emission.owner.id());
+            compiler.function_local = function_local;
+
+            let frame_operand = |binding: &StaticResponseEnvironmentBinding| {
+                frame_inputs
+                    .get(&binding.frame_source())
+                    .cloned()
+                    .ok_or_else(|| {
+                        backend_module(format!(
+                            "the response environment source {:?} names absent frame input {:?}",
+                            binding.source(),
+                            binding.frame_source(),
+                        ))
+                    })
+            };
+            let mut context_suffix = Vec::with_capacity(
+                emission.row.captures().len()
+                    + emission.row.continuation_inputs().len(),
+            );
+            for capture in emission.row.captures() {
+                context_suffix.push(
+                    frame_inputs
+                        .get(&StaticResponseFrameSource::Parameter(
+                            capture.producer_abi_slot(),
+                        ))
+                        .cloned()
+                        .ok_or_else(|| {
+                            backend_module(
+                                "a response K capture names an absent owner Parameter slot"
+                                    .to_string(),
+                            )
+                        })?,
+                );
+            }
+            for (ordinal, _, _) in emission.row.continuation_inputs() {
+                context_suffix.push(
+                    frame_inputs
+                        .get(&StaticResponseFrameSource::Capture(*ordinal))
+                        .cloned()
+                        .ok_or_else(|| {
+                            backend_module(
+                                "a response continuation input names an absent owner Capture slot"
+                                    .to_string(),
+                            )
+                        })?,
+                );
+            }
+            let mut context_calls = Vec::new();
+            let mut early_returned = None;
+            #[cfg(feature = "px8-ds-test-support")]
+            if body_mutation
+                == Some(StaticResponseOwnerBodyMutation::CallBeforeHostValidation)
+            {
+                let mut inputs = Vec::with_capacity(1 + context_suffix.len());
+                inputs.push(LoweringOperand::Specialized(
+                    Lowered::StaticResponseDeferred,
+                ));
+                inputs.extend(context_suffix.iter().cloned());
+                let (returned, call) = compiler.call_declared_unit_target(
+                    &mut builder,
+                    selected_context.clone(),
+                    &inputs,
+                    #[cfg(test)]
+                    None,
+                )?;
+                context_calls.push(call);
+                early_returned = Some(returned);
+            }
+
+            let mut lowered_arguments = BTreeMap::new();
+            let mut effect_environment = Vec::with_capacity(
+                emission.row.effect_environment().len(),
+            );
+            for input in emission.row.effect_environment() {
+                let operand = match input {
+                    StaticResponseEffectInput::Frame(binding) => frame_operand(binding)?,
+                    StaticResponseEffectInput::BoundedNatToInt {
+                        span,
+                        span_identity,
+                    } => {
+                        let span = match frame_operand(span)? {
+                            LoweringOperand::Carried(word) => word,
+                            LoweringOperand::Specialized(_) => {
+                                return Err(backend_module(
+                                    "a response BoundedNat conversion span is not carried"
+                                        .to_string(),
+                                ));
+                            }
+                        };
+                        let tag = compiler.emit_carrier_tag(&mut builder, span)?;
+                        let expected = i64::try_from(span_identity.tag_abi_word()?).map_err(|_| {
+                            backend_module(
+                                "response span identity exceeds the runtime tag word".to_string(),
+                            )
+                        })?;
+                        Lowering::require_i64(&mut builder, tag, expected);
+                        let fields = compiler.emit_carrier_field_count(&mut builder, span)?;
+                        Lowering::require_i64(&mut builder, fields, 3);
+                        let length = compiler.emit_carrier_field(&mut builder, span, 2)?;
+                        let length_tag = builder.ins().band_imm(
+                            length.word,
+                            crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+                        );
+                        Lowering::require_i64(
+                            &mut builder,
+                            length_tag,
+                            crate::boundary_value::BoundaryTag::ImmediateBoundedNat as i64,
+                        );
+                        let value = builder.ins().ushr_imm(
+                            length.word,
+                            i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
+                        );
+                        LoweringOperand::Specialized(
+                            compiler.lower_dynamic_small_int(&mut builder, value),
+                        )
+                    }
+                    StaticResponseEffectInput::OperationArgument {
+                        origin,
+                        environment,
+                    } => {
+                        if let Some(lowered) = lowered_arguments.get(origin).cloned() {
+                            lowered
+                        } else {
+                            let argument = emission.operation_arguments.get(origin).ok_or_else(|| {
+                                backend_module(
+                                    "a mapped response operation argument has no retained source expression"
+                                        .to_string(),
+                                )
+                            })?;
+                            let argument_environment = environment
+                                .iter()
+                                .map(|binding| {
+                                    frame_operand(binding)
+                                        .map(LoweringEnvironmentBinding::Value)
+                                })
+                                .collect::<Result<Vec<_>, _>>()?;
+                            let lowered = compiler.lower_expr(
+                                &mut builder,
+                                SourceOccurrence {
+                                    expr: argument,
+                                    static_origin: *origin,
+                                },
+                                &argument_environment,
+                            )?;
+                            if lowered_arguments.insert(*origin, lowered.clone()).is_some() {
+                                return Err(backend_module(
+                                    "one response operation argument was lowered twice".to_string(),
+                                ));
+                            }
+                            lowered
+                        }
+                    }
+                };
+                effect_environment.push(LoweringEnvironmentBinding::Value(operand));
+            }
+
+            let response = compiler.lower_expr(
+                &mut builder,
+                SourceOccurrence {
+                    expr: &emission.effect,
+                    static_origin: emission.row.effect_origin(),
+                },
+                &effect_environment,
+            )?;
+            if !matches!(response, LoweringOperand::Specialized(Lowered::HostResult { .. })) {
+                return Err(backend_module(
+                    "a specialized response owner did not materialize an exact HostResult"
+                        .to_string(),
+                ));
+            }
+            let host_validation_block = builder.current_block().ok_or_else(|| {
+                backend_module(
+                    "host response validation left no active response-owner block".to_string(),
+                )
+            })?;
+            let host_validation_end = builder
+                .func
+                .layout
+                .last_inst(host_validation_block)
+                .ok_or_else(|| {
+                    backend_module(
+                        "host response validation emitted no finished instruction".to_string(),
+                    )
+                })?;
+            #[cfg(feature = "px8-ds-test-support")]
+            let raw_host_result_escape = if body_mutation
+                == Some(StaticResponseOwnerBodyMutation::RawHostResultEscape)
+            {
+                let LoweringOperand::Specialized(value) = &response else {
+                    unreachable!("the HostResult shape was checked above")
+                };
+                Some(compiler.transfer_unit_result_into_carrier(
+                    &mut builder,
+                    emission.row.effect_origin(),
+                    value,
+                )?)
+            } else {
+                None
+            };
+
+            let mut response_input = response;
+            let mut response_is_current_host_result = true;
+            #[cfg(feature = "px8-ds-test-support")]
+            match body_mutation {
+                Some(StaticResponseOwnerBodyMutation::ResponseWithOperation) => {
+                    response_input = LoweringOperand::Specialized(
+                        Lowered::StaticResponseDeferred,
+                    );
+                    response_is_current_host_result = false;
+                }
+                Some(StaticResponseOwnerBodyMutation::ResponseWithPriorResponse) => {
+                    response_input = frame_inputs
+                        .iter()
+                        .find(|(source, _)| {
+                            matches!(source, StaticResponseFrameSource::Capture(_))
+                        })
+                        .map(|(_, operand)| operand.clone())
+                        .ok_or_else(|| {
+                            backend_module(
+                                "the prior-response substitution found no carried prior lane"
+                                    .to_string(),
+                            )
+                        })?;
+                    response_is_current_host_result = false;
+                }
+                Some(StaticResponseOwnerBodyMutation::ResponseWithApplicationEnvironment) => {
+                    response_input = frame_inputs
+                        .get(&StaticResponseFrameSource::Parameter(1))
+                        .cloned()
+                        .ok_or_else(|| {
+                            backend_module(
+                                "the application-environment substitution found no app capture"
+                                    .to_string(),
+                            )
+                        })?;
+                    response_is_current_host_result = false;
+                }
+                _ => {}
+            }
+
+            let mut context_inputs = Vec::with_capacity(1 + context_suffix.len());
+            context_inputs.push(response_input);
+            context_inputs.extend(context_suffix.iter().cloned());
+            let result_offset = i32::try_from(result_offset).map_err(|_| {
+                backend_module("response-owner result slot offset exceeds range".to_string())
+            })?;
+            let mut result_store = None;
+            #[cfg(feature = "px8-ds-test-support")]
+            if body_mutation
+                == Some(StaticResponseOwnerBodyMutation::CallAfterAnswerCollapse)
+            {
+                let collapsed = builder.ins().iconst(types::I64, 0);
+                result_store = Some(builder.ins().store(
+                    MemFlags::trusted(),
+                    collapsed,
+                    frame,
+                    result_offset,
+                ));
+            }
+            let returned_operand = if let Some(returned) = early_returned {
+                returned
+            } else {
+                #[cfg(feature = "px8-ds-test-support")]
+                if body_mutation == Some(StaticResponseOwnerBodyMutation::OmitKCall) {
+                    LoweringOperand::Carried(CarriedBoundaryWord {
+                        word: builder.ins().iconst(types::I64, 0),
+                    })
+                } else {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if body_mutation
+                        == Some(StaticResponseOwnerBodyMutation::BypassTrapBeforeResult)
+                    {
+                        super::calls::set_trap_caller_protocol_mutation(
+                            super::calls::TrapCallerProtocolMutation::ReadResultBeforeTrap,
+                        );
+                    }
+                    let result = compiler.call_declared_unit_target(
+                        &mut builder,
+                        selected_context.clone(),
+                        &context_inputs,
+                        #[cfg(test)]
+                        None,
+                    );
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if body_mutation
+                        == Some(StaticResponseOwnerBodyMutation::BypassTrapBeforeResult)
+                    {
+                        super::calls::set_trap_caller_protocol_mutation(
+                            super::calls::TrapCallerProtocolMutation::Exact,
+                        );
+                    }
+                    let (returned, call) = result?;
+                    context_calls.push(call);
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if body_mutation == Some(StaticResponseOwnerBodyMutation::DuplicateKCall) {
+                        let (_duplicate_result, duplicate_call) =
+                            compiler.call_declared_unit_target(
+                                &mut builder,
+                                selected_context.clone(),
+                                &context_inputs,
+                                #[cfg(test)]
+                                None,
+                            )?;
+                        context_calls.push(duplicate_call);
+                    }
+                    returned
+                }
+                #[cfg(not(feature = "px8-ds-test-support"))]
+                {
+                    let (returned, call) = compiler.call_declared_unit_target(
+                        &mut builder,
+                        selected_context.clone(),
+                        &context_inputs,
+                        #[cfg(test)]
+                        None,
+                    )?;
+                    context_calls.push(call);
+                    returned
+                }
+            };
+            let returned = match returned_operand {
+                LoweringOperand::Carried(word) => word,
+                LoweringOperand::Specialized(_) => {
+                    return Err(backend_module(
+                        "a response K context returned a specialized template instead of its Trap-checked runtime Result"
+                            .to_string(),
+                    ));
+                }
+            };
+            let exact_ret_abi_word = emission.row.k_ret_identity().tag_abi_word()?;
+            #[cfg(feature = "px8-ds-test-support")]
+            let ret_abi_word = if body_mutation
+                == Some(StaticResponseOwnerBodyMutation::VaryRet)
+            {
+                exact_ret_abi_word.checked_add(1).ok_or_else(|| {
+                    backend_module("the response Ret mutation exhausted the ABI word".to_string())
+                })?
+            } else {
+                exact_ret_abi_word
+            };
+            #[cfg(not(feature = "px8-ds-test-support"))]
+            let ret_abi_word = exact_ret_abi_word;
+            let ret_tag = compiler.emit_carrier_tag(&mut builder, returned)?;
+            let expected_ret = i64::try_from(ret_abi_word).map_err(|_| {
+                backend_module("response Ret identity exceeds the runtime tag word".to_string())
+            })?;
+            Lowering::require_i64(&mut builder, ret_tag, expected_ret);
+            let ret_fields = compiler.emit_carrier_field_count(&mut builder, returned)?;
+            Lowering::require_i64(&mut builder, ret_fields, 1);
+            let ret_validation_end = builder
+                .func
+                .layout
+                .blocks()
+                .filter_map(|block| builder.func.layout.last_inst(block))
+                .last()
+                .ok_or_else(|| {
+                    backend_module("response Ret validation emitted no instruction".to_string())
+                })?;
+            let application = CheckedIhApplicationResult::from_declared_call(
+                LoweringOperand::Carried(returned),
+            )?;
+            let result_store = match result_store {
+                Some(store) => store,
+                None => {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    let result_word = raw_host_result_escape
+                        .map_or(application.word.word, |word| word.word);
+                    #[cfg(not(feature = "px8-ds-test-support"))]
+                    let result_word = application.word.word;
+                    builder.ins().store(
+                        MemFlags::trusted(),
+                        result_word,
+                        frame,
+                        result_offset,
+                    )
+                }
+            };
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().return_(&[zero]);
+            builder.seal_all_blocks();
+            finished_body = StaticResponseFinishedBody {
+                context_calls,
+                host_validation_end,
+                ret_validation_end,
+                result_store,
+                returned_word: application.word.word,
+                response_is_current_host_result,
+                ret_abi_word,
+            };
+            builder.finalize();
+        }
+        ambient.release(compiler);
+        frame_scope.close(compiler)?;
+        verify_cranelift_function(&func, module.isa())?;
+        verify_static_response_finished_body(
+            &func,
+            expected_context_target,
+            emission.row.k_ret_identity().tag_abi_word()?,
+            &finished_body,
+        )?;
+        compiler.commit_aggregate_events()?;
+        #[cfg(feature = "px8-ds-test-support")]
+        if body_mutation == Some(StaticResponseOwnerBodyMutation::OmitOwnerDefinition) {
+            continue;
+        }
+        let mut ctx = module.make_context();
+        std::mem::swap(&mut ctx.func, &mut func);
+        module
+            .define_function(id, &mut ctx)
+            .map_err(|error| backend_module(error.to_string()))?;
+        defined += 1;
+    }
+    Ok(defined)
 }
 
 /// **`RT-CONTSPEC-ACTIVATE` `D2` — define each declared continuation target
@@ -3560,10 +4737,26 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 emission_owner,
             )?;
         }
+        let response_owner_calls = verified_response_owner_calls(
+            &compiler.static_transition_plan,
+            bundle,
+            compiler
+                .function_local
+                .continuation_emissions
+                .keys()
+                .chain(
+                    compiler
+                        .function_local
+                        .checked_ih_transport_emissions
+                        .iter()
+                        .map(|(transport, _)| transport.source_call_identity()),
+                ),
+        )?;
         if let Some(ledger) = compiler.continuation_claims.as_mut() {
             ledger.record_emitted(
                 compiler.function_local.continuation_emissions.keys().cloned(),
             )?;
+            ledger.record_response_owner_calls(response_owner_calls);
         }
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
@@ -4168,10 +5361,26 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 causal_owner,
             )?;
         }
+        let response_owner_calls = verified_response_owner_calls(
+            &compiler.static_transition_plan,
+            bundle,
+            compiler
+                .function_local
+                .continuation_emissions
+                .keys()
+                .chain(
+                    compiler
+                        .function_local
+                        .checked_ih_transport_emissions
+                        .iter()
+                        .map(|(transport, _)| transport.source_call_identity()),
+                ),
+        )?;
         if let Some(ledger) = compiler.continuation_claims.as_mut() {
             ledger.record_emitted(
                 compiler.function_local.continuation_emissions.keys().cloned(),
             )?;
+            ledger.record_response_owner_calls(response_owner_calls);
         }
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
@@ -4606,6 +5815,10 @@ pub(super) struct ContinuationClaimLedger {
     /// accumulated across all generated functions after each one's CLIF has been
     /// checked.
     emitted: BTreeSet<ContinuationCallIdentity>,
+    /// Every response-selected incoming edge whose direct call was decoded and
+    /// matched after finished CLIF, including checked-IH transport calls that
+    /// lawfully remain outside the ordinary direct/composed discharge partition.
+    response_owner_calls: BTreeMap<ContinuationCallIdentity, usize>,
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8k`** -- every identity discharged by a
     /// VERIFIED composed source-continuation consumption, accumulated across
     /// every generated function after each one's CLIF has been checked.
@@ -5054,6 +6267,7 @@ impl ContinuationClaimLedger {
             planned,
             declared: BTreeSet::new(),
             emitted: BTreeSet::new(),
+            response_owner_calls: BTreeMap::new(),
             composed: BTreeSet::new(),
         })
     }
@@ -5093,6 +6307,15 @@ impl ContinuationClaimLedger {
             }
         }
         Ok(())
+    }
+
+    fn record_response_owner_calls(
+        &mut self,
+        calls: impl IntoIterator<Item = ContinuationCallIdentity>,
+    ) {
+        for identity in calls {
+            *self.response_owner_calls.entry(identity).or_default() += 1;
+        }
     }
 
     /// **`D8k`** -- record the causal tokens one generated function discharged
@@ -5293,6 +6516,69 @@ impl ContinuationClaimLedger {
     /// Declaration is bulk over planned by `D8k`'s own design, so narrowing
     /// those two would refuse every artifact with an `InlineNoCall` candidate
     /// for the opposite reason.
+    /// Every response owner must be entered by its exact selected causal caller,
+    /// and every response-issued context key must therefore have at least one
+    /// such verified direct call. A forward declaration alone never satisfies
+    /// this gate.
+    fn validate_response_owner_call_coverage(
+        &self,
+        plan: &StaticTransitionPlan<'_>,
+        dispositions: &BTreeMap<ContinuationCallIdentity, CandidateDisposition>,
+    ) -> Result<(), CraneliftBackendError> {
+        let owners = plan
+            .static_response_owner_specializations()?
+            .map_err(|infeasible| {
+                backend_module(format!(
+                    "compile-time response specialization is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ))
+            })?;
+        let required_new_contexts = plan
+            .static_response_feasibility_ledger_all()?
+            .map_err(|infeasible| {
+                backend_module(format!(
+                    "compile-time response specialization is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ))
+            })?
+            .into_iter()
+            .filter(|row| !row.context_was_preexisting())
+            .map(|row| row.k_context())
+            .collect::<BTreeSet<_>>();
+        let mut called_new_contexts = BTreeSet::new();
+        for owner in owners {
+            if !self.response_owner_calls.contains_key(owner.selected_caller()) {
+                return Err(backend_module(format!(
+                    "a forward-declared response owner has no verified selected incoming call: \
+                     owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}",
+                    owner.id(),
+                    owner.k_context(),
+                    owner.context_was_preexisting(),
+                    owner.selected_caller(),
+                    dispositions.get(owner.selected_caller()),
+                )));
+            }
+            if self.composed.contains(owner.selected_caller()) {
+                return Err(backend_module(
+                    "a selected response caller was both directly retargeted and compositionally consumed"
+                        .to_string(),
+                ));
+            }
+            if !owner.context_was_preexisting() {
+                called_new_contexts.insert(owner.k_context());
+            }
+        }
+        if called_new_contexts != required_new_contexts {
+            return Err(backend_module(
+                "the response-issued context population is not covered by selected response-owner calls"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     pub(super) fn close(
         self,
         call_obligations: &BTreeSet<ContinuationCallIdentity>,
@@ -5943,6 +7229,14 @@ pub(super) fn close_continuation_claim_ledger(
                 acc
             });
     });
+    compiler
+        .continuation_claims
+        .as_ref()
+        .ok_or_else(|| backend_module("the continuation claim ledger went missing".to_string()))?
+        .validate_response_owner_call_coverage(
+            &compiler.static_transition_plan,
+            &candidates.settled,
+        )?;
     // `D2` — the order, and it is the mechanism rather than a style choice.
     // Totality and disjointness FIRST, then the derived subset, then the
     // unchanged equality over it.
@@ -6085,6 +7379,36 @@ pub(in crate::cranelift_backend) fn reset_capacity_phase_dispatch() {
 /// ⛔ Keyed by the planner's `ContinuationContextId`, never by the body origin
 /// the context executes -- that key is what would let a consumer resolve a
 /// context from a body origin, which is the reconstruction the ruling forbids.
+fn declare_response_context_call_in_func<M: Module>(
+    module: &mut M,
+    func: &mut Function,
+    plan: &StaticTransitionPlan<'_>,
+    bundle: &UnitBundle,
+    id: ContinuationContextId,
+) -> Result<DeclaredUnitCall, CraneliftBackendError> {
+    let context = plan
+        .continuation_contexts()?
+        .into_iter()
+        .find(|context| context.id() == id)
+        .ok_or_else(|| {
+            backend_module(
+                "a response owner names no installed continuation context".to_string(),
+            )
+        })?;
+    let target = bundle.context(id).ok_or_else(|| {
+        backend_module("a response context was never forward-declared".to_string())
+    })?;
+    let (offsets, _frame_bytes) = context.slot_offsets()?;
+    Ok(DeclaredUnitCall {
+        function: module.declare_func_in_func(target, func),
+        origin: context.worker_body_origin(),
+        call_site_origin: context.worker_body_origin(),
+        header: context.header(),
+        slots: context.slots().to_vec(),
+        offsets,
+    })
+}
+
 pub(in crate::cranelift_backend) fn declare_context_calls_in_func<M: Module>(
     module: &mut M,
     func: &mut Function,
@@ -6889,10 +8213,26 @@ fn define_unit_body<M: Module>(
         != ContinuationEmissionMutation::SuppressEmissionAccumulation;
     #[cfg(not(test))]
     let accumulate = true;
+    let response_owner_calls = verified_response_owner_calls(
+        &compiler.static_transition_plan,
+        bundle,
+        compiler
+            .function_local
+            .continuation_emissions
+            .keys()
+            .chain(
+                compiler
+                    .function_local
+                    .checked_ih_transport_emissions
+                    .iter()
+                    .map(|(transport, _)| transport.source_call_identity()),
+            ),
+    )?;
     if let Some(ledger) = compiler.continuation_claims.as_mut() {
         if accumulate {
             ledger.record_emitted(compiler.function_local.continuation_emissions.keys().cloned())?;
         }
+        ledger.record_response_owner_calls(response_owner_calls);
     }
     verify_cranelift_function(&func, module.isa())?;
     compiler.commit_aggregate_events()?;
