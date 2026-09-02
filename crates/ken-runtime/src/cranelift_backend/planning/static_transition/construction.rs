@@ -297,6 +297,7 @@ impl<'src> Planner<'src> {
                 static_response_continuations: Vec::new(),
                 static_response_plan_installed: false,
                 static_response_infeasible: None,
+                static_response_deferred: Vec::new(),
                 // Empty by construction: the planner has no oriented plan, so a
                 // fusion identity cannot exist yet. `D2f`'s post-planner
                 // installer is the only writer.
