@@ -9,7 +9,7 @@ tier: T1
 depends_on: [RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT]
 blocks: []
 github: null
-origin: "RECUT 2026-09-02 (HS3 structural closure, Architect ruling evt_5yjjsrhpmt204 on research advisory evt_3z83vwpenscft): the absence-based decline is replaced by a first-class Deferred residual (classify->Disposition=Specialized|Deferred{payload}, total-match every stage, §7 sealed-enum no catch-all); the proved Specialized path is retained; base cut fresh from origin/main 4a088d8aa; ACs 1-6 in the RECUT body section; HS3 discharged (next HS6). Prior origin: Architect mechanism ruling evt_29jfzzw9j5xjz (2026-09-01), the authoritative byte-level contract for the Specialized path; do NOT re-derive it, fold and cite it. Issued under the operator preference for compile-time SSA handling OVER the runtime closure (2026-09-01, correcting a Steward mis-scope of the approach fork; Steward direction correction evt_10dfspc3ssk5). Research extension advisory SHA-256 19bc67e5dada7cbac4445875cdcfd5ab079aecb3bc56b6df712696bcd296f3c1. The Architect confirmed this SSA path opens NO new operator fork (no public ABI change — unit_signature stays (frame_ptr, services_ptr) -> i64; no kernel primitive; no spec commitment), so the Steward frames and releases it. Bound base = the clean held checkpoint ad191d1c29af288b059bbb00c1b573c3c4356ab3, tree 342e3b735 (carries WP1's preserved environment/result role split, and BoundaryClosureEnvironment / ContinuationCallIdentity.worker as the body/arity/capture-schema authorities). The invocation-owned runtime closure (RT-COMPOSED-RETURN-RUNTIME-CLOSURE, ruling evt_3j6vshm83rk5q) remains the FALLBACK, held draft, selected ONLY if this SSA path returns SsaInfeasible and the operator so rules; it is NOT built in parallel. Halted runtime-closure scratch aee8c9408c986bb946d228069a5104c70db84ea4 is evidence only. WP1 RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT preserved as the base asset and depends_on predecessor; the delayed-SSA WP2/WP3 (RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE, RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT) stay closed. Origin funding evt_3met6tbk5wrnd after accepted terminal NO_UNIQUE_EDGE evt_mx6scjje1yjp."
+origin: "RECUT 2026-09-02 (HS3 structural closure, Architect ruling evt_5yjjsrhpmt204 on research advisory evt_3z83vwpenscft): the absence-based decline is replaced by a first-class Deferred residual (classify->Disposition=Specialized|Deferred{payload}, total-match every stage, §7 sealed-enum no catch-all); the proved Specialized path is retained; base cut fresh from origin/main 4a088d8aa; ACs 1-7 in the RECUT body section; HS3 discharged. AMENDED 2026-09-02 (Architect evt_4ar3rxzrra5v4, on implementer pre-impl hard stop evt_33teszvwarz6 = HS4, not a CI-red): Deferred = P1 UNION P2 (P1 absent-residual + P2 present-but-unconsumed placeholder = the HS3-b leak); discriminator = caller-consumption (Specialized IFF specializable AND caller consumed), retargetability hoisted to planning (answer b, D0 preserved); added AC-7 pins classify vs lowering-time CandidateDisposition. Next re-trigger HS6. Prior origin: Architect mechanism ruling evt_29jfzzw9j5xjz (2026-09-01), the authoritative byte-level contract for the Specialized path; do NOT re-derive it, fold and cite it. Issued under the operator preference for compile-time SSA handling OVER the runtime closure (2026-09-01, correcting a Steward mis-scope of the approach fork; Steward direction correction evt_10dfspc3ssk5). Research extension advisory SHA-256 19bc67e5dada7cbac4445875cdcfd5ab079aecb3bc56b6df712696bcd296f3c1. The Architect confirmed this SSA path opens NO new operator fork (no public ABI change — unit_signature stays (frame_ptr, services_ptr) -> i64; no kernel primitive; no spec commitment), so the Steward frames and releases it. Bound base = the clean held checkpoint ad191d1c29af288b059bbb00c1b573c3c4356ab3, tree 342e3b735 (carries WP1's preserved environment/result role split, and BoundaryClosureEnvironment / ContinuationCallIdentity.worker as the body/arity/capture-schema authorities). The invocation-owned runtime closure (RT-COMPOSED-RETURN-RUNTIME-CLOSURE, ruling evt_3j6vshm83rk5q) remains the FALLBACK, held draft, selected ONLY if this SSA path returns SsaInfeasible and the operator so rules; it is NOT built in parallel. Halted runtime-closure scratch aee8c9408c986bb946d228069a5104c70db84ea4 is evidence only. WP1 RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT preserved as the base asset and depends_on predecessor; the delayed-SSA WP2/WP3 (RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE, RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT) stay closed. Origin funding evt_3met6tbk5wrnd after accepted terminal NO_UNIQUE_EDGE evt_mx6scjje1yjp."
 ---
 
 ## RECUT — HS3 structural closure: first-class Deferred residual (Architect ruling evt_5yjjsrhpmt204)
@@ -23,6 +23,82 @@ only, the call is the Architect's). It RETIRES the point-fix chain: no further
 patch to the absence-based decline. The everything-below-here detail on the
 **Specialized** path is RETAINED and remains authoritative for that path; only
 the **decline / residual** handling is replaced.
+
+### AMENDMENT (Architect ruling evt_4ar3rxzrra5v4) — Deferred = P1 UNION P2; discriminator = caller-consumption. READ FIRST.
+
+A runtime-implementer pre-implementation hard stop (evt_6cp1w4mac9jaa /
+evt_33teszvwarz6; HS4 in the chain, NOT a CI-red and NOT held against the chain —
+stopping before a runtime-unverifiable blind push is the correct move) CORRECTED
+the premise of this recut, and the Architect adopted the correction. The recut
+scope stands, amended as follows; this block governs the Mechanism section below
+wherever they differ.
+
+**Premise correction.** The original recut said "the ledger computes the
+Specialized side soundly; the defect is the absent residual." The second half is
+refuted by provenance: `StaticResponseDeferred` is produced ONLY at
+`core.rs:13922` (Construct) and `effects.rs:2205` (Effect), both gated on the
+ledger-SPECIALIZED set (`is_static_response_operation_root` /
+`is_static_response_effect` reading `static_response_continuations`). So HS3-b's
+leaking response is INSIDE the specialized set — a present-but-unconsumed
+placeholder — not the absent `1229` residual. **Deferred therefore has TWO
+sub-cases, both -> residual:**
+
+- **P1** — no continuation unit (`matching.is_empty()`, the `1229` residual /
+  absent complement that Q1 declined). The original Deferred captured only this.
+- **P2** — has a unit + owner + `StaticResponseDeferred` placeholder, but its
+  selected caller is never retargeted/consumed (HS3-b; same root as HS3-a
+  `disposition=None`). Capturing only P1 would compile clean and still leak =
+  HS4.
+
+Complete Deferred = **P1 UNION P2**.
+
+**The discriminator (answer (b), with rigor).** `classify` emits **Specialized
+IFF (has a unit) AND (its selected caller will be consumed — retargeted to a real
+`DirectCall`/`ComposedCall`)**; otherwise **Deferred**. The consumption fact is
+today settled at lowering as `CandidateDisposition`
+(`DirectCall`/`ComposedCall` vs `InlineNoCall`/`TransportDormant`); it must be
+HOISTED to planning so `classify` decides it ONCE (R2). Hoisting changes WHEN the
+fact is computed, not the emitted code, so **D0 holds** — Specialized still emits
+direct calls, no selector, no environment transport.
+
+Do NOT classify on a syntactic proxy (e.g. the D3 `CheckedIhCapturedEnvironment`
+shape) UNLESS that shape is PROVEN equal to caller-non-consumption. A proxy that
+merely correlates recurs as HS4 (fix the class, not the instance). If the
+retargetability predicate turns out to BE a nameable static shape, that is the
+concrete form of (b) and (a)/(b) coincide — but only with the equality proof,
+never assumed. Answer (c) is REFUTED by the provenance above (both production
+sites are specialized-gated). Do NOT block on the OOM'd native trace for this
+decision; the static provenance settles it. Cheap confirmation short of the full
+native suite: a planning-time classification log on the `writeAll` fixture — does
+its response have a unit, and is its caller `InlineNoCall`/`TransportDormant`? —
+confirms P2 directly.
+
+**GUARDRAIL (the one thing that could still obstruct (b)).** The ledger already
+inspects the caller edge (rejecting a non-ordinary-callable continuation edge) —
+NECESSARY but not SUFFICIENT for consumption; the missing piece is whether that
+ordinary caller is retargeted to a real call vs stays
+`InlineNoCall`/`TransportDormant`. **VERIFY that distinction is derivable from
+PLANNING-available facts** (the caller edge's shape; `CandidateDisposition` keys
+on caller shape the ledger already has) BEFORE threading. If it genuinely depends
+on an emission-time-only decision not derivable at planning, **HARD-STOP back to
+the Architect** — that is a real obstruction to R2 (the partition cannot be
+classified once) and the Architect re-rules the structure, not the implementer.
+
+**Integration.** `classify` (extended ledger) emits Specialized only for
+**P0 = specializable-AND-consumed**; Deferred for **P1 UNION P2**. The Deferred
+verdict gates ALL downstream: no owner forward-declaration for a Deferred response
+(closes HS3-a), no `StaticResponseDeferred` placeholder emitted for it (closes
+HS3-b), lowers to main's pre-WP path carrying its payload (R3). The proved
+Specialized path (feasibility-ledger specialized computation,
+`verify_static_response_finished_body`, Q1/Q2) is retained unchanged for P0.
+
+**ADDED AC (AC-7 below; sharpens AC-5).** Pin `classify`'s agreement with
+lowering-time `CandidateDisposition`: a response classified Specialized MUST have
+its caller consumed at lowering (`DirectCall`/`ComposedCall`), and a Deferred
+response MUST NOT acquire an owner or placeholder. A control that REDS if
+`classify` says Specialized while lowering finds `InlineNoCall`/`TransportDormant`
+(the HS3-b leak reintroduced) — the soundness pin that makes `classify` a
+faithful planning-time predictor of the lowering fact.
 
 ### Why the recut (the hard-stop chain, one predicate)
 
@@ -133,6 +209,13 @@ pre-existing main path, which introduces no selector.
    `px8f_buffer_native`, `rt_parity_native` all shards,
    `rt_resource_release_carried_observe`, all 8 test shards — the authoritative
    close that caught HS1/HS2/HS3.
+7. **classify/lowering agreement pin (AMENDMENT AC, evt_4ar3rxzrra5v4).** A
+   response classified Specialized MUST have its caller consumed at lowering
+   (`DirectCall`/`ComposedCall`); a Deferred response MUST NOT acquire an owner or
+   `StaticResponseDeferred` placeholder. A control REDS if `classify` says
+   Specialized while lowering finds `InlineNoCall`/`TransportDormant` (the HS3-b
+   leak reintroduced). This is the soundness pin proving `classify` is a faithful
+   planning-time predictor of the lowering-time `CandidateDisposition` fact.
 
 Also fold in the **deferred option-2 coverage fixture** (`evt_55jt2yydg0661`)
 while the response-IR is being restructured — it is the same surface.
