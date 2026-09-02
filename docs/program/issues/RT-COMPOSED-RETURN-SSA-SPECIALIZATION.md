@@ -9,8 +9,223 @@ tier: T1
 depends_on: [RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT]
 blocks: []
 github: null
-origin: "RECUT 2026-09-02 (HS3 structural closure, Architect ruling evt_5yjjsrhpmt204 on research advisory evt_3z83vwpenscft): the absence-based decline is replaced by a first-class Deferred residual (classify->Disposition=Specialized|Deferred{payload}, total-match every stage, §7 sealed-enum no catch-all); the proved Specialized path is retained; base cut fresh from origin/main 4a088d8aa; ACs 1-7 in the RECUT body section; HS3 discharged. AMENDED 2026-09-02 (Architect evt_4ar3rxzrra5v4, on implementer pre-impl hard stop evt_33teszvwarz6 = HS4, not a CI-red): Deferred = P1 UNION P2 (P1 absent-residual + P2 present-but-unconsumed placeholder = the HS3-b leak); discriminator = caller-consumption (Specialized IFF specializable AND caller consumed), retargetability hoisted to planning (answer b, D0 preserved); added AC-7 pins classify vs lowering-time CandidateDisposition. Next re-trigger HS6. Prior origin: Architect mechanism ruling evt_29jfzzw9j5xjz (2026-09-01), the authoritative byte-level contract for the Specialized path; do NOT re-derive it, fold and cite it. Issued under the operator preference for compile-time SSA handling OVER the runtime closure (2026-09-01, correcting a Steward mis-scope of the approach fork; Steward direction correction evt_10dfspc3ssk5). Research extension advisory SHA-256 19bc67e5dada7cbac4445875cdcfd5ab079aecb3bc56b6df712696bcd296f3c1. The Architect confirmed this SSA path opens NO new operator fork (no public ABI change — unit_signature stays (frame_ptr, services_ptr) -> i64; no kernel primitive; no spec commitment), so the Steward frames and releases it. Bound base = the clean held checkpoint ad191d1c29af288b059bbb00c1b573c3c4356ab3, tree 342e3b735 (carries WP1's preserved environment/result role split, and BoundaryClosureEnvironment / ContinuationCallIdentity.worker as the body/arity/capture-schema authorities). The invocation-owned runtime closure (RT-COMPOSED-RETURN-RUNTIME-CLOSURE, ruling evt_3j6vshm83rk5q) remains the FALLBACK, held draft, selected ONLY if this SSA path returns SsaInfeasible and the operator so rules; it is NOT built in parallel. Halted runtime-closure scratch aee8c9408c986bb946d228069a5104c70db84ea4 is evidence only. WP1 RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT preserved as the base asset and depends_on predecessor; the delayed-SSA WP2/WP3 (RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE, RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT) stay closed. Origin funding evt_3met6tbk5wrnd after accepted terminal NO_UNIQUE_EDGE evt_mx6scjje1yjp."
+origin: "RECUT 2026-09-02 (HS3 structural closure, Architect ruling evt_5yjjsrhpmt204 on research advisory evt_3z83vwpenscft): the absence-based decline is replaced by a first-class Deferred residual (classify->Disposition=Specialized|Deferred{payload}, total-match every stage, §7 sealed-enum no catch-all); the proved Specialized path is retained; base cut fresh from origin/main 4a088d8aa; ACs 1-7 in the RECUT body section; HS3 discharged. AMENDED 2026-09-02 (Architect evt_4ar3rxzrra5v4, on implementer pre-impl hard stop evt_33teszvwarz6 = HS4, not a CI-red): Deferred = P1 UNION P2 (P1 absent-residual + P2 present-but-unconsumed placeholder = the HS3-b leak); discriminator = caller-consumption (Specialized IFF specializable AND caller consumed), retargetability hoisted to planning (answer b, D0 preserved); added AC-7 pins classify vs lowering-time CandidateDisposition. Next re-trigger HS6. Prior origin: Architect mechanism ruling evt_29jfzzw9j5xjz (2026-09-01), the authoritative byte-level contract for the Specialized path; do NOT re-derive it, fold and cite it. Issued under the operator preference for compile-time SSA handling OVER the runtime closure (2026-09-01, correcting a Steward mis-scope of the approach fork; Steward direction correction evt_10dfspc3ssk5). Research extension advisory SHA-256 19bc67e5dada7cbac4445875cdcfd5ab079aecb3bc56b6df712696bcd296f3c1. The Architect confirmed this SSA path opens NO new operator fork (no public ABI change — unit_signature stays (frame_ptr, services_ptr) -> i64; no kernel primitive; no spec commitment), so the Steward frames and releases it. Bound base = the clean held checkpoint ad191d1c29af288b059bbb00c1b573c3c4356ab3, tree 342e3b735 (carries WP1's preserved environment/result role split, and BoundaryClosureEnvironment / ContinuationCallIdentity.worker as the body/arity/capture-schema authorities). The invocation-owned runtime closure (RT-COMPOSED-RETURN-RUNTIME-CLOSURE, ruling evt_3j6vshm83rk5q) remains the FALLBACK, held draft, selected ONLY if this SSA path returns SsaInfeasible and the operator so rules; it is NOT built in parallel. Halted runtime-closure scratch aee8c9408c986bb946d228069a5104c70db84ea4 is evidence only. WP1 RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT preserved as the base asset and depends_on predecessor; the delayed-SSA WP2/WP3 (RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE, RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT) stay closed. Origin funding evt_3met6tbk5wrnd after accepted terminal NO_UNIQUE_EDGE evt_mx6scjje1yjp. RE-RECUT 2026-09-02 (HS5 structural, Architect ruling evt_7eh84c8n6w08e + #3 refinement evt_6v4yp7arvd4f4 + design-close evt_53s106a7btrb8/evt_411q6cvg74yrn, research advisory evt_5ryjd4dk65x05 adopted 2-of-3): the 5th CI-red (e193dc631, PR #3241) is a hard-stop-ruled RESCOPE — same deliverable, restructured mechanism. The install-time causal-proxy classify is REPLACED by a TWO-PHASE, owner-additive, domain-total classify (phase A owner-less context entries over has-K-unit population, causal-prefix; phase B disposition over the sealed whole-population classify, post-:1251), closedness preserved by same-state re-derivation. Seal domain (whole population P1+P2+Specialized) strictly wider than context-entry domain (has-K-unit = P2+Specialized). e193dc631 DEAD; next candidate cut fresh from origin/main (tip 4e5481c57), NEW SHA. #3 (fs_read/write un-ignores) measurement-gated three-way ((a) in S_causal-minus-S_record, (b) Specialized lowering observes InvalidOffset): rides this WP if (a)&&(b), else splits to the InvalidOffset-product-witness piece. See RECUT 2 governing section."
 ---
+
+## RECUT 2 — HS5 structural: post-install, domain-total response classify (Architect ruling evt_7eh84c8n6w08e, #3 refinement evt_6v4yp7arvd4f4)
+
+**This section is now the CURRENT governing contract and supersedes the HS3
+recut below wherever they conflict, on the response-CLASSIFICATION structure.**
+Architect structural ruling `evt_7eh84c8n6w08e` (2026-09-02), refined on the #3
+attribution by `evt_6v4yp7arvd4f4`, on research advisory `evt_5ryjd4dk65x05`
+(adopted 2 of 3 conditions; see RESEARCH DIVERGENCE). The 5th CI-red
+(`e193dc631`, PR #3241) is a hard-stop-ruled RESCOPE, not a candidate respin:
+same deliverable (two fixed products via first-class Deferred), restructured
+mechanism. `e193dc631` is DEAD; the next candidate is cut fresh from
+`origin/main` on a NEW SHA. Thread retained: `thr_4cyk4x5wwjb3e`.
+
+**Diagnosis confirmed (Architect, independently verified at e193dc631).** The
+closed-derivation fix WORKED (writeAll compiles; the plane-closure invariant no
+longer fires) and in doing so exposed that the causal set is a STRICT SUPERSET
+of the record set, and over-admission is UNSOUND, not merely imprecise:
+`checked_ih_coordinate_run` (aggregates.rs:4234) is NECESSARY, not sufficient,
+for "unconsumed transport caller"; the transport-DESTINATION test is the real
+Deferred/Specialized discriminator, and it is genuinely post-install.
+
+### SYMPTOM INVENTORY (Architect §1b)
+
+1. HS3 `c93babfde` — FM1 leak: forward-declared owner whose transport caller is
+   never consumed — keyed on an UNDER-classified install (P2 missed).
+2. `cb68866e5` — closed-derivation invariant fires: record-derived P2 set empty
+   at install, populated at validate — keyed on reading a POST-INSTALL fact AT
+   install (phase-unstable).
+3. `e193dc631` — over-admission traps consumed responses (px8f mixed :713;
+   rt_parity fs_read/fs_write :568) — keyed on substituting a CAUSAL PROXY for
+   the post-install fact (unsound superset).
+
+### THE SHARED PREDICATE (stop iterating predicates)
+
+Response classification is NOT YET A REAL, FROZEN, WHOLE-PROGRAM PHASE. Two
+coupled gaps, both instances of that:
+
+- **(A) PHASE/DATA.** The exact discriminator (coordinate-run source WITH vs
+  WITHOUT a transport destination) needs the destination fact, resolved
+  POST-install: `aggregate_ownership` at construction.rs:1249, transports at
+  :1251. The classify runs at :1213 — structurally too early. Every red is a
+  different way to fail to compute a post-install fact at install.
+- **(B) DOMAIN/TOTALITY.** Classification's domain + its §7 total match is the
+  modeled owner-call/response-Vis set, but the CONSUMERS reach the wider
+  transport-SOURCE population (fs_read/fs_write). An unclassified member
+  surfaces as a RUNTIME PatternMatchFailure — the §7 "exhaustive by
+  construction" closure was scoped to a SUBSET, not the real population
+  (COORDINATION §7 violated).
+
+### THE RECUT — retain everything proved; replace the thing the predicate names
+
+**RETAIN** (unchanged, authoritative): the first-class-Deferred direction,
+classify-once (R2), residual-carries-routing (R3), the §7 total-match seats, the
+AC-7 owner-call-coverage backstop, the closed-derivation validator. HS3's
+direction STANDS. The HS3-recut Specialized-path detail below remains
+authoritative for the Specialized path.
+
+**REPLACE** the install-time, causal-proxy, subset-domain classify with a
+POST-`aggregate_ownership`, DOMAIN-TOTAL classify. Two axes:
+
+- **(i) PHASE.** Run the Deferred/Specialized DETERMINATION after
+  construction.rs:1251, where the exact record-derived destination set exists.
+  Preserve closedness by having `validate_static_response_context_plan`
+  re-derive from the SAME post-install state (install and validate read
+  identical finalized `aggregate_ownership`/transports). Sound because the
+  destination fact is genuinely post-install
+  (`build_checked_ih_environment_transports` reads `aggregate_ownership` +
+  finalized — the z1315 cycle, reconfirmed).
+- **(ii) DOMAIN.** Enlarge classification's domain to the WHOLE reachable
+  transport-source population so domain(classify) superset-or-equal
+  domain(every consumer), and make the total match SEALED over that population —
+  an unclassified member becomes a COMPILE error, never a runtime
+  PatternMatchFailure. This permanently closes the sig-3 class (fs_read/fs_write
+  and any sibling).
+
+### THE RESOLVED STRUCTURE — TWO-PHASE, owner-additive (ring measured; Architect confirmed evt_411q6cvg74yrn)
+
+The move-wholesale-vs-two-phase measurement is DONE (runtime-implementer
+`evt_1c798rdvzrcam`, Architect confirm `evt_411q6cvg74yrn`): it is TWO-PHASE,
+owner-ADDITIVE (no retraction). The main-keying grep found exactly three
+response-aware lowering seats — `response_disposition_at_operation_root`
+(core.rs:13922), `_at_effect` (effects.rs:2205),
+`is_static_response_selected_caller` (core.rs:8970) — all keying on
+OWNER/disposition-row membership, none on `continuation_contexts` membership, so
+a Deferred member routes `Some(Deferred)` -> main with no sealed marker needed
+for response dispatch.
+
+- **Phase A** (install-side, causal-prefix): mint owner-LESS
+  `PlannedContinuationContext` entries over the has-K-unit population. `has-K-unit
+  = matching = continuation_units().filter(producer_construct_origin ==
+  vis_origin)`; `continuation_units` is fixed by continuation_specializations +
+  the continuation-specialization ABI, both installed BEFORE the response
+  install, so has-K-unit is causal-prefix-determinable and SPLIT-INDEPENDENT (no
+  :1249 destination fact needed).
+- **Phase B** (post-:1251): assign owners to Specialized (has-K-unit AND
+  has-destination); leave P2 and P1 Deferred. Owner-ADDITIVE — phase B ADDS
+  owners, never retracts.
+- **Two-phase validator**: re-derive phase A from `continuation_units`
+  (causal-prefix state) and phase B from finalized post-:1251
+  `aggregate_ownership`+transports. This is the closed-derivation invariant,
+  preserved by same-state re-derivation (AC-9).
+
+Inertness (structural support, CONFIRM on the built recut via the two-phase
+validator + native, per the implementer — the authoritative check, not the
+read): a P2 Deferred owner-less context entry is enclosed by its K unit, which
+lowers regardless (a transport caller is a real continuation unit), so it
+materializes in that K's frame, not dangling; owner-additive leaves no unfilled
+response slot.
+
+The implementer's first EDIT is this two-phase structure; read-only pre-work is
+exhausted. Sized to reach a releasable increment or a hard stop within an hour.
+
+### RESEARCH DIVERGENCE (advisory evt_5ryjd4dk65x05; research advises, Architect rules)
+
+ADOPT fully: DOMAIN TOTALITY and STRUCTURAL ENFORCEMENT (sealed sum -> compile
+error) — exactly the sig-3 closure. DIVERGE on "keep classification an ACYCLIC
+pre-install prefix / factor only a causal-prefix-pure subset upstream": that
+presupposes the exact discriminator is causal-prefix-derivable, and it is NOT
+(the transport-destination fact genuinely needs post-install
+`aggregate_ownership` — the cycle `cb68866e5` proved by going phase-unstable and
+`e193dc631` proved by going unsound on a causal proxy). The DETERMINATION runs
+post-install; the "real frozen phase" is achieved by staging it AFTER
+`aggregate_ownership` over the total domain, not by pretending it is a
+pre-install prefix. If a genuine PRE-install consumer of the classification
+exists, research's shared-subset factoring applies to THAT consumer only — the
+ring names it or confirms none exists.
+
+### #3 ACCEPTANCE GATE — MEASURED three-way, not declared (Architect evt_6v4yp7arvd4f4 + evt_53s106a7btrb8; implementer three-way table evt_6trkwrt5gh7ge)
+
+Both `fs_read_at_malformed_offset_narrows_to_invalid_offset` and
+`fs_write_..._narrows_to_invalid_offset` are `#[ignore]`d on origin/main with
+DIFFERENT pre-existing debts; the candidate un-ignores both and asserts its fix
+closes them. The recut MUST NOT be DECLARED to close #3 on the mechanism story;
+it is MEASURED on the built candidate. Two measurements:
+
+- **(a)** fs_read/write's response is in (S_causal minus S_record) — instrument
+  the recut classify. **STATUS: strongly indicated, not yet positively
+  confirmed.** runtime-leader `evt_1fb7kkw4bbxv5` is decisive on the NEGATIVE
+  half only: the two historical `#[ignore]` reasons (read = "ExitCode::Failure
+  payload" trap; write = "closure-boundary-lane") are distinct from each other
+  and from the CURRENT shared signature (`PatternMatchFailure` / "no match case
+  ...ResourceBodyResult") failing IDENTICALLY on both — two different old debts
+  do not converge to one signature, so H_debt-reappearance is refuted and H_over
+  is strongly indicated. This is INDIRECT; the POSITIVE (a) instrumentation
+  rides the candidate.
+- **(b)** the domain-total post-install classify makes it Specialized AND that
+  Specialized lowering OBSERVES InvalidOffset (the un-ignored assertion), not
+  the ResourceBodyResult frontier trap — native run on the candidate.
+
+THREE-WAY DISPOSITION (the ring returns the measured branch WITH the candidate;
+nobody asserts #3 beforehand — all three need the built recut, so this is
+implementation-time, NOT a scope-release gate):
+
+- **(a) AND (b)** -> #3 CLOSED here; the two un-ignores RIDE this WP.
+- **(a) AND NOT (b)** -> over-admission was the immediate cause but the correct
+  classify still hits the frontier -> the InvalidOffset product is a SEPARATE
+  deliverable (RT-RESULT-CONTINUATION-BINDING-PROVENANCE territory); SPLIT via
+  re-`#[ignore]`, not a respin.
+- **NOT (a)** -> the response is not a coordinate-run source at all;
+  over-admission never touched it, the un-ignore surfaced independent
+  pre-existing debt -> SPLIT.
+
+Do not conflate — a recut that ships "green" while the stated deliverable
+silently isn't met is the failure this gate prevents.
+
+### SEAL x PARITY-DEBT — sealed-as-classified, never carve out (Architect evt_53s106a7btrb8)
+
+The domain-total seal (AC-8) is a STATIC classification-COMPLETENESS invariant
+(every reachable member gets a disposition; an UNCLASSIFIED member is a compile
+error), NOT a runtime-liveness invariant. Because Deferred is the TOTAL residual
+arm (routes to main's pre-WP lowering), every reachable member classifies as
+Specialized-with-owner OR Deferred by construction — there is no "unclassifiable"
+member, so the seal is ALWAYS satisfiable (worst case Deferred). Consequences,
+binding on the recut:
+
+- Sealing does NOT convert un-closeable native-parity debt into a compile error;
+  it converts an UNCLASSIFIED member (the sig-3 domain-bleed bug) into a compile
+  error. A member carrying genuine orthogonal runtime parity-debt classifies
+  fine (seal passes) and, if it still traps, fails at RUNTIME — surfaced by its
+  test, handled by re-`#[ignore]`/split at the (b) layer.
+- **Do NOT carve parity-debt members out of the seal.** Carving a reachable
+  member out IS the subset-domain gap that produced sig-3. Domain-totality means
+  NO reachable member sits outside the seal. The seal covers fs_read/write as
+  classified members in ALL THREE sig-3 branches; the (a)/(b) measurement
+  decides ride-vs-split at the runtime layer, never by shrinking the seal.
+
+### ACCEPTANCE (this recut)
+
+Retain the HS3-recut ACs 1-7 for the Specialized path. Add:
+
+- **AC-8 (domain-total seal; two distinct domains — keep separate).** The SEAL
+  DOMAIN is the WHOLE reachable response-Vis population (P1 no-unit UNION P2
+  transport-caller UNION Specialized); the §7 total match over
+  `Option<ResponseDisposition>` covers all of it, and an unclassified member is a
+  COMPILE error — this is what closes sig-3 (consumers key on disposition rows
+  over the whole population). The CONTEXT-ENTRY DOMAIN is has-K-unit (P2 UNION
+  Specialized) ONLY; a unit-less P1 structurally cannot get a
+  `PlannedContinuationContext` (it requires an enclosing_specialization) and must
+  not — P1 is sealed via the Deferred arm (disposition = P1-Deferred), never via
+  a context entry. The seal is STRICTLY WIDER than the context-entry set; that is
+  the design, not a gap, and conflating the two domains is the trap. Control: a
+  witness member outside the old owner-call subset classifies, and removing its
+  disposition arm REDS at COMPILE time, not at runtime.
+- **AC-9 (phase closedness preserved).** install and validate derive the
+  Deferred/Specialized determination from IDENTICAL finalized post-install state
+  (`aggregate_ownership`/transports); `validate_static_response_context_plan`
+  passes by same-state re-derivation, not a second independent computation.
+- **AC-10 (#3, conditional).** Per the #3 gate: (b) measured on the candidate;
+  if it fails, the two un-ignores are split out, not carried.
+- **AC-NO-REGRESSION.** Green across the transport-source population in CI (px8f
+  + rt_parity native shards), not just the modeled owner-call fixtures. Targeted
+  `scripts/ken-cargo` locally; whole-suite is CI's.
+
+Base: fresh from `origin/main` (current tip `4e5481c57`), NEW SHA. `e193dc631`
+dead.
 
 ## RECUT — HS3 structural closure: first-class Deferred residual (Architect ruling evt_5yjjsrhpmt204)
 
