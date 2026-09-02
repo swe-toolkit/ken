@@ -3913,33 +3913,62 @@ fn assert_d1_route_control_child() {
         ),
         other => panic!("unknown D1 route-control child mode: {other}"),
     };
-    let Differential { native, .. } = differential(case, entry);
-    let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-        native.terminal_error.as_ref()
-    else {
-        panic!("{mode}: expected typed frontier trap, got {native:?}");
-    };
-    assert_eq!(
-        provenance.trap.code,
-        ken_runtime::RuntimeTrapCode::PatternMatchFailure
-    );
-    assert!(
-        provenance
-            .trap
-            .message
-            .ends_with(&format!("::{expected_family}")),
-        "{mode}: expected {expected_family} frontier, got {}",
-        provenance.trap.message
-    );
-    assert_eq!(
-        native
-            .effect_trace
-            .iter()
-            .map(|event| event.operation)
-            .collect::<Vec<_>>(),
-        expected_effects,
-        "{mode}: route perturbation must preserve the pre-dispatch effect prefix"
-    );
+    let Differential { native, interpreted } = differential(case, entry);
+    // Relocation (Architect re-rule evt_2427xbynt1d2e, Q2). SSA response
+    // specialization statically supersedes the runtime route control for the
+    // routes it specializes, so a runtime route-control perturbation of a
+    // specialized route is INERT rather than reaching the ITree frontier. The
+    // property therefore relocates onto native's actual outcome versus the
+    // interpreter oracle, per-mode, with no assertion of an outcome that mode no
+    // longer produces:
+    //   - native traps  => the runtime route-control guard is still live for this
+    //     (unspecialized) route; assert the exact fail-closed frontier family and
+    //     pre-dispatch effect prefix, unchanged.
+    //   - native returns => the route is statically specialized, so the
+    //     perturbation is inert; native must then agree with the interpreter
+    //     oracle EXACTLY. A native NormalReturn that diverged from a trapping
+    //     interpreter would be arm (a) fail-open and fails here.
+    match native.terminal_error.as_ref() {
+        Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) => {
+            assert_eq!(
+                provenance.trap.code,
+                ken_runtime::RuntimeTrapCode::PatternMatchFailure
+            );
+            assert!(
+                provenance
+                    .trap
+                    .message
+                    .ends_with(&format!("::{expected_family}")),
+                "{mode}: expected {expected_family} frontier, got {}",
+                provenance.trap.message
+            );
+            assert_eq!(
+                native
+                    .effect_trace
+                    .iter()
+                    .map(|event| event.operation)
+                    .collect::<Vec<_>>(),
+                expected_effects,
+                "{mode}: route perturbation must preserve the pre-dispatch effect prefix"
+            );
+        }
+        _ => {
+            assert_eq!(
+                native.terminal_error, interpreted.terminal_error,
+                "{mode}: a specialized route's inert perturbation must match the \
+                 interpreter oracle's terminal outcome (a divergent NormalReturn is \
+                 arm (a) fail-open)"
+            );
+            assert_eq!(
+                native.exit_status, interpreted.exit_status,
+                "{mode}: specialized-route native/interpreter exit parity"
+            );
+            assert_eq!(
+                native.effect_trace, interpreted.effect_trace,
+                "{mode}: specialized-route native/interpreter complete-effect parity"
+            );
+        }
+    }
 }
 
 // Durable invariant. MEASURED: isolated mutation children replace each named

@@ -20,7 +20,7 @@ use super::continuations::{
 use super::occurrences::StaticOriginId;
 use super::semantic_ir::ConstructorIdentity;
 use super::{planner_capacity_error, planner_error, CraneliftBackendError, StaticTransitionPlan};
-use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol};
+use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) struct StaticResponseContinuationId(u32);
@@ -1186,15 +1186,24 @@ impl StaticTransitionPlan<'_> {
             if operation.is_some_and(|operation| route.operation != operation) {
                 continue;
             }
+            // Q1 (Architect re-rule evt_2427xbynt1d2e): classify the incoming K so
+            // a genuinely opaque/dynamic edge and a real-but-unspecialized edge no
+            // longer share one refusal. The K is the Vis's second argument; an
+            // opaque K is `RuntimeValue::Unknown` -- there is no static
+            // continuation to name and no existing (main) lowering path, so it is
+            // the typed fail-closed hard stop. Any other K is a real static
+            // continuation main already lowers.
+            let k_is_opaque = matches!(&args[1], RuntimeExpr::Value(RuntimeValue::Unknown));
             response_vis.push((
                 vis_origin,
                 operation_origin,
                 selected_operation_origin,
                 route,
+                k_is_opaque,
             ));
         }
         response_vis.sort_by_key(
-            |(vis_origin, operation_origin, selected_operation_origin, route)| {
+            |(vis_origin, operation_origin, selected_operation_origin, route, _k_is_opaque)| {
                 (
                     route.producer_call_origin,
                     *vis_origin,
@@ -1206,22 +1215,45 @@ impl StaticTransitionPlan<'_> {
         );
 
         let mut demands = Vec::new();
-        for (vis_origin, operation_root_origin, selected_operation_origin, route) in response_vis {
+        for (vis_origin, operation_root_origin, selected_operation_origin, route, k_is_opaque) in
+            response_vis
+        {
             let matching = units
                 .iter()
                 .filter(|unit| unit.producer_construct_origin() == vis_origin)
                 .collect::<Vec<_>>();
             if matching.is_empty() {
-                let owner = self.semantic.function_owner(vis_origin)?.ok_or_else(|| {
-                    planner_error("a dynamic response Vis has no predeclared source owner")
-                })?;
-                return Ok(Err(SsaInfeasible::at_vis(
-                    ContinuationEmissionOwner::Predeclared(owner),
-                    vis_origin,
-                    Some(route.producer_call_origin),
-                    "an incoming response edge carries an opaque or dynamic K",
-                )
-                .with_operation(route.operation)));
+                if k_is_opaque {
+                    // Category (i): a genuinely opaque/dynamic K (RuntimeValue::
+                    // Unknown) with no static continuation and no existing main
+                    // lowering path. This is the typed fail-closed hard stop and
+                    // is unchanged -- a runtime-closure dispatcher would be needed
+                    // to lower it, which this WP does not introduce.
+                    let owner = self.semantic.function_owner(vis_origin)?.ok_or_else(|| {
+                        planner_error("a dynamic response Vis has no predeclared source owner")
+                    })?;
+                    return Ok(Err(SsaInfeasible::at_vis(
+                        ContinuationEmissionOwner::Predeclared(owner),
+                        vis_origin,
+                        Some(route.producer_call_origin),
+                        "an incoming response edge carries an opaque or dynamic K",
+                    )
+                    .with_operation(route.operation)));
+                }
+                // Category (ii): a real static continuation this WP does not yet
+                // specialize (e.g. the deferred D3 CheckedIhCapturedEnvironment
+                // frontier). The SSA-specialization pass is an additive,
+                // behavior-preserving overlay -- main already lowers this Vis
+                // construct (it compiled and reached its runtime frontier before
+                // this WP existed), so decline the edge and emit no demand rather
+                // than aborting object emission. With no demand this Vis is absent
+                // from `static_response_continuations`, so every
+                // `is_static_response_*` predicate returns false for it and
+                // lowering routes it through the pre-existing (main) path,
+                // byte-for-behavior identical to main. No continuation unit was
+                // ever created for this Vis (matching is empty), so the pass has
+                // not diverted or consumed the edge before declining it.
+                continue;
             }
             for unit in matching {
                 let base_owner = ContinuationEmissionOwner::Specialization(unit.id());
