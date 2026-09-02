@@ -53,6 +53,49 @@ fn generated_record_index_reflexivity_closes_nested_top_field() {
 }
 
 #[test]
+fn generated_record_index_reflexivity_closes_nested_top_first_field() {
+    // Promise class: durable invariant. The first and second Sigma children are
+    // independent recursive dispatch sites; this fixture puts the closed List
+    // equality in the first field, complementing the second-field fixture above.
+    // MEASURED: a real dependent match whose first record field equality WHNFs
+    // to Top while the result depends on the variable second field. CLAIMED:
+    // generated evidence dispatches its first Sigma child through Eq/Sigma/Top.
+    // THE GAP: restoring only the first old recursive call is the independent
+    // causality mutation for this fixture.
+    let mut env = ElabEnv::new().expect("base env");
+    env.elaborate_decl("data GenFirstSeq = GenFirstMkSeq (List Nat) (List Nat)")
+        .expect("GenFirstSeq");
+    env.elaborate_decl(
+        "data GenFirstDerivation : GenFirstSeq -> Type where { \
+           GenFirstDeriv : (delta : List Nat) -> \
+             GenFirstDerivation (GenFirstMkSeq (Nil Nat) delta) \
+         }",
+    )
+    .expect("GenFirstDerivation");
+    env.elaborate_decl(
+        "data GenFirstWitness (delta : List Nat) : Type where { \
+           GenFirstMkWitness : GenFirstWitness delta \
+         }",
+    )
+    .expect("GenFirstWitness");
+
+    env.elaborate_decl(
+        "fn generated_nested_top_first \
+           (delta : List Nat) \
+           (derivation : GenFirstDerivation \
+             (GenFirstMkSeq (Nil Nat) delta)) \
+           : GenFirstWitness delta = \
+         match derivation { \
+           GenFirstDeriv actual_delta ↦ GenFirstMkWitness delta \
+         }",
+    )
+    .expect(
+        "generated reflexive record-index evidence must close when its first \
+         field's closed List equality reduces to Top",
+    );
+}
+
+#[test]
 fn bare_user_refl_on_top_level_top_remains_rejected() {
     // Promise class: durable invariant. Extensions may add generated-evidence
     // shapes, but bare user Refl remains accepted only for equality-origin
