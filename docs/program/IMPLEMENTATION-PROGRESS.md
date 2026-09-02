@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-02 20:56:11Z — from 518 issue file(s) in `docs/program/issues/`.
+2026-09-02 21:50:47Z — from 519 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -206,6 +206,7 @@ the committed file matches the generator's output.
 | `LANG-PRELUDE-ELABORATION-DEPTH` | Elaboration has an unstated stack requirement that exceeds Rust's 2 MiB spawned-thread default: every compilation elaborates the whole prelude, `elab.rs:997` measures ~115 KiB of headroom out of 2 MiB, and thirteen sites across four crates independently bumped their thread to 256 MiB without any stated rule -- so the rest of `37 §9` is a queue of prelude additions spending a margin nobody measures and no site states | merged | language | S | none | — |
 | `LANG-REACHABILITY-SUBSUMING-ARMS` | `ReachabilityError` carries only a span, so a redundant-arm diagnostic cannot say WHICH earlier arms subsume the dead arm -- the mirror of the gap `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` closed on the exhaustiveness side, except `34 §4.2` does NOT mandate it, so this is ergonomics and must not be filed or read as a conformance obligation | merged | language | M | none | — |
 | `LANG-RECORD-INDEX-REFINEMENT` | D2b predecessor, RESOLVED TO A KERNEL/TCB BINDER-HYGIENE FIX: eq_at_inductive (obs.rs:228) must weaken the accumulated nested-conjunction codomain past each newly bound proof (Term::sigma(conjunct, weaken(&acc, 1))), the same de Bruijn rule eq_at_sigma already uses. The elaborator transport hypothesis is FALSIFIED by measurement and reverts. OPERATOR-APPROVED 2026-09-01; released to the language ring as a kernel candidate under kernel QA + Architect TCB review. | merged | kernel | S | operator | https://github.com/swe-toolkit/ken/pull/3216 |
+| `LANG-RECORD-INDEX-SIGMA-CLOSURE` | D2b predecessor #2 (elaborator structural closure): record-index-equality CONSUMERS in the elaborator handle the Eq head but not its observational Sigma-decomposition. install_index_refinements peels only Term::Eq and falls through on the Sigma-shaped record-index equality, installing no per-component refinement (gamma->g0), so a dependent-inversion body needs fok_nth_form @14 (outer gamma) where the constructor-declared type says @10 (local g0). Fix the consumer to recursively project the Sigma into per-component refinements, AUDIT every such consumer for the same Eq-only gap, and close the class with a per-site regression fixture. Section-1b predicate named by the Architect (evt_2ptgr3f2ef7c4). | draft | language | M | none | — |
 | `LANG-RECORD-STACK-OVERFLOW` | The record-literal surface work aborts a real `ken-cli` native compilation with a stack overflow -- `mrc_4a_cross_crate_census_and_its_controls` SIGABRTs at every SHA of the arc including the one carrying the 143-line stack rework, so the rework is not the repair; the arc's own depth fixture never detected it because it builds match arms with `=>`, which is not a Ken token | merged | language | M | none | — |
 | `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` | The doc comment justifying LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT's -3120 saving says the pow10 cascade's arms are all bare literals, which the generator refutes -- only the True arms are, every False arm is the next nested match, and the innermost is an application; the conclusion survives, the recorded reason does not, and it misleads in both directions | merged | language | S | none | 2195 |
 | `LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN` | Ken's SCT termination checker traces a structural decrease only through a direct pattern match feeding the recursive call, so factoring a shared guard into a non-recursive helper reds NotTerminating -- forcing duplication at exactly the sites a checker wants one guard | draft | language | S | none | — |
@@ -609,6 +610,7 @@ is itself not yet `merged`/`closed`:
 - `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: ready)
 - `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `LANG-MOD-KENFMT-DECL-LAYOUT` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
+- `LANG-RECORD-INDEX-SIGMA-CLOSURE` blocked by `LANG-GENERATED-INDEX-EVIDENCE-CLOSURE` (status: ready)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: ready)
 - `PX10` blocked by `ABI-S5` (status: draft)
@@ -625,6 +627,7 @@ is itself not yet `merged`/`closed`:
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 - `V3-FO-EMBEDDING-ADEQUACY` blocked by `LANG-GENERATED-INDEX-EVIDENCE-CLOSURE` (status: ready)
+- `V3-FO-EMBEDDING-ADEQUACY` blocked by `LANG-RECORD-INDEX-SIGMA-CLOSURE` (status: draft)
 
 ## Gate progress
 
