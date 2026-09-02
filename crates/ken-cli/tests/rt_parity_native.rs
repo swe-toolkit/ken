@@ -175,19 +175,27 @@ proc rt_read_offset_stage (cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-(withResource AFull Unit Unit cap (bytes_encode "source")
-  ResourceRead rt_read_offset_file)
-(\_first. rt_read_offset_second cap)
+(Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+(withBuffer AFull Unit Unit (1 : Int) rt_body_ok)
+(\gate. rt_read_offset_branch cap gate)
 
-proc rt_read_offset_second (cap : Cap AFull)
+proc rt_read_offset_branch (cap : Cap AFull)
+  (gate : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-(withResource AFull Unit Unit cap (bytes_encode "source")
-  ResourceRead rt_read_offset_file)
-(\outcome. rt_bracket_done outcome)
+  match gate {
+Ok bracket |-> bind (Coproduct (FSOp AFull) AmbientOp)
+  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+  (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+  (withResource AFull Unit Unit cap (bytes_encode "source")
+    ResourceRead rt_read_offset_file)
+  (\outcome. rt_bracket_done outcome);
+Err error |-> bind (Coproduct (FSOp AFull) AmbientOp)
+  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+  (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+  (withResource AFull Unit Unit cap (bytes_encode "source")
+    ResourceRead rt_read_offset_file)
+  (\outcome. rt_bracket_done outcome)
+  }
 
 proc rt_read_window_body (file : Resource FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
@@ -1599,34 +1607,57 @@ fn static_response_full_demand_population_controls_reach_red_and_restore() {
             drop(restored_root);
         }
 
-        for (entry, population, cases) in [
-            (
-                "rt_read_offset_stage",
-                (29usize, 19usize),
-                [
-                    ("drop-capture", Mutation::DropEveryCapture, 29usize),
-                    ("permute-capture", Mutation::PermuteEveryCapture, 29usize),
-                    ("vary-capture", Mutation::VaryEveryCapture, 29usize),
-                    ("drop-input", Mutation::DropEveryContinuationInput, 19usize),
-                    ("permute-input", Mutation::PermuteEveryContinuationInput, 19usize),
-                    ("vary-input", Mutation::VaryEveryContinuationInput, 19usize),
-                ],
-            ),
-            (
-                "rt_write_writable_stage",
-                (62usize, 44usize),
-                [
-                    ("drop-capture", Mutation::DropEveryCapture, 62usize),
-                    ("permute-capture", Mutation::PermuteEveryCapture, 62usize),
-                    ("vary-capture", Mutation::VaryEveryCapture, 62usize),
-                    ("drop-input", Mutation::DropEveryContinuationInput, 44usize),
-                    ("permute-input", Mutation::PermuteEveryContinuationInput, 44usize),
-                    ("vary-input", Mutation::VaryEveryContinuationInput, 44usize),
-                ],
-            ),
+        for (entry, baseline_diag) in [
+            ("rt_read_offset_stage", &read[0]),
+            ("rt_write_writable_stage", &write[0]),
         ] {
-            assert!(population.0 > 0 && population.1 > 0);
-            for (label, mutation, expected_applications) in cases {
+            // RECUT 2 HS6 (ii)-redesign 2nd extension (Architect evt_bk6vky2pkncy):
+            // DE-BAKE the (29,19)/(62,44) capture/input census -- stale native
+            // constants the owner-add invalidated. The DropEvery{Capture,Input}
+            // mutations apply in the phase-A classify to the FULL has-K-unit demand
+            // population (Specialized UNION P2-Deferred), so `applications` counts
+            // captures/inputs across BOTH. Derive the expected totals from the
+            // baseline diagnostic: Specialized counts from all_static_response_rows,
+            // P2-Deferred counts from the extended Deferred fields (P1 contributes
+            // 0 -- no demand, correctly excluded). `applications == derived sum` is a
+            // cross-check of two independent derivations (mutation reach vs. observed
+            // population), NOT derive-from-actual, and no native count is baked back.
+            let expected_captures: usize = baseline_diag
+                .all_static_response_rows
+                .iter()
+                .map(|row| row.captures.len())
+                .sum::<usize>()
+                + baseline_diag
+                    .static_response_deferred
+                    .iter()
+                    .map(|row| row.capture_count)
+                    .sum::<usize>();
+            let expected_inputs: usize = baseline_diag
+                .all_static_response_rows
+                .iter()
+                .map(|row| row.continuation_inputs.len())
+                .sum::<usize>()
+                + baseline_diag
+                    .static_response_deferred
+                    .iter()
+                    .map(|row| row.continuation_input_count)
+                    .sum::<usize>();
+            assert!(
+                expected_captures > 0 && expected_inputs > 0,
+                "{entry}: capture/input census population must be non-empty"
+            );
+            for (label, mutation, expected_applications) in [
+                ("drop-capture", Mutation::DropEveryCapture, expected_captures),
+                ("permute-capture", Mutation::PermuteEveryCapture, expected_captures),
+                ("vary-capture", Mutation::VaryEveryCapture, expected_captures),
+                ("drop-input", Mutation::DropEveryContinuationInput, expected_inputs),
+                (
+                    "permute-input",
+                    Mutation::PermuteEveryContinuationInput,
+                    expected_inputs,
+                ),
+                ("vary-input", Mutation::VaryEveryContinuationInput, expected_inputs),
+            ] {
                 let ((_root, (result, diagnostics)), applications) =
                     ken_runtime::with_static_response_context_demand_mutation(mutation, || {
                         compile(entry, label)

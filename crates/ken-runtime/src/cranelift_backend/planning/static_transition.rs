@@ -981,6 +981,12 @@ pub struct DeferredResponseObservation {
     pub operation: String,
     /// "NoContinuationUnit" (P1) or "UnconsumedTransportCaller" (P2).
     pub sub_case: String,
+    /// The K's capture / continuation-input counts (P2 from the demand, P1 zero).
+    /// Lets the census control cross-check the DropEvery mutation's reach against
+    /// the FULL has-K-unit demand population (RECUT 2 HS6 (ii)-redesign 2nd
+    /// extension): the P2 Deferred demands' counts are observable only here.
+    pub capture_count: usize,
+    pub continuation_input_count: usize,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1115,6 +1121,8 @@ fn record_static_response_feasibility_diagnostic(
             effect_origin: row.effect_origin().0,
             operation: format!("{:?}", row.operation()),
             sub_case: format!("{:?}", row.sub_case()),
+            capture_count: row.capture_count(),
+            continuation_input_count: row.continuation_input_count(),
         })
         .collect();
     STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
