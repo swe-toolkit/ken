@@ -90,8 +90,9 @@ pub(in crate::cranelift_backend) use responses::{
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use responses::{
-    static_response_context_demand_mutation_is_exact,
-    with_static_response_context_demand_mutation, StaticResponseContextDemandMutation,
+    force_specialize_deferred_response_is_exact, static_response_context_demand_mutation_is_exact,
+    with_force_specialize_deferred_response, with_static_response_context_demand_mutation,
+    StaticResponseContextDemandMutation,
 };
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,
