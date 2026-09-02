@@ -19,7 +19,42 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
    field equalities — keyed on the index equality's representation rather than
    the derivation relation.
 
-> # D2b RE-FROZEN 2026-09-01 (HS3) — behind a FOURTH elaborator predecessor
+> # D2b RE-RELEASED 2026-09-02 — fourth predecessor landed, consumer probe green
+>
+> **This banner supersedes the RE-FROZEN banner below.** The fourth predecessor
+> [[LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE]] MERGED: exact candidate
+> `361ad044` landed as squash `0202018065ee460cd3ec3d38ee2b9d83e13e86bd` on
+> `main`, full CI green, all three routed blobs byte-identical, node `merged`
+> (PR #3228, M7 closure `e93210c4`). A route-integrity STOP from the lieutenant
+> (a `7bc920a4` tree from the PRIOR predecessor `a3ded668d`, not this candidate)
+> was adjudicated: candidate `361ad044` tree `94b6fcb5` landed verbatim.
+>
+> **Consumer probe GREEN on the merged tree.** The generic context-telescope
+> acceptance test
+> (`crates/ken-elaborator/tests/dependent_match_context_telescope_acceptance.rs`,
+> blob `97b13750` on `main`) carries the mandated pins — the unconvoyed positive
+> `captured_env_follows_fin_index_refinement_under_match` (the original red shape
+> now elaborates), the manually-convoyed positive oracle, the one-site-mutation
+> REDs, the dependent-let member, and the AST inspection proving the three-deep
+> `xs'/h'/z'` convoy telescope is carried in the motive, every method, and the
+> final application in dependency order. It passed in the merge's full CI. This is
+> the SAME standard as the 2026-09-01 re-release (predecessor generic acceptance
+> test green on the merged tree); the actual FoKripke un-convoying is the ring's
+> fold work below, not this gate. Basis: test identity + required pins verified by
+> the Steward against `origin/main`; green established by the merge's full CI
+> (local rerun withheld — CI owns workspace closure and this box's RAM was at
+> ~1.6Gi available; forcing a local elaborator build risked an OOM-SIGKILL).
+>
+> **RE-RELEASED to the language ring 2026-09-02 from `bf8f37326`.** The ring now
+> rebases/folds the held spine `70a291a96` and continues the EXACT unchanged
+> adequacy theorem, past the `fok_coh_extend` captured-context-telescope stop the
+> fourth predecessor cleared. Constraints still bind: do NOT re-index
+> `FokDerivation`, add a Nat sequent code, split the record into List indices, or
+> touch `fok_derives`/`fok_classically_valid`. If the fold hits a genuinely new
+> elimination stop, that is a FIFTH predecessor hard stop — reset clean, measure,
+> route to the Steward; do not source-convoy it permanently.
+>
+> # D2b RE-FROZEN 2026-09-01 (HS3) — behind a FOURTH elaborator predecessor (history)
 >
 > **This banner supersedes the RE-RELEASED banner below.** After the two
 > predecessors landed and D2b was re-released, the proof advanced (spine folded,

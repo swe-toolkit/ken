@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-02 03:45:37Z — from 516 issue file(s) in `docs/program/issues/`.
+2026-09-02 04:10:12Z — from 517 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -66,6 +66,7 @@ the committed file matches the generator's output.
 | `CAT-EXPORT-CENSUS-DERIVES-LOADER-PREDICATE` | Derive the export-census population from the loader's own publication predicate instead of a parallel hand-maintained Decl match, so the exactly-six equality control cannot silently narrow as new publishable declaration kinds are added. | closed | foundation | S | none | — |
 | `CAT-GCD-REFACTOR` | Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last) | merged | foundation | S | none | — |
 | `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | merged | foundation | M | none | — |
+| `CAT-LAWFULFUNCTORS-STANDALONE-IMPORT` | Bring Core/Classes/LawfulFunctors.ken.md to standalone-clean by adding the single missing import of list_append from Data.Collections.Derived — the provider is now pub and standalone-clean, no cycle, no chained prerequisite, so this removes LawfulFunctors from the census standalone-failure set with one import line. It does NOT do the deferred law-carrying list_map/list_foldr reuse migration. | ready | foundation | S | none | — |
 | `CAT-MAP-DEPENDENCY-CLOSURE-REPAIR` | Repair the Map package's dependency closure so Data/Collections/Map.ken.md elaborates from its own declared imports rather than relying on the map_build_acceptance.rs fixture to preload Compare/Transport/Derived/Or and to resolve undeclared list_append. | draft | foundation | unsized | none | — |
 | `CAT-NAT-REUSE-CONSUMERS` | Catalog-reuse rework, first scoped batch: the nine unblocked low-risk Nat arithmetic/order consumer duplicates from the census (groups 2 and 3), across six packages — each package imports add/leq_nat/sub/min from its canonical owner and drops the local reimplementation, one independently-releasable increment per package | merged | foundation | M | none | — |
 | `CAT-ORD-LEQ-PUB-EXPORT` | Export ord_leq_at as pub from Core.Classes.LawfulClasses so the group-5 ordered-list consumers can import the canonical dictionary-projection wrapper instead of reimplementing it. | merged | foundation | S | none | — |
@@ -561,6 +562,7 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `ABI-M1` — manifest v2 — family-scoped, versioned, generated from family schemas
+- `CAT-LAWFULFUNCTORS-STANDALONE-IMPORT` — Bring Core/Classes/LawfulFunctors.ken.md to standalone-clean by adding the single missing import of list_append from Data.Collections.Derived — the provider is now pub and standalone-clean, no cycle, no chained prerequisite, so this removes LawfulFunctors from the census standalone-failure set with one import line. It does NOT do the deferred law-carrying list_map/list_foldr reuse migration.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
