@@ -22,7 +22,7 @@ fn dependency_env() -> ElabEnv {
     catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
     env.elaborate_ken_md_file(BYTES_KEYS)
         .expect("Data.Binary.BytesKeys must elaborate before the Nat-order closure");
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS)
         .expect("Core.Classes.LawfulFunctors must elaborate");
     env

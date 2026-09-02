@@ -12,9 +12,14 @@ const LAWFUL_FUNCTORS_KEN_MD: &str =
 
 fn mk_env_with_lawful_functors() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
+    // LawfulFunctors now declares real imports — `Data.Collections.Derived
+    // (list_append)` and `Core.Logic.Transport (cong, sym, trans)` — after the
+    // list_append attached-proof migration. Keep Derived importable (clearing
+    // the bare `list_append` alias so the real selective import installs it) and
+    // let Transport resolve through Compare's loaded closure, rather than the
+    // legacy flat-exposure fixture that predated LawfulFunctors having imports.
     catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
         .expect("catalog/packages/Core/Classes/LawfulFunctors.ken.md must elaborate");
     env

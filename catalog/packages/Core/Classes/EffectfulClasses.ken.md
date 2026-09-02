@@ -559,9 +559,10 @@ proof assoc for list_bind
   }
 ```
 
-`ap_id`/`ap_hom`/`map_coh` for `List` compose with the
-`list_append::right_unit`/`list_map::id` (`Core/Classes/LawfulFunctors.ken`) — zero new
-induction needed for any of the three:
+`ap_id`/`ap_hom`/`map_coh` for `List` compose with
+`list_append::right_unit` (`Data/Collections/Derived.ken`) and `list_map::id`
+(`Core/Classes/LawfulFunctors.ken`) — zero new induction needed for any of the
+three:
 
 ```ken
 theorem list_ap_id

@@ -33,6 +33,10 @@ ergonomic mappend operation, written as a plain identifier field. `assoc` is
 a propositional equation in `Omega`.
 
 ```ken
+import Data.Collections.Derived (list_append)
+
+import Core.Logic.Transport (cong, sym, trans)
+
 class Semigroup a {
   op : a → a → a;
   assoc : (x : a) → (y : a) → (z : a) → Equal a (op (op x y) z) (op x (op y z))
@@ -76,64 +80,16 @@ parametric-head instance.
 
 ### 4.1 The `List` append monoid — the canonical inductive carrier
 
-`op = list_append`, `mempty = Nil`. The three laws and the `Monoid` instance
-are generic in `a`: `instance Monoid (List a)` elaborates as
-`(a : Type) → Monoid (List a)`, and its law fields use generic list proofs
-rather than re-proving them at a closed carrier.
-
-Left unit is DEFINITIONAL: `list_append Nil x` iota-reduces to `x` by
-append's first match arm, so the goal `Equal (List a) x x` stays `Eq`-shaped
-over the neutral `x` — closed by `Refl`. Assoc is proved by induction on the
-first list: base (`Nil`) both sides reduce to the NEUTRAL
-`list_append a ys zs`, still `Eq`-shaped, `Refl`; step (`Cons h t`) lifts the
-tail IH under `Cons a h` with `cong`. Right unit is proved by induction on
-the list: base (`Nil`) both sides reduce to the CONSTRUCTOR `Nil a`, which
-observationally collapses to `Top` (the same nullary constructor) — so
-the goal is no longer `Eq`-shaped and `Refl` does not apply; it is
-`Top`-introduced by `Proved` (the exact `Proved`-vs-`Refl` discrimination
-constructor-headed endpoints give `Top` and `Proved`, while neutral endpoints
-remain stuck `Eq` goals and use `Refl`; step
-(`Cons h t`) is `cong` under `Cons a h` on the tail IH.
+`op = list_append`, `mempty = Nil`. The three monoid laws are the
+function-level append laws `list_append::{left_unit, assoc, right_unit}`,
+proved beside `list_append` in `Data.Collections.Derived` (§4.1) and imported
+here — an attached proof `f::law` belongs to the module that defines `f`, so
+these laws live with `list_append`, not with the class. `instance Monoid
+(List a)` is generic in `a`: it elaborates as `(a : Type) → Monoid (List a)`,
+and its law fields discharge the class obligations by citing the imported
+function-level proofs rather than re-deriving them at a closed carrier.
 
 ```ken
-proof left_unit for list_append
-      (a : Type) (xs : List a)
-    : Equal (List a) (list_append a (Nil a) xs) xs =
-  Refl
-
-proof assoc for list_append
-      (a : Type) (xs : List a) (ys : List a) (zs : List a)
-    : Equal
-        (List a)
-        (list_append a (list_append a xs ys) zs)
-        (list_append a xs (list_append a ys zs)) =
-  match xs {
-    Nil ↦ Refl;
-    Cons h t ↦
-      cong
-        (List a)
-        (List a)
-        (list_append a (list_append a t ys) zs)
-        (list_append a t (list_append a ys zs))
-        (Cons a h)
-        ((proof assoc for list_append) a t ys zs)
-  }
-
-proof right_unit for list_append
-      (a : Type) (xs : List a)
-    : Equal (List a) (list_append a xs (Nil a)) xs =
-  match xs {
-    Nil ↦ Proved;
-    Cons h t ↦
-      cong
-        (List a)
-        (List a)
-        (list_append a t (Nil a))
-        t
-        (Cons a h)
-        ((proof right_unit for list_append) a t)
-  }
-
 instance Semigroup (List Nat) {
   op = list_append Nat;
   assoc = proof assoc for list_append Nat
