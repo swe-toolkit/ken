@@ -1137,22 +1137,46 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
             let diagnostic = diagnostics.into_iter().next().unwrap();
             assert_eq!(diagnostic.static_response_infeasible, None);
             assert_eq!(diagnostic.all_static_response_infeasible, None);
+            // RECUT 2 HS6 #2 (A)-refined (Architect evt_27hj9nxevvjyr): TOTALITY +
+            // sub-case oracle. The BufferAllocate response is in EXACTLY ONE column.
+            // The read product specializes it (owner + ABI, pinned below); the write
+            // product's BufferAllocate K is the closure-boundary transport source, so
+            // the recut correctly DEFERS it. The sub-case UnconsumedTransportCaller is
+            // phase B's own correctness label (assigned ONLY to a transport source),
+            // so it is the classification's correctness oracle over the fixture-known
+            // population -- not a value derived from what the code emitted. The
+            // Deferred member's context id is deliberately NOT pinned: it is the one
+            // native value that would otherwise be an ungrounded guess.
+            let specialized_buffer = &diagnostic.static_response_rows;
+            let deferred_buffer = diagnostic
+                .static_response_deferred
+                .iter()
+                .filter(|row| row.operation == "BufferAllocate")
+                .collect::<Vec<_>>();
             assert_eq!(
-                diagnostic.static_response_rows.len(),
+                specialized_buffer.len() + deferred_buffer.len(),
                 1,
-                "one BufferAllocate response row is expected"
+                "exactly one BufferAllocate response, in exactly one column \
+                 (Specialized={specialized_buffer:?}, Deferred={deferred_buffer:?})",
             );
-            let buffer = &diagnostic.static_response_rows[0];
-            assert_eq!(buffer.operation, "BufferAllocate");
-            assert_eq!(
-                diagnostic
-                    .all_static_response_rows
-                    .iter()
-                    .filter(|row| row.operation == "BufferAllocate")
-                    .collect::<Vec<_>>(),
-                vec![buffer],
-                "the filtered row must be the same authority as the all-producer row"
-            );
+            if let Some(buffer) = specialized_buffer.first() {
+                assert_eq!(buffer.operation, "BufferAllocate");
+                assert_eq!(
+                    diagnostic
+                        .all_static_response_rows
+                        .iter()
+                        .filter(|row| row.operation == "BufferAllocate")
+                        .collect::<Vec<_>>(),
+                    vec![buffer],
+                    "the filtered row must be the same authority as the all-producer row"
+                );
+            } else {
+                assert_eq!(
+                    deferred_buffer[0].sub_case, "UnconsumedTransportCaller",
+                    "write-BufferAllocate's K is a checked-IH environment transport source, so \
+                     the recut correctly Defers it (the (a) correctness oracle)"
+                );
+            }
             assert_eq!(
                 diagnostic.static_response_owners.len(),
                 diagnostic.all_static_response_rows.len(),
@@ -1256,21 +1280,15 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
         assert_eq!(
             summary(&write),
             vec![
+                // RECUT 2 HS6 #2 (A)-refined: write-BufferAllocate is correctly
+                // Deferred (its K is the closure-boundary transport source), so it is
+                // NO LONGER a Specialized row here -- asserted in the Deferred column
+                // via its UnconsumedTransportCaller sub-case above. The remaining
+                // Specialized rows are unchanged: phase A mints the same has-K demand
+                // population, and BufferAllocate reused causal context 0 (preexisting),
+                // so deferring it removes only its owner, not any appended context id.
                 ("FsWriteAt", 126, 124, 1043, 1, 993, 979, 2, false, 13, 9),
                 ("FsReadAt", 139, 137, 1107, 0, 1087, 1075, 3, false, 11, 9),
-                (
-                    "BufferAllocate",
-                    151,
-                    149,
-                    1250,
-                    3,
-                    1246,
-                    1238,
-                    0,
-                    true,
-                    7,
-                    6
-                ),
                 (
                     "ResourceRelease",
                     159,
