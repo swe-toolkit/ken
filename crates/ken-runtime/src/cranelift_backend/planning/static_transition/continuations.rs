@@ -1642,6 +1642,29 @@ impl<'plan> ContinuationUnitView<'plan> {
         })
     }
 
+    /// The ordered input projection before stage-2 availability stamping.
+    ///
+    /// Planner passes that create additional ordinary contexts need the typed
+    /// coordinate/schema authority before the complete context population exists;
+    /// they must not weaken the public publication gate by fabricating finalized
+    /// availability. This accessor rechecks the installed specialization ABI's
+    /// identity fields and exposes only the immutable projection records.
+    pub(super) fn prefinalization_continuation_inputs(
+        &self,
+    ) -> Result<&'plan [ContinuationInputProjection], CraneliftBackendError> {
+        for (projection, authority) in self.key.continuation_inputs.iter().zip(self.inputs) {
+            if projection.ordinal != authority.ordinal
+                || abi::AbiContinuationInputProvenance::of(projection.coordinate)
+                    != authority.provenance
+            {
+                return Err(planner_error(
+                    "a continuation input projection disagrees with its validated ABI input authority",
+                ));
+            }
+        }
+        Ok(&self.key.continuation_inputs)
+    }
+
     /// **The ordered continuation inputs**, re-exposed from the immutable key
     /// and recompared against the validated ABI input authority.
     ///
@@ -6607,14 +6630,26 @@ pub(super) fn validate_continuation_specialization_plan(
     for context in &mut landed_contexts {
         context.finalized_availability.clear();
     }
+    // CP2 preserves this derivation as an exact causal prefix. The response
+    // suffix is not admitted by weakening this equality: its own validator
+    // independently re-derives the union and checks the complete installed
+    // context/continuation plane immediately below.
+    let causal_contexts_match = if plan.static_response_plan_installed {
+        landed_contexts.get(..expected_contexts.len()) == Some(expected_contexts.as_slice())
+    } else {
+        landed_contexts == expected_contexts
+    };
     if landed_units != expected_units
         || plan.continuation_specialization_calls != expected_calls
         || plan.required_consumer_projections != expected_required_consumers
-        || landed_contexts != expected_contexts
+        || !causal_contexts_match
     {
         return Err(planner_error(
             "continuation specialization plan is not the exact closed derivation",
         ));
+    }
+    if plan.static_response_plan_installed {
+        plan.validate_static_response_context_plan(&expected_contexts)?;
     }
     Ok(())
 }

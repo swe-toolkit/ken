@@ -1110,7 +1110,7 @@ impl<'a> Lowering<'a> {
                                 };
                                 if let Some(environment) = materialized {
                                     SourceMachineState::Value {
-                                        value: RoutedAnswer::direct(environment),
+                                        value: RoutedAnswer::direct(environment.into_operand()),
                                         control,
                                     }
                                 } else {
@@ -1688,18 +1688,12 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         ));
                                     }
                                     let environment = self
-                                        .call_checked_ih_transport_from_case_environment(
+                                        .checked_ih_captured_environment_from_case_environment(
                                             builder,
                                             &transport,
                                             &env,
                                         )?;
-                                    if !matches!(&environment, LoweringOperand::Carried(_)) {
-                                        return Err(unsupported(
-                                            "CheckedIhEnvironmentTransport",
-                                            "the source-machine transport did not yield an environment carrier word",
-                                        ));
-                                    }
-                                    lowered[position] = environment;
+                                    lowered[position] = environment.into_operand();
                                 }
                                 let constructed = if lowered.iter().any(|field| {
                                     matches!(field, LoweringOperand::Carried(_))
@@ -4147,8 +4141,10 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         control: SourceControl<'b>,
     ) -> Result<SourceCallOutcome<'b>, CraneliftBackendError> {
         // Generated-entry admission validates current consumer-call arrival C
-        // here. Test support retains C's role through later transport selection;
-        // production authority independently reopens I's certificate E/S.
+        // here. The governed projection is retained only as compiler control so
+        // the later transport consumer can exhaustively select Direct versus
+        // Tail without a runtime discriminator.
+        let mut current_checked_ih_projection = None;
         #[cfg(feature = "px8-ds-test-support")]
         let mut current_forward_ret_role_witness = None;
         // Total generated-entry admission, before `specialized_at` and every
@@ -4287,6 +4283,16 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             callee_origin,
                             &projection,
                         )?;
+                    }
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if mutation
+                        != CheckedIhGeneratedEntryArrivalMutation::GovernedThroughNonGoverned
+                    {
+                        current_checked_ih_projection = Some((projection, pending, callee_origin));
+                    }
+                    #[cfg(not(feature = "px8-ds-test-support"))]
+                    {
+                        current_checked_ih_projection = Some((projection, pending, callee_origin));
                     }
                 }
             }
@@ -4463,37 +4469,135 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             proof,
                         );
                     }
-                    let _forward_ret_authority = match forward_ret_outcome {
-                        ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
-                            Some(authority)
+                    // Non-governed current calls may still select a transport
+                    // whose source-specific certificate is Tail. They retain
+                    // the existing producer path; only a validated governed
+                    // Direct projection activates the new call emitter.
+                    if current_checked_ih_projection.is_none() {
+                        let _forward_ret_authority = match forward_ret_outcome {
+                            ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
+                                Some(authority)
+                            }
+                            ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
+                                self.pending_computational_ih_call.take();
+                                let environment = self
+                                    .checked_ih_captured_environment_from_case_environment(
+                                        builder,
+                                        &transport,
+                                        &env,
+                                    )?;
+                                return Ok(SourceCallOutcome::Continue(
+                                    SourceMachineState::Value {
+                                        value: RoutedAnswer::checked(environment.into_operand()),
+                                        control,
+                                    },
+                                ));
+                            }
+                            #[cfg(feature = "px8-ds-test-support")]
+                            ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
+                                None
+                            }
+                            #[cfg(feature = "px8-ds-test-support")]
+                            ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                                return Err(unsupported(
+                                    "ComposedReturnForwardRetAuthority",
+                                    "a validated Tail producer-to-Ret route has no exact post-selection authority",
+                                ));
+                            }
+                            #[cfg(feature = "px8-ds-test-support")]
+                            ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                                return Err(unsupported(
+                                    "ComposedReturnForwardRetAuthority",
+                                    "a validated Tail producer-to-Ret route formed more than one post-selection authority",
+                                ));
+                            }
+                        };
+                        self.pending_computational_ih_call.take();
+                        let result = self.call_tail_checked_ih_transport_from_case_environment(
+                            builder, &transport, &env,
+                        )?;
+                        return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
+                            value: RoutedAnswer::checked(result),
+                            control,
+                        }));
+                    }
+                    let (projection, pending, callee_origin) = current_checked_ih_projection
+                        .take()
+                        .expect("the governed route projection was checked above");
+                    let routed_answer = match projection.fresh_result_route() {
+                        CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {
+                            match forward_ret_outcome {
+                                ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {}
+                                ComposedReturnForwardRetAuthorityOutcome::Formed(_) => {
+                                    return Err(unsupported(
+                                        "CheckedIhApplicationResult",
+                                        "a Direct route unexpectedly formed Tail forward-Ret authority",
+                                    ));
+                                }
+                                #[cfg(feature = "px8-ds-test-support")]
+                                ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness
+                                | ComposedReturnForwardRetAuthorityOutcome::MissingRequired
+                                | ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                                    return Err(unsupported(
+                                        "CheckedIhApplicationResult",
+                                        "a Direct route reached a test-only Tail authority outcome",
+                                    ));
+                                }
+                            }
+                            self.pending_computational_ih_call.take();
+                            self.call_direct_checked_ih_transport_from_case_environment(
+                                builder,
+                                &transport,
+                                &projection,
+                                pending,
+                                callee_origin,
+                                &env,
+                            )?
+                            .into_routed_answer()
                         }
-                        ComposedReturnForwardRetAuthorityOutcome::NonApplicable => None,
-                        #[cfg(feature = "px8-ds-test-support")]
-                        ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => None,
-                        #[cfg(feature = "px8-ds-test-support")]
-                        ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
-                            return Err(unsupported(
-                                "ComposedReturnForwardRetAuthority",
-                                "a validated Tail producer-to-Ret route has no exact post-selection authority",
-                            ));
-                        }
-                        #[cfg(feature = "px8-ds-test-support")]
-                        ComposedReturnForwardRetAuthorityOutcome::Duplicated(
-                            _first,
-                            _duplicate,
-                        ) => {
-                            return Err(unsupported(
-                                "ComposedReturnForwardRetAuthority",
-                                "a validated Tail producer-to-Ret route formed more than one post-selection authority",
-                            ));
+                        CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
+                            let _forward_ret_authority = match forward_ret_outcome {
+                                ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
+                                    Some(authority)
+                                }
+                                ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
+                                    return Err(unsupported(
+                                        "ComposedReturnForwardRetAuthority",
+                                        "a validated Tail producer-to-Ret route has no exact post-selection authority",
+                                    ));
+                                }
+                                #[cfg(feature = "px8-ds-test-support")]
+                                ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
+                                    None
+                                }
+                                #[cfg(feature = "px8-ds-test-support")]
+                                ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                                    return Err(unsupported(
+                                        "ComposedReturnForwardRetAuthority",
+                                        "a validated Tail producer-to-Ret route has no exact post-selection authority",
+                                    ));
+                                }
+                                #[cfg(feature = "px8-ds-test-support")]
+                                ComposedReturnForwardRetAuthorityOutcome::Duplicated(
+                                    _first,
+                                    _duplicate,
+                                ) => {
+                                    return Err(unsupported(
+                                        "ComposedReturnForwardRetAuthority",
+                                        "a validated Tail producer-to-Ret route formed more than one post-selection authority",
+                                    ));
+                                }
+                            };
+                            self.pending_computational_ih_call.take();
+                            RoutedAnswer::checked(
+                                self.call_tail_checked_ih_transport_from_case_environment(
+                                    builder, &transport, &env,
+                                )?,
+                            )
                         }
                     };
-                    self.pending_computational_ih_call.take();
-                    let returned = self.call_checked_ih_transport_from_case_environment(
-                        builder, &transport, &env,
-                    )?;
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
-                        value: RoutedAnswer::checked(returned),
+                        value: routed_answer,
                         control,
                     }));
                 }

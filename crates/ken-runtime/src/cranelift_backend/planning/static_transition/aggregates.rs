@@ -768,6 +768,22 @@ impl CheckedIhGeneratedEntryProjection {
         ) == (invocation_origin, call_origin, callee_origin)
     }
 
+    /// Whether the Direct route's governed application source is exactly the
+    /// generated-entry arrival validated by lowering. Tail intentionally
+    /// answers false because its producer source is an earlier application.
+    pub(in crate::cranelift_backend) fn direct_source_matches_governed_arrival(&self) -> bool {
+        match &self.fresh_result_route {
+            CheckedIhFreshResultRoute::DirectInvocationReturn { source, .. } => {
+                source.invocation_origin == self.arrival.invocation_origin
+                    && source.call_origin == self.arrival.call_origin
+                    && source.callee_origin == self.arrival.callee_origin
+                    && source.binding == self.arrival.binding
+                    && source.immediate_k_locator == self.arrival.immediate_k_locator
+            }
+            CheckedIhFreshResultRoute::TailProducerToRet { .. } => false,
+        }
+    }
+
     pub(in crate::cranelift_backend) fn fresh_result_route(&self) -> &CheckedIhFreshResultRoute {
         &self.fresh_result_route
     }

@@ -2197,6 +2197,15 @@ impl<'a> Lowering<'a> {
         static_origin: StaticOriginId,
         env: &[LoweringEnvironmentBinding],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        if self.function_local.static_response_owner.is_none()
+            && self
+                .static_transition_plan
+                .is_static_response_effect(static_origin)
+        {
+            return Ok(LoweringOperand::Specialized(
+                Lowered::StaticResponseDeferred,
+            ));
+        }
         if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation) {
             // `RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the SECOND refusal site, and
             // the same question as the seat's.
