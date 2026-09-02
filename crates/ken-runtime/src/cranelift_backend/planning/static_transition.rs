@@ -955,6 +955,19 @@ pub struct StaticResponseOwnerObservation {
     pub slots: Vec<(String, u32)>,
 }
 
+/// One `Deferred` residual row observed for AC-1 congruence and AC-4/AC-5/AC-7
+/// controls (recut amendment `evt_4ar3rxzrra5v4`).
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeferredResponseObservation {
+    pub vis_origin: u32,
+    pub operation_root_origin: u32,
+    pub effect_origin: u32,
+    pub operation: String,
+    /// "NoContinuationUnit" (P1) or "UnconsumedTransportCaller" (P2).
+    pub sub_case: String,
+}
+
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StaticResponseFeasibilityDiagnostic {
@@ -963,6 +976,10 @@ pub struct StaticResponseFeasibilityDiagnostic {
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub all_static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub static_response_owners: Vec<StaticResponseOwnerObservation>,
+    /// The complete `Deferred` residual (P1 ∪ P2). Together with
+    /// `static_response_rows` (the Specialized set) this is the full response-`Vis`
+    /// classification, so a test can assert congruence (AC-1).
+    pub static_response_deferred: Vec<DeferredResponseObservation>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1073,6 +1090,17 @@ fn record_static_response_feasibility_diagnostic(
             .collect(),
         Err(_) => Vec::new(),
     };
+    let static_response_deferred = plan
+        .static_response_deferred()
+        .iter()
+        .map(|row| DeferredResponseObservation {
+            vis_origin: row.vis_origin().0,
+            operation_root_origin: row.operation_root_origin().0,
+            effect_origin: row.effect_origin().0,
+            operation: format!("{:?}", row.operation()),
+            sub_case: format!("{:?}", row.sub_case()),
+        })
+        .collect();
     STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
         if let Some(rows) = slot.borrow_mut().as_mut() {
             rows.push(StaticResponseFeasibilityDiagnostic {
@@ -1081,6 +1109,7 @@ fn record_static_response_feasibility_diagnostic(
                 all_static_response_rows,
                 all_static_response_infeasible,
                 static_response_owners,
+                static_response_deferred,
             });
         }
     });

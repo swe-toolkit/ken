@@ -41,10 +41,10 @@ pub use static_transition::{
     CheckedIhGeneratedEntryObservation, ComposedReturnForwardRetAuthorityMutation,
     ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
     ComposedReturnForwardRetRoleWitnessObservation,
-    RetainedResultClosureProofMutation, StaticResponseCaptureObservation,
-    StaticResponseContextDemandMutation, StaticResponseFeasibilityDiagnostic,
-    StaticResponseFeasibilityObservation, StaticResponseOwnerObservation,
-    StaticResponseInfeasibleObservation, WorkerPrefixDeferral,
+    DeferredResponseObservation, RetainedResultClosureProofMutation,
+    StaticResponseCaptureObservation, StaticResponseContextDemandMutation,
+    StaticResponseFeasibilityDiagnostic, StaticResponseFeasibilityObservation,
+    StaticResponseOwnerObservation, StaticResponseInfeasibleObservation, WorkerPrefixDeferral,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
