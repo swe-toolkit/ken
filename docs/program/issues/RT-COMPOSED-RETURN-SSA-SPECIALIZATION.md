@@ -138,33 +138,37 @@ pre-install prefix. If a genuine PRE-install consumer of the classification
 exists, research's shared-subset factoring applies to THAT consumer only — the
 ring names it or confirms none exists.
 
-### #3 ACCEPTANCE GATE — MEASURED three-way, not declared (Architect evt_6v4yp7arvd4f4 + evt_53s106a7btrb8; implementer three-way table evt_6trkwrt5gh7ge)
+### #3 STAGING — MECHANISM-FIRST; #3 is a FOLLOW-UP, not a mechanism-SHA gate (Architect evt_1enehr9nxkjz9, refining evt_6v4yp7arvd4f4 + evt_53s106a7btrb8; implementer three-way table evt_6trkwrt5gh7ge)
 
-Both `fs_read_at_malformed_offset_narrows_to_invalid_offset` and
-`fs_write_..._narrows_to_invalid_offset` are `#[ignore]`d on origin/main with
-DIFFERENT pre-existing debts; the candidate un-ignores both and asserts its fix
-closes them. The recut MUST NOT be DECLARED to close #3 on the mechanism story;
-it is MEASURED on the built candidate. Two measurements:
+The mechanism candidate does NOT un-ignore
+`fs_read_at_malformed_offset_narrows_to_invalid_offset` /
+`fs_write_..._narrows_to_invalid_offset`. The mechanism SHA is a PARTIAL-WP
+candidate (§8); its OWN acceptance is the 5-red-chain closure — writeAll
+fixtures AC-1..9 green + the AC-7 backstop reds correctly + NO regression to the
+previously-passing native suite. #3 is NOT a gate on the mechanism SHA's
+release. Do NOT un-ignore the fs_*_narrows tests on the mechanism SHA: a
+fs-only red would conflate a rider-red with a mechanism-red and burn a SHA on a
+bet that cannot be checked locally (native OOMs).
+
+#3 rides as a SEPARATE follow-up un-ignore on the SAME branch AFTER the
+mechanism greens, and the population MUST BE RE-READ on the fresh base
+`4e5481c57`, not settled from old logs. **BASE DRIFT (Architect
+evt_1enehr9nxkjz9): on 4e5481c57 the fs_*_narrows `#[ignore]` reasons CHANGED**
+(both now "post-M6 ... InvalidBounds/InvalidOffset"; RT-CLOSURE-BOUNDARY-LANE
+gone). The base moved under the fixtures, so the e193dc631-era #3 attribution
+AND runtime-leader's read/write-differ elimination (`evt_1fb7kkw4bbxv5`) do NOT
+carry — measure on the built recut, never inherit. Two measurements:
 
 - **(a)** fs_read/write's response is in (S_causal minus S_record) — instrument
-  the recut classify. **STATUS: strongly indicated, not yet positively
-  confirmed.** runtime-leader `evt_1fb7kkw4bbxv5` is decisive on the NEGATIVE
-  half only: the two historical `#[ignore]` reasons (read = "ExitCode::Failure
-  payload" trap; write = "closure-boundary-lane") are distinct from each other
-  and from the CURRENT shared signature (`PatternMatchFailure` / "no match case
-  ...ResourceBodyResult") failing IDENTICALLY on both — two different old debts
-  do not converge to one signature, so H_debt-reappearance is refuted and H_over
-  is strongly indicated. This is INDIRECT; the POSITIVE (a) instrumentation
-  rides the candidate.
+  the recut classify, re-read on 4e5481c57.
 - **(b)** the domain-total post-install classify makes it Specialized AND that
   Specialized lowering OBSERVES InvalidOffset (the un-ignored assertion), not
-  the ResourceBodyResult frontier trap — native run on the candidate.
+  the ResourceBodyResult frontier trap — native run.
 
-THREE-WAY DISPOSITION (the ring returns the measured branch WITH the candidate;
-nobody asserts #3 beforehand — all three need the built recut, so this is
-implementation-time, NOT a scope-release gate):
+THREE-WAY DISPOSITION (governs the FOLLOW-UP un-ignore; measured on the built
+recut after the mechanism greens, nobody asserts #3 beforehand):
 
-- **(a) AND (b)** -> #3 CLOSED here; the two un-ignores RIDE this WP.
+- **(a) AND (b)** -> fold the follow-up un-ignore in on the same branch.
 - **(a) AND NOT (b)** -> over-admission was the immediate cause but the correct
   classify still hits the frontier -> the InvalidOffset product is a SEPARATE
   deliverable (RT-RESULT-CONTINUATION-BINDING-PROVENANCE territory); SPLIT via
@@ -173,8 +177,8 @@ implementation-time, NOT a scope-release gate):
   over-admission never touched it, the un-ignore surfaced independent
   pre-existing debt -> SPLIT.
 
-Do not conflate — a recut that ships "green" while the stated deliverable
-silently isn't met is the failure this gate prevents.
+Do not conflate the follow-up un-ignore with the mechanism's own green — that
+conflation is the failure this staging prevents.
 
 ### SEAL x PARITY-DEBT — sealed-as-classified, never carve out (Architect evt_53s106a7btrb8)
 
@@ -218,8 +222,13 @@ Retain the HS3-recut ACs 1-7 for the Specialized path. Add:
   Deferred/Specialized determination from IDENTICAL finalized post-install state
   (`aggregate_ownership`/transports); `validate_static_response_context_plan`
   passes by same-state re-derivation, not a second independent computation.
-- **AC-10 (#3, conditional).** Per the #3 gate: (b) measured on the candidate;
-  if it fails, the two un-ignores are split out, not carried.
+- **AC-10 (#3 is a FOLLOW-UP, not a mechanism-SHA gate).** The mechanism SHA
+  ships WITHOUT the fs_*_narrows un-ignores (partial-WP, §8); its acceptance is
+  AC-1..9 + AC-7 backstop + AC-NO-REGRESSION. #3 rides as a separate follow-up
+  un-ignore on the same branch after the mechanism greens, three-way measured on
+  4e5481c57 (re-read the population; the e193dc631-era attribution does not
+  carry): (a)&&(b) folds the un-ignore in, else split. Not a gate on the
+  mechanism's release.
 - **AC-NO-REGRESSION.** Green across the transport-source population in CI (px8f
   + rt_parity native shards), not just the modeled owner-call fixtures. Targeted
   `scripts/ken-cargo` locally; whole-suite is CI's.
