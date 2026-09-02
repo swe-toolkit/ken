@@ -32,7 +32,7 @@ of the record set, and over-admission is UNSOUND, not merely imprecise:
 for "unconsumed transport caller"; the transport-DESTINATION test is the real
 Deferred/Specialized discriminator, and it is genuinely post-install.
 
-### RECUT-2 AMENDMENT — HS6 staging correction: collapse the owner/aggregate_ownership boundary (Architect ruling evt_7yegg3t1sdn8d)
+### RECUT-2 AMENDMENT — HS6: #1 = force-scoped FM-routing fix (ii); #2/#3 = totality-reframed ledger (Architect rulings evt_7yegg3t1sdn8d + evt_2980vtzybp6bj)
 
 GOVERNS THE NEXT RESPIN. The 6th CI-red (candidate 46951a660, PR #3242,
 held, nothing landed) is a BOUNDED staging correction against the two-phase
@@ -41,48 +41,69 @@ then reconciled evt_4kgv6g9fnjfwg); the ring grounded (evt_4ggkeyhnsdvgd); the
 ring's source trace is the record of authority (§7a) where it corrects research's
 hypothesized mechanism. The two-phase split HOLDS.
 
-THE §1b PREDICATE NOW SPANS THREE BOUNDARIES — ONE PREDICATE (extends the
-SYMPTOM INVENTORY / SHARED PREDICATE below with the 6th red):
+THE §1b PREDICATE (Architect's read, REFINED by M1 + the grounded DAG). HS3 and
+HS5 were REAL instances of one predicate — A DERIVATION IS FINALIZED BEFORE A
+FACT IT TRANSITIVELY DEPENDS ON IS FROZEN:
 - HS3: install classified before the transport fact existed (over-admission).
 - HS5: the post-install transport read computed at install (phase-instability).
-- HS6 #1: owner assignment finalized in phase B (construction.rs:1257) AFTER
-  aggregate_ownership's derivation closed (:1249-:1250).
-Shared predicate: A DERIVATION IS FINALIZED BEFORE A FACT IT TRANSITIVELY
-DEPENDS ON IS FROZEN. Not three bugs — one predicate at three boundaries. The
-closure is frozen-phase-ordering: each derivation runs ONCE where all its
-transitive inputs are frozen, downstream CONSUMES. The recut already applied
-that closure to the RESPONSE-CONTEXT plane (first-class Deferred) and CLOSED it
-there; #1 is the SAME predicate at the owner/aggregate_ownership boundary. The
-closed-derivation validator is CORRECT and CAUGHT #1 — it is not over-coupled.
+The recut applied the closure (each derivation runs ONCE where its transitive
+inputs are frozen, downstream CONSUMES) to the RESPONSE-CONTEXT plane
+(first-class Deferred) and CLOSED it there.
+HS6 #1 was FIRST read as the SAME predicate at the owner/aggregate_ownership
+boundary, but M1 (grounded) REFUTES that for real compiles: aggregate_ownership
+does NOT read phase B's owner fact, so its finalized value does not transitively
+depend on phase B — the DAG (aggregate_ownership -> transports -> phase B) is
+acyclic and already correctly frozen-ordered, and :2091 == :1249 holds in every
+real compile. HS6#1 is therefore NOT a real frozen-phase-ordering defect; it is a
+FORCE-injected FAILURE-MODE-ROUTING artifact (see #1 FIX below). The convergence
+ruling is thereby STRONGER than first stated — the real-compile pipeline is
+already correctly ordered at this boundary.
 
-RULING 1 — CONVERGENCE, not cascade. The response-plane closed-derivation class
-that cascaded HS3->HS5 is drained AS A CLASS (writeAll compiles; the
-plane-closure invariants no longer fire; 7/8 shards green). That meets the exact
-(B)-drainable discriminator research set (the class closed structurally, not one
-member at a time). What remains is two BOUNDED things: (i) #2/#3/#4 = one root,
-the recut's CORRECT transport-caller reclassification exposing stale test
-expectations; (ii) #1 = one bounded force-path aggregate_ownership divergence.
+RULING 1 — CONVERGENCE, not cascade (STRENGTHENED). The response-plane
+closed-derivation class that cascaded HS3->HS5 is drained AS A CLASS (writeAll
+compiles; the plane-closure invariants no longer fire; 7/8 shards green) — the
+exact (B)-drainable discriminator research set. What remained resolved to two
+BOUNDED, drainable things, both now dispositioned: #2/#3/#4 = stale test
+expectations from the recut's CORRECT transport-caller reclassification; #1 = a
+force-only failure-mode-routing artifact.
 
-RULING 2 — #1 DISCIPLINE: collapse preferred, re-validate-after-B fallback. The
-ring's trace REFUTES a direct-perturbation story: phase B writes only
-static_response_continuations/deferred; build_aggregate_ownership_plan
-(aggregates.rs:4358-4714) reads plan.source_occurrences / semantic /
-record_field_identity / escape+meet — none of them. #1 is a TRANSITIVE,
-force-only divergence (a forced Specialized owner coexisting with a
-transport-source record on one member re-derives record_field_identity /
-escape-meet differently at closure.rs:2091 vs :1249). Because the coupling is
-transitive and unlocalized, research's "partition disjoint non-meet-read owner
-rows" sub-option is DEAD — you cannot partition a coupling no one has localized.
-Preference order:
-- PREFERRED (collapse): finalize the WHOLE owner assignment BEFORE
-  aggregate_ownership builds (:1249), so :1249 and the final validator (:2091)
-  close over the SAME frozen owner state — direct AND transitive coupling both
-  vanish (no later phase to perturb). Removes the hazard CLASS
-  (subsume-don't-proliferate), not the field the transitive path runs through.
-- FALLBACK (re-validate-after-B): if collapse is infeasible, schedule
-  aggregate_ownership's validate/re-derivation AFTER phase B so :1250 and :2091
-  both close over final owner state (LLVM invalidate-and-rerun). Minimal correct
-  fix; disciplines the boundary rather than removing it.
+#1 FIX = (ii), FORCE-SCOPED FM-ROUTING — NOT a phase reorder, NOT the cascade
+(Architect evt_2980vtzybp6bj; measurements grounded + adopted evt_1284qw0hqahp3).
+The collapse-vs-re-validate measurement path (THE MEASUREMENTS, below) is the
+derivation; the grounded outcome (M1/M3/(a) all YES) resolved it PAST both
+collapse (infeasible: the HS5 cycle) AND the re-validate cascade (disproportionate
+for a force artifact). The mechanism:
+- FORCE-ONLY BY THE SEALED CLASSIFICATION. The recut defers every transport
+  source (P2 -> Deferred, no owner); classification is total and sealed. A
+  Specialized owner coexisting with a transport-source record on one member
+  CANNOT arise in a real compile — only AC-7's out-of-band force hook injects it.
+  In every real compile the DAG already makes :2091 == :1249 (why non-force px8f
+  and writeAll pass). A design guarantee, not "not yet seen."
+- THE DEFECT IS FAILURE-MODE ROUTING: the abnormal force-injected state trips
+  the INTERNAL closure.rs:2091 invariant ("please report this compiler bug")
+  before its INTENDED validator. (ii) routes that abnormal state to
+  validate_response_owner_call_coverage — the validator AC-7 already asserts — so
+  AC-7 reds THERE ("has no verified selected incoming call"), never at the
+  internal panic. (ii) touches nothing in aggregate_ownership's derivation and
+  needs no localization of the transitive path.
+- CASCADE (i) REJECTED: :2091 == :1249 already holds for real compiles, so a
+  re-run reconciles nothing real; under force it either re-injects the owner
+  (vacuous — the panic just moves) or erases it (breaks AC-7's purpose), paying
+  that cost on every real compile.
+
+GATE before build (load-bearing premise; verify at source, do not inherit):
+confirm NO real-compile path assigns a Specialized owner to a member in
+checked_ih_environment_transport_source_identities() — i.e. the coexistence is
+force-only. Holds -> build (ii). If ANY real-compile path can produce it -> the
+aggregate_ownership divergence is a REAL soundness bug that (ii) would MASK ->
+HARD-STOP to the Architect (a different, larger fix), do NOT proceed to (ii).
+
+SOUNDNESS GUARDS on (ii): do NOT weaken or remove the :2091 aggregate_ownership
+internal invariant for real compiles — it stays a hard invariant; (ii) only
+ensures the abnormal force state is caught earlier by its intended owner-coverage
+validator, never silently admitted. CLOSURE = AC-7 (px8f :778) reds at
+validate_response_owner_call_coverage, never at an internal panic — the exact CI
+discriminator between (ii)-fixed and the bug. AC-7 PASSING IS the closure.
 
 RULING 3 — #2/#3 DISCIPLINE: gate on measurement (a); reframe the ledger to
 TOTALITY. (a) = is the write-BufferAllocate k_identity in
@@ -102,75 +123,63 @@ checked_ih_environment_transport_source_identities()?
 - #4 (rt_cold_lowering_path_enumeration rt_allocate_stage :610): currency — move
   to Disposition::Completes (the mechanism retired its blocker).
 
-THE GATING MEASUREMENTS (ring's ground; CI/native-instrumentable; the respin
-RELEASES on them — do NOT respin before measurements 1 and (a) land; 3 is
-conditional). Adopted research's fallback precondition (evt_717p9fgzzg3sv),
-Architect evt_5786jn8ty5hkr:
-- MEASUREMENT 1 — FEASIBILITY (decides collapse vs fallback): does
-  checked_ih_environment_transports @construction.rs:1251 — the input phase B
-  keys on — DEPEND on build_aggregate_ownership_plan's OUTPUT (:1249)?
-  Independent -> LIFT the transport build above :1249, do the whole owner
-  assignment there -> collapse feasible -> PREFERRED. Dependent -> collapse
-  infeasible -> re-validate-after-B. (The ring already grounded the other half:
-  aggregate_ownership does not read phase B's output.)
-- MEASUREMENT 3 — FALLBACK PRECONDITION (CONDITIONAL: ground ONLY if
-  measurement 1 forces the fallback branch; do NOT let it delay 1 and (a)): does
-  aggregate_ownership's plan have any SURVIVING consumer BETWEEN :1249 and phase
-  B (:1257)? invalidate-and-rerun at :2091 is sound only if EVERY consumer of
-  aggregate_ownership's result is covered by the re-derivation, not just the
-  final validator; an intermediate pass that already consumed the pre-B result
-  and committed on it is an HS7 waiting to happen. If a surviving consumer
-  exists -> the fallback must RE-RUN those consumers after phase B too, not only
-  :2091; if none survive -> re-validate-after-B at :2091 alone is sufficient.
-  COLLAPSE (Resolution 1) discharges this obligation BY CONSTRUCTION — no re-run
-  to schedule, no intermediate-consumer check — a second, independent reason to
-  prefer collapse over the fallback.
-- MEASUREMENT (a) — decides #2/#3 currency vs over-deferral bug: as in Ruling 3.
+THE MEASUREMENTS — ALL GROUNDED (source/CI-derived, no native run; adopted
+evt_1284qw0hqahp3). They are the derivation that resolved #1 to (ii):
+- M1 = YES: checked_ih_environment_transports @construction.rs:1251 READS
+  build_aggregate_ownership_plan's output at 3 sites -> collapse INFEASIBLE (this
+  IS the HS5 cycle — correct, expected).
+- M3 = YES: the surviving intermediate consumer between :1249 and phase B (:1257)
+  IS the transport build itself, feeding phase B -> the re-validate fallback
+  would be a self-referential cascade. Combined with #1 being force-only, this is
+  why the cascade (i) is rejected in favour of the force-scoped (ii).
+- (a) = YES: write-BufferAllocate is a transport source -> the recut CORRECTLY
+  classifies it Deferred (0 Specialized + 1 Deferred / UnconsumedTransportCaller)
+  -> the test is STALE, totality-reframe (Ruling 3), not an over-deferral bug.
 
 ACCEPTANCE DELTA (HS6; additive to the ACCEPTANCE ACs below):
-- AC-HS6-1: #1 boundary closed — by collapse (transport+owner assignment
-  finalized before aggregate_ownership @:1249; :1249 and :2091 close over
-  identical frozen owner state) OR by re-validate-after-B; the AC-7
-  force-specialize path that red at px8f :778 now greens. Control: the
-  closed-derivation validator still REDS a deliberately-perturbed owner state —
-  it stays a real check, not disabled to pass.
+- AC-HS6-1: #1 fixed by (ii), failure-mode routing — the AC-7 force-specialize
+  path (px8f :778) now reds at validate_response_owner_call_coverage ("has no
+  verified selected incoming call"), NEVER at the internal closure.rs:2091
+  panic; AC-7 PASSING is the closure. Guards: the :2091 aggregate_ownership
+  internal invariant is NOT weakened for real compiles (it still reds a genuinely
+  divergent real-compile derivation); the source-verification gate (the
+  Specialized-owner / transport-source coexistence is force-only) is RECORDED as
+  the load-bearing premise (ii) rests on.
 - AC-HS6-2: the demand ledger is a TOTALITY assertion (Specialized+Deferred =
   fixture population, exactly one column per member). Control: a mutation that
   drops a member reds (0 and 0); a mis-column reds; the correct
   0-Specialized-1-Deferred write-path reclassification greens.
 - AC-HS6-3: #4 rt_allocate_stage at Disposition::Completes.
-- RELEASE EVIDENCE: measurements 1 and (a) RECORDED (and 3, if 1 forced the
-  fallback); the chosen #1 discipline (collapse vs fallback) stated with the
-  measurement that chose it, and — on the fallback — the re-run scope from
-  measurement 3.
+- RELEASE EVIDENCE: measurements M1/M3/(a) recorded (all YES) + the
+  source-verification gate result (coexistence force-only, or HARD-STOP); the fix
+  is (ii), stated with the closure discriminator (AC-7 reds at owner-coverage,
+  not the internal panic).
 
 Honesty on the z1400 placement (Architect §7a/§1b-iii, carried into the frame):
 z1400's "the exact discriminator needs post-install data" was locally correct
 (the transport fact IS post-install) but conflated post-INSTALL with
 post-AGGREGATE_OWNERSHIP, placing phase B at :1257 when the fact may only need
 to be after INSTALL. That conflation is the origin of the #1 boundary hazard.
-The 6th red vindicates neither a seal redesign nor the exact z1400 placement — it
-vindicates a MORE PRECISE staging: transports + owner assignment lift to before
-aggregate_ownership IF transports are independent of it (Resolution 1).
+The 6th red vindicates neither a seal redesign nor the exact z1400 placement. M1
+then showed transports are NOT independent of aggregate_ownership (collapse
+infeasible), and the DAG showed the real-compile boundary is ALREADY correctly
+ordered — so #1 is not a staging defect at all in real compiles, but a force-only
+FM-routing artifact fixed by (ii).
 
-CARRY — total freeze-order (POST-respin design item, NOT a blocker on this
-respin; Architect evt_5786jn8ty5hkr, research completeness note evt_717p9fgzzg3sv;
-Steward-held release lever). The frozen-phase-ordering closure applied
-PER-BOUNDARY closes HS6#1 exactly as HS3/HS5 were closed at the response-context
-plane — but a per-boundary closure does not guarantee against an HS7 at some
-FURTHER boundary. The class-level guarantee is to establish the phase order as a
-TOTAL, ACYCLIC FREEZE-ORDER over ALL derivations: a topological order in which no
-derivation is finalized before any of its transitive inputs is frozen. Proven
-structurally, that closes the predicate as a CLASS ("no such pair can exist") —
-the "prove the closure of the set, not a better grep" bar and the strongest form
-of the convergence ruling; it is the durable answer to "is this the LAST of its
-kind," which the operator's priority-calculus on this WP will want. This is a
-follow-up, not a re-open: the bounded correction above is the right immediate
-move, and cutting a total freeze-order into scope now would over-reach a
-green-able fix. DISPOSITION: after this respin lands green, the Steward assesses
-whether the static_transition pipeline's phase order should be made an explicit
-total freeze-order; the Architect frames it on the Steward's release. Held, not
-released.
+CARRY — total freeze-order (POST-respin design item; Architect evt_5786jn8ty5hkr
++ REFINED evt_2980vtzybp6bj, research completeness note evt_717p9fgzzg3sv;
+Steward-held release lever). LOWER URGENCY than first stated, and a PROVING task,
+NOT a live-defect fix — because M1 + the DAG established HS6#1 is force-only and
+the real-compile boundary is already correctly frozen-ordered (there is no live
+third-boundary staging defect to fix). The remaining value is a CLASS guarantee
+against an HS7 at some FURTHER boundary: establish structurally that the
+static_transition pipeline's phase order is a TOTAL, ACYCLIC FREEZE-ORDER over
+ALL derivations (no derivation finalized before any transitive input is frozen),
+so no such pair CAN exist. That is the "prove the closure of the set, not a
+better grep" bar and the durable answer to "is this the LAST of its kind," which
+the operator's priority-calculus will want. DISPOSITION: after this respin lands
+green, the Steward assesses whether to prove the total freeze-order; the Architect
+frames it on the Steward's release. Held, not released; not urgent.
 
 ### SYMPTOM INVENTORY (Architect §1b)
 
