@@ -29,8 +29,12 @@ PASS_RE = re.compile(
     r"^\s*PASS\s+\[[^]]+\]\s+(?P<payload>.+?)\s*$"
 )
 PASS_PREFIX_RE = re.compile(r"^\s*PASS(?:\s|$)")
+# nextest right-aligns the running index to the width of the total, so a
+# single-digit index prints with a leading space once the total reaches two
+# digits (e.g. "( 3/34)"). Tolerate that interior whitespace; the population
+# consistency check below (index/total vs expected) remains the real invariant.
 COUNTER_RE = re.compile(
-    r"^\((?P<index>\d+)/(?P<total>\d+)\)\s+(?P<identity>.+)$"
+    r"^\(\s*(?P<index>\d+)\s*/\s*(?P<total>\d+)\)\s+(?P<identity>.+)$"
 )
 LEVEL_THREE_HEADING_RE = re.compile(r"^###\s+(?P<token>\S+)(?:\s.*)?$")
 TEST_ATTRIBUTE_RE = re.compile(r"^\s*#\[test\]\s*$")
