@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-01 23:18:10Z — from 516 issue file(s) in `docs/program/issues/`.
+2026-09-02 03:45:37Z — from 516 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -161,7 +161,7 @@ the committed file matches the generator's output.
 | `LANG-CONVOY-MATCH-FIELD-PROVENANCE` | capability 2's sibling-convoy candidate range is a positional proxy for a provenance property -- carry the match-field regions explicitly on the elaboration context and skip them, closing spec 34 section 3.2's Boundary gap without the incompleteness a positional floor would introduce | merged | language | S | none | — |
 | `LANG-CTOR-PREMISE-ELABORATION-DIVERGES` | A data constructor whose premise applies a recursive function to a telescope-bound variable diverges during elaboration -- proof-carrying inductive families are unavailable in Ken | merged | kernel | L | none | — |
 | `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` | `37 §2.5` defers the proof-carrying `DecEq String` / `Ord String` instances as a `tracked follow-on` because the transport needs a lawful `DecEq Char` that is not landed -- and the follow-on was never filed, so the second unowned obligation in this chapter sits in spec prose with no tracker row | draft | language | unsized | operator | — |
-| `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` | D2b elaborator-only predecessor (the context telescope): constructor index refinement must transform the transitive forward-dependency closure of the LOCAL CONTEXT as one typed telescope substitution, not just the motive, constructor expected goal, and direct IH. One branch-refinement plan owns the root substitution plus the ordered convoy; it REPLACES the sibling-outer-binding portion of install_index_refinements, not layers beside it. Elaborator-crate only — NO kernel/TCB change; if implementation reveals a kernel/TCB touch is required (as LANG-RECORD-INDEX-REFINEMENT did), STOP and route to the Steward -> operator, do NOT make a silent kernel change. | active | language | M | lang-qa+architect | — |
+| `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` | D2b elaborator-only predecessor (the context telescope): constructor index refinement must transform the transitive forward-dependency closure of the LOCAL CONTEXT as one typed telescope substitution, not just the motive, constructor expected goal, and direct IH. One branch-refinement plan owns the root substitution plus the ordered convoy; it REPLACES the sibling-outer-binding portion of install_index_refinements, not layers beside it. Elaborator-crate only — NO kernel/TCB change; if implementation reveals a kernel/TCB touch is required (as LANG-RECORD-INDEX-REFINEMENT did), STOP and route to the Steward -> operator, do NOT make a silent kernel change. | merged | language | M | lang-qa+architect | https://github.com/swe-toolkit/ken/pull/3228 |
 | `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` | D2b elaborator-only predecessor (the inversion idiom): generic simultaneous rebasing of the dependent-match motive, the constructor expected goal, and the direct recursive IH so that BOTH the actual indices and the outer scrutinee become local indices/value. Architect ruled NO source-level escape for the FokDerivation inversion. Elaborator-only — NO kernel/TCB change; if implementation reveals a kernel/TCB touch is required (as the prior predecessor LANG-RECORD-INDEX-REFINEMENT did), STOP and route to the Steward -> operator, do NOT make a silent kernel change. | merged | language | M | lang-qa+architect | https://github.com/swe-toolkit/ken/pull/3224 |
 | `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` | 34 §4.1 requires naming the unmatched PATTERN WITNESS, and ExhaustivenessError's payload is a single String documented as a constructor NAME -- so no change at any emission site can discharge the obligation, and it reads as satisfied today only because every landed omission test uses a zero-arity constructor where name and most-general pattern coincide | merged | language | M | none | — |
 | `LANG-FIXITY-DECL-SURFACE` | `infixl N op` / `infixr N op` / `infix N op` populate a fixity table the parser consults -- the third and last part of user-defined operators, and the only one carrying a real design call: declaration-before-use versus whole-module collection, and scoping across imports | draft | language | M | none | — |
@@ -621,7 +621,6 @@ is itself not yet `merged`/`closed`:
 - `RT-COMPOSED-RETURN-SSA-SPECIALIZATION` blocked by `RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
-- `V3-FO-EMBEDDING-ADEQUACY` blocked by `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (status: active)
 
 ## Gate progress
 
@@ -632,7 +631,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **lang-qa+architect**: `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (active) `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` (merged)
+- **lang-qa+architect**: `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (merged) `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` (merged)
 - **operator**: `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` (merged) `KERNEL-SCT-TELESCOPE-CANON` (merged) `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` (draft) `LANG-FOREIGN-NAME-FORMAT-CHARS` (draft) `LANG-RECORD-INDEX-REFINEMENT` (merged)
 - **runtime-qa+architect**: `RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT` (closed) `RT-COMPOSED-RETURN-RUNTIME-CLOSURE` (draft) `RT-COMPOSED-RETURN-SSA-SPECIALIZATION` (active)
 

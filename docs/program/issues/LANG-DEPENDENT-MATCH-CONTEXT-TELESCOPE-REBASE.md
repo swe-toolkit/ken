@@ -1,14 +1,14 @@
 ---
 id: LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE
 title: "D2b elaborator-only predecessor (the context telescope): constructor index refinement must transform the transitive forward-dependency closure of the LOCAL CONTEXT as one typed telescope substitution, not just the motive, constructor expected goal, and direct IH. One branch-refinement plan owns the root substitution plus the ordered convoy; it REPLACES the sibling-outer-binding portion of install_index_refinements, not layers beside it. Elaborator-crate only — NO kernel/TCB change; if implementation reveals a kernel/TCB touch is required (as LANG-RECORD-INDEX-REFINEMENT did), STOP and route to the Steward -> operator, do NOT make a silent kernel change."
-status: active
+status: merged
 owner: language
 size: M
 gate: lang-qa+architect
 tier: T1
 depends_on: []
 blocks: [V3-FO-EMBEDDING-ADEQUACY]
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3228
 origin: "Steward, 2026-09-01. FOURTH D2b predecessor, framed+released from the Architect HARD-STOP-3 mechanism ruling evt_mpmnxxh42r0z (thread thr_ncn98kb1htt0), which classified the third consecutive dependent-index elimination hard stop as (a) an elaborator completeness closure over the dependent context telescope — NO kernel/TCB route (no well-typed core Elim/Cast redex required by 14/17 shown stuck) and NO permanent FoKripke source convoy. Mandatory hard-stop-3 Research advisory evt_240ycvyantgrb (artifact /tmp/d2b-r2-hs3-research-advisory.txt sha b5d13c58...) preceded the ruling and reached the same disposition, with Agda with-abstraction and Lean getFVarsToGeneralize as prior art. The prior three predecessors: LANG-RECORD-INDEX-REFINEMENT (kernel eq_at_inductive weaken, MERGED PR #3216) and LANG-DEPENDENT-MATCH-MOTIVE-REBASE (three-site motive/expected_here/direct-IH rebasing, MERGED PR #3224, 1189aa3a) cleared the record-index MATCH and the derivation inversion; D2b then hit the fok_coh_extend context-telescope stop (evt_3b9k92cmkn5zh): a captured xs : FokObjectEnv ... n does not follow the constructor refinement of a FokFin index under match j. Shared predicate across all three: constructor-produced index refinement is not propagated through every dependent consumer — first the record-equality representation, then the explicit motive/goal/IH, now a captured dependent context telescope. D2b (V3-FO-EMBEDDING-ADEQUACY) is FROZEN at held checkpoint bf8f37326 (tree 8ff4f3921, base 436ac00e9) and FO stays Unknown behind this predecessor; D2b resumes ONLY after this lands and the exact held FoKripke consumer re-passes WITHOUT the manual convoy."
 ---
 
