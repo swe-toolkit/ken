@@ -5,11 +5,126 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
+
+## Symptom inventory
+
+1. A derivation family over a constructor-headed record index can be built but
+   not dependently eliminated: generated refinement treats observational record
+   equality as a primitive `Eq`/`J` witness after it has reduced to a Sigma of
+   field equalities — keyed on the index equality's representation rather than
+   the derivation relation.
+
+> # D2b RE-RELEASED 2026-09-02 — fourth predecessor landed, consumer probe green
+>
+> **This banner supersedes the RE-FROZEN banner below.** The fourth predecessor
+> [[LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE]] MERGED: exact candidate
+> `361ad044` landed as squash `0202018065ee460cd3ec3d38ee2b9d83e13e86bd` on
+> `main`, full CI green, all three routed blobs byte-identical, node `merged`
+> (PR #3228, M7 closure `e93210c4`). A route-integrity STOP from the lieutenant
+> (a `7bc920a4` tree from the PRIOR predecessor `a3ded668d`, not this candidate)
+> was adjudicated: candidate `361ad044` tree `94b6fcb5` landed verbatim.
+>
+> **Consumer probe GREEN on the merged tree.** The generic context-telescope
+> acceptance test
+> (`crates/ken-elaborator/tests/dependent_match_context_telescope_acceptance.rs`,
+> blob `97b13750` on `main`) carries the mandated pins — the unconvoyed positive
+> `captured_env_follows_fin_index_refinement_under_match` (the original red shape
+> now elaborates), the manually-convoyed positive oracle, the one-site-mutation
+> REDs, the dependent-let member, and the AST inspection proving the three-deep
+> `xs'/h'/z'` convoy telescope is carried in the motive, every method, and the
+> final application in dependency order. It passed in the merge's full CI. This is
+> the SAME standard as the 2026-09-01 re-release (predecessor generic acceptance
+> test green on the merged tree); the actual FoKripke un-convoying is the ring's
+> fold work below, not this gate. Basis: test identity + required pins verified by
+> the Steward against `origin/main`; green established by the merge's full CI
+> (local rerun withheld — CI owns workspace closure and this box's RAM was at
+> ~1.6Gi available; forcing a local elaborator build risked an OOM-SIGKILL).
+>
+> **RE-RELEASED to the language ring 2026-09-02 from `bf8f37326`.** The ring now
+> rebases/folds the held spine `70a291a96` and continues the EXACT unchanged
+> adequacy theorem, past the `fok_coh_extend` captured-context-telescope stop the
+> fourth predecessor cleared. Constraints still bind: do NOT re-index
+> `FokDerivation`, add a Nat sequent code, split the record into List indices, or
+> touch `fok_derives`/`fok_classically_valid`. If the fold hits a genuinely new
+> elimination stop, that is a FIFTH predecessor hard stop — reset clean, measure,
+> route to the Steward; do not source-convoy it permanently.
+>
+> # D2b RE-FROZEN 2026-09-01 (HS3) — behind a FOURTH elaborator predecessor (history)
+>
+> **This banner supersedes the RE-RELEASED banner below.** After the two
+> predecessors landed and D2b was re-released, the proof advanced (spine folded,
+> coherence chain, atom/forcing projections) then hit its THIRD consecutive hard
+> stop in the same dependent-index elimination class: `fok_coh_extend`, where a
+> captured `xs : FokObjectEnv … n` does not follow the constructor refinement of a
+> `FokFin` index under `match j` (implementer measurement `evt_3b9k92cmkn5zh`).
+> Mandatory hard-stop-3 Research advisory (`evt_240ycvyantgrb`) and the Architect
+> ruling (`evt_mpmnxxh42r0z`) both classify it **(a) an elaborator completeness
+> closure over the dependent context telescope — NO kernel/TCB, NO permanent
+> FoKripke source convoy.** The shared predicate across all three stops:
+> constructor index refinement is not propagated through every dependent consumer
+> (record-equality representation, then motive/goal/IH, now the captured context
+> telescope).
+>
+> **D2b is FROZEN at held checkpoint `bf8f37326` (tree `8ff4f3921`, base
+> `436ac00e9`); FO stays `Unknown`** behind the fourth predecessor
+> [[LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE]] (elaborator-only: one typed
+> branch-refinement plan transforming the transitive forward-dependency closure of
+> the local context; framed+released 2026-09-01 from the Architect mechanism
+> ruling). **Consumer gate for re-release:** after that predecessor lands, rerun
+> the exact held FoKripke consumer at `bf8f37326` WITHOUT the manual convoy; only
+> then does the Steward explicitly RE-RELEASE D2b from `bf8f37326`. No parallel
+> source repair, no kernel escalation, no D2b movement before that gate.
+>
+> # D2b RE-RELEASED 2026-09-01 — both predecessors landed, consumer probe green (history)
+>
+> **RELEASED to the language ring 2026-09-01.** Both D2b predecessors are now
+> merged: (1) [[LANG-RECORD-INDEX-REFINEMENT]] (kernel `eq_at_inductive` weaken,
+> PR #3216) cleared the record-index MATCH elaboration; (2)
+> [[LANG-DEPENDENT-MATCH-MOTIVE-REBASE]] (elaborator-only simultaneous rebasing of
+> motive + constructor goal + direct IH) landed as `1189aa3a74bc21ba4d6377f73ee4ccb4c7e14544`
+> on `main` `6c4fbfa8c` (PR #3224, node `merged`; both elaborator blobs
+> byte-identical to reviewed `a3ded668d`). The exact consumer probe is GREEN on the
+> merged tree: `ken-elaborator --test dependent_match_motive_rebase_acceptance`
+> = 4 passed, 0 failed. The ring now rebases/folds the held spine `70a291a96` and
+> continues the EXACT unchanged adequacy theorem from `main` `6c4fbfa8c`. The
+> constraints below still bind (do NOT re-index `FokDerivation`, add a Nat sequent
+> code, split the record into List indices, or touch
+> `fok_derives`/`fok_classically_valid`).
+>
+> # D2b UNBLOCKED 2026-09-01 — kernel predecessor MERGED (history)
+>
+> **This banner supersedes the D2a-outcome status: D2a is DONE and the statement
+> survives verbatim, but D2b hard-stopped at the derivation inversion.**
+>
+> Proving adequacy requires dependently eliminating `FokDerivation` over its
+> compound record index `FokMkSequent gamma delta`. The current match compiler
+> cannot: generated branch refinement treats observational record equality as a
+> primitive `Eq`/`J` after it has reduced to a Sigma of field equalities. Six
+> encodings fail (compound index, equality convoy as arg/param, projection
+> equalities, separate-field/List equalities). Held green evidence `70a291a96`
+> (177-line strengthened ledger/inversion spine) is reusable D2b material, NOT a
+> candidate.
+>
+> **UPDATE 2026-09-01: the ELABORATOR-only hypothesis (Architect
+> `evt_68t4wwrs274nh`) was FALSIFIED by four-probe measurement.** The real fix
+> was a one-line kernel/TCB binder-hygiene COMPLETENESS repair in
+> `eq_at_inductive` (`obs.rs` `weaken(&acc, 1)`), Architect-confirmed layer (c)
+> as completeness-not-soundness (`evt_3f61wtca219hw`), operator-APPROVED, and now
+> MERGED via [[LANG-RECORD-INDEX-REFINEMENT]] (on main at `ab28450fa` /
+> `5b7466ce2`, PR #3216). D2b is UNBLOCKED and re-released; the held evidence
+> `70a291a96` (177-line strengthened ledger/inversion spine) folds onto the
+> landed kernel fix and the ring continues the EXACT unchanged adequacy theorem. **Do NOT re-index
+> `FokDerivation`, add a Nat code for sequents, split the record into List
+> indices, or touch `fok_derives`/`fok_classically_valid`** — that would
+> compensate in the relation for an elaborator defect. The D2b theorem statement
+> is UNCHANGED. Only after the predecessor's exact consumer gate is green does
+> the Steward explicitly RE-RELEASE D2b; the ring then rebases/folds the held
+> spine and continues the exact unchanged theorem.
 
 > # D2 RECUT 2026-08-27 — THE LANDED D1 STATEMENT IS REFUTED
 >
