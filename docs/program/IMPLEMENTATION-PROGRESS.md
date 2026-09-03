@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-03 05:18:09Z — from 526 issue file(s) in `docs/program/issues/`.
+2026-09-03 06:49:24Z — from 526 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -71,7 +71,7 @@ the committed file matches the generator's output.
 | `CAT-MIGRATE-EC-FUNCTOR-IMPORT` | Scaffold-retirement, orthogonal Core.Classes node (off the DecEq critical path): make EffectfulClasses (EC) standalone-green by publishing the four LawfulFunctors (LF) provider surfaces it consumes ambiently — LF marks class Functor + fn comp + fn idf + fn list_map pub; EC replaces ambient resolution with a real selective import from LF. Publication + one import block + loader-inventory extension; NO relocation, NO proof authoring. Not a regression fix — EC already elaborates in the full-catalog build via ambient class-install; this node removes its dependence on that scaffolding so it elaborates standalone. | ready | foundation | S | none | — |
 | `CAT-MIGRATE-TIER-A-PROVIDERS` | Scaffold-retirement Tier A (primitive providers): publish the two remaining consumer-needed Derived provider values nth and bytes_nat_length as pub, so lower-tier consumers (Cursor, Parsing, Process.Arguments) import the canonical values instead of reaching them through fixture scaffolding. Census folded the tier to one module: Transport/Compare/Arithmetic/Nat.Order are already sufficiently published. | merged | foundation | S | none | — |
 | `CAT-MIGRATE-TIER-B-CLASSES` | Scaffold-retirement Tier B (class-owner relocation + primitive-instance consolidation): relocate the three orphaned primitive DecEq instances (UInt8, Bytes from BytesKeys; String from StringKeys) with their eq/sound/complete wiring and injectivity certificates into the class owner LC (LawfulClasses); consolidate EmptyDec's byte-identical duplicate class DecEq / fn bool_eq / instance DecEq Bool into an import from LC; and give the three scaffolded modules (BytesKeys, StringKeys, EmptyDec) real import blocks so they elaborate standalone with zero fixture-scaffolding dependence. LC/LF/EC are already CLEAN (census fold), so no Core.Classes module-migration remains — the tier is the DecEq relocation + the three consumers' standalone-ification. | draft | foundation | M | none | — |
-| `CAT-MIGRATE-TIER-B-PROVIDERS` | Scaffold-retirement Tier B, provider-publication predecessor P (Tier-A shape, NO relocation): publish the two provider surfaces the DecEq class-owner relocation actually consumes — (a) LC (LawfulClasses) marks its OWN class DecEq + fn bool_eq pub (already listed public in LC's Public-API prose; markers just missing), confirming instance DecEq Bool loader-visible; and (c) StringBijection (a Tier-A-missed Data.Text provider) migrates off scaffolding onto real Transport imports and publishes string_to_list_char_injective. Publishing only; the relocation is the successor CAT-MIGRATE-TIER-B-CLASSES, gated on this. | active | foundation | S | none | — |
+| `CAT-MIGRATE-TIER-B-PROVIDERS` | Scaffold-retirement Tier B, provider-publication predecessor P (Tier-A shape, NO relocation): publish the two provider surfaces the DecEq class-owner relocation actually consumes — (a) LC (LawfulClasses) marks its OWN class DecEq + fn bool_eq pub (already listed public in LC's Public-API prose; markers just missing), confirming instance DecEq Bool loader-visible; and (c) StringBijection (a Tier-A-missed Data.Text provider) migrates off scaffolding onto real Transport imports and publishes string_to_list_char_injective. Publishing only; the relocation is the successor CAT-MIGRATE-TIER-B-CLASSES, gated on this. | merged | foundation | S | none | — |
 | `CAT-NAT-REUSE-CONSUMERS` | Catalog-reuse rework, first scoped batch: the nine unblocked low-risk Nat arithmetic/order consumer duplicates from the census (groups 2 and 3), across six packages — each package imports add/leq_nat/sub/min from its canonical owner and drops the local reimplementation, one independently-releasable increment per package | merged | foundation | M | none | — |
 | `CAT-ORD-LEQ-PUB-EXPORT` | Export ord_leq_at as pub from Core.Classes.LawfulClasses so the group-5 ordered-list consumers can import the canonical dictionary-projection wrapper instead of reimplementing it. | merged | foundation | S | none | — |
 | `CAT-ORD-LEQ-REUSE-CONSUMERS` | Drain the group-5 ordered-list reimplementations (OrderedSearch, InsertionSort) to their canonical providers LC.ord_leq_at, D.eq_from_ord, D.count via selective import. | merged | foundation | M | none | https://github.com/swe-toolkit/ken/pull/3201 |
@@ -610,7 +610,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: ready)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
-- `CAT-MIGRATE-TIER-B-CLASSES` blocked by `CAT-MIGRATE-TIER-B-PROVIDERS` (status: active)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)

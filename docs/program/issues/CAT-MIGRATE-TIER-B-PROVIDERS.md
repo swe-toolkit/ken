@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-B-PROVIDERS
 title: "Scaffold-retirement Tier B, provider-publication predecessor P (Tier-A shape, NO relocation): publish the two provider surfaces the DecEq class-owner relocation actually consumes — (a) LC (LawfulClasses) marks its OWN class DecEq + fn bool_eq pub (already listed public in LC's Public-API prose; markers just missing), confirming instance DecEq Bool loader-visible; and (c) StringBijection (a Tier-A-missed Data.Text provider) migrates off scaffolding onto real Transport imports and publishes string_to_list_char_injective. Publishing only; the relocation is the successor CAT-MIGRATE-TIER-B-CLASSES, gated on this."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
