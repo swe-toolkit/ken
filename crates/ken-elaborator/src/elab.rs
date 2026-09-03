@@ -1373,6 +1373,65 @@ fn synth_generated_index_evidence(
     }
 }
 
+#[derive(Clone)]
+struct IndexEqualityLeaf {
+    index_ty: Term,
+    target: Term,
+    scrutinee: Term,
+    proof: Term,
+}
+
+/// Project one generated dependent-match equality premise into the `Eq` leaves
+/// that can lawfully drive `J`-based refinement. The producer keeps one raw
+/// `Eq` premise per declared index; observational equality may expose that one
+/// premise as a nested `Sigma`, so the proof for each leaf is a projection from
+/// the original sentinel rather than a new method argument.
+///
+/// The walk is atomic: callers receive no leaves unless the complete evidence
+/// shape is in the generated `{Eq, Sigma, Top}` vocabulary. In particular, an
+/// `Omega` component exposes `Pi` evidence and rejects the whole plan rather
+/// than applying only the earlier supported leaves.
+fn project_generated_index_equality_leaves(
+    env: &GlobalEnv,
+    ctx: &Context,
+    evidence_ty: &Term,
+    proof: Term,
+) -> Result<Vec<IndexEqualityLeaf>, ElabError> {
+    fn visit(
+        env: &GlobalEnv,
+        ctx: &Context,
+        evidence_ty: &Term,
+        proof: Term,
+        leaves: &mut Vec<IndexEqualityLeaf>,
+    ) -> Result<(), ElabError> {
+        match whnf(env, ctx, evidence_ty) {
+            Term::Eq(index_ty, target, scrutinee) => {
+                leaves.push(IndexEqualityLeaf {
+                    index_ty: *index_ty,
+                    target: *target,
+                    scrutinee: *scrutinee,
+                    proof,
+                });
+                Ok(())
+            }
+            Term::Sigma(domain, codomain) => {
+                let first = Term::proj1(proof.clone());
+                visit(env, ctx, &domain, first.clone(), leaves)?;
+                let second_ty = subst0(&codomain, &first);
+                visit(env, ctx, &second_ty, Term::proj2(proof), leaves)
+            }
+            Term::Const { id, .. } if id == env.top_id() => Ok(()),
+            other => Err(ElabError::Internal(format!(
+                "index refinement: unsupported generated equality evidence shape {other:?}"
+            ))),
+        }
+    }
+
+    let mut leaves = Vec::new();
+    visit(env, ctx, evidence_ty, proof, &mut leaves)?;
+    Ok(leaves)
+}
+
 /// Replace an occurrence of `target` with `u` while preserving the surrounding
 /// context exactly. Under binders both `target` and `u` are weakened, so the
 /// match is against the same outer term as seen from the deeper scope. A thin
@@ -2704,6 +2763,7 @@ fn finish_dependent_elim(
     motive: Term,
     methods: Vec<Term>,
     scrut_indices: &[Term],
+    scrut_ty: &Term,
     scrut_core: &Term,
     context_convoy: &[ConvoyEntry],
     add_hidden_equation: bool,
@@ -2732,7 +2792,13 @@ fn finish_dependent_elim(
         elim = Term::app(elim, Term::var(entry.var));
     }
     if add_hidden_equation {
-        elim = Term::app(elim, Term::Refl(Box::new(scrut_core.clone())));
+        let hidden_equation = Term::Eq(
+            Box::new(scrut_ty.clone()),
+            Box::new(scrut_core.clone()),
+            Box::new(scrut_core.clone()),
+        );
+        let proof = synth_generated_index_evidence(cx.env, &cx.ctx, &hidden_equation, span)?;
+        elim = Term::app(elim, proof);
         let zonked_ctx = Context {
             types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
         };
@@ -3379,6 +3445,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         motive,
         methods,
         &scrut_indices,
+        &scrut_ty,
         &scrut_core,
         &context_convoy,
         equation.is_some() || hidden_group_result_refinement,
@@ -3804,23 +3871,28 @@ fn refine_branch_goal(
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let pairs = method_index_premise_pairs(ind, params, target_indices, scrut_indices, n);
+    // Complete every evidence walk before refining the goal. An unsupported
+    // child therefore rejects the whole plan, even when an earlier declared
+    // index or Sigma child had usable Eq leaves.
+    let mut leaves = Vec::new();
+    for (slot, (idx_ty, target, scrut)) in pairs.iter().enumerate() {
+        let raw_eq = Term::Eq(
+            Box::new(cx.metas.zonk_term(idx_ty)),
+            Box::new(cx.metas.zonk_term(target)),
+            Box::new(cx.metas.zonk_term(scrut)),
+        );
+        leaves.extend(project_generated_index_equality_leaves(
+            cx.env,
+            &zonked_ctx,
+            &raw_eq,
+            Term::var(INDEX_REFINEMENT_SENTINEL_BASE + slot),
+        )?);
+    }
+
     let mut goal = expected_here.clone();
     let mut restorations = Vec::new();
-    for (slot, (idx_ty, target, scrut)) in pairs.iter().enumerate() {
-        let idx_ty = cx.metas.zonk_term(idx_ty);
-        let target = cx.metas.zonk_term(target);
-        let scrut = cx.metas.zonk_term(scrut);
-        let raw_eq = Term::Eq(
-            Box::new(idx_ty.clone()),
-            Box::new(target.clone()),
-            Box::new(scrut.clone()),
-        );
-        let reduced = whnf(cx.env, &zonked_ctx, &raw_eq);
-        let (peel_ty, a2, b2) = match &reduced {
-            Term::Eq(t, a, b) => ((**t).clone(), (**a).clone(), (**b).clone()),
-            _ => (idx_ty.clone(), target.clone(), scrut.clone()),
-        };
-        let candidate = subst_term_generalize(&goal, &b2, &a2);
+    for leaf in leaves {
+        let candidate = subst_term_generalize(&goal, &leaf.scrutinee, &leaf.target);
         if candidate == goal {
             continue;
         }
@@ -3829,16 +3901,15 @@ fn refine_branch_goal(
                 "index refinement: could not classify the branch goal: {e:?}"
             ))
         })?;
-        let h_sentinel = Term::var(INDEX_REFINEMENT_SENTINEL_BASE + slot);
         let restoration = classify_branch_goal_restoration(
             cx.env,
             &zonked_ctx,
-            &peel_ty,
-            &a2,
-            &b2,
+            &leaf.index_ty,
+            &leaf.target,
+            &leaf.scrutinee,
             &candidate,
             whnf(cx.env, &zonked_ctx, &level_ty),
-            h_sentinel,
+            leaf.proof,
         )?;
         restorations.push(restoration);
         goal = candidate;
@@ -3878,23 +3949,56 @@ fn install_hidden_result_variable_refinements(
             "result refinement: could not classify the matched type: {error:?}"
         ))
     })?;
-    let index_level = match whnf(cx.env, &zonked_ctx, &index_level_ty) {
-        Term::Type(level) => level,
+    match whnf(cx.env, &zonked_ctx, &index_level_ty) {
+        Term::Type(_) => {}
         other => {
             return Err(ElabError::Internal(format!(
                 "result refinement: matched type is not classified by Type, found {other:?}"
             )))
         }
-    };
-    let proof = Term::var(INDEX_REFINEMENT_SENTINEL_BASE + premise_slot);
-    let proof_sym = build_sym(
+    }
+
+    let raw_eq = Term::Eq(
+        Box::new(index_ty),
+        Box::new(concrete_index),
+        Box::new(refined_index),
+    );
+    let leaves = project_generated_index_equality_leaves(
         cx.env,
         &zonked_ctx,
-        &index_ty,
-        index_level,
-        &concrete_index,
-        proof,
-    );
+        &raw_eq,
+        Term::var(INDEX_REFINEMENT_SENTINEL_BASE + premise_slot),
+    )?;
+    // The hidden premise is oriented `concrete = refined`, while outer
+    // bindings are retyped from the refined scrutinee back to the constructor.
+    // Build one symmetric proof per projected Eq leaf, never one J over the
+    // whole observational Sigma.
+    let mut symmetric_leaves = Vec::with_capacity(leaves.len());
+    for leaf in leaves {
+        let level_ty = kernel_infer(cx.env, &zonked_ctx, &leaf.index_ty).map_err(|error| {
+            ElabError::Internal(format!(
+                "result refinement: could not classify a projected index type: {error:?}"
+            ))
+        })?;
+        let level = match whnf(cx.env, &zonked_ctx, &level_ty) {
+            Term::Type(level) => level,
+            other => {
+                return Err(ElabError::Internal(format!(
+                    "result refinement: projected index is not classified by Type, found {other:?}"
+                )))
+            }
+        };
+        let proof_sym = build_sym(
+            cx.env,
+            &zonked_ctx,
+            &leaf.index_ty,
+            level,
+            &leaf.target,
+            leaf.proof.clone(),
+        );
+        symmetric_leaves.push((leaf, proof_sym));
+    }
+
     let mut installed = Vec::new();
     for position in 0..outer_scope_depth {
         if cx.match_field_regions.iter().any(|region| region.contains(&position))
@@ -3929,18 +4033,29 @@ fn install_hidden_result_variable_refinements(
                 continue;
             }
         }
-        if let Some((cast, cast_ty)) = try_reindex_cast(
-            cx.env,
-            &zonked_ctx,
-            &index_ty,
-            &refined_index,
-            &concrete_index,
-            &outer_ty,
-            Term::var(index),
-            proof_sym.clone(),
-        )? {
+
+        let mut value = Term::var(index);
+        let mut value_ty = outer_ty;
+        let mut changed = false;
+        for (leaf, proof_sym) in &symmetric_leaves {
+            if let Some((cast, cast_ty)) = try_reindex_cast(
+                cx.env,
+                &zonked_ctx,
+                &leaf.index_ty,
+                &leaf.scrutinee,
+                &leaf.target,
+                &value_ty,
+                value.clone(),
+                proof_sym.clone(),
+            )? {
+                value = cast;
+                value_ty = cast_ty;
+                changed = true;
+            }
+        }
+        if changed {
             cx.var_refinements
-                .insert(position, (cast, cast_ty, cx.ctx.len()));
+                .insert(position, (value, value_ty, cx.ctx.len()));
             installed.push(position);
         }
     }
@@ -3956,88 +4071,44 @@ fn install_index_refinements(
     n: usize,
     outer_scope_depth: usize,
 ) -> Result<Vec<usize>, ElabError> {
-    let mut installed = Vec::new();
     // Zonk a throwaway copy of the context (and every term this function
     // hands to the raw kernel): a bare surface `(a:Type)` parameter's own
-    // type may still carry an unresolved elaborator level metavariable
-    // here — the kernel has no notion of those (`gate-widening-exposes-
-    // latent-bugs`; the SAME zonk this function's caller already applies
-    // to its own `motive_ctx`, just re-derived at this branch's own,
-    // deeper context).
+    // type may still carry an unresolved elaborator level metavariable here.
     let zonked_ctx = Context {
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let pairs = method_index_premise_pairs(ind, params, target_indices, scrut_indices, n);
+
+    // Build the complete leaf plan before mutating `var_refinements`. This is
+    // atomic across every declared-index premise: an unsupported child cannot
+    // leave earlier Eq components installed in the live elaboration context.
+    let mut leaves = Vec::new();
     for (slot, (idx_ty, target, scrut)) in pairs.iter().enumerate() {
-        let idx_ty = cx.metas.zonk_term(idx_ty);
-        let target = cx.metas.zonk_term(target);
-        let scrut = cx.metas.zonk_term(scrut);
-        // Not yet a real binder — `finalize_refined_body` relocates this to
-        // its true wrap-relative index once `check` returns (see the
-        // caller's comment).
-        let h_sentinel = Term::var(INDEX_REFINEMENT_SENTINEL_BASE + slot);
-        // WHNF the raw premise ourselves to discover the kernel's own
-        // constructor no-confusion peeling (e.g. `Eq Nat (Suc m) (Suc n)`
-        // reduces to `Eq Nat m n` via `eq_at_inductive`'s same-constructor
-        // case) — never re-implemented, only observed, so this generalizes
-        // to any index type with injective constructors, not just `Nat`.
         let raw_eq = Term::Eq(
-            Box::new(idx_ty.clone()),
-            Box::new(target.clone()),
-            Box::new(scrut.clone()),
+            Box::new(cx.metas.zonk_term(idx_ty)),
+            Box::new(cx.metas.zonk_term(target)),
+            Box::new(cx.metas.zonk_term(scrut)),
         );
-        let reduced = whnf(cx.env, &zonked_ctx, &raw_eq);
-        let (peel_ty, a2, b2) = match &reduced {
-            Term::Eq(t, a, b) => ((**t).clone(), (**a).clone(), (**b).clone()),
-            _ => (idx_ty.clone(), target.clone(), scrut.clone()),
-        };
+        leaves.extend(project_generated_index_equality_leaves(
+            cx.env,
+            &zonked_ctx,
+            &raw_eq,
+            Term::var(INDEX_REFINEMENT_SENTINEL_BASE + slot),
+        )?);
+    }
 
-        // Capability 1: constructor injectivity for this branch's own
-        // peeled recursive fields — does a field's raw (declared) type
-        // mention `a2` (the constructor-local, possibly-peeled index)?
-        for field_j in 0..n {
-            let field_pos = n - 1 - field_j;
-            let field_ty = cx.metas.zonk_term(&weaken(
-                cx.ctx
-                    .lookup(field_pos)
-                    .expect("field position just pushed"),
-                (field_pos as i64) + 1,
-            ));
-            if let Some((cast, new_ty)) = try_reindex_cast(
-                cx.env,
-                &zonked_ctx,
-                &peel_ty,
-                &a2,
-                &b2,
-                &field_ty,
-                Term::var(field_pos),
-                h_sentinel.clone(),
-            )? {
-                let bottom_pos = cx.ctx.len() - 1 - field_pos;
-                cx.var_refinements
-                    .insert(bottom_pos, (cast, new_ty, cx.ctx.len()));
-                installed.push(bottom_pos);
-            }
-        }
-
-        // Capability 2's per-binding sibling-Cast retyping is REPLACED by the
-        // context-telescope convoy (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-
-        // REBASE): the ordered ambient closure is generalized into the motive
-        // codomain and redirected via convoy binders in
-        // `check_match_dependent_mode`, not re-typed one binding at a time here.
-        // What REMAINS is the decision-5 FAIL-CLOSED guard: an index whose own
-        // type is not classified by a `Type` universe (an Omega-classified index)
-        // must be rejected before any sibling is refined, rather than silently
-        // convoyed. The convoy path depends on this guard firing per arm — it is
-        // not superseded by the kernel's later Elim check, which would surface a
-        // worse diagnostic for the same reject.
-        if outer_scope_depth > 0 {
-            let peel_level_ty = kernel_infer(cx.env, &zonked_ctx, &peel_ty).map_err(|e| {
+    // Capability 2's per-binding sibling-Cast retyping is replaced by the
+    // context-telescope convoy. What remains here is its decision-5 fail-closed
+    // guard, now applied to every projected index type rather than to an
+    // unreduced record type.
+    if outer_scope_depth > 0 {
+        for leaf in &leaves {
+            let level_ty = kernel_infer(cx.env, &zonked_ctx, &leaf.index_ty).map_err(|e| {
                 ElabError::Internal(format!(
                     "index refinement: could not classify an index type: {e:?}"
                 ))
             })?;
-            match whnf(cx.env, &zonked_ctx, &peel_level_ty) {
+            match whnf(cx.env, &zonked_ctx, &level_ty) {
                 Term::Type(_) => {}
                 other => {
                     return Err(ElabError::Internal(format!(
@@ -4045,6 +4116,45 @@ fn install_index_refinements(
                     )))
                 }
             }
+        }
+    }
+
+    // Capability 1: chain every projected component refinement through each
+    // constructor field. A field may depend on several components of the same
+    // record, so each successful transport becomes the next leaf's input.
+    let mut installed = Vec::new();
+    for field_j in 0..n {
+        let field_pos = n - 1 - field_j;
+        let field_ty = cx.metas.zonk_term(&weaken(
+            cx.ctx
+                .lookup(field_pos)
+                .expect("field position just pushed"),
+            (field_pos as i64) + 1,
+        ));
+        let mut value = Term::var(field_pos);
+        let mut value_ty = field_ty;
+        let mut changed = false;
+        for leaf in &leaves {
+            if let Some((cast, new_ty)) = try_reindex_cast(
+                cx.env,
+                &zonked_ctx,
+                &leaf.index_ty,
+                &leaf.target,
+                &leaf.scrutinee,
+                &value_ty,
+                value.clone(),
+                leaf.proof.clone(),
+            )? {
+                value = cast;
+                value_ty = new_ty;
+                changed = true;
+            }
+        }
+        if changed {
+            let bottom_pos = cx.ctx.len() - 1 - field_pos;
+            cx.var_refinements
+                .insert(bottom_pos, (value, value_ty, cx.ctx.len()));
+            installed.push(bottom_pos);
         }
     }
     Ok(installed)
@@ -10466,6 +10576,64 @@ mod nested_lift_association_tests {
             Box::new(nat.clone()),
             Box::new(zero.clone()),
             Box::new(zero),
+        );
+        let evidence_ty = Term::pi(equality, nat.clone());
+        let mut ctx = Context::new();
+        ctx.push(evidence_ty.clone());
+
+        let (specialized, specialized_ty) = discharge_reflexive_recursive_ih_evidence(
+            &env.env,
+            &ctx,
+            Term::var(0),
+            evidence_ty,
+            &nat,
+            &Span::new(0, 0),
+        )
+        .unwrap();
+
+        assert_eq!(specialized_ty, nat);
+        assert!(matches!(specialized, Term::App(_, _)));
+        assert_eq!(
+            kernel_infer(&env.env, &ctx, &specialized).unwrap(),
+            specialized_ty
+        );
+    }
+
+    #[test]
+    fn recursive_ih_record_sigma_evidence_is_applied_before_source_arguments() {
+        // Promise class: durable invariant.
+        // MEASURED: a private direct call specializes one reflexive record Eq
+        // premise whose observational evidence is Sigma(Eq, Top), and the
+        // resulting application kernel-infers at Nat.
+        // CLAIMED: recursive-IH discharge delegates whole generated premises to
+        // the same Sigma-aware evidence synthesizer. THE GAP: record fields are
+        // closed here; the integration fixture separately reaches a recursive
+        // constructor field with an open component equality.
+        let mut env = ElabEnv::new().unwrap();
+        env.elaborate_decl("data RecursiveIx = RecursiveMkIx Nat Bool")
+            .unwrap();
+        let (nat, zero, _) = nat_terms(&env);
+        let record_ty = Term::IndFormer {
+            id: env.globals["RecursiveIx"],
+            level_args: vec![],
+        };
+        let record_value = Term::app(
+            Term::app(
+                Term::Constructor {
+                    id: env.globals["RecursiveMkIx"],
+                    level_args: vec![],
+                },
+                zero,
+            ),
+            Term::Constructor {
+                id: env.globals["True"],
+                level_args: vec![],
+            },
+        );
+        let equality = Term::Eq(
+            Box::new(record_ty),
+            Box::new(record_value.clone()),
+            Box::new(record_value),
         );
         let evidence_ty = Term::pi(equality, nat.clone());
         let mut ctx = Context::new();
