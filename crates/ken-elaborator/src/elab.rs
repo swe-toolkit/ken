@@ -1469,6 +1469,57 @@ struct IndexEqualityLeaf {
     proof: Term,
 }
 
+/// The complete inventory of data carried by a coherent dependent-match
+/// motive into a constructor-refined frame. Keep the dispatch below exhaustive:
+/// adding a fourth class must fail compilation until its transport is designed.
+enum CoherentFrameCarriedDatum {
+    EqualityLeaves(Vec<IndexEqualityLeaf>),
+    IndexEquation(Term),
+    MotiveReturnTelescopeArguments(Vec<(Term, Term)>),
+}
+
+#[derive(Default)]
+struct CoherentFrameCarriedData {
+    equality_leaves: Vec<IndexEqualityLeaf>,
+    index_equation: Option<Term>,
+    telescope_argument_substitutions: Vec<(Term, Term)>,
+}
+
+impl CoherentFrameCarriedDatum {
+    fn carry_into(self, carried: &mut CoherentFrameCarriedData) {
+        match self {
+            CoherentFrameCarriedDatum::EqualityLeaves(leaves) => {
+                carried.equality_leaves = leaves;
+            }
+            CoherentFrameCarriedDatum::IndexEquation(equation) => {
+                debug_assert!(carried.index_equation.is_none());
+                carried.index_equation = Some(equation);
+            }
+            CoherentFrameCarriedDatum::MotiveReturnTelescopeArguments(substitutions) => {
+                carried.telescope_argument_substitutions = substitutions;
+            }
+        }
+    }
+}
+
+fn carry_coherent_frame_data(
+    leaves: Vec<IndexEqualityLeaf>,
+    index_equation: Term,
+    telescope_argument_substitutions: Vec<(Term, Term)>,
+) -> CoherentFrameCarriedData {
+    let mut carried = CoherentFrameCarriedData::default();
+    for datum in [
+        CoherentFrameCarriedDatum::EqualityLeaves(leaves),
+        CoherentFrameCarriedDatum::IndexEquation(index_equation),
+        CoherentFrameCarriedDatum::MotiveReturnTelescopeArguments(
+            telescope_argument_substitutions,
+        ),
+    ] {
+        datum.carry_into(&mut carried);
+    }
+    carried
+}
+
 /// Project one generated dependent-match equality premise into the `Eq` leaves
 /// that can lawfully drive `J`-based refinement. The producer keeps one raw
 /// `Eq` premise per declared index; observational equality may expose that one
@@ -2349,11 +2400,40 @@ fn refresh_embedded_elim_evidence(
     }
 }
 
+/// Does a return telescope contain an argument type coupled to `target`?
+/// Only Pi domains count: an occurrence solely in the terminal goal belongs to
+/// the existing equality/index-equation path, not the telescope-argument class.
+fn motive_return_telescope_argument_occurs(
+    env: &GlobalEnv,
+    ctx: &Context,
+    term: &Term,
+    target: &Term,
+) -> bool {
+    match whnf(env, ctx, term) {
+        Term::Pi(domain, codomain) => {
+            if scrut_occurs(&domain, target) {
+                return true;
+            }
+            let mut codomain_ctx = ctx.clone();
+            codomain_ctx.push((*domain).clone());
+            motive_return_telescope_argument_occurs(
+                env,
+                &codomain_ctx,
+                &codomain,
+                &weaken(target, 1),
+            )
+        }
+        _ => false,
+    }
+}
+
 /// Build a branch-specific coherent-frame motive by large-eliminating the one
 /// generalized index before introducing the matched-family value. Conflict
 /// constructors compute to a J-free `Bottom -> Top`; compatible constructors
 /// compute to the usual generated equality premise followed by a transport
-/// built only from that branch's already-peeled equality leaves.
+/// built only from that branch's already-peeled equality leaves. A forced
+/// scrutinee index may additionally rebase coupled return-telescope arguments
+/// into the constructor's predecessor frame before method construction.
 fn build_index_equation_convoy_body(
     env: &GlobalEnv,
     outer_ctx: &Context,
@@ -2364,24 +2444,43 @@ fn build_index_equation_convoy_body(
     scrut_indices: &[Term],
     original_expected: &Term,
     motive_base_depth: usize,
+    context_convoy: &[ConvoyEntry],
+    sentinel_region: usize,
 ) -> Result<Option<Term>, ElabError> {
     if ind.indices.len() != 1 || scrut_indices.len() != 1 {
         return Ok(None);
     }
     let goal_head = whnf(env, outer_ctx, original_expected);
-    let Term::Eq(goal_ty, _, _) = goal_head else {
-        return Ok(None);
-    };
-    let Term::Type(goal_level) = whnf(
-        env,
-        outer_ctx,
-        &kernel_infer(env, outer_ctx, &goal_ty).map_err(|error| {
-            ElabError::Internal(format!(
-                "large index convoy could not classify its equality carrier: {error:?}"
-            ))
-        })?,
-    ) else {
-        return Ok(None);
+    let (return_telescope, goal_level) = match goal_head {
+        Term::Eq(goal_ty, _, _) => {
+            let Term::Type(goal_level) = whnf(
+                env,
+                outer_ctx,
+                &kernel_infer(env, outer_ctx, &goal_ty).map_err(|error| {
+                    ElabError::Internal(format!(
+                        "large index convoy could not classify its equality carrier: {error:?}"
+                    ))
+                })?,
+            ) else {
+                return Ok(None);
+            };
+            (false, goal_level)
+        }
+        Term::Pi(_, _) => {
+            let Term::Omega(goal_level) = whnf(
+                env,
+                outer_ctx,
+                &kernel_infer(env, outer_ctx, original_expected).map_err(|error| {
+                    ElabError::Internal(format!(
+                        "large index convoy could not classify its return telescope: {error:?}"
+                    ))
+                })?,
+            ) else {
+                return Ok(None);
+            };
+            (true, goal_level)
+        }
+        _ => return Ok(None),
     };
     let goal_sort = Term::Omega(goal_level);
 
@@ -2492,81 +2591,158 @@ fn build_index_equation_convoy_body(
             Box::new(weaken(&scrut_indices[0], (method_binder_count + 1) as i64)),
         );
         let evidence_shape = whnf(env, &method_ctx, &raw_evidence);
-        let branch_result = if matches!(
+        let conflicting_equation = matches!(
             evidence_shape,
             Term::Const { id, .. } if id == env.bottom_id()
-        ) {
-            Term::pi(
-                raw_evidence,
-                Term::Const {
-                    id: env.top_id(),
-                    level_args: Vec::new(),
-                },
-            )
+        );
+        let mut evidence_ctx = method_ctx.clone();
+        let leaves = if conflicting_equation {
+            Vec::new()
         } else {
-            let mut evidence_ctx = method_ctx.clone();
             evidence_ctx.push(raw_evidence.clone());
-            let leaves = project_generated_index_equality_leaves(
+            project_generated_index_equality_leaves(
                 env,
                 &evidence_ctx,
                 &weaken(&raw_evidence, 1),
                 Term::var(0),
-            )?;
-            let mut value = Term::var(1);
-            let mut value_ty = weaken(&value_domain, 2);
-            let mut changed = false;
-            for leaf in leaves {
-                let Term::Type(index_level) = whnf(
-                    env,
-                    &evidence_ctx,
-                    &kernel_infer(env, &evidence_ctx, &leaf.index_ty).map_err(|error| {
-                        ElabError::Internal(format!(
-                            "large index convoy could not classify a peeled index: {error:?}"
-                        ))
-                    })?,
-                ) else {
-                    return Ok(None);
-                };
-                let reverse = build_sym(
-                    env,
-                    &evidence_ctx,
-                    &leaf.index_ty,
-                    index_level.clone(),
-                    &leaf.target,
-                    leaf.proof,
-                );
-                let stable_forward = build_sym(
-                    env,
-                    &evidence_ctx,
-                    &leaf.index_ty,
-                    index_level,
-                    &leaf.scrutinee,
-                    reverse,
-                );
-                if let Some((cast, cast_ty)) = try_reindex_cast(
-                    env,
-                    &evidence_ctx,
-                    &leaf.index_ty,
-                    &leaf.target,
-                    &leaf.scrutinee,
-                    &value_ty,
-                    value.clone(),
-                    stable_forward,
-                )? {
-                    value = cast;
-                    value_ty = cast_ty;
-                    changed = true;
+            )?
+        };
+        let depth = method_binder_count + 2;
+        let expected_at_depth = weaken(original_expected, depth as i64);
+        let telescope_argument_substitutions = if conflicting_equation {
+            Vec::new()
+        } else {
+            leaves
+                .iter()
+                .filter(|leaf| {
+                    motive_return_telescope_argument_occurs(
+                        env,
+                        &evidence_ctx,
+                        &expected_at_depth,
+                        &leaf.scrutinee,
+                    )
+                })
+                .map(|leaf| (leaf.scrutinee.clone(), leaf.target.clone()))
+                .collect()
+        };
+        let carried = carry_coherent_frame_data(
+            leaves,
+            raw_evidence,
+            telescope_argument_substitutions,
+        );
+        let raw_evidence = carried.index_equation.ok_or_else(|| {
+            ElabError::Internal("coherent-frame index equation was not carried".into())
+        })?;
+        let branch_result = if conflicting_equation {
+            let impossible_result = if return_telescope {
+                expected_at_depth.clone()
+            } else {
+                Term::Const {
+                    id: env.top_id(),
+                    level_args: Vec::new(),
                 }
-            }
-            if !changed {
-                return Ok(None);
-            }
-            let depth = method_binder_count + 2;
-            let goal = subst_term_generalize(
-                &weaken(original_expected, depth as i64),
-                &weaken(scrut_core, depth as i64),
-                &value,
-            );
+            };
+            Term::pi(raw_evidence, impossible_result)
+        } else {
+            let goal = if return_telescope {
+                if carried.telescope_argument_substitutions.is_empty() {
+                    return Ok(None);
+                }
+                let telescope_substitutions = carried.telescope_argument_substitutions;
+                let mut goal_substitutions = telescope_substitutions.clone();
+                goal_substitutions.push((weaken(scrut_core, depth as i64), Term::var(1)));
+                let mut goal =
+                    subst_term_generalize_many(&expected_at_depth, &goal_substitutions);
+
+                // Ambient context-convoy entries are the already-bound half of
+                // the same telescope class. Rebind them inside the selected
+                // proposition, refine their types with the same equality-leaf
+                // substitutions, and redirect every goal occurrence to the
+                // new binders. Constructor extraction later peels these hidden
+                // Pis back into the method premise telescope.
+                if !context_convoy.is_empty() {
+                    let target_index = subst_term_generalize_many(
+                        &weaken(&scrut_indices[0], depth as i64),
+                        &telescope_substitutions,
+                    );
+                    let (types_inner_first, sentinels) = convoy_binder_types(
+                        context_convoy,
+                        scrut_indices,
+                        scrut_core,
+                        &[target_index],
+                        &Term::var(1),
+                        depth,
+                        0,
+                        sentinel_region,
+                    );
+                    let types_inner_first: Vec<Term> = types_inner_first
+                        .iter()
+                        .map(|ty| subst_term_generalize_many(ty, &telescope_substitutions))
+                        .collect();
+                    goal = redirect_convoy_body(context_convoy, depth, &sentinels, goal);
+                    let mut premises = Vec::with_capacity(context_convoy.len());
+                    for index in (0..context_convoy.len()).rev() {
+                        premises.push(types_inner_first[index].clone());
+                    }
+                    goal = wrap_premise_pis_finalized(goal, &premises, sentinel_region);
+                }
+                goal
+            } else {
+                let mut value = Term::var(1);
+                let mut value_ty = weaken(&value_domain, 2);
+                let mut changed = false;
+                for leaf in carried.equality_leaves {
+                    let Term::Type(index_level) = whnf(
+                        env,
+                        &evidence_ctx,
+                        &kernel_infer(env, &evidence_ctx, &leaf.index_ty).map_err(|error| {
+                            ElabError::Internal(format!(
+                                "large index convoy could not classify a peeled index: {error:?}"
+                            ))
+                        })?,
+                    ) else {
+                        return Ok(None);
+                    };
+                    let reverse = build_sym(
+                        env,
+                        &evidence_ctx,
+                        &leaf.index_ty,
+                        index_level.clone(),
+                        &leaf.target,
+                        leaf.proof,
+                    );
+                    let stable_forward = build_sym(
+                        env,
+                        &evidence_ctx,
+                        &leaf.index_ty,
+                        index_level,
+                        &leaf.scrutinee,
+                        reverse,
+                    );
+                    if let Some((cast, cast_ty)) = try_reindex_cast(
+                        env,
+                        &evidence_ctx,
+                        &leaf.index_ty,
+                        &leaf.target,
+                        &leaf.scrutinee,
+                        &value_ty,
+                        value.clone(),
+                        stable_forward,
+                    )? {
+                        value = cast;
+                        value_ty = cast_ty;
+                        changed = true;
+                    }
+                }
+                if !changed {
+                    return Ok(None);
+                }
+                subst_term_generalize(
+                    &expected_at_depth,
+                    &weaken(scrut_core, depth as i64),
+                    &value,
+                )
+            };
             kernel_infer(env, &evidence_ctx, &goal).map_err(|error| {
                 ElabError::Internal(format!(
                     "large index convoy successor goal is ill-typed: {error:?}"
@@ -2744,10 +2920,15 @@ fn plan_coherent_frame_motive(
     // placed at the generalized index. The outer match itself stays opaque and
     // uses its ordinary context telescope so the nested covering is reached
     // only after the outer constructor has been selected.
-    let equation_convoy =
-        !cx.match_field_regions.is_empty() && has_nontrivial_coupled_sides;
+    let forced_telescope_convoy = matches!(original_expected, Term::Pi(_, _))
+        && scrut_indices
+            .iter()
+            .any(|index| !matches!(index, Term::Var(_)));
+    let equation_convoy = (!cx.match_field_regions.is_empty()
+        && has_nontrivial_coupled_sides)
+        || forced_telescope_convoy;
     if equation_convoy {
-        if !probe_context_convoy.is_empty() {
+        if !probe_context_convoy.is_empty() && !forced_telescope_convoy {
             return Err(ElabError::Internal(
                 "index-equation convoy unexpectedly overlaps an ambient context convoy".into(),
             ));
@@ -2762,10 +2943,12 @@ fn plan_coherent_frame_motive(
             scrut_indices,
             original_expected,
             motive_base_depth,
+            &probe_context_convoy,
+            sentinel_region,
         )? {
             return Ok(Box::new(CoherentFrameMotivePlan {
                 expected: original_expected.clone(),
-                context_convoy: Vec::new(),
+                context_convoy: probe_context_convoy.clone(),
                 embedded_method_convoy: Vec::new(),
                 embedded_method_repairs: Vec::new(),
                 motive_user_body,
@@ -4299,6 +4482,7 @@ fn build_dependent_constructor_frame(
             &target_indices,
             &concrete,
             field_count,
+            context_convoy.len(),
             sentinel_region,
         )?
     } else {
@@ -4319,7 +4503,7 @@ fn build_dependent_constructor_frame(
     };
 
     let index_premise_count = premise_domains.len();
-    let (types_inner_first, sentinels) = convoy_binder_types(
+    let (mut types_inner_first, sentinels) = convoy_binder_types(
         context_convoy,
         scrut_indices,
         scrut_core,
@@ -4329,6 +4513,35 @@ fn build_dependent_constructor_frame(
         index_premise_count,
         sentinel_region,
     );
+    if equation_convoy && !context_convoy.is_empty() {
+        let index_equation = premise_domains[0].clone();
+        let leaves = project_generated_index_equality_leaves(
+            cx.env,
+            &cx.ctx,
+            &index_equation,
+            index_refinement_sentinel(sentinel_region, 0),
+        )?;
+        let telescope_argument_substitutions: Vec<(Term, Term)> = leaves
+            .iter()
+            .filter(|leaf| {
+                types_inner_first
+                    .iter()
+                    .any(|ty| scrut_occurs(ty, &leaf.scrutinee))
+            })
+            .map(|leaf| (leaf.scrutinee.clone(), leaf.target.clone()))
+            .collect();
+        let carried = carry_coherent_frame_data(
+            leaves,
+            index_equation,
+            telescope_argument_substitutions,
+        );
+        for ty in &mut types_inner_first {
+            *ty = subst_term_generalize_many(
+                ty,
+                &carried.telescope_argument_substitutions,
+            );
+        }
+    }
     expected_here = redirect_convoy_body(
         context_convoy,
         field_count,
@@ -4433,6 +4646,7 @@ fn large_convoy_branch_goal(
     target_indices: &[Term],
     concrete: &Term,
     field_count: usize,
+    context_convoy_len: usize,
     sentinel_region: usize,
 ) -> Result<Term, ElabError> {
     let mut motive_args = target_indices.to_vec();
@@ -4445,10 +4659,22 @@ fn large_convoy_branch_goal(
             "large index convoy branch did not compute to its evidence premise".into(),
         ));
     };
-    Ok(subst0(
+    let mut goal = subst0(
         &codomain,
         &index_refinement_sentinel(sentinel_region, 0),
-    ))
+    );
+    for convoy_slot in 0..context_convoy_len {
+        let Term::Pi(_, codomain) = whnf(env, ctx, &goal) else {
+            return Err(ElabError::Internal(
+                "large index convoy branch lost a context-telescope argument".into(),
+            ));
+        };
+        goal = subst0(
+            &codomain,
+            &index_refinement_sentinel(sentinel_region, 1 + convoy_slot),
+        );
+    }
+    Ok(goal)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4945,7 +5171,10 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     // an earlier-built binder type nests at a different depth. Only the Elim
     // itself, kernel-validated, certifies the assembled shape.
     let convoy_count = context_convoy.len();
-    if convoy_count > 0 || !embedded_method_convoy.is_empty() {
+    let context_convoy_embedded_in_large_selector = equation_convoy && convoy_count > 0;
+    if context_convoy_embedded_in_large_selector {
+        debug_assert!(embedded_method_convoy.is_empty());
+    } else if convoy_count > 0 || !embedded_method_convoy.is_empty() {
         // Same ONE plan as the methods/IH: local indices `Var(n_i - j)` and the
         // scrutinee binder `Var(0)` are this frame's targets. Embedded methods
         // are appended after the ambient convoy, so their sentinels and types
