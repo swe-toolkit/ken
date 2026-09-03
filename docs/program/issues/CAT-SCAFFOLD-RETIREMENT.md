@@ -48,8 +48,13 @@ provider.
   Pure export publication, no consumer edits. Census folded it to
   `Derived::{nth, bytes_nat_length}`; Transport/Compare/Arithmetic/Nat.Order are
   already sufficiently published.
-- **Tier B — Core.Classes + primitive-instance consolidation.** LC then LF then
-  EC (EC imports LF; LF/EC import T/D). **The class-owner relocation lands here
+- **Tier B — Core.Classes + primitive-instance consolidation.**
+  ([[CAT-MIGRATE-TIER-B-CLASSES]], `active` — framed + released 2026-09-03.)
+  **Census fold (Steward measurement at `f01266423`): LC/LF/EC are ALREADY
+  CLEAN** (LF via the just-landed `CAT-LAWFULFUNCTORS-STANDALONE-IMPORT`), so the
+  "LC then LF then EC" module-migration folds out; the live Tier-B delta is the
+  DecEq relocation into LC + the three scaffolded consumers (BytesKeys,
+  StringKeys, EmptyDec) going standalone. **The class-owner relocation lands here
   and gates every DecEq/class consumer below.** Operator ruling 2026-09-02
   (Flag 2, verbatim "Move DecEq UInt8, etc to LC"): the orphaned primitive-type
   `DecEq` instances — `DecEq UInt8` and `DecEq Bytes` (from BytesKeys),
