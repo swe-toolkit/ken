@@ -736,6 +736,65 @@ impl<'a> Lowering<'a> {
         )
     }
 
+    /// D3-RECUT: the governed-Tail forward-SSA-edge closeout, shared by the two
+    /// TailProducerToRet consumption sites (the non-governed-current-call seam and
+    /// the governed generated-entry arrival's TailProducerToRet route). A Formed
+    /// authority means the selected transport's derived generated-entry row is a
+    /// TailProducerToRet route with a validated confluence member; this consumes it.
+    ///
+    /// It runs the declared continuation call once (the specialized response owner,
+    /// whose body IS the continuation, so `result` is the continuation's own
+    /// response ITree::Ret value -- NOT a hand-rolled product), gates it through
+    /// the Trap-checked `from_declared_call`, then PROJECTS the Ret's single answer
+    /// field -- the inner ResourceBodyResult -- exactly as the fall-through's
+    /// strict-Ret eliminator does (core.rs:13199-13292, `emit_carrier_field(scrut,
+    /// 0)`), and routes THAT word on one certified forward SSA edge to the
+    /// authority's shared Ret block. The jump terminates this predecessor; the
+    /// caller seals it with a RecursiveBackedge disposition. Per-arrival and
+    /// exact-once: it replaces the fall-through `RoutedAnswer::checked(result)` for
+    /// this arm and is gated by the Formed authority. Option (a): value projection
+    /// + one jump; no construction, no runtime carrier, no boundary reopen.
+    fn emit_composed_return_forward_ret_closeout(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        authority: ComposedReturnForwardRetAuthority,
+        transport: &CheckedIhEnvironmentTransport,
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        self.pending_computational_ih_call.take();
+        let result = self.call_tail_checked_ih_transport_from_case_environment(
+            builder, transport, env,
+        )?;
+        // The Trap-checked Result gate: a governed continuation call yields exactly
+        // one Carried runtime Result; a specialized template is refused here.
+        let checked = CheckedIhApplicationResult::from_declared_call(result)?;
+        // NOTE (D3-RECUT, unresolved decode): the correct envelope decode of the
+        // transport result to the inner ResourceBodyResult is still being pinned
+        // against the running fixture. emit_carrier_field(_, 0) reaches a Result
+        // match (moves the trap from ResourceBodyResult to Result); host_payload
+        // fails the carrier boundary. Held at field-0 pending the Architect's
+        // confirmation of the response-owner env-word structure.
+        let answer = self.emit_carrier_field(builder, checked.word, 0)?;
+        #[cfg(feature = "px8-ds-test-support")]
+        let edge_word = if composed_return_forward_ret_authority_mutation()
+            == ComposedReturnForwardRetAuthorityMutation::SubstituteForwardEdgeWord
+        {
+            // AC-CAUSAL-PAIR (b): keep the edge and the sink but carry an
+            // independent non-result word; a fixture that still greened would not
+            // depend on the exact answer reaching the exit. The behavioral flip
+            // (green under Exact, red here) is the anti-vacuity evidence.
+            builder.ins().iconst(types::I64, 0)
+        } else {
+            answer.word
+        };
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let edge_word = answer.word;
+        builder
+            .ins()
+            .jump(authority.return_body, &[edge_word.into()]);
+        Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge))
+    }
+
     pub(super) fn lower_source_machine_with_continuation<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -4469,14 +4528,21 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             proof,
                         );
                     }
-                    // Non-governed current calls may still select a transport
-                    // whose source-specific certificate is Tail. They retain
-                    // the existing producer path; only a validated governed
-                    // Direct projection activates the new call emitter.
+                    // A non-governed current call may still select a transport whose
+                    // derived generated-entry row is a TailProducerToRet route: the
+                    // forward-Ret plan proof keys on the transport's route, not on
+                    // the current call's projection, so `Formed` reaches HERE (this
+                    // is the seam the fs-at-offset composed returns take). D3-RECUT
+                    // consumes it with the forward-SSA-edge closeout; NonApplicable
+                    // retains the existing environment-capture producer path.
                     if current_checked_ih_projection.is_none() {
-                        let _forward_ret_authority = match forward_ret_outcome {
+                        match forward_ret_outcome {
                             ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
-                                Some(authority)
+                                return Ok(SourceCallOutcome::Complete(
+                                    self.emit_composed_return_forward_ret_closeout(
+                                        builder, authority, &transport, &env,
+                                    )?,
+                                ));
                             }
                             ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
                                 self.pending_computational_ih_call.take();
@@ -4493,9 +4559,23 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     },
                                 ));
                             }
+                            // AC-EXACT-ONCE (zero-closeout control): with the
+                            // authority suppressed, no forward edge is taken and the
+                            // result reverts to the source-machine answer collapse,
+                            // reddening on the base ResourceBodyResult trap.
                             #[cfg(feature = "px8-ds-test-support")]
                             ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
-                                None
+                                self.pending_computational_ih_call.take();
+                                let result = self
+                                    .call_tail_checked_ih_transport_from_case_environment(
+                                        builder, &transport, &env,
+                                    )?;
+                                return Ok(SourceCallOutcome::Continue(
+                                    SourceMachineState::Value {
+                                        value: RoutedAnswer::checked(result),
+                                        control,
+                                    },
+                                ));
                             }
                             #[cfg(feature = "px8-ds-test-support")]
                             ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
@@ -4511,15 +4591,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     "a validated Tail producer-to-Ret route formed more than one post-selection authority",
                                 ));
                             }
-                        };
-                        self.pending_computational_ih_call.take();
-                        let result = self.call_tail_checked_ih_transport_from_case_environment(
-                            builder, &transport, &env,
-                        )?;
-                        return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
-                            value: RoutedAnswer::checked(result),
-                            control,
-                        }));
+                        }
                     }
                     let (projection, pending, callee_origin) = current_checked_ih_projection
                         .take()
@@ -4556,18 +4628,19 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             .into_routed_answer()
                         }
                         CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
-                            // The governed Tail producer's Trap-checked runtime
-                            // Result takes ONE certified forward SSA edge to the
-                            // exact function-local shared Ret block, bypassing the
+                            // The governed generated-entry arrival's Tail route: the
+                            // Trap-checked runtime Result takes ONE certified forward
+                            // SSA edge to the shared Ret block, bypassing the
                             // source-machine answer collapse, the constructor
                             // transfer, the active carried backedge, and the checked
-                            // fallback. This is the single relaxed constraint; spec,
-                            // kernel, ABI, and runtime state are unchanged, and the
-                            // block handle is compiler state that never enters a Ken
-                            // value, carrier, frame, ABI, or memory.
-                            let authority = match forward_ret_outcome {
+                            // fallback. Same closeout as the non-governed seam above.
+                            match forward_ret_outcome {
                                 ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
-                                    authority
+                                    return Ok(SourceCallOutcome::Complete(
+                                        self.emit_composed_return_forward_ret_closeout(
+                                            builder, authority, &transport, &env,
+                                        )?,
+                                    ));
                                 }
                                 ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
                                     return Err(unsupported(
@@ -4575,12 +4648,10 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         "a validated Tail producer-to-Ret route has no exact post-selection authority",
                                     ));
                                 }
-                                // AC-EXACT-ONCE (zero-closeout control): with the
-                                // authority suppressed no forward edge is taken, so
-                                // the Result reverts to the source-machine answer
-                                // collapse and the fixture reddens on the base
-                                // ResourceBodyResult trap. This is the pre-D3
-                                // behavior, retained here only as the control.
+                                // AC-EXACT-ONCE (zero-closeout control): suppress the
+                                // authority and the Result reverts to the answer
+                                // collapse, reddening on the base ResourceBodyResult
+                                // trap.
                                 #[cfg(feature = "px8-ds-test-support")]
                                 ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
                                     self.pending_computational_ih_call.take();
@@ -4603,9 +4674,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     ));
                                 }
                                 // AC-EXACT-ONCE (twice-closeout control): two
-                                // post-selection authorities is exactly the "fires
-                                // twice for one arrival" state; it refuses at
-                                // formation rather than emitting a second closeout.
+                                // authorities is the "fires twice for one arrival"
+                                // state; it refuses at formation.
                                 #[cfg(feature = "px8-ds-test-support")]
                                 ComposedReturnForwardRetAuthorityOutcome::Duplicated(
                                     _first,
@@ -4616,52 +4686,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         "a validated Tail producer-to-Ret route formed more than one post-selection authority",
                                     ));
                                 }
-                            };
-                            self.pending_computational_ih_call.take();
-                            // Emit the declared governed call once; its result is
-                            // the returned carried word.
-                            let result = self
-                                .call_tail_checked_ih_transport_from_case_environment(
-                                    builder, &transport, &env,
-                                )?;
-                            // The Trap-checked Result gate: a governed continuation
-                            // call yields exactly one Carried runtime Result. A
-                            // specialized template is refused here and never reaches
-                            // the edge, so only a real Trap-checked Result crosses.
-                            let checked =
-                                CheckedIhApplicationResult::from_declared_call(result)?;
-                            #[cfg(feature = "px8-ds-test-support")]
-                            let edge_word = if composed_return_forward_ret_authority_mutation()
-                                == ComposedReturnForwardRetAuthorityMutation::SubstituteForwardEdgeWord
-                            {
-                                // AC-CAUSAL-PAIR (b): keep the edge and the sink but
-                                // carry an independent non-result word. A fixture
-                                // that still greened under this substitution would
-                                // not depend on the exact Result reaching the exit;
-                                // the behavioral flip (green under Exact, red here)
-                                // is the anti-vacuity evidence that this reached the
-                                // live edge.
-                                builder.ins().iconst(types::I64, 0)
-                            } else {
-                                checked.word.word
-                            };
-                            #[cfg(not(feature = "px8-ds-test-support"))]
-                            let edge_word = checked.word.word;
-                            // The certified forward SSA edge to the exact shared Ret
-                            // block. The jump terminates this predecessor; the
-                            // sealed RecursiveBackedge disposition (as the existing
-                            // join-edge seal at the top of this file) tells the
-                            // driver this branch yields no further source value, so
-                            // no remaining source continuation emits on it and there
-                            // is no second Ret body. Per-arrival and exact-once: this
-                            // arm returns immediately, emitting one edge for the one
-                            // arrival.
-                            builder
-                                .ins()
-                                .jump(authority.return_body, &[edge_word.into()]);
-                            return Ok(SourceCallOutcome::Complete(
-                                LoweringOperand::Specialized(Lowered::RecursiveBackedge),
-                            ));
+                            }
                         }
                     };
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
