@@ -16,6 +16,61 @@ EXCLUDED_BINARIES = {
     "px8f_write_partition",
 }
 
+# D2 (CI-GATE-TIME-REDUCTION) AC-NO-FALSE-GREEN: the required control arms of the
+# rt_parity_native grids that were decomposed from monolithic #[test]s into one
+# independently-schedulable #[test] per arm. rt_parity_native is excluded from the
+# 8-way partition above (it runs in its own native-slow job), but it is still
+# DISCOVERED in the authority inventory, so this INDEPENDENT roster verifies every
+# decomposed arm is present: a split that silently drops an arm (a per-mutation
+# test removed at the source) reds here, because the roster cannot shrink with the
+# source. The former monolithic grids' trailing whole-run "mutation_is_exact"
+# union is rehomed here. Renaming or retiring an arm is a deliberate, reviewed
+# change that must update this roster in lockstep.
+REQUIRED_RT_PARITY_ARMS = {
+    # direct_application_population (5)
+    "checked_ih_direct_application_drop_call_refuses_and_restores",
+    "checked_ih_direct_application_vary_transport_refuses_and_restores",
+    "checked_ih_direct_application_permute_captures_refuses_and_restores",
+    "checked_ih_direct_application_drop_capture_refuses_and_restores",
+    "checked_ih_direct_application_environment_for_result_refuses_and_restores",
+    # full_demand fan-out / population (1)
+    "static_response_full_demand_fan_out_population_is_deferred_and_distinct",
+    # full_demand producer/K-row (8)
+    "static_response_full_demand_drop_row_reds_and_restores",
+    "static_response_full_demand_duplicate_row_reds_and_restores",
+    "static_response_full_demand_vary_row_reds_and_restores",
+    "static_response_full_demand_merge_k_reds_and_restores",
+    "static_response_full_demand_response_operation_reds_and_restores",
+    "static_response_full_demand_response_prior_reds_and_restores",
+    "static_response_full_demand_response_app_env_reds_and_restores",
+    "static_response_full_demand_causal_prefix_reds_and_restores",
+    # full_demand census (12): read/write x {drop,permute,vary} x {capture,input}
+    "static_response_full_demand_read_drop_capture_reaches_and_restores",
+    "static_response_full_demand_read_permute_capture_reaches_and_restores",
+    "static_response_full_demand_read_vary_capture_reaches_and_restores",
+    "static_response_full_demand_read_drop_input_reaches_and_restores",
+    "static_response_full_demand_read_permute_input_reaches_and_restores",
+    "static_response_full_demand_read_vary_input_reaches_and_restores",
+    "static_response_full_demand_write_drop_capture_reaches_and_restores",
+    "static_response_full_demand_write_permute_capture_reaches_and_restores",
+    "static_response_full_demand_write_vary_capture_reaches_and_restores",
+    "static_response_full_demand_write_drop_input_reaches_and_restores",
+    "static_response_full_demand_write_permute_input_reaches_and_restores",
+    "static_response_full_demand_write_vary_input_reaches_and_restores",
+    # owner_body (11)
+    "static_response_owner_body_context_zero_reds_and_restores",
+    "static_response_owner_body_response_operation_reds_and_restores",
+    "static_response_owner_body_raw_host_result_reds_and_restores",
+    "static_response_owner_body_raw_worker_reds_and_restores",
+    "static_response_owner_body_omit_k_call_reds_and_restores",
+    "static_response_owner_body_duplicate_k_call_reds_and_restores",
+    "static_response_owner_body_before_host_validation_reds_and_restores",
+    "static_response_owner_body_after_answer_collapse_reds_and_restores",
+    "static_response_owner_body_trap_bypass_reds_and_restores",
+    "static_response_owner_body_vary_ret_reds_and_restores",
+    "static_response_owner_body_omit_owner_definition_reds_and_restores",
+}
+
 
 class ShardCheckError(RuntimeError):
     pass
@@ -127,10 +182,31 @@ def main() -> int:
             union |= selected
         if union != population:
             raise ShardCheckError("realized shard union differs from filtered inventory")
+        # AC-NO-FALSE-GREEN: every decomposed rt_parity control arm must be present
+        # in the authority inventory. rt_parity_native is excluded from the shard
+        # partition (own job) but still discovered, so this catches a silently
+        # dropped arm that the union check above cannot -- a dropped arm shrinks
+        # BOTH the union and the inventory together, so only an independent roster
+        # sees it.
+        rt_parity_arms = {
+            testcase
+            for (binary_id, testcase) in authority_discovered
+            if authority_classes[(binary_id, testcase)] == "rt_parity_native"
+        }
+        missing_arms = REQUIRED_RT_PARITY_ARMS - rt_parity_arms
+        if missing_arms:
+            raise ShardCheckError(
+                "required rt_parity_native control arms missing from the realized "
+                "inventory (a decomposed grid silently dropped an arm): "
+                + ", ".join(sorted(missing_arms))
+            )
     except ShardCheckError as error:
         print(f"realized-shard check failed: {error}", file=sys.stderr)
         return 2
-    print(f"realized shard partition verified: {len(union)} canonical test identities")
+    print(
+        f"realized shard partition verified: {len(union)} canonical test identities; "
+        f"{len(REQUIRED_RT_PARITY_ARMS)} required rt_parity control arms present"
+    )
     return 0
 
 

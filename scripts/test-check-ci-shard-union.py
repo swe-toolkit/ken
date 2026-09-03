@@ -2,6 +2,7 @@
 """Focused schema-faithful fixtures for realized shard partition evidence."""
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -11,6 +12,14 @@ import unittest
 
 
 SCRIPT = Path(__file__).with_name("check-ci-shard-union.py").resolve()
+
+# Import the checker module (hyphenated filename) to reuse the SINGLE source of
+# truth for the required-arm roster, so this test cannot silently diverge from the
+# check it exercises. `__name__` is not "__main__" here, so main() does not run.
+_spec = importlib.util.spec_from_file_location("check_ci_shard_union", SCRIPT)
+_checker = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_checker)
+REQUIRED_RT_PARITY_ARMS = _checker.REQUIRED_RT_PARITY_ARMS
 
 
 def listing(rows, matches):
@@ -34,6 +43,13 @@ class Fixtures(unittest.TestCase):
         native = [
             (f"fixture::{name}", "native_test")
             for name in ("rt_parity_native", "px8f_buffer_native", "px8f_write_partition")
+        ] + [
+            # The decomposed rt_parity control arms: discovered + excluded (own job),
+            # so the arm-coverage roster check sees them without the shard partition
+            # selecting them. Populated from the checker's own roster so success stays
+            # in lockstep with the required set.
+            ("fixture::rt_parity_native", arm)
+            for arm in sorted(REQUIRED_RT_PARITY_ARMS)
         ]
         rows = ordinary + native
         assignments = list(ordinary)
@@ -224,6 +240,49 @@ class Fixtures(unittest.TestCase):
             value["rust-suites"]["suite-8"]["testcases"]["native_test"]["filter-match"]["status"] = "matches"
             path.write_text(json.dumps(value))
         self.assert_red(union_extra_native, "union differs")
+
+    def test_dropped_rt_parity_arm_reds(self):
+        # AC-NO-FALSE-GREEN: a decomposed rt_parity control arm silently removed at
+        # the source (no per-mutation test emitted) is NOT caught by the union check
+        # -- it shrinks the discovered inventory and the union together -- but the
+        # independent required-arm roster reds. Drop one arm's suite from every
+        # artifact member and confirm the roster check fails with a diagnosed message.
+        dropped = sorted(REQUIRED_RT_PARITY_ARMS)[0]
+
+        def drop_arm(root):
+            for artifact in sorted(root.iterdir()):
+                if not artifact.is_dir():
+                    continue
+                for member in sorted(artifact.iterdir()):
+                    if member.suffix != ".json":
+                        continue
+                    value = json.loads(member.read_text())
+                    suites = value["rust-suites"]
+                    doomed = [
+                        sid
+                        for sid, suite in suites.items()
+                        if dropped in suite.get("testcases", {})
+                    ]
+                    for sid in doomed:
+                        del suites[sid]
+                        value["test-count"] -= 1
+                    member.write_text(json.dumps(value))
+
+        self.assert_red(drop_arm, "control arms missing")
+
+    def test_success_covers_every_required_arm(self):
+        # The clean fixture already exercises the roster (its native rows carry every
+        # required arm); assert here that the roster is actually non-empty and that the
+        # success path reports the arm count, so the coverage check cannot pass
+        # vacuously on an empty roster.
+        self.assertTrue(REQUIRED_RT_PARITY_ARMS)
+        with self.fixture() as temporary:
+            result = self.run_fixture(temporary)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            f"{len(REQUIRED_RT_PARITY_ARMS)} required rt_parity control arms present",
+            result.stdout,
+        )
 
 
 if __name__ == "__main__":
