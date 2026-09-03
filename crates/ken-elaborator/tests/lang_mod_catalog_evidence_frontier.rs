@@ -438,6 +438,13 @@ fn legacy_evidence(
             owned.insert(*id);
         }
     }
+    for declaration in env.env.declarations() {
+        if let Decl::Opaque { id, name, .. } = declaration {
+            if name.starts_with(&format!("{module}.")) {
+                owned.insert(*id);
+            }
+        }
+    }
 
     let mut resolved = BTreeSet::new();
     if entry_ids.is_empty() {
@@ -467,8 +474,10 @@ fn legacy_evidence(
     for identity in resolved.iter().copied() {
         // Dependencies finish before the root unit starts, and Sigma is
         // append-only. The root's first returned declaration therefore bounds
-        // every later helper/proof identity owned by that root, including
-        // generated opaque law fields not present in the surface globals map.
+        // every later helper/proof identity owned by that root. Earlier private
+        // `axiom` identities and generated opaque law fields are instead owned
+        // by their kernel audit label even when absent from the surface globals
+        // map.
         if owned.contains(&identity)
             || entry_start.is_some_and(|start| identity.0 >= start)
             || strict_available.contains(&identity)
