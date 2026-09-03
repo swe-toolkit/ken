@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-EC-CLOSURE-PROVIDERS
 title: "EC standalone-cleanness predecessor (off the DecEq critical path): widen the LF / Derived / Transport PUBLISHED surfaces to the exact free-symbol closure set EffectfulClasses names across package boundaries, so EC can import that closure and elaborate standalone. Mechanical export publication (mark pub + extend each provider's loader-visible inventory), INCLUDING the currently-private attached proofs EC composes with; NO proof re-authoring, NO body change, NO relocation. Reuse-not-reimplement: EC composes with the existing proofs, it does not re-prove them."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
