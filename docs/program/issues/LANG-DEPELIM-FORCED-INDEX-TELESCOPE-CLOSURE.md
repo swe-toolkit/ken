@@ -1,7 +1,7 @@
 ---
 id: LANG-DEPELIM-FORCED-INDEX-TELESCOPE-CLOSURE
 title: "D2b predecessor #5 (elaborator dependent-elim completeness): under a FORCED (non-variable) scrutinee index, the generated motive frame omits the motive's return-Pi TELESCOPE arguments from the HS16-18 coherent-frame refinement — a structurally-exhaustive forced-index correspondence false-rejects at motive/method-type CONSTRUCTION (before any arm body), exact `TypeMismatch { expected ((Dg581 @8) @4), found ((Dg581 @8) (cg69 @7)) }`, Dg581 = DualEnv, cg69 = Nat successor. The B-green/C-red 2x2 D0 (evt_2h58340324ehh) RULED OUT motive-Pi-binding-per-se (B green: return-Pi-bound non-destructed DualEnv rebases under a BARE index) and inner-destructure rescue (C red with the ill-typed-body confound EXCLUDED), locating the reject at forced-index motive-frame construction. Fix = extend the merged coherent-frame convoy to carry return-telescope arguments as the THIRD sealed datum class under the SAME refinement substitution. Architect fix-surface ruling evt_7tmjw5hvpxrb9."
-status: active
+status: merged
 owner: language
 size: M
 gate: none
