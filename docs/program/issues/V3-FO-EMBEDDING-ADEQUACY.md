@@ -5,12 +5,31 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE, LANG-DEPELIM-IH-EIGENPARAM-TRANSPORT]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
+> # OPERATIVE (Steward, 2026-09-03) — D2b HS4: elaborator predecessor framed.
+> # Supersedes the HS3 banner below for CURRENT state. Architecture B is
+> # UNCHANGED and still adopted — HS4 is a wall WITHIN building B, not a change of
+> # architecture.
+>
+> Building Option B, the ring hit the wall the HS3 ruling explicitly named as a
+> genuinely-new one: the target-soundness induction's Forall recursion
+> false-rejects (KernelRejected TypeMismatch on both ForallWorldRight and
+> ForallObjRight; Init/Imp pass). The Architect classified it (evt_anzrvvzaccep)
+> as an elaborator-capability predecessor — the eliminator method construction
+> cannot transport a recursive IH across an eigenparameter-driven context
+> extension — NOT a kernel change, NOT source-compensable, NOT a B refutation.
+> Steward framed [[LANG-DEPELIM-IH-EIGENPARAM-TRANSPORT]] (added to `depends_on`);
+> D2b is HELD at `eac970705` (WIP `97477903e` preserved). The Steward EXPLICITLY
+> re-releases D2b only after that predecessor lands, whereupon the ring rebuilds
+> B's Forall arms against the fixed elaborator and produces the D2b candidate
+> (Architect required soundness reviewer). §1a: HS4 self-ruled, next Research
+> trigger = HS6. This is D2b design hard-stop #4.
+>
 > # OPERATIVE (Steward, 2026-09-03) — D2b HS3 RULED: adopt Option B. This banner
 > # supersedes EVERY banner below; the held-ledger proof approach is RETIRED.
 >
