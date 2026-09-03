@@ -5,12 +5,37 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE, LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE, LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW, LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
+> # OPERATIVE (Steward, 2026-09-03) — D2b HS5: predecessor #4 framed, D0 grid
+> # DONE, fix direction RULED (structural coherent-frame closure). Supersedes the
+> # HS4 banner below for CURRENT state. Architecture B is UNCHANGED and still
+> # adopted — HS5 is another wall WITHIN building B.
+>
+> The DUAL-VIEW predecessor (HS4) LANDED (b22e62530) and D2b's target-soundness is
+> now GREEN (`all_five_lemmas_elaborate_with_zero_trusted_base_delta` passes 1/1,
+> both Architecture-B Forall arms). Building the NEXT required Arch-B lemma
+> (embedding correspondence) the ring hit HS5 (language-implementer
+> evt_7pjp210wgs7aw): a nontrivial cross-structure equality whose two sides refine
+> differently under one indexed elimination false-rejects a structurally-exhaustive
+> proof (`KernelRejected TypeMismatch: expected g0, found Eq .. @3`; the two sides
+> land in different de Bruijn frames, @2 vs @4). The Architect CONFIRMED it a
+> distinct elaborator predecessor (evt_6zjegefzv0am2); the language ring built the
+> D0 grid (evt_t9w0fnhq68p0), which FALSIFIED the Architect's provisional lean and
+> RULED (evt_45h2qab5nejg3) the fix as the STRUCTURAL COHERENT-FRAME CLOSURE over
+> the motive-rebase / context-telescope invariant (68100a5cd, 128b6c000) — NOT a
+> point-fix, gated on actual occurrence per-side (no over-rebase). NOT kernel, NOT
+> source-compensable, NOT a B refutation. Steward framed
+> [[LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME]] (added to `depends_on`); the
+> implementer builds the closure to the invariant, grid + landed regression suites
+> the acceptance. D2b stays HELD (WIP 26dd33f25 over b5cad7322, statement
+> unchanged); the Steward RE-RELEASES D2b only after this predecessor lands. §1a:
+> HS5 self-ruled, next Research trigger = HS6. This is D2b design hard-stop #5.
+>
 > # OPERATIVE (Steward, 2026-09-03) — D2b HS4: elaborator predecessor framed.
 > # Supersedes the HS3 banner below for CURRENT state. Architecture B is
 > # UNCHANGED and still adopted — HS4 is a wall WITHIN building B, not a change of
