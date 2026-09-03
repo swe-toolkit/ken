@@ -31,6 +31,50 @@ origin: "Steward, 2026-09-03. D2b design hard-stop #5 for V3-FO-EMBEDDING-ADEQUA
 > lemma against the fixed elaborator, produces the D2b candidate, and the
 > Architect is the required soundness reviewer on it.
 
+> # RECUT PENDING — HS7 §1b STRUCTURAL FINDING (Architect evt_614ka77qm02gz,
+> # 2026-09-03). The D2 fix direction below ("single neutral motive frame
+> # closure") is SUPERSEDED for the RECURSIVE cross-structure case and is being
+> # RE-CUT to whatever the voluntary research advisory confirms. HS6's proved
+> # two-companion leaf-discharge convoy is RETAINED (single-elim C greens, the Nil
+> # impossibility discharge is parametric, genuinely-false still rejects). D2b
+> # stays HELD (26dd33f25). The Architect rules the mechanism on the advisory;
+> # resume signal = research posts in-thread mentioning Architect + Steward.
+> #
+> # THE NAMED PREDICATE (§1b, HS6+HS7): the coherent frame NEUTRALIZES the
+> # embedded eliminator's index, and every index-dependent companion needing the
+> # PEELED per-constructor equation is thereby lost — HS6 rediscovered the
+> # impossibility discharge, HS7 the recursive IH. HS7 sits on the path-A /
+> # path-B seam (elab.rs ~2200): path A (coherent-frame convoy) hands the raw
+> # whole-index equality at the NEUTRALIZED index (v0 = Eq Nat (Suc k) j, j
+> # neutral); path B (install_index_refinements, 2953 / whnf-peel 2982-2996) would
+> # PEEL it via the kernel's existing same-constructor no-confusion but cannot,
+> # because a neutral endpoint is not constructor-headed. A leaf method is applied
+> # at the completed outer eliminator (index concrete) so deferral rescued HS6; a
+> # RECURSIVE method calls itself at the predecessor BEFORE the outer index is
+> # concrete, so neither mechanism alone gives the recursive IH its peeled
+> # equation (v1 = Pi (Eq Nat k j). a). "Also convoy the recursive IH" would be
+> # the 3rd point-fix on ONE predicate — the closure is the neutral-index
+> # single-frame defect for cross-structure RECURSIVE goals.
+> #
+> # TCB BOUNDARY (Architect evt_4nmfxvdnhzjep): PROVISIONAL ELABORATOR-ONLY, no
+> # operator gate owed now (same class as Arm 1) — the kernel no-confusion already
+> # exists and is already consumed elaborator-side; the defect is elaborator index
+> # representation. FLIP-CONDITION: if research finds the only sound closure needs
+> # constructor injectivity as a KERNEL-PROVIDED fact for the recursive IH, that
+> # is TCB growth and the Architect escalates to the Steward for an operator gate
+> # BEFORE ruling the arm. §1a: HS7 is NOT a trigger (HS6 was; next mandatory =
+> # HS9); the research pull is VOLUNTARY, count unaffected.
+> #
+> # RESEARCH SUB-QUESTION (Architect voluntary pull): proving a relation between
+> # two functions recursive on DIFFERENTLY-structured indices (dual_nth on Nat vs
+> # dual_lookup on DualFin over one value) under a single coherent motive frame
+> # that neutralizes the index so the recursive IH lacks its peeled predecessor
+> # equation. Lean to confirm/replace: (a) keep the embedded recursion index
+> # constructor-headed per-branch, neutralize only the shared cross-structure
+> # axis, correlate through the outer equation only; (b) define the motive BY
+> # RECURSION on the index so the companion is definitionally correlated; (c)
+> # other. "(a) is known-best, nothing to add" is a first-class answer.
+
 ## One-line objective
 
 Close the coherent-frame invariant in the dependent-match refinement machinery:
@@ -168,5 +212,9 @@ mechanical.
   language-implementer builds D2 (the closure) to the invariant, proves the grid
   greens + the over-rebase non-regression; the candidate goes Architect + CV ->
   Steward M1-M4 -> lieutenant M5-M9. D2b stays HELD until this lands; the Steward
-  RE-RELEASES D2b only after this predecessor merges. Next §1a Research trigger =
-  HS6.
+  RE-RELEASES D2b only after this predecessor merges.
+- §1a HISTORY: HS5 self-ruled; HS6 was the Research-advisory trigger (Arm 1
+  ruled, elaborator-only, discharged); HS7 (recursive-IH neutral-index wall) is
+  NOT a trigger and carries a VOLUNTARY Architect research pull (count
+  unaffected). Next MANDATORY §1a Research trigger = HS9. See the RECUT-PENDING
+  operative banner at the top for the HS6+HS7 named predicate and the recut.
