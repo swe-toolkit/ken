@@ -7511,6 +7511,29 @@ impl StaticTransitionPlan<'_> {
             return Ok(None);
         };
 
+        // R3 SHAPE NARROWING (Architect ruling evt_39rn7empzmgym). The b2 defect
+        // the operator funded is a specific shape: a PURE outcome-remap
+        // continuation that RT-SSA specialized OUT of the source chain as a bare
+        // k-Match (`Construct{...::ITree::Ret, [payload]}`), so the collapse
+        // returned the raw carried word and R3 reconstructs exactly that k-Match.
+        // An EFFECT-PERFORMING continuation (host `Vis` effects,
+        // `CheckedComputationalIHInvocation`, nested composed returns) is NOT that
+        // shape and was never the b2 defect: it is not homed out as a bare
+        // k-Match, and the existing checked-computational-match machinery is its
+        // natural home. Claiming it here would over-reach R3. So the forward-Ret
+        // authority is SHAPE-BASED -- Ret{Match} pure-remap bodies only; anything
+        // else returns no plan and flows through the existing machinery. This
+        // NARROWS R3 to what it was built for, and it keeps every plain Ret{Match}
+        // body on R3 unchanged.
+        let worker_body_is_ret_kmatch = matches!(
+            self.planned_occurrence_expr(transport.source_worker_body_origin)?,
+            RuntimeExpr::Construct { constructor, args }
+                if constructor.ends_with("::ITree::Ret") && args.len() == 1
+        );
+        if !worker_body_is_ret_kmatch {
+            return Ok(None);
+        }
+
         let classes = self
             .checked_ih_generated_entry_confluences
             .iter()
