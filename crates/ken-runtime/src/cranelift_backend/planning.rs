@@ -31,14 +31,20 @@ pub use static_transition::{
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses,
-    with_retained_result_closure_proof_mutation, with_worker_prefix_deferrals,
+    with_retained_result_closure_proof_mutation,
+    force_specialize_deferred_response_is_exact, static_response_context_demand_mutation_is_exact,
+    with_force_specialize_deferred_response, with_static_response_context_demand_mutation,
+    with_static_response_feasibility_diagnostics, with_worker_prefix_deferrals,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
     CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
     CheckedIhGeneratedEntryObservation, ComposedReturnForwardRetAuthorityMutation,
     ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
     ComposedReturnForwardRetRoleWitnessObservation,
-    RetainedResultClosureProofMutation, WorkerPrefixDeferral,
+    DeferredResponseObservation, RetainedResultClosureProofMutation,
+    StaticResponseCaptureObservation, StaticResponseContextDemandMutation,
+    StaticResponseFeasibilityDiagnostic, StaticResponseFeasibilityObservation,
+    StaticResponseOwnerObservation, StaticResponseInfeasibleObservation, WorkerPrefixDeferral,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -139,7 +145,10 @@ pub(super) use static_transition::{
     ContinuationAvailabilityViews, ContinuationEnvironmentClaim, ContinuationFrameIdentity,
     ContinuationSourceCoordinate,
     ContinuationSourceSlotAuthority,
-    ContinuationSpecializationId,
+    ContinuationSpecializationId, DeferredResponseRow, DeferredResponseSubCase,
+    ResponseDisposition, StaticResponseContinuation, StaticResponseEffectInput,
+    StaticResponseEnvironmentBinding, StaticResponseFrameSource, StaticResponseOwnerId,
+    StaticResponseOwnerSpecialization,
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout reaches
     // lowering's test targets so its control can compare the authority against
     // the prefix production actually assembled, rather than against its own

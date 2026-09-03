@@ -81,14 +81,20 @@ pub(crate) use artifact::api::{
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::units::{
     retained_unit_call_target_mutation_is_exact,
-    with_retained_unit_call_target_mutation,
-    RetainedUnitCallTargetMutation,
+    static_response_caller_retarget_mutation_is_exact,
+    static_response_owner_body_mutation_is_exact,
+    with_retained_unit_call_target_mutation, with_static_response_caller_retarget_mutation,
+    with_static_response_owner_body_mutation, RetainedUnitCallTargetMutation,
+    StaticResponseCallerRetargetMutation, StaticResponseOwnerBodyMutation,
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::{
+    checked_ih_direct_application_mutation_is_exact,
     composed_return_ret_sink_mutation_is_exact,
+    with_checked_ih_direct_application_mutation,
     with_checked_ih_fresh_result_route_emission_observations,
     with_composed_return_ret_sink_mutation, with_px8ds_retired_flat_order,
+    CheckedIhDirectApplicationMutation, CheckedIhDirectApplicationObservation,
     CheckedIhFreshResultRouteEmissionObservation, CheckedIhFreshResultRouteObservationMutation,
     CheckedIhFreshResultRoutePairingLeg, ComposedReturnRetSinkMutation,
     ComposedReturnRetSinkObservation,
@@ -124,14 +130,20 @@ pub use planning::{
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses,
-    with_retained_result_closure_proof_mutation, with_worker_prefix_deferrals,
+    with_retained_result_closure_proof_mutation,
+    force_specialize_deferred_response_is_exact, static_response_context_demand_mutation_is_exact,
+    with_force_specialize_deferred_response, with_static_response_context_demand_mutation,
+    with_static_response_feasibility_diagnostics, with_worker_prefix_deferrals,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
     CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
     CheckedIhGeneratedEntryObservation, ComposedReturnForwardRetAuthorityMutation,
     ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
     ComposedReturnForwardRetRoleWitnessObservation,
-    RetainedResultClosureProofMutation, WorkerPrefixDeferral,
+    DeferredResponseObservation, RetainedResultClosureProofMutation,
+    StaticResponseCaptureObservation, StaticResponseContextDemandMutation,
+    StaticResponseFeasibilityDiagnostic, StaticResponseFeasibilityObservation,
+    StaticResponseOwnerObservation, StaticResponseInfeasibleObservation, WorkerPrefixDeferral,
 };
 
 #[cfg(feature = "px8-ds-test-support")]

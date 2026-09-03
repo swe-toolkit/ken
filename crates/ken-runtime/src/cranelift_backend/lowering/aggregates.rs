@@ -775,6 +775,7 @@ impl Lowered {
                 }
                 Lowered::DeclarationClosure { .. }
                 | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::StaticResponseDeferred
                 | Lowered::Int { .. }
                 | Lowered::Bool { .. }
                 | Lowered::ProcessExitStatus { .. }
@@ -882,7 +883,8 @@ impl<'a> Lowering<'a> {
                 // a nested closure as an ownership failure.
                 Lowered::Closure { .. }
                 | Lowered::DeclarationClosure { .. }
-                | Lowered::ComputationalRecursorClosure { .. } => Ok(()),
+                | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::StaticResponseDeferred => Ok(()),
 
                 // ── true leaves: no `Lowered` child position exists ───────────
                 //
@@ -987,6 +989,7 @@ impl<'a> Lowering<'a> {
                 }
                 | Lowered::DeclarationClosure { .. }
                 | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::StaticResponseDeferred
                 | Lowered::Int { .. }
                 | Lowered::Bool { .. }
                 | Lowered::ProcessExitStatus { .. }
@@ -1069,6 +1072,7 @@ impl<'a> Lowering<'a> {
                 }
                 | Lowered::DeclarationClosure { .. }
                 | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::StaticResponseDeferred
                 | Lowered::Int { .. }
                 | Lowered::Bool { .. }
                 | Lowered::ProcessExitStatus { .. }
@@ -1697,7 +1701,7 @@ impl<'a> Lowering<'a> {
         /// supplies the **payload and children**, which a disposition cannot carry
         /// because it is a function of the variant tag alone.
         ///
-        /// ⛔ **No wildcard arm.** A 22nd `Lowered` inhabitant is a compile error
+        /// ⛔ **No wildcard arm.** A 23rd `Lowered` inhabitant is a compile error
         /// here, exactly as it is in `variant()` and
         /// `boundary_transfer_admissibility` — so a new carrier of children cannot
         /// be added without someone deciding whether it can cross.
@@ -2008,7 +2012,7 @@ impl<'a> Lowering<'a> {
                 // because `boundary_transfer_admissibility` rejects the three
                 // closure forms at the entry point and `boundary_disposition`
                 // classifies the last two as `ProtocolOnly`. They are spelled
-                // anyway because exhaustiveness is the mechanism that makes a 22nd
+                // anyway because exhaustiveness is the mechanism that makes a 23rd
                 // variant a compile error — ⛔ collapsing them into a `_` arm would
                 // buy three lines and spend the whole closure property.
                 Lowered::Closure {
@@ -2042,7 +2046,9 @@ impl<'a> Lowering<'a> {
                      this arm is unreachable because the admissibility walk already \
                      refused the graph",
                 )),
-                Lowered::RecursiveBackedge | Lowered::Trap(_) => Err(unsupported(
+                Lowered::StaticResponseDeferred
+                | Lowered::RecursiveBackedge
+                | Lowered::Trap(_) => Err(unsupported(
                     lowered_value_kind(value),
                     "protocol machinery is never a source value at a boundary",
                 )),
@@ -3804,7 +3810,7 @@ impl<'a> Lowering<'a> {
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             worker: &StaticWorkerBinding,
-        ) -> Result<LoweringOperand, CraneliftBackendError> {
+        ) -> Result<CheckedIhCapturedEnvironment, CraneliftBackendError> {
             let owner = self.defining_emission_owner.ok_or_else(|| {
                 unsupported(
                     "CheckedIhCapturedEnvironment",
@@ -3914,7 +3920,7 @@ impl<'a> Lowering<'a> {
                 };
                 self.emit_carrier_store_field(builder, word, position, child)?;
             }
-            Ok(LoweringOperand::Carried(word))
+            Ok(CheckedIhCapturedEnvironment { word })
         }
 
         /// Materialize only the positional environment of one statically

@@ -572,6 +572,10 @@ fn assert_narrowed_alike(
     assert_eq!(interpreted.terminal_error, None, "{case}: interpreter");
     assert_eq!(native.terminal_error, None, "{case}: native");
     assert_eq!(
+        native.effect_trace, interpreted.effect_trace,
+        "{case}: complete ordered effects, requests, outcomes, and resource provenance must agree",
+    );
+    assert_eq!(
         interpreted.terminal_exit, native.terminal_exit,
         "{case}: terminal exit class must agree across executors"
     );
@@ -1145,6 +1149,1101 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
             };
             assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
         }
+    });
+}
+
+/// **Promise class: transition sentinel.** A reviewed graph change may replace
+/// these dense coordinates, but must replace the complete response-producer
+/// ledger and retain one fully validated context demand per singleton K row.
+///
+/// **MEASURED:** the read product has four response rows and the write product
+/// has seven. Their earlier `FsReadAt` rows require new contexts while the later
+/// `BufferAllocate` rows reuse causal context zero; every row has one exact
+/// owner ABI and selected caller.
+/// **CLAIMED:** absence from the old-caller context population is a demand, not
+/// SSA infeasibility. Every fixed row has one explicit capture/input schema and
+/// resolves by `(ContinuationSpecializationId, worker body)` after old context
+/// identities are preserved as the union prefix.
+/// **THE GAP:** this fixture observes planning and ABI identity. Finished owner
+/// body, exact context-call/Ret closure, and runtime InvalidOffset behavior are
+/// independently pinned below. Runtime closure remains unselected.
+#[test]
+fn static_response_context_demand_ledger_closes_fixed_products() {
+    in_generated_entry_stack_thread("rt-parity-static-response-demand", || {
+        let compile = |label: &str, entry: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("static-response-demand-{label}"));
+            let (result, diagnostics) =
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        &format!("rt_parity_static_response_demand_{label}"),
+                        root.path(),
+                    )
+                });
+            result.expect("the fixed response-demand product must compile");
+            assert_eq!(diagnostics.len(), 1, "one compile publishes one plan");
+            let diagnostic = diagnostics.into_iter().next().unwrap();
+            assert_eq!(diagnostic.static_response_infeasible, None);
+            assert_eq!(diagnostic.all_static_response_infeasible, None);
+            // RECUT 2 HS6 (A-full)-refined (Architect evt_27hj9nxevvjyr /
+            // evt_2fk574v1cb3b1): TOTALITY + sub-case oracle, COUNT-AGNOSTIC. Every
+            // BufferAllocate response is in exactly one column (Specialized xor
+            // Deferred); every Deferred one carries sub_case UnconsumedTransportCaller
+            // -- phase B's own correctness label, assigned ONLY to a transport source,
+            // so it independently proves "correctly deferred" over the fixture-known
+            // population (not derived from what the code emitted). No exact count is
+            // pinned (HS7 fallback reverted the added owner, so the read product now
+            // carries its single withBuffer bracket's BufferAllocate); the write
+            // product's closure-boundary BufferAllocate K is transport-deferred.
+            let specialized_buffer = &diagnostic.static_response_rows;
+            let all_buffer = diagnostic
+                .all_static_response_rows
+                .iter()
+                .filter(|row| row.operation == "BufferAllocate")
+                .collect::<Vec<_>>();
+            let deferred_buffer = diagnostic
+                .static_response_deferred
+                .iter()
+                .filter(|row| row.operation == "BufferAllocate")
+                .collect::<Vec<_>>();
+            assert!(
+                specialized_buffer.len() + deferred_buffer.len() >= 1,
+                "the fixed product carries at least one BufferAllocate response \
+                 (Specialized={specialized_buffer:?}, Deferred={deferred_buffer:?})",
+            );
+            assert_eq!(
+                specialized_buffer.len(),
+                all_buffer.len(),
+                "the BufferAllocate-filtered ledger must equal the all-producer BufferAllocate rows"
+            );
+            for buffer in specialized_buffer {
+                assert_eq!(buffer.operation, "BufferAllocate");
+                assert!(
+                    all_buffer.contains(&buffer),
+                    "a filtered BufferAllocate row is absent from the all-producer set"
+                );
+            }
+            for deferred in &deferred_buffer {
+                assert_eq!(
+                    deferred.sub_case, "UnconsumedTransportCaller",
+                    "a Deferred BufferAllocate is a transport-caller residual (the (a) oracle): \
+                     {deferred:?}"
+                );
+            }
+            assert_eq!(
+                diagnostic.static_response_owners.len(),
+                diagnostic.all_static_response_rows.len(),
+                "each feasible response row owns one forward declaration"
+            );
+            for (ordinal, (owner, row)) in diagnostic
+                .static_response_owners
+                .iter()
+                .zip(&diagnostic.all_static_response_rows)
+                .enumerate()
+            {
+                assert_eq!(owner.owner as usize, ordinal);
+                assert_eq!(owner.response as usize, ordinal);
+                assert_eq!(owner.base_owner, row.base_owner);
+                assert_eq!(owner.selected_caller, row.k_identity);
+                assert_eq!(owner.k_context, row.k_context);
+                assert_eq!(owner.context_was_preexisting, row.context_was_preexisting);
+                assert_eq!(owner.parameters as usize, 1 + row.captures.len());
+                assert_eq!(owner.captures as usize, row.continuation_inputs.len());
+                assert_eq!(
+                    owner.slots.len(),
+                    owner.parameters as usize + owner.captures as usize + 4
+                );
+                for (position, (kind, slot_ordinal)) in owner.slots.iter().enumerate() {
+                    let expected = if position < owner.parameters as usize {
+                        ("Parameter", position as u32)
+                    } else if position < (owner.parameters + owner.captures) as usize {
+                        ("Capture", position as u32 - owner.parameters)
+                    } else {
+                        (
+                            ["Result", "Control", "Trap", "Store"]
+                                [position - (owner.parameters + owner.captures) as usize],
+                            0,
+                        )
+                    };
+                    assert_eq!((kind.as_str(), *slot_ordinal), expected);
+                }
+                assert!(owner.frame_bytes > 0);
+            }
+            diagnostic
+        };
+
+        let read = compile("read", "rt_read_offset_stage");
+        let write = compile("write", "rt_write_writable_stage");
+        // RECUT 2 HS6 (A-full)-refined (Architect evt_4kqz8awr6sg1n): fully
+        // STRUCTURAL totality for BOTH products. The record-derived transport set
+        // defers transport-source members in the read AND write products (the
+        // retarget control proved the read owner population shrank too), so the
+        // exact per-row k_context summary tuples are no longer stable and are
+        // dropped for both. What remains holds for ANY correct classification and
+        // needs no native population:
+        //   - each Specialized response owns exactly one forward declaration
+        //     (checked per-product in `compile`);
+        //   - every Deferred residual carries a VALID sub-case -- the correctness
+        //     ORACLE. Phase B defers a has-K member ONLY via the transport check,
+        //     so a has-K Deferred member is UnconsumedTransportCaller IFF it is a
+        //     transport source, and a unit-less member is NoContinuationUnit by
+        //     construction. The sub-case independently proves "correctly deferred"
+        //     with no native population needed;
+        //   - the per-Specialized-row owner/K schema invariants below hold;
+        //   - both products classify a non-empty Specialized population.
+        // Exact-id stability is the total-acyclic-freeze-order carry's structural
+        // job, not a per-fixture tuple's.
+        for diagnostic in [&read, &write] {
+            assert!(
+                !diagnostic.all_static_response_rows.is_empty(),
+                "each fixed product specializes at least one response"
+            );
+            for deferred in &diagnostic.static_response_deferred {
+                assert!(
+                    deferred.sub_case == "UnconsumedTransportCaller"
+                        || deferred.sub_case == "NoContinuationUnit",
+                    "a Deferred residual carries an unclassified sub-case: {deferred:?}"
+                );
+            }
+        }
+        for diagnostic in [&read, &write] {
+            let mut contexts = std::collections::BTreeMap::new();
+            for row in &diagnostic.all_static_response_rows {
+                assert_eq!(
+                    row.base_owner,
+                    format!(
+                        "Specialization(ContinuationSpecializationId({}))",
+                        row.k_specialization
+                    )
+                );
+                for exact in [
+                    format!(
+                        "producer_construct_origin: StaticOriginId({})",
+                        row.vis_origin
+                    ),
+                    format!(
+                        "target: ContinuationSpecializationId({})",
+                        row.k_specialization
+                    ),
+                    format!("closure_origin: StaticOriginId({})", row.k_closure_origin),
+                    format!("body_origin: StaticOriginId({})", row.k_body_origin),
+                ] {
+                    assert!(
+                        row.k_identity.contains(&exact),
+                        "K identity omitted {exact}"
+                    );
+                }
+                assert_eq!(
+                    contexts.insert((row.k_specialization, row.k_body_origin), row.k_context),
+                    None,
+                    "these fixed products contain no duplicate K demand key"
+                );
+                for (ordinal, capture) in row.captures.iter().enumerate() {
+                    assert_eq!(capture.ordinal as usize, ordinal);
+                    assert_eq!(capture.origin, row.k_closure_origin - 1 - ordinal as u32);
+                    assert_eq!(capture.producer_abi_slot, 1 + ordinal as u32);
+                    assert!(
+                        capture.source.starts_with("ProducerLocal {")
+                            || capture.source.starts_with("EntryAbi {")
+                    );
+                }
+                for (ordinal, source, slot) in &row.continuation_inputs {
+                    assert_eq!(*ordinal as usize + 1 + row.captures.len(), *slot as usize);
+                    assert!(
+                        source.starts_with("ProducerLocal {") || source.starts_with("EntryAbi {")
+                    );
+                }
+            }
+        }
+    });
+}
+
+/// The demand mutation changes the population the union interner receives.
+/// Every negative reaches once and fails before emission; exact duplication is
+/// idempotent and leaves both the ledger and assigned context identities equal
+/// to the unmutated compile.
+#[test]
+fn static_response_context_demand_controls_reach_and_restore() {
+    use ken_runtime::StaticResponseContextDemandMutation as Mutation;
+
+    in_generated_entry_stack_thread("rt-parity-static-response-demand-controls", || {
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+        let compile = |label: &str| {
+            let root = output_dir(&format!("static-response-demand-control-{label}"));
+            let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    "rt_parity_static_response_demand_control",
+                    root.path(),
+                )
+            });
+            (root, observed)
+        };
+        let (baseline_root, (baseline_result, baseline)) = compile("baseline");
+        let baseline_result = baseline_result.expect("baseline response-demand compile");
+        let baseline_hash = baseline_result.artifact.executable_hash;
+        let baseline_bytes = std::fs::read(&baseline_result.artifact.executable_path)
+            .expect("baseline response-demand executable bytes");
+        assert_eq!(baseline.len(), 1);
+
+        for (label, mutation, expected) in [
+            (
+                "delete",
+                Mutation::DeleteResponseOnlyDemand,
+                "does not cover every derived response row",
+            ),
+            (
+                "vary-k",
+                Mutation::VaryKSpecialization,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "vary-body",
+                Mutation::VaryKBody,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "vary-capture",
+                Mutation::VaryCaptureSource,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "vary-input",
+                Mutation::VaryContinuationInputSource,
+                "disagrees with its K worker or input schema",
+            ),
+        ] {
+            let ((_mutated_root, (result, diagnostics)), applications) =
+                ken_runtime::with_static_response_context_demand_mutation(mutation, || {
+                    compile(label)
+                });
+            assert_eq!(applications, 1, "{label} did not reach its demand");
+            let error = result.expect_err("the reaching demand mutation must red");
+            assert!(
+                format!("{error:?}").contains(expected),
+                "{label} failed for a different reason: {error:?}"
+            );
+            assert!(
+                diagnostics.is_empty(),
+                "a red plan must not publish a ledger"
+            );
+            assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+            let (restored_root, (restored_result, restored)) =
+                compile(&format!("{label}-restored"));
+            let restored_result =
+                restored_result.expect("the exact response demand must restore");
+            assert_eq!(restored, baseline);
+            assert_eq!(restored_result.artifact.executable_hash, baseline_hash);
+            assert_eq!(
+                std::fs::read(&restored_result.artifact.executable_path)
+                    .expect("per-control restored response-demand bytes"),
+                baseline_bytes,
+                "{label}: exact byte restoration failed"
+            );
+            drop(restored_root);
+        }
+
+        let ((duplicate_root, (duplicate_result, duplicate)), applications) =
+            ken_runtime::with_static_response_context_demand_mutation(
+                Mutation::DuplicateResponseOnlyDemand,
+                || compile("duplicate"),
+            );
+        let duplicate_result =
+            duplicate_result.expect("an exact duplicate demand must reuse one context");
+        assert_eq!(applications, 1);
+        assert_eq!(duplicate, baseline);
+        assert_eq!(duplicate_result.artifact.executable_hash, baseline_hash);
+        assert_eq!(
+            std::fs::read(&duplicate_result.artifact.executable_path)
+                .expect("idempotent duplicate executable bytes"),
+            baseline_bytes
+        );
+        assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+        drop((duplicate_root, baseline_root));
+    });
+}
+
+/// **Promise class: durable invariant.** The complete producer/K relation is
+/// affine by response-row identity, preserves distinct K keys for a shared
+/// producer, and retains every capture/input coordinate in exact order.
+///
+/// **MEASURED:** row drop/duplicate/vary, K-key merge, three response-authority
+/// substitutions, and independent drop/permute/vary of every fixed READ and
+/// WRITE capture/input each reach the closed demand validator and red. The
+/// fixed ledgers also contain shared producers whose distinct K callers select
+/// distinct owners.
+/// **CLAIMED:** context interning cannot launder a malformed producer/K row or
+/// an incomplete explicit input run.
+/// **THE GAP:** exact duplicate context demand reuse is separately pinned by
+/// `static_response_context_demand_controls_reach_and_restore`; this test moves
+/// producer rows and each element of their typed population instead.
+#[test]
+fn static_response_full_demand_population_controls_reach_red_and_restore() {
+    use ken_runtime::StaticResponseContextDemandMutation as Mutation;
+
+    in_generated_entry_stack_thread("rt-parity-static-response-full-grid", || {
+        let compile = |entry: &str, label: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("static-response-full-grid-{entry}-{label}"));
+            let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    &format!("rt_parity_static_response_full_grid_{entry}"),
+                    root.path(),
+                )
+            });
+            (root, observed)
+        };
+        let (read_root, (read_result, read)) = compile("rt_read_offset_stage", "baseline");
+        let read_result = read_result.expect("the exact READ response population compiles");
+        let read_bytes = std::fs::read(&read_result.artifact.executable_path)
+            .expect("READ response-grid executable bytes");
+        let read_hash = read_result.artifact.executable_hash;
+        let (write_root, (write_result, write)) =
+            compile("rt_write_writable_stage", "baseline");
+        let write_result = write_result.expect("the exact WRITE response population compiles");
+        let write_bytes = std::fs::read(&write_result.artifact.executable_path)
+            .expect("WRITE response-grid executable bytes");
+        let write_hash = write_result.artifact.executable_hash;
+        assert_eq!(read.len(), 1);
+        assert_eq!(write.len(), 1);
+
+        // RECUT 2 HS6 (ii)-REDESIGN (Architect evt_2fk574v1cb3b1). The
+        // owner-splitting-under-a-shared-SPECIALIZED-producer requirement is
+        // DROPPED: post-recut that population (the ResourceRelease pairs) is
+        // transport-carried and correctly Deferred, so it is witnessless on the
+        // Specialized side (the fallback firing, precisely -- not a bare retire).
+        // The REAL property it protected -- a shared producer's distinct K are
+        // DISTINCT demand rows (not merged), correctly routed -- is RE-TARGETED
+        // onto the DEFERRED population, where the shared-producer multi-K witness
+        // now lives (the transport-deferred ResourceRelease pair: read producer
+        // 146, write 159). The producer is selected STRUCTURALLY (the one carrying
+        // >= 2 Deferred rows), not by the recut-invalidated baked id (part 2 /
+        // de-bake), so no native id is baked back and no future reclassification
+        // re-breaks it.
+        for diagnostic in [&read[0], &write[0]] {
+            let mut by_producer: std::collections::BTreeMap<u32, Vec<_>> =
+                std::collections::BTreeMap::new();
+            for row in &diagnostic.static_response_deferred {
+                by_producer
+                    .entry(row.producer_call_origin)
+                    .or_default()
+                    .push(row);
+            }
+            let fan_outs = by_producer
+                .iter()
+                .filter(|(_, rows)| rows.len() >= 2)
+                .collect::<Vec<_>>();
+            assert!(
+                !fan_outs.is_empty(),
+                "full-demand fan-out witness missing: no producer carries >= 2 Deferred rows in \
+                 this product after the recut. The shared-producer fan-out invariant is \
+                 re-targeted onto the Deferred population (the transport-deferred ResourceRelease \
+                 pairs); if none survives, the fan-out witness itself is unobservable -- a \
+                 diagnostic-reachability finding, not a fixture edit. Deferred: {:?}",
+                diagnostic.static_response_deferred
+            );
+            for (producer, fan_out) in fan_outs {
+                // Distinct K: the shared producer's fan-out members are distinct
+                // demand rows (keyed on vis_origin), never merged into one.
+                assert_eq!(
+                    fan_out
+                        .iter()
+                        .map(|row| row.vis_origin)
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len(),
+                    fan_out.len(),
+                    "shared producer {producer} merged distinct K into one Deferred row"
+                );
+                // Correct routing: every fan-out member is a P2 transport-caller
+                // residual (the ruled reason this population is Deferred, not
+                // Specialized).
+                for row in fan_out {
+                    assert_eq!(
+                        row.sub_case, "UnconsumedTransportCaller",
+                        "shared producer {producer}'s fan-out member is not a transport-caller \
+                         residual: {row:?}"
+                    );
+                }
+            }
+        }
+
+        for (label, mutation, expected) in [
+            (
+                "drop-row",
+                Mutation::DropProducerKRow,
+                "does not cover every derived response row",
+            ),
+            (
+                "duplicate-row",
+                Mutation::DuplicateProducerKRow,
+                "names no derived response row",
+            ),
+            (
+                "vary-row",
+                Mutation::VaryProducerKRow,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "merge-k",
+                Mutation::MergeTwoKKeys,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "response-operation",
+                Mutation::SubstituteResponseWithOperation,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "response-prior",
+                Mutation::SubstituteResponseWithPriorResponse,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "response-app-env",
+                Mutation::SubstituteResponseWithApplicationEnvironment,
+                "disagrees with its fully validated response row",
+            ),
+            (
+                "causal-prefix",
+                Mutation::VaryCausalContextPrefix,
+                "appending response context demands changed a causal context identity or schema",
+            ),
+        ] {
+            let ((_root, (result, diagnostics)), applications) =
+                ken_runtime::with_static_response_context_demand_mutation(mutation, || {
+                    compile("rt_read_offset_stage", label)
+                });
+            assert_eq!(applications, 1, "{label}: mutation did not reach");
+            let error = result.expect_err("a malformed producer/K row must red");
+            assert!(
+                format!("{error:?}").contains(expected),
+                "{label}: wrong refusal: {error:?}"
+            );
+            assert!(diagnostics.is_empty(), "{label}: red plan published rows");
+            assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+            let (restored_root, (restored, restored_rows)) =
+                compile("rt_read_offset_stage", &format!("{label}-restored"));
+            let restored = restored.expect("the exact READ demand population must restore");
+            assert_eq!(restored_rows, read, "{label}: restored rows changed");
+            assert_eq!(restored.artifact.executable_hash, read_hash);
+            assert_eq!(
+                std::fs::read(&restored.artifact.executable_path)
+                    .expect("per-control restored READ executable bytes"),
+                read_bytes,
+                "{label}: exact byte restoration failed"
+            );
+            drop(restored_root);
+        }
+
+        for (entry, baseline_diag) in [
+            ("rt_read_offset_stage", &read[0]),
+            ("rt_write_writable_stage", &write[0]),
+        ] {
+            // RECUT 2 HS6 (ii)-redesign 2nd extension (Architect evt_bk6vky2pkncy):
+            // DE-BAKE the (29,19)/(62,44) capture/input census -- stale native
+            // constants the owner-add invalidated. The DropEvery{Capture,Input}
+            // mutations apply in the phase-A classify to the FULL has-K-unit demand
+            // population (Specialized UNION P2-Deferred), so `applications` counts
+            // captures/inputs across BOTH. Derive the expected totals from the
+            // baseline diagnostic: Specialized counts from all_static_response_rows,
+            // P2-Deferred counts from the extended Deferred fields (P1 contributes
+            // 0 -- no demand, correctly excluded). `applications == derived sum` is a
+            // cross-check of two independent derivations (mutation reach vs. observed
+            // population), NOT derive-from-actual, and no native count is baked back.
+            let expected_captures: usize = baseline_diag
+                .all_static_response_rows
+                .iter()
+                .map(|row| row.captures.len())
+                .sum::<usize>()
+                + baseline_diag
+                    .static_response_deferred
+                    .iter()
+                    .map(|row| row.capture_count)
+                    .sum::<usize>();
+            let expected_inputs: usize = baseline_diag
+                .all_static_response_rows
+                .iter()
+                .map(|row| row.continuation_inputs.len())
+                .sum::<usize>()
+                + baseline_diag
+                    .static_response_deferred
+                    .iter()
+                    .map(|row| row.continuation_input_count)
+                    .sum::<usize>();
+            assert!(
+                expected_captures > 0 && expected_inputs > 0,
+                "{entry}: capture/input census population must be non-empty"
+            );
+            for (label, mutation, expected_applications) in [
+                ("drop-capture", Mutation::DropEveryCapture, expected_captures),
+                ("permute-capture", Mutation::PermuteEveryCapture, expected_captures),
+                ("vary-capture", Mutation::VaryEveryCapture, expected_captures),
+                ("drop-input", Mutation::DropEveryContinuationInput, expected_inputs),
+                (
+                    "permute-input",
+                    Mutation::PermuteEveryContinuationInput,
+                    expected_inputs,
+                ),
+                ("vary-input", Mutation::VaryEveryContinuationInput, expected_inputs),
+            ] {
+                let ((_root, (result, diagnostics)), applications) =
+                    ken_runtime::with_static_response_context_demand_mutation(mutation, || {
+                        compile(entry, label)
+                    });
+                assert_eq!(
+                    applications, expected_applications,
+                    "{entry}/{label}: not every element reached independently"
+                );
+                let error = result.expect_err("a malformed explicit input run must red");
+                assert!(
+                    format!("{error:?}")
+                        .contains("disagrees with its fully validated response row"),
+                    "{entry}/{label}: wrong refusal: {error:?}"
+                );
+                assert!(diagnostics.is_empty(), "{entry}/{label}: red plan published rows");
+                assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+                let (restored_root, (restored, restored_rows)) =
+                    compile(entry, &format!("{label}-restored"));
+                let restored = restored.expect("the exact input population must restore");
+                let (baseline_rows, baseline_hash, baseline_bytes) =
+                    if entry == "rt_read_offset_stage" {
+                        (&read, read_hash, &read_bytes)
+                    } else {
+                        (&write, write_hash, &write_bytes)
+                    };
+                assert_eq!(&restored_rows, baseline_rows);
+                assert_eq!(restored.artifact.executable_hash, baseline_hash);
+                assert_eq!(
+                    &std::fs::read(&restored.artifact.executable_path)
+                        .expect("per-control restored input-grid executable bytes"),
+                    baseline_bytes,
+                    "{entry}/{label}: exact byte restoration failed"
+                );
+                drop(restored_root);
+            }
+        }
+
+        assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+        drop((write_root, read_root));
+    });
+}
+
+/// **Promise class: durable invariant.** Every specialized response owner has
+/// exactly one planner-selected incoming identity and at least one decoded
+/// finished-CLIF caller targeting that owner.
+///
+/// **MEASURED:** removing the incoming edge, restoring its unspecialized K
+/// target, or retargeting it to a different response owner each reaches and
+/// leaves the exact owner unentered.
+/// **CLAIMED:** neither declaration nor another owner's call can discharge the
+/// selected incoming-caller relation.
+/// **THE GAP:** the controls mutate the real resolution population and the
+/// unchanged whole-artifact coverage ledger supplies the refusal.
+#[test]
+fn static_response_selected_caller_retarget_reaches_and_restores() {
+    use ken_runtime::StaticResponseCallerRetargetMutation as Mutation;
+
+    in_generated_entry_stack_thread("rt-parity-static-response-retarget", || {
+        let source =
+            RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+        let compile = |label: &str| {
+            let root = output_dir(&format!("static-response-retarget-{label}"));
+            let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    "rt_parity_static_response_retarget",
+                    root.path(),
+                )
+            });
+            (root, observed)
+        };
+
+        let (baseline_root, (baseline_result, baseline)) = compile("baseline");
+        let baseline_result =
+            baseline_result.expect("the exact response-owner retarget must compile");
+        let baseline_hash = baseline_result.artifact.executable_hash;
+        let baseline_bytes = std::fs::read(&baseline_result.artifact.executable_path)
+            .expect("baseline response-retarget executable bytes");
+        assert_eq!(baseline.len(), 1);
+        assert!(!baseline[0].static_response_owners.is_empty());
+
+        // RECUT 2 HS7 FALLBACK (Architect evt_73r305aqtchgw; Steward scope confirm
+        // evt_7xjkcw0tqnxj0). The >= 2-Specialized-owner arm
+        // (RetargetToDifferentResponseOwner, which retargets BETWEEN two owners) is
+        // RETIRED on non-constructibility grounds: for the rt_read_offset fixture
+        // family no compilable Ken program yields >= 2 Specialized response owners.
+        // Sequencing makes the link continuation capture cap (WorkerCapture, not
+        // Specialized); a 2-arm branch forces both recursion-bearing arm-frames into
+        // one oriented segment (shared-parent segment inheritance,
+        // erasure.rs:1252-1296) so their checked endpoints do not compose (the
+        // program fails to compile). NOT a universal non-existence claim over all
+        // programs. The surviving single-owner controls (RestoreSelectedKTarget,
+        // RemoveSelectedCaller) retarget onto the single-owner population; assert the
+        // >= 1 precondition EXPLICITLY so a 0-owner degenerate reds with a diagnosed
+        // message, never a silent vacuous pass.
+        let distinct_specialized_callers = baseline[0]
+            .static_response_owners
+            .iter()
+            .map(|owner| &owner.selected_caller)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            !distinct_specialized_callers.is_empty(),
+            "retarget precondition unmet: the read fixture supplies no Specialized \
+             owner after transport-source deferral; the single-owner caller controls \
+             need >= 1."
+        );
+
+        for (label, mutation, expected) in [
+            (
+                "restore-k",
+                Mutation::RestoreSelectedKTarget,
+                "a forward-declared response owner has no verified selected incoming call",
+            ),
+            (
+                "remove",
+                Mutation::RemoveSelectedCaller,
+                "removed one selected incoming caller",
+            ),
+        ] {
+            let ((_mutated_root, (mutated_result, mutated_diagnostic)), applications) =
+                ken_runtime::with_static_response_caller_retarget_mutation(mutation, || {
+                    compile(label)
+                });
+            assert!(applications > 0, "{label}: caller mutation did not reach");
+            let error = mutated_result.expect_err("a caller mutation must leave an owner unentered");
+            assert!(
+                format!("{error:?}").contains(expected),
+                "{label}: caller mutation failed for a different reason: {error:?}"
+            );
+            assert_eq!(
+                mutated_diagnostic, baseline,
+                "{label}: caller mutation altered the typed planner ledger"
+            );
+            assert!(ken_runtime::static_response_caller_retarget_mutation_is_exact());
+            let (restored_root, (restored_result, restored)) =
+                compile(&format!("{label}-restored"));
+            let restored_result =
+                restored_result.expect("the response-owner retarget must restore");
+            assert_eq!(restored, baseline);
+            assert_eq!(restored_result.artifact.executable_hash, baseline_hash);
+            assert_eq!(
+                std::fs::read(&restored_result.artifact.executable_path)
+                    .expect("per-control restored response-retarget bytes"),
+                baseline_bytes,
+                "{label}: exact byte restoration failed"
+            );
+            drop(restored_root);
+        }
+        drop(baseline_root);
+    });
+}
+
+/// **Promise class: durable invariant.** A specialized response-owner body
+/// emits exactly one finished-CLIF call to its exact K context, after host
+/// validation and before exact Ret collapse, with status and Trap checked before
+/// Result. Only that K-call Result reaches the owner Result slot.
+///
+/// **MEASURED:** context-zero/raw-worker substitution, three wrong response
+/// authorities, raw HostResult escape, K-call omission/duplication/reordering,
+/// Trap bypass, and Ret variation each alter one real emitted owner and red in
+/// the unchanged finished-function verifier. Exact rebuilds restore diagnostics,
+/// hashes, and executable bytes for both fixed products.
+/// **CLAIMED:** declaration shape cannot stand in for the emitted owner/context/
+/// call/Ret relation, and no response/control/environment value can escape in
+/// place of the Trap-checked K result.
+/// **THE GAP:** the verifier decodes direct callees and reads instruction/value
+/// order from finalized CLIF; response provenance itself remains the typed
+/// owner-local construction that the three substitution controls vary.
+#[test]
+fn static_response_owner_body_controls_reach_red_and_restore() {
+    use ken_runtime::StaticResponseOwnerBodyMutation as Mutation;
+
+    in_generated_entry_stack_thread("rt-parity-static-response-owner-grid", || {
+        let compile = |entry: &str, label: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("static-response-owner-grid-{entry}-{label}"));
+            let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    &format!("rt_parity_static_response_owner_grid_{entry}"),
+                    root.path(),
+                )
+            });
+            (root, observed)
+        };
+        let (read_root, (read_result, read_rows)) =
+            compile("rt_read_offset_stage", "baseline");
+        let read_result = read_result.expect("the exact READ response owners compile");
+        let read_bytes = std::fs::read(&read_result.artifact.executable_path)
+            .expect("READ response-owner executable bytes");
+        let read_hashes = (
+            read_result.plan_transport_hash,
+            read_result.runtime_program.core_semantic_hash,
+            read_result.runtime_program.artifact_hash,
+            read_result.artifact.executable_hash,
+        );
+        let (write_root, (write_result, write_rows)) =
+            compile("rt_write_writable_stage", "baseline");
+        let write_result = write_result.expect("the exact WRITE response owners compile");
+        let write_bytes = std::fs::read(&write_result.artifact.executable_path)
+            .expect("WRITE response-owner executable bytes");
+        let write_hashes = (
+            write_result.plan_transport_hash,
+            write_result.runtime_program.core_semantic_hash,
+            write_result.runtime_program.artifact_hash,
+            write_result.artifact.executable_hash,
+        );
+        // HS7 (Architect evt_25kcq9qb31gkp): the WRITE product's BufferAllocate is
+        // transport-DEFERRED (its sibling ledger asserts exactly this at the closure
+        // boundary), so all_static_response_rows carries no BufferAllocate -- the prior
+        // app486.len()==1 + baked (1246,1238) K was a never-executed bake that
+        // contradicted the ledger. The surviving WRITE-targeted control (context-zero)
+        // substitutes the write product's actual Specialized response owner's context;
+        // assert that population is present (de-baked: no BufferAllocate filter, no baked
+        // coords). The former app-environment control that consumed app486 is retired as
+        // unreachable (see the loop below). The kept controls' discriminating power is the
+        // mutation loop below (reach, red on the diagnosed message, restore the exact
+        // typed population).
+        assert!(
+            !write_rows[0].all_static_response_rows.is_empty(),
+            "the WRITE product must carry a Specialized response owner for the \
+             write-targeted owner-body control (context-zero) to target"
+        );
+        for (label, entry, mutation, expected) in [
+            (
+                // HS7 de-bake (Architect evt_25kcq9qb31gkp): the reverted READ owner
+                // has k_context 0 (context_was_preexisting), so SubstituteContextZero is
+                // a no-op there (nothing to substitute -> unreachable). The WRITE owner
+                // has a non-zero k_context, so the wrong-context substitution reaches and
+                // reds there -- retarget onto that real target, grounded on the actual
+                // diagnostic, not the never-run read bake.
+                "context-zero",
+                "rt_write_writable_stage",
+                Mutation::SubstituteContextZero,
+                "called a context or raw worker other than its exact K context",
+            ),
+            (
+                "response-operation",
+                "rt_read_offset_stage",
+                Mutation::ResponseWithOperation,
+                "substituted operation, prior-response, or application-environment authority",
+            ),
+            // HS7 RETIREMENT (Architect evt_7hk776pcdewv9, refined by evidence). Two
+            // response-authority mutations are UNREACHABLE under the reverted single-read
+            // family, both confirmed "did not reach" (applications 0):
+            // ResponseWithPriorResponse (substitutes a PRIOR Specialized response -> needs
+            // >= 2 Specialized responses) and ResponseWithApplicationEnvironment (the
+            // single-owner product forms no application-environment authority to
+            // substitute). Both hit the same >= 2-Specialized-response wall ruled
+            // non-constructible (the >= 2-owner / option-2 arms). Retired as
+            // cited-unreachable, tracked for re-enable when that capability lands
+            // (operator's call from the reachability brief). Their sibling
+            // ResponseWithOperation (above) substitutes the SINGLE owner's authority (NOT
+            // a prior, no app-env) and DOES reach -- confirmed by the loop reding then
+            // restoring on it -- so it is KEPT, not dropped, per the evidence.
+            (
+                "raw-host-result",
+                "rt_read_offset_stage",
+                Mutation::RawHostResultEscape,
+                "raw HostResult or non-K value escape",
+            ),
+            (
+                "raw-worker",
+                "rt_read_offset_stage",
+                Mutation::CallRawWorker,
+                "called a context or raw worker other than its exact K context",
+            ),
+            (
+                "omit-k-call",
+                "rt_read_offset_stage",
+                Mutation::OmitKCall,
+                "emitted 0 K calls instead of exactly one",
+            ),
+            (
+                "duplicate-k-call",
+                "rt_read_offset_stage",
+                Mutation::DuplicateKCall,
+                "emitted 2 K calls instead of exactly one",
+            ),
+            (
+                "before-host-validation",
+                "rt_read_offset_stage",
+                Mutation::CallBeforeHostValidation,
+                "called K before host response validation completed",
+            ),
+            (
+                "after-answer-collapse",
+                "rt_read_offset_stage",
+                Mutation::CallAfterAnswerCollapse,
+                "called K after its answer was already collapsed",
+            ),
+            (
+                "trap-bypass",
+                "rt_read_offset_stage",
+                Mutation::BypassTrapBeforeResult,
+                "without the status then Trap-before-Result branches",
+            ),
+            (
+                "vary-ret",
+                "rt_read_offset_stage",
+                Mutation::VaryRet,
+                "validated a Ret identity other than its exact K Ret",
+            ),
+            (
+                "omit-owner-definition",
+                "rt_read_offset_stage",
+                Mutation::OmitOwnerDefinition,
+                "the response-owner body population is incomplete",
+            ),
+        ] {
+            let ((_root, (result, diagnostics)), applications) =
+                ken_runtime::with_static_response_owner_body_mutation(mutation, || {
+                    compile(entry, label)
+                });
+            assert_eq!(applications, 1, "{label}: owner mutation did not reach");
+            let error = result.expect_err("a malformed response-owner body must red");
+            assert!(
+                format!("{error:?}").contains(expected),
+                "{label}: wrong finished-body refusal: {error:?}"
+            );
+            let baseline = if entry == "rt_read_offset_stage" {
+                &read_rows
+            } else {
+                &write_rows
+            };
+            assert_eq!(
+                &diagnostics, baseline,
+                "{label}: body mutation changed the typed planner population"
+            );
+            assert!(ken_runtime::static_response_owner_body_mutation_is_exact());
+            let (restored_root, (restored, restored_rows)) =
+                compile(entry, &format!("{label}-restored"));
+            let restored = restored.expect("the exact response-owner body must restore");
+            let (baseline_rows, baseline_hashes, baseline_bytes) =
+                if entry == "rt_read_offset_stage" {
+                    (&read_rows, read_hashes, &read_bytes)
+                } else {
+                    (&write_rows, write_hashes, &write_bytes)
+                };
+            assert_eq!(&restored_rows, baseline_rows);
+            assert_eq!(
+                (
+                    restored.plan_transport_hash,
+                    restored.runtime_program.core_semantic_hash,
+                    restored.runtime_program.artifact_hash,
+                    restored.artifact.executable_hash,
+                ),
+                baseline_hashes,
+                "{label}: restored owner artifact hashes changed"
+            );
+            assert_eq!(
+                &std::fs::read(&restored.artifact.executable_path)
+                    .expect("per-control restored response-owner bytes"),
+                baseline_bytes,
+                "{label}: exact byte restoration failed"
+            );
+            drop(restored_root);
+        }
+
+        drop((write_root, read_root));
+    });
+}
+
+/// **Promise class: durable invariant.** Intended planner growth may add Direct
+/// arrivals, but every such arrival must retain one source-keyed declared call
+/// and use that call's Trap-checked result rather than its capture environment.
+///
+/// **MEASURED:** the write fixture's exact governed Direct application records
+/// its invocation/call/callee provenance, a non-degenerate planner-ordered
+/// capture run, one
+/// emitted call and a call-derived result; the Tail-only read fixture records no
+/// Direct application.
+/// **CLAIMED:** Direct applies its carried environment exactly once while Tail
+/// cannot enter the Direct lookup and app486 remains an environment-only
+/// zero-call materializer.
+/// **THE GAP:** the observation is emitted at the actual declared-call seam.
+/// The population mutations below independently vary every joining operand and
+/// compare restored executable bytes.
+#[test]
+fn checked_ih_direct_application_pairs_one_declared_call_result() {
+    in_generated_entry_stack_thread("rt-parity-direct-application-pairing", || {
+        let compile = |label: &str, entry: &str| {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("direct-application-pairing-{label}"));
+            let (result, observations, applications) =
+                ken_runtime::with_checked_ih_direct_application_mutation(
+                    ken_runtime::CheckedIhDirectApplicationMutation::Exact,
+                    || {
+                        ken_cli::build_native_program(
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_parity_direct_application_pairing_{label}"),
+                            root.path(),
+                        )
+                    },
+                );
+            result.expect("the exact Direct application fixture must compile");
+            (observations, applications)
+        };
+
+        let (read, read_applications) = compile("read", "rt_read_offset_stage");
+        let (write, write_applications) = compile("write", "rt_write_writable_stage");
+        assert!(
+            read.is_empty() && read_applications == 0,
+            "the Tail-only read fixture must not enter the Direct application lookup: {read:#?}"
+        );
+        assert!(
+            !write.is_empty(),
+            "the write fixture must reach its governed Direct application"
+        );
+        assert_eq!(write_applications, write.len());
+        for row in &write {
+            assert_eq!(row.invocation_origin, "StaticOriginId(741)");
+            assert_eq!(row.application_origin, "StaticOriginId(740)");
+            assert_eq!(row.callee_origin, "StaticOriginId(739)");
+            assert!(
+                row.capture_count > 1,
+                "the capture-order control requires a non-degenerate Direct population: {row:#?}"
+            );
+            assert_eq!(row.emitted_call_count, 1);
+            assert!(row.emitted_call.is_some());
+            assert!(row.application_result_from_call);
+            assert!(
+                !row.application_origin.contains("486"),
+                "app486 remains environment-only and cannot be the Direct call seat"
+            );
+        }
+        assert!(ken_runtime::checked_ih_direct_application_mutation_is_exact());
+    });
+}
+
+/// **Promise class: durable invariant.** Every joining operand of the Direct
+/// application is population-controlled at the production seam.
+///
+/// **MEASURED:** call removal, a neighboring declared transport identity,
+/// capture permutation, capture removal and environment-for-result substitution
+/// each reach one real Direct arrival and return their exact refusal.
+/// **CLAIMED:** one validated Direct arrival can only assemble the planner-
+/// ordered capture run, select its transport's declared call once and use the
+/// emitted call's Result.
+/// **THE GAP:** each mutation moves the population-side operand named by the
+/// claim, leaves the detector fixed, proves application provenance, then an
+/// independent exact rebuild restores hashes and executable bytes to the
+/// baseline.
+#[test]
+fn checked_ih_direct_application_population_controls_refuse_and_restore() {
+    in_generated_entry_stack_thread("rt-parity-direct-application-controls", || {
+        use ken_runtime::CheckedIhDirectApplicationMutation as Mutation;
+
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_write_writable_stage");
+        let build = |label: &str, mutation: Mutation| {
+            let root = output_dir(&format!("direct-application-control-{label}"));
+            let (result, observations, applications) =
+                ken_runtime::with_checked_ih_direct_application_mutation(mutation, || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        "rt_parity_direct_application_control",
+                        root.path(),
+                    )
+                });
+            (root, result, observations, applications)
+        };
+
+        let (baseline_root, baseline, baseline_rows, baseline_applications) =
+            build("baseline", Mutation::Exact);
+        let baseline = baseline.expect("the exact Direct application must compile");
+        assert!(!baseline_rows.is_empty());
+        assert_eq!(baseline_applications, baseline_rows.len());
+        let baseline_bytes = std::fs::read(&baseline.artifact.executable_path)
+            .expect("baseline Direct executable bytes");
+        let baseline_hashes = (
+            baseline.plan_transport_hash,
+            baseline.runtime_program.core_semantic_hash,
+            baseline.runtime_program.artifact_hash,
+            baseline.artifact.executable_hash,
+        );
+
+        for (label, mutation, expected, expected_calls) in [
+            (
+                "drop-call",
+                Mutation::DropCall,
+                "Direct application emitted zero calls for one governed arrival",
+                0,
+            ),
+            (
+                "vary-transport",
+                Mutation::VaryTransportIdentity,
+                "Direct declared-call lookup varied away from the selected transport identity",
+                0,
+            ),
+            (
+                "permute-captures",
+                Mutation::PermuteCaptures,
+                "continuation call's independently assembled WorkerCapture suffix",
+                0,
+            ),
+            (
+                "drop-capture",
+                Mutation::DropCapture,
+                "Direct captured environment has a missing planner-ordered capture",
+                0,
+            ),
+            (
+                "environment-for-result",
+                Mutation::EnvironmentForResult,
+                "substituted its captured environment for the emitted call Result",
+                1,
+            ),
+        ] {
+            let (_mutated_root, mutated, rows, applications) = build(label, mutation);
+            let error = mutated.expect_err("a malformed Direct relation must refuse");
+            let rendered = format!("{error:?}");
+            assert!(
+                rendered.contains(expected),
+                "{label}: wrong refusal arm; error={rendered}; rows={rows:#?}"
+            );
+            assert_eq!(applications, 1, "{label}: mutation missed Direct");
+            assert_eq!(rows.len(), 1, "{label}: missing application provenance");
+            assert_eq!(rows[0].invocation_origin, "StaticOriginId(741)");
+            assert_eq!(rows[0].application_origin, "StaticOriginId(740)");
+            assert_eq!(rows[0].callee_origin, "StaticOriginId(739)");
+            assert_eq!(rows[0].emitted_call_count, expected_calls);
+            assert_eq!(rows[0].emitted_call.is_some(), expected_calls == 1);
+            assert!(!rows[0].application_result_from_call);
+            assert!(ken_runtime::checked_ih_direct_application_mutation_is_exact());
+
+            let (restored_root, restored, restored_rows, restored_applications) =
+                build(&format!("{label}-restored"), Mutation::Exact);
+            let restored = restored.expect("the exact Direct relation must restore");
+            assert_eq!(restored_rows, baseline_rows);
+            assert_eq!(restored_applications, baseline_applications);
+            assert_eq!(
+                (
+                    restored.plan_transport_hash,
+                    restored.runtime_program.core_semantic_hash,
+                    restored.runtime_program.artifact_hash,
+                    restored.artifact.executable_hash,
+                ),
+                baseline_hashes,
+                "{label}: exact restoration changed an artifact hash"
+            );
+            assert_eq!(
+                std::fs::read(&restored.artifact.executable_path)
+                    .expect("restored Direct executable bytes"),
+                baseline_bytes,
+                "{label}: exact restoration changed executable bytes"
+            );
+            drop(restored_root);
+        }
+        drop(baseline_root);
     });
 }
 
@@ -2849,17 +3948,6 @@ const D1_ROUTE_CONTROL_CHILD: &str = "KEN_RT_ITREE_D1_ROUTE_CONTROL_CHILD";
 fn assert_d1_route_control_child() {
     let mode = std::env::var(D1_ROUTE_CONTROL_CHILD).expect("D1 child mode");
     let (case, entry, expected_family, expected_effects) = match mode.as_str() {
-        "exact-write" => (
-            "fs-write-at-offset-single",
-            "rt_write_writable_stage",
-            "ResourceBodyResult",
-            vec![
-                ken_runtime::HostOpV1::FsOpen,
-                ken_runtime::HostOpV1::FsOpen,
-                ken_runtime::HostOpV1::ResourceRelease,
-                ken_runtime::HostOpV1::ResourceRelease,
-            ],
-        ),
         "drop-read" | "unknown-read" | "direct-read" => (
             "fs-read-at-offset-single",
             "rt_read_offset_stage",
@@ -2895,46 +3983,74 @@ fn assert_d1_route_control_child() {
         ),
         other => panic!("unknown D1 route-control child mode: {other}"),
     };
-    let Differential { native, .. } = differential(case, entry);
-    let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-        native.terminal_error.as_ref()
-    else {
-        panic!("{mode}: expected typed frontier trap, got {native:?}");
-    };
-    assert_eq!(
-        provenance.trap.code,
-        ken_runtime::RuntimeTrapCode::PatternMatchFailure
-    );
-    assert!(
-        provenance
-            .trap
-            .message
-            .ends_with(&format!("::{expected_family}")),
-        "{mode}: expected {expected_family} frontier, got {}",
-        provenance.trap.message
-    );
-    assert_eq!(
-        native
-            .effect_trace
-            .iter()
-            .map(|event| event.operation)
-            .collect::<Vec<_>>(),
-        expected_effects,
-        "{mode}: route perturbation must preserve the pre-dispatch effect prefix"
-    );
+    let Differential { native, interpreted } = differential(case, entry);
+    // Relocation (Architect re-rule evt_2427xbynt1d2e, Q2). SSA response
+    // specialization statically supersedes the runtime route control for the
+    // routes it specializes, so a runtime route-control perturbation of a
+    // specialized route is INERT rather than reaching the ITree frontier. The
+    // property therefore relocates onto native's actual outcome versus the
+    // interpreter oracle, per-mode, with no assertion of an outcome that mode no
+    // longer produces:
+    //   - native traps  => the runtime route-control guard is still live for this
+    //     (unspecialized) route; assert the exact fail-closed frontier family and
+    //     pre-dispatch effect prefix, unchanged.
+    //   - native returns => the route is statically specialized, so the
+    //     perturbation is inert; native must then agree with the interpreter
+    //     oracle EXACTLY. A native NormalReturn that diverged from a trapping
+    //     interpreter would be arm (a) fail-open and fails here.
+    match native.terminal_error.as_ref() {
+        Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) => {
+            assert_eq!(
+                provenance.trap.code,
+                ken_runtime::RuntimeTrapCode::PatternMatchFailure
+            );
+            assert!(
+                provenance
+                    .trap
+                    .message
+                    .ends_with(&format!("::{expected_family}")),
+                "{mode}: expected {expected_family} frontier, got {}",
+                provenance.trap.message
+            );
+            assert_eq!(
+                native
+                    .effect_trace
+                    .iter()
+                    .map(|event| event.operation)
+                    .collect::<Vec<_>>(),
+                expected_effects,
+                "{mode}: route perturbation must preserve the pre-dispatch effect prefix"
+            );
+        }
+        _ => {
+            assert_eq!(
+                native.terminal_error, interpreted.terminal_error,
+                "{mode}: a specialized route's inert perturbation must match the \
+                 interpreter oracle's terminal outcome (a divergent NormalReturn is \
+                 arm (a) fail-open)"
+            );
+            assert_eq!(
+                native.exit_status, interpreted.exit_status,
+                "{mode}: specialized-route native/interpreter exit parity"
+            );
+            assert_eq!(
+                native.effect_trace, interpreted.effect_trace,
+                "{mode}: specialized-route native/interpreter complete-effect parity"
+            );
+        }
+    }
 }
 
-// Durable invariant. MEASURED: isolated child compiles of both admitted full
-// programs replace the active checked edge's control with Direct and return to
+// Durable invariant. MEASURED: isolated mutation children replace each named
+// active checked edge's control with Direct and return to
 // the exact ITree default; an unknown active control also defaults; malformed
 // initial Direct control cannot shadow an ordinary case; and a real
 // recursor-layer Direct producer defaults unless that same edge is misrouted
 // Checked. CLAIMED: both header edges consume only their exact route control,
 // ordinary cases precede fallback, and all out-of-domain controls fail closed.
 // THE GAP: these are test-support mutations at frame 1, not production route
-// authority; the unmutated transitional witness above records the later
-// ResourceBodyResult frontier and D2 owns final InvalidOffset behavior.
-d1_route_case!(d1_route_control_exact_write, "exact-write", None, None);
+// authority; the durable read/write InvalidOffset products below own the
+// unmutated behavior.
 d1_route_case!(d1_route_control_drop_read, "drop-read", Some("active-checked-to-direct"), None);
 d1_route_case!(d1_route_control_drop_write, "drop-write", Some("active-checked-to-direct"), None);
 d1_route_case!(d1_route_control_unknown_read, "unknown-read", Some("active-checked-to-unknown"), None);
@@ -2942,6 +4058,9 @@ d1_route_case!(d1_route_control_ordinary_read, "ordinary-read", Some("initial-di
 d1_route_case!(d1_route_control_direct_read, "direct-read", None, Some("drop-checked-frame-1"));
 d1_route_case!(d1_route_control_misroute_direct_read, "misroute-direct-read", Some("active-direct-to-checked"), Some("drop-checked-frame-1"));
 
+/// Durable invariant: a statically specialized read response preserves the
+/// complete ordered effect/provenance trace and exposes exact InvalidOffset
+/// without dispatching the malformed FsReadAt request.
 #[test]
 #[ignore = "post-M6 runtime parity debt: native construction completes, but execution traps on a malformed ExitCode::Failure payload instead of observing InvalidOffset"]
 fn fs_read_at_malformed_offset_narrows_to_invalid_offset() {
@@ -3017,28 +4136,9 @@ fn fs_read_at_malformed_offset_without_read_right_narrows_to_invalid_offset() {
 //
 // Their coverage is the interpreter-level dispatch test, not this differential.
 
-// Ignored pending RT-CLOSURE-BOUNDARY-LANE.
-//
-// Observed signature, exactly:
-//   Closure: a closure cannot cross the boundary: it is runtime-local and
-//     live-domain only, and it has no durable lane
-//
-// Owner node: RT-CLOSURE-BOUNDARY-LANE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// This is the CLOSURE lane, not the byte-span seat that owns the four
-// px4b-adjacent rt_parity rows. Its own nearest sibling
-// fs_write_at_malformed_offset_without_write_right_... refuses on the
-// byte-span seat. Two rows, near-identical names, different owners.
-// The refusal surfaces on the helper thread 'rt-parity-write-offset'; this
-// test thread then fails only with the wrapper
-//   RT-PARITY fixture thread: Any { .. }
-// which carries no signature of its own. The signature above is the
-// real cause.
-// Annotation only -- test body and expectations are unchanged.
+/// Durable invariant: a statically specialized write response preserves the
+/// complete ordered effect/provenance trace and exposes exact InvalidOffset
+/// without dispatching the malformed FsWriteAt request.
 #[test]
 #[ignore = "RT-CLOSURE-BOUNDARY-LANE: a runtime-local closure has no durable lane across the boundary; fails at base 21fd46dc"]
 fn fs_write_at_malformed_offset_narrows_to_invalid_offset() {
@@ -3192,4 +4292,111 @@ fn buffer_freeze_malformed_span_is_unconstructible_at_the_landed_surface() {
     // rejections above are about scope and not about the probe's own form.
     elaborates("MkBufferWindow (sub_int 0 1) (1 : Int)", "BufferWindow")
         .expect("control: the public window constructor elaborates from source");
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. Recut option-2 coverage
+/// (Architect evt_55jt2yydg0661). The concrete "real-but-unrelated owner
+/// substituted" arm of the SubstituteUnrelatedOwnerRoot mutation lost its only
+/// exerciser under the recut: its sole prior host (the px8f writeAll fixture)
+/// degraded to the empty-traversal 0-owner case (writeAll's responses are now all
+/// Deferred), so every writeAll unrelated-owner-root run duplicates
+/// suppress-graph-claims and the distinct real-owner substitution went uncovered.
+/// This drives the SAME existing mutation against a program that carries real
+/// specialization owners (the rt_parity READ stage), so a concrete unrelated legal
+/// static-body owner is substituted as the retained-unit traversal root and the
+/// retained body reaches its "has no graph-derived call target in this unit"
+/// rejection from a genuine unrelated root, not the degenerate empty one.
+#[cfg(target_os = "linux")]
+const OPTION2_UNRELATED_OWNER_CHILD: &str = "KEN_RT_OPTION2_UNRELATED_OWNER_CHILD";
+
+#[cfg(target_os = "linux")]
+fn assert_option2_unrelated_owner_child() {
+    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+    // HS7 fallback RETIREMENT (Architect evt_28ga3szctktee). The CONCRETE
+    // SubstituteUnrelatedOwnerRoot "must not compile" arm is UNREACHABLE under the
+    // reverted single-read fixture family. It needs an UNRELATED legal static-body
+    // owner as the substitution SOURCE -- effectively >= 2 distinct legal
+    // static-body owners, the SAME population ruled non-constructible for the
+    // retarget >= 2-owner arm (sequencing captures cap -> not Specialized; a 2-arm
+    // branch's recursion-bearing arm-frames collide in one oriented segment via
+    // shared-parent inheritance -> checked endpoints do not compose,
+    // erasure.rs:1252-1296). Counting Specialized owners (the retired >= 1
+    // precondition) guarded the WRONG population: with no unrelated owner the
+    // mutation degenerates to the empty traversal and forms NO illegal program, so it
+    // CORRECTLY compiles (the mechanism did not fail to reject -- no illegal program
+    // was constructed). Retire the arm as a diagnosed guard on the unrelated-owner
+    // population, cited to the reachability finding: assert the degenerate is reached
+    // (never a vacuous pass). The parent asserts the empty-traversal provenance line.
+    let root = output_dir("option2-unrelated-owner-root");
+    let result = ken_runtime::with_retained_unit_call_target_mutation(
+        ken_runtime::RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot,
+        || {
+            ken_cli::build_native_program(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                "rt_parity_option2_unrelated_owner",
+                root.path(),
+            )
+        },
+    );
+    result.expect(
+        "with no unrelated legal static-body owner under the single-read family, \
+         SubstituteUnrelatedOwnerRoot degenerates to the empty traversal and forms no \
+         illegal program -- it must compile (unreachable-retirement, cited to the \
+         >= 2-distinct-legal-owner reachability finding)",
+    );
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant -- HS7 unreachable-retirement (Architect
+/// evt_28ga3szctktee). The CONCRETE "real-but-unrelated owner substituted" arm of
+/// SubstituteUnrelatedOwnerRoot is UNREACHABLE under the reverted single-read
+/// fixture family: it needs an unrelated legal static-body owner as the substitution
+/// SOURCE -- effectively >= 2 distinct legal static-body owners, the same population
+/// ruled non-constructible for the retarget >= 2-owner arm. With none, the mutation
+/// degenerates to the empty traversal and forms no illegal program, so it correctly
+/// compiles (the mechanism did not fail to reject; no illegal program was formed).
+///
+/// The CHILD (spawned with the mutation active on the rt_parity READ stage) asserts
+/// that compile-success; the PARENT captures the child's stderr and asserts the
+/// empty-traversal provenance ("no unrelated legal static-body owner exists"),
+/// documenting the non-constructibility rather than a concrete substitution that
+/// cannot occur -- a diagnosed guard on the unrelated-owner population, cited to the
+/// reachability finding, never a vacuous pass. It reds again if the mechanism ever
+/// makes an unrelated owner constructible for this family.
+#[test]
+fn substitute_unrelated_owner_root_reds_on_a_specialized_owner_program() {
+    if std::env::var_os(OPTION2_UNRELATED_OWNER_CHILD).is_some() {
+        in_generated_entry_stack_thread(
+            "rt-parity-option2-unrelated-owner-child",
+            assert_option2_unrelated_owner_child,
+        );
+        return;
+    }
+    let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args([
+            "--exact",
+            "substitute_unrelated_owner_root_reds_on_a_specialized_owner_program",
+            "--nocapture",
+        ])
+        .env(OPTION2_UNRELATED_OWNER_CHILD, "1")
+        .env_remove("RUST_MIN_STACK")
+        .output()
+        .expect("spawn option-2 unrelated-owner child");
+    assert!(
+        output.status.success(),
+        "option-2 child failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("no unrelated legal static-body owner exists"),
+        "option-2 RETIRED (unreachable): under the reverted single-read family the \
+         unrelated-owner substitution SOURCE is non-constructible, so the mutation must \
+         degenerate to the empty traversal ('no unrelated legal static-body owner \
+         exists') and compile -- it must NOT reach a concrete substitution that cannot \
+         occur under this family; stderr:\n{stderr}"
+    );
 }

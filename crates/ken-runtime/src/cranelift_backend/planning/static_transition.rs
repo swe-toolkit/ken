@@ -18,6 +18,7 @@ pub(in crate::cranelift_backend) use continuations::tests::contspec_activation_o
 mod effects;
 mod joins_traps;
 mod occurrences;
+mod responses;
 mod semantic_ir;
 mod units;
 
@@ -80,6 +81,20 @@ pub(in crate::cranelift_backend) use semantic_ir::{
     SynthesizedFixedConstructorRole,
 };
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
+#[allow(unused_imports)]
+pub(in crate::cranelift_backend) use responses::{
+    DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
+    StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
+    StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
+    StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
+    StaticResponsePhaseA,
+};
+#[cfg(feature = "px8-ds-test-support")]
+pub use responses::{
+    force_specialize_deferred_response_is_exact, static_response_context_demand_mutation_is_exact,
+    with_force_specialize_deferred_response, with_static_response_context_demand_mutation,
+    StaticResponseContextDemandMutation,
+};
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,
 };
@@ -549,9 +564,40 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// call identity, never by specialization identity or function provenance.
     required_consumer_projections:
         BTreeMap<ContinuationCallIdentity, RequiredConsumerProjection>,
-    /// `RT-DECL-CLOSURE-PORT` `D5a`. The generated producer execution contexts,
-    /// derived after the specialization fixed point closes.
+    /// `RT-DECL-CLOSURE-PORT` `D5a`. The generated producer execution contexts.
+    /// Causal-call demands retain the exact prefix produced by specialization
+    /// planning; validated static-response demands append through the same
+    /// `(specialization, worker body)` interner before this population's ABI is
+    /// installed.
     continuation_contexts: Vec<PlannedContinuationContext>,
+    /// Every validated response edge resolved through the installed union
+    /// context population. Empty exactly when `static_response_infeasible` is
+    /// populated or the complete response population is empty.
+    static_response_continuations: Vec<StaticResponseContinuation>,
+    /// Distinguishes a lawfully empty installed response population from the
+    /// pre-install draft state; neither row count nor infeasibility can do so.
+    static_response_plan_installed: bool,
+    /// The typed fail-closed result for a genuinely opaque/dynamic response K
+    /// or a source that cannot be expressed in the existing typed schema.
+    static_response_infeasible: Option<SsaInfeasible>,
+    /// The complete `Deferred` residual population (recut amendment
+    /// `evt_4ar3rxzrra5v4`): every response `Vis` that is NOT specialized —
+    /// P1 (no continuation unit) ∪ P2 (unit present but the selected caller is a
+    /// checked-IH environment transport source that never retargets to a real
+    /// call). Populated (never an absence) so `classify` is congruent with
+    /// `static_response_continuations` over the full response-`Vis` population and
+    /// every downstream stage reconciles the residual by total match (R2/§7).
+    /// A `Deferred` response acquires no owner and no `StaticResponseDeferred`
+    /// placeholder; its operation root and host effect fall through to main's
+    /// pre-WP lowering (R3).
+    static_response_deferred: Vec<DeferredResponseRow>,
+    /// Phase-A carry of the two-phase response context install (RECUT 2, HS5):
+    /// the owner-less demand + P1 population minted at install
+    /// (construction.rs:1213), consumed by
+    /// `install_static_response_context_plan_phase_b` post-:1251. `Some` after
+    /// phase A on a feasible plane; `None` before phase A, after phase B (taken),
+    /// or on an opaque-K refusal (which sets `static_response_infeasible` instead).
+    static_response_phase_a: Option<StaticResponsePhaseA>,
     /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`. The interned fusion identity
     /// plane, **installed after planning rather than during it**.
     ///
@@ -695,6 +741,18 @@ fn inline_synthesized_seat_emission_owners(
         if occurrence_subtree_contains(plan, body, seat)? {
             owners.push(ContinuationEmissionOwner::Specialization(unit.id()));
         }
+    }
+    if plan.static_response_plan_installed {
+        let responses = match plan.static_response_feasibility_ledger_all()? {
+            Ok(responses) => responses,
+            Err(_) => Vec::new(),
+        };
+        owners.extend(
+            responses
+                .into_iter()
+                .filter(|response| response.effect_origin() == seat)
+                .map(|response| response.base_owner()),
+        );
     }
     owners.sort();
     owners.dedup();
@@ -844,7 +902,242 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'s
         }
     }
     planner.connect_declaration_calls(&declaration_entries)?;
-    planner.finish(symbols, root_ingress, functionized_units)
+    let plan = planner.finish(symbols, root_ingress, functionized_units)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    record_static_response_feasibility_diagnostic(&plan)?;
+    Ok(plan)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StaticResponseCaptureObservation {
+    pub ordinal: u32,
+    pub origin: u32,
+    pub source: String,
+    pub producer_abi_slot: u32,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StaticResponseFeasibilityObservation {
+    pub base_owner: String,
+    pub producer_call_origin: u32,
+    pub response_origin: u32,
+    pub vis_origin: u32,
+    pub operation: String,
+    pub k_identity: String,
+    pub k_specialization: u32,
+    pub k_closure_origin: u32,
+    pub k_body_origin: u32,
+    pub k_context: u32,
+    pub context_was_preexisting: bool,
+    pub captures: Vec<StaticResponseCaptureObservation>,
+    pub continuation_inputs: Vec<(u32, String, u32)>,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StaticResponseInfeasibleObservation {
+    pub base_owner: String,
+    pub vis_origin: u32,
+    pub producer_call_origin: Option<u32>,
+    pub operation: Option<String>,
+    pub k_closure_origin: Option<u32>,
+    pub k_body_origin: Option<u32>,
+    pub k_capture_count: Option<usize>,
+    pub continuation_input_count: Option<usize>,
+    pub reason: String,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StaticResponseOwnerObservation {
+    pub owner: u32,
+    pub base_owner: String,
+    pub response: u32,
+    pub selected_caller: String,
+    pub k_context: u32,
+    pub context_was_preexisting: bool,
+    pub parameters: u32,
+    pub captures: u32,
+    pub frame_bytes: u32,
+    pub slots: Vec<(String, u32)>,
+}
+
+/// One `Deferred` residual row observed for AC-1 congruence and AC-4/AC-5/AC-7
+/// controls (recut amendment `evt_4ar3rxzrra5v4`).
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeferredResponseObservation {
+    pub vis_origin: u32,
+    /// The producer call origin this Deferred residual belongs to. Lets a control
+    /// group the Deferred population by shared producer (RECUT 2 HS6 (ii)-redesign:
+    /// the fan-out-accounting invariant re-targeted onto the Deferred side, where
+    /// the shared-producer multi-K witness -- the transport-deferred ResourceRelease
+    /// pairs -- now lives).
+    pub producer_call_origin: u32,
+    pub operation_root_origin: u32,
+    pub effect_origin: u32,
+    pub operation: String,
+    /// "NoContinuationUnit" (P1) or "UnconsumedTransportCaller" (P2).
+    pub sub_case: String,
+    /// The K's capture / continuation-input counts (P2 from the demand, P1 zero).
+    /// Lets the census control cross-check the DropEvery mutation's reach against
+    /// the FULL has-K-unit demand population (RECUT 2 HS6 (ii)-redesign 2nd
+    /// extension): the P2 Deferred demands' counts are observable only here.
+    pub capture_count: usize,
+    pub continuation_input_count: usize,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StaticResponseFeasibilityDiagnostic {
+    pub static_response_rows: Vec<StaticResponseFeasibilityObservation>,
+    pub static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
+    pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
+    pub all_static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
+    pub static_response_owners: Vec<StaticResponseOwnerObservation>,
+    /// The complete `Deferred` residual (P1 ∪ P2). Together with
+    /// `static_response_rows` (the Specialized set) this is the full response-`Vis`
+    /// classification, so a test can assert congruence (AC-1).
+    pub static_response_deferred: Vec<DeferredResponseObservation>,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS:
+        std::cell::RefCell<Option<Vec<StaticResponseFeasibilityDiagnostic>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_static_response_feasibility_diagnostics<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<StaticResponseFeasibilityDiagnostic>) {
+    STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
+        assert!(
+            slot.borrow().is_none(),
+            "static-response feasibility observation windows cannot nest"
+        );
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let observations = STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
+        slot.borrow_mut()
+            .take()
+            .expect("static-response feasibility observation window")
+    });
+    (result, observations)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_static_response_feasibility_diagnostic(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<(), CraneliftBackendError> {
+    let observe = |result: Result<Vec<StaticResponseContinuation>, SsaInfeasible>| match result {
+        Ok(rows) => {
+            let observations = rows
+                .iter()
+                .map(|row| StaticResponseFeasibilityObservation {
+                    base_owner: format!("{:?}", row.base_owner()),
+                    producer_call_origin: row.producer_call_origin().0,
+                    response_origin: row.response_origin().0,
+                    vis_origin: row.vis_origin().0,
+                    operation: format!("{:?}", row.operation()),
+                    k_identity: format!("{:?}", row.k_identity()),
+                    k_specialization: row.k_specialization().0,
+                    k_closure_origin: row.k_closure_origin().0,
+                    k_body_origin: row.k_body_origin().0,
+                    k_context: row.k_context().0,
+                    context_was_preexisting: row.context_was_preexisting(),
+                    captures: row
+                        .captures()
+                        .iter()
+                        .map(|capture| StaticResponseCaptureObservation {
+                            ordinal: capture.ordinal(),
+                            origin: capture.origin().0,
+                            source: format!("{:?}", capture.source()),
+                            producer_abi_slot: capture.producer_abi_slot(),
+                        })
+                        .collect(),
+                    continuation_inputs: row
+                        .continuation_inputs()
+                        .iter()
+                        .map(|(ordinal, source, slot)| (*ordinal, format!("{source:?}"), *slot))
+                        .collect(),
+                })
+                .collect();
+            (observations, None)
+        }
+        Err(infeasible) => (
+            Vec::new(),
+            Some(StaticResponseInfeasibleObservation {
+                base_owner: format!("{:?}", infeasible.base_owner()),
+                vis_origin: infeasible.vis_origin().0,
+                producer_call_origin: infeasible.producer_call_origin().map(|origin| origin.0),
+                operation: infeasible.operation().map(|operation| format!("{operation:?}")),
+                k_closure_origin: infeasible.k_closure_origin().map(|origin| origin.0),
+                k_body_origin: infeasible.k_body_origin().map(|origin| origin.0),
+                k_capture_count: infeasible.k_capture_count(),
+                continuation_input_count: infeasible.continuation_input_count(),
+                reason: infeasible.reason().to_string(),
+            }),
+        ),
+    };
+    let (static_response_rows, static_response_infeasible) = observe(
+        plan.static_response_feasibility_ledger(ken_host::HostOpV1::BufferAllocate)?,
+    );
+    let (all_static_response_rows, all_static_response_infeasible) =
+        observe(plan.static_response_feasibility_ledger_all()?);
+    let static_response_owners = match plan.static_response_owner_specializations()? {
+        Ok(owners) => owners
+            .iter()
+            .map(|owner| StaticResponseOwnerObservation {
+                owner: owner.id().ordinal(),
+                base_owner: format!("{:?}", owner.base_owner()),
+                response: owner.response().ordinal(),
+                selected_caller: format!("{:?}", owner.selected_caller()),
+                k_context: owner.k_context().0,
+                context_was_preexisting: owner.context_was_preexisting(),
+                parameters: owner.header().parameters,
+                captures: owner.header().captures,
+                frame_bytes: owner.header().frame_bytes,
+                slots: owner
+                    .slots()
+                    .iter()
+                    .map(|slot| (format!("{:?}", slot.kind), slot.ordinal))
+                    .collect(),
+            })
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+    let static_response_deferred = plan
+        .static_response_deferred()
+        .iter()
+        .map(|row| DeferredResponseObservation {
+            vis_origin: row.vis_origin().0,
+            producer_call_origin: row.producer_call_origin().0,
+            operation_root_origin: row.operation_root_origin().0,
+            effect_origin: row.effect_origin().0,
+            operation: format!("{:?}", row.operation()),
+            sub_case: format!("{:?}", row.sub_case()),
+            capture_count: row.capture_count(),
+            continuation_input_count: row.continuation_input_count(),
+        })
+        .collect();
+    STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
+        if let Some(rows) = slot.borrow_mut().as_mut() {
+            rows.push(StaticResponseFeasibilityDiagnostic {
+                static_response_rows,
+                static_response_infeasible,
+                all_static_response_rows,
+                all_static_response_infeasible,
+                static_response_owners,
+                static_response_deferred,
+            });
+        }
+    });
+    Ok(())
 }
 
 /// The governed nested-bracket source shared by the planning and emission
