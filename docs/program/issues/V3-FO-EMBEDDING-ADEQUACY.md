@@ -11,6 +11,20 @@ github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
+> # OPERATIVE (Steward, 2026-09-03) — D2b RE-RELEASED. Predecessor #4
+> # [[LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME]] MERGED at origin/main
+> # `ab55f525c` (blob-verified byte-identical to reviewed `60ea656228`; Decision
+> # `dec_6fz8zcm7gfc3m`, QA + Architect + CV exact-SHA). The HELD condition in the
+> # banner below ("until predecessor #4 merges") is DISCHARGED. The language ring
+> # RESUMES D2b from the CURRENT `origin/main` tip — re-measure coordinates before
+> # editing; the statement is UNCHANGED; the held WIP `26dd33f25` is reusable and
+> # the cast/J index-refinement it depends on is now on `main` via the
+> # predecessor. Architect is the required soundness reviewer on the resumed D2b
+> # candidate (his HS15-18 scrutiny points); QA + CV as applicable, then Steward
+> # M1-M4 -> lieutenant. This is the funded FO/Kripke soundness completion
+> # (`embedding_adequacy`), lane 2. This banner supersedes the HELD banner below
+> # for CURRENT state.
+>
 > # OPERATIVE (Steward, 2026-09-03) — OPERATOR GATE RESOLVED: predecessor
 > # #4's coupled coherence realizes via the cast/J INDEX-REFINEMENT (option a).
 > # Supersedes the HS13-FIRED banner below for CURRENT state.
