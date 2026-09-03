@@ -4648,15 +4648,17 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             #[cfg(not(feature = "px8-ds-test-support"))]
                             let edge_word = checked.word.word;
                             // The certified forward SSA edge to the exact shared Ret
-                            // block. Per-arrival and exact-once: after the jump this
-                            // predecessor is sealed and yields no further source
-                            // value, so no remaining source continuation emits on it
-                            // and there is no second Ret body.
+                            // block. The jump terminates this predecessor; the
+                            // sealed RecursiveBackedge disposition (as the existing
+                            // join-edge seal at the top of this file) tells the
+                            // driver this branch yields no further source value, so
+                            // no remaining source continuation emits on it and there
+                            // is no second Ret body. Per-arrival and exact-once: this
+                            // arm returns immediately, emitting one edge for the one
+                            // arrival.
                             builder
                                 .ins()
                                 .jump(authority.return_body, &[edge_word.into()]);
-                            let sealed = builder.create_block();
-                            builder.switch_to_block(sealed);
                             return Ok(SourceCallOutcome::Complete(
                                 LoweringOperand::Specialized(Lowered::RecursiveBackedge),
                             ));
