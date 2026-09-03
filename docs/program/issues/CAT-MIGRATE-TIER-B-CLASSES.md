@@ -1,17 +1,52 @@
 ---
 id: CAT-MIGRATE-TIER-B-CLASSES
 title: "Scaffold-retirement Tier B (class-owner relocation + primitive-instance consolidation): relocate the three orphaned primitive DecEq instances (UInt8, Bytes from BytesKeys; String from StringKeys) with their eq/sound/complete wiring and injectivity certificates into the class owner LC (LawfulClasses); consolidate EmptyDec's byte-identical duplicate class DecEq / fn bool_eq / instance DecEq Bool into an import from LC; and give the three scaffolded modules (BytesKeys, StringKeys, EmptyDec) real import blocks so they elaborate standalone with zero fixture-scaffolding dependence. LC/LF/EC are already CLEAN (census fold), so no Core.Classes module-migration remains — the tier is the DecEq relocation + the three consumers' standalone-ification."
-status: active
+status: draft
 owner: foundation
 size: M
 gate: none
 tier: T1
-depends_on: [CAT-MIGRATE-TIER-A-PROVIDERS]
+depends_on: [CAT-MIGRATE-TIER-A-PROVIDERS, CAT-MIGRATE-TIER-B-PROVIDERS]
 blocks: [CAT-SCAFFOLD-RETIREMENT]
 github: null
 origin: "Steward, 2026-09-03. Tier B of the scaffold-retirement migration (parent CAT-SCAFFOLD-RETIREMENT; Architect 5-tier DAG decomposition evt_2e0pee5jxzv07). Carries the operator ruling 2026-09-02 Flag 2 (verbatim 'Move DecEq UInt8, etc to LC'; lanes.md OPERATOR RULING 2026-09-02 block, commit 43f1c20a2): the orphaned primitive-type DecEq instances RELOCATE with their wiring to LC (the class owner), NOT a new prelude; BytesKeys/StringKeys become pure consumers; EmptyDec's duplicate local class/fn/instance CONSOLIDATE into LC. Fixed inputs measured at origin/main f01266423 (Steward measurement 2026-09-03): the three instances + their spans + helper spans + the EmptyDec byte-identity + the per-module scaffolding verdicts are in Fixed Inputs below. The tier's LF/EC/LC module-migration FOLDED OUT — all three of Core.Classes' modules already carry real import blocks (LF via the just-landed CAT-LAWFULFUNCTORS-STANDALONE-IMPORT, 6c95c6ff3), so the only scaffolding to retire in this tier is in BytesKeys, StringKeys, EmptyDec. Re-measure at your build SHA via the STEP-2 census (D0); a line number decays."
 ---
 
+> # RECUT (Architect evt_21c0cdvnmv3f3 + Steward evt_7bzffq1q90rr8, 2026-09-03) —
+> # this node is now the RELOCATION SUCCESSOR, gated on the provider-publication
+> # predecessor [[CAT-MIGRATE-TIER-B-PROVIDERS]] (P). status: draft until P lands,
+> # then the Steward re-releases. This banner supersedes the census-fold /
+> # Fixed-Inputs claims below.
+>
+> The foundation D0 (evt_5bt85erc05fa4) found the relocation consuming two
+> UNPUBLISHED provider surfaces (LC's private `class DecEq`/`bool_eq`;
+> StringBijection's private, scaffolded `string_to_list_char_injective`) and one
+> census error (EC not clean). The Architect converged on the RECUT (over its own
+> crossed rescope-in-place evt_4rvss5eaqqbzw, WITHDRAWN). Net structure:
+>
+> - PREDECESSOR P = [[CAT-MIGRATE-TIER-B-PROVIDERS]] (active, released): publishes
+>   (a) LC `class DecEq` + `fn bool_eq` and (c) StringBijection's cert + off-scaffold
+>   clean-ification. This node's `depends_on` now includes P.
+> - THIS node (recut) = the WHOLE relocation, gated on P: DecEq UInt8 + Bytes +
+>   STRING (String is NO LONGER deferred — P publishes StringBijection's cert) into
+>   LC + EmptyDec consolidation (LC now exports DecEq/bool_eq, so the byte-identical
+>   duplicate becomes an import) + BytesKeys/StringKeys/EmptyDec standalone. The
+>   `trans` "design judgment" below is a NON-ISSUE (Architect Finding 4: LC has no
+>   bare top-level `trans`, only namespaced `proof trans for <rel>`; change LC's
+>   selective import :47 `(cong, sym)` -> `(cong, sym, trans)`, no proof edit, no
+>   Transport export-surface change — the :168-180 note is historical).
+> - OUT of this node (census error): EC (EffectfulClasses) standalone-cleanness on
+>   private LF `Functor`/`comp`/`idf`/`list_map` — orthogonal to the DecEq chain, a
+>   SEPARATE Core.Classes node the Steward frames off the critical path (not a
+>   regression fix; EC still elaborates in the full catalog build via ambient
+>   resolution).
+>
+> Class-uniformity stays the Architect's candidate criterion (after D2, exactly one
+> `class DecEq` catalog-wide, EmptyDec's duplicate GONE not shadowed). D0 count:
+> 1st D0 stop on this WP. The Fixed Inputs below stay as measured reference; where
+> they conflict with this banner (LC/EC clean; String deferred; `trans`), the
+> banner governs.
+>
 > # Tier B of the scaffold-retirement migration: the DecEq class-owner
 > # relocation + the three primitive-instance modules' standalone-ification.
 > # The class-owner relocation GATES every DecEq/class consumer in Tiers C-E.

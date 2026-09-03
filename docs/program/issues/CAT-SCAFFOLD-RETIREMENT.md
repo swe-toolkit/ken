@@ -48,14 +48,25 @@ provider.
   Pure export publication, no consumer edits. Census folded it to
   `Derived::{nth, bytes_nat_length}`; Transport/Compare/Arithmetic/Nat.Order are
   already sufficiently published.
-- **Tier B — Core.Classes + primitive-instance consolidation.**
-  ([[CAT-MIGRATE-TIER-B-CLASSES]], `active` — framed + released 2026-09-03.)
-  **Census fold (Steward measurement at `f01266423`): LC/LF/EC are ALREADY
-  CLEAN** (LF via the just-landed `CAT-LAWFULFUNCTORS-STANDALONE-IMPORT`), so the
-  "LC then LF then EC" module-migration folds out; the live Tier-B delta is the
-  DecEq relocation into LC + the three scaffolded consumers (BytesKeys,
-  StringKeys, EmptyDec) going standalone. **The class-owner relocation lands here
-  and gates every DecEq/class consumer below.** Operator ruling 2026-09-02
+- **Tier B — Core.Classes + primitive-instance consolidation.** RECUT after the
+  foundation D0 hard-stop (Architect evt_21c0cdvnmv3f3 + Steward evt_7bzffq1q90rr8)
+  into a provider-publication predecessor + a relocation successor, honoring the
+  DAG "no consumer-only WP references an unpublished provider" axis:
+  - P = [[CAT-MIGRATE-TIER-B-PROVIDERS]] (`active`, released 2026-09-03): LC
+    publishes its own `class DecEq` + `fn bool_eq`; StringBijection (a
+    Tier-A-missed Data.Text provider) clean-ifies + publishes
+    `string_to_list_char_injective`.
+  - [[CAT-MIGRATE-TIER-B-CLASSES]] (`draft`, gated on P): the WHOLE DecEq
+    UInt8/Bytes/String relocation into LC + EmptyDec consolidation + BytesKeys /
+    StringKeys / EmptyDec standalone.
+  - Off the critical path (census error — EC was NOT clean): an independent
+    Core.Classes node clean-ifies EC (LF publishes `Functor`/`comp`/`idf`/
+    `list_map`; EC imports them). Steward to frame; runs in parallel, not a
+    regression fix. LF (LawfulFunctors) itself is genuinely clean via
+    `CAT-LAWFULFUNCTORS-STANDALONE-IMPORT`.
+
+  **The class-owner relocation lands here and gates every DecEq/class consumer
+  below.** Operator ruling 2026-09-02
   (Flag 2, verbatim "Move DecEq UInt8, etc to LC"): the orphaned primitive-type
   `DecEq` instances — `DecEq UInt8` and `DecEq Bytes` (from BytesKeys),
   `DecEq String` (from StringKeys) — RELOCATE with their eq/sound/complete wiring
