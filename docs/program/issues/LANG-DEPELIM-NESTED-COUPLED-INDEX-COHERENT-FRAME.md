@@ -12,6 +12,62 @@ github: null
 origin: "Steward, 2026-09-03. D2b design hard-stop #5 for V3-FO-EMBEDDING-ADEQUACY. Classified by the Architect (evt_6zjegefzv0am2) a distinct, reachable elaborator-capability predecessor in crates/ken-elaborator — NOT a kernel change (the kernel correctly rejects; the elaborator must PRODUCE a well-typed term that typechecks against the unmodified kernel = a completeness/false-reject fix), NOT source-compensable (the correspondence is a REQUIRED architecture-B lemma so it cannot live in FoKripke), NOT an architecture-B refutation (the proposition is true by construction and the match i/match xs proof is structurally exhaustive). The Architect's provisional lean (the derived/coupled index through the nested elim) was FALSIFIED by the D0 grid (evt_t9w0fnhq68p0, fixture /tmp/d2b-hs5-grid-final.rs) and WITHDRAWN (§7a, evt_45h2qab5nejg3): Row B (RED, direct index, no dual_fin_to_nat) rules the derived index OUT; Row A (GREEN, trivial equality, same coupled index + nesting) rules the coupled-index motive OUT; the single-elim C substitute (RED at ONE match xs) rules nesting OUT. CONFIRMED CAUSE (from the flipping cells): the discriminator is a NONTRIVIAL equality whose two sides are DEPENDENT RESULTS refining DIFFERENTLY under the same indexed elimination (cross-structure dependent-result refinement), failing ALREADY at a SINGLE elimination depth — the two sides' refinements land in different de Bruijn frames (@2 vs @4), so the branch's equality type does not sit in the same frame as the refined goal. FIX DIRECTION RULED (evt_45h2qab5nejg3): the structural coherent-frame CLOSURE, not a point-fix (the grid falsifies any special extension of the derived-occurrence/nested-elim gate). §1a: HS5 self-ruled; next Research trigger = HS6; no research pull. §1b (Architect, entry 4): entries 1 (68100a5cd, direct coupled scrutinee occurrence), 2 (128b6c000, captured convoy binder), 4 (this) share ONE predicate — no single coherent de Bruijn frame across the refined goal; entry 3 (b22e62530 DUAL-VIEW) is the field-side sibling. FOLD-VS-DISTINCT: this is motive/goal-rebase-side (expected g0) and DISTINCT from the Adversary's queued infer-mode-RVar successor (evt_3gh2pkrw3ny8z, field-view/application-head side); confirmed no application-head field-retyping is involved. Coordinates re-measure at your build SHA; grid fixture /tmp/d2b-hs5-grid-final.rs on the held WIP 26dd33f25."
 ---
 
+> # OPERATIVE (Steward, 2026-09-03) — OPERATOR GATE RESOLVED: option (a) ACCEPTED,
+> # the cast/J INDEX-REFINEMENT realization. This banner SUPERSEDES the HS13-FIRED
+> # and HS12-RULED banners below for CURRENT state and is the AUTHORIZED mechanism.
+> #
+> # Chain resolution: HS12's "transport-free with two nested
+> # existing homogeneous Elims" was FALSIFIED at build (HS13,
+> # language-implementer evt_51nwxnxvbstt0) and the Architect
+> # ESCALATED the reserved policy gate to the Steward (Architect
+> # evt_3megf5mnmh90t, §7a reversal). PROVEN: sequential
+> # single-scrutinee elimination of a coupled shared-index pair with
+> # opaque coupling functions (dual_nth/dual_lookup) INTRINSICALLY
+> # requires index-transport — whichever family is eliminated SECOND,
+> # its homogeneous recursor must generalize the shared index and
+> # strands the FIRST family's now-concrete constructor; no split-order
+> # and no convoy removes it (the convoy only relocates the horn to the
+> # next elimination, never terminates). Conflation corrected for the
+> # record: "without-K-solvable" is NOT "transport-free" — without-K
+> # bans axiom K but PERMITS J; Cockx/GMC coupled Fin/Vec-over-Nat
+> # elimination is without-K precisely by SOLVING the shared-index
+> # equation and TRANSPORTING along it (J on the homogeneous Eq Nat
+> # equation).
+> #
+> # THE OPERATOR RULING (2026-09-03, direct to the Steward): ACCEPT option (a), the
+> # index-refinement cast/J realization. Options (b) decouple dual_lookup's index to
+> # plain Nat and (c) declare out-of-scope were NOT chosen.
+> #
+> # AUTHORIZED MECHANISM (Architect evt_3megf5mnmh90t point 3+5a; the sound
+> # route): carry the homogeneous `Eq Nat` index equation (the Suc-injectivity
+> # peel already done at elab.rs:2982-2996) and `cast`/`J` the stranded sibling
+> # along it. This is the index-refinement route (install_index_refinements) the
+> # chain RETIRED in pursuit of transport-freeness; completing it for the coupled
+> # covering is a real ELABORATOR build. HOMOGENEOUS (Eq Nat, NOT
+> # heterogeneous/John-Major); the equations are reflexive-after-instantiation so
+> # the casts COMPUTE (a stuck cast is a build defect, not the design); SOUND with
+> # ZERO trusted-base DELTA — `cast`/`J` are EXISTING K2 primitives
+> # (ADR-0005 observational kernel; ken-kernel/src/lib.rs:15, term.rs:322-324
+> # Cast(A,B,e,t)/J(m,d,e)). NO kernel change, NO new primitive. The gate the
+> # operator resolved was the POLICY of leaning on observational transport for
+> # catalog coherences — NOT a soundness or novelty question.
+> #
+> # §1b CLOSURE (Architect point 6, refining the HS12 §1b below): the defect across
+> # HS10/11/12/13 is ONE — the chain assumed a transport-free realization was
+> # achievable; for this coupled coherence with opaque coupling functions it is NOT,
+> # and index-transport (cast/J on Eq Nat) is intrinsic.
+> #
+> # RELEASE: the language ring builds the cast/J index-refinement for the coupled
+> # covering from 7b766fc89 (production clean except byte-preserved user Cargo).
+> # Architect is the required soundness/design reviewer on the candidate (their
+> # mechanism); CV if strict-resolution conformance applies -> Steward M1-M4 ->
+> # lieutenant. A stuck (non-computing) cast or any ambiguity in re-enabling
+> # install_index_refinements for the coupled covering HARD-STOPS to the Architect
+> # elaborator-side, never as a new gate (the operator has ruled the policy). D2b
+> # (V3-FO-EMBEDDING-ADEQUACY) stays HELD (WIP 26dd33f25 over 7b766fc89, statement
+> # UNCHANGED) until this predecessor lands; the Steward RE-RELEASES D2b only after
+> # it merges.
+>
 > # OPERATIVE (Steward, 2026-09-03) — HS13 FIRED: xs-first SWAPS the horn but does
 > # NOT remove it. The HS12 xs-first mechanism (banner below) is NOT settled —
 > # awaiting the Architect's HS13 mechanism ruling; TCB tripwire ARMED.
@@ -26,17 +82,17 @@ origin: "Steward, 2026-09-03. D2b design hard-stop #5 for V3-FO-EMBEDDING-ADEQUA
 > # (DualNil : DualEnv a Zero vs the arbitrary-p inner motive) and SIMPLIFYING
 > # reintroduces carrier eliminators (the retired common-frame error). Measured
 > # /tmp/hs12-transpose3.log + transpose4.log; disposable
-> # /tmp/hs13-xs-first-covering.diff. The only two resolutions the ring sees BOTH
-> # cross the TCB boundary: (a) a kernel term rep other than sequential single Elims
-> # (a simultaneous telescopic eliminator = new kernel primitive), or (b) an
-> # equality/transport convoy (het-eq / J / Cast). HS13 ROUTED to the Architect
-> # (Steward evt_46ew5qfjayc4h): if either is load-bearing => TCB growth => Architect
-> # escalates to Steward => operator gate; if a THIRD elaborator-only realization
-> # exists (simultaneous split lowering to existing homogeneous Elims, no kernel-rep,
-> # no transport), the Architect rules directly. §1a: HS13 is NOT a trigger; next
-> # mandatory = HS15. Ring restored clean at 7b766fc89, idle pending the ruling. The
-> # HS12 banner below records what was RULED and BUILT — do not read it as the final
-> # mechanism.
+> # /tmp/hs13-xs-first-covering.diff. The only two resolutions the ring sees
+> # BOTH cross the TCB boundary: (a) a kernel term rep other than sequential
+> # single Elims (a simultaneous telescopic eliminator = new kernel primitive),
+> # or (b) an equality/transport convoy (het-eq / J / Cast). HS13 ROUTED to the
+> # Architect (Steward evt_46ew5qfjayc4h): if either is load-bearing => TCB
+> # growth => Architect escalates to Steward => operator gate; if a THIRD
+> # elaborator-only realization exists (simultaneous split lowering to existing
+> # homogeneous Elims, no kernel-rep, no transport), the Architect rules
+> # directly. §1a: HS13 is NOT a trigger; next mandatory = HS15. Ring restored
+> # clean at 7b766fc89, idle pending the ruling. The HS12 banner below records
+> # what was RULED and BUILT — do not read it as the final mechanism.
 >
 > # OPERATIVE (Steward, 2026-09-03) — HS12 RULED: coupled-covering xs-FIRST.
 > # This banner SUPERSEDES the "D2 (RECUT) path-A/path-B" mechanism and the HS6+HS7

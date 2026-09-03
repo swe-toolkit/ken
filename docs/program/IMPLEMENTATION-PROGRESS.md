@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-03 12:16:43Z — from 535 issue file(s) in `docs/program/issues/`.
+2026-09-03 15:23:31Z — from 536 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -286,6 +286,7 @@ the committed file matches the generator's output.
 | `RT-BODY-OCCURRENCE-PROVENANCE` | Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree | merged | runtime | M | none | — |
 | `RT-BORROWED-INPUT-CARRIER-DURABILITY` | Execution-parity successor — give a borrowed process input (BorrowedOpaque) a durable carrier representation on the generic carried-value path, so a capture that crosses the closure boundary does not trap at run with `malformed borrowed process input` (object_linker_packaging.rs:2221, native stub value -1) | draft | runtime | M | none | — |
 | `RT-BOUNDARY-IGNORED-CORPUS-MEASURE` | Read unit_boundary_environment_fields on the six ignored closure-at-boundary tests, the population the merged measurement's own selection rule excluded | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2381 |
+| `RT-BRACKET-RELEASE-ORDER-PARITY` | Interp vs native diverge on multi-resource bracket TEARDOWN order: on a two-resource (file + buffer) bracket the interpreter releases resource 1 then 2, native releases 2 then 1 — outcome-independent, in bracket teardown, orthogonal to the composed-return repair (R3). Pre-existing; newly EXPOSED once the five composed-return fixtures run past the base ResourceBodyResult trap. First task: determine the spec-correct release order (which side is the bug), then fix that side. | draft | runtime | S | none | — |
 | `RT-BRANCH-LOCAL-DECLARED-CALLABLE` | recursive_position_unit_body returns one Option<StaticOriginId> for the whole source, so whole-source agreement is too coarse for a Match whose arms differ -- the cut is constructor-and-recursive-position-specific callable authority installed inside the already-selected constructor case, which eliminates the closure crossing rather than opening a durable closure lane | merged | runtime | L | none | — |
 | `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` | Port the recursive-unit-body resolution through a branched scrutinee -- recursive_position_unit_body returns None whenever the scrutinee is a plain Match rather than a literal Construct, so a carried child whose owning form branches has no declared body unit and every consumer falls back to refusal | merged | runtime | M | none | — |
 | `RT-C2-DRIVER-STAGE-ATTRIBUTION` | The D5 observation identity driver reports every non-zero nested exit as `nested {} compilation failed`, so the one message AC-2 itself produces names the wrong stage -- plus one clause recording why the compiled-feature const must stay adjacent to the gate it mirrors | merged | runtime | XS | none | — |
