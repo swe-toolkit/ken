@@ -31,49 +31,36 @@ origin: "Steward, 2026-09-03. D2b design hard-stop #5 for V3-FO-EMBEDDING-ADEQUA
 > lemma against the fixed elaborator, produces the D2b candidate, and the
 > Architect is the required soundness reviewer on it.
 
-> # RECUT PENDING — HS7 §1b STRUCTURAL FINDING (Architect evt_614ka77qm02gz,
-> # 2026-09-03). The D2 fix direction below ("single neutral motive frame
-> # closure") is SUPERSEDED for the RECURSIVE cross-structure case and is being
-> # RE-CUT to whatever the voluntary research advisory confirms. HS6's proved
-> # two-companion leaf-discharge convoy is RETAINED (single-elim C greens, the Nil
-> # impossibility discharge is parametric, genuinely-false still rejects). D2b
-> # stays HELD (26dd33f25). The Architect rules the mechanism on the advisory;
-> # resume signal = research posts in-thread mentioning Architect + Steward.
+> # RECUT — FINALIZED (Architect MECHANISM RULING evt_e5vhq4jzze7m, on research
+> # advisory evt_5w7t0qxd5d7gh; §1b finding evt_614ka77qm02gz). VERDICT: lean (a),
+> # ELABORATOR-ONLY, NO operator gate. The D2 fix direction below ("single neutral
+> # motive frame closure") is SUPERSEDED for the RECURSIVE cross-structure case —
+> # see "D2 (RECUT)" for the finalized mechanism. HS6's proved two-companion
+> # leaf-discharge convoy is RETAINED. D2b stays HELD (26dd33f25) until this lands.
 > #
-> # THE NAMED PREDICATE (§1b, HS6+HS7): the coherent frame NEUTRALIZES the
-> # embedded eliminator's index, and every index-dependent companion needing the
-> # PEELED per-constructor equation is thereby lost — HS6 rediscovered the
-> # impossibility discharge, HS7 the recursive IH. HS7 sits on the path-A /
-> # path-B seam (elab.rs ~2200): path A (coherent-frame convoy) hands the raw
-> # whole-index equality at the NEUTRALIZED index (v0 = Eq Nat (Suc k) j, j
-> # neutral); path B (install_index_refinements, 2953 / whnf-peel 2982-2996) would
-> # PEEL it via the kernel's existing same-constructor no-confusion but cannot,
-> # because a neutral endpoint is not constructor-headed. A leaf method is applied
-> # at the completed outer eliminator (index concrete) so deferral rescued HS6; a
-> # RECURSIVE method calls itself at the predecessor BEFORE the outer index is
-> # concrete, so neither mechanism alone gives the recursive IH its peeled
-> # equation (v1 = Pi (Eq Nat k j). a). "Also convoy the recursive IH" would be
-> # the 3rd point-fix on ONE predicate — the closure is the neutral-index
-> # single-frame defect for cross-structure RECURSIVE goals.
+> # THE §1b NAMED PREDICATE (HS6+HS7): a neutral-index single frame DECORRELATES
+> # the two recursions. The coherent frame neutralizes the embedded eliminator's
+> # index; abstracting the shared Nat n to a neutral j abstracts nth's Nat
+> # position and lookup's Fin position INDEPENDENTLY, so every index-dependent
+> # companion that needs the PEELED per-constructor equation is lost — HS6 the
+> # impossibility discharge, HS7 the recursive IH (IH relates unrelated positions =
+> # measured option 2; spine at neutral index = measured option 1). The two
+> # recursions stay correlated ONLY while they share a REFINED index; neutralizing
+> # it is exactly what breaks the correlation the frame was built to express.
+> # Seam (elab.rs ~2200): path A (coherent-frame convoy) hands the raw whole-index
+> # equality at the neutralized index (v0 = Eq Nat (Suc k) j); path B
+> # (install_index_refinements, whnf-peel 2982-2996) peels via the kernel's
+> # EXISTING same-constructor no-confusion but only when both endpoints are
+> # constructor-headed. "Also convoy the recursive IH" would be a 3rd point-fix on
+> # ONE predicate; the closure splits the two conflated jobs (D2 RECUT).
 > #
-> # TCB BOUNDARY (Architect evt_4nmfxvdnhzjep): PROVISIONAL ELABORATOR-ONLY, no
-> # operator gate owed now (same class as Arm 1) — the kernel no-confusion already
-> # exists and is already consumed elaborator-side; the defect is elaborator index
-> # representation. FLIP-CONDITION: if research finds the only sound closure needs
-> # constructor injectivity as a KERNEL-PROVIDED fact for the recursive IH, that
-> # is TCB growth and the Architect escalates to the Steward for an operator gate
-> # BEFORE ruling the arm. §1a: HS7 is NOT a trigger (HS6 was; next mandatory =
-> # HS9); the research pull is VOLUNTARY, count unaffected.
-> #
-> # RESEARCH SUB-QUESTION (Architect voluntary pull): proving a relation between
-> # two functions recursive on DIFFERENTLY-structured indices (dual_nth on Nat vs
-> # dual_lookup on DualFin over one value) under a single coherent motive frame
-> # that neutralizes the index so the recursive IH lacks its peeled predecessor
-> # equation. Lean to confirm/replace: (a) keep the embedded recursion index
-> # constructor-headed per-branch, neutralize only the shared cross-structure
-> # axis, correlate through the outer equation only; (b) define the motive BY
-> # RECURSION on the index so the companion is definitionally correlated; (c)
-> # other. "(a) is known-best, nothing to add" is a first-class answer.
+> # TCB BOUNDARY — CONFIRMED ELABORATOR-ONLY, NO gate (Architect evt_e5vhq4jzze7m
+> # resolving the hold evt_4nmfxvdnhzjep). No kernel/infer_j change, no new
+> # primitive: the fix is architectural ROUTING of the recursive goal through the
+> # EXISTING path-B peel. The flip-caveat (a kernel-provided injectivity primitive
+> # for the recursive IH) did NOT materialize — the kernel's no-confusion already
+> # exists and is already consumed elaborator-side. §1a: HS7 DISCHARGED (voluntary
+> # advisory in hand); next mandatory Research trigger = HS9.
 
 ## One-line objective
 
@@ -122,34 +109,65 @@ The flip pattern (A green, B red, C red) is why a special extension of the
 derived-occurrence / nested-elim gate is falsified and the closure is the
 remaining shape. The grid is also the acceptance instrument for D2.
 
-## D2 — the fix: the structural coherent-frame closure (direction RULED)
+## D2 (RECUT) — the fix: split correlation (path A) from recursion (path B)
 
-Build the closure to the invariant in the One-line objective. Not a 4th special
-case; the grid rules that out.
+RULED by the Architect's mechanism ruling (evt_e5vhq4jzze7m) on the research
+advisory (evt_5w7t0qxd5d7gh): lean (a), elaborator-only. The single neutral
+motive frame conflated two jobs and DECORRELATED the two recursions; split them.
 
-- WHERE (Architect, provisional on the closure — you build it, this names the
-  machinery not the patch): the same motive-construction / `dependent_rebase_subs`
-  / `install_index_refinements` path the two landed fixes live in. The closure
-  generalizes their per-site rebase to a whole-goal, both-sides-of-equality,
-  single-frame rebase. EXTEND the shared helper the convoy fix (128b6c000)
-  already introduced rather than adding a parallel path.
-- NON-REGRESSION GUARD (load-bearing — the trap both landed fixes hit): the
-  closure MUST NOT over-rebase. The `scrut_occurs` / goal-references-a-convoy-
-  binder gating exists because a blanket index rebase corrupts a
+- JOB 1 — CORRELATION (relating the two eliminators): path A's HS6 convoy of the
+  OUTER equation, parametric. KEEP it unchanged — it is proved and correct for the
+  leaf / non-recursive correlation and the impossible discharge.
+- JOB 2 — RECURSION: structural induction on the INDEX-REFINING structure (the
+  `FokFin`), recursion index kept CONSTRUCTOR-HEADED per branch — path B
+  (`install_index_refinements`, whnf-peel 2982-2996). Do NOT neutralize the
+  recursion index. The alignment is what makes this work: `FokFin`'s constructors
+  both produce `FokFin (Suc n)`, so matching the `FokFin` refines the shared `Nat`
+  to `Suc _` in every branch. At `i = FokFinSuc j` the goal refines to
+  `R (nth (Suc k)) (lookup (FokFinSuc j))`; both sides unfold in lockstep; path B
+  peels `Eq Nat (Suc k) (Suc j) -> Eq Nat k j`, so the recursive IH
+  `R (nth k) (lookup j)` applies DIRECTLY — the predecessor equation comes for
+  free from structural induction on the refiner, no per-index point-fix, no
+  representation change.
+- ARCHITECTURAL CHANGE (elab.rs, ~2200 seam): ROUTE the recursive cross-structure
+  goal through path B (refining-structure induction); KEEP path A's convoy for the
+  non-recursive correlation / leaf discharge (HS6). Lift the neutralization OFF the
+  recursion index and restrict it to the outer-equation correlation. This is the
+  closure, not a 3rd point-fix on the shared §1b predicate.
+- DO NOT reach for (b) motive-by-recursion — it is the fallback for NON-ALIGNING
+  measures only and trades the peel for a CBV motive-reduction hazard (definitional
+  equality does not imply executability under Ken's CBV whnf). `FokFin`-over-`Nat`
+  ALIGNS, so (a) applies; (c) a simultaneous-induction/correspondence datatype is
+  heaviest and unnecessary here. Recorded so a future reader does not re-derive.
+- NON-REGRESSION GUARD (load-bearing — the trap the landed fixes hit): path A's
+  convoy rebase stays gated on ACTUAL occurrence (`scrut_occurs` /
+  goal-references-a-convoy-binder) — a blanket rebase corrupts a
   coincidentally-equal index (Vec `zip_with` result-length coincidence; Vec `map`
-  goal that never mentions the scrutinee). The closure's rebase stays gated on
-  ACTUAL occurrence, now applied per-side across the equality, not a blanket pass.
-- Completeness-side only; kernel unmodified; produce a term the standing kernel
-  recheck accepts. No FoKripke compensation.
+  goal that never mentions the scrutinee). Routing the recursive arm through path B
+  must not weaken that gate on the retained path-A correlation.
+- Completeness-side only; kernel UNMODIFIED (path B's peel already exists); produce
+  a term the standing kernel recheck accepts. No FoKripke compensation. Zero
+  trusted-base delta.
 
 ## Acceptance criteria
 
 - AC-D0-GRID: SATISFIED. Rows A/B/C built on the held WIP as a disposable
   localization (no production edit); flip pattern A-green / B-red / C-red posted
   and ruled (evt_45h2qab5nejg3). The grid is the D2 acceptance instrument.
-- AC-GRID-GREEN-AFTER: after the fix — baseline GREEN, Row B GREEN, single-elim C
-  GREEN, Row A stays GREEN. The generic cross-structure Option-equality goal
-  elaborates and the kernel accepts it.
+- AC-RECURSIVE-GRID (RECUT, mandatory D0 up front — proves the FULL closure, not a
+  4th partial; Architect evt_e5vhq4jzze7m). Four cells: (1) the Row B RECURSIVE
+  case (`FokFinSuc` / `DualCons`) turns GREEN — the IH applies via path B's peel;
+  (2) single-elim C (HS6) STAYS GREEN — the leaf convoy is retained; (3) the
+  cross-structure equality is genuinely ESTABLISHED — both sides unfold in lockstep
+  at the refined index (the two sides CORRELATED, not option-2 unrelated
+  hypotheses); (4) the genuinely-false reachable branch (`Some = None`) still
+  REJECTS, and the direct / same-side controls stay green. The NON-DEGENERATE pair
+  is (1) greening WHILE (4) rejects: the peel discharges by real structural
+  refinement, not blanket admission. Build the grid first as a disposable
+  localization (no production edit), then build D2 to green it.
+- AC-GRID-GREEN-AFTER (prior HS5 grid, retained): after the fix the earlier
+  A/B/C grid stays consistent — Row A GREEN, and the generic cross-structure
+  Option-equality goal elaborates and the kernel accepts it.
 - AC-NON-REGRESSION (hard, load-bearing): a red-turning mutation at the NEW closure
   site demonstrates the control has power, AND the full landed regression set stays
   green — 68100a5cd motive-rebase, 128b6c000 convoy, record-index, and the Vec
@@ -165,10 +183,13 @@ case; the grid rules that out.
 - AC-COMPLETENESS-NOT-SOUNDNESS: a mutation that mis-selects the rebase frame yields
   a COMPLETENESS loss (kernel recheck rejects), never an acceptance — the standing
   top-level kernel recheck is unmodified, so over-acceptance is impossible.
-- AC-CLOSURE-NOT-POINT-FIX: the fix closes the invariant (every refined occurrence,
-  both sides of a nontrivial equality, one frame) rather than adding a special case
-  for the derived-index/nested-elim shape; a point-fix here is a defect against the
-  grid + evt_45h2qab5nejg3.
+- AC-CLOSURE-NOT-POINT-FIX (RECUT): the fix closes the §1b predicate by SPLITTING
+  the two conflated jobs — path A convoys the outer-equation correlation (leaf /
+  non-recursive, HS6 retained); the recursive cross-structure goal routes through
+  path B's refining-structure induction (recursion index constructor-headed) — NOT
+  by adding a per-index special case (which would be the 3rd point-fix on one
+  predicate). A point-fix here, or neutralizing the recursion index, is a defect
+  against the mechanism ruling evt_e5vhq4jzze7m.
 
 ## §1b — the coherent-frame invariant (Architect entry 4, CONFIRMED by the grid)
 
