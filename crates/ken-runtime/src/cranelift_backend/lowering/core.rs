@@ -8420,6 +8420,38 @@ impl<'a> Lowering<'a> {
     /// consulted — the AC-NO-BOUNDARY-REOPEN means-(a) boundary holds. The jump
     /// seals this predecessor; the caller returns the `RecursiveBackedge`
     /// disposition.
+    /// The R3 forward-Ret shape gate, at CONSUMPTION (Architect ruling A,
+    /// evt_h0vgd11g5xfb). Formation is unnarrowed -- every real Tail producer-to-Ret
+    /// route forms its authority (`planned == formed == base`) -- so a formed Tail
+    /// authority's worker body may be either a pure `Ret{Match}` remap or an
+    /// effect-performing body. The forward-SSA-edge closeout claims ONLY the pure
+    /// `Construct{ ..::ITree::Ret, [payload] }` shape (the funded READ half); an
+    /// effect body returns `false` and the seam routes it through the existing
+    /// machinery (the base `call_tail -> Continue` path), which inc2's (a) closeout
+    /// will later consume instead. This is the sole place the shape is decided.
+    pub(super) fn tail_worker_body_is_ret_kmatch(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<bool, CraneliftBackendError> {
+        let body_origin = self
+            .static_transition_plan
+            .continuation_units()?
+            .into_iter()
+            .find(|unit| unit.id() == transport.source_specialization())
+            .ok_or_else(|| {
+                unsupported(
+                    "ComposedReturnForwardRet",
+                    "the transport source has no continuation unit",
+                )
+            })?
+            .worker_body_origin();
+        Ok(matches!(
+            self.retained_body_occurrence(body_origin)?.expr,
+            RuntimeExpr::Construct { constructor, args }
+                if constructor.ends_with("::ITree::Ret") && args.len() == 1
+        ))
+    }
+
     pub(super) fn emit_composed_return_ret_kmatch_closeout(
         &mut self,
         builder: &mut FunctionBuilder<'_>,

@@ -748,6 +748,29 @@ impl CheckedIhGeneratedEntryAccess {
         }
         selected
     }
+
+    /// Side-effect-free lookup of the governed projection for one generated-entry
+    /// coordinate. Unlike [`Self::admission_for`], this records NO admission-outcome
+    /// observation (it must not perturb `admission_outcome_count`), so it is safe to
+    /// call from the forward-Ret closeout's test-support reach recording. Returns
+    /// `None` for an absent key or a NonGoverned admission. D3-RECUT (b2 inc1 fix).
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn governed_projection_for(
+        &self,
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+    ) -> Option<&CheckedIhGeneratedEntryProjection> {
+        let key = CheckedIhGeneratedEntryCallCoordinate {
+            invocation_origin,
+            call_origin,
+            callee_origin,
+        };
+        match self.admissions.get(&key) {
+            Some(CheckedIhGeneratedEntryAdmission::Governed(projection)) => Some(projection),
+            _ => None,
+        }
+    }
 }
 
 impl CheckedIhGeneratedEntryProjection {
@@ -886,6 +909,32 @@ impl CheckedIhForwardRetPlanProof {
     /// projects this carrier field as the k-Match's Parameter-0.
     pub(in crate::cranelift_backend) fn fresh_result_capture_ordinal(&self) -> u32 {
         self.fresh_result_capture_ordinal
+    }
+
+    /// The governed certificate E's generated-entry arrival coordinate (the
+    /// selected projection's `arrival`; see the `entry_*: arrival.*` population
+    /// in `checked_ih_forward_ret_plan_proof`). D3-RECUT (b2 inc1 fix): the
+    /// forward-SSA-edge closeout consumed at a non-governed current call records
+    /// E's capsule reach on this coordinate — the same key the displaced
+    /// downstream governed arrival used. Test-support observation only.
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn entry_binding(&self) -> CheckedIhBinding {
+        self.entry_binding
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn entry_invocation_origin(&self) -> StaticOriginId {
+        self.entry_invocation_origin
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn entry_call_origin(&self) -> StaticOriginId {
+        self.entry_call_origin
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn entry_callee_origin(&self) -> StaticOriginId {
+        self.entry_callee_origin
     }
 }
 
@@ -2022,6 +2071,114 @@ pub(in crate::cranelift_backend) fn record_checked_ih_generated_entry_governed_v
                 .expect("governed generated-entry validation count exhausted");
         },
     );
+}
+
+/// The forward edge's SEALED downstream-observation obligation (Architect HS3
+/// structural closure, evt_18x2n8yta31xz / evt_16b5brxhg4stm). The read
+/// `Ret{Match}` closeout's `Complete(RecursiveBackedge)` turns a non-empty,
+/// observation-bearing continuation into a tail; base recorded these
+/// current-call-seam observations for the elided continuation's governed
+/// generated-entry `E` by CONTINUING past it (every-Tail-form-and-continue).
+/// The forward edge assumes `E`'s COMPLETE seam-observation obligation: this
+/// enum is the closed set, and [`discharge_forward_edge_sealed_observations`]
+/// discharges every member by a TOTAL match with NO catch-all. A new member
+/// without a discharge arm is a non-exhaustive compile error, so a future
+/// displaced counter (HS4) is a build failure AT THE EDGE, not a hard-stop.
+/// Do NOT add a wildcard arm and do NOT maintain a member roster by hand -- the
+/// `first`/`next` walk is the enumeration.
+///
+/// All members are (a)-HOIST keyed on `E`'s GOVERNED coordinate (measurement
+/// evt_ptge7pk5r4qg: each is a seam-arrival event with no flowing-state function
+/// to reconstruct and no convergence point on the call_tail path). The edge is
+/// `E`'s genuine new reach point (the closeout resolves `E`'s sink and jumps
+/// `E`'s `return_body`), so this records REAL reaches/arrivals at their new site.
+/// Test-support observation only (`px8-ds-test-support`): zero production/TCB.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy)]
+enum ForwardEdgeSealedObservation {
+    CertificateReach,
+    RawArrival,
+    AdmissionOutcome,
+    GovernedValidation,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+impl ForwardEdgeSealedObservation {
+    /// The first sealed member; `first`/`next` enumerate the set with no
+    /// hand-maintained roster. Both are total matches with no catch-all, so a new
+    /// member reds the build until it joins the walk AND gets a discharge arm.
+    fn first() -> Self {
+        Self::CertificateReach
+    }
+
+    fn next(self) -> Option<Self> {
+        match self {
+            Self::CertificateReach => Some(Self::RawArrival),
+            Self::RawArrival => Some(Self::AdmissionOutcome),
+            Self::AdmissionOutcome => Some(Self::GovernedValidation),
+            Self::GovernedValidation => None,
+        }
+    }
+}
+
+/// Discharge the forward edge's complete sealed observation obligation for the
+/// governed certificate `E` it reaches, keyed on `E`'s governed coordinate. Each
+/// member is recorded EXACTLY ONCE: under the short-circuit the seam recorders
+/// (4162/4265/...) never fire for `E`, so the edge is the sole recorder
+/// (measurement evt_ptge7pk5r4qg). See [`ForwardEdgeSealedObservation`] for the
+/// structural-completeness contract.
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn discharge_forward_edge_sealed_observations(
+    access: &CheckedIhGeneratedEntryAccess,
+    binding: CheckedIhBinding,
+    invocation_origin: StaticOriginId,
+    call_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+    projection: &CheckedIhGeneratedEntryProjection,
+) {
+    let key = CheckedIhGeneratedEntryCallCoordinate {
+        invocation_origin,
+        call_origin,
+        callee_origin,
+    };
+    let mut member = Some(ForwardEdgeSealedObservation::first());
+    while let Some(obligation) = member {
+        // TOTAL match, NO catch-all: a new sealed member is a compile error here
+        // until it is given a discharge -- the structural closure over the
+        // shared predicate (HS4 = build failure, not a 4th hard-stop).
+        match obligation {
+            ForwardEdgeSealedObservation::CertificateReach => {
+                record_checked_ih_generated_entry_reached(
+                    access,
+                    binding,
+                    invocation_origin,
+                    call_origin,
+                    callee_origin,
+                    projection,
+                );
+            }
+            ForwardEdgeSealedObservation::RawArrival => {
+                record_checked_ih_generated_entry_raw_arrival(
+                    access,
+                    invocation_origin,
+                    call_origin,
+                    callee_origin,
+                );
+            }
+            ForwardEdgeSealedObservation::AdmissionOutcome => {
+                record_checked_ih_generated_entry_admission_outcome(access, key, true);
+            }
+            ForwardEdgeSealedObservation::GovernedValidation => {
+                record_checked_ih_generated_entry_governed_validation(
+                    access,
+                    invocation_origin,
+                    call_origin,
+                    callee_origin,
+                );
+            }
+        }
+        member = obligation.next();
+    }
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -7511,28 +7668,19 @@ impl StaticTransitionPlan<'_> {
             return Ok(None);
         };
 
-        // R3 SHAPE NARROWING (Architect ruling evt_39rn7empzmgym). The b2 defect
-        // the operator funded is a specific shape: a PURE outcome-remap
-        // continuation that RT-SSA specialized OUT of the source chain as a bare
-        // k-Match (`Construct{...::ITree::Ret, [payload]}`), so the collapse
-        // returned the raw carried word and R3 reconstructs exactly that k-Match.
-        // An EFFECT-PERFORMING continuation (host `Vis` effects,
-        // `CheckedComputationalIHInvocation`, nested composed returns) is NOT that
-        // shape and was never the b2 defect: it is not homed out as a bare
-        // k-Match, and the existing checked-computational-match machinery is its
-        // natural home. Claiming it here would over-reach R3. So the forward-Ret
-        // authority is SHAPE-BASED -- Ret{Match} pure-remap bodies only; anything
-        // else returns no plan and flows through the existing machinery. This
-        // NARROWS R3 to what it was built for, and it keeps every plain Ret{Match}
-        // body on R3 unchanged.
-        let worker_body_is_ret_kmatch = matches!(
-            self.planned_occurrence_expr(transport.source_worker_body_origin)?,
-            RuntimeExpr::Construct { constructor, args }
-                if constructor.ends_with("::ITree::Ret") && args.len() == 1
-        );
-        if !worker_body_is_ret_kmatch {
-            return Ok(None);
-        }
+        // R3 SHAPE GATE LIVES AT CONSUMPTION, not here (Architect ruling A,
+        // evt_h0vgd11g5xfb, the faithful realization of evt_39rn7empzmgym). The
+        // PLAN -- the set of real Tail routes -- is a property of the source
+        // program and must be STABLE across increments: an effect-performing
+        // continuation genuinely IS a Tail producer-to-Ret route, so its
+        // authority MUST form here (keeping `planned == formed == base`; the
+        // role-witness and population invariants depend on it). What legitimately
+        // varies per increment is CONSUMPTION -- how each formed Tail authority is
+        // lowered. The forward-Ret closeout (`tail_worker_body_is_ret_kmatch`,
+        // core.rs) claims ONLY a pure `Ret{Match}` body; an effect body flows
+        // through the existing machinery (the base `call_tail -> Continue` path),
+        // exactly as base did for every Tail, and inc2's (a) closeout later flips
+        // that consumption arm. Do NOT re-narrow formation here.
 
         let classes = self
             .checked_ih_generated_entry_confluences

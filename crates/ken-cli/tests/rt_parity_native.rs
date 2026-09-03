@@ -948,12 +948,37 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
             ),
             ("write", write_result, ken_runtime::HostOpV1::FsWriteAt),
         ] {
-            let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-                result.native.terminal_error.as_ref()
-            else {
-                panic!("{label}: planner-only relation must preserve the fail-closed product");
-            };
-            assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
+            if forbidden_operation == ken_runtime::HostOpV1::FsWriteAt {
+                // WRITE half: deferred to inc2 (unbuilt) -- correctly fail-closed;
+                // the composed-return product is not formed yet, so it traps
+                // ResourceBodyResult. KEEP this trap assertion byte-unchanged.
+                let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+                    result.native.terminal_error.as_ref()
+                else {
+                    panic!("{label}: planner-only relation must preserve the fail-closed product");
+                };
+                assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
+            } else {
+                // READ half: inc1's BUILT deliverable. The forward-Ret edge forms
+                // the read's ResourceBodyResult, so the old PatternMatchFailure
+                // fail-closed placeholder no longer fires and InvalidOffset reaches
+                // exit CLEANLY. The fixture exits 0 iff the expected InvalidOffset
+                // variant, so exit 0 + no trap is the SPECIFIC clean outcome (a
+                // regressed read would trap PatternMatchFailure and fail here) --
+                // the same read half the 3 read narrows prove correct. Recalibrated
+                // per Architect evt_1z33cmjvapw99, the same read-expectation change
+                // inc1 applied when it removed the fs-read-at-offset-provenance
+                // read-trap test.
+                assert_eq!(
+                    result.native.exit_status, 0,
+                    "{label}: the built read half returns clean InvalidOffset (exit 0), not the fail-closed PatternMatchFailure trap: {:?}",
+                    result.native
+                );
+                assert_eq!(
+                    result.native.terminal_error, None,
+                    "{label}: the built read half does not trap"
+                );
+            }
             assert!(result
                 .native
                 .effect_trace
@@ -1158,14 +1183,30 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
             assert_eq!(row.callee_origin, row.locator_callee_origin);
         }
 
-        for (label, result) in [("read", read_result), ("write", write_result)] {
-            let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-                result.native.terminal_error.as_ref()
-            else {
-                panic!("{label}: predecessor must preserve the fail-closed product");
-            };
-            assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
-        }
+        // READ half: inc1's BUILT deliverable -- the forward-Ret edge forms the
+        // ResourceBodyResult, so InvalidOffset reaches exit CLEANLY (exit 0), not
+        // the old PatternMatchFailure fail-closed trap. exit 0 iff the expected
+        // InvalidOffset variant, so this is the SPECIFIC clean outcome (a regressed
+        // read would trap and fail); the same read half the 3 read narrows prove.
+        // Recalibrated per Architect evt_1z33cmjvapw99 (same shape as inc1's
+        // fs-read-at-offset-provenance read-expectation change).
+        assert_eq!(
+            read_result.native.exit_status, 0,
+            "read: the built read half returns clean InvalidOffset (exit 0): {:?}",
+            read_result.native
+        );
+        assert_eq!(
+            read_result.native.terminal_error, None,
+            "read: the built read half does not trap"
+        );
+        // WRITE half: deferred to inc2 (unbuilt) -- correctly fail-closed. KEEP the
+        // trap assertion byte-unchanged.
+        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+            write_result.native.terminal_error.as_ref()
+        else {
+            panic!("write: predecessor must preserve the fail-closed product");
+        };
+        assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
     });
 }
 
@@ -2467,6 +2508,20 @@ fn checked_ih_generated_entry_admission_population_is_total() {
                 "every raw arrival performs exactly one total-map lookup: {row:?}"
             );
             if row.governed {
+                // SUBSUMES three retired arrival controls (Architect
+                // evt_3zba50hydkpdb; "power transfers, never vanishes"). The read's
+                // governed E now transits the forward edge, so seam-level arrival
+                // mutations went INERT on the read; their power moved HERE (+ the
+                // HS3 sealed closure's exactly-once total-match discharge, a
+                // compile-time member-skip guard):
+                //  - the `raw_arrival == governed_validation` equality below
+                //    subsumes generated_entry_arrival_skip_validation (governed_
+                //    validation < raw_arrival) and _duplicate_validation (>);
+                //  - the `ordinary_continuation == 0` below (+ raw_arrival > 0 + the
+                //    governed gate aggregates.rs:7565-7577) subsumes generated_entry_
+                //    arrival_governed_through_non_governed.
+                // Weakening these (e.g. governed_validation back to `> 0`) silently
+                // re-opens those retired controls -- restore them if you do.
                 assert!(row.raw_arrival_count > 0, "every governed key is reached: {row:?}");
                 assert_eq!(
                     row.raw_arrival_count, row.governed_validation_count,
@@ -2481,12 +2536,28 @@ fn checked_ih_generated_entry_admission_population_is_total() {
                 );
             }
         }
-        for result in [read_result, write_result] {
-            assert!(matches!(
-                result.native.terminal_error,
-                Some(ken_runtime::TerminalErrorV1::RuntimeTrap(_))
-            ));
-        }
+        // READ half: inc1's BUILT deliverable -- the forward-Ret edge forms the
+        // ResourceBodyResult, so InvalidOffset reaches exit CLEANLY (exit 0), not
+        // the old PatternMatchFailure fail-closed trap. exit 0 iff the expected
+        // InvalidOffset variant = the SPECIFIC clean outcome (a regressed read
+        // traps and fails); the same read half the 3 read narrows prove correct.
+        // Recalibrated per Architect evt_1z33cmjvapw99 (same shape as inc1's
+        // fs-read-at-offset-provenance read-expectation change).
+        assert_eq!(
+            read_result.native.exit_status, 0,
+            "read: the built read half returns clean InvalidOffset (exit 0): {:?}",
+            read_result.native
+        );
+        assert_eq!(
+            read_result.native.terminal_error, None,
+            "read: the built read half does not trap"
+        );
+        // WRITE half: deferred to inc2 (unbuilt) -- correctly fail-closed. KEEP the
+        // trap assertion byte-unchanged.
+        assert!(matches!(
+            write_result.native.terminal_error,
+            Some(ken_runtime::TerminalErrorV1::RuntimeTrap(_))
+        ));
     });
 }
 
@@ -2654,7 +2725,8 @@ macro_rules! generated_entry_case {
 }
 
 macro_rules! generated_entry_checked_case {
-    ($name:ident, $env:ident, $runner:ident, $child:ident, $mode:literal, $expected:literal) => {
+    ($(#[$attr:meta])* $name:ident, $env:ident, $runner:ident, $child:ident, $mode:literal, $expected:literal) => {
+        $(#[$attr])*
         #[test]
         fn $name() {
             if std::env::var_os($env).is_some() {
@@ -2754,12 +2826,31 @@ macro_rules! d1_route_case {
     };
 }
 
+// KEEP -- still LIVE controls: these inject a detectable fault at the seam for
+// populations that do NOT transit the read forward edge (the lookup dimension and
+// the non-governed keys), so they still redden and retain their power.
 generated_entry_case!(generated_entry_arrival_duplicate_lookup, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "duplicate-lookup");
 generated_entry_case!(generated_entry_arrival_skip_lookup, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "skip-lookup");
-generated_entry_case!(generated_entry_arrival_duplicate_validation, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "duplicate-validation");
-generated_entry_case!(generated_entry_arrival_skip_validation, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "skip-validation");
-generated_entry_case!(generated_entry_arrival_governed_through_non_governed, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "governed-through-non-governed");
 generated_entry_case!(generated_entry_arrival_non_governed_through_governed, GENERATED_ENTRY_ARRIVAL_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_arrival_mutation_child, "non-governed-through-governed");
+// RETIRED -- SUBSUMED, not deferred (Architect evt_5kpshvbx32gnr group-2(i) /
+// evt_3zba50hydkpdb). The read's governed E now transits the forward edge, so
+// these three governed-validation-dimension seam mutations went INERT on the read
+// (verified in isolation: each "did not break the per-key equality"). Their power
+// is UPGRADED, not lost -- the HS3 sealed closure discharges governed_validation
+// as a total-match member (a skipped member is a COMPILE error; discharged exactly
+// once), and it is asserted by checked_ih_generated_entry_admission_population_is_total:
+//  - generated_entry_arrival_skip_validation  (governed_validation < raw_arrival)
+//  - generated_entry_arrival_duplicate_validation (governed_validation > raw_arrival)
+//      => both subsumed by the `raw_arrival == governed_validation` equality
+//         (admission_population_is_total, the governed-branch assert) + the sealed
+//         closure's exactly-once total-match discharge.
+//  - generated_entry_arrival_governed_through_non_governed
+//      => subsumed by the governed `ordinary_continuation == 0` assert + `raw_arrival
+//         > 0` + the governed gate (aggregates.rs:7565-7577; a mis-route drops the
+//         closeout => E's counters go 0 => the reach assert fails).
+// The bidirectional tie is at admission_population_is_total's governed branch; a
+// re-key of this seam power lives in the inc2 unified edge-control migration
+// (RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY).
 
 const GENERATED_ENTRY_ADMISSION_MUTATION_CHILD: &str =
     "KEN_RT_CHECKED_IH_GENERATED_ENTRY_ADMISSION_MUTATION_CHILD";
@@ -3037,13 +3128,37 @@ generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_i
 // **THE GAP:** the Tail/read controls above separately prove retained D2
 // access/confluence equality and prove that these Direct controls mutate zero
 // Tail projections.
+// DEFERRED to inc2 (Steward option (b), evt_63n3d4n5y3fnf). These eight
+// non-direct capsule fine-structure controls test the read's answer via the
+// generated-entry CAPSULE -- a VALUE SOURCE the read half abandoned for the
+// forward edge's captured-env CARRIER -- so they are inert-by-design on the read
+// (verified: wrong-slot "did not redden"; retarget-to-write empirically refuted,
+// the write lacks the read's specialized computational-recursor capsule). This is
+// NOT a soundness gap: the read answer's correctness is independently held (the 3
+// read narrows end-to-end + type-check) and the read EDGE is controlled at four
+// levels (edge-word forward_ret_edge_substituted_word_reds, governed-E pairing
+// role-witness family, HS3 sealed-discharge admission/confluence counters, and the
+// narrows). Their per-slot mutation power re-keys to a read-edge-carrier mutation
+// family in inc2's UNIFIED read+write edge-control migration, tracked by the named
+// obligation RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY -- each is
+// un-ignored and greened there (genuine green->trap flip). The direct-control and
+// retained-access (forward-ret-access) capsule controls stay LIVE (they run on the
+// write / the Tail layer and still redden).
+#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge (read derives its answer from the carrier, not the capsule); re-key to a read-edge-carrier mutation in inc2's unified edge-control migration"]
 generated_entry_checked_case!(generated_entry_capsule_outer_carried, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "outer-carried", "does not name a specialized computational-recursor capsule");
+#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
 generated_entry_checked_case!(generated_entry_capsule_specialized_sibling, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "specialized-sibling", "is not a computational-recursor capsule");
+#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
 generated_entry_checked_case!(generated_entry_capsule_static_worker, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "static-worker", "StaticWorkerBinding: a source-machine Var in value position is a value-producing position");
+#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
 generated_entry_checked_case!(generated_entry_capsule_wrong_frame, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-frame", "checked frame, slot, call template, or residual phase");
+#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
 generated_entry_checked_case!(generated_entry_capsule_wrong_slot, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-slot", "checked frame, slot, call template, or residual phase");
+#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
 generated_entry_checked_case!(generated_entry_capsule_wrong_invocation, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-invocation", "projection disagrees with its current function, binding, or call coordinate");
+#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
 generated_entry_checked_case!(generated_entry_capsule_non_carried_residual, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "non-carried-residual", "checked frame, slot, call template, or residual phase");
+#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
 generated_entry_checked_case!(generated_entry_capsule_provenance_index, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "provenance-index", "callee Var disagrees with the immediate K locator index");
 generated_entry_split_checked_case!(generated_entry_capsule_wrong_destination_owner, "wrong-destination-owner", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=DestinationOwner direct_applied=true tail_applied=false", "write");
 generated_entry_split_checked_case!(generated_entry_capsule_wrong_destination_body, "wrong-destination-body", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=DestinationBody direct_applied=true tail_applied=false", "write");
@@ -3450,7 +3565,24 @@ fn composed_return_forward_ret_authority_is_live_at_the_forward_edge() {
         );
         assert!(suppressed_rows.is_empty());
         assert_eq!(exact_applications, exact_rows.len());
-        assert_eq!(suppressed_applications, exact_applications);
+        // (A) ruling evt_h0vgd11g5xfb: formation is unnarrowed, so the read
+        // program's successful-path effect Tail also forms. In the EXACT build the
+        // forward edge delivers the answer and short-circuits, bypassing EXACTLY
+        // ONE continuation -- that effect Tail -- which the SuppressForInertness
+        // collapse still lowers; so suppressed builds exactly one more plan-proof
+        // application than exact. That -1 is the SIGNATURE of a LIVE forward edge:
+        // a bare `<=` would also pass if the edge went dead (exact == 0), so pin
+        // both the exact relationship and the presence of the forward-edge
+        // application in exact.
+        assert!(
+            exact_applications >= 1,
+            "the forward-edge application must be present in exact (edge liveness)"
+        );
+        assert_eq!(
+            suppressed_applications,
+            exact_applications + 1,
+            "the forward edge must bypass exactly one continuation (the successful-path effect Tail the SuppressForInertness collapse still lowers)"
+        );
         assert!(exact_rows.iter().all(|row| {
             row.coordinate
                 .ret_input_binder
@@ -4285,16 +4417,86 @@ fn forward_ret_edge_suppressed_reverts_to_collapse() {
 }
 
 /// **Promise class: durable invariant.** AC-CAUSAL-PAIR (b): keep the edge and
-/// the sink but carry an independent non-result word. Native reddens because the
-/// exact Trap-checked Result no longer reaches the exit -- separating result
-/// identity from producer existence and binding, which the suppress control (no
-/// edge at all) and the population control (which authority) hold fixed.
+/// the sink but carry an independent non-result word, so the exact Trap-checked
+/// Result no longer reaches the exit -- separating result identity from producer
+/// existence and binding, which the suppress control (no edge at all) and the
+/// population control (which authority) hold fixed.
+///
+/// Under (A) (evt_h0vgd11g5xfb) the read program's successful-path effect Tail
+/// takes the base `call_tail -> Continue` path, so a corrupted edge word
+/// manifests as an `UnclassifiedRuntimeTrap` rather than a clean captured red.
+/// The mutant is still KILLED; this pins the exact green->trap FLIP (the
+/// unmutated edge runs clean, `SubstituteForwardEdgeWord` traps) and CATCHES the
+/// trap rather than relying on a panicking differential helper. The edge word is
+/// compiler-produced and never attacker-controlled, so the trap is unreachable
+/// in unmutated production and no runtime guard is warranted.
 #[test]
 fn forward_ret_edge_substituted_word_reds() {
     in_large_stack_thread("rt-parity-forward-ret-substituted", || {
-        assert_forward_ret_authority_control_reds(
-            ken_runtime::ComposedReturnForwardRetAuthorityMutation::SubstituteForwardEdgeWord,
+        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
+
+        // Build + run the read fixture's native artifact under `mutation`,
+        // returning the run Result so a corrupted-edge trap is CAUGHT here, not
+        // panicked through the differential helper.
+        fn run_native(
+            mutation: Mutation,
+        ) -> Result<ken_runtime::EffectObservation, ken_runtime::NativeEffectRunErrorV1> {
+            // The mutation wrapper returns (closure_result, authority_rows,
+            // applications); only the run Result is needed here.
+            let (run_result, _rows, _applications) =
+                ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
+                    let root = output_dir(&format!("forward-ret-substituted-{mutation:?}"));
+                    std::fs::write(root.path().join("source"), b"ab").unwrap();
+                    let source =
+                        RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+                    let output = ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        "rt_parity_forward_ret_substituted",
+                        root.path(),
+                    )
+                    .expect("the substituted-edge control reaches linked native lowering");
+                    ken_runtime::run_bound_process_effect_observation(
+                        &output.artifact,
+                        &ken_runtime::NativeEffectRunOptionsV1 {
+                            arguments: Vec::new(),
+                            environment: Vec::new(),
+                            cwd: root.path().to_owned(),
+                            plan_hash: output.plan_transport_hash,
+                        },
+                    )
+                });
+            run_result
+        }
+
+        // Unmutated: the compiler-produced edge delivers the Trap-checked Result,
+        // so native cleanly observes InvalidOffset (exit 0, no trap) -- GREEN.
+        let unmutated =
+            run_native(Mutation::Exact).expect("the unmutated forward edge runs cleanly");
+        assert_eq!(
+            unmutated.exit_status, 0,
+            "unmutated: native cleanly observes InvalidOffset via the forward edge: {unmutated:?}"
         );
+        assert_eq!(
+            unmutated.terminal_error, None,
+            "unmutated: native must not trap"
+        );
+
+        // SubstituteForwardEdgeWord: the edge carries an independent non-result
+        // word, so the Trap-checked Result never reaches the exit and native
+        // TRAPS. The green->trap flip is the mutant-kill for "the edge word
+        // matters"; pin the exact trap, do not accept "any non-green".
+        match run_native(Mutation::SubstituteForwardEdgeWord) {
+            Err(ken_runtime::NativeEffectRunErrorV1::UnclassifiedRuntimeTrap { terminal_value }) => {
+                assert_eq!(
+                    terminal_value, -1,
+                    "SubstituteForwardEdgeWord: native traps with terminal value -1"
+                );
+            }
+            other => panic!(
+                "SubstituteForwardEdgeWord must flip the clean edge to UnclassifiedRuntimeTrap {{ terminal_value: -1 }}; got {other:?}"
+            ),
+        }
     });
 }
 

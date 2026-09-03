@@ -155,6 +155,7 @@ pub use aggregates::{
 #[cfg(feature = "px8-ds-test-support")]
 pub(in crate::cranelift_backend) use aggregates::{
     checked_ih_generated_entry_arrival_mutation, composed_return_forward_ret_authority_mutation,
+    discharge_forward_edge_sealed_observations,
     record_checked_ih_generated_entry_governed_validation,
     record_checked_ih_generated_entry_installed,
     record_checked_ih_generated_entry_ordinary_continuation,

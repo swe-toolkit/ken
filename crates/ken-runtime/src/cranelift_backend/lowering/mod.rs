@@ -228,6 +228,7 @@ pub(in crate::cranelift_backend) use super::planning::{
 use super::planning::{
     checked_ih_generated_entry_arrival_mutation,
     composed_return_forward_ret_authority_mutation,
+    discharge_forward_edge_sealed_observations,
     record_composed_return_forward_ret_authority,
     record_composed_return_forward_ret_role_witness,
     record_checked_ih_generated_entry_governed_validation,
