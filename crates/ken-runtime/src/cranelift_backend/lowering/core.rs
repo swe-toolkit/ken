@@ -8439,9 +8439,15 @@ impl<'a> Lowering<'a> {
                 "the InlineNoCall continuation return is not the carried captured-environment word",
             ));
         };
+        // The context body's Parameter-0 (`outcome`) is the continuation's bound
+        // result, held in the captured-environment carrier at the descriptor-derived
+        // ordinal the planner recorded on the Tail route (R3 Case-B, Architect
+        // ruling evt_6s66s11vtf2m1). Read it from the plan proof; never a literal
+        // ordinal, never a numeric formula.
+        let outcome_ordinal = authority._plan.fresh_result_capture_ordinal() as usize;
         // Read every owned fact off the continuation unit up front, so the unit
         // view is dropped before any `&mut self` emit below.
-        let (envelope, inputs_view, body_origin, recursive_count) = {
+        let (envelope, inputs_view, body_origin) = {
             let unit = self
                 .static_transition_plan
                 .continuation_units()?
@@ -8457,29 +8463,19 @@ impl<'a> Lowering<'a> {
                 unit.ordinary_envelope()?,
                 unit.continuation_inputs()?,
                 unit.worker_body_origin(),
-                unit.recursive_positions().len(),
             )
         };
-        let field_start = recursive_count;
         let mut ordinary = Vec::with_capacity(envelope.len() + transport.continuation_input_count());
         for role in &envelope {
             match role {
-                ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
-                    source_position,
-                } => {
-                    let binding = env
-                        .get(field_start + *source_position as usize)
-                        .ok_or_else(|| {
-                            unsupported(
-                                "ComposedReturnRetKMatch",
-                                "a nonrecursive continuation field is outside the selected case environment",
-                            )
-                        })?;
-                    ordinary.push(
-                        binding
-                            .value_at("a composed-return k-Match nonrecursive field")?
-                            .clone(),
-                    );
+                ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField { .. } => {
+                    // Parameter-0 = the continuation's bound result (`outcome`),
+                    // projected from the captured-environment carrier at the
+                    // descriptor-derived ordinal — the same means-(a) projection the
+                    // captures use, sourced from the Tail route's recorded ordinal.
+                    let field =
+                        self.emit_carrier_field(builder, captured_word, outcome_ordinal)?;
+                    ordinary.push(LoweringOperand::Carried(field));
                 }
                 ContinuationOrdinaryEnvelopeRole::WorkerCapture { ordinal, source, .. } => {
                     let ContinuationWorkerCaptureSource::Lexical(_) = source else {

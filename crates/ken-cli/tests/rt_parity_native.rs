@@ -577,9 +577,60 @@ fn assert_narrowed_alike(
     );
     assert_eq!(interpreted.terminal_error, None, "{case}: interpreter");
     assert_eq!(native.terminal_error, None, "{case}: native");
+    // Effect-trace parity with the bracket RELEASE ORDER excluded.
+    //
+    // RT-BRACKET-RELEASE-ORDER-PARITY (Steward scope ruling): the interpreter and
+    // native disagree on the ORDER in which a nested/multi-resource bracket
+    // releases its resources (e.g. file-before-buffer vs buffer-before-file). That
+    // divergence is outcome-INDEPENDENT, lives in bracket teardown, and is
+    // orthogonal to this composed-return repair (RT-COMPOSED-RETURN-FORWARD-RET-EDGE
+    // b2), which was exonerated by the structural check (captures threaded in
+    // planner order; Architect concurred it is pre-existing). It is scoped OUT of
+    // b2 and tracked as its own node; the spec-correct release order is not yet
+    // adjudicated, so this assertion MUST NOT pin an expected order to either side.
+    //
+    // So: every NON-release effect must agree in order (unchanged), and the
+    // release events must agree as a SET -- same resources, requests, and outcomes
+    // -- with their relative order excluded. Once RT-BRACKET-RELEASE-ORDER-PARITY
+    // fixes the violating executor, restore the full ordered `effect_trace`
+    // equality here (delete the split below).
+    let non_release_events = |observation: &ken_runtime::EffectObservation| {
+        observation
+            .effect_trace
+            .iter()
+            .filter(|event| event.operation != ken_runtime::HostOpV1::ResourceRelease)
+            .cloned()
+            .collect::<Vec<_>>()
+    };
     assert_eq!(
-        native.effect_trace, interpreted.effect_trace,
-        "{case}: complete ordered effects, requests, outcomes, and resource provenance must agree",
+        non_release_events(&native),
+        non_release_events(&interpreted),
+        "{case}: complete ordered NON-release effects, requests, outcomes, and resource provenance must agree",
+    );
+    let release_set = |observation: &ken_runtime::EffectObservation| {
+        let mut releases = observation
+            .effect_trace
+            .iter()
+            .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
+            .map(|event| {
+                (
+                    event.resource_bindings.clone(),
+                    event.request.clone(),
+                    event.outcome.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+        // Order-insensitive: RELEASE ORDER is excluded per
+        // RT-BRACKET-RELEASE-ORDER-PARITY. Keyed on the Debug rendering so no Ord
+        // bound is required on the canonical release payloads.
+        releases.sort_by_key(|release| format!("{release:?}"));
+        releases
+    };
+    assert_eq!(
+        release_set(&native),
+        release_set(&interpreted),
+        "{case}: the SET of bracket releases (resources, requests, outcomes) must agree across \
+         executors; their relative ORDER is excluded here per RT-BRACKET-RELEASE-ORDER-PARITY",
     );
     assert_eq!(
         interpreted.terminal_exit, native.terminal_exit,

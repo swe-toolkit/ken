@@ -386,6 +386,17 @@ pub(in crate::cranelift_backend) enum CheckedIhFreshResultRoute {
         ret_case_body_origin: StaticOriginId,
         ret_input_binder: CheckedBinderProvenance,
         ret_input_delivery: CheckedIhFreshResultRetInputDelivery,
+        /// D3-RECUT (b2/R3, Case-B): the ordinal, within the producer worker's
+        /// captured-environment carrier, of the continuation's bound result
+        /// parameter (the `outcome` the k-Match consumes). This is the Tail-route
+        /// analogue of the Direct route's
+        /// [`CheckedIhFreshResultDestination::capture_ordinal`]: recorded here at
+        /// route construction by identity (the unique worker capture whose binder
+        /// provenance is the continuation closure's parameter), so the composed-
+        /// return closeout reads the outcome carrier field by descriptor rather
+        /// than by a numeric formula. A compile-time planning fact only; no runtime
+        /// value is stored.
+        fresh_result_capture_ordinal: u32,
     },
 }
 
@@ -410,6 +421,11 @@ pub(in crate::cranelift_backend) struct CheckedIhForwardRetPlanProof {
     ret_case_body_origin: StaticOriginId,
     ret_input_field_position: u32,
     delivery: CheckedIhFreshResultRetInputDelivery,
+    /// D3-RECUT (b2/R3, Case-B): the Tail producer worker's captured-environment
+    /// carrier ordinal of the continuation's bound result (`outcome`), carried
+    /// from the route's `fresh_result_capture_ordinal` so the composed-return
+    /// closeout reads the outcome by descriptor rather than by a numeric formula.
+    fresh_result_capture_ordinal: u32,
 }
 
 /// One planner-only continuation-inheritance projection of an existing
@@ -863,6 +879,13 @@ impl CheckedIhForwardRetPlanProof {
 
     pub(in crate::cranelift_backend) fn ret_input_field_position(&self) -> u32 {
         self.ret_input_field_position
+    }
+
+    /// The Tail producer worker's captured-environment carrier ordinal of the
+    /// continuation's bound result (`outcome`). D3-RECUT (b2/R3): the closeout
+    /// projects this carrier field as the k-Match's Parameter-0.
+    pub(in crate::cranelift_backend) fn fresh_result_capture_ordinal(&self) -> u32 {
+        self.fresh_result_capture_ordinal
     }
 }
 
@@ -1745,6 +1768,7 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                         ret_case_body_origin,
                         ret_input_binder,
                         ret_input_delivery,
+                        fresh_result_capture_ordinal: _,
                     } => confluence
                         .members
                         .iter()
@@ -6072,6 +6096,69 @@ fn checked_ih_generated_entry_arrival(
     })
 }
 
+/// D3-RECUT (b2/R3, Case-B): the ordinal, within the Tail producer worker's
+/// captured-environment carrier, of the continuation's bound result parameter
+/// (the `outcome` the k-Match consumes).
+///
+/// This is the Tail-route analogue of the Direct route's
+/// [`CheckedIhFreshResultDestination::capture_ordinal`]. The Direct route already
+/// records its fresh-result -> capture-ordinal mapping at construction; the Tail
+/// route never did, and that asymmetry is the whole gap the composed-return
+/// closeout hit (Architect ruling `evt_6s66s11vtf2m1`). We resolve it here, at the
+/// route site where the facts are live, by SOURCE IDENTITY -- never a numeric
+/// formula (recursive_position + 1, method_argument_count, and selected_index all
+/// coincide by accident on the current fixtures and are each unrelated to the
+/// carrier ordinal).
+///
+/// The identity: the worker captures the continuation closure's result parameter
+/// as one of its captures; that capture's binder provenance is
+/// [`CheckedBinderProvenance::LexicalClosureParameter`] at parameter ordinal 0
+/// (the single-parameter continuation, the same 1-parameter shape the Direct
+/// destination requires). We reverse-match that provenance against the worker's
+/// captured-environment record (`checked_ih_capture_origin`) and return the N whose
+/// capture is that parameter. The uniqueness of that capture is required rather
+/// than assumed: more than one continuation-parameter capture makes the fresh
+/// result ambiguous, and zero means the Tail producer has no continuation-argument
+/// capture -- both are refused rather than guessed.
+fn tail_fresh_result_capture_ordinal(
+    plan: &StaticTransitionPlan<'_>,
+    inheritance: &CheckedIhContinuationInheritance,
+) -> Result<u32, CraneliftBackendError> {
+    let binder_provenance = build_checked_binder_provenance(plan)?;
+    let owner = inheritance.transport.source_owner;
+    let seat = inheritance.transport.seat;
+    let mut found: Option<u32> = None;
+    let mut ordinal = 0u32;
+    loop {
+        let origin = match plan.checked_ih_capture_origin(owner, seat, ordinal) {
+            Ok(origin) => origin,
+            Err(_) => break,
+        };
+        if let Some(CheckedBinderProvenance::LexicalClosureParameter {
+            parameter_ordinal: 0,
+            ..
+        }) = binder_provenance.get(&origin).map(|resolution| resolution.provenance)
+        {
+            if found.is_some() {
+                return Err(planner_error(
+                    "a Tail producer-to-Ret route captures more than one continuation result \
+                     parameter, so its fresh-result carrier ordinal is ambiguous",
+                ));
+            }
+            found = Some(ordinal);
+        }
+        ordinal = ordinal.checked_add(1).ok_or_else(|| {
+            planner_capacity_error("Tail producer capture ordinal exhausted")
+        })?;
+    }
+    found.ok_or_else(|| {
+        planner_error(
+            "a Tail producer-to-Ret route has no continuation result-parameter capture from which \
+             to derive its fresh-result carrier ordinal",
+        )
+    })
+}
+
 fn checked_ih_fresh_result_route(
     plan: &StaticTransitionPlan<'_>,
     inheritance: &CheckedIhContinuationInheritance,
@@ -6181,6 +6268,7 @@ fn checked_ih_fresh_result_route(
                 "an earlier transport result was substituted for the forward Ret sink identity",
             ));
         }
+        let fresh_result_capture_ordinal = tail_fresh_result_capture_ordinal(plan, inheritance)?;
         (
             CheckedIhFreshResultRoute::TailProducerToRet {
                 source: tail_source,
@@ -6190,6 +6278,7 @@ fn checked_ih_fresh_result_route(
                 ret_case_body_origin: producer_sink.0,
                 ret_input_binder: producer_sink.1,
                 ret_input_delivery: CheckedIhFreshResultRetInputDelivery::ProducerResultDirect,
+                fresh_result_capture_ordinal,
             },
             Some(producer_step),
             Some(tail_kind),
@@ -6222,6 +6311,9 @@ fn checked_ih_fresh_result_route(
                         ret_input_binder: destination.constructor_child,
                         ret_input_delivery:
                             CheckedIhFreshResultRetInputDelivery::ProducerResultDirect,
+                        // Cross-variant control: carry the Direct destination's
+                        // ordinal so the synthesized Tail route is well-formed.
+                        fresh_result_capture_ordinal: destination.capture_ordinal,
                     };
                 }
             }
@@ -7507,6 +7599,7 @@ impl StaticTransitionPlan<'_> {
             ret_case_body_origin,
             ret_input_binder,
             ret_input_delivery,
+            fresh_result_capture_ordinal,
             ..
         } = selected_projection.fresh_result_route()
         else {
@@ -7661,6 +7754,7 @@ impl StaticTransitionPlan<'_> {
             ret_case_body_origin: *ret_case_body_origin,
             ret_input_field_position: 0,
             delivery: *ret_input_delivery,
+            fresh_result_capture_ordinal: *fresh_result_capture_ordinal,
         }))
     }
 }
