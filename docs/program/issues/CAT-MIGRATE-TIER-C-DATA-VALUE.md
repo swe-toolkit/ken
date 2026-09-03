@@ -50,7 +50,9 @@ split-out predecessors (below), the DAG-axis discipline every tier respects.
 
 ## Module set — READY lane, this node, per-module increments IN THIS ORDER
 
-1. StringBijection (SB) -> 2. StringKeys (edge `SB -> StringKeys`)
+1. StringBijection (SB) -> 2. StringKeys (edge `SB -> StringKeys` is TRANSITIVE
+   through LawfulClasses — SB -> LC -> StringKeys — NOT a direct StringKeys
+   free-symbol edge; increment 2 is a CLOSEOUT, see the disposition below)
 3. BytesKeys (BK) — pure consumer since Tier B (`DecEq UInt8`/`DecEq Bytes`
    relocated to LC); standalone-cleanness closeout, no new proof content
 4. Sums.Combinators -> 5. Map (edge `Sums.Combinators -> Map`)
@@ -58,6 +60,36 @@ split-out predecessors (below), the DAG-axis discipline every tier respects.
 
 Map (increment 5) additionally carries the `bool_and`-family attached-owner
 relocation to LC, ruling (a) below.
+
+### Increment 2 (StringKeys) — RECLASSIFIED to a standalone-cleanness CLOSEOUT (Steward disposition 2026-09-03)
+
+D0 re-measurement at clean base `c3bb29c81` (foundation-implementer
+evt_6222whgedadsr, foundation-leader evt_7rj2smke4t430) FALSIFIED the
+direct-import premise: the `SB -> StringKeys` edge is TRANSITIVE through
+LawfulClasses. StringKeys is already standalone-green (`ken check` exit 0),
+owned/public inventory EMPTY, and directly consumes only LC's `string_deceq_eq`
+and `string_ord_leq` (from its existing selective LC import). A direct SB import
+is REDUNDANT and its removal stays green — so `AC-STANDALONE-GREEN`'s
+missing-import reddening control is INAPPLICABLE here (no required direct import
+to red). The ring is right to refuse an unused import; none is added.
+
+Increment 2 is therefore the same shape as increment 3 (BytesKeys): a measured
+production NO-OP, test-only, NO source edit to StringKeys. Deliverable = the
+controls that ARE honest and DO have power:
+- StringKeys owned/public inventory is EMPTY — a mutation adding a
+  StringKeys-local decl reds; a selective import of any StringKeys-local name
+  rejects `UnboundName`.
+- StringKeys's exact direct consumed set from LC is `{string_deceq_eq,
+  string_ord_leq}`, per-symbol reddening — dropping either from the LC import reds
+  the corresponding checked fence (measured); dropping `DecEq`/`Ord` as class
+  names stays green, and that asymmetry is itself an assertion.
+- Do NOT re-assert the transitive canonical SB identity or the no-competing-mint
+  negative — increment 1's landed StringKeys control
+  (`string_keys_closure_retains_the_published_injectivity_identity`) already owns
+  those. CITE it; do not duplicate.
+
+Reviewers unchanged (Architect confirms the closeout is a true no-op + the
+transitive-edge refinement; Foundation QA + CV; then Steward M1-M4 -> lieutenant).
 
 ### SPLIT OUT — held, NOT this node
 - **{NonEmpty, Validation}** -> [[CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION]], held
