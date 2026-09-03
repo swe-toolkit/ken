@@ -4635,10 +4635,12 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 == ComposedReturnForwardRetAuthorityMutation::SubstituteForwardEdgeWord
                             {
                                 // AC-CAUSAL-PAIR (b): keep the edge and the sink but
-                                // carry an independent non-result word, catching a
-                                // fixture that greened without depending on the exact
-                                // Result reaching the exit.
-                                record_composed_return_forward_ret_authority_application();
+                                // carry an independent non-result word. A fixture
+                                // that still greened under this substitution would
+                                // not depend on the exact Result reaching the exit;
+                                // the behavioral flip (green under Exact, red here)
+                                // is the anti-vacuity evidence that this reached the
+                                // live edge.
                                 builder.ins().iconst(types::I64, 0)
                             } else {
                                 checked.word.word

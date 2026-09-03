@@ -41,6 +41,12 @@
 //! | `fs_write_at_malformed_offset` | FAILS | dispatch skip |
 //! | `buffer_freeze_malformed_span_is_unconstructible...` | passes | none -- source-scope pin, not interpreter behaviour |
 //!
+//! Post-fix (D3-RECUT, this WP): the four `fs_*_at_malformed_*` narrowing cases
+//! observe the exact variant with exit 0 and are durable, non-ignored products
+//! -- the governed Tail composed return takes the forward SSA edge to the shared
+//! Ret block. `buffer_allocate_malformed_capacity` stays ignored under its own
+//! owner (RT-SITEOP-CARRIED-WITNESS), out of this WP's scope.
+//!
 //! `BufferFreeze` has no *narrowing* case here because no malformed span is
 //! constructible from checked source at the landed surface -- an empirical
 //! finding, not a derived closure result, and not an omission. See
@@ -690,55 +696,15 @@ fn buffer_allocate_malformed_capacity_narrows_to_invalid_bounds() {
 
 // -- FsReadAt ------------------------------------------------------------
 
-/// Transition sentinel. MEASURED: the exact checked-source InvalidOffset
-/// witness crosses the repaired private route lane and reaches the named
-/// ResourceBodyResult fail-closed frontier with recoverable planner provenance.
-/// CLAIMED: D1 no longer terminates at the earlier ITree default. THE GAP: the
-/// ResourceBodyResult default is not final behavior and this test intentionally
-/// retires when RT-RESULT-CONTINUATION-BINDING-PROVENANCE replaces it with the
-/// durable nonignored InvalidOffset product witness.
-#[test]
-fn fs_read_at_malformed_offset_reaches_resource_body_result_frontier() {
-    in_large_stack_thread("rt-parity-read-offset-provenance", || {
-        let Differential { native, .. } =
-            differential("fs-read-at-offset-provenance", "rt_read_offset_stage");
-        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-            native.terminal_error.as_ref()
-        else {
-            panic!("native witness must report typed planner trap provenance: {native:?}");
-        };
-        assert!(
-            provenance.planned_identity > 0,
-            "identity zero is reserved for no trap"
-        );
-        assert_eq!(
-            provenance.trap.code,
-            ken_runtime::RuntimeTrapCode::PatternMatchFailure
-        );
-        assert_eq!(
-            provenance.trap.message,
-            "no runtime match case selected for \
-             decl:rt_parity_fs_read_at_offset_provenance::ResourceBodyResult"
-        );
-        let stderr = String::from_utf8_lossy(&native.stderr);
-        assert!(stderr.contains("PatternMatchFailure"));
-        assert!(stderr.contains(&provenance.trap.message));
-        assert!(!stderr.contains("unknown terminal sentinel"));
-        assert_eq!(
-            native
-                .effect_trace
-                .iter()
-                .map(|event| event.operation)
-                .collect::<Vec<_>>(),
-            vec![
-                ken_runtime::HostOpV1::FsOpen,
-                ken_runtime::HostOpV1::BufferAllocate,
-                ken_runtime::HostOpV1::ResourceRelease,
-                ken_runtime::HostOpV1::ResourceRelease,
-            ]
-        );
-    });
-}
+// RETIRED by D3-RECUT. The transition sentinel
+// `fs_read_at_malformed_offset_reaches_resource_body_result_frontier` asserted
+// that native terminated at the ResourceBodyResult fail-closed frontier with a
+// PatternMatchFailure planner trap -- the malformed ExitCode::Failure payload.
+// Its own contract retired it "when the durable nonignored InvalidOffset product
+// witness" replaced the frontier. The governed Tail forward SSA edge is that
+// replacement: `fs_read_at_malformed_offset_narrows_to_invalid_offset` (below)
+// now observes exact InvalidOffset with exit 0, so the trap the sentinel pinned
+// no longer occurs and the sentinel is removed rather than left to red.
 
 #[test]
 fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
@@ -3379,24 +3345,27 @@ fn composed_return_ret_sink_is_byte_inert() {
 
 /// **Promise class: durable invariant.**
 ///
-/// **MEASURED:** exact post-selection D2 authority formation and complete
-/// suppression emit identical semantic hashes, executable hashes, and bytes;
-/// every exact observation names forward, producer-result-direct delivery to
-/// field zero of one compiler-local Ret block.
-/// **CLAIMED:** the move-only authority join changes no call, result route,
-/// ABI, runtime carrier, or artifact before D3 activates a consumer.
-/// **THE GAP:** the suppression arm moves the authority operation while leaving
-/// the same new planner route in place; the plan-shape positive and the five
-/// natural-site refusal arms independently cover what this differential does
-/// not.
+/// **MEASURED:** D3 consumes the post-selection authority as a live forward SSA
+/// edge, so exact authority formation and complete suppression emit the SAME
+/// upstream plan (transport hash) and SAME core semantic hash but DIFFERENT
+/// executable bytes; every exact observation still names forward,
+/// producer-result-direct delivery to field zero of one compiler-local Ret block.
+/// **CLAIMED:** the authority is now load-bearing at codegen (forming vs
+/// suppressing it changes the emitted code), and the change is confined to
+/// codegen -- no spec, kernel, ABI, wire, or semantic-plan change accompanies it
+/// (AC-NO-BOUNDARY-REOPEN: the edge is compiler state, not a runtime lane).
+/// **THE GAP:** this differential isolates that the forward edge is emitted and
+/// that its effect is codegen-only; the population and role-witness controls
+/// establish the authority's coordinate identity, and the durable
+/// `fs_*_narrows` products below establish the executed behavior.
 #[test]
-fn composed_return_forward_ret_authority_is_byte_inert() {
-    in_large_stack_thread("rt-parity-forward-ret-authority-inert", || {
+fn composed_return_forward_ret_authority_is_live_at_the_forward_edge() {
+    in_large_stack_thread("rt-parity-forward-ret-authority-live", || {
         use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
 
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
-        let exact_root = output_dir("forward-ret-authority-inert-exact");
-        let suppressed_root = output_dir("forward-ret-authority-inert-suppressed");
+        let exact_root = output_dir("forward-ret-authority-live-exact");
+        let suppressed_root = output_dir("forward-ret-authority-live-suppressed");
         let (exact, exact_rows, exact_applications) =
             ken_runtime::with_composed_return_forward_ret_authority_mutation(
                 Mutation::Exact,
@@ -3404,12 +3373,12 @@ fn composed_return_forward_ret_authority_is_byte_inert() {
                     ken_cli::build_native_program(
                         &source,
                         ken_cli::SourceFormat::Ken,
-                        "rt_parity_forward_ret_authority_inert",
+                        "rt_parity_forward_ret_authority_live",
                         exact_root.path(),
                     )
                 },
             );
-        let exact = exact.expect("exact D2 forward-Ret authority artifact");
+        let exact = exact.expect("exact D3 forward-Ret authority artifact");
         let (suppressed, suppressed_rows, suppressed_applications) =
             ken_runtime::with_composed_return_forward_ret_authority_mutation(
                 Mutation::SuppressForInertness,
@@ -3417,12 +3386,12 @@ fn composed_return_forward_ret_authority_is_byte_inert() {
                     ken_cli::build_native_program(
                         &source,
                         ken_cli::SourceFormat::Ken,
-                        "rt_parity_forward_ret_authority_inert",
+                        "rt_parity_forward_ret_authority_live",
                         suppressed_root.path(),
                     )
                 },
             );
-        let suppressed = suppressed.expect("suppressed D2 forward-Ret authority artifact");
+        let suppressed = suppressed.expect("suppressed D3 forward-Ret authority artifact");
 
         assert!(
             !exact_rows.is_empty(),
@@ -3440,24 +3409,26 @@ fn composed_return_forward_ret_authority_is_byte_inert() {
                 && !row.coordinate.source_call_identity.is_empty()
                 && !row.return_body_block.is_empty()
         }));
+        // Codegen-only: the upstream plan and the core semantic program are
+        // unchanged by taking the edge -- the edge is a Cranelift lowering
+        // choice, never a spec/ABI/wire/semantic change.
         assert_eq!(exact.plan_transport_hash, suppressed.plan_transport_hash);
         assert_eq!(
             exact.runtime_program.core_semantic_hash,
             suppressed.runtime_program.core_semantic_hash
         );
-        assert_eq!(
-            exact.runtime_program.artifact_hash,
-            suppressed.runtime_program.artifact_hash
-        );
-        assert_eq!(
+        // Load-bearing at codegen: consuming the authority (the forward edge)
+        // emits different machine code than the suppressed collapse path.
+        assert_ne!(
             exact.artifact.executable_hash,
-            suppressed.artifact.executable_hash
+            suppressed.artifact.executable_hash,
+            "consuming the forward-Ret authority must change the emitted code"
         );
-        assert_eq!(
+        assert_ne!(
             std::fs::read(&exact.artifact.executable_path).expect("exact executable bytes"),
             std::fs::read(&suppressed.artifact.executable_path)
                 .expect("suppressed executable bytes"),
-            "D2 authority formation must change no emitted byte"
+            "the forward SSA edge must change emitted bytes vs the collapse path"
         );
         assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
     });
@@ -4081,8 +4052,10 @@ d1_route_case!(d1_route_control_misroute_direct_read, "misroute-direct-read", So
 /// Durable invariant: a statically specialized read response preserves the
 /// complete ordered effect/provenance trace and exposes exact InvalidOffset
 /// without dispatching the malformed FsReadAt request.
+// D3-RECUT (durable product): the governed Tail composed return now takes the
+// forward SSA edge to the shared Ret block, so native observes exact
+// InvalidOffset instead of the malformed ExitCode::Failure trap.
 #[test]
-#[ignore = "post-M6 runtime parity debt: native construction completes, but execution traps on a malformed ExitCode::Failure payload instead of observing InvalidOffset"]
 fn fs_read_at_malformed_offset_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-read-offset", || {
         assert_narrowed_alike(
@@ -4094,8 +4067,9 @@ fn fs_read_at_malformed_offset_narrows_to_invalid_offset() {
     });
 }
 
+// D3-RECUT (AC-SWEEP-INVALIDBOUNDS): rides the same Int narrow-failure lane and
+// the same governed Tail forward SSA edge; native observes exact InvalidBounds.
 #[test]
-#[ignore = "post-M6 runtime parity debt: native construction completes, but execution traps on a malformed ExitCode::Failure payload instead of observing InvalidBounds"]
 fn fs_read_at_malformed_window_narrows_to_invalid_bounds() {
     in_large_stack_thread("rt-parity-read-window", || {
         assert_narrowed_alike(
@@ -4125,8 +4099,10 @@ fn fs_read_at_malformed_window_narrows_to_invalid_bounds() {
 /// more than once`. That is a pre-existing native lowering limitation, not an
 /// RT-PARITY regression, and is reported rather than worked around; the
 /// rights fault discriminates the same narrowing-order property.
+// D3-RECUT (durable product): the governed Tail composed return now takes the
+// forward SSA edge to the shared Ret block, so native observes exact
+// InvalidOffset instead of the malformed ExitCode::Failure trap.
 #[test]
-#[ignore = "post-M6 runtime parity debt: native construction completes, but execution traps on a malformed ExitCode::Failure payload instead of observing InvalidOffset"]
 fn fs_read_at_malformed_offset_without_read_right_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-read-norights", || {
         assert_narrowed_alike(
@@ -4159,8 +4135,12 @@ fn fs_read_at_malformed_offset_without_read_right_narrows_to_invalid_offset() {
 /// Durable invariant: a statically specialized write response preserves the
 /// complete ordered effect/provenance trace and exposes exact InvalidOffset
 /// without dispatching the malformed FsWriteAt request.
+// D3-RECUT (durable product): the write-side governed Tail composed return takes
+// the same forward SSA edge; native observes exact InvalidOffset. The prior
+// RT-CLOSURE-BOUNDARY-LANE blocker (base 21fd46dc, pre-RT-SSA) is superseded --
+// RT-SSA's response-owner specialization supplies the durable lane and the
+// population control builds this write entry with a formed Tail authority.
 #[test]
-#[ignore = "RT-CLOSURE-BOUNDARY-LANE: a runtime-local closure has no durable lane across the boundary; fails at base 21fd46dc"]
 fn fs_write_at_malformed_offset_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-write-offset", || {
         assert_narrowed_alike(
@@ -4176,8 +4156,10 @@ fn fs_write_at_malformed_offset_narrows_to_invalid_offset() {
 /// read-only, so the write right is not held. Before the repair the sentinel
 /// entered dispatch and rights won, surfacing `RightNotHeld`; native
 /// synthesised `InvalidOffset`.
+// D3-RECUT (durable product): the governed Tail composed return now takes the
+// forward SSA edge to the shared Ret block, so native observes exact
+// InvalidOffset instead of the malformed ExitCode::Failure trap.
 #[test]
-#[ignore = "post-M6 runtime parity debt: native construction completes, but execution traps on a malformed ExitCode::Failure payload instead of observing InvalidOffset"]
 fn fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-write-readonly", || {
         assert_narrowed_alike(
@@ -4186,6 +4168,71 @@ fn fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset() 
             ken_runtime::HostOpV1::FsWriteAt,
             "InvalidOffset",
         )
+    });
+}
+
+// -- D3 forward-SSA-edge causal controls ---------------------------------
+//
+// Each runs the read-offset durable product under ONE compile-time mutation of
+// the governed Tail closeout and asserts native no longer cleanly observes
+// InvalidOffset, while the interpreter -- untouched by a cranelift-only mutation
+// -- still does. The divergence is the causal evidence that the exact forward
+// SSA edge carrying the exact Trap-checked Result, and only it, produces the
+// durable product. The twice-closeout (DuplicateTailAuthorityAt) and
+// missing-authority (RemoveTailAuthorityAt) refusals are separately closed by
+// `composed_return_forward_ret_authority_population_is_exact` above.
+
+/// Run the read-offset differential under one forward-Ret authority mutation and
+/// assert native fails the fixture's own axis-1 green condition (exit 0 with no
+/// terminal error) while the interpreter still meets it.
+fn assert_forward_ret_authority_control_reds(
+    mutation: ken_runtime::ComposedReturnForwardRetAuthorityMutation,
+) {
+    let (
+        Differential {
+            interpreted,
+            native,
+        },
+        _rows,
+        _applications,
+    ) = ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
+        differential("fs-read-at-offset-single", "rt_read_offset_stage")
+    });
+    assert_eq!(
+        interpreted.exit_status, 0,
+        "{mutation:?}: the interpreter still observes InvalidOffset (cranelift-only mutation): {interpreted:?}"
+    );
+    assert_eq!(interpreted.terminal_error, None, "{mutation:?}: interpreter");
+    assert!(
+        native.exit_status != 0 || native.terminal_error.is_some(),
+        "{mutation:?}: native must NOT cleanly observe InvalidOffset -- only the exact forward edge delivers the product: {native:?}"
+    );
+}
+
+/// **Promise class: durable invariant.** AC-EXACT-ONCE (zero-closeout): suppress
+/// the authority and the governed Tail reverts to the source-machine answer
+/// collapse, so native reddens on the base ResourceBodyResult trap. The causal
+/// pair of `fs_read_at_malformed_offset_narrows_to_invalid_offset`.
+#[test]
+fn forward_ret_edge_suppressed_reverts_to_collapse() {
+    in_large_stack_thread("rt-parity-forward-ret-suppressed", || {
+        assert_forward_ret_authority_control_reds(
+            ken_runtime::ComposedReturnForwardRetAuthorityMutation::SuppressForInertness,
+        );
+    });
+}
+
+/// **Promise class: durable invariant.** AC-CAUSAL-PAIR (b): keep the edge and
+/// the sink but carry an independent non-result word. Native reddens because the
+/// exact Trap-checked Result no longer reaches the exit -- separating result
+/// identity from producer existence and binding, which the suppress control (no
+/// edge at all) and the population control (which authority) hold fixed.
+#[test]
+fn forward_ret_edge_substituted_word_reds() {
+    in_large_stack_thread("rt-parity-forward-ret-substituted", || {
+        assert_forward_ret_authority_control_reds(
+            ken_runtime::ComposedReturnForwardRetAuthorityMutation::SubstituteForwardEdgeWord,
+        );
     });
 }
 
