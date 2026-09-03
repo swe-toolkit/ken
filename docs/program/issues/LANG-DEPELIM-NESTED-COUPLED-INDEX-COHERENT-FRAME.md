@@ -1,7 +1,7 @@
 ---
 id: LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME
 title: "D2b predecessor #4 (elaborator dependent-elim capability): a nontrivial CROSS-STRUCTURE equality whose two sides are dependent results that refine DIFFERENTLY under the same indexed elimination false-rejects a structurally-exhaustive proof — the two sides land in DIFFERENT de Bruijn frames (`expected g0, found Eq .. @3`; single-elim `expected (Dg578 @2), found (Dg578 (cg69 @4))`). The D0 grid (evt_t9w0fnhq68p0) RULED OUT the derived index (Row B red with a direct index), the coupled-index motive (Row A green, trivial), and nesting (single-elim C red): the fix is the STRUCTURAL COHERENT-FRAME CLOSURE over the motive-rebase / context-telescope invariant (subsuming 68100a5cd + 128b6c000 per-site), NOT a 4th point-fix — every refined occurrence on BOTH sides of a nontrivial equality at a single indexed elimination rebased into ONE frame, gated on ACTUAL occurrence per-side (no over-rebase). Architect classification evt_6zjegefzv0am2, fix-direction ruling evt_45h2qab5nejg3."
-status: active
+status: merged
 owner: language
 size: M
 gate: none
@@ -12,6 +12,18 @@ github: null
 origin: "Steward, 2026-09-03. D2b design hard-stop #5 for V3-FO-EMBEDDING-ADEQUACY. Classified by the Architect (evt_6zjegefzv0am2) a distinct, reachable elaborator-capability predecessor in crates/ken-elaborator — NOT a kernel change (the kernel correctly rejects; the elaborator must PRODUCE a well-typed term that typechecks against the unmodified kernel = a completeness/false-reject fix), NOT source-compensable (the correspondence is a REQUIRED architecture-B lemma so it cannot live in FoKripke), NOT an architecture-B refutation (the proposition is true by construction and the match i/match xs proof is structurally exhaustive). The Architect's provisional lean (the derived/coupled index through the nested elim) was FALSIFIED by the D0 grid (evt_t9w0fnhq68p0, fixture /tmp/d2b-hs5-grid-final.rs) and WITHDRAWN (§7a, evt_45h2qab5nejg3): Row B (RED, direct index, no dual_fin_to_nat) rules the derived index OUT; Row A (GREEN, trivial equality, same coupled index + nesting) rules the coupled-index motive OUT; the single-elim C substitute (RED at ONE match xs) rules nesting OUT. CONFIRMED CAUSE (from the flipping cells): the discriminator is a NONTRIVIAL equality whose two sides are DEPENDENT RESULTS refining DIFFERENTLY under the same indexed elimination (cross-structure dependent-result refinement), failing ALREADY at a SINGLE elimination depth — the two sides' refinements land in different de Bruijn frames (@2 vs @4), so the branch's equality type does not sit in the same frame as the refined goal. FIX DIRECTION RULED (evt_45h2qab5nejg3): the structural coherent-frame CLOSURE, not a point-fix (the grid falsifies any special extension of the derived-occurrence/nested-elim gate). §1a: HS5 self-ruled; next Research trigger = HS6; no research pull. §1b (Architect, entry 4): entries 1 (68100a5cd, direct coupled scrutinee occurrence), 2 (128b6c000, captured convoy binder), 4 (this) share ONE predicate — no single coherent de Bruijn frame across the refined goal; entry 3 (b22e62530 DUAL-VIEW) is the field-side sibling. FOLD-VS-DISTINCT: this is motive/goal-rebase-side (expected g0) and DISTINCT from the Adversary's queued infer-mode-RVar successor (evt_3gh2pkrw3ny8z, field-view/application-head side); confirmed no application-head field-retyping is involved. Coordinates re-measure at your build SHA; grid fixture /tmp/d2b-hs5-grid-final.rs on the held WIP 26dd33f25."
 ---
 
+> # LANDED (Steward, 2026-09-03) — MERGED at origin/main `ab55f525c` (squash of
+> # PR #3291). Blob-verified: both changed paths byte-identical to the reviewed
+> # candidate `60ea656228` — `crates/ken-elaborator/src/elab.rs` blob
+> # `c62506078`, `crates/ken-elaborator/tests/dependent_match_coherent_frame_
+> # acceptance.rs` blob `7ce70319c`. Decision `dec_6fz8zcm7gfc3m` (QA 207/207 +
+> # lib/doc + Architect design/soundness + CV grid 6/6, all exact-SHA). The
+> # lieutenant reported squash `f69590d0b`, which is NOT in main's ancestry — a
+> # pre-squash preview SHA; the actual landed squash is `ab55f525c` (confirmed by
+> # BLOB, not SHA). `ken-ci` auto-close did NOT fire (`github: null`); Steward
+> # flipped `status: active -> merged` by hand. This discharges the `depends_on`
+> # for `V3-FO-EMBEDDING-ADEQUACY` (D2b), now RE-RELEASED.
+>
 > # OPERATIVE (Steward, 2026-09-03) — OPERATOR GATE RESOLVED: option (a) ACCEPTED,
 > # the cast/J INDEX-REFINEMENT realization. This banner SUPERSEDES the HS13-FIRED
 > # and HS12-RULED banners below for CURRENT state and is the AUTHORIZED mechanism.
