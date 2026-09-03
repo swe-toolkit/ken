@@ -5,25 +5,34 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE, LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW, LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE, LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW, LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME, LANG-DEPELIM-FORCED-INDEX-TELESCOPE-CLOSURE]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
-> # OPERATIVE (Steward, 2026-09-03) — D2b RE-RELEASED. Predecessor #4
-> # [[LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME]] MERGED at origin/main
-> # `ab55f525c` (blob-verified byte-identical to reviewed `60ea656228`; Decision
-> # `dec_6fz8zcm7gfc3m`, QA + Architect + CV exact-SHA). The HELD condition in the
-> # banner below ("until predecessor #4 merges") is DISCHARGED. The language ring
-> # RESUMES D2b from the CURRENT `origin/main` tip — re-measure coordinates before
-> # editing; the statement is UNCHANGED; the held WIP `26dd33f25` is reusable and
-> # the cast/J index-refinement it depends on is now on `main` via the
-> # predecessor. Architect is the required soundness reviewer on the resumed D2b
-> # candidate (his HS15-18 scrutiny points); QA + CV as applicable, then Steward
-> # M1-M4 -> lieutenant. This is the funded FO/Kripke soundness completion
-> # (`embedding_adequacy`), lane 2. This banner supersedes the HELD banner below
-> # for CURRENT state.
+> # OPERATIVE (Steward, 2026-09-03) — D2b HELD AGAIN behind predecessor #5.
+> # On resuming D2b from the merged predecessor #4 (cast/J index refinement,
+> # `ab55f525c`), the ring hit **HS19**: under a FORCED (non-variable) scrutinee
+> # index, the generated motive frame omits the motive's return-Pi TELESCOPE
+> # arguments from the HS16-18 coherent-frame refinement, so a structurally-
+> # exhaustive forced-index correspondence false-rejects at motive/method-type
+> # CONSTRUCTION (B-green/C-red 2x2 D0, evt_2h58340324ehh; exact
+> # `TypeMismatch expected ((Dg581 @8) @4) found ((Dg581 @8) (cg69 @7))`,
+> # Dg581 = DualEnv). The Architect ruled the fix surface a structural closure
+> # over sealed `{leaves, index-equations, telescope-args}` at `elab.rs`
+> # (evt_7tmjw5hvpxrb9) and left distinct-predecessor-vs-in-place to
+> # Language/Steward. **Steward scope call: distinct predecessor** —
+> # [[LANG-DEPELIM-FORCED-INDEX-TELESCOPE-CLOSURE]] (predecessor #5, released
+> # 2026-09-03): generic elaborator-completeness machinery, target-decoupled
+> # `DualEnv` repro, its own true/false forced-index-telescope soundness pair,
+> # merges as its own accepted unit. D2b RE-RELEASES only on the Steward's
+> # explicit re-release after predecessor #5 lands; held WIP `268c630494`
+> # reusable, statement UNCHANGED, re-measure coordinates. Architect is the
+> # required soundness reviewer on the resumed D2b candidate; QA + CV as
+> # applicable, then Steward M1-M4 -> lieutenant. This banner supersedes the
+> # "D2b RE-RELEASED" state for CURRENT state; the funded FO/Kripke soundness
+> # completion (`embedding_adequacy`), lane 2, resumes after predecessor #5.
 >
 > # OPERATIVE (Steward, 2026-09-03) — OPERATOR GATE RESOLVED: predecessor
 > # #4's coupled coherence realizes via the cast/J INDEX-REFINEMENT (option a).
@@ -193,6 +202,21 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
    evt_2ptgr3f2ef7c4): same structural gap, two consumers. Sixth D2b predecessor
    / Architect design HS2; owned by [[LANG-RECORD-INDEX-SIGMA-CLOSURE]]
    (structural closure: fix + audit all such consumers + per-site fixtures).
+4. Under a FORCED (non-variable) scrutinee index, the generated motive frame
+   carries the constructor refinement into the equality LEAVES and INDEX EQUATIONS
+   but NOT into the motive's return-Pi TELESCOPE ARGUMENT types, so a
+   structurally-exhaustive forced-index correspondence false-rejects at
+   motive/method-type CONSTRUCTION, before any arm body: exact `TypeMismatch
+   expected ((Dg581 @8) @4) found ((Dg581 @8) (cg69 @7))`, `Dg581 = DualEnv`
+   (B-green/C-red 2x2 D0, evt_2h58340324ehh). HS19. Section-1b predicate (Architect
+   evt_7tmjw5hvpxrb9): SHARED with HS16-18 — the generated motive frame must carry
+   EVERY scrutinee-coupled datum into the constructor-refined frame, total over
+   `{equality leaves, index equations, motive-return-telescope arguments}`,
+   occurrence-gated per-side (ONE predicate, not four). Fix = the sealed structural
+   closure extending predecessor #4's convoy with the telescope-argument class;
+   owned by [[LANG-DEPELIM-FORCED-INDEX-TELESCOPE-CLOSURE]] (predecessor #5,
+   released 2026-09-03). Sealed-totality forecloses HS20 (a 4th coupled-datum class
+   = compile error). §1a: HS19 NOT a trigger; next mandatory = HS21.
 
 > # D2b RE-FROZEN 2026-09-02 (HS-fifth) — behind a FIFTH elaborator predecessor
 >
