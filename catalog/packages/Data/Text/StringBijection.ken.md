@@ -10,10 +10,12 @@ lawful String keys consume.
 The assumption is explicit and unique. It is not minted in a Text package.
 
 ```ken
+import Core.Logic.Transport (cong, sym, trans)
+
 axiom string_to_list_char_retraction
     : (text : String) → Equal String (list_char_to_string (string_to_list_char text)) text
 
-theorem string_to_list_char_injective
+pub theorem string_to_list_char_injective
       (left : String)
       (right : String)
       (same_chars : Equal (List Char) (string_to_list_char left) (string_to_list_char right))
@@ -45,7 +47,8 @@ theorem string_to_list_char_injective
 
 ## 2. Trust and derivation
 
-`string_to_list_char_retraction` is the one named postulate selected by the
-operator. `string_to_list_char_injective` is a transparent consequence using
-only symmetry, transitivity, and congruence. No comparator primitive or second
-certificate is introduced.
+`string_to_list_char_injective` is the public certificate. Its
+`string_to_list_char_retraction` premise is the one named postulate selected by
+the operator and remains private. The certificate is a transparent consequence
+using the imported symmetry, transitivity, and congruence providers. No
+comparator primitive or second certificate is introduced.

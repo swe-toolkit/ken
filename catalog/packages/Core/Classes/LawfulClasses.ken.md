@@ -72,7 +72,7 @@ It semantically subsumes `Eq a` (recorded as a fact here, not wired as a
 superclass constraint — `51 §2.2`/`33 §5.4`).
 
 ```ken
-class DecEq a {
+pub class DecEq a {
   eq : a → a → Bool;
   sound : (x : a) → (y : a) → IsTrue (eq x y) → Equal a x y;
   complete : (x : a) → (y : a) → Equal a x y → IsTrue (eq x y)
@@ -326,7 +326,7 @@ pub fn bool_leq (a : Bool) (b : Bool) : Bool =
     True ↦ b
   }
 
-fn bool_eq (a : Bool) (b : Bool) : Bool =
+pub fn bool_eq (a : Bool) (b : Bool) : Bool =
   match a {
     True ↦ b;
     False ↦
@@ -2278,8 +2278,8 @@ Ken-native; no external reference implementation informed its source.
    `Ord Char` re-homing); `docs/adr/0013-int-decidable-equality-kernel-
    posture.md` + `docs/program/wp/DS-6a-int-deceq-certificate.md` (the
    `Eq`/`DecEq Int` certificate collapse + `DecEq Char`).
-2. **Public API.** `IsTrue`, `class Eq`, `class DecEq`, `bool_or`,
-   `class Ord`, `leq_nat`, `leq_nat::refl`, `leq_nat::trans`,
+2. **Public API.** `IsTrue`, `class Eq`, `class DecEq`, `bool_eq`,
+   `bool_or`, `class Ord`, `leq_nat`, `leq_nat::refl`, `leq_nat::trans`,
    `leq_nat::antisym`, `bool_or::eq_true_of_or`, `instance Ord Nat`,
    `instance Eq Int`, `instance DecEq Int`, `instance Ord Int`,
    `instance Ord Bool`, `instance Eq Bool`, `instance DecEq Bool`,
