@@ -359,11 +359,13 @@ fn bool_or_bridge_has_only_the_provider_identity() {
     );
 }
 
-/// MEASURED: the ownership closure adds only the pre-existing audited Ord Int
-/// postulates, while the Nat relation, bridge, and dictionary are transparent
+/// MEASURED: the ownership closure adds the pre-existing audited Ord Int
+/// postulates and the existing String structural-view retraction imported by the
+/// class owner, while the Nat relation, bridge, and dictionary are transparent
 /// and executable on a concrete non-degenerate case. CLAIMED: moving ownership
-/// changes neither TCB posture nor behavior. THE GAP: equality of source bodies
-/// is not claimed; behavior and kernel artifact kinds are the oracle.
+/// adds no new trusted declaration and changes no Nat behavior. THE GAP: equality
+/// of source bodies is not claimed; behavior and kernel artifact kinds are the
+/// oracle.
 #[test]
 fn ownership_move_preserves_trust_posture_and_behavior() {
     let mut env = ElabEnv::new().expect("base environment");
@@ -381,6 +383,7 @@ fn ownership_move_preserves_trust_posture_and_behavior() {
     assert_eq!(
         added_names,
         BTreeSet::from([
+            "Data.Text.StringBijection.string_to_list_char_retraction",
             "Ord.Int.antisym",
             "Ord.Int.refl",
             "Ord.Int.total",

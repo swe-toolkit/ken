@@ -277,11 +277,12 @@ fn lawful_local_pair_proofs_do_not_extend_the_derived_subject_namespace() {
     assert_eq!(
         added_opaque_names,
         BTreeSet::from([
+            "Data.Text.StringBijection.string_to_list_char_retraction",
             "Ord.Int.antisym",
             "Ord.Int.refl",
             "Ord.Int.total",
             "Ord.Int.trans",
         ]),
-        "LawfulClasses may add exactly its four audited Ord Int law postulates"
+        "LawfulClasses may add only its existing audited provider assumptions"
     );
 }

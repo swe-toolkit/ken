@@ -591,10 +591,14 @@ fn char_ord_laws_reject_missing_law_field() {
     let prefix_end = tangled
         .find("instance Ord Char")
         .expect("`instance Ord Char` marker must be present in the real package source");
-    let prefix = &tangled[..prefix_end];
+    let prefix = tangled[..prefix_end].replace(
+        "import Data.Text.StringBijection (string_to_list_char_injective)\n\n",
+        "",
+    );
     let mut env = ElabEnv::new().expect("base env construction failed");
     catalog_or::load_core_logic_compare(&mut env);
-    env.elaborate_file(prefix).expect("package prefix (classes + Int/Bool instances) must elaborate");
+    env.elaborate_file(&prefix)
+        .expect("package prefix (classes + Int/Bool instances) must elaborate");
 
     let r = env.elaborate_decl(
         "instance Ord Char { leq = (Ord_instance_Int).leq ; refl = (Ord_instance_Int).refl ; \

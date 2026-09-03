@@ -1,4 +1,4 @@
-//! CAT-BOOL-PUB-EXPORT provider-surface acceptance controls.
+//! CAT class-owner provider-surface acceptance controls.
 //!
 //! Promise class: durable invariants. The two provider modules expose exactly
 //! their authorized loader-visible surfaces while retaining provider identity.
@@ -10,6 +10,9 @@ use ken_elaborator::{parser, Decl, ElabEnv, ElabError, ExportForm};
 use ken_kernel::{GlobalId, Term};
 
 const LAWFUL: &str = "Core.Classes.LawfulClasses";
+const BYTES_KEYS: &str = "Data.Binary.BytesKeys";
+const STRING_KEYS: &str = "Data.Text.StringKeys";
+const EMPTY_DEC: &str = "Core.Logic.EmptyDec";
 const SUMS: &str = "Data.Sums.Combinators";
 const LAWFUL_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
@@ -56,6 +59,29 @@ fn assert_transparent_body_mentions(env: &ElabEnv, wrapper: &str, provider: Glob
         term_mentions(&body, provider),
         "consumer wrapper `{wrapper_name}` must retain the selected provider GlobalId"
     );
+}
+
+fn canonical_instance(env: &ElabEnv, class: &str, head: &str) -> GlobalId {
+    let class_id = env.globals[class];
+    let head_id = env.globals[head];
+    let mut instances =
+        env.class_env
+            .instances
+            .iter()
+            .filter(|((candidate_class, candidate_head), info)| {
+                env.globals.get(candidate_class) == Some(&class_id)
+                    && env.globals.get(candidate_head) == Some(&head_id)
+                    && info.class_name == *candidate_class
+            });
+    let (_, instance) = instances
+        .next()
+        .unwrap_or_else(|| panic!("the loader registry must contain canonical {class} {head}"));
+    assert!(
+        instances.next().is_none(),
+        "the loader registry must contain exactly one canonical {class} {head} dictionary"
+    );
+    assert_eq!(instance.defining_package, LAWFUL);
+    instance.instance_id
 }
 
 struct PublicationQuery {
@@ -161,6 +187,7 @@ fn module_publication_queries(module: &str, ken_md: &str) -> ModulePublicationQu
                 let index = attached.len();
                 let probe = format!("cat_bool_export_probe_{index}");
                 let alias = format!("cat_bool_export_subject_{index}");
+                let binders = rename_identifier(&binders, subject, &alias);
                 let theorem = rename_identifier(theorem, subject, &alias);
                 let surface = format!("{subject}::{proof_name}");
                 attached.push(PublicationQuery {
@@ -215,28 +242,69 @@ fn published_module_surfaces(module: &str, ken_md: &str) -> BTreeSet<String> {
                 panic!("{module} dependency imports must resolve for publication probes: {error:?}")
             });
     }
+    let mut probe = |query: &PublicationQuery| match env.elaborate_file(&query.source) {
+        Ok(_) => true,
+        Err(ElabError::UnboundName { name: rejected, .. }) => {
+            assert!(
+                query.unpublished_names.contains(&rejected),
+                "publication query for {} failed at unrelated name {rejected}",
+                query.surface
+            );
+            false
+        }
+        Err(other) => panic!(
+            "loader publication query for {} failed: {other:?}\n{}",
+            query.surface, query.source
+        ),
+    };
 
-    queries
+    let direct = queries
         .direct
         .into_iter()
-        .chain(queries.attached)
-        .filter(|query| match env.elaborate_file(&query.source) {
-            Ok(_) => true,
-            Err(ElabError::UnboundName { name: rejected, .. }) => {
-                assert!(
-                    query.unpublished_names.contains(&rejected),
-                    "publication query for {} failed at unrelated name {rejected}",
-                    query.surface
-                );
-                false
-            }
-            Err(other) => panic!(
-                "loader publication query for {} failed: {other:?}\n{}",
-                query.surface, query.source
-            ),
-        })
+        .filter(|query| probe(query))
         .map(|query| query.surface)
-        .collect()
+        .collect::<BTreeSet<_>>();
+    let direct_imports = direct
+        .iter()
+        .filter(|surface| !surface.contains("::"))
+        .cloned()
+        .collect::<Vec<_>>();
+    let attached = queries
+        .attached
+        .into_iter()
+        .enumerate()
+        .filter_map(|(query_index, mut query)| {
+            let subject = query
+                .surface
+                .split_once("::")
+                .expect("attached surface has a subject")
+                .0;
+            let (subject_import, declaration) = query
+                .source
+                .split_once('\n')
+                .expect("attached query has a subject import and theorem");
+            let mut declaration = declaration.to_owned();
+            let mut dependency_imports = Vec::new();
+            for (index, dependency) in direct_imports
+                .iter()
+                .filter(|surface| surface.as_str() != subject)
+                .enumerate()
+            {
+                let alias = format!("cat_bool_export_dependency_{query_index}_{index}");
+                let renamed = rename_identifier(&declaration, dependency, &alias);
+                if renamed != declaration {
+                    dependency_imports.push(format!("import {module} ({dependency} as {alias})"));
+                    declaration = renamed;
+                }
+            }
+            dependency_imports.push(subject_import.to_owned());
+            dependency_imports.push(declaration);
+            query.source = dependency_imports.join("\n");
+            probe(&query).then_some(query.surface)
+        })
+        .collect::<BTreeSet<_>>();
+
+    direct.union(&attached).cloned().collect()
 }
 
 /// MEASURED: real selective imports of the target definitions resolve to their
@@ -350,6 +418,54 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
     }
 }
 
+/// MEASURED: each historical primitive-instance package roots-loads from a fresh
+/// built-in environment, and its registry contains exactly one dictionary for
+/// every moved `(class, head)` pair, all owned by LawfulClasses. No catalog
+/// module is preloaded, so every catalog dependency must arrive through the
+/// consumer's declared imports. Loading all three consumers after their provider
+/// preserves the same five dictionary identities. CLAIMED: the primitive-head
+/// instances were relocated rather than shadowed, and every consumer now reaches
+/// only their canonical class-owner definitions. THE GAP: compiler-installed
+/// conveniences are deliberately in the fresh base environment; operation
+/// behavior and proof fields are covered by their focused acceptance suites.
+#[test]
+fn primitive_class_owner_instances_are_canonical_across_isolated_consumers() {
+    let pairs = [
+        ("DecEq", "Bool"),
+        ("DecEq", "UInt8"),
+        ("DecEq", "Bytes"),
+        ("DecEq", "String"),
+        ("Ord", "String"),
+    ];
+
+    for module in [BYTES_KEYS, STRING_KEYS, EMPTY_DEC] {
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots(&[catalog_root()], module)
+            .unwrap_or_else(|error| panic!("{module} must isolated-roots-load: {error:?}"));
+        for (class, head) in pairs {
+            canonical_instance(&env, class, head);
+        }
+    }
+
+    let mut combined = ElabEnv::new().expect("base environment");
+    combined
+        .elaborate_module_from_roots(&[catalog_root()], LAWFUL)
+        .expect("LawfulClasses must isolated-roots-load");
+    let canonical = pairs.map(|(class, head)| canonical_instance(&combined, class, head));
+    for module in [BYTES_KEYS, STRING_KEYS, EMPTY_DEC] {
+        combined
+            .elaborate_module_from_roots(&[catalog_root()], module)
+            .unwrap_or_else(|error| {
+                panic!("{module} must not redeclare a moved instance: {error:?}")
+            });
+        assert_eq!(
+            pairs.map(|(class, head)| canonical_instance(&combined, class, head)),
+            canonical,
+            "loading {module} must preserve every canonical class-owner dictionary"
+        );
+    }
+}
+
 /// MEASURED: for both real provider modules, every parsed loader-surface source
 /// is queried through the roots loader: publishable top-level definitions,
 /// attached definitions, and every facade or in-scope re-export item under its
@@ -359,13 +475,17 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
 /// declaration variants; constructors and non-publishable declaration forms are
 /// not loader-selectable definitions.
 #[test]
-fn boolean_provider_loader_visible_inventories_are_exact() {
+fn class_owner_provider_loader_visible_inventories_are_exact() {
     assert_eq!(
         published_module_surfaces(LAWFUL, LAWFUL_KEN_MD),
         BTreeSet::from([
             "DecEq".to_owned(),
             "IsTrue".to_owned(),
             "Ord".to_owned(),
+            "bytes_deceq_eq".to_owned(),
+            "bytes_deceq_eq::complete".to_owned(),
+            "bytes_deceq_eq::sound".to_owned(),
+            "bytes_to_list_injective".to_owned(),
             "bool_and".to_owned(),
             "bool_eq".to_owned(),
             "bool_leq".to_owned(),
@@ -376,6 +496,18 @@ fn boolean_provider_loader_visible_inventories_are_exact() {
             "leq_nat::refl".to_owned(),
             "leq_nat::trans".to_owned(),
             "ord_leq_at".to_owned(),
+            "string_deceq_eq".to_owned(),
+            "string_deceq_eq::complete".to_owned(),
+            "string_deceq_eq::sound".to_owned(),
+            "string_ord_leq".to_owned(),
+            "string_ord_leq::antisym".to_owned(),
+            "string_ord_leq::refl".to_owned(),
+            "string_ord_leq::total".to_owned(),
+            "string_ord_leq::trans".to_owned(),
+            "uint8_deceq_complete".to_owned(),
+            "uint8_deceq_eq".to_owned(),
+            "uint8_deceq_sound".to_owned(),
+            "uint8_to_int_injective".to_owned(),
         ]),
         "LawfulClasses loader-visible inventory must equal its authorized surface"
     );

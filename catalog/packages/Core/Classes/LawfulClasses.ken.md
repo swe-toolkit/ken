@@ -44,10 +44,12 @@ import Core.Logic.Or (Or, Inl, Inr)
 import Core.Logic.OrdResult
   (OrdResult, ord_eq, ord_lt, ord_gt, ord_result_leq, ord_result_elim, ord_result_elim2)
 
-import Core.Logic.Transport (cong, sym)
+import Core.Logic.Transport (cong, sym, trans)
 
 import Core.Logic.Compare
   (list_compare, list_eq, pair_compare, pair_compare_lt_cases, pair_compare_result_of)
+
+import Data.Text.StringBijection (string_to_list_char_injective)
 
 pub fn IsTrue (b : Bool) : Prop = Equal Bool b True
 ```
@@ -2160,6 +2162,197 @@ instance DecEq (List a) where DecEq a {
 }
 ```
 
+
+### 4.7 Opaque primitive equality and `String` order
+
+The opaque primitive carriers obtain lawful equality by transport through their
+structural or injected views. `Bytes` reuses the structural `List UInt8`
+dictionary, while `String` reuses the structural `List Char` equality and order
+dictionaries.
+
+```ken
+pub theorem uint8_to_int_injective
+      (left : UInt8)
+      (right : UInt8)
+      (same_ints : Equal Int (uint8_to_int left) (uint8_to_int right))
+    : Equal UInt8 left right =
+  trans
+    UInt8
+    left
+    (int_to_uint8_raw (uint8_to_int left))
+    right
+    (sym UInt8 (int_to_uint8_raw (uint8_to_int left)) left (uint8_int_retract left))
+    (trans
+      UInt8
+      (int_to_uint8_raw (uint8_to_int left))
+      (int_to_uint8_raw (uint8_to_int right))
+      right
+      (cong Int UInt8 (uint8_to_int left) (uint8_to_int right) int_to_uint8_raw same_ints)
+      (uint8_int_retract right))
+
+pub fn uint8_deceq_eq (left : UInt8) (right : UInt8) : Bool =
+  eq_int (uint8_to_int left) (uint8_to_int right)
+
+pub theorem uint8_deceq_sound
+      (left : UInt8)
+      (right : UInt8)
+      (is_equal : IsTrue (eq_int (uint8_to_int left) (uint8_to_int right)))
+    : Equal UInt8 left right =
+  uint8_to_int_injective
+    left
+    right
+    (int_eq_sound (uint8_to_int left) (uint8_to_int right) is_equal)
+
+pub theorem uint8_deceq_complete
+      (left : UInt8) (right : UInt8) (same : Equal UInt8 left right)
+    : IsTrue (eq_int (uint8_to_int left) (uint8_to_int right)) =
+  int_eq_complete
+    (uint8_to_int left)
+    (uint8_to_int right)
+    (cong UInt8 Int left right uint8_to_int same)
+
+instance DecEq UInt8 {
+  eq = uint8_deceq_eq;
+  sound = uint8_deceq_sound;
+  complete = uint8_deceq_complete
+}
+
+pub theorem bytes_to_list_injective
+      (left : Bytes)
+      (right : Bytes)
+      (same_bytes : Equal (List UInt8) (bytes_to_list left) (bytes_to_list right))
+    : Equal Bytes left right =
+  trans
+    Bytes
+    left
+    (list_to_bytes (bytes_to_list left))
+    right
+    (sym Bytes (list_to_bytes (bytes_to_list left)) left (bytes_list_roundtrip left))
+    (trans
+      Bytes
+      (list_to_bytes (bytes_to_list left))
+      (list_to_bytes (bytes_to_list right))
+      right
+      (cong
+        (List UInt8)
+        Bytes
+        (bytes_to_list left)
+        (bytes_to_list right)
+        list_to_bytes
+        same_bytes)
+      (bytes_list_roundtrip right))
+
+pub fn bytes_deceq_eq (left : Bytes) (right : Bytes) : Bool =
+  list_eq UInt8 uint8_deceq_eq (bytes_to_list left) (bytes_to_list right)
+
+pub proof sound for bytes_deceq_eq
+      (left : Bytes) (right : Bytes) (is_equal : IsTrue (bytes_deceq_eq left right))
+    : Equal Bytes left right =
+  bytes_to_list_injective
+    left
+    right
+    ((DecEq_instance_List UInt8 DecEq_instance_UInt8).sound
+      (bytes_to_list left)
+      (bytes_to_list right)
+      is_equal)
+
+pub proof complete for bytes_deceq_eq
+      (left : Bytes) (right : Bytes) (same : Equal Bytes left right)
+    : IsTrue (bytes_deceq_eq left right) =
+  (DecEq_instance_List UInt8 DecEq_instance_UInt8).complete
+    (bytes_to_list left)
+    (bytes_to_list right)
+    (cong Bytes (List UInt8) left right bytes_to_list same)
+
+instance DecEq Bytes {
+  eq = bytes_deceq_eq;
+  sound = proof sound for bytes_deceq_eq;
+  complete = proof complete for bytes_deceq_eq
+}
+
+pub fn string_deceq_eq (left : String) (right : String) : Bool =
+  (DecEq_instance_List Char DecEq_instance_Char).eq
+    (string_to_list_char left)
+    (string_to_list_char right)
+
+pub proof sound for string_deceq_eq
+      (left : String) (right : String) (is_equal : IsTrue (string_deceq_eq left right))
+    : Equal String left right =
+  string_to_list_char_injective
+    left
+    right
+    ((DecEq_instance_List Char DecEq_instance_Char).sound
+      (string_to_list_char left)
+      (string_to_list_char right)
+      is_equal)
+
+pub proof complete for string_deceq_eq
+      (left : String) (right : String) (same : Equal String left right)
+    : IsTrue (string_deceq_eq left right) =
+  (DecEq_instance_List Char DecEq_instance_Char).complete
+    (string_to_list_char left)
+    (string_to_list_char right)
+    (cong String (List Char) left right string_to_list_char same)
+
+instance DecEq String {
+  eq = string_deceq_eq;
+  sound = proof sound for string_deceq_eq;
+  complete = proof complete for string_deceq_eq
+}
+
+pub fn string_ord_leq (left : String) (right : String) : Bool =
+  (Ord_instance_List Char Ord_instance_Char).leq
+    (string_to_list_char left)
+    (string_to_list_char right)
+
+pub proof refl for string_ord_leq (text : String) : IsTrue (string_ord_leq text text) =
+  (Ord_instance_List Char Ord_instance_Char).refl (string_to_list_char text)
+
+pub proof antisym for string_ord_leq
+      (left : String)
+      (right : String)
+      (forward : IsTrue (string_ord_leq left right))
+      (reverse : IsTrue (string_ord_leq right left))
+    : Equal String left right =
+  string_to_list_char_injective
+    left
+    right
+    ((Ord_instance_List Char Ord_instance_Char).antisym
+      (string_to_list_char left)
+      (string_to_list_char right)
+      forward
+      reverse)
+
+pub proof trans for string_ord_leq
+      (left : String)
+      (middle : String)
+      (right : String)
+      (first : IsTrue (string_ord_leq left middle))
+      (second : IsTrue (string_ord_leq middle right))
+    : IsTrue (string_ord_leq left right) =
+  (Ord_instance_List Char Ord_instance_Char).trans
+    (string_to_list_char left)
+    (string_to_list_char middle)
+    (string_to_list_char right)
+    first
+    second
+
+pub proof total for string_ord_leq
+      (left : String) (right : String)
+    : IsTrue (bool_or (string_ord_leq left right) (string_ord_leq right left)) =
+  (Ord_instance_List Char Ord_instance_Char).total
+    (string_to_list_char left)
+    (string_to_list_char right)
+
+instance Ord String {
+  leq = string_ord_leq;
+  refl = proof refl for string_ord_leq;
+  antisym = proof antisym for string_ord_leq;
+  trans = proof trans for string_ord_leq;
+  total = proof total for string_ord_leq
+}
+```
+
 ## 5. Design notes
 
 ### 5.1 Why `Eq Bool`'s `sym`/`trans` need a real correction, not only K7
@@ -2278,12 +2471,18 @@ Ken-native; no external reference implementation informed its source.
    `Ord Char` re-homing); `docs/adr/0013-int-decidable-equality-kernel-
    posture.md` + `docs/program/wp/DS-6a-int-deceq-certificate.md` (the
    `Eq`/`DecEq Int` certificate collapse + `DecEq Char`).
-2. **Public API.** `IsTrue`, `class Eq`, `class DecEq`, `bool_eq`,
+2. **Public API.** `IsTrue`, `class DecEq`, `bool_eq`,
    `bool_or`, `class Ord`, `leq_nat`, `leq_nat::refl`, `leq_nat::trans`,
    `leq_nat::antisym`, `bool_or::eq_true_of_or`, `instance Ord Nat`,
-   `instance Eq Int`, `instance DecEq Int`, `instance Ord Int`,
-   `instance Ord Bool`, `instance Eq Bool`, `instance DecEq Bool`,
-   `instance Ord Char`, and `instance DecEq Char`.
+   `instance DecEq Int`, `instance Ord Int`, `instance Ord Bool`,
+   `instance DecEq Bool`,
+   `instance Ord Char`, `instance DecEq Char`, `uint8_to_int_injective`,
+   `uint8_deceq_eq`, `uint8_deceq_sound`, `uint8_deceq_complete`,
+   `bytes_to_list_injective`, `bytes_deceq_eq`, `bytes_deceq_eq::sound`,
+   `bytes_deceq_eq::complete`, `string_deceq_eq`,
+   `string_deceq_eq::sound`, `string_deceq_eq::complete`, `string_ord_leq`,
+   `string_ord_leq::refl`, `string_ord_leq::antisym`,
+   `string_ord_leq::trans`, and `string_ord_leq::total`.
 3. **Source map.**
 
    | Task | Section |
@@ -2291,7 +2490,7 @@ Ken-native; no external reference implementation informed its source.
    | Choose a class or inspect its public field shape | [Definition](#2-definition) |
    | See the three classes | [Definition](#2-definition) |
    | Project a field off a dictionary | [Using it](#3-using-it) |
-   | Audit the `Int`, `Bool`, `Nat`, or `Char` proof family | [Laws & proofs](#4-laws--proofs) |
+   | Audit a built-in carrier proof family | [Laws & proofs](#4-laws--proofs) |
    | The `Proved`-vs-`Refl`/K7 story, the restructuring discipline | [Laws & proofs](#4-laws--proofs) |
    | Why `Eq Bool`/`Ord Char` needed the fixes they did | [Design notes](#5-design-notes) |
    | Check assumptions, consumers, and validation evidence | [Trust & derivation](#8-trust--derivation) |
@@ -2313,7 +2512,9 @@ Ken-native; no external reference implementation informed its source.
    collapse. `Ord Nat` uses structural recursion for its relation, laws, and
    proof-relevant totality program, then a provider-owned `bool_or` bridge to
    assemble the class field. `Ord Char`/`DecEq Char` transport every field via
-   `.`-projection off `Ord_instance_Int`/`DecEq_instance_Int`.
+   `.`-projection off `Ord_instance_Int`/`DecEq_instance_Int`. The
+   `UInt8`, `Bytes`, and `String` instances transport through their existing
+   injective views and structural dictionaries.
 5. **`trusted_base()` delta.** `Ord Int`: 4 `Axiom` entries (`refl`/
    `antisym`/`trans`/`total`), each a real, grep-able `Decl::Opaque` —
    illustrative-only, not claimed zero-delta, untouched by the Int-equality
@@ -2343,13 +2544,15 @@ Ken-native; no external reference implementation informed its source.
    case-split (`Int` has none to do). `Ord Nat`: structural recursion over
    `Nat`, with the `Or`-to-`bool_or` bridge assembled from the provider's two
    introduction proofs. `Ord Char`/`DecEq Char`: no case-split, pure
-   `.`-projection.
+   `.`-projection. `UInt8`, `Bytes`, and `String` use injectivity
+   of their existing structural views; the String order laws project from the
+   canonical structural `Ord (List Char)` dictionary.
 7. **Consumers.** `Data/Numeric/Nat/Order.ken.md` imports and re-exports the
    canonical `Ord`/`leq_nat` surface and carries this same dictionary.
-   `catalog/packages/Core/Logic/EmptyDec.ken.md` inlines its own `DecEq Bool`
-   for self-containment (same idiom, independently); the sort/comparison threads
-   across `Data/Collections/Derived.ken` and `Data/Collections/Map.ken` depend on
-   `Ord`'s `leq` field.
+   `Core.Logic.EmptyDec`, `Data.Binary.BytesKeys`, and `Data.Text.StringKeys`
+   import this class owner rather than redeclaring or orphaning canonical
+   instances. The sort/comparison threads across `Data/Collections/Derived.ken`
+   and `Data/Collections/Map.ken` depend on `Ord`'s `leq` field.
 8. **Validation evidence.**
    `crates/ken-elaborator/tests/es4_classes_acceptance.rs` — confirms all
    three `Bool` instances are complete zero-`Axiom` lawful instances (every
