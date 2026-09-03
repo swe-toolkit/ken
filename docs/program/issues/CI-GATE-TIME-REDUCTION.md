@@ -1,7 +1,7 @@
 ---
 id: CI-GATE-TIME-REDUCTION
 title: "Temporary operator-directed detour (2026-09-03): the PR-gate CI wall-clock regressed from ~19m to ~60m when RT-COMPOSED-RETURN-SSA-SPECIALIZATION landed (ad9905a7e). Attribute the 3x regression across the gate's jobs and reduce the PR-gate wall-clock back to under 20m WITHOUT reducing gate coverage or soundness (no gate removed, no suite dropped, no --locked/conformance weakening). Reduce wall-clock by parallelism, sharding, caching, and per-test cost, not by gating less."
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -9,7 +9,7 @@ tier: T1
 depends_on: []
 blocks: []
 github: null
-status_note: "D1 COMPLETE (foundation, 2026-09-03, evt_27h2v7c4ny07f + evt_4b0zpkf3gyg6t): regression is 100% RT-SSA's rt_parity_native.rs test additions, not workflow shape. D2 re-owned to RUNTIME (only the runtime lane may edit crates/ken-cli/tests/rt_parity_native.rs). Foundation resumes Tier-B."
+status_note: "D1 COMPLETE (foundation, 2026-09-03, evt_27h2v7c4ny07f + evt_4b0zpkf3gyg6t): regression is 100% RT-SSA's rt_parity_native.rs test additions, not workflow shape. D2 COMPLETE (runtime, 2026-09-03, landed 4b9408b25 / PR #3263): rt_parity_native.rs decomposed 37-arm loop into per-arm tests, native-rt-parity resharded 3->6, union-pin added. Measured on the candidate SHA: native-rt-parity 6-shard max 17m19s, overall PR-gate wall-clock 17m41s, both under the AC-UNDER-20M target; all 26 checks pass. Coverage-preserving (no gate/suite/--locked/conformance change). Detour complete; foundation Tier-B and runtime D3-RECUT proceed unpaused."
 origin: "Operator directive 2026-09-03 (Steward session): 'RT-COMPOSED-RETURN-SPECIALIZATION merged and bumped CI time from ~19m to almost 60m. At the next convenient seam of any team, temporarily redirect them to reducing the CI time to less than 20m.' Steward first considered verify (natural CI-tooling owner) but its ring is NOT seated this session (no moot-verify-* tmux session; convo participant records are stale). Reassigned to foundation: lane 3 (lowest priority) and between deliverables (Tier-A landed, Tier-B not yet cut) = least-disruptive convenient seam, keeping the priority runtime lane free for the L1 D3-RECUT closeout. Temporary detour: foundation's Tier-B (scaffold-retirement) pauses and resumes on completion."
 ---
 
