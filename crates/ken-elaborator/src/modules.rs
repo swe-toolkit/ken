@@ -24,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::ast::{
-    BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, ImportItem, ImportKind,
+    BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, ImportItem, ImportKind, Type,
 };
 use crate::error::{ElabError, Span};
 use crate::resolve::{
@@ -287,7 +287,7 @@ impl Scope {
     /// `bind_import` supplies the symmetric arm.
     fn bind_local(&mut self, bare: &str, qualified: &str, span: &Span) -> Result<(), ElabError> {
         if let Some(binding) = self.bindings.get(bare) {
-            if !self.locals.contains(bare) {
+            if binding != qualified {
                 let mut sources = vec![binding.clone()];
                 sources.push(qualified.to_string());
                 return Err(ElabError::AmbiguousReference {
@@ -1764,6 +1764,11 @@ enum DeclNamespaceEffect<'a> {
         proof_name: &'a str,
         span: &'a Span,
     },
+    ReferenceWithSynthesizedDictionary {
+        class_name: &'a str,
+        head_name: &'a str,
+        span: &'a Span,
+    },
     ReferenceOnly,
     NoBinding,
 }
@@ -1771,6 +1776,23 @@ enum DeclNamespaceEffect<'a> {
 enum ConstructorNameSource<'a> {
     Simple(&'a [CtorDecl]),
     Explicit(&'a [ExplicitDataCtor]),
+}
+
+fn surface_type_head_name(ty: &Type) -> Option<&str> {
+    match ty {
+        Type::TCon(name, _) | Type::TVar(name, _) => Some(name),
+        Type::TApp(function, _, _) => surface_type_head_name(function),
+        Type::TRefine(_, carrier, _, _) => surface_type_head_name(carrier),
+        Type::TPi(_, _, _, _)
+        | Type::TSigma(_, _, _, _)
+        | Type::TArr(_, _, _)
+        | Type::TEffectArr(_, _, _, _)
+        | Type::TUniv(_, _) => None,
+    }
+}
+
+fn canonical_leaf(name: &str) -> &str {
+    name.rsplit('.').next().unwrap_or(name)
 }
 
 fn decl_namespace_effect(decl: &Decl) -> DeclNamespaceEffect<'_> {
@@ -1813,10 +1835,29 @@ fn decl_namespace_effect(decl: &Decl) -> DeclNamespaceEffect<'_> {
             proof_name,
             span,
         },
-        Decl::InstanceDecl { .. }
-        | Decl::DeriveDecl { .. }
-        | Decl::ImportDecl { .. }
-        | Decl::ExportDecl { .. } => DeclNamespaceEffect::ReferenceOnly,
+        Decl::InstanceDecl {
+            class_name,
+            head_type,
+            span,
+            ..
+        } => match surface_type_head_name(head_type) {
+            Some(head_name) => DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+                class_name,
+                head_name,
+                span,
+            },
+            None => DeclNamespaceEffect::ReferenceOnly,
+        },
+        Decl::DeriveDecl {
+            class_name,
+            data_name,
+            span,
+        } => DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+            class_name,
+            head_name: data_name,
+            span,
+        },
+        Decl::ImportDecl { .. } | Decl::ExportDecl { .. } => DeclNamespaceEffect::ReferenceOnly,
         Decl::BoundaryDecl { .. } | Decl::ModuleDecl { .. } => DeclNamespaceEffect::NoBinding,
     }
 }
@@ -1870,6 +1911,18 @@ fn reject_decl_prelude_bindings(
                 prelude_binding_names,
             )
         }
+        DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+            class_name,
+            head_name,
+            span,
+        } => reject(
+            &format!(
+                "{}_instance_{}",
+                canonical_leaf(class_name),
+                canonical_leaf(head_name)
+            ),
+            span,
+        ),
         DeclNamespaceEffect::ReferenceOnly | DeclNamespaceEffect::NoBinding => Ok(()),
     }
 }
@@ -1878,6 +1931,8 @@ fn prebind_scope_declarations(
     scope: &mut Scope,
     decls: &[Decl],
     prefix: &str,
+    exports: &HashMap<String, HashMap<String, String>>,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
 ) -> Result<(), ElabError> {
     // Collision population follows declaration namespace effects, not the
@@ -1928,6 +1983,56 @@ fn prebind_scope_declarations(
             _ => {}
         }
     }
+
+    if !decls.iter().any(|decl| {
+        matches!(
+            decl_namespace_effect(decl.unwrap_pub()),
+            DeclNamespaceEffect::ReferenceWithSynthesizedDictionary { .. }
+        )
+    }) {
+        return Ok(());
+    }
+
+    // Instance and derive declarations produce a checked dictionary global even
+    // though their class name remains a reference, not a declaration binding.
+    // Replay imports in a throwaway scope to compute the exact resolved class
+    // and head names synthesis will receive, then bind the conventional bare
+    // dictionary spelling to that already-determined canonical identity. The
+    // real import pass below remains textual and unchanged.
+    let mut synthesis_scope = scope.clone();
+    for decl in decls {
+        let inner = decl.unwrap_pub();
+        if let Decl::ImportDecl { module, kind, span } = inner {
+            apply_import(
+                &mut synthesis_scope,
+                exports,
+                globals,
+                prelude_binding_names,
+                module,
+                kind,
+                span,
+            )?;
+            continue;
+        }
+        let (class_name, head_name, span) = match decl_namespace_effect(inner) {
+            DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+                class_name,
+                head_name,
+                span,
+            } => (class_name, head_name, span),
+            _ => continue,
+        };
+        let resolved_class = resolve_class_ref(&synthesis_scope, exports, class_name, span)?;
+        let resolved_head = resolve_ref(&synthesis_scope, exports, head_name, span)?;
+        let bare = format!(
+            "{}_instance_{}",
+            canonical_leaf(&resolved_class),
+            canonical_leaf(head_name)
+        );
+        let canonical = format!("{resolved_class}_instance_{resolved_head}");
+        scope.bind_local(&bare, &canonical, span)?;
+        synthesis_scope.bind_local(&bare, &canonical, span)?;
+    }
     Ok(())
 }
 
@@ -1970,6 +2075,8 @@ fn expand_scope(
         scope,
         decls,
         prefix,
+        &elab.module_state.exports,
+        &elab.globals,
         &elab.module_state.prelude_binding_names,
     )?;
 
