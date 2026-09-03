@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-EC-FUNCTOR-IMPORT
 title: "Scaffold-retirement, orthogonal Core.Classes node (off the DecEq critical path): make EffectfulClasses (EC) standalone-green by publishing the four LawfulFunctors (LF) provider surfaces it consumes ambiently — LF marks class Functor + fn comp + fn idf + fn list_map pub; EC replaces ambient resolution with a real selective import from LF. Publication + one import block + loader-inventory extension; NO relocation, NO proof authoring. Not a regression fix — EC already elaborates in the full-catalog build via ambient class-install; this node removes its dependence on that scaffolding so it elaborates standalone."
-status: ready
+status: active
 owner: foundation
 size: S
 gate: none
