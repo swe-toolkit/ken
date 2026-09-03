@@ -1,41 +1,17 @@
 # `Data.Text.StringKeys` — lawful String equality and order
 
-String equality and ordering transport through the landed lawful `List Char`
-instances. Only the equality-producing fields consume the separately-homed
-`string_to_list_char_injective` certificate.
+Canonical String equality now lives with `DecEq` in
+`Core.Classes.LawfulClasses`. This package retains the transported `Ord String`
+dictionary and imports every non-floor dependency explicitly.
 
 ## 1. Transported operations and laws
 
 ```ken
-fn string_deceq_eq (left : String) (right : String) : Bool =
-  (DecEq_instance_List Char DecEq_instance_Char).eq
-    (string_to_list_char left)
-    (string_to_list_char right)
+import Core.Classes.LawfulClasses (IsTrue, Ord, bool_or)
 
-proof sound for string_deceq_eq
-      (left : String) (right : String) (is_equal : IsTrue (string_deceq_eq left right))
-    : Equal String left right =
-  string_to_list_char_injective
-    left
-    right
-    ((DecEq_instance_List Char DecEq_instance_Char).sound
-      (string_to_list_char left)
-      (string_to_list_char right)
-      is_equal)
+import Core.Logic.Transport (cong)
 
-proof complete for string_deceq_eq
-      (left : String) (right : String) (same : Equal String left right)
-    : IsTrue (string_deceq_eq left right) =
-  (DecEq_instance_List Char DecEq_instance_Char).complete
-    (string_to_list_char left)
-    (string_to_list_char right)
-    (cong String (List Char) left right string_to_list_char same)
-
-instance DecEq String {
-  eq = string_deceq_eq;
-  sound = proof sound for string_deceq_eq;
-  complete = proof complete for string_deceq_eq
-}
+import Data.Text.StringBijection (string_to_list_char_injective)
 
 fn string_ord_leq (left : String) (right : String) : Bool =
   (Ord_instance_List Char Ord_instance_Char).leq
@@ -105,8 +81,7 @@ const string_key_order_example : Bool = string_ord_leq "alpha" "beta"
 
 ## 3. Trust and derivation
 
-This package contains no `Axiom`. Its `DecEq` and `Ord` dictionaries are
-transparent transports through the existing lawful `List Char` dictionaries.
-`sound` and `antisym` cite the single prerequisite certificate by name;
-`complete`, `refl`, `trans`, and `total` use only dictionary projections and
-congruence. Bytes keys remain outside this package.
+This package contains no `Axiom`. Its `Ord` dictionary is a transparent transport through the existing lawful
+`List Char` dictionary. `antisym` cites the prerequisite injectivity certificate;
+`refl`, `trans`, and `total` use only dictionary projections. Bytes keys remain
+outside this package.
