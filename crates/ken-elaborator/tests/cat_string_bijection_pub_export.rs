@@ -1,8 +1,9 @@
-//! CAT-MIGRATE-TIER-B-PROVIDERS StringBijection surface controls.
+//! CAT-MIGRATE-TIER-C-DATA-VALUE StringBijection increment controls.
 //!
 //! Promise class: durable invariants. The roots-loaded module exposes exactly
 //! its authorized injectivity certificate while retaining the canonical
-//! Transport provider identities and keeping its premise private.
+//! Transport provider identities, keeping its premise private, and supplying
+//! the same certificate identity through the StringKeys dependency closure.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -10,9 +11,11 @@ use std::path::PathBuf;
 use ken_elaborator::{parser, Decl, ElabEnv, ElabError, ExportForm};
 use ken_kernel::{GlobalId, Term};
 
+const LAWFUL: &str = "Core.Classes.LawfulClasses";
 const STRING_BIJECTION: &str = "Data.Text.StringBijection";
 const STRING_BIJECTION_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Text/StringBijection.ken.md");
+const STRING_KEYS: &str = "Data.Text.StringKeys";
 const TRANSPORT: &str = "Core.Logic.Transport";
 
 fn catalog_root() -> PathBuf {
@@ -25,6 +28,8 @@ fn load_string_bijection() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_module_from_roots(&[catalog_root()], STRING_BIJECTION)
         .expect("StringBijection must elaborate through its real import closure");
+    env.execute_loaded_entry_checked_fences(STRING_BIJECTION)
+        .expect("StringBijection Definition and every checked fence must elaborate");
     env
 }
 
@@ -188,13 +193,21 @@ fn string_bijection_standalone_imports_retain_provider_identities() {
         .env
         .transparent_body(injective)
         .expect("the injectivity certificate must remain transparent");
-    for name in ["cong", "sym", "trans"] {
-        let provider = env.globals[&format!("{TRANSPORT}.{name}")];
-        assert!(
-            term_mentions(&injective_body, provider),
-            "the injectivity certificate must retain Transport.{name}'s exact provider identity"
-        );
-    }
+    let transport_prefix = format!("{TRANSPORT}.");
+    let transport_references = env
+        .globals
+        .iter()
+        .filter_map(|(name, provider)| {
+            name.strip_prefix(&transport_prefix)
+                .filter(|_| term_mentions(&injective_body, *provider))
+                .map(str::to_owned)
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        transport_references,
+        BTreeSet::from(["cong".to_owned(), "sym".to_owned(), "trans".to_owned()]),
+        "the injectivity certificate's direct Transport provider set must stay exact"
+    );
 
     env.elaborate_file(
         "import Data.Text.StringBijection \
@@ -227,6 +240,40 @@ fn string_bijection_standalone_imports_retain_provider_identities() {
         Err(other) => panic!("private premise import must fail as UnboundName: {other:?}"),
         Ok(_) => panic!("string_to_list_char_retraction became selectively importable"),
     }
+}
+
+/// MEASURED: a fresh roots load of StringKeys reaches the two LawfulClasses
+/// proofs that consume StringBijection's certificate; both bodies retain the
+/// exact published certificate `GlobalId`, and StringKeys owns no competing
+/// identity. CLAIMED: the only StringBijection surface needed downstream is the
+/// published injectivity certificate, carried transitively without duplication.
+/// THE GAP: the exact StringBijection surface is independently closed by the
+/// inventory equality below.
+#[test]
+fn string_keys_closure_retains_the_published_injectivity_identity() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[catalog_root()], STRING_KEYS)
+        .expect("StringKeys must elaborate through its real dependency closure");
+    env.execute_loaded_entry_checked_fences(STRING_KEYS)
+        .expect("StringKeys Definition and every checked fence must elaborate");
+
+    let injective = env.globals[&format!("{STRING_BIJECTION}.string_to_list_char_injective")];
+    for consumer in ["string_deceq_eq::sound", "string_ord_leq::antisym"] {
+        let consumer = format!("{LAWFUL}.{consumer}");
+        let (_, body) = env
+            .env
+            .transparent_body(env.globals[&consumer])
+            .unwrap_or_else(|| panic!("{consumer} must remain transparent"));
+        assert!(
+            term_mentions(&body, injective),
+            "{consumer} must retain StringBijection's published certificate identity"
+        );
+    }
+    assert!(
+        !env.globals
+            .contains_key(&format!("{STRING_KEYS}.string_to_list_char_injective")),
+        "StringKeys must not mint a competing injectivity identity"
+    );
 }
 
 /// MEASURED: every parsed loader-publishable definition is queried through the
