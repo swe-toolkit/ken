@@ -587,10 +587,42 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Core.Logic.EmptyDec".to_string(),
-            ["Dec", "Empty", "Equal", "IsTrue", "No", "Proved", "Yes"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            [
+                "And",
+                "Bottom",
+                "Dec",
+                "Empty",
+                "Equal",
+                "No",
+                "Prop",
+                "Proved",
+                "Yes",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
+            // The historical package now imports the canonical class owner and
+            // declares no local instance. Its remaining convenience set is
+            // inherited from that provider's checked proof vocabulary.
+            "Data.Binary.BytesKeys".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
         ),
         (
             "Data.Collections.Deque".to_string(),
@@ -675,6 +707,25 @@ fn catalog_ambient_passthrough_migration_census() {
             ["Equal"].into_iter().map(str::to_string).collect(),
         ),
         (
+            // Equality and order moved to their canonical class owner. The
+            // historical package imports that owner and adds no local instance;
+            // this is the provider's remaining checked proof vocabulary.
+            "Data.Text.StringKeys".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Data.Vector.Vector".to_string(),
             ["Equal", "Proved"]
                 .into_iter()
@@ -751,13 +802,11 @@ fn catalog_ambient_passthrough_migration_census() {
         "Capability.Process.Arguments",
         "Capability.System.IO",
         "Core.Classes.EffectfulClasses",
-        "Data.Binary.BytesKeys",
         "Data.Collections.Map",
         "Data.Collections.NonEmpty",
         "Data.Serialization.Json",
         "Data.Sums.Validation",
         "Data.Text.Codec",
-        "Data.Text.StringKeys",
     ]
     .into_iter()
     .map(str::to_string)

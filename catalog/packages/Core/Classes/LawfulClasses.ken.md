@@ -2163,11 +2163,12 @@ instance DecEq (List a) where DecEq a {
 ```
 
 
-### 4.7 Opaque primitive views — `UInt8`, `Bytes`, and `String`
+### 4.7 Opaque primitive equality and `String` order
 
 The opaque primitive carriers obtain lawful equality by transport through their
 structural or injected views. `Bytes` reuses the structural `List UInt8`
-dictionary, and `String` reuses the structural `List Char` dictionary.
+dictionary, while `String` reuses the structural `List Char` equality and order
+dictionaries.
 
 ```ken
 pub theorem uint8_to_int_injective
@@ -2298,6 +2299,58 @@ instance DecEq String {
   sound = proof sound for string_deceq_eq;
   complete = proof complete for string_deceq_eq
 }
+
+pub fn string_ord_leq (left : String) (right : String) : Bool =
+  (Ord_instance_List Char Ord_instance_Char).leq
+    (string_to_list_char left)
+    (string_to_list_char right)
+
+pub proof refl for string_ord_leq (text : String) : IsTrue (string_ord_leq text text) =
+  (Ord_instance_List Char Ord_instance_Char).refl (string_to_list_char text)
+
+pub proof antisym for string_ord_leq
+      (left : String)
+      (right : String)
+      (forward : IsTrue (string_ord_leq left right))
+      (reverse : IsTrue (string_ord_leq right left))
+    : Equal String left right =
+  string_to_list_char_injective
+    left
+    right
+    ((Ord_instance_List Char Ord_instance_Char).antisym
+      (string_to_list_char left)
+      (string_to_list_char right)
+      forward
+      reverse)
+
+pub proof trans for string_ord_leq
+      (left : String)
+      (middle : String)
+      (right : String)
+      (first : IsTrue (string_ord_leq left middle))
+      (second : IsTrue (string_ord_leq middle right))
+    : IsTrue (string_ord_leq left right) =
+  (Ord_instance_List Char Ord_instance_Char).trans
+    (string_to_list_char left)
+    (string_to_list_char middle)
+    (string_to_list_char right)
+    first
+    second
+
+pub proof total for string_ord_leq
+      (left : String) (right : String)
+    : IsTrue (bool_or (string_ord_leq left right) (string_ord_leq right left)) =
+  (Ord_instance_List Char Ord_instance_Char).total
+    (string_to_list_char left)
+    (string_to_list_char right)
+
+instance Ord String {
+  leq = string_ord_leq;
+  refl = proof refl for string_ord_leq;
+  antisym = proof antisym for string_ord_leq;
+  trans = proof trans for string_ord_leq;
+  total = proof total for string_ord_leq
+}
 ```
 
 ## 5. Design notes
@@ -2423,7 +2476,13 @@ Ken-native; no external reference implementation informed its source.
    `leq_nat::antisym`, `bool_or::eq_true_of_or`, `instance Ord Nat`,
    `instance DecEq Int`, `instance Ord Int`, `instance Ord Bool`,
    `instance DecEq Bool`,
-   `instance Ord Char`, and `instance DecEq Char`.
+   `instance Ord Char`, `instance DecEq Char`, `uint8_to_int_injective`,
+   `uint8_deceq_eq`, `uint8_deceq_sound`, `uint8_deceq_complete`,
+   `bytes_to_list_injective`, `bytes_deceq_eq`, `bytes_deceq_eq::sound`,
+   `bytes_deceq_eq::complete`, `string_deceq_eq`,
+   `string_deceq_eq::sound`, `string_deceq_eq::complete`, `string_ord_leq`,
+   `string_ord_leq::refl`, `string_ord_leq::antisym`,
+   `string_ord_leq::trans`, and `string_ord_leq::total`.
 3. **Source map.**
 
    | Task | Section |
@@ -2431,7 +2490,7 @@ Ken-native; no external reference implementation informed its source.
    | Choose a class or inspect its public field shape | [Definition](#2-definition) |
    | See the three classes | [Definition](#2-definition) |
    | Project a field off a dictionary | [Using it](#3-using-it) |
-   | Audit the `Int`, `Bool`, `Nat`, or `Char` proof family | [Laws & proofs](#4-laws--proofs) |
+   | Audit a built-in carrier proof family | [Laws & proofs](#4-laws--proofs) |
    | The `Proved`-vs-`Refl`/K7 story, the restructuring discipline | [Laws & proofs](#4-laws--proofs) |
    | Why `Eq Bool`/`Ord Char` needed the fixes they did | [Design notes](#5-design-notes) |
    | Check assumptions, consumers, and validation evidence | [Trust & derivation](#8-trust--derivation) |
@@ -2453,7 +2512,9 @@ Ken-native; no external reference implementation informed its source.
    collapse. `Ord Nat` uses structural recursion for its relation, laws, and
    proof-relevant totality program, then a provider-owned `bool_or` bridge to
    assemble the class field. `Ord Char`/`DecEq Char` transport every field via
-   `.`-projection off `Ord_instance_Int`/`DecEq_instance_Int`.
+   `.`-projection off `Ord_instance_Int`/`DecEq_instance_Int`. The
+   `UInt8`, `Bytes`, and `String` instances transport through their existing
+   injective views and structural dictionaries.
 5. **`trusted_base()` delta.** `Ord Int`: 4 `Axiom` entries (`refl`/
    `antisym`/`trans`/`total`), each a real, grep-able `Decl::Opaque` —
    illustrative-only, not claimed zero-delta, untouched by the Int-equality
@@ -2483,13 +2544,15 @@ Ken-native; no external reference implementation informed its source.
    case-split (`Int` has none to do). `Ord Nat`: structural recursion over
    `Nat`, with the `Or`-to-`bool_or` bridge assembled from the provider's two
    introduction proofs. `Ord Char`/`DecEq Char`: no case-split, pure
-   `.`-projection.
+   `.`-projection. `UInt8`, `Bytes`, and `String` use injectivity
+   of their existing structural views; the String order laws project from the
+   canonical structural `Ord (List Char)` dictionary.
 7. **Consumers.** `Data/Numeric/Nat/Order.ken.md` imports and re-exports the
    canonical `Ord`/`leq_nat` surface and carries this same dictionary.
-   `catalog/packages/Core/Logic/EmptyDec.ken.md` inlines its own `DecEq Bool`
-   for self-containment (same idiom, independently); the sort/comparison threads
-   across `Data/Collections/Derived.ken` and `Data/Collections/Map.ken` depend on
-   `Ord`'s `leq` field.
+   `Core.Logic.EmptyDec`, `Data.Binary.BytesKeys`, and `Data.Text.StringKeys`
+   import this class owner rather than redeclaring or orphaning canonical
+   instances. The sort/comparison threads across `Data/Collections/Derived.ken`
+   and `Data/Collections/Map.ken` depend on `Ord`'s `leq` field.
 8. **Validation evidence.**
    `crates/ken-elaborator/tests/es4_classes_acceptance.rs` — confirms all
    three `Bool` instances are complete zero-`Axiom` lawful instances (every

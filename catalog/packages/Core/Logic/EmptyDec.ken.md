@@ -64,9 +64,7 @@ identifier is reserved checked-mode surface sugar for `Ω`-classified
 `absurd_empty` is the clear, reachable name this entry uses instead:
 
 ```ken
-import Core.Classes.LawfulClasses (DecEq, bool_eq)
-
-import Core.Logic.Or (Or, Inl, Inr)
+import Core.Classes.LawfulClasses (DecEq, IsTrue, bool_eq)
 
 import Core.Logic.Transport (sym, trans)
 
@@ -86,30 +84,19 @@ fn no (prp : Ω) (f : prp → Empty) : Dec prp = No prp f
 
 `DecEq` and its canonical `Bool` dictionary come from the class owner.
 `dec_eq_decides` works for any `DecEq a` instance; only the worked example needs
-a concrete instance in scope:
-
-```ken
-
-```
-
-The `match e eqn: h` modifier retains the equation between a computed `Bool`
-and its branch constructor, so the equation can be used as a proof directly.
+a concrete instance in scope. The `match e eqn: h` modifier retains the equation
+between a computed `Bool` and its branch constructor, so the equation can be used
+as a proof directly.
 
 The No-branch contradiction uses the canonical `sym` and `trans` proofs imported
-from `Core.Logic.Transport`:
-
-```ken
-
-```
-
-The bridge: any `DecEq a` instance decides propositional equality.
-`d.eq x y = True` (`Inl p`, `p : Equal Bool (d.eq x y) True`) → `sound`
-hands back the proof directly. `d.eq x y = False` (`Inr q`) → assuming a
-proof `pxy : Equal a x y` gives `d.complete x y pxy : IsTrue (d.eq x y) =
-Equal Bool (d.eq x y) True`; combined with `q` via `sym`/`trans`, that is
+from `Core.Logic.Transport`. Any `DecEq a` instance therefore decides
+propositional equality. In the `True` branch, the retained equation has type
+`Equal Bool (d.eq x y) True`, so `sound` hands back the proof directly. In the
+`False` branch, assuming a proof `pxy : Equal a x y` gives
+`d.complete x y pxy : IsTrue (d.eq x y) = Equal Bool (d.eq x y) True`.
+Combining that result with the retained branch equation via `sym`/`trans` gives
 `Equal Bool False True`, which reduces to `Bottom`. The `absurd` sugar then
-discharges it into `Empty` directly; this bridge is `Ω → Type`, not
-`Empty → C`:
+discharges it into `Empty` directly; this bridge is `Ω → Type`, not `Empty → C`:
 
 ```ken
 fn dec_eq_decides (a : Type) (d : DecEq a) (x : a) (y : a) : Dec (Equal a x y) =
