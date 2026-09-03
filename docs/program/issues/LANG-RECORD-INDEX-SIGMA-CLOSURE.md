@@ -1,7 +1,7 @@
 ---
 id: LANG-RECORD-INDEX-SIGMA-CLOSURE
 title: "D2b predecessor #2 (elaborator structural closure): record-index-equality CONSUMERS in the elaborator handle the Eq head but not its observational Sigma-decomposition. install_index_refinements peels only Term::Eq and falls through on the Sigma-shaped record-index equality, installing no per-component refinement (gamma->g0), so a dependent-inversion body needs fok_nth_form @14 (outer gamma) where the constructor-declared type says @10 (local g0). Fix the consumer to recursively project the Sigma into per-component refinements, AUDIT every such consumer for the same Eq-only gap, and close the class with a per-site regression fixture. Section-1b predicate named by the Architect (evt_2ptgr3f2ef7c4)."
-status: active
+status: merged
 owner: language
 size: M
 gate: none
@@ -11,6 +11,22 @@ blocks: [V3-FO-EMBEDDING-ADEQUACY]
 github: null
 origin: "Steward, 2026-09-02. D2b hard-stop #2 for V3-FO-EMBEDDING-ADEQUACY, the CONSUMPTION-side sibling of the just-built synthesis-side predecessor LANG-GENERATED-INDEX-EVIDENCE-CLOSURE. After the Top-closure fix (synthesis) let D2b advance past HS1, the fold reached fok_invert_atomlike and false-rejected. Probe (language-implementer evt_4cjm6qrwccjvc, language-leader evt_5597m0qf9rzhn) confirmed case (a): elaborator-owned dependent-index rebasing, NOT a source scoping error and NOT a bare weakening omission. Architect ruling evt_5w65hdk73zp9b (provisional case-(a) route) then evt_2ptgr3f2ef7c4 (Section-1b predicate NAMED + structural-closure disposition). Elaborator-only, no FoKripke workaround (D2b's banned-source-compensation constraint), no operator authorization (kernel_infer backstop unchanged). Coordinates measured at origin/main e485a696c; they DRIFT on the held D2b branch acef50612. Architect count: D2b design hard-stop #2; §1a Research advisory fires at the 3rd, not triggered."
 ---
+
+> # MERGED (Steward, 2026-09-03) — squash `4af6e16f4` on `origin/main`, full CI
+> # green (PR #3255, exact `2462be787`). Blob-verified: the atomic
+> # `project_generated_index_equality_leaves` {Eq,Sigma,Top} walker present in
+> # `crates/ken-elaborator/src/elab.rs`. Architect soundness APPROVE
+> # (`evt_44gxn8bk0rd9e`, sole crates/-only domain reviewer: completeness fix,
+> # kernel_infer backstop intact) + Language QA APPROVE (`evt_5xrt562agm95e`,
+> # reproduced the 6 closure fixtures + all 12 mutations); Decision
+> # `dec_2pjd6e8mhaw0r`. This DISCHARGES the D2b HS2 predecessor — D2b
+> # (V3-FO-EMBEDDING-ADEQUACY, held `acef50612`) re-releases to the language ring
+> # for the Architect's resumed-proof re-review (Steward move).
+>
+> The consumption-side mirror of the synthesis-side {Eq,Sigma,Top} closure
+> (LANG-GENERATED-INDEX-EVIDENCE-CLOSURE). One atomic leaf-plan walker projects
+> the single retained Eq sentinel into per-component leaves at all three
+> refinement consumers + the hidden-finish synthesis; producers byte-unchanged.
 
 ## One-line objective
 
