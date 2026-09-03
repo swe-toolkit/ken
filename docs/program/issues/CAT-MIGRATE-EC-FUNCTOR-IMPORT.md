@@ -6,7 +6,7 @@ owner: foundation
 size: S
 gate: none
 tier: T2
-depends_on: [CAT-MIGRATE-EC-CLOSURE-PROVIDERS]
+depends_on: [CAT-MIGRATE-EC-CLOSURE-PROVIDERS, LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]
 blocks: []
 github: null
 origin: "Steward, 2026-09-03. Spun out of the Tier-B recut as a census-error correction: the Tier-B D0 (foundation-implementer) found EC fails standalone with UnresolvedCon Functor — EC was wrongly folded in as clean. Architect ruling evt_21c0cdvnmv3f3 CONFIRM 2: (b) LF-Functor + EC clean-ification is ORTHOGONAL to the DecEq chain (Functor is not DecEq; the recut relocation touches LC/BytesKeys/StringKeys/EmptyDec/StringBijection, never EC), so it is its OWN independent Core.Classes node, runnable in parallel whenever, and must NOT sit on the relocation's critical path. Architect CONFIRM 1 blessed the surface: publishing LF class Functor + comp/idf/list_map is the sound and intended consequence of the class-owner model + scaffold-retirement mandate — pub changes VISIBILITY only, class-uniformity preserved by construction (still exactly one class Functor in LF). Coordinates re-measured by Steward at origin/main 21f87f5b5 (below); re-measure at your build SHA (D0)."
@@ -44,6 +44,17 @@ origin: "Steward, 2026-09-03. Spun out of the Tier-B recut as a census-error cor
 > # structural answer, so no surface ladder. The "four LF surfaces" text below is
 > # the PRE-RULING premise, kept for its provider/consumer coordinates; read the
 > # import target as the closure set, not the four.
+> #
+> # SECOND PREDECESSOR (Architect classification evt_5hnv374ev2a80): finding (A)'s
+> # "local *_instance_* resolve locally" does NOT hold under standalone/roots
+> # today — the roots loader never binds a locally-synthesized instance dictionary
+> # into the per-unit scope (empty prebind arm for InstanceDecl/DeriveDecl), so a
+> # bare later ref is UnresolvedCon; the whole-catalog build masked it via the flat
+> # cx.globals fallback. That is a distinct ELABORATOR predecessor
+> # [[LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]] (language lane). EC
+> # standalone-green depends on BOTH predecessors — the closure-providers
+> # publication AND the roots-loader binding. (A) stays correct authoring
+> # regardless; the roots-loader fix is its roots-side structural closure.
 >
 > # Orthogonal EC standalone-cleanness node. Off the DecEq critical path.
 > # Tier-A publication shape (mark pub / add one import block / extend the
