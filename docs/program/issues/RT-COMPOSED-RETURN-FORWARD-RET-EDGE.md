@@ -12,7 +12,9 @@ github: null
 origin: "Operator ruling 2026-08-30 (this session, verbatim: \"use shape (a)\") FUNDED the shape-(a) relaxation after the constraint-differential report (docs/program/rt-composed-return-constraint-differential-report.md, merged 5b20fe84f) found BOTH native walls INCIDENTAL, not spec-mandated. The build design is the fresh operator+Architect decision the report fed; Architect ruling evt_70n2y6s9wanf9 (base origin/main 7d807a78e, tree 37da2a975) mints this fresh T1 node and closes the held authority-only build RT-COMPOSED-RETURN-PRODUCER-ORDER-BUILD (refuted/superseded without implementation). Steward-filed and released per COORDINATION section 2."
 ---
 
-> # ACTIVE — lane 1, funded shape-(a). D1+D2 LANDED; D3 REFUTED at HS15 (spent) — fresh D0-only successor released. `active`.
+> # ACTIVE — lane 1, funded shape-(a). D1+D2 LANDED; the old D3 release is
+> STALE, RETIRED, superseded by D3-RECUT (fresh atomic closeout; see the
+> governing section below). `active`.
 >
 > The operator funded shape (a); the Architect designed it (`evt_70n2y6s9wanf9`)
 > and minted this fresh node in place of the refuted authority-only build. This is
@@ -38,6 +40,117 @@ origin: "Operator ruling 2026-08-30 (this session, verbatim: \"use shape (a)\") 
 > (AC-CAUSAL-PAIR / AC-FORWARD-SSA / AC-PRODUCTS-EXACT). Base is current main
 > `e7caf60be`; D1/D2 moved the source.rs/core.rs/aggregates.rs coordinates —
 > re-measure before acting.
+
+## D3-RECUT — fresh atomic closeout (GOVERNING; supersedes the banner's D3 release)
+
+**This is the current governing contract for the terminal deliverable of this
+node.** Architect (B)-ruling `evt_3hsmvkh5za39d` (2026-09-03) + the option-(a)(i)
+build design `evt_381dzjykr4knn`/`evt_5963far74b735` (2026-09-01); runtime-leader
+sequencing/vehicle call `evt_7gmdjyjpvyc1m`. Released by the Steward.
+
+**Why the banner's D3 release is retired, not resumed.** The old D3 predates (a)
+the 12-stop LIVE-K/checked-IH D0 measurement chain that ran 2026-08-30/31 on this
+exact seam and terminated at NO_UNIQUE_EDGE (`evt_mx6scjje1yjp`,
+Architect-accepted; the boundary is closed and this closeout does NOT re-open
+it), and (b) RT-SSA's landing (`ad9905a7e`), which rewrote `responses.rs` (+2590,
+the WP's own core production file) and shifted the
+`source.rs`/`core.rs`/`aggregates.rs` coordinates the old D3 named. Cut D3-RECUT
+FRESH from the current `origin/main` tip and RE-MEASURE every coordinate below; a
+line number here decays.
+
+### What RT-SSA did and did NOT do (Architect item 1, grounded on `f84e231dc`)
+
+RT-SSA landed the response-owner SPECIALIZATION component ONLY: it decides and
+installs WHICH response owners specialize (k_specialization,
+specialized-vs-deferred owner partitioning, worker-body-origin pairing).
+`responses.rs` contains ZERO
+`InvalidOffset`/`ResourceBodyErr`/`ResourceBodyOk`/`ExitCode`/`PatternMatchFailure`
+construction. It does NOT construct the exact `InvalidOffset` product nor close
+the errored composed return out to the process exit. That closeout is this WP.
+
+### Mechanism (Architect item 3; re-measure coordinates at your base SHA)
+
+Consume `ComposedReturnForwardRetAuthority` (Architect read `core.rs:12822`,
+move-only) TOGETHER WITH the specialized response owner's Trap-checked Result,
+and branch to the exact function-local shared `Ret` block — with PER-ARRIVAL
+PAIRING and EXACT-ONCE CLOSEOUT constructing the exact read/write `InvalidOffset`
+PRODUCT at the `RoutedAnswer`/constructor collapse, so
+`ResourceBodyErr(InvalidOffset)` reaches the exit instead of the
+malformed-`ExitCode::Failure` payload trap. Also complete the forward-Ret-edge
+CONSUMPTION if D1/D2's shared-block wiring does not already supply it (Architect's
+conditional — measure it on the built recut, do not assume).
+
+The pieces exist but are NOT wired end-to-end for the fs-at-offset error arms
+(re-measure): the synthesized `ResourceInvalidOffset` constructor role
+(`effects.rs:3402`, semantic_ir `ResourceInvalidOffset`); the Int narrow-failure
+lane feeding `InvalidBounds`/`InvalidOffset` (`effects.rs`
+`narrow_positioned_int_seat`); the move-only `ComposedReturnForwardRetAuthority`
+(`core.rs:12822`).
+
+### Boundary — this is option (a), NOT option (b) (Architect item 4)
+
+The closeout introduces NO runtime callable/continuation identity object, NO
+`HostResult` reuse, NO seed substitution, NO side table, NO stored Cranelift
+value, NO cross-Function `FuncRef`, NO new header/frame field, NO second
+selector. It is the tag-only, co-located forward-SSA-edge mechanism the operator
+funded; it creates no later owner and does not re-open the NO_UNIQUE_EDGE
+boundary. No TCB growth, no spec/kernel/ABI/wire change, no operator loop. A
+design fork that would need any of the option-(b) machinery is a HARD STOP to the
+Architect, never a workaround.
+
+### Acceptance (predicate form; the fixtures are the acceptance, not a roster)
+
+- **AC-INVALIDOFFSET-FLIP (positive).** Un-ignore and green the four
+  `fs_*_narrows` differentials on the `assert_narrowed_alike` (interp==native,
+  exit 0 iff exactly the expected variant): `fs_read_at_malformed_offset`
+  (`rt_parity_native.rs:4066`), `..without_read_right` (`:4110`),
+  `fs_write_at_malformed_offset` (`:4144`), `..without_write_right` (`:4161`).
+  Each now observes `InvalidOffset`, not the malformed-`ExitCode::Failure`
+  `PatternMatchFailure` trap. Re-measure the four line numbers at your base.
+- **AC-SWEEP-INVALIDBOUNDS.** Sweep in
+  `fs_read_at_malformed_window_narrows_to_invalid_bounds` (`:4079`) in the SAME
+  un-ignore — it rides the same Int narrow-failure lane (`InvalidBounds` is that
+  lane). Un-ignore + green it here.
+- **AC-EXCLUDE-BUFFER-ALLOC.** Do NOT bundle
+  `buffer_allocate_malformed_capacity_narrows_to_invalid_bounds` (`:680`) — a
+  different owner (RT-SITEOP-CARRIED-WITNESS D2: a carried recursive hypothesis
+  is an eliminated value, not a callable). It stays `#[ignore]`d; touching it is
+  a scope violation.
+- **AC-EXACT-ONCE / AC-PER-ARRIVAL (soundness controls).** Per-arrival pairing is
+  exact-once: a control that reds if a closeout fires twice or zero times for one
+  arrival; a control that reds if the forward-SSA edge is taken without the
+  Trap-checked Result gate. The `InvalidOffset` product is constructed at the
+  collapse, not a reused `HostResult`.
+- **AC-NO-BOUNDARY-REOPEN (boundary control).** No new runtime callable/identity
+  object, side table, stored value, cross-Function `FuncRef`, header/frame field,
+  or second selector appears in the diff — the option-(a) boundary holds.
+  `crates/ken-kernel` byte-unchanged; no `/spec`, no `/conformance`.
+- **AC-NO-REGRESSION.** Green across the transport-source population in CI (px8f +
+  rt_parity native shards); targeted `scripts/ken-cargo` locally, whole-suite is
+  CI's.
+
+### Size, gate, base
+
+- **SIZE: L** (~1-2 T1 held checkpoints — the WP3 closeout, plus the
+  forward-Ret-edge consumption if D1/D2 did not fully wire it). Same atomic merge
+  unit as the original three-checkpoint decomposition; the un-ignore is this WP's
+  ACCEPTANCE, not a separate trivial follow-up.
+- **GATE: runtime-qa+architect.** The Architect is the required soundness
+  reviewer on the candidate (their own commitment, `evt_3hsmvkh5za39d`); Runtime
+  QA; standing Adversary independent. On the candidate: fresh Architect + Runtime
+  QA on the exact SHA, then Steward M1-M4, lieutenant M5-M9. `gate: none` in the
+  operator sense (no TCB touch, no operator authorization — option (a) is already
+  funded).
+- **BASE:** cut fresh from the current `origin/main` tip; re-measure
+  `ComposedReturnForwardRetAuthority`, `ResourceInvalidOffset` constructor role,
+  the Int narrow-failure lane, and the five test line numbers before the first
+  edit.
+- **Grounding honesty (Architect §7a):** the Architect grounded from source
+  (`responses.rs`/`effects.rs`/`core.rs`/`rt_parity_native.rs`) + runtime-leader's
+  blob-verified analysis, NOT a fresh native run (box memory pressure).
+  Belt-and-suspenders check for the ring: un-ignoring `fs_read_at_malformed_offset`
+  on the base should still trap on the malformed `ExitCode::Failure` before the
+  closeout lands.
 
 ## The single relaxed constraint, and what stays closed
 

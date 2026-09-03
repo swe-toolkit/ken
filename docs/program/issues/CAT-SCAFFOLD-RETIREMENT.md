@@ -43,7 +43,8 @@ provider.
 
 ## The five tiers
 
-- **Tier A — primitive providers** ([[CAT-MIGRATE-TIER-A-PROVIDERS]], `active`).
+- **Tier A — primitive providers** ([[CAT-MIGRATE-TIER-A-PROVIDERS]], `merged`
+  — squash `f1d7d4133`, 2026-09-03).
   Pure export publication, no consumer edits. Census folded it to
   `Derived::{nth, bytes_nat_length}`; Transport/Compare/Arithmetic/Nat.Order are
   already sufficiently published.

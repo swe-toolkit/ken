@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-A-PROVIDERS
 title: "Scaffold-retirement Tier A (primitive providers): publish the two remaining consumer-needed Derived provider values nth and bytes_nat_length as pub, so lower-tier consumers (Cursor, Parsing, Process.Arguments) import the canonical values instead of reaching them through fixture scaffolding. Census folded the tier to one module: Transport/Compare/Arithmetic/Nat.Order are already sufficiently published."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
@@ -12,8 +12,16 @@ github: null
 origin: "Steward, 2026-09-02. Tier A of the scaffold-retirement migration (parent CAT-SCAFFOLD-RETIREMENT; Architect 5-tier DAG decomposition evt_2e0pee5jxzv07). Tier A = primitive-provider export publication, no consumer edits. Foundation-leader STEP-2 census at exact origin/main e485a696c (evt_3qgh6dvwf647v, cross-checked against the STEP-2 dynamic inventory + source): Transport cong/sym/trans already public (pub theorem :53/:71/:78); Compare list_eq already pub fn (:369); Arithmetic add already pub fn (:18), remaining privates not consumer-needed; Nat.Order sub already pub fn (:69), no private value/law consumer-needed. ONLY delta = Data.Collections.Derived nth (:83) + bytes_nat_length (:892), both private fn, consumer-needed by Cursor/Parsing/Process.Arguments/higher; no attached law consumed in the measured import lists, no [higher] hazard measured. Same shape as CAT-DERIVED-PUB-EXPORT / CAT-ORD-LEQ-PUB-EXPORT (a prior pub-export that published Derived's other surface)."
 ---
 
+> # MERGED (Steward, 2026-09-03) — squash `f1d7d4133` on `origin/main`, full CI
+> # green. Blob-verified: `pub fn nth` (:83) + `pub fn bytes_nat_length` (:892)
+> # on main; the `cat_derived_pub_export.rs` inventory extended to the 11-name
+> # set. Foundation QA `evt_2dmz06114m8hy` + CV `evt_rht7rmk31qdq` approved on
+> # exact `6fc9fca04`; Decision `dec_11r8mfh83ma60`; the conditional Architect
+> # gate did not trigger (no attached-law hazard). Successor: Tier B
+> # (Core.Classes + the operator-ruled DecEq->LC relocation), framed next.
+> #
 > # Tier A of the scaffold-retirement migration: the primitive-provider export
-> publication, folded by census to two Derived values.
+> # publication, folded by census to two Derived values.
 >
 > The Architect's bottom-up DAG (evt_2e0pee5jxzv07) places primitive providers
 > at the base: publish their export surfaces so every higher tier imports the
