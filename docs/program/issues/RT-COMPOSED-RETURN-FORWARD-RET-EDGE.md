@@ -232,7 +232,86 @@ HS6 — but the sealed-set closure is engineered to terminate the chain (a 4th
 displaced counter is a compile error, not a hard-stop).** Implementer builds the
 sealed-obligation discharge → fresh SHA → Architect design+soundness +
 runtime-qa → fresh Decision (runtime-leader) → Steward M1-M4. `dec_22xpy0mnz221a`
-is void; `711724f32` never merges. inc2 (option a) resumes after inc1 lands.
+is void; `711724f32` never merges. inc2 (write-half migration) resumes after inc1
+lands — now ALSO the unified edge-control-migration home; see the Increment-2 frame
+seed below.
+
+## Increment-1 control-side census disposition + Increment-2 frame seed
+
+**Scope call — Steward AUTHORIZES option (b)** (2026-09-03), on the Architect's
+design ruling `evt_5kpshvbx32gnr` and control-side census (implementer
+`evt_7j9pvzgfgsy6m`, Architect z2145 requirement discharged). The read-half fix
+derives the read answer from the edge CARRIER, not the capsule, so ~14 base
+controls that probed the read via the CAPSULE projection have NO surviving control
+home. Retarget-to-write is empirically REFUTED — the write program lacks the read's
+specialized computational-recursor capsule structure; capsule wrong-slot on the
+write did not redden (`rt_parity_native.rs:3065`). This is a coverage-scoping call
+(a WP-cut, no TCB delta, inc1 stays its funded READ half), the Steward's to make;
+the design half (soundness + (a)-vs-(b)) is the Architect's and is settled.
+
+Per-dimension disposition (Architect three groups, `evt_5kpshvbx32gnr`):
+
+1. **Direct-control capsule** (wrong-destination-owner / body / binding /
+   locator-*): KEEP — already on the write, still redden. No change.
+2. **Arrival seam-counters:** SUBSUMED per-variant — for EACH variant, either
+   (i) its exact property is "a discharge member can be skipped / a seam arrival
+   missed" ⇒ power UPGRADED to the HS3 sealed-closure compile-time totality + the
+   green admission/confluence/reach/raw_arrival counters ⇒ RETIRE with citation
+   (NOT `#[ignore]`); or (ii) a distinct fine-structure the sealed match does NOT
+   cover ⇒ joins group 3. The per-variant line is the implementer's to produce —
+   not "arrival = same shape as capsule."
+3. **Non-direct capsule fine-structure** (wrong-slot / frame / invocation /
+   non-carried-residual / provenance-index / outer-carried / specialized-sibling /
+   static-worker + retained-access-*): DEFERRED — regression-catchers over the
+   carrier's fine structure, NOT soundness gates; re-key to a new read-edge-carrier
+   mutation family (a control-design build) in inc2.
+
+**Soundness of landing inc1 core under the deferral: AFFIRMED (Architect).** The
+read EDGE stays controlled at four independent levels — carrier WORD
+(`forward_ret_edge_substituted_word_reds` / `SubstituteForwardEdgeWord`, green→trap
+flip), governed coordinate (role-witness paired family, `planned == formed`
+3549/3560/3561), observation discharge (HS3 sealed closure compile-totality +
+admission/confluence/reach/raw_arrival counters), and end-to-end answer (3 read
+narrows, independent of the capsule slot). The deferred item is fine-grained
+per-slot mutation power over the carrier's internal structure — a coverage
+refinement, not a correctness gate; deferring it cannot admit a wrong read answer.
+(b) is chosen over (a) because inc2 migrates the WRITE half onto the SAME edge
+mechanism and re-keys both halves' controls once; building read-edge-only controls
+in inc1 and re-merging them in inc2 is duplicative, and box contention makes a fresh
+control build's per-dimension validation especially costly now.
+
+### Increment-2 frame seed: unified read+write edge-control migration
+
+inc2 migrates the WRITE half onto the same forward-edge mechanism and is the single
+natural home for re-keying BOTH halves' controls. It carries this named, tracked
+obligation — the Architect's z2145 "power transfers, never vanishes," made
+enforceable:
+
+- **AC-EDGE-CONTROL-REKEY.** Re-key the read-edge carrier-mutation controls deferred
+  from inc1: for each deferred dimension build the read-edge-carrier analog mutation
+  (corrupt the closeout's carrier-slot / frame projection / sealed discharge),
+  un-ignore its base test, and green it — a genuine green→trap flip, never a vacuous
+  pass. Every inc1 `#[ignore]` cites THIS AC by id
+  (`RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY`), never a prose
+  "follow-up." The census in this section is the completeness ledger: no dimension
+  silently loses coverage, the Architect re-checks it against the deferred set at
+  inc1 landing, and inc2 discharges it.
+
+  Deferred set — provisional (from `evt_7j9pvzgfgsy6m`), FINALIZED into this list
+  from the implementer's inc1 per-variant disposition BEFORE inc1 lands:
+  - non-direct capsule: wrong-slot, wrong-frame, wrong-invocation,
+    non-carried-residual, provenance-index, outer-carried, specialized-sibling,
+    static-worker
+  - retained-access-*
+  - group-2(ii) arrival variants: TBD (implementer per-variant disposition; each
+    subsumed variant RETIRES with a sealed-closure citation instead and is NOT in
+    this set)
+
+**Count of record (Architect `evt_5kpshvbx32gnr`): NOT a new hard-stop** — a
+control-side consequence of the already-ruled read-half fix (z2145 continued), a
+coverage-scoping question. inc1 stays at 3 hard-stops; §1a HS3 check discharged,
+next mandatory §1a re-trigger = HS6; §1b same predicate already named (read closeout
+derives from the carrier, not the capsule) — no new inventory entry, no new recut.
 
 ## The single relaxed constraint, and what stays closed
 
