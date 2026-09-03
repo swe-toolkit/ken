@@ -324,6 +324,90 @@ coverage-scoping question. inc1 stays at 3 hard-stops; §1a HS3 check discharged
 next mandatory §1a re-trigger = HS6; §1b same predicate already named (read closeout
 derives from the carrier, not the capsule) — no new inventory entry, no new recut.
 
+## Increment-1 M5 CI red on 07c31b0c5 — symptom dispositions (Steward)
+
+The re-spin candidate `07c31b0c5` (Decision `dec_22r1rbn9qnn81`) passed M1-M4 and was
+ROUTED, then hit **M5 CI red** on the first full native suite (run 33813131586;
+lieutenant `evt_5ty9e9q8xrtej`). NOTHING merged (PR #3288 open); `dec_22r1rbn9qnn81`
+is VOID/SPENT — a re-spin is a FRESH SHA + FRESH Decision (leader `evt_dg3t5hpavgby`,
+Steward `evt_5k35tfcqhdh35`). The CI contingency fired as designed: reviewers approved
+on box-OOM-forced ISOLATED runs, and the first full native run exposed it — the
+Architect's explicit greenness caveat named exactly this. Architect re-review
+`evt_1hqe1kst2ygak`; the design+soundness findings STAND (the red is runtime/semantic,
+not a structural/soundness defect in the sealed closure).
+
+**Symptom 1 (stack overflow) — BOUNDED-depth TEST-HARNESS GAP, NOT a mechanism defect,
+NOT a hard-stop.** The Architect's initial NON-TERMINATION hypothesis was REFUTED by
+measurement (both reviewers, runtime-qa `evt_20aa62vg55tmv` reproduced directly,
+runtime-leader relay `evt_4bak5ksy1s5re`): 4 shards SIGABRT deterministically on
+`rt_cold_lowering_path_enumeration` (rt_write_writable/rt_read_norights/rt_read_offset/
+rt_write_readonly), but `RUST_MIN_STACK=268435456` (256 MiB) PASSES cleanly — the
+recursion is BOUNDED, not runaway. Exact cause: that fixture's `entry_outcome()` calls
+`build_native_program` on the DEFAULT thread with NO `in_large_stack_thread` wrapper,
+while every other call site in the WP's own `rt_parity_native.rs` already wraps in the
+256 MiB thread. The candidate's closeout (`emit_composed_return_ret_kmatch_closeout ->
+lower_expr` on the k-Match payload) genuinely adds BOUNDED codegen depth on exactly the
+4 crashing routes — which is why base was green and this candidate reds — and the same
+programs already compile inside the wrapped threads. FIX: wrap
+`rt_cold_lowering_path_enumeration.rs`'s `entry_outcome` in the same
+`in_large_stack_thread`-shaped 256 MiB thread, matching the existing precedent — a
+TEST-FILE change, NOT production. **COUNT (Steward, tracker-authoritative): NOT a
+hard-stop — the mechanism is sound (bounded, correct); this is a test-harness
+stack-provisioning gap. inc1 STAYS at 3 hard-stops; no §1a trigger.** Lesson (worth
+keeping): a local "box OOM" that forced a CI-pending posture was the candidate's own
+BOUNDED stack demand meeting an unwrapped fixture — measure before calling it either
+contention OR non-termination. Fix this FIRST — it is the CI blocker.
+
+**Symptom 2 (release-order) — RT-BRACKET class; disposition (Architect identity +
+Steward sequencing).** The Architect made the identity call the lieutenant deferred
+(`evt_1hqe1kst2ygak`): the divergence in `d1_route_control_direct_read`
+(rt_parity_native.rs ~4210) is PURELY relative release order (identical 4 effect
+events; only FsHandle/Buffer order flips) = the [[RT-BRACKET-RELEASE-ORDER-PARITY]]
+class, NOT a new soundness hole. The candidate applied the exclusion at
+`assert_narrowed_alike` (~557-608) but this test reaches the `_ =>` arm's raw
+`assert_eq!(effect_trace)`, a full-ordered compare NOT under the exclusion.
+runtime-qa traced the exact mechanism (`evt_20aa62vg55tmv`): of the 6
+`d1_route_case!` variants (rt_parity_native.rs:4228-4233),
+`d1_route_control_direct_read` is the ONLY one with `expected_family: None` — the
+other 5 take the trap-provenance branch and never reach the strict full-order
+comparison; the read-half fix makes direct-read return cleanly for the FIRST time, so
+it newly falls through to `assert_d1_route_control_child`'s `_` arm (4210-4213). QA has
+NOT confirmed the same pattern covers all 6 rt_parity_native shard failures — the
+re-spin MUST check the other 5 before assuming full coverage.
+**Sequencing (Steward): the fix stays IN the inc1 re-spin as a test-harness
+exclusion-completion** — route every native/interpreter parity assertion on a
+release-bearing route (the `_ =>` arm + its audited siblings) through the same
+non-release split, consistent with the exclusion scope the Architect ruled.
+[[RT-BRACKET-RELEASE-ORDER-PARITY]] remains the underlying-class tracker; it is NOT
+reopened, and symptom 2 is NOT a new node. **REQUIRED CONFIRMATION before excluding
+(Architect):** measure the divergence is purely relative release order — same release
+SET (resources/requests/outcomes) AND non-release events agree in order. If the SET or
+non-release order differs, it is NOT the tracked class but a real closeout regression
+⇒ reopen, do NOT exclude.
+
+**§1b CONDITIONAL (Steward, on symptom 2's measurement).** IF that measurement shows
+the closeout actually REORDERED releases (not the RT-BRACKET class), THEN the HS3
+sealed closure's datum-set was too NARROW — it sealed the observation counters
+{reach, raw_arrival, admission_outcome, governed_validation} but the short-circuit
+also displaces RESOURCE RELEASES, which the closure did not carry ⇒ a §1b signal to
+WIDEN the sealed closure to release-order (structural), NOT a per-site patch. IF
+symptom 2 IS the RT-BRACKET class (the likely case), NO closure widening is owed.
+
+**Symptom 3 (ignored-row census 45 vs 37) — PRE-EXISTING DRIFT, not candidate-caused
+(runtime-qa CONFIRMED, `evt_4bak5ksy1s5re`/`evt_20aa62vg55tmv`).** The 9 flagged files
+are byte-identical base vs candidate, and the census mechanism itself correctly
+handles the candidate's new `#[ignore]`s (45-37 = 8 = the added ignores is a red
+herring — the discrepancy is the pre-existing ledger, not the candidate). FILE
+SEPARATELY (census/ledger maintenance); it does NOT gate this re-spin's mechanism but
+must be green for the eventual merge.
+
+Re-spin path (both reviewers, `evt_4bak5ksy1s5re`): impl fixes the test-harness stack
+wrapper FIRST (the CI blocker — wrap `entry_outcome` in the 256 MiB thread), then
+completes the release-order exclusion at `assert_d1_route_control_child`'s `_` arm +
+runs the required symptom-2 measurement + checks the other 5 shards, then re-verifies
+symptom 3 is still clear; FRESH SHA -> both reviewers re-review -> fresh Decision
+(runtime-leader) -> Steward M1-M4. `07c31b0c5` / `dec_22r1rbn9qnn81` never merge.
+
 ## The single relaxed constraint, and what stays closed
 
 The ONE relaxed constraint: a governed Tail result BYPASSES the source-machine
