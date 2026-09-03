@@ -736,65 +736,6 @@ impl<'a> Lowering<'a> {
         )
     }
 
-    /// D3-RECUT: the governed-Tail forward-SSA-edge closeout, shared by the two
-    /// TailProducerToRet consumption sites (the non-governed-current-call seam and
-    /// the governed generated-entry arrival's TailProducerToRet route). A Formed
-    /// authority means the selected transport's derived generated-entry row is a
-    /// TailProducerToRet route with a validated confluence member; this consumes it.
-    ///
-    /// It runs the declared continuation call once (the specialized response owner,
-    /// whose body IS the continuation, so `result` is the continuation's own
-    /// response ITree::Ret value -- NOT a hand-rolled product), gates it through
-    /// the Trap-checked `from_declared_call`, then PROJECTS the Ret's single answer
-    /// field -- the inner ResourceBodyResult -- exactly as the fall-through's
-    /// strict-Ret eliminator does (core.rs:13199-13292, `emit_carrier_field(scrut,
-    /// 0)`), and routes THAT word on one certified forward SSA edge to the
-    /// authority's shared Ret block. The jump terminates this predecessor; the
-    /// caller seals it with a RecursiveBackedge disposition. Per-arrival and
-    /// exact-once: it replaces the fall-through `RoutedAnswer::checked(result)` for
-    /// this arm and is gated by the Formed authority. Option (a): value projection
-    /// + one jump; no construction, no runtime carrier, no boundary reopen.
-    fn emit_composed_return_forward_ret_closeout(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        authority: ComposedReturnForwardRetAuthority,
-        transport: &CheckedIhEnvironmentTransport,
-        env: &[LoweringEnvironmentBinding],
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
-        self.pending_computational_ih_call.take();
-        let result = self.call_tail_checked_ih_transport_from_case_environment(
-            builder, transport, env,
-        )?;
-        // The Trap-checked Result gate: a governed continuation call yields exactly
-        // one Carried runtime Result; a specialized template is refused here.
-        let checked = CheckedIhApplicationResult::from_declared_call(result)?;
-        // NOTE (D3-RECUT, unresolved decode): the correct envelope decode of the
-        // transport result to the inner ResourceBodyResult is still being pinned
-        // against the running fixture. emit_carrier_field(_, 0) reaches a Result
-        // match (moves the trap from ResourceBodyResult to Result); host_payload
-        // fails the carrier boundary. Held at field-0 pending the Architect's
-        // confirmation of the response-owner env-word structure.
-        let answer = self.emit_carrier_field(builder, checked.word, 0)?;
-        #[cfg(feature = "px8-ds-test-support")]
-        let edge_word = if composed_return_forward_ret_authority_mutation()
-            == ComposedReturnForwardRetAuthorityMutation::SubstituteForwardEdgeWord
-        {
-            // AC-CAUSAL-PAIR (b): keep the edge and the sink but carry an
-            // independent non-result word; a fixture that still greened would not
-            // depend on the exact answer reaching the exit. The behavioral flip
-            // (green under Exact, red here) is the anti-vacuity evidence.
-            builder.ins().iconst(types::I64, 0)
-        } else {
-            answer.word
-        };
-        #[cfg(not(feature = "px8-ds-test-support"))]
-        let edge_word = answer.word;
-        builder
-            .ins()
-            .jump(authority.return_body, &[edge_word.into()]);
-        Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge))
-    }
-
     pub(super) fn lower_source_machine_with_continuation<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -4539,7 +4480,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         match forward_ret_outcome {
                             ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
                                 return Ok(SourceCallOutcome::Complete(
-                                    self.emit_composed_return_forward_ret_closeout(
+                                    self.emit_composed_return_ret_kmatch_closeout(
                                         builder, authority, &transport, &env,
                                     )?,
                                 ));
@@ -4637,7 +4578,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             match forward_ret_outcome {
                                 ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
                                     return Ok(SourceCallOutcome::Complete(
-                                        self.emit_composed_return_forward_ret_closeout(
+                                        self.emit_composed_return_ret_kmatch_closeout(
                                             builder, authority, &transport, &env,
                                         )?,
                                     ));
