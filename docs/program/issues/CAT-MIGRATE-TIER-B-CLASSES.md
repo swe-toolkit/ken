@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-B-CLASSES
 title: "Scaffold-retirement Tier B (class-owner relocation + primitive-instance consolidation): relocate the three orphaned primitive DecEq instances (UInt8, Bytes from BytesKeys; String from StringKeys) with their eq/sound/complete wiring and injectivity certificates into the class owner LC (LawfulClasses); consolidate EmptyDec's byte-identical duplicate class DecEq / fn bool_eq / instance DecEq Bool into an import from LC; and give the three scaffolded modules (BytesKeys, StringKeys, EmptyDec) real import blocks so they elaborate standalone with zero fixture-scaffolding dependence. LC/LF/EC are already CLEAN (census fold), so no Core.Classes module-migration remains — the tier is the DecEq relocation + the three consumers' standalone-ification."
-status: draft
+status: active
 owner: foundation
 size: M
 gate: none
@@ -13,10 +13,30 @@ origin: "Steward, 2026-09-03. Tier B of the scaffold-retirement migration (paren
 ---
 
 > # RECUT (Architect evt_21c0cdvnmv3f3 + Steward evt_7bzffq1q90rr8, 2026-09-03) —
-> # this node is now the RELOCATION SUCCESSOR, gated on the provider-publication
-> # predecessor [[CAT-MIGRATE-TIER-B-PROVIDERS]] (P). status: draft until P lands,
-> # then the Steward re-releases. This banner supersedes the census-fold /
-> # Fixed-Inputs claims below.
+> # this node is the RELOCATION SUCCESSOR, gated on the provider-publication
+> # predecessor [[CAT-MIGRATE-TIER-B-PROVIDERS]] (P). P HAS LANDED (squash
+> # 7722f4c26 on main; the Steward re-released this node active 2026-09-03). This
+> # banner supersedes the census-fold / Fixed-Inputs claims below.
+> #
+> # POST-P SURFACE (re-measured by Steward at origin/main a7f1fdfd8; D0 reconfirms):
+> # LC now carries `pub class DecEq a` (:75) and `pub fn bool_eq` (:329) — the
+> # relocated instances resolve their class from LC's published surface, no longer
+> # ambiently. StringBijection publishes `pub theorem string_to_list_char_injective`
+> # (:18; axiom string_to_list_char_retraction :15 stays private) — so DecEq String
+> # is NO LONGER deferred and its injectivity cert has a real provider. LC still
+> # imports Transport `(cong, sym)` (:47) — the `trans` piece for the UInt8 cert is
+> # the live design judgment (below).
+> #
+> # FOLD-IN (P's carry — Architect Eq-prose ruling evt_46yd7nc0mbhqh, carried by
+> # foundation-leader + CV flag + Adversary top-level sweep): LC's "Public API"
+> # prose (:2281-2286) lists `class Eq` as public, but `class Eq` (:61) is
+> # deliberately PRIVATE and has no consumer — do NOT publish it; REMOVE it from the
+> # prose and sweep the whole Eq entry to actual loader visibility. This folds into
+> # THIS WP (it already edits LC); no separate node. Adversary confirmed `class Eq`
+> # :61 is the ONLY mis-declared top-level NAME (IsTrue/bool_or/class Ord/leq_nat/
+> # class DecEq/bool_eq all genuinely pub); the Eq INSTANCE lines (`instance Eq Int`
+> # :205, `instance Eq Bool` :380) are the separate visibility sweep in the carry.
+> # See deliverable D-EQ-PROSE + AC-EQ-PROSE-ACCURATE below.
 >
 > The foundation D0 (evt_5bt85erc05fa4) found the relocation consuming two
 > UNPUBLISHED provider surfaces (LC's private `class DecEq`/`bool_eq`;
@@ -147,6 +167,16 @@ import surface, not a Foundation-owned mechanical migration).
   fixture-scaffolding resolution. (A module whose D0 census found an unpublished
   provider defers its full clean-ification with the cited reason and stays a
   partial consumer for that symbol only.)
+- **D-EQ-PROSE — correct LC's Public API prose for `class Eq` (P's carry).** In
+  LC's "Public API" prose block (:2281-2286 at a7f1fdfd8; re-measure at D0), REMOVE
+  `class Eq` — it is private (:61, bare, no `pub`) and unconsumed, so listing it as
+  public is a documentation defect (do NOT resolve it by publishing `class Eq`;
+  the ruling is that it stays private). Then sweep the WHOLE Eq entry in that prose
+  against ACTUAL loader visibility: for each Eq name it lists (`class Eq`,
+  `instance Eq Int` :205, `instance Eq Bool` :380), verify real loader-visibility
+  and align the prose line to reality — a name that is genuinely visible stays, a
+  name that is not is removed. This is prose-only in LC and does not touch the
+  relocation; it lands in the same LC edit.
 
 ## Acceptance criteria, each with its control
 
@@ -183,6 +213,13 @@ import surface, not a Foundation-owned mechanical migration).
   are byte-unchanged; a differential over the moved definitions shows only their
   module home changed, not their text. Consumers of these instances compute the
   same results.
+- **AC-EQ-PROSE-ACCURATE (P's carry).** LC's "Public API" prose lists exactly the
+  loader-visible public names in the Eq entry: `class Eq` (private :61) is REMOVED,
+  and every remaining Eq name it lists is corroborated loader-visible. Control: the
+  removed `class Eq` is verified still bare/private at :61 (not published to
+  satisfy the prose); for the instance sweep, a listed Eq-instance name that the
+  loader does not actually expose reds the check (prose-vs-loader differential),
+  not a bare grep for the word `Eq`. No computational change — prose only.
 - **AC-NO-REGRESSION.** Re-run the COMPLETE affected-target closure (every target
   that loads LC, or a migrated module, or a module whose closure this changes),
   scoped by which PATHS changed. Targeted via `scripts/ken-cargo`, never
