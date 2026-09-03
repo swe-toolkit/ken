@@ -26,10 +26,12 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > field whose type depends on the refined record index; the missing capability is
 > DUAL-VIEW of that field at the local-helper boundary. NOT a kernel change, NOT
 > source-compensable, NOT a B refutation.
-> Steward framed [[LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW]] (added to `depends_on`);
-> D2b is HELD at `eac970705` (WIP `97477903e` preserved). The Steward EXPLICITLY
-> re-releases D2b only after that predecessor lands, whereupon the ring rebuilds
-> B's Forall arms against the fixed elaborator and produces the D2b candidate
+> Steward framed [[LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW]] (added to `depends_on`).
+> That predecessor has LANDED (b22e62530, merged 2026-09-03) and the Steward has
+> EXPLICITLY RE-RELEASED D2b (evt_h43jey480ktz, 2026-09-03): the language ring
+> resumes from the held WIP `97477903e` (base `eac970705`), rebased onto current
+> main, rebuilding B's Forall arms against the now-fixed elaborator to produce the
+> D2b candidate
 > (Architect required soundness reviewer). §1a: HS4 self-ruled, next Research
 > trigger = HS6. This is D2b design hard-stop #4.
 >
