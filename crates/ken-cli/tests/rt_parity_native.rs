@@ -3272,28 +3272,37 @@ fn composed_return_ret_sink_population_is_unique() {
             "rt_write_writable_stage",
             "write",
         );
+        // D3-RECUT (b2 inc1) recalibration, Architect ruling B (evt_63dg2292sqwgv).
+        // The pure-Ret{Match} composed-return forward SSA edge (read AND valid-write,
+        // shape-gated at consumption, not operation-gated) returns
+        // Complete(RecursiveBackedge), short-circuiting the source machine AT the
+        // composed-return collapse. Strict-Ret seams DOWNSTREAM of that collapse --
+        // the ones base reached by continuing past it -- are no longer reached, so
+        // their sinks are not installed => the reached-seam population DROPS
+        // (read 35->17, write 26->17; the count is 1:1 with reached seams, invariant
+        // below unchanged). This is pure SUBSUMPTION, not a structural rewrite: the
+        // new coordinate set is a strict SUBSET of the base set (no new seam appears),
+        // and the removed coordinates are exactly the backedge-subsumed downstream
+        // seams -- read loses (301,465),(511,676); write loses (525,691).
         for (label, observations, expected_count, expected_semantic_coordinates) in [
             (
                 "read",
                 read,
-                35,
+                17,
                 std::collections::BTreeSet::from([
                     ("StaticOriginId(12)", "StaticOriginId(294)", 0),
-                    ("StaticOriginId(301)", "StaticOriginId(465)", 0),
                     ("StaticOriginId(470)", "StaticOriginId(505)", 0),
-                    ("StaticOriginId(511)", "StaticOriginId(676)", 0),
                     ("StaticOriginId(681)", "StaticOriginId(744)", 0),
                 ]),
             ),
             (
                 "write",
                 write,
-                26,
+                17,
                 std::collections::BTreeSet::from([
                     ("StaticOriginId(25)", "StaticOriginId(307)", 0),
                     ("StaticOriginId(314)", "StaticOriginId(478)", 0),
                     ("StaticOriginId(483)", "StaticOriginId(518)", 0),
-                    ("StaticOriginId(525)", "StaticOriginId(691)", 0),
                     ("StaticOriginId(696)", "StaticOriginId(731)", 0),
                     ("StaticOriginId(737)", "StaticOriginId(904)", 0),
                     ("StaticOriginId(909)", "StaticOriginId(1053)", 0),
