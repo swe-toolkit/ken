@@ -12872,14 +12872,16 @@ impl<'a> Lowering<'a> {
         record_composed_return_forward_ret_authority(&proof, format!("{return_body:?}"));
         Ok(ComposedReturnForwardRetAuthority {
             _plan: proof,
-            _return_body: return_body,
+            return_body,
         })
     }
 
     /// Join one post-selection planner member proof to the unique function-local
-    /// Ret sink. The resulting authority is move-only and deliberately unused
-    /// by D2; D3 must be separately released before any returned SSA value may
-    /// consume its block.
+    /// Ret sink. D3 consumes the resulting authority in the governed Tail
+    /// producer-to-Ret route (`source.rs`): its `return_body` is the sole forward
+    /// SSA edge target for the governed call's Trap-checked runtime Result. A
+    /// non-governed current call never reaches this consumer -- the outcome is
+    /// dropped there -- so the edge is gated on the governed projection.
     pub(super) fn composed_return_forward_ret_authority(
         &self,
         access: &CheckedIhGeneratedEntryAccess,

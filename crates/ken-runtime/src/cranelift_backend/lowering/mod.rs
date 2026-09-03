@@ -229,6 +229,7 @@ use super::planning::{
     checked_ih_generated_entry_arrival_mutation,
     composed_return_forward_ret_authority_mutation,
     record_composed_return_forward_ret_authority,
+    record_composed_return_forward_ret_authority_application,
     record_composed_return_forward_ret_role_witness,
     record_checked_ih_generated_entry_governed_validation,
     record_checked_ih_generated_entry_installed,
@@ -2782,11 +2783,13 @@ struct ActiveCarriedComputationalElimination {
 }
 
 /// One move-only compiler proof joining the selected planner member to the
-/// unique function-local Ret block. D2 deliberately has no result consumer;
-/// keeping both halves private makes a runtime carrier unrepresentable here.
+/// unique function-local Ret block. D3 consumes `return_body` as the single
+/// forward SSA edge target for a governed Tail producer's Trap-checked runtime
+/// Result; `_plan` stays the private move-only member proof that authorized the
+/// join and is never itself lowered, so no runtime carrier is representable here.
 struct ComposedReturnForwardRetAuthority {
     _plan: CheckedIhForwardRetPlanProof,
-    _return_body: Block,
+    return_body: Block,
 }
 
 /// Post-selection result of attempting to form the D2 compiler-only authority.

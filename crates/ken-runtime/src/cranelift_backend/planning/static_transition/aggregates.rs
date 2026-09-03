@@ -1311,6 +1311,15 @@ pub enum CheckedIhGeneratedEntryConfluenceMutation {
 /// Every non-suppression arm changes one operand after generated-entry
 /// validation and exact transport selection, so its refusal cannot be borrowed
 /// from an upstream planner gate.
+///
+/// `SubstituteForwardEdgeWord` is the one D3 live-edge control: it fires at the
+/// governed Tail closeout emission, after the authority has formed correctly,
+/// and carries an independent non-result word on the forward SSA edge instead of
+/// the call's exact Trap-checked runtime Result. It is the AC-CAUSAL-PAIR
+/// discriminator that separates result identity from producer existence and
+/// binding -- the edge and the sink are unchanged; only the word delivered to the
+/// shared Ret block is wrong, so a fixture that greens under it would not depend
+/// on the exact result reaching the exit.
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ComposedReturnForwardRetAuthorityMutation {
@@ -1323,6 +1332,7 @@ pub enum ComposedReturnForwardRetAuthorityMutation {
     WrongSource,
     ProducerSourceFromEntry,
     WrongSink,
+    SubstituteForwardEdgeWord,
 }
 
 /// Complete compiler-only coordinate shared by one planned Tail route and its

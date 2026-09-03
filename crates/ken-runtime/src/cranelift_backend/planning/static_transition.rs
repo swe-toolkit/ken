@@ -160,6 +160,7 @@ pub(in crate::cranelift_backend) use aggregates::{
     record_checked_ih_generated_entry_ordinary_continuation,
     record_checked_ih_generated_entry_raw_arrival, record_checked_ih_generated_entry_reached,
     record_composed_return_forward_ret_authority,
+    record_composed_return_forward_ret_authority_application,
     record_composed_return_forward_ret_role_witness,
     take_composed_return_forward_ret_population_mutation,
 };

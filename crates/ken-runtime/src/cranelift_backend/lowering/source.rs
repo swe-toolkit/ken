@@ -4556,9 +4556,18 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             .into_routed_answer()
                         }
                         CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
-                            let _forward_ret_authority = match forward_ret_outcome {
+                            // The governed Tail producer's Trap-checked runtime
+                            // Result takes ONE certified forward SSA edge to the
+                            // exact function-local shared Ret block, bypassing the
+                            // source-machine answer collapse, the constructor
+                            // transfer, the active carried backedge, and the checked
+                            // fallback. This is the single relaxed constraint; spec,
+                            // kernel, ABI, and runtime state are unchanged, and the
+                            // block handle is compiler state that never enters a Ken
+                            // value, carrier, frame, ABI, or memory.
+                            let authority = match forward_ret_outcome {
                                 ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
-                                    Some(authority)
+                                    authority
                                 }
                                 ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
                                     return Err(unsupported(
@@ -4566,9 +4575,25 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         "a validated Tail producer-to-Ret route has no exact post-selection authority",
                                     ));
                                 }
+                                // AC-EXACT-ONCE (zero-closeout control): with the
+                                // authority suppressed no forward edge is taken, so
+                                // the Result reverts to the source-machine answer
+                                // collapse and the fixture reddens on the base
+                                // ResourceBodyResult trap. This is the pre-D3
+                                // behavior, retained here only as the control.
                                 #[cfg(feature = "px8-ds-test-support")]
                                 ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
-                                    None
+                                    self.pending_computational_ih_call.take();
+                                    let result = self
+                                        .call_tail_checked_ih_transport_from_case_environment(
+                                            builder, &transport, &env,
+                                        )?;
+                                    return Ok(SourceCallOutcome::Continue(
+                                        SourceMachineState::Value {
+                                            value: RoutedAnswer::checked(result),
+                                            control,
+                                        },
+                                    ));
                                 }
                                 #[cfg(feature = "px8-ds-test-support")]
                                 ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
@@ -4577,6 +4602,10 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         "a validated Tail producer-to-Ret route has no exact post-selection authority",
                                     ));
                                 }
+                                // AC-EXACT-ONCE (twice-closeout control): two
+                                // post-selection authorities is exactly the "fires
+                                // twice for one arrival" state; it refuses at
+                                // formation rather than emitting a second closeout.
                                 #[cfg(feature = "px8-ds-test-support")]
                                 ComposedReturnForwardRetAuthorityOutcome::Duplicated(
                                     _first,
@@ -4589,11 +4618,46 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 }
                             };
                             self.pending_computational_ih_call.take();
-                            RoutedAnswer::checked(
-                                self.call_tail_checked_ih_transport_from_case_environment(
+                            // Emit the declared governed call once; its result is
+                            // the returned carried word.
+                            let result = self
+                                .call_tail_checked_ih_transport_from_case_environment(
                                     builder, &transport, &env,
-                                )?,
-                            )
+                                )?;
+                            // The Trap-checked Result gate: a governed continuation
+                            // call yields exactly one Carried runtime Result. A
+                            // specialized template is refused here and never reaches
+                            // the edge, so only a real Trap-checked Result crosses.
+                            let checked =
+                                CheckedIhApplicationResult::from_declared_call(result)?;
+                            #[cfg(feature = "px8-ds-test-support")]
+                            let edge_word = if composed_return_forward_ret_authority_mutation()
+                                == ComposedReturnForwardRetAuthorityMutation::SubstituteForwardEdgeWord
+                            {
+                                // AC-CAUSAL-PAIR (b): keep the edge and the sink but
+                                // carry an independent non-result word, catching a
+                                // fixture that greened without depending on the exact
+                                // Result reaching the exit.
+                                record_composed_return_forward_ret_authority_application();
+                                builder.ins().iconst(types::I64, 0)
+                            } else {
+                                checked.word.word
+                            };
+                            #[cfg(not(feature = "px8-ds-test-support"))]
+                            let edge_word = checked.word.word;
+                            // The certified forward SSA edge to the exact shared Ret
+                            // block. Per-arrival and exact-once: after the jump this
+                            // predecessor is sealed and yields no further source
+                            // value, so no remaining source continuation emits on it
+                            // and there is no second Ret body.
+                            builder
+                                .ins()
+                                .jump(authority.return_body, &[edge_word.into()]);
+                            let sealed = builder.create_block();
+                            builder.switch_to_block(sealed);
+                            return Ok(SourceCallOutcome::Complete(
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge),
+                            ));
                         }
                     };
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
