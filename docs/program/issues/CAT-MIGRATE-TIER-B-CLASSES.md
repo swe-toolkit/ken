@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-B-CLASSES
 title: "Scaffold-retirement Tier B (class-owner relocation + primitive-instance consolidation): relocate the three orphaned primitive DecEq instances (UInt8, Bytes from BytesKeys; String from StringKeys) with their eq/sound/complete wiring and injectivity certificates into the class owner LC (LawfulClasses); consolidate EmptyDec's byte-identical duplicate class DecEq / fn bool_eq / instance DecEq Bool into an import from LC; and give the three scaffolded modules (BytesKeys, StringKeys, EmptyDec) real import blocks so they elaborate standalone with zero fixture-scaffolding dependence. LC/LF/EC are already CLEAN (census fold), so no Core.Classes module-migration remains — the tier is the DecEq relocation + the three consumers' standalone-ification."
-status: active
+status: merged
 owner: foundation
 size: M
 gate: none
