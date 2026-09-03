@@ -36,23 +36,39 @@ scaffolding / ambient resolution`, [[CAT-SCAFFOLD-RETIREMENT]]). "Module X fails
 standalone at UnresolvedCon/UnboundName Y" is the STARTING condition each
 increment closes, not a defect on `main`.
 
-## Module set (Architect decomposition evt_2e0pee5jxzv07)
+## D0 CENSUS DONE + CONFIRMED — this node = the READY lane (8 modules)
 
-The Data value modules, migrated off scaffolding this tier:
+D0 census (foundation evt_19kq7r92attpy) measured TEN modules (authoritative,
+not nine) as an acyclic DAG with 7 WCCs and exactly three intra-tier edges
+(`SB -> StringKeys`, `Sums.Combinators -> Map`, `NonEmpty -> Validation`). The
+Architect CONFIRMED it (evt_4hp6qxkdaqgbz): the census IS the completeness proof;
+the WCC split is correct; the ready-first order is sound. Granularity call
+(Steward, Architect-confirmed): this node carries the READY lane as per-module
+increments; **{NonEmpty, Validation} are SPLIT OUT to a held node** —
+[[CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION]] — because they sit behind unpublished
+split-out predecessors (below), the DAG-axis discipline every tier respects.
 
-- StringBijection -> StringKeys (`SB -> StringKeys` — the one ordering edge the
-  decomposition names explicitly: StringBijection provides to StringKeys, so its
-  increment precedes StringKeys')
-- BytesKeys (BK) — became a pure consumer in Tier B (its `DecEq UInt8`/`DecEq
-  Bytes` relocated to LC); complete its standalone-cleanness as a consumer
-- NonEmpty (NE)
-- Map — carries the `bool_and`-family attached-owner migration to LC (Architect
-  non-collapse note: lands WITH this tier, not a blind delete)
-- Codec
-- Validation
-- Deque
-- Vector
-- Sums.Combinators
+## Module set — READY lane, this node, per-module increments IN THIS ORDER
+
+1. StringBijection (SB) -> 2. StringKeys (edge `SB -> StringKeys`)
+3. BytesKeys (BK) — pure consumer since Tier B (`DecEq UInt8`/`DecEq Bytes`
+   relocated to LC); standalone-cleanness closeout, no new proof content
+4. Sums.Combinators -> 5. Map (edge `Sums.Combinators -> Map`)
+6. Codec  7. Deque  8. Vector (independent consumers of Tier A/B)
+
+Map (increment 5) additionally carries the `bool_and`-family attached-owner
+relocation to LC, ruling (a) below.
+
+### SPLIT OUT — held, NOT this node
+- **{NonEmpty, Validation}** -> [[CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION]], held
+  behind: [[CAT-MIGRATE-LF-SEMIGROUP-PUBLISH]] (NonEmpty needs private LF
+  Semigroup), [[CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS]] (Validation needs EC
+  apply_to/compose/functor_map_of/Applicative, all private + EC roots-loads red),
+  and the Language roots-loader faces-3 predecessor
+  ([[LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]] follow-up).
+- **LF private `bool_and` consolidation** -> [[CAT-MIGRATE-LF-BOOL-AND-CONSOLIDATION]]
+  (Core.Classes, sequenced AFTER Map's (a) lands) — NOT part of Map's Data
+  increment; it only DROPS + repoints, mints nothing.
 
 ## Deliverables
 
@@ -73,9 +89,19 @@ The Data value modules, migrated off scaffolding this tier:
   for the exact D0-confirmed set; retire the ambient reach; extend the module's
   loader-visible inventory to reflect both the new exports and the imports
   (imported names are not new exports — reflect them the way an existing import
-  is reflected); the module elaborates standalone (exit 0). Map's increment
-  additionally migrates the `bool_and` family to its LC owner per the Architect
-  non-collapse note.
+  is reflected); the module elaborates standalone (exit 0).
+- **Map's increment (5) — the `bool_and` (a) relocation, RULED (Architect
+  evt_4hp6qxkdaqgbz).** DROP Map's byte-identical `bool_and` dup, import LC's
+  PUBLIC `bool_and`, and RELOCATE Map's six proofs
+  (`comm`/`assoc`/`idempotent`/`left_identity`/`right_identity`/`true_intro`) to
+  LC as a reviewed-verbatim-modulo-`pub` move — they fill genuine LC gaps and do
+  NOT collide with LC's `intro`/`left`/`right`. This establishes LC's ownership
+  of `assoc` + the identity laws. ALSO measure `Map.true_intro` vs `LC.intro`:
+  same proposition -> drop/reuse under one name; else keep distinct. One
+  proposition, one proof. BINDING CONSTRAINT: LC is the SOLE canonical `bool_and`
+  owner; every proposition exists there EXACTLY ONCE under ONE name (the LF
+  private dup consolidation that reconciles the divergent names lives in
+  [[CAT-MIGRATE-LF-BOOL-AND-CONSOLIDATION]], sequenced after this).
 
 ## Acceptance criteria, each with its control (proven Tier-A / EC shape)
 
