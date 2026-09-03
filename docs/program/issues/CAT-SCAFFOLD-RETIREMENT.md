@@ -59,10 +59,12 @@ provider.
   - [[CAT-MIGRATE-TIER-B-CLASSES]] (`draft`, gated on P): the WHOLE DecEq
     UInt8/Bytes/String relocation into LC + EmptyDec consolidation + BytesKeys /
     StringKeys / EmptyDec standalone.
-  - Off the critical path (census error — EC was NOT clean): an independent
-    Core.Classes node clean-ifies EC (LF publishes `Functor`/`comp`/`idf`/
-    `list_map`; EC imports them). Steward to frame; runs in parallel, not a
-    regression fix. LF (LawfulFunctors) itself is genuinely clean via
+  - Off the critical path (census error — EC was NOT clean):
+    [[CAT-MIGRATE-EC-FUNCTOR-IMPORT]] (`ready`, framed 2026-09-03,
+    `depends_on: []`) clean-ifies EC (LF publishes `Functor`/`comp`/`idf`/
+    `list_map`; EC imports them → standalone-green). Runs in parallel, not a
+    regression fix (EC elaborates in the full-catalog build via ambient today).
+    Do NOT preempt P with it. LF (LawfulFunctors) itself is genuinely clean via
     `CAT-LAWFULFUNCTORS-STANDALONE-IMPORT`.
 
   **The class-owner relocation lands here and gates every DecEq/class consumer
