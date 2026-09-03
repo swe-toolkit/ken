@@ -491,6 +491,7 @@ struct ResultRefinement {
     concrete_index: Term,
     refined_index: Term,
     premise_slot: usize,
+    sentinel_region: usize,
     install_depth: usize,
 }
 
@@ -1427,6 +1428,24 @@ fn synth_refl_proof(
     }
 }
 
+fn synth_refl_method_from_type(
+    env: &GlobalEnv,
+    ctx: &mut Context,
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    match whnf(env, ctx, expected) {
+        Term::Pi(domain, codomain) => {
+            let domain = *domain;
+            ctx.push(domain.clone());
+            let body = synth_refl_method_from_type(env, ctx, &codomain, span);
+            ctx.pop();
+            Ok(Term::lam(domain, body?))
+        }
+        _ => synth_refl_proof(env, ctx, expected, span),
+    }
+}
+
 fn synth_generated_index_evidence(
     env: &GlobalEnv,
     ctx: &Context,
@@ -1775,6 +1794,1068 @@ struct ConvoyEntry {
     ambient_ty: Term,
 }
 
+/// One method of an already-elaborated indexed eliminator that is valid in the
+/// ambient goal but ceases to be valid when that eliminator's actual index is
+/// generalized into an enclosing match motive. The method travels as an
+/// explicit motive companion: at the original index the completed outer
+/// eliminator supplies `ambient_value`; at constructor-local indices the method
+/// is a genuine hypothesis. This keeps an impossible-branch discharge and the
+/// generated reflexivity witness in the same convoy instead of rewriting only
+/// one of them.
+#[derive(Clone)]
+struct EmbeddedMethodConvoy {
+    sentinel_region: usize,
+    elim_ordinal: usize,
+    method_ordinal: usize,
+    ambient_value: Term,
+    ambient_ty: Term,
+    motive_ty: Term,
+}
+
+#[derive(Clone)]
+struct EmbeddedElimSnapshot {
+    fam: GlobalId,
+    level_args: Vec<Level>,
+    params: Vec<Term>,
+    motive: Term,
+    methods: Vec<Term>,
+}
+
+struct CoherentFrameMotivePlan {
+    expected: Term,
+    context_convoy: Vec<ConvoyEntry>,
+    embedded_method_convoy: Vec<EmbeddedMethodConvoy>,
+    embedded_method_repairs: Vec<(usize, usize)>,
+    motive_user_body: Term,
+    equation_convoy: bool,
+}
+
+/// Collect only the outermost eliminators in each term position. Once an
+/// eliminator is captured, its methods belong to that eliminator's own frame;
+/// any nested elimination in a method is reached after that method is selected
+/// and is not a sibling companion of the enclosing goal occurrence.
+#[inline(never)]
+fn collect_outer_embedded_elims(term: &Term, out: &mut Vec<EmbeddedElimSnapshot>) {
+    if let Term::Elim {
+        fam,
+        level_args,
+        params,
+        motive,
+        methods,
+        ..
+    } = term
+    {
+        out.push(EmbeddedElimSnapshot {
+            fam: *fam,
+            level_args: level_args.clone(),
+            params: params.clone(),
+            motive: (**motive).clone(),
+            methods: methods.clone(),
+        });
+        return;
+    }
+    for child in term.children() {
+        collect_outer_embedded_elims(child, out);
+    }
+}
+
+fn term_contains_absurd(term: &Term) -> bool {
+    matches!(term, Term::Absurd(_, _)) || term.children().into_iter().any(term_contains_absurd)
+}
+
+/// Rebuild an invalid structurally recursive method from the recursive-IH
+/// binder already required by the kernel method telescope. The surface method
+/// may have captured a concrete-index cast; after convoying the actual index,
+/// its recursive IH is the canonical constructor-local computation and carries
+/// the exact generalized result type.
+fn repair_embedded_method_from_ih(
+    env: &GlobalEnv,
+    ctx: &Context,
+    method: &Term,
+    expected: &Term,
+) -> Option<Term> {
+    fn go(env: &GlobalEnv, ctx: &Context, method: &Term, expected: &Term) -> Option<Term> {
+        match (method, whnf(env, ctx, expected)) {
+            (Term::Lam(_, body), Term::Pi(domain, codomain)) => {
+                let mut body_ctx = ctx.clone();
+                body_ctx.push((*domain).clone());
+                let body = go(env, &body_ctx, body, &codomain)?;
+                Some(Term::lam(*domain, body))
+            }
+            _ if kernel_check(env, ctx, method, expected).is_ok() => Some(method.clone()),
+            _ => {
+                for index in 0..ctx.len() {
+                    let mut candidate = Term::var(index);
+                    let mut candidate_ty = kernel_infer(env, ctx, &candidate).ok()?;
+                    let mut consumed = false;
+                    loop {
+                        if convert_type(env, ctx, &candidate_ty, expected) && consumed {
+                            return Some(candidate);
+                        }
+                        let Term::Pi(domain, codomain) = whnf(env, ctx, &candidate_ty) else {
+                            break;
+                        };
+                        let Some(argument) = (0..ctx.len()).find_map(|argument_index| {
+                            let argument = Term::var(argument_index);
+                            let argument_ty = kernel_infer(env, ctx, &argument).ok()?;
+                            convert_type(env, ctx, &argument_ty, &domain).then_some(argument)
+                        }) else {
+                            break;
+                        };
+                        candidate = Term::app(candidate, argument.clone());
+                        candidate_ty = subst0(&codomain, &argument);
+                        consumed = true;
+                    }
+                }
+                None
+            }
+        }
+    }
+    go(env, ctx, method, expected)
+}
+
+/// Find exactly those embedded methods whose ambient proof was specialized to
+/// the old actual index. A method is convoyed only when its original form
+/// kernel-checks and the same structural rebase fails against the generalized
+/// method type; already-parametric methods stay in place.
+#[inline(never)]
+fn plan_embedded_method_convoy(
+    env: &GlobalEnv,
+    ambient_ctx: &Context,
+    motive_ctx: &Context,
+    ambient_expected: &Term,
+    rebased_expected: &Term,
+    sentinel_region: usize,
+) -> Result<(Vec<EmbeddedMethodConvoy>, Vec<(usize, usize)>), ElabError> {
+    let mut ambient_elims = Vec::new();
+    let mut rebased_elims = Vec::new();
+    collect_outer_embedded_elims(ambient_expected, &mut ambient_elims);
+    collect_outer_embedded_elims(rebased_expected, &mut rebased_elims);
+    if ambient_elims.len() != rebased_elims.len() {
+        return Err(ElabError::Internal(format!(
+            "coherent-frame convoy changed the embedded-eliminator population: {} -> {}",
+            ambient_elims.len(),
+            rebased_elims.len()
+        )));
+    }
+
+    let mut plan = Vec::new();
+    let mut repairs = Vec::new();
+    for (elim_ordinal, (ambient, rebased)) in ambient_elims.iter().zip(&rebased_elims).enumerate() {
+        if ambient.fam != rebased.fam
+            || ambient.level_args != rebased.level_args
+            || ambient.methods.len() != rebased.methods.len()
+        {
+            return Err(ElabError::Internal(
+                "coherent-frame convoy changed an embedded eliminator's identity".into(),
+            ));
+        }
+        let ind = env.inductive(ambient.fam).ok_or_else(|| {
+            ElabError::Internal(format!(
+                "coherent-frame convoy could not find embedded family {:?}",
+                ambient.fam
+            ))
+        })?;
+        for method_ordinal in 0..ambient.methods.len() {
+            let ambient_ty = method_type(
+                env,
+                ind,
+                method_ordinal,
+                &ambient.motive,
+                &ambient.params,
+                &ambient.level_args,
+            )
+            .map_err(|error| {
+                ElabError::Internal(format!(
+                    "coherent-frame convoy could not classify ambient method: {error:?}"
+                ))
+            })?;
+            kernel_check(
+                env,
+                ambient_ctx,
+                &ambient.methods[method_ordinal],
+                &ambient_ty,
+            )
+            .map_err(|error| {
+                ElabError::Internal(format!(
+                    "coherent-frame convoy found an ill-typed ambient method: {error:?}"
+                ))
+            })?;
+
+            let motive_ty = method_type(
+                env,
+                ind,
+                method_ordinal,
+                &rebased.motive,
+                &rebased.params,
+                &rebased.level_args,
+            )
+            .map_err(|error| {
+                ElabError::Internal(format!(
+                    "coherent-frame convoy could not classify rebased method: {error:?}"
+                ))
+            })?;
+            let rebased_check = kernel_check(
+                env,
+                motive_ctx,
+                &rebased.methods[method_ordinal],
+                &motive_ty,
+            );
+            if rebased_check.is_err() {
+                if term_contains_absurd(&ambient.methods[method_ordinal]) {
+                    plan.push(EmbeddedMethodConvoy {
+                        sentinel_region,
+                        elim_ordinal,
+                        method_ordinal,
+                        ambient_value: ambient.methods[method_ordinal].clone(),
+                        ambient_ty,
+                        motive_ty,
+                    });
+                } else if repair_embedded_method_from_ih(
+                    env,
+                    motive_ctx,
+                    &rebased.methods[method_ordinal],
+                    &motive_ty,
+                )
+                .is_some()
+                {
+                    repairs.push((elim_ordinal, method_ordinal));
+                } else {
+                    return Err(ElabError::Internal(format!(
+                        "coherent-frame convoy cannot repair embedded method \
+                         {elim_ordinal}:{method_ordinal}"
+                    )));
+                }
+            }
+        }
+    }
+    Ok((plan, repairs))
+}
+
+/// Replace the planned methods by their companion-binder sentinels. Traversal
+/// order is structural and fail-closed: every planned coordinate must be seen
+/// exactly once, so two identical method terms in distinct eliminators cannot
+/// be conflated by a term-wide substitution.
+#[inline(never)]
+fn install_embedded_method_sentinels(
+    env: &GlobalEnv,
+    ctx: &Context,
+    term: &Term,
+    plan: &[EmbeddedMethodConvoy],
+    repairs: &[(usize, usize)],
+    slot_base: usize,
+) -> Result<Term, ElabError> {
+    fn go(
+        env: &GlobalEnv,
+        ctx: &Context,
+        term: &Term,
+        plan: &[EmbeddedMethodConvoy],
+        repairs: &[(usize, usize)],
+        slot_base: usize,
+        next_elim: &mut usize,
+        seen: &mut [bool],
+    ) -> Term {
+        let recur = |term: &Term, next_elim: &mut usize, seen: &mut [bool]| {
+            go(env, ctx, term, plan, repairs, slot_base, next_elim, seen)
+        };
+        match term {
+            Term::Elim {
+                fam,
+                level_args,
+                params,
+                motive,
+                methods,
+                indices,
+                scrut,
+            } => {
+                let ordinal = *next_elim;
+                *next_elim += 1;
+                let params: Vec<Term> = params
+                    .iter()
+                    .map(|term| recur(term, next_elim, seen))
+                    .collect();
+                let motive = Box::new(recur(motive, next_elim, seen));
+                let methods = methods
+                    .iter()
+                    .enumerate()
+                    .map(|(method_ordinal, method)| {
+                        let rewritten = recur(method, next_elim, seen);
+                        if let Some((plan_index, entry)) =
+                            plan.iter().enumerate().find(|(_, entry)| {
+                                entry.elim_ordinal == ordinal
+                                    && entry.method_ordinal == method_ordinal
+                            })
+                        {
+                            seen[plan_index] = true;
+                            index_refinement_sentinel(entry.sentinel_region, slot_base + plan_index)
+                        } else if repairs.contains(&(ordinal, method_ordinal)) {
+                            let repaired_ty = env.inductive(*fam).and_then(|ind| {
+                                method_type(env, ind, method_ordinal, &motive, &params, level_args)
+                                    .ok()
+                            });
+                            repaired_ty
+                                .as_ref()
+                                .and_then(|expected| {
+                                    repair_embedded_method_from_ih(env, ctx, &rewritten, expected)
+                                })
+                                .unwrap_or(rewritten)
+                        } else {
+                            rewritten
+                        }
+                    })
+                    .collect();
+                let indices = indices
+                    .iter()
+                    .map(|term| recur(term, next_elim, seen))
+                    .collect();
+                let scrut = Box::new(recur(scrut, next_elim, seen));
+                Term::Elim {
+                    fam: *fam,
+                    level_args: level_args.clone(),
+                    params,
+                    motive,
+                    methods,
+                    indices,
+                    scrut,
+                }
+            }
+            Term::Pi(a, b) => Term::pi(recur(a, next_elim, seen), recur(b, next_elim, seen)),
+            Term::Lam(a, b) => Term::lam(recur(a, next_elim, seen), recur(b, next_elim, seen)),
+            Term::Sigma(a, b) => Term::sigma(recur(a, next_elim, seen), recur(b, next_elim, seen)),
+            Term::Let { ty, val, body } => Term::Let {
+                ty: Box::new(recur(ty, next_elim, seen)),
+                val: Box::new(recur(val, next_elim, seen)),
+                body: Box::new(recur(body, next_elim, seen)),
+            },
+            Term::App(f, a) => Term::app(recur(f, next_elim, seen), recur(a, next_elim, seen)),
+            Term::Pair(a, b) => Term::pair(recur(a, next_elim, seen), recur(b, next_elim, seen)),
+            Term::Proj1(p) => Term::proj1(recur(p, next_elim, seen)),
+            Term::Proj2(p) => Term::proj2(recur(p, next_elim, seen)),
+            Term::Ascript(t, a) => Term::Ascript(
+                Box::new(recur(t, next_elim, seen)),
+                Box::new(recur(a, next_elim, seen)),
+            ),
+            Term::Eq(a, t, u) => Term::Eq(
+                Box::new(recur(a, next_elim, seen)),
+                Box::new(recur(t, next_elim, seen)),
+                Box::new(recur(u, next_elim, seen)),
+            ),
+            Term::Cast(a, b, e, t) => Term::Cast(
+                Box::new(recur(a, next_elim, seen)),
+                Box::new(recur(b, next_elim, seen)),
+                Box::new(recur(e, next_elim, seen)),
+                Box::new(recur(t, next_elim, seen)),
+            ),
+            Term::J(m, d, e) => Term::J(
+                Box::new(recur(m, next_elim, seen)),
+                Box::new(recur(d, next_elim, seen)),
+                Box::new(recur(e, next_elim, seen)),
+            ),
+            Term::Quot(a, r) => Term::Quot(
+                Box::new(recur(a, next_elim, seen)),
+                Box::new(recur(r, next_elim, seen)),
+            ),
+            Term::QuotClass(t) => Term::QuotClass(Box::new(recur(t, next_elim, seen))),
+            Term::Trunc(a) => Term::Trunc(Box::new(recur(a, next_elim, seen))),
+            Term::TruncProj(t) => Term::TruncProj(Box::new(recur(t, next_elim, seen))),
+            Term::Refl(t) => Term::Refl(Box::new(recur(t, next_elim, seen))),
+            Term::QuotElim {
+                motive,
+                method,
+                respect,
+                scrut,
+            } => Term::QuotElim {
+                motive: Box::new(recur(motive, next_elim, seen)),
+                method: Box::new(recur(method, next_elim, seen)),
+                respect: Box::new(recur(respect, next_elim, seen)),
+                scrut: Box::new(recur(scrut, next_elim, seen)),
+            },
+            Term::Absurd(motive, proof) => Term::Absurd(
+                Box::new(recur(motive, next_elim, seen)),
+                Box::new(recur(proof, next_elim, seen)),
+            ),
+            Term::Type(_)
+            | Term::Omega(_)
+            | Term::Var(_)
+            | Term::Const { .. }
+            | Term::IndFormer { .. }
+            | Term::Constructor { .. }
+            | Term::IntLit(_) => term.clone(),
+        }
+    }
+
+    let mut next_elim = 0;
+    let mut seen = vec![false; plan.len()];
+    let rewritten = go(
+        env,
+        ctx,
+        term,
+        plan,
+        repairs,
+        slot_base,
+        &mut next_elim,
+        &mut seen,
+    );
+    if let Some(missing) = seen.iter().position(|seen| !seen) {
+        return Err(ElabError::Internal(format!(
+            "coherent-frame convoy did not reach planned embedded method {missing}"
+        )));
+    }
+    Ok(rewritten)
+}
+
+/// Re-synthesize the generated top equality spine of every completed embedded
+/// eliminator after its actual indices have moved into the convoy frame. This is
+/// paired with `install_embedded_method_sentinels`: refreshing only this witness
+/// is the partial-convoy bug, while refreshing it together with every invalid
+/// method companion yields a well-typed eliminator at the generalized index.
+#[inline(never)]
+fn refresh_embedded_elim_evidence(
+    env: &GlobalEnv,
+    ctx: &Context,
+    term: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let go = |term: &Term, ctx: &Context| refresh_embedded_elim_evidence(env, ctx, term, span);
+    match term {
+        Term::App(f, a) => {
+            let rebuilt = Term::app(go(f, ctx)?, go(a, ctx)?);
+            let (head, mut args) = peel_app(&rebuilt);
+            let Term::Elim {
+                fam,
+                params,
+                indices,
+                ..
+            } = &head
+            else {
+                return Ok(rebuilt);
+            };
+            let ind = env.inductive(*fam).ok_or_else(|| {
+                ElabError::Internal(format!(
+                    "coherent-frame convoy could not find embedded family {fam:?}"
+                ))
+            })?;
+            let premises = method_index_premises(ind, params, indices, indices, 0);
+            if args.len() < premises.len() {
+                return Ok(rebuilt);
+            }
+            for (argument, premise) in args.iter_mut().zip(&premises) {
+                *argument = synth_generated_index_evidence(env, ctx, premise, span)?;
+            }
+            Ok(args.into_iter().fold(head, Term::app))
+        }
+        Term::Pi(a, b) => {
+            let a = go(a, ctx)?;
+            let mut body_ctx = ctx.clone();
+            body_ctx.push(a.clone());
+            Ok(Term::pi(a, go(b, &body_ctx)?))
+        }
+        Term::Lam(a, b) => {
+            let a = go(a, ctx)?;
+            let mut body_ctx = ctx.clone();
+            body_ctx.push(a.clone());
+            Ok(Term::lam(a, go(b, &body_ctx)?))
+        }
+        Term::Sigma(a, b) => {
+            let a = go(a, ctx)?;
+            let mut body_ctx = ctx.clone();
+            body_ctx.push(a.clone());
+            Ok(Term::sigma(a, go(b, &body_ctx)?))
+        }
+        Term::Let { ty, val, body } => {
+            let ty = go(ty, ctx)?;
+            let val = go(val, ctx)?;
+            let mut body_ctx = ctx.clone();
+            body_ctx.push(ty.clone());
+            Ok(Term::Let {
+                ty: Box::new(ty),
+                val: Box::new(val),
+                body: Box::new(go(body, &body_ctx)?),
+            })
+        }
+        Term::Pair(a, b) => Ok(Term::pair(go(a, ctx)?, go(b, ctx)?)),
+        Term::Proj1(p) => Ok(Term::proj1(go(p, ctx)?)),
+        Term::Proj2(p) => Ok(Term::proj2(go(p, ctx)?)),
+        Term::Ascript(t, a) => Ok(Term::Ascript(Box::new(go(t, ctx)?), Box::new(go(a, ctx)?))),
+        Term::Eq(a, t, u) => Ok(Term::Eq(
+            Box::new(go(a, ctx)?),
+            Box::new(go(t, ctx)?),
+            Box::new(go(u, ctx)?),
+        )),
+        Term::Cast(a, b, e, t) => Ok(Term::Cast(
+            Box::new(go(a, ctx)?),
+            Box::new(go(b, ctx)?),
+            Box::new(go(e, ctx)?),
+            Box::new(go(t, ctx)?),
+        )),
+        Term::J(m, d, e) => Ok(Term::J(
+            Box::new(go(m, ctx)?),
+            Box::new(go(d, ctx)?),
+            Box::new(go(e, ctx)?),
+        )),
+        Term::Quot(a, r) => Ok(Term::Quot(Box::new(go(a, ctx)?), Box::new(go(r, ctx)?))),
+        Term::QuotClass(t) => Ok(Term::QuotClass(Box::new(go(t, ctx)?))),
+        Term::Trunc(a) => Ok(Term::Trunc(Box::new(go(a, ctx)?))),
+        Term::TruncProj(t) => Ok(Term::TruncProj(Box::new(go(t, ctx)?))),
+        Term::Refl(t) => Ok(Term::Refl(Box::new(go(t, ctx)?))),
+        Term::QuotElim {
+            motive,
+            method,
+            respect,
+            scrut,
+        } => Ok(Term::QuotElim {
+            motive: Box::new(go(motive, ctx)?),
+            method: Box::new(go(method, ctx)?),
+            respect: Box::new(go(respect, ctx)?),
+            scrut: Box::new(go(scrut, ctx)?),
+        }),
+        Term::Elim {
+            fam,
+            level_args,
+            params,
+            motive,
+            methods,
+            indices,
+            scrut,
+        } => Ok(Term::Elim {
+            fam: *fam,
+            level_args: level_args.clone(),
+            params: params
+                .iter()
+                .map(|term| go(term, ctx))
+                .collect::<Result<Vec<_>, _>>()?,
+            motive: Box::new(go(motive, ctx)?),
+            methods: methods
+                .iter()
+                .map(|term| go(term, ctx))
+                .collect::<Result<Vec<_>, _>>()?,
+            indices: indices
+                .iter()
+                .map(|term| go(term, ctx))
+                .collect::<Result<Vec<_>, _>>()?,
+            scrut: Box::new(go(scrut, ctx)?),
+        }),
+        Term::Absurd(motive, proof) => Ok(Term::Absurd(
+            Box::new(go(motive, ctx)?),
+            Box::new(go(proof, ctx)?),
+        )),
+        Term::Type(_)
+        | Term::Omega(_)
+        | Term::Var(_)
+        | Term::Const { .. }
+        | Term::IndFormer { .. }
+        | Term::Constructor { .. }
+        | Term::IntLit(_) => Ok(term.clone()),
+    }
+}
+
+/// Build a branch-specific coherent-frame motive by large-eliminating the one
+/// generalized index before introducing the matched-family value. Conflict
+/// constructors compute to a J-free `Bottom -> Top`; compatible constructors
+/// compute to the usual generated equality premise followed by a transport
+/// built only from that branch's already-peeled equality leaves.
+fn build_index_equation_convoy_body(
+    env: &GlobalEnv,
+    outer_ctx: &Context,
+    motive_ctx: &Context,
+    ind: &InductiveDecl,
+    params: &[Term],
+    scrut_core: &Term,
+    scrut_indices: &[Term],
+    original_expected: &Term,
+    motive_base_depth: usize,
+) -> Result<Option<Term>, ElabError> {
+    if ind.indices.len() != 1 || scrut_indices.len() != 1 {
+        return Ok(None);
+    }
+    let goal_head = whnf(env, outer_ctx, original_expected);
+    let Term::Eq(goal_ty, _, _) = goal_head else {
+        return Ok(None);
+    };
+    let Term::Type(goal_level) = whnf(
+        env,
+        outer_ctx,
+        &kernel_infer(env, outer_ctx, &goal_ty).map_err(|error| {
+            ElabError::Internal(format!(
+                "large index convoy could not classify its equality carrier: {error:?}"
+            ))
+        })?,
+    ) else {
+        return Ok(None);
+    };
+    let goal_sort = Term::Omega(goal_level);
+
+    let index_ty = subst_outer(&ind.indices[0], ind.params.len(), params, 0);
+    let (index_head, index_params) = peel_app(&whnf(env, outer_ctx, &index_ty));
+    let Term::IndFormer {
+        id: index_family,
+        level_args: index_level_args,
+    } = index_head
+    else {
+        return Ok(None);
+    };
+    let index_ind = env
+        .inductive(index_family)
+        .ok_or_else(|| ElabError::Internal("large index convoy lost its index family".into()))?;
+    if !index_ind.indices.is_empty() {
+        return Ok(None);
+    }
+
+    let matched_at = |depth: usize, index: Term| {
+        let mut family = Term::IndFormer {
+            id: ind.id,
+            level_args: Vec::new(),
+        };
+        for param in params {
+            family = Term::app(family, weaken(param, depth as i64));
+        }
+        Term::app(family, index)
+    };
+
+    // N(r) := D params r -> goal-sort. Eliminating r computes a predicate
+    // over the eventual D-value, so no value of D p is captured while the
+    // index eliminator itself refines p to a constructor.
+    let mut index_binder_ctx = outer_ctx.clone();
+    index_binder_ctx.push(index_ty.clone());
+    let predicate_body = Term::pi(matched_at(1, Term::var(0)), weaken(&goal_sort, 1));
+    let predicate_sort =
+        kernel_infer(env, &index_binder_ctx, &predicate_body).map_err(|error| {
+            ElabError::Internal(format!(
+                "large index convoy predicate is ill-typed: {error:?}"
+            ))
+        })?;
+    let selector_motive = Term::Ascript(
+        Box::new(Term::lam(index_ty.clone(), predicate_body)),
+        Box::new(Term::pi(index_ty.clone(), predicate_sort)),
+    );
+
+    let mut selector_methods = Vec::with_capacity(index_ind.constructors.len());
+    for (constructor_ordinal, constructor) in index_ind.constructors.iter().enumerate() {
+        let index_method_ty = method_type(
+            env,
+            index_ind,
+            constructor_ordinal,
+            &selector_motive,
+            &index_params,
+            &index_level_args,
+        )
+        .map_err(|error| {
+            ElabError::Internal(format!(
+                "large index convoy could not form an index method: {error:?}"
+            ))
+        })?;
+        let recursive = recursive_shapes(env, constructor, index_family, index_ind.params.len())
+            .map_err(|error| {
+                ElabError::Internal(format!(
+                    "large index convoy could not classify index recursion: {error:?}"
+                ))
+            })?;
+        let method_binder_count = constructor.args.len() + recursive.len();
+        let mut method_ctx = outer_ctx.clone();
+        let mut cursor = index_method_ty.clone();
+        let mut method_domains = Vec::with_capacity(method_binder_count);
+        for _ in 0..method_binder_count {
+            let Term::Pi(domain, codomain) = whnf(env, &method_ctx, &cursor) else {
+                return Err(ElabError::Internal(
+                    "large index convoy index method lost its binder telescope".into(),
+                ));
+            };
+            let domain = *domain;
+            method_ctx.push(domain.clone());
+            method_domains.push(domain);
+            cursor = *codomain;
+        }
+        let Term::Pi(value_domain, _) = whnf(env, &method_ctx, &cursor) else {
+            return Err(ElabError::Internal(
+                "large index convoy index method did not return a predicate".into(),
+            ));
+        };
+        let value_domain = *value_domain;
+        method_ctx.push(value_domain.clone());
+
+        let mut target = Term::Constructor {
+            id: constructor.id,
+            level_args: index_level_args.clone(),
+        };
+        for param in &index_params {
+            target = Term::app(target, weaken(param, method_binder_count as i64));
+        }
+        for argument in 0..constructor.args.len() {
+            target = Term::app(
+                target,
+                Term::var(recursive.len() + constructor.args.len() - 1 - argument),
+            );
+        }
+        let raw_evidence = Term::Eq(
+            Box::new(weaken(&index_ty, (method_binder_count + 1) as i64)),
+            Box::new(weaken(&target, 1)),
+            Box::new(weaken(&scrut_indices[0], (method_binder_count + 1) as i64)),
+        );
+        let evidence_shape = whnf(env, &method_ctx, &raw_evidence);
+        let branch_result = if matches!(
+            evidence_shape,
+            Term::Const { id, .. } if id == env.bottom_id()
+        ) {
+            Term::pi(
+                raw_evidence,
+                Term::Const {
+                    id: env.top_id(),
+                    level_args: Vec::new(),
+                },
+            )
+        } else {
+            let mut evidence_ctx = method_ctx.clone();
+            evidence_ctx.push(raw_evidence.clone());
+            let leaves = project_generated_index_equality_leaves(
+                env,
+                &evidence_ctx,
+                &weaken(&raw_evidence, 1),
+                Term::var(0),
+            )?;
+            let mut value = Term::var(1);
+            let mut value_ty = weaken(&value_domain, 2);
+            let mut changed = false;
+            for leaf in leaves {
+                let Term::Type(index_level) = whnf(
+                    env,
+                    &evidence_ctx,
+                    &kernel_infer(env, &evidence_ctx, &leaf.index_ty).map_err(|error| {
+                        ElabError::Internal(format!(
+                            "large index convoy could not classify a peeled index: {error:?}"
+                        ))
+                    })?,
+                ) else {
+                    return Ok(None);
+                };
+                let reverse = build_sym(
+                    env,
+                    &evidence_ctx,
+                    &leaf.index_ty,
+                    index_level.clone(),
+                    &leaf.target,
+                    leaf.proof,
+                );
+                let stable_forward = build_sym(
+                    env,
+                    &evidence_ctx,
+                    &leaf.index_ty,
+                    index_level,
+                    &leaf.scrutinee,
+                    reverse,
+                );
+                if let Some((cast, cast_ty)) = try_reindex_cast(
+                    env,
+                    &evidence_ctx,
+                    &leaf.index_ty,
+                    &leaf.target,
+                    &leaf.scrutinee,
+                    &value_ty,
+                    value.clone(),
+                    stable_forward,
+                )? {
+                    value = cast;
+                    value_ty = cast_ty;
+                    changed = true;
+                }
+            }
+            if !changed {
+                return Ok(None);
+            }
+            let depth = method_binder_count + 2;
+            let goal = subst_term_generalize(
+                &weaken(original_expected, depth as i64),
+                &weaken(scrut_core, depth as i64),
+                &value,
+            );
+            kernel_infer(env, &evidence_ctx, &goal).map_err(|error| {
+                ElabError::Internal(format!(
+                    "large index convoy successor goal is ill-typed: {error:?}"
+                ))
+            })?;
+            Term::pi(raw_evidence, goal)
+        };
+
+        let mut method = Term::lam(value_domain, branch_result);
+        for domain in method_domains.into_iter().rev() {
+            method = Term::lam(domain, method);
+        }
+        kernel_check(env, outer_ctx, &method, &index_method_ty).map_err(|error| {
+            ElabError::Internal(format!(
+                "large index convoy constructed an ill-typed index method: {error:?}"
+            ))
+        })?;
+        selector_methods.push(method);
+    }
+
+    let selector_at_index = Term::Elim {
+        fam: index_family,
+        level_args: index_level_args,
+        params: index_params.iter().map(|param| weaken(param, 1)).collect(),
+        motive: Box::new(weaken(&selector_motive, 1)),
+        methods: selector_methods
+            .iter()
+            .map(|method| weaken(method, 1))
+            .collect(),
+        indices: Vec::new(),
+        scrut: Box::new(Term::var(0)),
+    };
+    let selector_ty = Term::pi(
+        index_ty.clone(),
+        Term::pi(matched_at(1, Term::var(0)), weaken(&goal_sort, 1)),
+    );
+    let selector = Term::Ascript(
+        Box::new(Term::lam(index_ty, selector_at_index)),
+        Box::new(selector_ty),
+    );
+    let body = Term::app(
+        Term::app(weaken(&selector, motive_base_depth as i64), Term::var(1)),
+        Term::var(0),
+    );
+    kernel_infer(env, motive_ctx, &body).map_err(|error| {
+        ElabError::Internal(format!(
+            "large index convoy constructed an ill-typed shared motive: {error:?}"
+        ))
+    })?;
+    Ok(Some(body))
+}
+
+fn has_nat_shaped_index(
+    env: &GlobalEnv,
+    ctx: &Context,
+    ind: &InductiveDecl,
+    params: &[Term],
+) -> bool {
+    if ind.indices.len() != 1 {
+        return false;
+    }
+    let index_ty = subst_outer(&ind.indices[0], ind.params.len(), params, 0);
+    let (head, index_params) = peel_app(&whnf(env, ctx, &index_ty));
+    let Term::IndFormer { id, .. } = head else {
+        return false;
+    };
+    let Some(index_ind) = env.inductive(id) else {
+        return false;
+    };
+    if !index_params.is_empty()
+        || !index_ind.params.is_empty()
+        || !index_ind.indices.is_empty()
+        || index_ind.constructors.len() != 2
+    {
+        return false;
+    }
+    let mut has_zero = false;
+    let mut has_successor = false;
+    for ctor in &index_ind.constructors {
+        let Ok(recursive) = recursive_shapes(env, ctor, id, 0) else {
+            return false;
+        };
+        has_zero |= ctor.args.is_empty() && recursive.is_empty();
+        has_successor |= ctor.args.len() == 1 && recursive.len() == 1;
+    }
+    has_zero && has_successor
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ordinary_coherent_frame_plan(
+    cx: &ElabCtx,
+    scrut_core: &Term,
+    scrut_indices: &[Term],
+    original_expected: &Term,
+    motive_base_depth: usize,
+    motive_local_indices: &[Term],
+) -> Box<CoherentFrameMotivePlan> {
+    let context_convoy = compute_context_convoy(
+        &cx.ctx,
+        scrut_core,
+        scrut_indices,
+        &cx.match_field_regions,
+    );
+    let motive_rebase = dependent_rebase_subs(
+        scrut_core,
+        scrut_indices,
+        motive_base_depth as i64,
+        motive_local_indices,
+        &Term::var(0),
+        original_expected,
+        context_convoy
+            .iter()
+            .any(|entry| scrut_occurs(original_expected, &Term::var(entry.var))),
+    );
+    Box::new(CoherentFrameMotivePlan {
+        expected: original_expected.clone(),
+        context_convoy,
+        embedded_method_convoy: Vec::new(),
+        embedded_method_repairs: Vec::new(),
+        motive_user_body: subst_term_generalize_many(
+            &weaken(original_expected, motive_base_depth as i64),
+            &motive_rebase,
+        ),
+        equation_convoy: false,
+    })
+}
+
+#[inline(never)]
+fn boxed_simplify_branch_goal(env: &GlobalEnv, ctx: &Context, term: &Term) -> Box<Term> {
+    Box::new(simplify_branch_goal(env, ctx, term))
+}
+
+#[inline(never)]
+fn plan_coherent_frame_motive(
+    cx: &ElabCtx,
+    ind: &InductiveDecl,
+    params_terms: &[Term],
+    scrut_core: &Term,
+    scrut_indices: &[Term],
+    original_expected: &Term,
+    motive_base_depth: usize,
+    motive_local_indices: &[Term],
+    sentinel_region: usize,
+    defer_coupled_expansion: bool,
+    span: &Span,
+) -> Result<Box<CoherentFrameMotivePlan>, ElabError> {
+    let zonked_ctx = Context {
+        types: cx
+            .ctx
+            .types
+            .iter()
+            .map(|term| cx.metas.zonk_term(term))
+            .collect(),
+    };
+    let motive_ctx = motive_context(&zonked_ctx, ind, params_terms);
+    if !has_nat_shaped_index(cx.env, &zonked_ctx, ind, params_terms) {
+        return Ok(ordinary_coherent_frame_plan(
+            cx,
+            scrut_core,
+            scrut_indices,
+            original_expected,
+            motive_base_depth,
+            motive_local_indices,
+        ));
+    }
+    let expanded_expected = boxed_simplify_branch_goal(cx.env, &zonked_ctx, original_expected);
+    let has_nontrivial_coupled_sides = matches!(original_expected, Term::Eq(_, _, _))
+        || matches!(expanded_expected.as_ref(), Term::Eq(_, _, _));
+    let probe_context_convoy =
+        compute_context_convoy(&cx.ctx, scrut_core, scrut_indices, &cx.match_field_regions);
+
+    // A nested covering is already inside a constructor-refined outer frame.
+    // Its motive convoys the generated index equation and transports the inner
+    // scrutinee back to that concrete outer index. No concrete sibling is ever
+    // placed at the generalized index. The outer match itself stays opaque and
+    // uses its ordinary context telescope so the nested covering is reached
+    // only after the outer constructor has been selected.
+    let equation_convoy =
+        !cx.match_field_regions.is_empty() && has_nontrivial_coupled_sides;
+    if equation_convoy {
+        if !probe_context_convoy.is_empty() {
+            return Err(ElabError::Internal(
+                "index-equation convoy unexpectedly overlaps an ambient context convoy".into(),
+            ));
+        }
+        if let Some(motive_user_body) = build_index_equation_convoy_body(
+            cx.env,
+            &zonked_ctx,
+            &motive_ctx,
+            ind,
+            params_terms,
+            scrut_core,
+            scrut_indices,
+            original_expected,
+            motive_base_depth,
+        )? {
+            return Ok(Box::new(CoherentFrameMotivePlan {
+                expected: original_expected.clone(),
+                context_convoy: Vec::new(),
+                embedded_method_convoy: Vec::new(),
+                embedded_method_repairs: Vec::new(),
+                motive_user_body,
+                equation_convoy: true,
+            }));
+        }
+    }
+
+    let planning_expected = if defer_coupled_expansion && has_nontrivial_coupled_sides {
+        original_expected
+    } else {
+        &expanded_expected
+    };
+    let probe_rebase = dependent_rebase_subs(
+        scrut_core,
+        scrut_indices,
+        motive_base_depth as i64,
+        motive_local_indices,
+        &Term::var(0),
+        planning_expected,
+        probe_context_convoy
+            .iter()
+            .any(|entry| scrut_occurs(planning_expected, &Term::var(entry.var))),
+    );
+    let probe_body = subst_term_generalize_many(
+        &weaken(planning_expected, motive_base_depth as i64),
+        &probe_rebase,
+    );
+    let (embedded_method_convoy, embedded_method_repairs) = if !(defer_coupled_expansion
+        && has_nontrivial_coupled_sides)
+        && has_nontrivial_coupled_sides
+        && probe_context_convoy.is_empty()
+    {
+        plan_embedded_method_convoy(
+            cx.env,
+            &zonked_ctx,
+            &motive_ctx,
+            planning_expected,
+            &probe_body,
+            sentinel_region,
+        )?
+    } else {
+        (Vec::new(), Vec::new())
+    };
+    let expected = if embedded_method_convoy.is_empty() && embedded_method_repairs.is_empty() {
+        original_expected.clone()
+    } else {
+        planning_expected.clone()
+    };
+    let context_convoy = if embedded_method_convoy.is_empty() && embedded_method_repairs.is_empty()
+    {
+        compute_context_convoy(&cx.ctx, scrut_core, scrut_indices, &cx.match_field_regions)
+    } else {
+        probe_context_convoy
+    };
+    let motive_rebase = dependent_rebase_subs(
+        scrut_core,
+        scrut_indices,
+        motive_base_depth as i64,
+        motive_local_indices,
+        &Term::var(0),
+        &expected,
+        context_convoy
+            .iter()
+            .any(|entry| scrut_occurs(&expected, &Term::var(entry.var))),
+    );
+    let mut motive_user_body =
+        subst_term_generalize_many(&weaken(&expected, motive_base_depth as i64), &motive_rebase);
+    if !embedded_method_convoy.is_empty() || !embedded_method_repairs.is_empty() {
+        motive_user_body = install_embedded_method_sentinels(
+            cx.env,
+            &motive_ctx,
+            &motive_user_body,
+            &embedded_method_convoy,
+            &embedded_method_repairs,
+            context_convoy.len(),
+        )?;
+        motive_user_body =
+            refresh_embedded_elim_evidence(cx.env, &motive_ctx, &motive_user_body, span)?;
+    }
+    Ok(Box::new(CoherentFrameMotivePlan {
+        expected,
+        context_convoy,
+        embedded_method_convoy,
+        embedded_method_repairs,
+        motive_user_body,
+        equation_convoy: false,
+    }))
+}
+
 /// Compute the ordered ambient-context convoy for a dependent match: the
 /// transitive forward-dependency closure of genuine ambient bindings whose type
 /// the root substitution (or an already-included convoy binder) changes.
@@ -1832,7 +2913,9 @@ fn compute_context_convoy(
             None => continue,
         };
         let ambient_ty = weaken(&raw_ty, (var as i64) + 1);
-        let mentions_dep = dep_vars.iter().any(|d| scrut_occurs(&ambient_ty, &Term::var(*d)));
+        let mentions_dep = dep_vars
+            .iter()
+            .any(|d| scrut_occurs(&ambient_ty, &Term::var(*d)));
         if mentions_dep {
             dep_vars.push(var);
             convoy.push(ConvoyEntry { var, ambient_ty });
@@ -1977,9 +3060,9 @@ fn term_mentions_family_indexed_by(
 }
 
 fn expression_mentions_recursive_group(cx: &ElabCtx, expr: &RExpr) -> bool {
-    cx.globals.iter().any(|(name, id)| {
-        cx.recursive_group.contains(id) && rexpr_mentions_name(expr, name)
-    })
+    cx.globals
+        .iter()
+        .any(|(name, id)| cx.recursive_group.contains(id) && rexpr_mentions_name(expr, name))
 }
 
 fn recursive_group_call_id(cx: &ElabCtx, expr: &RExpr) -> Option<GlobalId> {
@@ -2017,16 +3100,21 @@ fn transport_recursive_group_call_result(
     let mut transported_ty = inferred_ty;
     let mut changed = false;
     for refinement in cx.result_refinements.iter().rev() {
-        let growth = cx.ctx.len().checked_sub(refinement.install_depth).ok_or_else(|| {
-            ElabError::Internal("result refinement escaped its branch context".into())
-        })? as i64;
+        let growth = cx
+            .ctx
+            .len()
+            .checked_sub(refinement.install_depth)
+            .ok_or_else(|| {
+                ElabError::Internal("result refinement escaped its branch context".into())
+            })? as i64;
         let index_ty = weaken(&refinement.index_ty, growth);
         let concrete_index = weaken(&refinement.concrete_index, growth);
         let refined_index = weaken(&refinement.refined_index, growth);
         // The placeholder is embedded at the current source-binder depth so
         // `finalize_refined_body` can recover its canonical premise slot.
-        let proof = Term::var(
-            INDEX_REFINEMENT_SENTINEL_BASE + refinement.premise_slot + growth as usize,
+        let proof = index_refinement_sentinel(
+            refinement.sentinel_region,
+            refinement.premise_slot + growth as usize,
         );
         if let Some((cast, cast_ty)) = try_reindex_cast(
             cx.env,
@@ -2067,8 +3155,7 @@ fn infer_reflexive_recursive_self_call(
         head = function.as_ref();
     }
     arguments.reverse();
-    let (RExpr::RCon(name, _), Some(RExpr::RVar(index, _, _))) =
-        (head, arguments.first().copied())
+    let (RExpr::RCon(name, _), Some(RExpr::RVar(index, _, _))) = (head, arguments.first().copied())
     else {
         return Ok(None);
     };
@@ -2087,12 +3174,14 @@ fn infer_reflexive_recursive_self_call(
     let Some((evidence, evidence_ty)) = cx.binding_term(binding.evidence_position) else {
         return Ok(None);
     };
-    let owner_id = cx.globals.get(name).copied().ok_or_else(|| {
-        ElabError::UnresolvedCon {
+    let owner_id = cx
+        .globals
+        .get(name)
+        .copied()
+        .ok_or_else(|| ElabError::UnresolvedCon {
             name: name.clone(),
             span: span.clone(),
-        }
-    })?;
+        })?;
     let (_, owner_ty) = cx
         .env
         .const_type(owner_id)
@@ -2601,6 +3690,7 @@ fn check_match_dependent_refined_fallback(
     scrut_indices: &[Term],
     n: usize,
     expected_here: &Term,
+    preserve_goal: bool,
 ) -> Result<Term, ElabError> {
     let (goal_refined, goal_restorations) = refine_branch_goal(
         cx,
@@ -2611,11 +3701,11 @@ fn check_match_dependent_refined_fallback(
         n,
         expected_here,
     )?;
-    let expected_here_refined = if matches!(arm.body, RExpr::RLam(_, _, _)) {
+    let expected_here_refined = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
         goal_refined
     } else {
-        simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
-    };
+            simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
+        };
     let body_core_checked = check(cx, &arm.body, &expected_here_refined, &arm.span)?;
     let mut body_core = body_core_checked;
     for restoration in goal_restorations.into_iter().rev() {
@@ -2728,20 +3818,31 @@ fn classify_branch_goal_restoration(
 /// recursion level even though none is live across the recursive call.
 #[inline(never)]
 fn wrap_dependent_method_ihs(
+    env: &GlobalEnv,
+    outer_ctx: &Context,
+    span: &Span,
     shapes: &[RecursiveArgumentShape],
     n: usize,
     expected: &Term,
+    exact_motive: Option<&Term>,
     scrut_core: &Term,
     ind: &InductiveDecl,
     params_terms: &[Term],
     scrut_indices: &[Term],
     m: usize,
     ctor: &ConstructorDecl,
+    sentinel_region: usize,
     context_convoy: &[ConvoyEntry],
+    embedded_method_convoy: &[EmbeddedMethodConvoy],
+    embedded_method_repairs: &[(usize, usize)],
     method: Term,
-) -> Term {
+) -> Result<Term, ElabError> {
     // IH-slot emission (`dependent-match-nonnullary`, Map Gap B): the
     // kernel's `method_type` requires `Π(fields) Π(ih₁…ih_p). M t̄ (Cₖ …)`.
+    let mut method_ctx = outer_ctx.clone();
+    for j in 0..n {
+        method_ctx.push(subst_outer(&ctor.args[j], m, params_terms, j));
+    }
     let rec = shapes
         .iter()
         .map(|argument| {
@@ -2767,34 +3868,50 @@ fn wrap_dependent_method_ihs(
                     )
                 })
                 .collect();
-            let ih_body = subst_term_generalize_many(
-                &weaken(expected, n as i64),
-                &dependent_rebase_subs(
-                    scrut_core,
-                    scrut_indices,
-                    n as i64,
+            if let Some(motive) = exact_motive {
+                let mut ih_ty = weaken(motive, n as i64);
+                for index in &ih_indices {
+                    ih_ty = Term::app(ih_ty, index.clone());
+                }
+                Term::app(ih_ty, field_var)
+            } else {
+                let ih_body = subst_term_generalize_many(
+                    &weaken(expected, n as i64),
+                    &dependent_rebase_subs(
+                        scrut_core,
+                        scrut_indices,
+                        n as i64,
+                        &ih_indices,
+                        &field_var,
+                        expected,
+                        context_convoy
+                            .iter()
+                            .any(|e| scrut_occurs(expected, &Term::var(e.var))),
+                    ),
+                );
+                // The direct IH is `motive` applied to the recursive field at
+                // `ih_indices`, so it carries the same context-telescope convoy the
+                // motive codomain generalizes. Build it through the shared helper
+                // (degenerates to the old `wrap_premise_pis` when the convoy is
+                // empty).
+                build_convoy_refined_type(
+                    env,
+                    &method_ctx,
+                    span,
+                    ind,
+                    params_terms,
                     &ih_indices,
+                    scrut_indices,
+                    scrut_core,
                     &field_var,
-                    expected,
-                    context_convoy.iter().any(|e| scrut_occurs(expected, &Term::var(e.var))),
-                ),
-            );
-            // The direct IH is `motive` applied to the recursive field at
-            // `ih_indices`, so it carries the same context-telescope convoy the
-            // motive codomain generalizes. Build it through the shared helper
-            // (degenerates to the old `wrap_premise_pis` when the convoy is
-            // empty).
-            build_convoy_refined_type(
-                ind,
-                params_terms,
-                &ih_indices,
-                scrut_indices,
-                scrut_core,
-                &field_var,
-                n,
-                context_convoy,
-                ih_body,
-            )
+                    n,
+                    sentinel_region,
+                    context_convoy,
+                    embedded_method_convoy,
+                    embedded_method_repairs,
+                    ih_body,
+                )?
+            }
         } else {
             let mut scrut_body = Term::var(n - 1 - pos + nb);
             for bk in 0..nb {
@@ -2820,7 +3937,7 @@ fn wrap_dependent_method_ihs(
     for j in (0..n).rev() {
         method = Term::lam(subst_outer(&ctor.args[j], m, params_terms, j), method);
     }
-    method
+    Ok(method)
 }
 
 #[inline(never)]
@@ -2835,11 +3952,11 @@ fn finish_dependent_elim(
     scrut_ty: &Term,
     scrut_core: &Term,
     context_convoy: &[ConvoyEntry],
+    embedded_method_convoy: &[EmbeddedMethodConvoy],
     add_hidden_equation: bool,
     span: &Span,
 ) -> Result<Term, ElabError> {
-    let top_premises =
-        method_index_premises(ind, &params_terms, scrut_indices, scrut_indices, 0);
+    let top_premises = method_index_premises(ind, &params_terms, scrut_indices, scrut_indices, 0);
     let mut elim = Term::Elim {
         fam: d_id,
         level_args: vec![],
@@ -2859,6 +3976,9 @@ fn finish_dependent_elim(
     // actual indices (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE step 5).
     for entry in context_convoy.iter().rev() {
         elim = Term::app(elim, Term::var(entry.var));
+    }
+    for entry in embedded_method_convoy {
+        elim = Term::app(elim, entry.ambient_value.clone());
     }
     if add_hidden_equation {
         let hidden_equation = Term::Eq(
@@ -2880,6 +4000,783 @@ fn finish_dependent_elim(
         })?;
     }
     Ok(elim)
+}
+
+/// Check a recursive source arm for a large-index convoy in the frame where
+/// the enclosing recursive IH is defined.  The successor method's peeled
+/// evidence is `k = m`, while the IH is naturally an `m`-frame proof.  Abstract
+/// each current constructor field that depends on `k`, build the reflexive
+/// `m`-frame base without casts, then transport the whole goal once along
+/// `sym(e) : m = k`.  The value cast in the large-selector codomain is thereby
+/// an image in this single goal-level J motive, never a separately composed
+/// branch refinement.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn check_large_convoy_recursive_arm(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    ind: &InductiveDecl,
+    params: &[Term],
+    target_indices: &[Term],
+    scrut_indices: &[Term],
+    n: usize,
+    expected_here: &Term,
+    sentinel_region: usize,
+) -> Result<Option<Term>, ElabError> {
+    if !expression_mentions_recursive_group(cx, &arm.body) || ind.indices.len() != 1 {
+        return Ok(None);
+    }
+    let pairs = method_index_premise_pairs(ind, params, target_indices, scrut_indices, n);
+    if pairs.len() != 1 {
+        return Ok(None);
+    }
+    let (index_ty, _, _) = &pairs[0];
+    let raw_evidence = Term::Eq(
+        Box::new(index_ty.clone()),
+        Box::new(target_indices[0].clone()),
+        Box::new(weaken(&scrut_indices[0], n as i64)),
+    );
+    let leaves = project_generated_index_equality_leaves(
+        cx.env,
+        &cx.ctx,
+        &raw_evidence,
+        index_refinement_sentinel(sentinel_region, 0),
+    )?;
+    let [leaf] = leaves.as_slice() else {
+        return Ok(None);
+    };
+    let Term::Type(index_level) = whnf(
+        cx.env,
+        &cx.ctx,
+        &kernel_infer(cx.env, &cx.ctx, &leaf.index_ty).map_err(|error| {
+            ElabError::Internal(format!(
+                "large index convoy could not classify its peeled equality: {error:?}"
+            ))
+        })?,
+    ) else {
+        return Ok(None);
+    };
+
+    // The large-selector codomain deliberately uses this stable, double-sym
+    // representative of the forward equality.  With the goal-J oriented over
+    // `sym(e)`, its result image contains the same representative, while its
+    // reflexive base reduces all three symmetry/J layers away.
+    let reverse = build_sym(
+        cx.env,
+        &cx.ctx,
+        &leaf.index_ty,
+        index_level.clone(),
+        &leaf.target,
+        leaf.proof.clone(),
+    );
+    let stable_forward = build_sym(
+        cx.env,
+        &cx.ctx,
+        &leaf.index_ty,
+        index_level.clone(),
+        &leaf.scrutinee,
+        reverse.clone(),
+    );
+    if !scrut_occurs(expected_here, &stable_forward) {
+        return Ok(None);
+    }
+
+    // Abstract precisely the current constructor fields whose types move from
+    // the matched predecessor `k` to the IH predecessor `m`.  For DualEnv this
+    // is `rest`; the enclosing DualFin sibling remains an ordinary m-frame
+    // argument of the IH.  This is the single-J replacement for capability 1,
+    // not an additional cast layered beneath it.
+    let mut moving_fields = Vec::new();
+    for field_j in 0..n {
+        let field_index = n - 1 - field_j;
+        let field_term = Term::var(field_index);
+        let field_ty = weaken(
+            cx.ctx
+                .lookup(field_index)
+                .expect("constructor field in range"),
+            (field_index + 1) as i64,
+        );
+        let source_ty = subst_term_generalize(&field_ty, &leaf.target, &leaf.scrutinee);
+        if source_ty != field_ty && scrut_occurs(expected_here, &field_term) {
+            let position = cx.ctx.len() - 1 - field_index;
+            moving_fields.push((position, field_index, field_term, field_ty, source_ty));
+        }
+    }
+    if moving_fields.is_empty() {
+        return Ok(None);
+    }
+
+    let mut base_substitutions = vec![
+        (leaf.target.clone(), leaf.scrutinee.clone()),
+        (
+            stable_forward.clone(),
+            Term::Refl(Box::new(refl_base_arg(
+                cx.env,
+                &cx.ctx,
+                &leaf.index_ty,
+                &leaf.scrutinee,
+            ))),
+        ),
+    ];
+    let mut source_domains = Vec::with_capacity(moving_fields.len());
+    for (slot, (_, _, field_term, _, source_ty)) in moving_fields.iter().enumerate() {
+        base_substitutions.push((
+            field_term.clone(),
+            index_refinement_sentinel(sentinel_region, slot),
+        ));
+        source_domains.push(source_ty.clone());
+    }
+    let base_goal = subst_term_generalize_many(expected_here, &base_substitutions);
+
+    let refinement_snapshot = cx.var_refinements.clone();
+    for (slot, (position, _, _, _, source_ty)) in moving_fields.iter().enumerate() {
+        cx.var_refinements.insert(
+            *position,
+            (
+                index_refinement_sentinel(sentinel_region, slot),
+                source_ty.clone(),
+                cx.ctx.len(),
+            ),
+        );
+    }
+    let checked_base = (|| {
+        let (core, inferred) = infer(cx, &arm.body)?;
+        unify_types(&mut cx.metas, &base_goal, &inferred);
+        let base = wrap_premise_lams_finalized(core, &source_domains, sentinel_region);
+        let base_ty =
+            wrap_premise_pis_finalized(base_goal.clone(), &source_domains, sentinel_region);
+        let zonked_base = cx.metas.zonk_term(&base);
+        let zonked_ty = cx.metas.zonk_term(&base_ty);
+        let zonked_ctx = Context {
+            types: cx
+                .ctx
+                .types
+                .iter()
+                .map(|term| cx.metas.zonk_term(term))
+                .collect(),
+        };
+        kernel_check(cx.env, &zonked_ctx, &zonked_base, &zonked_ty).map_err(|error| {
+            ElabError::KernelRejected {
+                error,
+                span: arm.span.clone(),
+            }
+        })?;
+        Ok(zonked_base)
+    })();
+    cx.var_refinements = refinement_snapshot;
+    let base = checked_base?;
+
+    // Build P(x,h) from the exact large-selector codomain.  Here
+    // h : m = x, so sym(h) : x = m is exactly the equality image used by the
+    // selector's value cast.  At x=m,h=Refl the goal and every moving field are
+    // definitionally the uncast recursive base.
+    let mut motive_ctx = cx.ctx.clone();
+    motive_ctx.push(leaf.index_ty.clone());
+    let motive_evidence_domain = Term::Eq(
+        Box::new(weaken(&leaf.index_ty, 1)),
+        Box::new(weaken(&leaf.scrutinee, 1)),
+        Box::new(Term::var(0)),
+    );
+    motive_ctx.push(motive_evidence_domain.clone());
+    let motive_reverse = build_sym(
+        cx.env,
+        &motive_ctx,
+        &weaken(&leaf.index_ty, 2),
+        index_level.clone(),
+        &weaken(&leaf.scrutinee, 2),
+        Term::var(0),
+    );
+    let mut motive_substitutions = vec![
+        (weaken(&leaf.target, 2), Term::var(1)),
+        (weaken(&stable_forward, 2), motive_reverse),
+    ];
+    let mut motive_domains = Vec::with_capacity(moving_fields.len());
+    for (slot, (_, _, field_term, field_ty, _)) in moving_fields.iter().enumerate() {
+        motive_substitutions.push((
+            weaken(field_term, 2),
+            index_refinement_sentinel(sentinel_region, slot),
+        ));
+        motive_domains.push(subst_term_generalize(
+            &weaken(field_ty, 2),
+            &weaken(&leaf.target, 2),
+            &Term::var(1),
+        ));
+    }
+    let motive_goal = subst_term_generalize_many(&weaken(expected_here, 2), &motive_substitutions);
+    let motive_result = wrap_premise_pis_finalized(motive_goal, &motive_domains, sentinel_region);
+
+    let Term::Eq(goal_carrier, _, _) = whnf(cx.env, &cx.ctx, expected_here) else {
+        return Ok(None);
+    };
+    let Term::Type(goal_level) = whnf(
+        cx.env,
+        &cx.ctx,
+        &kernel_infer(cx.env, &cx.ctx, &goal_carrier).map_err(|error| {
+            ElabError::Internal(format!(
+                "large index convoy could not classify its recursive goal: {error:?}"
+            ))
+        })?,
+    ) else {
+        return Ok(None);
+    };
+    let motive_body = Term::lam(
+        leaf.index_ty.clone(),
+        Term::lam(motive_evidence_domain.clone(), motive_result),
+    );
+    let motive_ty = Term::pi(
+        leaf.index_ty.clone(),
+        Term::pi(motive_evidence_domain, Term::Omega(goal_level)),
+    );
+    let motive = Term::Ascript(Box::new(motive_body), Box::new(motive_ty));
+    let symmetric_evidence = build_sym(
+        cx.env,
+        &cx.ctx,
+        &leaf.index_ty,
+        index_level,
+        &leaf.target,
+        leaf.proof.clone(),
+    );
+    let mut transported = Term::J(
+        Box::new(motive),
+        Box::new(base),
+        Box::new(symmetric_evidence),
+    );
+    for (_, field_index, _, _, _) in &moving_fields {
+        transported = Term::app(transported, Term::var(*field_index));
+    }
+    Ok(Some(transported))
+}
+
+struct DependentConstructorFrame {
+    concrete: Box<Term>,
+    target_indices: Vec<Term>,
+    premise_domains: Vec<Term>,
+    expected_here: Term,
+    convoy_refinements: Vec<(usize, Term, Term)>,
+    hidden_result_premise_slot: Option<usize>,
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn build_dependent_constructor_frame(
+    cx: &ElabCtx,
+    ind: &InductiveDecl,
+    ctor: &ConstructorDecl,
+    params: &[Term],
+    scrut_indices: &[Term],
+    scrut_ty: &Term,
+    scrut_core: &Term,
+    expected: &Term,
+    motive: &Term,
+    field_count: usize,
+    sentinel_region: usize,
+    context_convoy: &[ConvoyEntry],
+    embedded_method_convoy: &[EmbeddedMethodConvoy],
+    embedded_method_repairs: &[(usize, usize)],
+    hidden_group_result_refinement: bool,
+    equation_convoy: bool,
+    span: &Span,
+) -> Result<Box<DependentConstructorFrame>, ElabError> {
+    let concrete = build_dependent_concrete(ctor, params, field_count);
+    let target_indices = ctor_target_indices(ctor, ind, params, field_count);
+    let mut premise_domains = method_index_premises(
+        ind,
+        params,
+        &target_indices,
+        scrut_indices,
+        field_count,
+    );
+    let mut expected_here = if equation_convoy {
+        if premise_domains.len() != 1 {
+            return Err(ElabError::Internal(
+                "large index convoy expected exactly one generated premise".into(),
+            ));
+        }
+        large_convoy_branch_goal(
+            cx.env,
+            &cx.ctx,
+            motive,
+            &target_indices,
+            &concrete,
+            field_count,
+            sentinel_region,
+        )?
+    } else {
+        subst_term_generalize_many(
+            &weaken(expected, field_count as i64),
+            &dependent_rebase_subs(
+                scrut_core,
+                scrut_indices,
+                field_count as i64,
+                &target_indices,
+                &concrete,
+                expected,
+                context_convoy
+                    .iter()
+                    .any(|entry| scrut_occurs(expected, &Term::var(entry.var))),
+            ),
+        )
+    };
+
+    let index_premise_count = premise_domains.len();
+    let (types_inner_first, sentinels) = convoy_binder_types(
+        context_convoy,
+        scrut_indices,
+        scrut_core,
+        &target_indices,
+        &concrete,
+        field_count,
+        index_premise_count,
+        sentinel_region,
+    );
+    expected_here = redirect_convoy_body(
+        context_convoy,
+        field_count,
+        &sentinels,
+        expected_here,
+    );
+    let mut convoy_refinements = Vec::with_capacity(context_convoy.len());
+    for (index, entry) in context_convoy.iter().enumerate() {
+        let bottom_position = cx.ctx.len() - 1 - (entry.var + field_count);
+        convoy_refinements.push((
+            bottom_position,
+            sentinels[index].clone(),
+            types_inner_first[index].clone(),
+        ));
+    }
+    for index in (0..context_convoy.len()).rev() {
+        premise_domains.push(types_inner_first[index].clone());
+    }
+
+    if !embedded_method_convoy.is_empty() || !embedded_method_repairs.is_empty() {
+        let embedded_slot_base = premise_domains.len();
+        expected_here = install_embedded_method_sentinels(
+            cx.env,
+            &cx.ctx,
+            &expected_here,
+            embedded_method_convoy,
+            embedded_method_repairs,
+            embedded_slot_base,
+        )?;
+        expected_here =
+            refresh_embedded_elim_evidence(cx.env, &cx.ctx, &expected_here, span)?;
+        let branch_rebase = dependent_rebase_subs(
+            scrut_core,
+            scrut_indices,
+            field_count as i64,
+            &target_indices,
+            &concrete,
+            expected,
+            context_convoy
+                .iter()
+                .any(|entry| scrut_occurs(expected, &Term::var(entry.var))),
+        );
+        for entry in embedded_method_convoy {
+            let branch_ty = subst_term_generalize_many(
+                &weaken(&entry.ambient_ty, field_count as i64),
+                &branch_rebase,
+            );
+            premise_domains.push(redirect_convoy_body(
+                context_convoy,
+                field_count,
+                &sentinels,
+                branch_ty,
+            ));
+        }
+    }
+
+    let hidden_result_premise_slot = if hidden_group_result_refinement {
+        let slot = premise_domains.len();
+        premise_domains.push(Term::Eq(
+            Box::new(weaken(scrut_ty, field_count as i64)),
+            Box::new(concrete.as_ref().clone()),
+            Box::new(weaken(scrut_core, field_count as i64)),
+        ));
+        Some(slot)
+    } else {
+        None
+    };
+    Ok(Box::new(DependentConstructorFrame {
+        concrete,
+        target_indices,
+        premise_domains,
+        expected_here,
+        convoy_refinements,
+        hidden_result_premise_slot,
+    }))
+}
+
+#[inline(never)]
+fn build_dependent_concrete(
+    ctor: &ConstructorDecl,
+    params: &[Term],
+    field_count: usize,
+) -> Box<Term> {
+    let mut concrete = Term::Constructor {
+        id: ctor.id,
+        level_args: Vec::new(),
+    };
+    for param in params {
+        concrete = Term::app(concrete, weaken(param, field_count as i64));
+    }
+    for field in (0..field_count).rev() {
+        concrete = Term::app(concrete, Term::var(field));
+    }
+    Box::new(concrete)
+}
+
+#[inline(never)]
+fn large_convoy_branch_goal(
+    env: &GlobalEnv,
+    ctx: &Context,
+    motive: &Term,
+    target_indices: &[Term],
+    concrete: &Term,
+    field_count: usize,
+    sentinel_region: usize,
+) -> Result<Term, ElabError> {
+    let mut motive_args = target_indices.to_vec();
+    motive_args.push(concrete.clone());
+    let specialized = motive_args
+        .into_iter()
+        .fold(weaken(motive, field_count as i64), Term::app);
+    let Term::Pi(_, codomain) = whnf(env, ctx, &specialized) else {
+        return Err(ElabError::Internal(
+            "large index convoy branch did not compute to its evidence premise".into(),
+        ));
+    };
+    Ok(subst0(
+        &codomain,
+        &index_refinement_sentinel(sentinel_region, 0),
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn build_large_convoy_recursive_method(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    ind: &InductiveDecl,
+    params: &[Term],
+    target_indices: &[Term],
+    scrut_indices: &[Term],
+    field_count: usize,
+    expected_here: &Term,
+    sentinel_region: usize,
+    premise_domains: &[Term],
+) -> Result<Term, ElabError> {
+    let goal_j = check_large_convoy_recursive_arm(
+        cx,
+        arm,
+        ind,
+        params,
+        target_indices,
+        scrut_indices,
+        field_count,
+        expected_here,
+        sentinel_region,
+    )?
+    .ok_or_else(|| {
+        ElabError::Internal(
+            "large index convoy could not construct its recursive goal transport".into(),
+        )
+    })?;
+    Ok(wrap_premise_lams_finalized(
+        goal_j,
+        premise_domains,
+        sentinel_region,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn finalize_large_convoy_refl_method(
+    env: &GlobalEnv,
+    ctx: &Context,
+    equation_convoy: bool,
+    arm_index: Option<usize>,
+    arms: &[RMatchArm],
+    ind: &InductiveDecl,
+    constructor_ordinal: usize,
+    motive: &Term,
+    params: &[Term],
+    fallback: Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let Some(arm_index) = arm_index.filter(|arm_index| {
+        equation_convoy
+            && matches!(&arms[*arm_index].body, RExpr::RCon(name, _) if name == SUGAR_REFL)
+    }) else {
+        return Ok(fallback);
+    };
+    let exact_ty =
+        method_type(env, ind, constructor_ordinal, motive, params, &[]).map_err(|error| {
+            ElabError::KernelRejected {
+                error,
+                span: span.clone(),
+            }
+        })?;
+    synth_refl_method_from_type(env, &mut ctx.clone(), &exact_ty, &arms[arm_index].span)
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn finish_dependent_constructor_method(
+    cx: &mut ElabCtx,
+    span: &Span,
+    shapes: &[RecursiveArgumentShape],
+    field_count: usize,
+    expected: &Term,
+    equation_convoy: bool,
+    scrut_core: &Term,
+    ind: &InductiveDecl,
+    params: &[Term],
+    scrut_indices: &[Term],
+    param_count: usize,
+    ctor: &ConstructorDecl,
+    sentinel_region: usize,
+    context_convoy: &[ConvoyEntry],
+    embedded_method_convoy: &[EmbeddedMethodConvoy],
+    embedded_method_repairs: &[(usize, usize)],
+    method: Term,
+    arm_index: Option<usize>,
+    arms: &[RMatchArm],
+    constructor_ordinal: usize,
+    motive: &Term,
+) -> Result<Term, ElabError> {
+    let wrapped = wrap_dependent_method_ihs(
+        cx.env,
+        &cx.ctx,
+        span,
+        shapes,
+        field_count,
+        expected,
+        equation_convoy.then_some(motive),
+        scrut_core,
+        ind,
+        params,
+        scrut_indices,
+        param_count,
+        ctor,
+        sentinel_region,
+        context_convoy,
+        embedded_method_convoy,
+        embedded_method_repairs,
+        method,
+    )?;
+    finalize_large_convoy_refl_method(
+        cx.env,
+        &cx.ctx,
+        equation_convoy,
+        arm_index,
+        arms,
+        ind,
+        constructor_ordinal,
+        motive,
+        params,
+        wrapped,
+        span,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn build_checked_dependent_motive(
+    env: &GlobalEnv,
+    motive_ctx: &Context,
+    ind: &InductiveDecl,
+    family: GlobalId,
+    params: &[Term],
+    scrut_indices: &[Term],
+    motive_user_body: Term,
+    equation_convoy: bool,
+    span: &Span,
+) -> Result<Box<Term>, ElabError> {
+    let motive_premises = motive_index_premises(ind, params, scrut_indices);
+    let motive_body = if equation_convoy {
+        motive_user_body
+    } else {
+        wrap_premise_pis(motive_user_body, &motive_premises)
+    };
+    let motive_sort =
+        kernel_infer(env, motive_ctx, &motive_body).map_err(|error| ElabError::KernelRejected {
+            error,
+            span: span.clone(),
+        })?;
+    let motive_ty = motive_type(ind, family, params, &motive_sort);
+    Ok(Box::new(Term::Ascript(
+        Box::new(wrap_motive_lambdas(ind, family, params, motive_body)),
+        Box::new(motive_ty),
+    )))
+}
+
+/// Check an ordinary dependent-match arm outside the wide method-construction
+/// dispatcher. Keeping this stateful fallback in a cold frame is load-bearing:
+/// the elaborator's unoptimized recursive checker runs near the spawned-thread
+/// stack limit even for matches that never use a coherent-frame convoy.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn check_dependent_branch_body(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    ind: &InductiveDecl,
+    params: &[Term],
+    target_indices: &[Term],
+    scrut_indices: &[Term],
+    n: usize,
+    expected_here: &Term,
+    premise_domains: &[Term],
+    hidden_result_premise_slot: Option<usize>,
+    scrut_ty: &Term,
+    concrete: &Term,
+    scrut_core: &Term,
+    sentinel_region: usize,
+    convoy_refinements: &[(usize, Term, Term)],
+    equation_convoy: bool,
+) -> Result<Term, ElabError> {
+    let outer_scope_depth = cx.ctx.len() - n;
+    let var_refinement_snapshot = cx.var_refinements.clone();
+    let result_refinement_base = cx.result_refinements.len();
+    cx.match_field_regions.push(outer_scope_depth..cx.ctx.len());
+
+    let outcome = (|| {
+        install_index_refinements(
+            cx,
+            ind,
+            params,
+            target_indices,
+            scrut_indices,
+            n,
+            outer_scope_depth,
+        )?;
+        if let Some(premise_slot) = hidden_result_premise_slot {
+            install_hidden_result_variable_refinements(
+                cx,
+                &weaken(scrut_ty, n as i64),
+                concrete,
+                &weaken(scrut_core, n as i64),
+                premise_slot,
+                outer_scope_depth,
+            )?;
+        }
+        for (bottom_pos, sentinel, ctor_ty) in convoy_refinements {
+            cx.var_refinements.insert(
+                *bottom_pos,
+                (sentinel.clone(), ctor_ty.clone(), cx.ctx.len()),
+            );
+        }
+
+        let preserve_nested_goal =
+            !ind.indices.is_empty() && matches!(arm.body, RExpr::RMatch { .. });
+        let expected_unrefined =
+            if preserve_nested_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
+                expected_here.clone()
+            } else {
+                simplify_branch_goal(cx.env, &cx.ctx, expected_here)
+            };
+        if let Some(premise_slot) = hidden_result_premise_slot {
+            cx.result_refinements.push(ResultRefinement {
+                index_ty: weaken(scrut_ty, n as i64),
+                concrete_index: concrete.clone(),
+                refined_index: weaken(scrut_core, n as i64),
+                premise_slot,
+                sentinel_region,
+                install_depth: cx.ctx.len(),
+            });
+        }
+        let obligation_base = cx.obligations.len();
+        let attempt = check(cx, &arm.body, &expected_unrefined, &arm.span)
+        .and_then(|checked| {
+            let wrapped =
+                wrap_premise_lams_finalized(checked.clone(), premise_domains, sentinel_region);
+            let wrapped_ty = wrap_premise_pis_finalized(
+                expected_unrefined.clone(),
+                premise_domains,
+                sentinel_region,
+            );
+            let zonked_wrapped = cx.metas.zonk_term(&wrapped);
+            let zonked_ty = cx.metas.zonk_term(&wrapped_ty);
+            let zonked_ctx = Context {
+                types: cx
+                    .ctx
+                    .types
+                    .iter()
+                    .map(|term| cx.metas.zonk_term(term))
+                    .collect(),
+            };
+            kernel_check(cx.env, &zonked_ctx, &zonked_wrapped, &zonked_ty)
+                .map(|()| checked)
+                .map_err(|error| ElabError::KernelRejected {
+                    error,
+                    span: arm.span.clone(),
+                })
+        });
+        let checked = match attempt {
+            Ok(checked) => checked,
+            Err(_) => {
+                cx.obligations.truncate(obligation_base);
+                check_match_dependent_refined_fallback(
+                    cx,
+                    arm,
+                    ind,
+                    params,
+                    target_indices,
+                    scrut_indices,
+                    n,
+                    expected_here,
+                    equation_convoy || preserve_nested_goal,
+                )?
+            }
+        };
+        Ok(wrap_premise_lams_finalized(
+            checked,
+            premise_domains,
+            sentinel_region,
+        ))
+    })();
+
+    cx.result_refinements.truncate(result_refinement_base);
+    cx.var_refinements = var_refinement_snapshot;
+    cx.match_field_regions.pop();
+    outcome
+}
+
+#[inline(never)]
+fn dependent_inductive(env: &GlobalEnv, family: GlobalId) -> Result<Box<InductiveDecl>, ElabError> {
+    env.inductive(family)
+        .cloned()
+        .map(Box::new)
+        .ok_or_else(|| ElabError::Internal(format!("inductive {:?} not found", family)))
+}
+
+#[inline(never)]
+fn dependent_scrutinee_family(
+    scrutinee_type: &Term,
+    span: &Span,
+) -> Result<(GlobalId, Vec<Level>, Vec<Term>), ElabError> {
+    let (head, arguments) = peel_app(scrutinee_type);
+    let Term::IndFormer { id, level_args } = head else {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "match scrutinee must have an inductive type".into(),
+        });
+    };
+    Ok((id, level_args, arguments))
+}
+
+#[inline(never)]
+fn zonked_dependent_expected(cx: &ElabCtx, expected: &Term) -> Box<Term> {
+    Box::new(cx.metas.zonk_term(expected))
+}
+
+#[inline(never)]
+fn infer_dependent_match_scrutinee(
+    cx: &mut ElabCtx,
+    scrutinee: &RExpr,
+) -> Result<(Box<Term>, Box<Term>), ElabError> {
+    let (core, inferred) = infer(cx, scrutinee)?;
+    let inferred = whnf(cx.env, &cx.ctx, &inferred);
+    Ok((Box::new(core), Box::new(inferred)))
 }
 
 /// Check `match scrut { C₁ p… => e₁ ; … }` against a KNOWN `expected` goal
@@ -2934,25 +4831,13 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     // before because only NULLARY families reached `check_match_dependent`,
     // and none of those goals closed over a still-unresolved generic type
     // parameter this early.
-    let expected = &cx.metas.zonk_term(expected);
-    let (scrut_core, scrut_ty_raw) = infer(cx, scrut)?;
-    let scrut_ty = whnf(cx.env, &cx.ctx, &scrut_ty_raw);
+    let expected_zonked = zonked_dependent_expected(cx, expected);
+    let original_expected = expected_zonked.as_ref();
+    let (scrut_core, scrut_ty) = infer_dependent_match_scrutinee(cx, scrut)?;
 
-    let (head, scrut_args) = peel_app(&scrut_ty);
-    let (d_id, family_level_args) = match &head {
-        Term::IndFormer { id, level_args } => (*id, level_args.clone()),
-        _ => {
-            return Err(ElabError::TypeMismatch {
-                span: span.clone(),
-                reason: "match scrutinee must have an inductive type".into(),
-            })
-        }
-    };
-    let ind = cx
-        .env
-        .inductive(d_id)
-        .ok_or_else(|| ElabError::Internal(format!("inductive {:?} not found", d_id)))?
-        .clone();
+    let (d_id, family_level_args, scrut_args) =
+        dependent_scrutinee_family(&scrut_ty, span)?;
+    let ind = dependent_inductive(cx.env, d_id)?;
     ensure_arm_ctors_belong_to_family(cx, arms, &ind, d_id)?;
     if equation.is_some()
         && (ind.indices.len() != 0 || ind.constructors.iter().any(|ctor| !ctor.args.is_empty()))
@@ -2970,15 +4855,15 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             reason: "match scrutinee has the wrong number of family arguments".into(),
         });
     }
-    let params_terms = scrut_args[..m].to_vec();
-    let scrut_indices = scrut_args[m..].to_vec();
+    let mut params_terms = Box::new(scrut_args);
+    let scrut_indices = Box::new(params_terms.split_off(m));
 
     // A source field paired with residual generated `All` evidence is
     // eliminated through that evidence. Its recorded source index keeps the
     // host constructor and support constructor aligned without exposing the
     // generated family at the surface.
     if equation.is_none() {
-        if let Term::Var(index) = &scrut_core {
+        if let Term::Var(index) = scrut_core.as_ref() {
             if let Some(position) = cx.ctx.len().checked_sub(1 + *index) {
                 if let Some(binding) = cx.lift_bindings.get(&position).copied() {
                     if binding.support.is_some() {
@@ -3002,31 +4887,42 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     // The motive: `expected` with the elaborated scrutinee abstracted to the
     // final `D p̄ ī` binder. Indexed families additionally return a telescope
     // of branch-local equalities `Eq I_j i_j i0_j -> ...`; the completed elim is
-    // applied to `Refl` at the actual scrutinee indices after construction.
+    // applied to generated reflexivity evidence at the actual indices.
     let motive_base_depth = n_i + 1;
-    // Rebase the scrutinee AND its actual indices together (Architect invariant,
-    // LANG-DEPENDENT-MATCH-MOTIVE-REBASE): the abstracted scrutinee gets the
-    // local index binders (i_j = Var(n_i - j)) alongside scrutinee = Var(0), so a
-    // goal coupling the scrutinee to its own index (`fin_to_nat nn i`) stays
-    // well-typed under the motive's binder telescope instead of keeping the outer
-    // actual index. Degenerates to the old scrutinee-only pass when n_i = 0.
+    let sentinel_region = cx.match_field_regions.len();
     let motive_local_indices: Vec<Term> = (0..n_i).map(|j| Term::var(n_i - j)).collect();
-    // The ambient-context convoy is computed here (before the motive rebase) so
-    // its presence can force the goal's own index rebase (see `dependent_rebase_
-    // subs`'s `force`). Its members are generalized into the motive codomain below.
-    let context_convoy =
-        compute_context_convoy(&cx.ctx, &scrut_core, &scrut_indices, &cx.match_field_regions);
-    let motive_rebase = dependent_rebase_subs(
+    let mut motive_plan = plan_coherent_frame_motive(
+        cx,
+        &ind,
+        &params_terms,
         &scrut_core,
         &scrut_indices,
-        motive_base_depth as i64,
+        original_expected,
+        motive_base_depth,
         &motive_local_indices,
-        &Term::var(0),
-        expected,
-        context_convoy.iter().any(|e| scrut_occurs(expected, &Term::var(e.var))),
-    );
+        sentinel_region,
+        !ind.indices.is_empty()
+            && arms
+                .iter()
+                .any(|arm| matches!(arm.body, RExpr::RMatch { .. })),
+        span,
+    )?;
     let mut motive_user_body =
-        subst_term_generalize_many(&weaken(expected, motive_base_depth as i64), &motive_rebase);
+        std::mem::replace(&mut motive_plan.motive_user_body, Term::Type(Level::Zero));
+    let expected = &motive_plan.expected;
+    let context_convoy = motive_plan.context_convoy.as_slice();
+    let embedded_method_convoy = motive_plan.embedded_method_convoy.as_slice();
+    let embedded_method_repairs = motive_plan.embedded_method_repairs.as_slice();
+    let equation_convoy = motive_plan.equation_convoy;
+    let zonked_ctx = Context {
+        types: cx
+            .ctx
+            .types
+            .iter()
+            .map(|term| cx.metas.zonk_term(term))
+            .collect(),
+    };
+    let motive_ctx = motive_context(&zonked_ctx, &ind, &params_terms);
     // Context-telescope convoy (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE):
     // the ordered forward-dependency closure of ambient bindings whose type the
     // index refinement changes (`context_convoy`, computed above) travels WITH the
@@ -3049,11 +4945,12 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     // an earlier-built binder type nests at a different depth. Only the Elim
     // itself, kernel-validated, certifies the assembled shape.
     let convoy_count = context_convoy.len();
-    if convoy_count > 0 {
+    if convoy_count > 0 || !embedded_method_convoy.is_empty() {
         // Same ONE plan as the methods/IH: local indices `Var(n_i - j)` and the
-        // scrutinee binder `Var(0)` are this frame's targets; slot_base 0 (the
-        // convoy is the innermost telescope wrapped directly around the goal —
-        // the index-eq premises wrap OUTSIDE it below).
+        // scrutinee binder `Var(0)` are this frame's targets. Embedded methods
+        // are appended after the ambient convoy, so their sentinels and types
+        // share the same finalized telescope rather than being wrapped by an
+        // independent pass.
         let (cv_types_inner_first, sentinels) = convoy_binder_types(
             &context_convoy,
             &scrut_indices,
@@ -3062,14 +4959,29 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             &Term::var(0),
             motive_base_depth,
             0,
+            sentinel_region,
         );
-        motive_user_body =
-            redirect_convoy_body(&context_convoy, motive_base_depth, &sentinels, motive_user_body);
-        let mut convoy_premises: Vec<Term> = Vec::with_capacity(convoy_count);
+        motive_user_body = redirect_convoy_body(
+            &context_convoy,
+            motive_base_depth,
+            &sentinels,
+            motive_user_body,
+        );
+        let mut convoy_premises: Vec<Term> =
+            Vec::with_capacity(convoy_count + embedded_method_convoy.len());
         for i in (0..convoy_count).rev() {
             convoy_premises.push(cv_types_inner_first[i].clone());
         }
-        motive_user_body = wrap_premise_pis_finalized(motive_user_body, &convoy_premises);
+        for entry in embedded_method_convoy {
+            convoy_premises.push(redirect_convoy_body(
+                &context_convoy,
+                motive_base_depth,
+                &sentinels,
+                entry.motive_ty.clone(),
+            ));
+        }
+        motive_user_body =
+            wrap_premise_pis_finalized(motive_user_body, &convoy_premises, sentinel_region);
     }
     let hidden_group_result_refinement = MAY_REFINE_GROUP_RESULT
         && ind.indices.is_empty()
@@ -3108,31 +5020,21 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         );
         motive_user_body = Term::pi(eq_dom, weaken(&motive_user_body, 1));
     }
-    let motive_premises = motive_index_premises(&ind, &params_terms, &scrut_indices);
-    let motive_body = wrap_premise_pis(motive_user_body, &motive_premises);
-    // `expected` is already zonked (above); the CONTEXT itself may still
-    // hold an unresolved metavariable for some other in-scope parameter
-    // (e.g. `a`'s own `(a : Type)` binding) that `kernel_infer` would need
-    // to look up — zonk a throwaway copy of `cx.ctx` for this one raw-kernel
-    // call rather than mutating the live elaborator context.
-    let zonked_ctx = Context {
-        types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
-    };
-    let motive_ctx = motive_context(&zonked_ctx, &ind, &params_terms);
-    let motive_sort =
-        kernel_infer(cx.env, &motive_ctx, &motive_body).map_err(|e| ElabError::KernelRejected {
-            error: e,
-            span: span.clone(),
-        })?;
-    let motive_ty = motive_type(&ind, d_id, &params_terms, &motive_sort);
-    let motive = Term::Ascript(
-        Box::new(wrap_motive_lambdas(&ind, d_id, &params_terms, motive_body)),
-        Box::new(motive_ty),
-    );
+    let motive = build_checked_dependent_motive(
+        cx.env,
+        &motive_ctx,
+        &ind,
+        d_id,
+        &params_terms,
+        &scrut_indices,
+        motive_user_body,
+        equation_convoy,
+        span,
+    )?;
 
-    let mut methods: Vec<Option<Term>> = vec![None; ind.constructors.len()];
-    let mut arm_used = vec![false; arms.len()];
-    let mut subsumed_by: Vec<Option<usize>> = vec![None; arms.len()];
+    let mut methods = Box::new(vec![None; ind.constructors.len()]);
+    let mut arm_used = Box::new(vec![false; arms.len()]);
+    let mut subsumed_by = Box::new(vec![None; arms.len()]);
     for (k, ctor) in ind.constructors.iter().enumerate() {
         let arm_idx = arms
             .iter()
@@ -3161,11 +5063,14 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 }
             }
         }
-        let shapes =
-            recursive_shapes(cx.env, ctor, d_id, m).map_err(|error| ElabError::KernelRejected {
-                error,
-                span: span.clone(),
-            })?;
+        let shapes = Box::new(
+            recursive_shapes(cx.env, ctor, d_id, m).map_err(|error| {
+                ElabError::KernelRejected {
+                    error,
+                    span: span.clone(),
+                }
+            })?,
+        );
         if shapes
             .iter()
             .any(|argument| argument.shape.as_legacy().is_none())
@@ -3197,88 +5102,52 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             let raw_ty = subst_outer(&ctor.args[j], m, &params_terms, j);
             cx.ctx.push(raw_ty);
         }
-        // Reconstruct the concrete scrutinee `Cₖ p̄ (Var(n-1)) … (Var(0))`
-        // in the (now n-deeper) context.
-        let mut concrete = Term::Constructor {
-            id: ctor.id,
-            level_args: vec![],
-        };
-        for p in &params_terms {
-            concrete = Term::app(concrete, weaken(p, n as i64));
-        }
-        for j in (0..n).rev() {
-            concrete = Term::app(concrete, Term::var(j));
-        }
-        let target_indices = ctor_target_indices(ctor, &ind, &params_terms, n);
-        let mut expected_here = subst_term_generalize_many(
-            &weaken(expected, n as i64),
-            &dependent_rebase_subs(
-                &scrut_core,
-                &scrut_indices,
-                n as i64,
-                &target_indices,
-                &concrete,
-                expected,
-                context_convoy.iter().any(|e| scrut_occurs(expected, &Term::var(e.var))),
-            ),
-        );
-        let mut premise_domains =
-            method_index_premises(&ind, &params_terms, &target_indices, &scrut_indices, n);
-        // Method side of the context-telescope convoy (step 4): the branch proves
-        // `Π(premises). Π(convoy at ctor-refined types). P[amb := binder]`. Append
-        // each convoy binding's CONSTRUCTOR-refined type (index rebased to the
-        // ctor targets; earlier convoy binders threaded via their sentinels) to
-        // premise_domains, outermost-first, and rewrite the goal's ambient
-        // reference to that binder's sentinel. `convoy_refinements` redirects the
-        // BODY's ambient RVar to the same sentinel (replacing capability 2). Each
-        // sentinel is relocated to its real wrap-relative binder by
-        // `finalize_refined_body`. `n_idx_premises` is the slot base.
-        let n_idx_premises = premise_domains.len();
-        let mut convoy_refinements: Vec<(usize, Term, Term)> = Vec::new();
-        {
-            // Same ONE plan, at this constructor's frame: the ctor's target
-            // indices and its reconstructed value `concrete` are the targets;
-            // slot_base is the index-premise count, since the convoy is appended
-            // after them in `premise_domains`.
-            let (types_inner_first, sentinels) = convoy_binder_types(
-                &context_convoy,
-                &scrut_indices,
-                &scrut_core,
-                &target_indices,
-                &concrete,
-                n,
-                n_idx_premises,
-            );
-            // Redirect the goal to the binder sentinels, and record the same
-            // redirect for each captured binding's body reference (var_refinement).
-            expected_here = redirect_convoy_body(&context_convoy, n, &sentinels, expected_here);
-            for (i, entry) in context_convoy.iter().enumerate() {
-                let bottom_pos = cx.ctx.len() - 1 - (entry.var + n);
-                convoy_refinements.push((
-                    bottom_pos,
-                    sentinels[i].clone(),
-                    types_inner_first[i].clone(),
-                ));
-            }
-            // Append ctor-refined types outermost-first (reverse of innermost-first).
-            for i in (0..context_convoy.len()).rev() {
-                premise_domains.push(types_inner_first[i].clone());
-            }
-        }
-        let hidden_result_premise_slot = if hidden_group_result_refinement {
-            let slot = premise_domains.len();
-            premise_domains.push(Term::Eq(
-                Box::new(weaken(&scrut_ty, n as i64)),
-                Box::new(concrete.clone()),
-                Box::new(weaken(&scrut_core, n as i64)),
-            ));
-            Some(slot)
-        } else {
-            None
-        };
+        let constructor_frame = build_dependent_constructor_frame(
+            cx,
+            &ind,
+            ctor,
+            &params_terms,
+            &scrut_indices,
+            &scrut_ty,
+            &scrut_core,
+            expected,
+            &motive,
+            n,
+            sentinel_region,
+            context_convoy,
+            embedded_method_convoy,
+            embedded_method_repairs,
+            hidden_group_result_refinement,
+            equation_convoy,
+            span,
+        )?;
+        let concrete = constructor_frame.concrete.as_ref();
+        let target_indices = constructor_frame.target_indices.as_slice();
+        let premise_domains = constructor_frame.premise_domains.as_slice();
+        let expected_here = &constructor_frame.expected_here;
+        let convoy_refinements = constructor_frame.convoy_refinements.as_slice();
+        let hidden_result_premise_slot = constructor_frame.hidden_result_premise_slot;
         let method = if let Some(arm_idx) = arm_idx {
             let arm = &arms[arm_idx];
-            if equation.is_some() {
+            if equation_convoy && matches!(&arm.body, RExpr::RCon(name, _) if name == SUGAR_REFL) {
+                Term::Const {
+                    id: cx.env.tt_id(),
+                    level_args: Vec::new(),
+                }
+            } else if equation_convoy && expression_mentions_recursive_group(cx, &arm.body) {
+                build_large_convoy_recursive_method(
+                    cx,
+                    arm,
+                    &ind,
+                    &params_terms,
+                    &target_indices,
+                    &scrut_indices,
+                    n,
+                    &expected_here,
+                    sentinel_region,
+                    &premise_domains,
+                )?
+            } else if equation.is_some() {
                 let eq_dom = Term::Eq(
                     Box::new(weaken(&scrut_ty, n as i64)),
                     Box::new(weaken(&scrut_core, n as i64)),
@@ -3289,202 +5158,64 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 cx.ctx.pop();
                 Term::lam(eq_dom, body)
             } else {
-                // Install index-refinement `var_refinements` for this
-                // branch — constructor injectivity (peeled recursive fields)
-                // and sibling convoy — BEFORE checking the body, so the body's
-                // own elaboration can see through them. `cx.ctx` deliberately
-                // stays exactly `n`-deep here (fields only): `resolve.rs`
-                // pre-computed every `RVar` index in `arm.body` assuming
-                // exactly that depth (it has no notion of these
-                // elaborator-internal premises), so pushing the premises onto
-                // `cx.ctx` here would desync every OTHER reference in the arm.
-                // Each installed refinement's proof instead references its
-                // premise via an `INDEX_REFINEMENT_SENTINEL_BASE`-tagged
-                // placeholder `Var` — not yet a real binder — which
-                // `finalize_refined_body` relocates to its true, wrap-relative
-                // index once `check` returns (the premises only become real
-                // λ-binders afterward, via `wrap_premise_lams_from_full`).
-                let outer_scope_depth = cx.ctx.len() - n;
-                // Record this arm's own field region BEFORE calling
-                // `install_index_refinements` so capability 2's loop (which
-                // ranges over `0..outer_scope_depth`, disjoint from this
-                // region) can already see it and skip an enclosing match's
-                // fields. The current arm's own region is
-                // `outer_scope_depth..cx.ctx.len()`, disjoint from that
-                // loop's range, so pushing it here cannot affect this arm's
-                // own installation.
-                let field_region = outer_scope_depth..cx.ctx.len();
-                cx.match_field_regions.push(field_region);
-                let mut installed_refinements = install_index_refinements(
+                check_dependent_branch_body(
                     cx,
+                    arm,
                     &ind,
                     &params_terms,
                     &target_indices,
                     &scrut_indices,
                     n,
-                    outer_scope_depth,
-                )?;
-                if let Some(premise_slot) = hidden_result_premise_slot {
-                    installed_refinements.extend(install_hidden_result_variable_refinements(
-                        cx,
-                        &weaken(&scrut_ty, n as i64),
-                        &concrete,
-                        &weaken(&scrut_core, n as i64),
-                        premise_slot,
-                        outer_scope_depth,
-                    )?);
-                }
-                // Install the context-telescope convoy redirects (step 4): each
-                // captured ambient binding's body reference resolves to its
-                // convoy binder (via the binder's sentinel), which
-                // `finalize_refined_body` relocates. This is the replacement for
-                // capability 2's per-binding sibling Cast.
-                for (bottom_pos, sentinel, ctor_ty) in &convoy_refinements {
-                    cx.var_refinements
-                        .insert(*bottom_pos, (sentinel.clone(), ctor_ty.clone(), cx.ctx.len()));
-                    installed_refinements.push(*bottom_pos);
-                }
-                // Capability 3 (goal refinement) and capability 1/2 (var
-                // refinement) solve overlapping cases in OPPOSITE directions —
-                // capability 1 makes an existing field/sibling look like the
-                // ORIGINAL (unrefined) goal via `Cast`; capability 3 makes the
-                // GOAL itself look like the ctor-refined type. Both active at
-                // once on the same index is a guaranteed mismatch (confirmed:
-                // regressed `tail`, whose `ys` capability-1 already resolves
-                // the original goal). So try the cheap, unrefined path FIRST
-                // (covers any branch whose body only re-uses existing
-                // capability-1/2-refined bindings, e.g. `tail`); only a branch
-                // that constructs a FRESH value against an index-dependent goal
-                // (e.g. `zip`'s `VNil` base case) needs capability 3, and only
-                // reaches it here. `check` mutates `cx.obligations` before it
-                // can fail, so roll any partial obligations back before retrying
-                // — `cx.metas` gaining unused, never-referenced metavariables
-                // from the discarded attempt is harmless.
-                // Capability 3 (goal refinement) and capability 1/2 (var
-                // refinement) solve overlapping cases in OPPOSITE directions —
-                // capability 1 makes an existing field/sibling look like the
-                // ORIGINAL (unrefined) goal via `Cast`; capability 3 makes the
-                // GOAL itself look like the ctor-refined type. Both active at
-                // once on the same index is a guaranteed mismatch (confirmed:
-                // double-applying regressed `tail`, whose `ys` capability-1
-                // already resolves the original goal on its own). The
-                // discriminator: a branch body that is a bare existing binding
-                // (`ys`) is exactly capability 1/2's case — it never needs its
-                // own goal refined, only the reference re-typed. A branch body
-                // that CONSTRUCTS a fresh value of the family (`VNil Nat`,
-                // `VCons Nat m a (...)`, `zip`'s base *and* recursive cases)
-                // has no existing binding for capability 1/2 to redirect, so
-                // its NATURAL type uses the ctor's own (unrefined-in-the-
-                // caller's-frame) index — only capability 3 can bridge that.
-                let expected_here_unrefined = if matches!(arm.body, RExpr::RLam(_, _, _)) {
-                    expected_here.clone()
-                } else {
-                    simplify_branch_goal(cx.env, &cx.ctx, &expected_here)
-                };
-                let result_refinement_base = cx.result_refinements.len();
-                if let Some(premise_slot) = hidden_result_premise_slot {
-                    cx.result_refinements.push(ResultRefinement {
-                        index_ty: weaken(&scrut_ty, n as i64),
-                        concrete_index: concrete.clone(),
-                        refined_index: weaken(&scrut_core, n as i64),
-                        premise_slot,
-                        install_depth: cx.ctx.len(),
-                    });
-                }
-                let obl_snapshot = cx.obligations.len();
-                // Try the UNREFINED goal first — sufficient whenever capability
-                // 1/2 already resolve every reference the body makes (`tail`,
-                // and (non-obviously) a NESTED branch whose own recursive call
-                // is rescued by the OUTER match's capability-1 refinement, e.g.
-                // `zip`'s inner `VCons` arm). `check`'s `Ok` alone is not proof
-                // — elaborator unification can defer a mismatch rather than
-                // reject it immediately — so probe eagerly: `finalize` +
-                // `wrap_premise_lams_from_full` the checked body (resolving
-                // every index-refinement sentinel into a real, self-contained
-                // binder) and `kernel_check` it against the equally `Pi`-wrapped
-                // goal. Only if THAT fails does a branch genuinely need its own
-                // goal refined (capability 3) — e.g. a branch that CONSTRUCTS a
-                // fresh family value (`VNil Nat`, `zip`'s base case) has no
-                // existing binding for capability 1/2 to redirect, so its
-                // natural type uses the ctor's own index directly.
-                let attempt = check(cx, &arm.body, &expected_here_unrefined, &arm.span).and_then(
-                    |body_core_checked| {
-                        // Finalizing wrappers relocate index-refinement sentinels
-                        // in the codomain AND in each premise domain, so a
-                        // transitive convoy premise that names an earlier convoy
-                        // binder resolves correctly. Body and goal type use the
-                        // same wrapper, so a convoy binder the goal references
-                        // lands at the same de Bruijn index in both. Degenerates
-                        // to the plain `from_full` wrap when no sentinel is
-                        // present (the non-convoy path).
-                        let wrapped =
-                            wrap_premise_lams_finalized(body_core_checked.clone(), &premise_domains);
-                        let wrapped_ty = wrap_premise_pis_finalized(
-                            expected_here_unrefined.clone(),
-                            &premise_domains,
-                        );
-                        let zonked_wrapped = cx.metas.zonk_term(&wrapped);
-                        let zonked_ty = cx.metas.zonk_term(&wrapped_ty);
-                        let zonked_ctx = Context {
-                            types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
-                        };
-                        kernel_check(cx.env, &zonked_ctx, &zonked_wrapped, &zonked_ty)
-                            .map(|()| body_core_checked)
-                            .map_err(|e| ElabError::KernelRejected {
-                                error: e,
-                                span: arm.span.clone(),
-                            })
-                    },
-                );
-                let body_core = match attempt {
-                    Ok(body_core_checked) => Ok(body_core_checked),
-                    Err(_) => {
-                        cx.obligations.truncate(obl_snapshot);
-                        // Moved to `check_match_dependent_refined_fallback`
-                        // (LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT D2) -- see
-                        // its doc comment. Same calls, same order.
-                        check_match_dependent_refined_fallback(
-                            cx,
-                            arm,
-                            &ind,
-                            &params_terms,
-                            &target_indices,
-                            &scrut_indices,
-                            n,
-                            &expected_here,
-                        )
-                    }
-                };
-                cx.result_refinements.truncate(result_refinement_base);
-                let body_core = body_core?;
-                for pos in installed_refinements {
-                    cx.var_refinements.remove(&pos);
-                }
-                cx.match_field_regions.pop();
-                wrap_premise_lams_finalized(body_core, &premise_domains)
+                    &expected_here,
+                    &premise_domains,
+                    hidden_result_premise_slot,
+                    &scrut_ty,
+                    &concrete,
+                    &scrut_core,
+                    sentinel_region,
+                    &convoy_refinements,
+                    equation_convoy,
+                )?
             }
         } else {
             let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &expected_here);
             let missing = missing_pattern_witness(cx, ctor.id);
-            synthesize_omitted_index_method(cx, &premise_domains, &expected_here, missing, span)?
+            synthesize_omitted_index_method(
+                cx,
+                &premise_domains,
+                &expected_here,
+                sentinel_region,
+                missing,
+                span,
+            )?
         };
         for _ in 0..n {
             cx.ctx.pop();
         }
 
-        methods[k] = Some(wrap_dependent_method_ihs(
+        methods[k] = Some(finish_dependent_constructor_method(
+            cx,
+            span,
             &shapes,
             n,
             expected,
+            equation_convoy,
             &scrut_core,
             &ind,
             &params_terms,
             &scrut_indices,
             m,
             ctor,
-            &context_convoy,
+            sentinel_region,
+            context_convoy,
+            embedded_method_convoy,
+            embedded_method_repairs,
             method,
-        ));
+            arm_idx,
+            arms,
+            k,
+            &motive,
+        )?);
     }
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
@@ -3501,22 +5232,22 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             });
         }
     }
-    let methods: Vec<Term> = methods
+    let methods: Vec<Term> = (*methods)
         .into_iter()
         .map(|m| m.expect("every ctor bucket filled above"))
         .collect();
-
     finish_dependent_elim(
         cx,
         d_id,
         &ind,
-        params_terms,
-        motive,
+        *params_terms,
+        *motive,
         methods,
         &scrut_indices,
         &scrut_ty,
         &scrut_core,
-        &context_convoy,
+        context_convoy,
+        embedded_method_convoy,
         equation.is_some() || hidden_group_result_refinement,
         span,
     )
@@ -3940,6 +5671,7 @@ fn refine_branch_goal(
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let pairs = method_index_premise_pairs(ind, params, target_indices, scrut_indices, n);
+    let sentinel_region = cx.match_field_regions.len().saturating_sub(1);
     // Complete every evidence walk before refining the goal. An unsupported
     // child therefore rejects the whole plan, even when an earlier declared
     // index or Sigma child had usable Eq leaves.
@@ -3954,7 +5686,7 @@ fn refine_branch_goal(
             cx.env,
             &zonked_ctx,
             &raw_eq,
-            Term::var(INDEX_REFINEMENT_SENTINEL_BASE + slot),
+            index_refinement_sentinel(sentinel_region, slot),
         )?);
     }
 
@@ -3970,6 +5702,7 @@ fn refine_branch_goal(
                 "index refinement: could not classify the branch goal: {e:?}"
             ))
         })?;
+        let classifier = whnf(cx.env, &zonked_ctx, &level_ty);
         let restoration = classify_branch_goal_restoration(
             cx.env,
             &zonked_ctx,
@@ -3977,7 +5710,7 @@ fn refine_branch_goal(
             &leaf.target,
             &leaf.scrutinee,
             &candidate,
-            whnf(cx.env, &zonked_ctx, &level_ty),
+            classifier,
             leaf.proof,
         )?;
         restorations.push(restoration);
@@ -4027,6 +5760,7 @@ fn install_hidden_result_variable_refinements(
         }
     }
 
+    let sentinel_region = cx.match_field_regions.len().saturating_sub(1);
     let raw_eq = Term::Eq(
         Box::new(index_ty),
         Box::new(concrete_index),
@@ -4036,7 +5770,7 @@ fn install_hidden_result_variable_refinements(
         cx.env,
         &zonked_ctx,
         &raw_eq,
-        Term::var(INDEX_REFINEMENT_SENTINEL_BASE + premise_slot),
+        index_refinement_sentinel(sentinel_region, premise_slot),
     )?;
     // The hidden premise is oriented `concrete = refined`, while outer
     // bindings are retyped from the refined scrutinee back to the constructor.
@@ -4070,14 +5804,19 @@ fn install_hidden_result_variable_refinements(
 
     let mut installed = Vec::new();
     for position in 0..outer_scope_depth {
-        if cx.match_field_regions.iter().any(|region| region.contains(&position))
+        if cx
+            .match_field_regions
+            .iter()
+            .any(|region| region.contains(&position))
             || cx.var_refinements.contains_key(&position)
         {
             continue;
         }
         let index = cx.ctx.len() - 1 - position;
         let outer_ty = cx.metas.zonk_term(&weaken(
-            cx.ctx.lookup(index).expect("outer result-refinement position in range"),
+            cx.ctx
+                .lookup(index)
+                .expect("outer result-refinement position in range"),
             (index + 1) as i64,
         ));
         let outer_classifier = whnf(
@@ -4147,6 +5886,7 @@ fn install_index_refinements(
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let pairs = method_index_premise_pairs(ind, params, target_indices, scrut_indices, n);
+    let sentinel_region = cx.match_field_regions.len().saturating_sub(1);
 
     // Build the complete leaf plan before mutating `var_refinements`. This is
     // atomic across every declared-index premise: an unsupported child cannot
@@ -4162,7 +5902,7 @@ fn install_index_refinements(
             cx.env,
             &zonked_ctx,
             &raw_eq,
-            Term::var(INDEX_REFINEMENT_SENTINEL_BASE + slot),
+            index_refinement_sentinel(sentinel_region, slot),
         )?);
     }
 
@@ -4226,6 +5966,7 @@ fn install_index_refinements(
             installed.push(bottom_pos);
         }
     }
+
     Ok(installed)
 }
 
@@ -4235,7 +5976,12 @@ fn install_index_refinements(
 /// premises become real λs). `INDEX_REFINEMENT_SENTINEL_BASE + slot` is
 /// astronomically larger than any real nesting depth a Ken program could
 /// reach, so it can never collide with a genuine `Var`.
-const INDEX_REFINEMENT_SENTINEL_BASE: usize = 1 << 48;
+const INDEX_REFINEMENT_SENTINEL_BASE: usize = 1 << 40;
+const INDEX_REFINEMENT_SENTINEL_STRIDE: usize = 1 << 20;
+
+fn index_refinement_sentinel(region: usize, slot: usize) -> Term {
+    Term::var(INDEX_REFINEMENT_SENTINEL_BASE + region * INDEX_REFINEMENT_SENTINEL_STRIDE + slot)
+}
 
 /// Resolve a checked branch body's index-refinement sentinels to their true
 /// index and shift every other free variable by `premise_count` — together
@@ -4250,17 +5996,29 @@ const INDEX_REFINEMENT_SENTINEL_BASE: usize = 1 << 48;
 /// `+premise_count` shift `wrap_premise_lams_from_full`'s callers used to
 /// apply via `weaken`. Exhaustive over every `Term` variant — no catch-all
 /// — so a future variant forces this traversal to be extended too.
-fn finalize_refined_body(term: &Term, depth: usize, premise_count: usize) -> Term {
-    let go = |t: &Term, d: usize| finalize_refined_body(t, d, premise_count);
+fn finalize_refined_body(
+    term: &Term,
+    depth: usize,
+    premise_count: usize,
+    sentinel_region: usize,
+) -> Term {
+    let go = |t: &Term, d: usize| finalize_refined_body(t, d, premise_count, sentinel_region);
     match term {
         Term::Var(v) => {
             if *v < depth {
                 Term::Var(*v)
             } else {
                 let canonical = *v - depth;
-                if canonical >= INDEX_REFINEMENT_SENTINEL_BASE {
-                    let slot = canonical - INDEX_REFINEMENT_SENTINEL_BASE;
-                    Term::var(depth + premise_count - 1 - slot)
+                let region_start = INDEX_REFINEMENT_SENTINEL_BASE
+                    + sentinel_region * INDEX_REFINEMENT_SENTINEL_STRIDE;
+                if canonical >= region_start
+                    && canonical < region_start + INDEX_REFINEMENT_SENTINEL_STRIDE
+                {
+                    let slot = canonical - region_start;
+                    let resolved = premise_count
+                        .checked_sub(1 + slot)
+                        .expect("refinement sentinel slot exceeds its own premise telescope");
+                    Term::var(depth + resolved)
                 } else {
                     Term::var(*v + premise_count)
                 }
@@ -4384,20 +6142,26 @@ fn wrap_premise_lams_from_full(body: Term, premises: &[Term]) -> Term {
 /// binders and shifts its field references by `i` — exactly the shift
 /// `weaken(_, i)` performs for the sentinel-free premises, so this degenerates
 /// to `wrap_premise_{pis,lams}_from_full` when no premise carries a sentinel.
-fn wrap_premise_lams_finalized(body: Term, premises: &[Term]) -> Term {
+fn wrap_premise_lams_finalized(body: Term, premises: &[Term], sentinel_region: usize) -> Term {
     let total = premises.len();
-    let mut term = finalize_refined_body(&body, 0, total);
+    let mut term = finalize_refined_body(&body, 0, total, sentinel_region);
     for i in (0..total).rev() {
-        term = Term::lam(finalize_refined_body(&premises[i], 0, i), term);
+        term = Term::lam(
+            finalize_refined_body(&premises[i], 0, i, sentinel_region),
+            term,
+        );
     }
     term
 }
 
-fn wrap_premise_pis_finalized(body: Term, premises: &[Term]) -> Term {
+fn wrap_premise_pis_finalized(body: Term, premises: &[Term], sentinel_region: usize) -> Term {
     let total = premises.len();
-    let mut term = finalize_refined_body(&body, 0, total);
+    let mut term = finalize_refined_body(&body, 0, total, sentinel_region);
     for i in (0..total).rev() {
-        term = Term::pi(finalize_refined_body(&premises[i], 0, i), term);
+        term = Term::pi(
+            finalize_refined_body(&premises[i], 0, i, sentinel_region),
+            term,
+        );
     }
     term
 }
@@ -4434,10 +6198,11 @@ fn convoy_binder_types(
     core_target: &Term,
     frame_depth: usize,
     slot_base: usize,
+    sentinel_region: usize,
 ) -> (Vec<Term>, Vec<Term>) {
     let c = context_convoy.len();
     let sentinels: Vec<Term> = (0..c)
-        .map(|i| Term::var(INDEX_REFINEMENT_SENTINEL_BASE + slot_base + (c - 1 - i)))
+        .map(|i| index_refinement_sentinel(sentinel_region, slot_base + (c - 1 - i)))
         .collect();
     let mut types: Vec<Term> = Vec::with_capacity(c);
     for (i, entry) in context_convoy.iter().enumerate() {
@@ -4475,6 +6240,9 @@ fn redirect_convoy_body(
 }
 
 fn build_convoy_refined_type(
+    env: &GlobalEnv,
+    ctx: &Context,
+    span: &Span,
     ind: &InductiveDecl,
     params_terms: &[Term],
     refined_indices: &[Term],
@@ -4482,11 +6250,13 @@ fn build_convoy_refined_type(
     scrut_core: &Term,
     refined_core: &Term,
     n: usize,
+    sentinel_region: usize,
     context_convoy: &[ConvoyEntry],
+    embedded_method_convoy: &[EmbeddedMethodConvoy],
+    embedded_method_repairs: &[(usize, usize)],
     base_body: Term,
-) -> Term {
-    let mut premises =
-        method_index_premises(ind, params_terms, refined_indices, scrut_indices, n);
+) -> Result<Term, ElabError> {
+    let mut premises = method_index_premises(ind, params_terms, refined_indices, scrut_indices, n);
     let n_idx = premises.len();
     let (types_inner_first, sentinels) = convoy_binder_types(
         context_convoy,
@@ -4496,19 +6266,52 @@ fn build_convoy_refined_type(
         refined_core,
         n,
         n_idx,
+        sentinel_region,
     );
-    let body = redirect_convoy_body(context_convoy, n, &sentinels, base_body);
+    let mut body = redirect_convoy_body(context_convoy, n, &sentinels, base_body);
     // Append the convoy binder types outermost-first (reverse of innermost-first).
     for i in (0..context_convoy.len()).rev() {
         premises.push(types_inner_first[i].clone());
     }
-    wrap_premise_pis_finalized(body, &premises)
+    if !embedded_method_convoy.is_empty() || !embedded_method_repairs.is_empty() {
+        let embedded_slot_base = premises.len();
+        body = install_embedded_method_sentinels(
+            env,
+            ctx,
+            &body,
+            embedded_method_convoy,
+            embedded_method_repairs,
+            embedded_slot_base,
+        )?;
+        body = refresh_embedded_elim_evidence(env, ctx, &body, span)?;
+        let branch_rebase = dependent_rebase_subs(
+            scrut_core,
+            scrut_indices,
+            n as i64,
+            refined_indices,
+            refined_core,
+            &body,
+            true,
+        );
+        for entry in embedded_method_convoy {
+            let branch_ty =
+                subst_term_generalize_many(&weaken(&entry.ambient_ty, n as i64), &branch_rebase);
+            premises.push(redirect_convoy_body(
+                context_convoy,
+                n,
+                &sentinels,
+                branch_ty,
+            ));
+        }
+    }
+    Ok(wrap_premise_pis_finalized(body, &premises, sentinel_region))
 }
 
 fn synthesize_omitted_index_method(
     cx: &ElabCtx,
     premise_domains: &[Term],
     expected_here: &Term,
+    sentinel_region: usize,
     missing: MissingPatternWitness,
     span: &Span,
 ) -> Result<Term, ElabError> {
@@ -4527,13 +6330,13 @@ fn synthesize_omitted_index_method(
             missing,
             span: span.clone(),
         })?;
-    let premise_count = premise_domains.len();
-    let proof_var = Term::var(premise_count - 1 - impossible_idx);
-    let body = Term::Absurd(
-        Box::new(weaken(expected_here, premise_count as i64)),
-        Box::new(proof_var),
-    );
-    Ok(wrap_premise_lams_from_full(body, premise_domains))
+    let proof = index_refinement_sentinel(sentinel_region, impossible_idx);
+    let body = Term::Absurd(Box::new(expected_here.clone()), Box::new(proof));
+    Ok(wrap_premise_lams_finalized(
+        body,
+        premise_domains,
+        sentinel_region,
+    ))
 }
 
 fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
