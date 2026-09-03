@@ -80,7 +80,7 @@ pub fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
     Cons x xs2 ↦ Cons a x (list_append a xs2 ys)
   }
 
-fn nth (a : Type) (n : Nat) (xs : List a) : Option a =
+pub fn nth (a : Type) (n : Nat) (xs : List a) : Option a =
   match xs {
     Nil ↦ None a;
     Cons h t ↦
@@ -889,7 +889,7 @@ registered round-trip propositions. This definition adds no primitive,
 postulate, cached-`Nat` carrier, or `Axiom`.
 
 ```ken
-fn bytes_nat_length (bs : Bytes) : Nat = length UInt8 (bytes_to_list bs)
+pub fn bytes_nat_length (bs : Bytes) : Nat = length UInt8 (bytes_to_list bs)
 ```
 
 ## 5. Design notes
