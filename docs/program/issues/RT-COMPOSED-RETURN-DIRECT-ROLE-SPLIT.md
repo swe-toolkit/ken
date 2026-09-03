@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT
 title: "PRESERVED base asset (re-scope 2026-09-01): the environment/result role split is retained in the held checkpoint ad191d1c2 and now feeds the successor RT-COMPOSED-RETURN-RUNTIME-CLOSURE (Architect runtime-closure mechanism evt_3j6vshm83rk5q); the delayed-SSA WP2/WP3 successors are superseded and closed. This node stays active as the base member of the atomic runtime-closure candidate. Composed-return native repair, option (a)(i) WP1 of 3 (HELD CHECKPOINT of one atomic merge unit — no independent QA/Decision/merge): split captured-environment from application-result in private compiler types, and make DirectInvocationReturn's carried-environment arm emit one declared continuation call whose Trap-checked Result is the application result (no environment-as-result). app486 and constructor materialization stay environment-only; Tail byte-identical except shared private refactoring."
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -12,6 +12,18 @@ github: null
 origin: "Architect component design for the operator-funded composed-return native repair, option (a)(i) co-located forward Ret edge (PART 1/2 evt_381dzjykr4knn, PART 2/2 evt_5963far74b735, 2026-09-01), grounded on the operator funding (evt_3met6tbk5wrnd) that followed the accepted terminal NO_UNIQUE_EDGE (evt_mx6scjje1yjp). Bound base current origin/main e6a6c5240e6d74381ffcd755c60c6705f1a99501, tree 1513c8279a669225e985ee97e746c0af786021a7. This is WP1 of a three-checkpoint ATOMIC merge unit (WP1 RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT -> WP2 RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE -> WP3 RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT); the three land as ONE product candidate cut only after WP3. WP1 and WP2 are HELD CHECKPOINTS: no QA, Decision, publication, or merge follows either. Steward owns framing + release sequencing; the Architect's two posts are the authoritative mechanism contract (do NOT re-derive it here)."
 ---
 
+> # SUBSUMED-CLOSE (Steward, 2026-09-03; runtime-leader blob-verified
+> # evt_5zs041nxn03s4). This node's deliverable — the environment/result role
+> # split plus the `BoundaryClosureEnvironment` / `ContinuationCallIdentity.worker`
+> # body/arity/capture-schema authorities — is INCORPORATED in landed `origin/main`
+> # (`aggregates.rs:148`, `continuations.rs:1291`), carried in through the
+> # RT-COMPOSED-RETURN-SSA-SPECIALIZATION arc it was the bound base for (RT-SSA
+> # merged `ad9905a7e`). Nothing further to build; status active -> merged. The
+> # runtime-closure successor it once fed (RT-COMPOSED-RETURN-RUNTIME-CLOSURE)
+> # stays draft as the untriggered fallback. The still-live runtime nodes
+> # (RT-COMPOSED-RETURN-FORWARD-RET-EDGE, RT-NATIVE-CARRIED-VALUE,
+> # RT-NESTED-IH-NATIVE-REALIZATION) are separate mechanisms, not RT-SSA residue.
+>
 > # WP1 of 3 — HELD CHECKPOINT of the RT-COMPOSED-RETURN atomic merge unit.
 > # RELEASED to the runtime ring (lane 1). Runtime is parked; this IS the release.
 > #
