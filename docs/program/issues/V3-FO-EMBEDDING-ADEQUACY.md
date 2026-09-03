@@ -11,6 +11,22 @@ github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
+> # OPERATIVE (Steward, 2026-09-03) — OPERATOR GATE RESOLVED: predecessor
+> # #4's coupled coherence realizes via the cast/J INDEX-REFINEMENT (option a).
+> # Supersedes the HS13-FIRED banner below for CURRENT state.
+> #
+> # HS13 falsified HS12's transport-free realization; the Architect escalated
+> # the reserved policy gate (evt_3megf5mnmh90t) and the operator RULED
+> # (2026-09-03): accept option (a) — carry the homogeneous Eq Nat index
+> # equation and cast/J the stranded sibling (existing K2 primitives, ADR-0005;
+> # ZERO trusted-base delta, elaborator-only, NO kernel change). Full mechanism
+> # + §1b closure recorded durably in
+> # [[LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME]] (predecessor #4). The
+> # language ring builds that predecessor from 7b766fc89; Architect required
+> # reviewer. D2b stays HELD (WIP over 7b766fc89, statement UNCHANGED) until
+> # predecessor #4 merges; the Steward RE-RELEASES D2b only after that landing
+> # and routes M1-M4.
+>
 > # OPERATIVE (Steward, 2026-09-03) — HS13 FIRED: the HS12 xs-first realization hit
 > # a symmetric horn at build (xs-first pins xs before i's neutral motive; the inner
 > # Elim's motive abstracts the shared index after the sibling is constructor-pinned
@@ -31,14 +47,15 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > # split (Research's Rep-3 verbatim) — ELABORATOR-ONLY, ZERO trusted-base delta,
 > # NO transport, NO het-equality, existing homogeneous Elims, NO operator gate.
 > # §1a HS12 DISCHARGED; next mandatory §1a = HS15 (Steward-authoritative count).
-> # The full kernel term shape + the §1b closure predicate are recorded durably in
-> # [[LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME]] (predecessor #4, refined
-> # scope = coupled-covering split-order selection). The language ring resumes
-> # building that predecessor xs-first from 7b766fc89 (termination-checker check
-> # first, fallback simultaneous telescopic split — also elaborator-only). D2b stays
-> # HELD (WIP over 7b766fc89, statement UNCHANGED) until predecessor #4 merges;
-> # Architect is the required soundness reviewer on the resumed D2b candidate; the
-> # Steward RE-RELEASES D2b only after that landing and routes M1-M4.
+> # The full kernel term shape + the §1b closure predicate are recorded
+> # durably in [[LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME]]
+> # (predecessor #4, refined scope = coupled-covering split-order selection).
+> # The language ring resumes building that predecessor xs-first from 7b766fc89
+> # (termination-checker check first, fallback simultaneous telescopic split —
+> # also elaborator-only). D2b stays HELD (WIP over 7b766fc89, statement
+> # UNCHANGED) until predecessor #4 merges; Architect is the required soundness
+> # reviewer on the resumed D2b candidate; the Steward RE-RELEASES D2b only
+> # after that landing and routes M1-M4.
 >
 > # OPERATIVE (Steward, 2026-09-03) — D2b HS5: predecessor #4 framed, D0 grid
 > # DONE, fix direction RULED (structural coherent-frame closure). Supersedes the
@@ -70,24 +87,23 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > # UNCHANGED and still adopted — HS4 is a wall WITHIN building B, not a change of
 > # architecture.
 >
-> Building Option B, the ring hit the wall the HS3 ruling explicitly named as a
-> genuinely-new one: the target-soundness induction's Forall recursion
+> Building Option B, the ring hit the wall the HS3 ruling explicitly named
+> as a genuinely-new one: the target-soundness induction's Forall recursion
 > false-rejects (KernelRejected TypeMismatch on both ForallWorldRight and
 > ForallObjRight; Init/Imp pass). The Architect classified it (evt_anzrvvzaccep)
 > as an elaborator-capability predecessor — CORRECTED by the ring's D0 grid
 > (evt_14xp6j8dqt9ky): the cause is NOT context extension (extension alone
 > elaborates) but the eliminator losing the constructor-local type of a branch
-> field whose type depends on the refined record index; the missing capability is
-> DUAL-VIEW of that field at the local-helper boundary. NOT a kernel change, NOT
-> source-compensable, NOT a B refutation.
-> Steward framed [[LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW]] (added to `depends_on`).
-> That predecessor has LANDED (b22e62530, merged 2026-09-03) and the Steward has
+> field whose type depends on the refined record index; the missing capability
+> is DUAL-VIEW of that field at the local-helper boundary. NOT a kernel change,
+> NOT source-compensable, NOT a B refutation. Steward framed
+> [[LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW]] (added to `depends_on`). That
+> predecessor has LANDED (b22e62530, merged 2026-09-03) and the Steward has
 > EXPLICITLY RE-RELEASED D2b (evt_h43jey480ktz, 2026-09-03): the language ring
 > resumes from the held WIP `97477903e` (base `eac970705`), rebased onto current
-> main, rebuilding B's Forall arms against the now-fixed elaborator to produce the
-> D2b candidate
-> (Architect required soundness reviewer). §1a: HS4 self-ruled, next Research
-> trigger = HS6. This is D2b design hard-stop #4.
+> main, rebuilding B's Forall arms against the now-fixed elaborator to produce
+> the D2b candidate (Architect required soundness reviewer). §1a: HS4
+> self-ruled, next Research trigger = HS6. This is D2b design hard-stop #4.
 >
 > # OPERATIVE (Steward, 2026-09-03) — D2b HS3 RULED: adopt Option B. This banner
 > # supersedes EVERY banner below; the held-ledger proof approach is RETIRED.
@@ -244,7 +260,8 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > elimination stop, that is a FIFTH predecessor hard stop — reset clean, measure,
 > route to the Steward; do not source-convoy it permanently.
 >
-> # D2b RE-FROZEN 2026-09-01 (HS3) — behind a FOURTH elaborator predecessor (history)
+> # D2b RE-FROZEN 2026-09-01 (HS3) — behind a FOURTH elaborator
+> # predecessor (history)
 >
 > **This banner supersedes the RE-RELEASED banner below.** After the two
 > predecessors landed and D2b was re-released, the proof advanced (spine folded,
@@ -270,7 +287,8 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > then does the Steward explicitly RE-RELEASE D2b from `bf8f37326`. No parallel
 > source repair, no kernel escalation, no D2b movement before that gate.
 >
-> # D2b RE-RELEASED 2026-09-01 — both predecessors landed, consumer probe green (history)
+> # D2b RE-RELEASED 2026-09-01 — both predecessors landed, consumer probe
+> # green (history)
 >
 > **RELEASED to the language ring 2026-09-01.** Both D2b predecessors are now
 > merged: (1) [[LANG-RECORD-INDEX-REFINEMENT]] (kernel `eq_at_inductive` weaken,
@@ -308,11 +326,12 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > MERGED via [[LANG-RECORD-INDEX-REFINEMENT]] (on main at `ab28450fa` /
 > `5b7466ce2`, PR #3216). D2b is UNBLOCKED and re-released; the held evidence
 > `70a291a96` (177-line strengthened ledger/inversion spine) folds onto the
-> landed kernel fix and the ring continues the EXACT unchanged adequacy theorem. **Do NOT re-index
-> `FokDerivation`, add a Nat code for sequents, split the record into List
-> indices, or touch `fok_derives`/`fok_classically_valid`** — that would
-> compensate in the relation for an elaborator defect. The D2b theorem statement
-> is UNCHANGED. Only after the predecessor's exact consumer gate is green does
+> landed kernel fix and the ring continues the EXACT unchanged adequacy theorem.
+> **Do NOT re-index `FokDerivation`, add a Nat code for sequents, split the
+> record into List indices, or touch `fok_derives`/`fok_classically_valid`** —
+> that would compensate in the relation for an elaborator defect. The D2b
+> theorem statement is UNCHANGED. Only after the predecessor's exact consumer
+> gate is green does
 > the Steward explicitly RE-RELEASE D2b; the ring then rebases/folds the held
 > spine and continues the exact unchanged theorem.
 
