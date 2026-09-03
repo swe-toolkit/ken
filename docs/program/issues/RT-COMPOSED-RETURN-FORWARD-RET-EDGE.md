@@ -408,6 +408,98 @@ runs the required symptom-2 measurement + checks the other 5 shards, then re-ver
 symptom 3 is still clear; FRESH SHA -> both reviewers re-review -> fresh Decision
 (runtime-leader) -> Steward M1-M4. `07c31b0c5` / `dec_22r1rbn9qnn81` never merge.
 
+## Increment-1 re-spin measurements + B/C rulings — dispositions (Steward)
+
+The re-spin measurement round (implementer `evt_4exdczywc7v7w`; Architect B/C
+rulings `evt_63dg2292sqwgv`) RESOLVED symptoms 1-3 and surfaced two more items (B
+recalibration, C layering) plus a WP-scope reconcile that is the Steward's. No
+merge yet — the FRESH SHA + fresh Decision still follow.
+
+**Symptoms 1-3 RESOLVED.** (1) Stack: PROPORTIONATE (all 4 routes pass at
+`RT_COLD_STACK_MIB=3` and `=4`; candidate peak <3 MiB, a ~1 MiB constant bump off
+the ~2 MiB base, not super-linear), SINGLE-LOWERING (code-confirmed one
+`lower_expr` on the k-Match payload), PRODUCTION-SAFE (<3 MiB << 8 MiB main) —
+Architect's three conditions met, wrapper is right. (2) Release-order: all 4
+reaching variants (direct/unknown/ordinary/misroute-read) measured
+`native_ops == interp_ops`, release SET equal, non-release events equal IN ORDER =
+the RT-BRACKET class per variant; fix factored `non_release_events`/`release_set`
+into shared helpers used by both `assert_narrowed_alike` and the `_` arm.
+(3) Census: **§7a CORRECTION — CANDIDATE-caused, not pre-existing drift** (Architect
+accepted the implementer finding, correcting BOTH reviewers' earlier "pre-existing"
+read): the 8 AC-EDGE-CONTROL-REKEY `#[ignore]`s sat BEFORE the
+`generated_entry_checked_case!` invocation where the macro's `$(#[$attr:meta])*`
+matcher never sees them, so `generated_entry_capsule_outer_carried` RAN and failed
+(45-37=8 = the non-applying ignores). Fixed by moving each `#[ignore]` inside the
+macro call; all 8 verified firing via `--list --ignored`. So the earlier
+"file separately, does not gate" disposition is SUPERSEDED — it IS candidate-caused
+and part of the re-spin.
+
+**§1b CONDITIONAL (symptom 2) — RESOLVED NEGATIVE.** The per-variant measurement
+showed same release SET + non-release order agreeing = RT-BRACKET class, NOT a
+release reorder. The HS3 sealed closure's observation-counter datum-set was NOT too
+narrow; NO closure widening to release-order is owed.
+
+**B (composed_return_ret_sink_population_is_unique, base test): recalibration, IN
+SCOPE, mechanism not defect.** Read 35->17 AND write 26->17. Mechanism: the forward
+SSA edge `Complete(RecursiveBackedge)` short-circuits the source machine, so
+downstream strict-Ret seams the base continued past are no longer REACHED = fewer
+sinks installed (production behavior; the sealed closure is unaffected). Architect
+§7a self-correction of the z2300 "count must go UP" guard: this test counts REACHED
+seams (`applications == observations.len()`), not FORMED authorities, so DOWN is
+correct. Recalibration requirements: keep `applications == observations.len()` and
+`observations.len() > 1` green; DERIVE (not paste) that the lost coords
+(read (301,465),(511,676); write (525,691)) are exactly the backedge-subsumed
+downstream seams.
+- **WP-SCOPE RECONCILE (Steward's call, per Architect's corollary).** The closeout
+  is SHAPE-gated (pure `Ret{Match}` composed-return at consumption, ruling A), NOT
+  operation-kind-gated. A valid write-writable stage whose tail worker body is a
+  pure `Ret{Match}` is the SAME shape as a read's, so it legitimately takes the edge
+  (write 26->17) — this is subsume-don't-proliferate, NOT scope creep; an
+  operation-kind special-case would be the defect. "read-half" names which half of
+  the observation/edge-control migration inc1 lands (the AC-EDGE-CONTROL-REKEY
+  controls), NOT which operations the shape-gated closeout optimizes;
+  effect-performing continuations are inc2. The frame carries no "read-operations-only"
+  wording to contradict, so this is a clarification: inc1's shape-gated scope
+  INCLUDES valid pure-`Ret{Match}` writes, and both read and write recalibrate to 17.
+  Malformed-write still trapping pre-composed-return (write trap tests green)
+  confirms the gate fires only on genuine pure-`Ret{Match}`.
+
+**C (checked_ih_inheritance_and_fresh_result_route_are_byte_inert): mechanism-
+IMPLEMENTATION layering defect — distinct inventory entry, NOT a hard-stop.** Under
+`SuppressForInertness` on the READ, only `executable_hash` + raw bytes differ;
+`plan_transport_hash`, `core_semantic_hash`, `artifact_hash` ALL AGREE = the
+spurious-codegen-dependency signature the Architect pre-registered as precondition
+(i), which FAILS the retirement license. Diagnosis: `emit_composed_return_ret_kmatch_closeout`
+reads a planner-only inheritance CERTIFICATE at codegen and lets it reach machine
+bytes — the exact layering the byte-inertness invariant exists to enforce (inheritance
+is a certificate, not a codegen input). Architect ruling = option (b): fix the closeout
+to derive its emission from the inert continuation STRUCTURE
+(`continuation_units`/`inputs`/`worker_body`, which live in the plan/artifact and are
+inert), keep the invariant GREEN on read AND valid-write; do NOT retire. Required
+confirming measurement: identify the exact datum the closeout reads that is affected
+by `SuppressForInertness` AND absent from the three agreeing hashes — if it is the
+inheritance well-formedness proof (the default, and what the signature says) it is the
+layering fix; only if it is a genuine load-bearing EXECUTION input under-captured by
+`core_semantic_hash` is it instead a hash-coverage defect (fix the hash, re-measure) —
+either way a FIX, not a bare retire.
+- **COUNT (Steward, tracker-authoritative): C is NOT a hard-stop.** It is a fixable
+  mechanism-implementation layering bug with a KNOWN fix (option b), caught PRE-MERGE
+  by the re-spin measurement — a gate-quality outcome, not a structural wall requiring
+  a ruling/recut to pass. The DESIGN stands (z2250 sealed closure + shape-gated
+  forward-Ret closeout unchanged); the implementation needs the layering fix before
+  re-approval. **inc1 STAYS at 3 hard-stops.** C's predicate — codegen consuming a
+  planner-only certificate — is DISTINCT from HS1-3's observation-displacement
+  predicate, so §1b-independent: record C as its OWN inventory entry, not a 4th of the
+  same. This CORRECTS the earlier "the 3 reds are all test issues" framing (C is a
+  mechanism-implementation defect, not a test issue). Below HS6 regardless, so no §1a
+  research trigger.
+
+**Re-spin path (updated):** apply the C layering fix (read + write byte-inertness
+green) + the B recalibration (derived to 17, invariants green) + the resolved
+symptom-1/2/3 fixes -> strip temp instrumentation -> FRESH SHA + fresh Decision ->
+both reviewers re-review (a)-(e) + C byte-inertness green on read and write + the B
+derivation -> Steward M1-M4.
+
 ## The single relaxed constraint, and what stays closed
 
 The ONE relaxed constraint: a governed Tail result BYPASSES the source-machine
