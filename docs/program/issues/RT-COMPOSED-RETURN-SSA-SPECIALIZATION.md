@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-SSA-SPECIALIZATION
 title: "Composed-return native repair — PRIMARY: polyvariant compile-time response-owner specialization (Architect mechanism ruling evt_29jfzzw9j5xjz), the operator-preferred compile-time SSA path OVER the runtime closure. For every statically attributable (response producer, K) pair, emit one Function whose code identity fixes K, whose frame carries all K captures + enclosing continuation inputs as explicit ABI slots, and whose body does host dispatch/validation then directly calls that K with the exact response as operand 0. NO K tag, closure word, apply dispatcher, environment aggregate, code pointer, process-global slot, or runtime selector. Checkpoint 1 is a FEASIBILITY LEDGER ONLY; an irreducibly-multiple or dynamic-K reached edge is a typed SsaInfeasible finding that STOPS and routes to the operator before the fallback is selected. No public ABI change (unit_signature unchanged); no kernel primitive; no spec commitment."
-status: active
+status: merged
 owner: runtime
 size: L
 gate: runtime-qa+architect
@@ -11,6 +11,55 @@ blocks: []
 github: null
 origin: "RECUT 2026-09-02 (HS3 structural closure, Architect ruling evt_5yjjsrhpmt204 on research advisory evt_3z83vwpenscft): the absence-based decline is replaced by a first-class Deferred residual (classify->Disposition=Specialized|Deferred{payload}, total-match every stage, §7 sealed-enum no catch-all); the proved Specialized path is retained; base cut fresh from origin/main 4a088d8aa; ACs 1-7 in the RECUT body section; HS3 discharged. AMENDED 2026-09-02 (Architect evt_4ar3rxzrra5v4, on implementer pre-impl hard stop evt_33teszvwarz6 = HS4, not a CI-red): Deferred = P1 UNION P2 (P1 absent-residual + P2 present-but-unconsumed placeholder = the HS3-b leak); discriminator = caller-consumption (Specialized IFF specializable AND caller consumed), retargetability hoisted to planning (answer b, D0 preserved); added AC-7 pins classify vs lowering-time CandidateDisposition. Next re-trigger HS6. Prior origin: Architect mechanism ruling evt_29jfzzw9j5xjz (2026-09-01), the authoritative byte-level contract for the Specialized path; do NOT re-derive it, fold and cite it. Issued under the operator preference for compile-time SSA handling OVER the runtime closure (2026-09-01, correcting a Steward mis-scope of the approach fork; Steward direction correction evt_10dfspc3ssk5). Research extension advisory SHA-256 19bc67e5dada7cbac4445875cdcfd5ab079aecb3bc56b6df712696bcd296f3c1. The Architect confirmed this SSA path opens NO new operator fork (no public ABI change — unit_signature stays (frame_ptr, services_ptr) -> i64; no kernel primitive; no spec commitment), so the Steward frames and releases it. Bound base = the clean held checkpoint ad191d1c29af288b059bbb00c1b573c3c4356ab3, tree 342e3b735 (carries WP1's preserved environment/result role split, and BoundaryClosureEnvironment / ContinuationCallIdentity.worker as the body/arity/capture-schema authorities). The invocation-owned runtime closure (RT-COMPOSED-RETURN-RUNTIME-CLOSURE, ruling evt_3j6vshm83rk5q) remains the FALLBACK, held draft, selected ONLY if this SSA path returns SsaInfeasible and the operator so rules; it is NOT built in parallel. Halted runtime-closure scratch aee8c9408c986bb946d228069a5104c70db84ea4 is evidence only. WP1 RT-COMPOSED-RETURN-DIRECT-ROLE-SPLIT preserved as the base asset and depends_on predecessor; the delayed-SSA WP2/WP3 (RT-COMPOSED-RETURN-TAIL-FORWARD-EDGE, RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT) stay closed. Origin funding evt_3met6tbk5wrnd after accepted terminal NO_UNIQUE_EDGE evt_mx6scjje1yjp. RE-RECUT 2026-09-02 (HS5 structural, Architect ruling evt_7eh84c8n6w08e + #3 refinement evt_6v4yp7arvd4f4 + design-close evt_53s106a7btrb8/evt_411q6cvg74yrn, research advisory evt_5ryjd4dk65x05 adopted 2-of-3): the 5th CI-red (e193dc631, PR #3241) is a hard-stop-ruled RESCOPE — same deliverable, restructured mechanism. The install-time causal-proxy classify is REPLACED by a TWO-PHASE, owner-additive, domain-total classify (phase A owner-less context entries over has-K-unit population, causal-prefix; phase B disposition over the sealed whole-population classify, post-:1251), closedness preserved by same-state re-derivation. Seal domain (whole population P1+P2+Specialized) strictly wider than context-entry domain (has-K-unit = P2+Specialized). e193dc631 DEAD; next candidate cut fresh from origin/main (tip 4e5481c57), NEW SHA. #3 (fs_read/write un-ignores) measurement-gated three-way ((a) in S_causal-minus-S_record, (b) Specialized lowering observes InvalidOffset): rides this WP if (a)&&(b), else splits to the InvalidOffset-product-witness piece. See RECUT 2 governing section."
 ---
+
+## MERGED — full WP close (Steward, 2026-09-03)
+
+The composed-return native repair LANDED as squash `ad9905a7e` (PR #3250,
+merge-base `e485a696c`), verified on `origin/main`. Full CI green — all 8 test
+shards, `px8f_buffer_native`, the `ignored-row` sweep, `z3`, and all 3
+`rt_parity_native` native-slow shards including the box-blocked 9-mutation tail.
+Adversary M8 NO OBJECTION (`evt_2pnesgbnst6vk`): attacked as a codegen change,
+discriminator safe both directions (over-specialize fail-closes at
+`validate_response_owner_call_coverage`, over-defer falls to the pre-WP path),
+force hook non-default cfg.
+
+**Why FULL close, not accepted-partial** (runtime-leader disposition
+`evt_6gngt3wpyhcfk`, verified by the Steward against this doc's own governing
+text). The mechanism's acceptance is exactly AC-1..9 + the AC-7 backstop +
+AC-NO-REGRESSION, and every governing surface is terminally dispositioned here:
+
+- Surface #1 (FM-routing artifact): AC-HS6-1, fixed by (ii) — landed.
+- Surface #2 (ledger totality reframe / stale test): AC-HS6-2 — landed (the
+  census de-bake present in the merged SHA).
+- Surface #3 (`fs_read`/`fs_write` un-ignores): **AC-10 pre-authorized this as a
+  FOLLOW-UP, not a mechanism-SHA gate** — "The mechanism SHA ships WITHOUT the
+  fs_*_narrows un-ignores (partial-WP, §8)... Not a gate on the mechanism's
+  release." The merged candidate keeping `fs_*_narrows` `#[ignore]`d IS the
+  WP's own design executing as written.
+- Surface #4 (`rt_allocate_stage` currency): AC-HS6-3, `Disposition::Completes` —
+  landed.
+
+The **fallback** `RT-COMPOSED-RETURN-RUNTIME-CLOSURE` correctly stays `draft`:
+its origin text selects it "ONLY if this SSA path returns `SsaInfeasible`." The
+SSA path succeeded, so the fallback was never triggered — a separate contingency
+WP, not a next increment of this one.
+
+### FOLLOW-UP (tracked, NOT a blocker on this WP — operator scheduling call)
+
+The `>=2-Specialized-owner` reachability finding (HS7) is a distinct,
+later-discovered §8 partial-narrowing (unreachable, not unbuilt, per the
+Architect). Four controls were retired-as-unreachable on the merged SHA and are
+tracked here for re-enable WHEN the `>=2-Specialized-owner` capability lands
+(the operator's scheduling call, cited in-code):
+
+1. the option-2 concrete arm,
+2. the owner-body `response-prior` retired control,
+3. the owner-body `response-app486-environment` retired control,
+4. the retarget `>=2-owner` arm.
+
+This subsumes the runtime-leader's earlier option-2 coverage-gap commitment. It
+is future paperwork, not open surface of this WP; no lane work is funded by it
+until the operator schedules the enabling capability.
 
 ## RECUT 2 — HS5 structural: post-install, domain-total response classify (Architect ruling evt_7eh84c8n6w08e, #3 refinement evt_6v4yp7arvd4f4)
 

@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-A-PROVIDERS
 title: "Scaffold-retirement Tier A (primitive providers): publish the two remaining consumer-needed Derived provider values nth and bytes_nat_length as pub, so lower-tier consumers (Cursor, Parsing, Process.Arguments) import the canonical values instead of reaching them through fixture scaffolding. Census folded the tier to one module: Transport/Compare/Arithmetic/Nat.Order are already sufficiently published."
-status: ready
+status: active
 owner: foundation
 size: S
 gate: none
