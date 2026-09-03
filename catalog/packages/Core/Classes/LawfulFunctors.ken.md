@@ -49,7 +49,7 @@ forgetting `mempty`, `left_unit`, and `right_unit`, while keeping `op` and
 `assoc`. This keeps the class records direct and independent.
 
 ```ken
-class Monoid a {
+pub class Monoid a {
   op : a → a → a;
   mempty : a;
   assoc : (x : a) → (y : a) → (z : a) → Equal a (op (op x y) z) (op x (op y z));
@@ -190,11 +190,11 @@ collapses to `Top` and uses `Proved`, while `Some v` remains an `Eq`-shaped goal
 and uses `Refl`.
 
 ```ken
-fn idf (a : Type) (x : a) : a = x
+pub fn idf (a : Type) (x : a) : a = x
 
-fn comp (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (x : a) : c = g (h x)
+pub fn comp (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (x : a) : c = g (h x)
 
-class Functor (f : Type → Type) {
+pub class Functor (f : Type → Type) {
   map : (a : Type) → (b : Type) → (a → b) → f a → f b;
   id_law : (a : Type) → (x : f a) → Equal (f a) (map a a (idf a) x) x;
   fusion_law :
@@ -207,20 +207,22 @@ class Functor (f : Type → Type) {
     → Equal (f c) (map a c (comp a b c g h) x) (map b c g (map a b h x))
 }
 
-fn list_map (a : Type) (b : Type) (g : a → b) (xs : List a) : List b =
+pub fn list_map (a : Type) (b : Type) (g : a → b) (xs : List a) : List b =
   match xs {
     Nil ↦ Nil b;
     Cons h t ↦ Cons b (g h) (list_map a b g t)
   }
 
-proof id for list_map (a : Type) (xs : List a) : Equal (List a) (list_map a a (idf a) xs) xs =
+pub proof id for list_map
+      (a : Type) (xs : List a)
+    : Equal (List a) (list_map a a (idf a) xs) xs =
   match xs {
     Nil ↦ Proved;
     Cons h t ↦
       cong (List a) (List a) (list_map a a (idf a) t) t (Cons a h) ((proof id for list_map) a t)
   }
 
-proof fusion for list_map
+pub proof fusion for list_map
       (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (xs : List a)
     : Equal (List c) (list_map a c (comp a b c g h) xs) (list_map b c g (list_map a b h xs)) =
   match xs {
@@ -282,12 +284,12 @@ induction + `cong`; `Option` laws close by case-split or definitional
 equality.
 
 ```ken
-fn monoid_mempty (m : Type) (mon : Monoid m) : m = mon.mempty
+pub fn monoid_mempty (m : Type) (mon : Monoid m) : m = mon.mempty
 
-fn fold_map_step (a : Type) (m : Type) (mon : Monoid m) (g : a → m) (y : a) (acc : m) : m =
+pub fn fold_map_step (a : Type) (m : Type) (mon : Monoid m) (g : a → m) (y : a) (acc : m) : m =
   mon.op (g y) acc
 
-class Foldable (f : Type → Type) {
+pub class Foldable (f : Type → Type) {
   foldr : (a : Type) → (b : Type) → (a → b → b) → b → f a → b;
   fold_map : (a : Type) → (m : Type) → Monoid m → (a → m) → f a → m;
   to_list : (a : Type) → f a → List a;
