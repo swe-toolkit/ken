@@ -152,6 +152,54 @@ Architect, never a workaround.
   on the base should still trap on the malformed `ExitCode::Failure` before the
   closeout lands.
 
+## Increment-1 hard-stop inventory (§1b-i durable holder)
+
+Maintained by the Steward for the runtime b2 D3-RECUT build (increment 1, the
+funded READ half). Live thread `thr_13yeftxjnxz2z`; clean checkpoint base
+`c3bb29c81` (all green). The Architect carries the working copy in-thread +
+`ARCHITECT-STATE.md`; THIS is the durable copy that survives compaction (§1b-i).
+Coordinates decay — re-measure.
+
+- **HS1 (capsule reach)** — `evt_1jxh8epayhnqe`. The read `Ret{Match}` closeout's
+  `Complete(RecursiveBackedge)` short-circuits BEFORE the downstream governed
+  arrival that recorded certificate E's capsule reach (`reached_count`,
+  `source.rs:4265`). Ruled Case-B: record E's reach at the closeout consumer,
+  `px8-ds-test-support`-gated, zero production change / zero TCB.
+- **HS2 (narrowing placement)** — `evt_h0vgd11g5xfb`. Shape-narrowing at
+  FORMATION dropped the effect Tail from `formed` while `planned` kept it
+  (`planned == formed` invariant, role-witness 3560). Ruled (A): move the shape
+  gate FORMATION to CONSUMPTION — unnarrow formation so `planned == formed ==
+  base`; dispatch at both consumption seams (`Ret{Match}` to the closeout, effect
+  Tail to the base `call_tail -> Continue`). Net inc1 production delta = exactly
+  the funded READ half.
+- **HS3 (raw arrival)** — `evt_38f5r814tbh55`. Under (A), the read closeout's
+  short-circuit ALSO prevents the flow that at base recorded E's generated-entry
+  raw arrival (`raw_arrival_count`, `rt_parity_native.rs:2470`): E installed,
+  `raw_arrival_count == 0`. This is inc1's 3rd structural wall.
+
+**Shared predicate (HS1 + HS3), named at the 3rd entry (§1b).** The read
+closeout's `Complete(RecursiveBackedge)` short-circuits the source machine, and
+base's observation model recorded downstream observations by CONTINUING PAST
+EVERY TAIL. HS1 was the capsule-reach counter; HS3 is the raw-arrival counter —
+ONE defect hitting TWO counters. Patching counter-by-counter is the unbounded
+chain §1b warns about (the next displaced counter is the 4th entry). The fix must
+be a STRUCTURAL CLOSURE — the short-circuiting forward edge must assume the
+COMPLETE downstream-observation obligation of the continuation it replaces — not
+another single-counter patch.
+
+**§1a research check (inc1 HS3).** Fired by the Architect on his own committed
+criterion (`evt_19x6xf1n2a539`), not a watchdog catch. The effect-Tail
+consumption ruling is HELD pending the research prior-art advisory (how
+comparable systems re-establish the displaced downstream-observation set under a
+forward-edge / tail-backedge optimization: hoist the full obligation, prove it
+reconstructible/redundant, or restructure so the observations are not
+continuation-dependent). `call_tail` stays the coherent production path; the
+unresolved question is the structural re-establishment. Causal attribution is
+confounded — the 711724f32-vs-(A) three-way varies two axes at once, so do NOT
+build the effect-Tail candidate until the advisory lands. Re-spun inc1 candidate
+returns to the Steward at M1-M4 with a fresh SHA + fresh dual-reviewer approval +
+a fresh merge Decision (`dec_22xpy0mnz221a` is void; `711724f32` never merges).
+
 ## The single relaxed constraint, and what stays closed
 
 The ONE relaxed constraint: a governed Tail result BYPASSES the source-machine
