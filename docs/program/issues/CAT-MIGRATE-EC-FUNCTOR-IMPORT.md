@@ -6,12 +6,45 @@ owner: foundation
 size: S
 gate: none
 tier: T2
-depends_on: []
+depends_on: [CAT-MIGRATE-EC-CLOSURE-PROVIDERS]
 blocks: []
 github: null
 origin: "Steward, 2026-09-03. Spun out of the Tier-B recut as a census-error correction: the Tier-B D0 (foundation-implementer) found EC fails standalone with UnresolvedCon Functor — EC was wrongly folded in as clean. Architect ruling evt_21c0cdvnmv3f3 CONFIRM 2: (b) LF-Functor + EC clean-ification is ORTHOGONAL to the DecEq chain (Functor is not DecEq; the recut relocation touches LC/BytesKeys/StringKeys/EmptyDec/StringBijection, never EC), so it is its OWN independent Core.Classes node, runnable in parallel whenever, and must NOT sit on the relocation's critical path. Architect CONFIRM 1 blessed the surface: publishing LF class Functor + comp/idf/list_map is the sound and intended consequence of the class-owner model + scaffold-retirement mandate — pub changes VISIBILITY only, class-uniformity preserved by construction (still exactly one class Functor in LF). Coordinates re-measured by Steward at origin/main 21f87f5b5 (below); re-measure at your build SHA (D0)."
 ---
 
+> # OPERATIVE (Architect structural-closure ruling evt_7zdb106gd707s, 2026-09-03)
+> # — this SUPERSEDES the "exact four LF surfaces" premise throughout the body
+> # below. Two findings:
+> #
+> # (A) LOCAL FIX, no rescope: `Functor_instance_Identity` (and every
+> # `*_instance_*` EC declares — `Applicative_instance_Identity`,
+> # `Applicative_instance_Option/List`, ...) is an EC-LOCAL generated global, not
+> # an LF surface. EC declares `data Identity`/`instance Functor Identity` and is
+> # a correct spec §5.3 owner. The D0 failure was the import block OVER-REACHING —
+> # trying to source a locally-generated dictionary from the LF import set.
+> # REMEDY: EXCLUDE every locally-generated `C_instance_T` from the import set;
+> # they resolve locally by EC's own declaration order. EC's body does not change;
+> # `instance Functor Identity` stays in EC. Apply now.
+> #
+> # (B) CLOSURE-SET IMPORT, not exact-four: the four is measurably insufficient.
+> # EC's import set = { every symbol EC's bodies reference } MINUS { every symbol
+> # EC declares locally }, a grep census PROVEN closed by EC checking standalone
+> # with exactly that set — never one surface at a time. The set spans THREE
+> # packages (LF incl. private attached proofs list_map::id/list_map::fusion;
+> # Derived list_append + right_unit + assoc; Transport cong/sym/trans). Widening
+> # those provider surfaces is OUTSIDE EC, so it is the predecessor
+> # [[CAT-MIGRATE-EC-CLOSURE-PROVIDERS]] (this node now depends_on it). EC then
+> # imports EXACTLY that closure set (REUSE — EC composes with the existing
+> # proofs, does not re-prove them) and resolves its local `*_instance_*` per (A).
+> #
+> # ACCEPTANCE (Architect, required reviewer): EC checks standalone importing
+> # exactly the closure set (no more/no less), every EC-declared `*_instance_*`
+> # resolved LOCALLY not imported, zero trusted-base delta, no EC declaration-body
+> # change. §1a: D0 HS1, no research; §1b entry 1 — the closure predicate IS the
+> # structural answer, so no surface ladder. The "four LF surfaces" text below is
+> # the PRE-RULING premise, kept for its provider/consumer coordinates; read the
+> # import target as the closure set, not the four.
+>
 > # Orthogonal EC standalone-cleanness node. Off the DecEq critical path.
 > # Tier-A publication shape (mark pub / add one import block / extend the
 > # loader-visible inventory), NO relocation, NO proof authoring.
