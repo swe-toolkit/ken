@@ -11,6 +11,53 @@ github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
+> # OPERATIVE (Steward, 2026-09-03) — D2b HS3 RULED: adopt Option B. This banner
+> # supersedes EVERY banner below; the held-ledger proof approach is RETIRED.
+>
+> Architect ruling `evt_522ys611k65ed` (mandatory §1a research advisory
+> `evt_3dzqfcytw7asa` in hand; the design call is the Architect's) discharges D2b
+> design hard-stop #3 — the third consecutive stop on the generalized bare-form
+> LEDGER lemma `fok_adequate_gen` (FoKripke.ken :2675). Per the fleet
+> structural-closure rule, a thrice-failed apparatus is REPLACED, not hand-patched
+> a third time. Full spec is the ruling; the operative shape:
+>
+> ADOPTED ARCHITECTURE (Option B — target-calculus soundness, NOT compose): remove
+> the entire `FokLedgerEntry` datatype (`FokInert` AND `FokActive`) and the
+> `FokAssign` side table; prove embedding adequacy as two lemmas —
+> 1. **target-soundness**: `FokDerivation (gamma => [phi]) -> (forall q in gamma,
+>    Forces w q) -> Forces w phi`, by induction on `FokDerivation` (Init subsumes
+>    the old active-source-discharge AND inert-structural-match; ForallRight is the
+>    step the chain hard-stopped on);
+> 2. **embedding-correspondence**: `Forces w (fok_w_forces ... (fok_erase_n ...))
+>    <-> fok_denote_at ...` (Probe 2 localizes entirely here);
+>
+> then compose (1)+(2) and instantiate at the EMPTY ledger + EMPTY object-env,
+> yielding the held `fok_embedding_adequacy_statement` (:2606) UNCHANGED.
+>
+> Q2 CARRIER (unconditional): adopt de Bruijn LEVELS; retire `List Nat` +
+> `FokAssign`. The ForallRight eigenparameter is the next (maximal) level — fresh
+> by construction, stable under extension, Access monotone, no side table —
+> subsuming the denotation side's existing length-indexed positional valuation
+> (`FokObjectEnv` :88-117). Probe 1 is unrepresentable by construction (no stored
+> bare form). Respects all three bans: inducts OVER `FokDerivation` (unchanged),
+> semantic argument (no source-compensation), unchanged :2606 statement.
+>
+> HELD BRANCH `eac970705`: the STATEMENT (:2606) is reusable verbatim; the held
+> ledger proof is retired. The merged elaborator predecessors (the `FokDerivation`
+> dependent-elimination machinery — symptom entries 1-3 below) REMAIN
+> load-bearing: Option B still inducts on `FokDerivation`, so `depends_on` is
+> unchanged.
+>
+> §1a: the 3rd-stop research pull is CONSUMED; the next §1a trigger is the 6th,
+> scoped to whatever new fork surfaces. If target-soundness's induction proves
+> infeasible on this substrate (the Architect does not expect it — it is the
+> textbook soundness-of-a-sequent-calculus-w.r.t.-Kripke-models argument), that is
+> a genuinely NEW wall = the next hard-stop, never a silent fallback to compose.
+>
+> Language ring resumes on B (Architect kicked `@language-leader` directly). D2b
+> stays HELD at `eac970705` until the ring cuts a candidate; the Architect is the
+> required soundness reviewer; the Steward routes M1-M4 then.
+
 ## Symptom inventory
 
 1. A derivation family over a constructor-headed record index can be built but
