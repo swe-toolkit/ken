@@ -220,15 +220,20 @@ jobs:
   # WHY A JOB EACH rather than letting them back into the shards: two of the
   # three (native-write-partition, native-buffer) are a SINGLE #[test] each,
   # running ~4 minutes, so no scheduler can subdivide either one. The third
-  # (native-rt-parity) is 7 tests in one binary, dominated by one outlier
-  # test — see the exclusion comment below — so it would still become
-  # whichever shard drew it, the same problem the single-test binaries have.
-  # In a shard any of the three would simply become that shard's critical
-  # path and push the whole gate out. Alone and in parallel each costs
-  # NOTHING: the worst shard is ~471s and each of these jobs is ~240-332s
-  # (native-rt-parity's Build+Test total is the largest of the three), so
-  # they finish first and never set the pace. That headroom is the budget
-  # for restoring coverage.
+  # (native-rt-parity) grew with the RT-SSA recut into large mutation grids and
+  # became the gate's pace-setter (one monolithic #[test] ran 42 serial native
+  # builds at ~34m, which no scheduler could subdivide). D2
+  # (CI-GATE-TIME-REDUCTION) decomposed those grids into one independently-
+  # schedulable #[test] per mutation arm, so this binary is now genuinely
+  # subdividable and runs as its own count-balanced matrix (below, 6-way) instead
+  # of a single dominating shard. The two single-#[test] px8f jobs still cannot be
+  # subdivided and stay alone. It keeps its own sharded job (not the main shard
+  # lane) so it stays the interp/native differential oracle AND so its decomposed
+  # arms are pinned by their own realized-arm coverage roster
+  # (scripts/check-ci-shard-union.py, AC-NO-FALSE-GREEN) rather than scattering
+  # across the general shards. Per-shard concurrency is unchanged (nextest's
+  # num_cpus), so the decomposition does not raise a runner's peak parallel native
+  # builds; the shard count is tuned by the PR-gate measurement.
   #
   # ⚠ SCOPED ON PURPOSE — `-p <crate> --test <name>`, NOT `--workspace`.
   # With `--workspace`, nextest compiles all 200 test binaries in order to
@@ -378,12 +383,12 @@ jobs:
   native-rt-parity:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full'
-    name: native-slow (rt_parity_native) ${{ matrix.shard }}/3
+    name: native-slow (rt_parity_native) ${{ matrix.shard }}/6
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -410,7 +415,7 @@ jobs:
       - name: Test
         run: >-
           cargo nextest run --locked -p ken-cli --test rt_parity_native
-          --partition count:${{ matrix.shard }}/3
+          --partition count:${{ matrix.shard }}/6
 
   z3-process-adapter:
     needs: classify-paths
