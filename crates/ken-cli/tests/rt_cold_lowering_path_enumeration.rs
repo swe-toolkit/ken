@@ -557,19 +557,47 @@ const EXPECTED: &[(&str, Disposition)] = &[
     ("rt_write_writable_stage", Disposition::Completes),
 ];
 
+// The full lowering (`build_native_program`) can recurse to a depth that
+// overflows the default test-thread stack on the composed-return read routes
+// (the D3-RECUT forward-Ret closeout adds bounded codegen depth on top of the
+// base source-machine lowering). Every heavy-lowering fixture in this WP's
+// sibling `rt_parity_native.rs` already provisions a 256 MiB thread via
+// `in_large_stack_thread`; this enumeration harness was the one call site that
+// still built on the ambient default stack. Provision the same local budget so
+// the depth increase is bounded by an explicit stack, not by the ambient one.
+fn in_large_stack_thread<R: Send + 'static>(
+    name: &'static str,
+    body: impl FnOnce() -> R + Send + 'static,
+) -> R {
+    std::thread::Builder::new()
+        .name(name.to_string())
+        // Measured peak on the 4 composed-return read/write routes is < 3 MiB (a
+        // ~1 MiB proportionate bump over the 2 MiB base; the closeout lowers the
+        // k-Match payload once). 256 MiB matches the sibling suite's provision and
+        // leaves ample headroom; production runs on the 8 MiB main thread, also safe.
+        .stack_size(256 * 1024 * 1024)
+        .spawn(body)
+        .expect("spawn large-stack cold-enumeration fixture")
+        .join()
+        .expect("cold-enumeration fixture thread")
+}
+
 fn entry_outcome(entry: &str) -> String {
-    let root = tempfile::tempdir().expect("temporary native-build root");
-    std::fs::write(root.path().join("source"), b"ab").unwrap();
-    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
-    match ken_cli::build_native_program(
-        &source,
-        ken_cli::SourceFormat::Ken,
-        &format!("rt_cold_enum_{entry}"),
-        root.path(),
-    ) {
-        Ok(_) => "OK".to_string(),
-        Err(error) => format!("{error:?}"),
-    }
+    let entry = entry.to_string();
+    in_large_stack_thread("rt-cold-enum", move || {
+        let root = tempfile::tempdir().expect("temporary native-build root");
+        std::fs::write(root.path().join("source"), b"ab").unwrap();
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", &entry);
+        match ken_cli::build_native_program(
+            &source,
+            ken_cli::SourceFormat::Ken,
+            &format!("rt_cold_enum_{entry}"),
+            root.path(),
+        ) {
+            Ok(_) => "OK".to_string(),
+            Err(error) => format!("{error:?}"),
+        }
+    })
 }
 
 fn entry_mismatch(entry: &str, outcome: &str) -> Option<String> {

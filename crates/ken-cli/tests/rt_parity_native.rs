@@ -550,6 +550,52 @@ fn operation_events(
         .collect()
 }
 
+// RT-BRACKET-RELEASE-ORDER-PARITY split, shared by EVERY native/interpreter
+// effect-trace parity site. The interpreter and native disagree only on the
+// relative ORDER in which a nested/multi-resource bracket releases its resources
+// (outcome-independent, lives in bracket teardown, pre-existing, tracked as its
+// own node); the spec-correct order is not yet adjudicated, so a parity
+// assertion MUST compare non-release events IN ORDER and release events AS A SET
+// -- never pin a release order to either side. Both `assert_narrowed_alike` and
+// `assert_d1_route_control_child`'s specialized (native-returns) arm route
+// through these two helpers, so the exclusion cannot be applied at one site and
+// missed at the sibling. When RT-BRACKET-RELEASE-ORDER-PARITY fixes the
+// violating executor, delete both helpers and restore the full ordered
+// `effect_trace` equality at every caller.
+fn non_release_events(
+    observation: &ken_runtime::EffectObservation,
+) -> Vec<ken_runtime::EffectEvent> {
+    observation
+        .effect_trace
+        .iter()
+        .filter(|event| event.operation != ken_runtime::HostOpV1::ResourceRelease)
+        .cloned()
+        .collect()
+}
+
+fn release_set(observation: &ken_runtime::EffectObservation) -> Vec<String> {
+    // Order-insensitive: keyed on the Debug rendering of (resource_bindings,
+    // request, outcome) so no Ord bound is required on the canonical release
+    // payloads. Relative RELEASE ORDER is excluded per the note above.
+    let mut releases = observation
+        .effect_trace
+        .iter()
+        .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
+        .map(|event| {
+            format!(
+                "{:?}",
+                (
+                    event.resource_bindings.clone(),
+                    event.request.clone(),
+                    event.outcome.clone(),
+                )
+            )
+        })
+        .collect::<Vec<_>>();
+    releases.sort();
+    releases
+}
+
 /// Assert both discriminators for one narrowing case.
 ///
 /// `operation` is the consuming host operation whose narrowing rejects the
@@ -577,55 +623,15 @@ fn assert_narrowed_alike(
     );
     assert_eq!(interpreted.terminal_error, None, "{case}: interpreter");
     assert_eq!(native.terminal_error, None, "{case}: native");
-    // Effect-trace parity with the bracket RELEASE ORDER excluded.
-    //
-    // RT-BRACKET-RELEASE-ORDER-PARITY (Steward scope ruling): the interpreter and
-    // native disagree on the ORDER in which a nested/multi-resource bracket
-    // releases its resources (e.g. file-before-buffer vs buffer-before-file). That
-    // divergence is outcome-INDEPENDENT, lives in bracket teardown, and is
-    // orthogonal to this composed-return repair (RT-COMPOSED-RETURN-FORWARD-RET-EDGE
-    // b2), which was exonerated by the structural check (captures threaded in
-    // planner order; Architect concurred it is pre-existing). It is scoped OUT of
-    // b2 and tracked as its own node; the spec-correct release order is not yet
-    // adjudicated, so this assertion MUST NOT pin an expected order to either side.
-    //
-    // So: every NON-release effect must agree in order (unchanged), and the
-    // release events must agree as a SET -- same resources, requests, and outcomes
-    // -- with their relative order excluded. Once RT-BRACKET-RELEASE-ORDER-PARITY
-    // fixes the violating executor, restore the full ordered `effect_trace`
-    // equality here (delete the split below).
-    let non_release_events = |observation: &ken_runtime::EffectObservation| {
-        observation
-            .effect_trace
-            .iter()
-            .filter(|event| event.operation != ken_runtime::HostOpV1::ResourceRelease)
-            .cloned()
-            .collect::<Vec<_>>()
-    };
+    // Effect-trace parity with the bracket RELEASE ORDER excluded via the shared
+    // `non_release_events` / `release_set` split (see the helper note above;
+    // RT-BRACKET-RELEASE-ORDER-PARITY). Non-release events must agree in order;
+    // releases must agree as a set.
     assert_eq!(
         non_release_events(&native),
         non_release_events(&interpreted),
         "{case}: complete ordered NON-release effects, requests, outcomes, and resource provenance must agree",
     );
-    let release_set = |observation: &ken_runtime::EffectObservation| {
-        let mut releases = observation
-            .effect_trace
-            .iter()
-            .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
-            .map(|event| {
-                (
-                    event.resource_bindings.clone(),
-                    event.request.clone(),
-                    event.outcome.clone(),
-                )
-            })
-            .collect::<Vec<_>>();
-        // Order-insensitive: RELEASE ORDER is excluded per
-        // RT-BRACKET-RELEASE-ORDER-PARITY. Keyed on the Debug rendering so no Ord
-        // bound is required on the canonical release payloads.
-        releases.sort_by_key(|release| format!("{release:?}"));
-        releases
-    };
     assert_eq!(
         release_set(&native),
         release_set(&interpreted),
@@ -3144,22 +3150,14 @@ generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_i
 // un-ignored and greened there (genuine green->trap flip). The direct-control and
 // retained-access (forward-ret-access) capsule controls stay LIVE (they run on the
 // write / the Tail layer and still redden).
-#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge (read derives its answer from the carrier, not the capsule); re-key to a read-edge-carrier mutation in inc2's unified edge-control migration"]
-generated_entry_checked_case!(generated_entry_capsule_outer_carried, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "outer-carried", "does not name a specialized computational-recursor capsule");
-#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
-generated_entry_checked_case!(generated_entry_capsule_specialized_sibling, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "specialized-sibling", "is not a computational-recursor capsule");
-#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
-generated_entry_checked_case!(generated_entry_capsule_static_worker, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "static-worker", "StaticWorkerBinding: a source-machine Var in value position is a value-producing position");
-#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
-generated_entry_checked_case!(generated_entry_capsule_wrong_frame, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-frame", "checked frame, slot, call template, or residual phase");
-#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
-generated_entry_checked_case!(generated_entry_capsule_wrong_slot, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-slot", "checked frame, slot, call template, or residual phase");
-#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
-generated_entry_checked_case!(generated_entry_capsule_wrong_invocation, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-invocation", "projection disagrees with its current function, binding, or call coordinate");
-#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
-generated_entry_checked_case!(generated_entry_capsule_non_carried_residual, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "non-carried-residual", "checked frame, slot, call template, or residual phase");
-#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"]
-generated_entry_checked_case!(generated_entry_capsule_provenance_index, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "provenance-index", "callee Var disagrees with the immediate K locator index");
+generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge (read derives its answer from the carrier, not the capsule); re-key to a read-edge-carrier mutation in inc2's unified edge-control migration"] generated_entry_capsule_outer_carried, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "outer-carried", "does not name a specialized computational-recursor capsule");
+generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_specialized_sibling, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "specialized-sibling", "is not a computational-recursor capsule");
+generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_static_worker, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "static-worker", "StaticWorkerBinding: a source-machine Var in value position is a value-producing position");
+generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_wrong_frame, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-frame", "checked frame, slot, call template, or residual phase");
+generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_wrong_slot, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-slot", "checked frame, slot, call template, or residual phase");
+generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_wrong_invocation, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-invocation", "projection disagrees with its current function, binding, or call coordinate");
+generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_non_carried_residual, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "non-carried-residual", "checked frame, slot, call template, or residual phase");
+generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_provenance_index, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "provenance-index", "callee Var disagrees with the immediate K locator index");
 generated_entry_split_checked_case!(generated_entry_capsule_wrong_destination_owner, "wrong-destination-owner", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=DestinationOwner direct_applied=true tail_applied=false", "write");
 generated_entry_split_checked_case!(generated_entry_capsule_wrong_destination_body, "wrong-destination-body", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=DestinationBody direct_applied=true tail_applied=false", "write");
 generated_entry_split_checked_case!(generated_entry_capsule_wrong_binding, "wrong-binding", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=BindingFrame direct_applied=true tail_applied=false", "write");
@@ -4207,9 +4205,23 @@ fn assert_d1_route_control_child() {
                 native.exit_status, interpreted.exit_status,
                 "{mode}: specialized-route native/interpreter exit parity"
             );
+            // RT-BRACKET-RELEASE-ORDER-PARITY: this specialized (native-returns)
+            // route now reaches a full effect-trace compare for the first time
+            // (base trapped here), so it hits the same pre-existing bracket
+            // release-order divergence that `assert_narrowed_alike` already
+            // excludes. Apply the identical split via the shared helpers: every
+            // NON-release event must agree IN ORDER; the releases must agree AS A
+            // SET, their relative order excluded. When the violating executor is
+            // fixed, restore the full ordered `effect_trace` equality here.
             assert_eq!(
-                native.effect_trace, interpreted.effect_trace,
-                "{mode}: specialized-route native/interpreter complete-effect parity"
+                non_release_events(&native),
+                non_release_events(&interpreted),
+                "{mode}: specialized-route native/interpreter complete ordered NON-release effects must agree",
+            );
+            assert_eq!(
+                release_set(&native),
+                release_set(&interpreted),
+                "{mode}: specialized-route the SET of bracket releases must agree; relative ORDER excluded per RT-BRACKET-RELEASE-ORDER-PARITY",
             );
         }
     }
