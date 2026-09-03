@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-EC-CLOSURE-PROVIDERS
 title: "EC standalone-cleanness predecessor (off the DecEq critical path): widen the LF / Derived / Transport PUBLISHED surfaces to the exact free-symbol closure set EffectfulClasses names across package boundaries, so EC can import that closure and elaborate standalone. Mechanical export publication (mark pub + extend each provider's loader-visible inventory), INCLUDING the currently-private attached proofs EC composes with; NO proof re-authoring, NO body change, NO relocation. Reuse-not-reimplement: EC composes with the existing proofs, it does not re-prove them."
-status: ready
+status: active
 owner: foundation
 size: S
 gate: none
@@ -30,32 +30,34 @@ PROVEN closed by EC checking standalone with exactly that set — it is a census
 not a sample, and it is NOT discovered by re-running the checker one surface at a
 time (that is the surface-ladder this predicate is designed to stop).
 
-## Measured candidate closure set (re-measure at the build SHA — D0)
+## Closure set — CENSUS COMPLETE (foundation-leader evt_29adqgskp9zs7)
 
-The Architect's enumeration against the providers at HEAD (the foundation-leader's
-finding-(B) census is the authority; reconcile against it in D0):
+The finding-(B) closure census is done; source is byte-clean. Publish EXACTLY
+this set (D0 confirms which members are already `pub` and drops those from D1
+with a note). EC-LOCAL dictionaries are explicitly EXCLUDED from publication and
+from EC's import inventory (finding (A) — they resolve locally); the
+`*_instance_List`/`*_instance_Option` below are LF-OWNED instances EC imports,
+which is a different thing from EC's own `*_instance_Identity`.
 
-- **LF — `catalog/packages/Core/Classes/LawfulFunctors.ken.md`.** The
-  Functor/Foldable/Monoid surfaces EC names, INCLUDING the currently-private
-  attached proofs EC composes with:
-  - `proof id for list_map` (:260) — EC uses it (EffectfulClasses.ken.md:579)
-  - `proof fusion for list_map` (:267) — EC uses it (EffectfulClasses.ken.md:858)
-  - plus the free Functor/Foldable/Monoid surface symbols EC names (D0 census
-    finalizes the exact list; LF currently publishes `class Functor` + `comp` +
-    `idf` + `list_map` per the EC-Functor-Import frame's four, which the
-    closure widens).
-- **Derived — `catalog/packages/Data/Collections/Derived.ken.md`** (:514):
-  - `list_append`
-  - `proof right_unit for list_append`
-  - `proof assoc for list_append`
-  (EC's List proofs use all three.)
+- **LF — `catalog/packages/Core/Classes/LawfulFunctors.ken.md`.** Direct EC
+  external set: `Functor`, `Foldable`, `Functor_instance_List`,
+  `Functor_instance_Option`, `Foldable_instance_List`, `Foldable_instance_Option`,
+  `comp`, `idf`, `list_map`, `list_map::id`, `list_map::fusion`. PLUS the
+  provider-internal SIGNATURE closure these pull into visibility:
+  `Monoid`, `fold_map_step`, `monoid_mempty`. (The signature closure is
+  mandatory — a published symbol whose signature names a private symbol is not
+  loader-resolvable; publish the whole signature-closed set.)
+- **Derived — `catalog/packages/Data/Collections/Derived.ken.md`:**
+  `concat_map` (EC already imports this today — D0 confirms it is already `pub`
+  and, if so, it is unchanged, not a new publication), `list_append`,
+  `list_append::assoc`, `list_append::right_unit`.
 - **Transport — `catalog/packages/Core/Logic/Transport`:** `cong`, `sym`,
   `trans`.
 
-If D0's census finds MORE or FEWER than the above, publish EXACTLY the census set
-and cite the delta. If the census surfaces a provider NOT owned by
-LF/Derived/Transport, cite it and route it — do not drag an unpublished provider
-in.
+D0 reconciles this set against the tree at the build SHA (confirm each member's
+owner + current visibility). If a member is already `pub`, it is unchanged and
+dropped from D1 with a note; the publication set is exactly the currently-private
+members of the above.
 
 ## Deliverables
 
