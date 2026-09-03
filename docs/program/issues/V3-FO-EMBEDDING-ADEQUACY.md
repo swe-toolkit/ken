@@ -5,7 +5,7 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE, LANG-DEPELIM-IH-EIGENPARAM-TRANSPORT]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE, LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
@@ -20,10 +20,13 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
 > genuinely-new one: the target-soundness induction's Forall recursion
 > false-rejects (KernelRejected TypeMismatch on both ForallWorldRight and
 > ForallObjRight; Init/Imp pass). The Architect classified it (evt_anzrvvzaccep)
-> as an elaborator-capability predecessor — the eliminator method construction
-> cannot transport a recursive IH across an eigenparameter-driven context
-> extension — NOT a kernel change, NOT source-compensable, NOT a B refutation.
-> Steward framed [[LANG-DEPELIM-IH-EIGENPARAM-TRANSPORT]] (added to `depends_on`);
+> as an elaborator-capability predecessor — CORRECTED by the ring's D0 grid
+> (evt_14xp6j8dqt9ky): the cause is NOT context extension (extension alone
+> elaborates) but the eliminator losing the constructor-local type of a branch
+> field whose type depends on the refined record index; the missing capability is
+> DUAL-VIEW of that field at the local-helper boundary. NOT a kernel change, NOT
+> source-compensable, NOT a B refutation.
+> Steward framed [[LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW]] (added to `depends_on`);
 > D2b is HELD at `eac970705` (WIP `97477903e` preserved). The Steward EXPLICITLY
 > re-releases D2b only after that predecessor lands, whereupon the ring rebuilds
 > B's Forall arms against the fixed elaborator and produces the D2b candidate
