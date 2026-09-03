@@ -346,7 +346,10 @@ struct ElabCtx<'e> {
     /// Elaborator-only bookkeeping: the kernel's own `Context` (raw types)
     /// is never touched, so a variable's real (kernel-checked) type never
     /// changes — only which TERM an `RVar` reference resolves to for one
-    /// branch's body. Capability 1 resolves it to a `Cast`-wrapped alias; the
+    /// branch's body. Inference selects this outer-refined alias; checking may
+    /// instead select the raw context binding when an expected Pi domain asks
+    /// for its constructor-local type, preserving both lawful views.
+    /// Capability 1 resolves it to a `Cast`-wrapped alias; the
     /// context-telescope convoy resolves it to an index-refinement SENTINEL
     /// `Var` (`INDEX_REFINEMENT_SENTINEL_BASE + slot`) that `finalize_refined_
     /// body` later relocates to the convoy binder — so the resolved term is a
@@ -1029,6 +1032,64 @@ fn check_pair_or_record(
     }
 }
 
+/// Check a source variable while an indexed-match branch has installed an
+/// outer-refined alias for it. `infer` deliberately keeps returning that alias:
+/// branch-source reuse needs the view transported from the constructor target
+/// index to the outer scrutinee index. Checking mode has more information. A
+/// local helper's Pi domain can demand the field's original constructor-local
+/// type, which remains the binding's real type in `cx.ctx`; select that raw view
+/// only when the refined view does not already satisfy the expected type.
+///
+/// This makes the refinement genuinely dual-view without changing the kernel
+/// context or inventing an equality: the refined view is the existing
+/// kernel-checked `try_reindex_cast` term, and the local view is the original
+/// kernel binding. If neither view is definitionally suitable, preserve the
+/// former behavior (return the refined alias and let ordinary meta unification
+/// plus the final kernel re-check decide the term).
+#[inline(never)]
+fn check_variable_with_index_views(
+    cx: &mut ElabCtx,
+    surface_index: usize,
+    expected: &Term,
+) -> Result<Term, ElabError> {
+    let (position, actual_index) = cx
+        .surface_var(surface_index)
+        .ok_or_else(|| ElabError::Internal(format!("Var({surface_index}) out of range")))?;
+    let stored_ty = cx
+        .ctx
+        .lookup(actual_index)
+        .ok_or_else(|| ElabError::Internal(format!("Var({surface_index}) out of range")))?;
+    let local_ty = weaken(stored_ty, (actual_index as i64) + 1);
+    let local_term = Term::var(actual_index);
+
+    let Some((raw_refined_term, raw_refined_ty, install_depth)) =
+        cx.var_refinements.get(&position)
+    else {
+        unify_types(&mut cx.metas, expected, &local_ty);
+        return Ok(local_term);
+    };
+    let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
+        ElabError::Internal("index-refined variable escaped its branch context".into())
+    })? as i64;
+    let refined_term = weaken(raw_refined_term, growth);
+    let refined_ty = weaken(raw_refined_ty, growth);
+    let expected_zonked = cx.metas.zonk_term(expected);
+    let refined_ty_zonked = cx.metas.zonk_term(&refined_ty);
+    if convert_type(cx.env, &cx.ctx, &refined_ty_zonked, &expected_zonked) {
+        unify_types(&mut cx.metas, expected, &refined_ty);
+        return Ok(refined_term);
+    }
+
+    let local_ty_zonked = cx.metas.zonk_term(&local_ty);
+    if convert_type(cx.env, &cx.ctx, &local_ty_zonked, &expected_zonked) {
+        unify_types(&mut cx.metas, expected, &local_ty);
+        return Ok(local_term);
+    }
+
+    unify_types(&mut cx.metas, expected, &refined_ty);
+    Ok(refined_term)
+}
+
 #[inline(never)]
 fn check_inferred_without_group_transport(
     cx: &mut ElabCtx,
@@ -1104,6 +1165,14 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
     // unoptimized free); that margin is this box's, not a guarantee for
     // every future caller.
     match expr {
+        // An indexed-match branch may give one source field two lawful types:
+        // the outer-refined alias installed by capability 1, and the field's
+        // original constructor-local type retained in the kernel context. The
+        // expected type selects the view at checking boundaries (notably local
+        // helper arguments); inference remains outer-refined by default.
+        RExpr::RVar(index, _, _) if !cx.var_refinements.is_empty() => {
+            check_variable_with_index_views(cx, *index, expected)
+        }
         RExpr::RPair(components, span) => check_pair_or_record(cx, components, expected, span),
         RExpr::RRecord { base, fields, span } => {
             check_record(cx, base.as_deref(), fields, expected, span)
@@ -10169,10 +10238,48 @@ mod omega_index_refinement_tests {
     };
 
     use super::{
-        build_index_omega_transport, classify_branch_goal_restoration,
-        install_hidden_result_variable_refinements, install_index_refinements,
-        subst_term_generalize, try_reindex_cast, weaken, ElabCtx,
+        build_index_omega_transport, check_variable_with_index_views,
+        classify_branch_goal_restoration, install_hidden_result_variable_refinements,
+        install_index_refinements, subst_term_generalize, try_reindex_cast, weaken, ElabCtx,
     };
+
+    #[test]
+    fn checked_index_refined_variable_selects_both_expected_views() {
+        // Promise class: durable invariant. MEASURED: the checking-mode
+        // selector returns the raw context binding for its constructor-local
+        // type and the installed alias for its outer-refined type. CLAIMED:
+        // capability 1 is dual-view at expected-type boundaries. THE GAP: the
+        // integration grid independently proves a real dependent-match field
+        // installs and consumes these views through the production producer.
+        let mut env = ElabEnv::new().expect("base environment");
+        let nat = Term::IndFormer {
+            id: env.globals["Nat"],
+            level_args: vec![],
+        };
+        let top = Term::const_(env.env.top_id(), vec![]);
+        let proved = Term::const_(env.env.tt_id(), vec![]);
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "dual-view-selector-control",
+        );
+        cx.ctx.push(nat.clone());
+        cx.var_refinements
+            .insert(0, (proved.clone(), top.clone(), cx.ctx.len()));
+
+        assert_eq!(
+            check_variable_with_index_views(&mut cx, 0, &nat)
+                .expect("the constructor-local view must remain selectable"),
+            Term::var(0)
+        );
+        assert_eq!(
+            check_variable_with_index_views(&mut cx, 0, &top)
+                .expect("the outer-refined view must remain selectable"),
+            proved
+        );
+    }
 
     #[test]
     fn direct_omega_transport_builds_the_ruled_j_motive_exactly() {
