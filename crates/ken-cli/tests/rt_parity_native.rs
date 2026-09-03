@@ -1466,65 +1466,68 @@ fn static_response_context_demand_controls_reach_and_restore() {
     });
 }
 
-/// **Promise class: durable invariant.** The complete producer/K relation is
-/// affine by response-row identity, preserves distinct K keys for a shared
-/// producer, and retains every capture/input coordinate in exact order.
-///
-/// **MEASURED:** row drop/duplicate/vary, K-key merge, three response-authority
-/// substitutions, and independent drop/permute/vary of every fixed READ and
-/// WRITE capture/input each reach the closed demand validator and red. The
-/// fixed ledgers also contain shared producers whose distinct K callers select
-/// distinct owners.
-/// **CLAIMED:** context interning cannot launder a malformed producer/K row or
-/// an incomplete explicit input run.
-/// **THE GAP:** exact duplicate context demand reuse is separately pinned by
-/// `static_response_context_demand_controls_reach_and_restore`; this test moves
-/// producer rows and each element of their typed population instead.
-#[test]
-fn static_response_full_demand_population_controls_reach_red_and_restore() {
-    use ken_runtime::StaticResponseContextDemandMutation as Mutation;
+// D2 (CI-GATE-TIME-REDUCTION): this full-demand population grid is decomposed
+// from a monolithic #[test] (42 serial native builds) into a fan-out/population
+// #[test] plus one independently-schedulable #[test] per mutation arm --
+// producer/K-row arms (full_demand_producer_k_test!) and per-entry census arms
+// (full_demand_census_test!). BEHAVIOR-PRESERVING: same native builds, same
+// mutation arms, same per-arm reach/refusal/red-plan-emptiness observations, the
+// same de-baked capture/input census (applications == derived), and the same
+// restoration hash/byte comparisons -- ONLY #[test] granularity changed so
+// nextest can shard the arms instead of running them serially. The trailing
+// whole-run mutation_is_exact union is carried by the strengthened realized-union
+// pin (check-ci-shard-union.py: name + required-arm coverage), which reds if a
+// decomposed arm is dropped.
+//
+// Promise class: durable invariant. The complete producer/K relation is affine
+// by response-row identity, preserves distinct K keys for a shared producer, and
+// retains every capture/input coordinate in exact order. MEASURED: row
+// drop/duplicate/vary, K-key merge, three response-authority substitutions, and
+// independent drop/permute/vary of every fixed READ and WRITE capture/input each
+// reach the closed demand validator and red; the fixed ledgers also contain
+// shared producers whose distinct K callers select distinct owners. CLAIMED:
+// context interning cannot launder a malformed producer/K row or an incomplete
+// explicit input run. THE GAP: exact duplicate context demand reuse is separately
+// pinned by static_response_context_demand_controls_reach_and_restore; these
+// controls move producer rows and each element of their typed population instead.
 
+// DRY compile step for the decomposed full-demand controls -- a macro (not a fn)
+// so the build/diagnostic return types stay inferred at each call site, as in the
+// original monolith's local closure. Returns (TempDir, (build result, diagnostics)).
+macro_rules! full_demand_compile {
+    ($entry:expr, $label:expr) => {{
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", $entry);
+        let root = output_dir(&format!("static-response-full-grid-{}-{}", $entry, $label));
+        let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+            ken_cli::build_native_program(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &format!("rt_parity_static_response_full_grid_{}", $entry),
+                root.path(),
+            )
+        });
+        (root, observed)
+    }};
+}
+
+#[test]
+fn static_response_full_demand_fan_out_population_is_deferred_and_distinct() {
     in_generated_entry_stack_thread("rt-parity-static-response-full-grid", || {
-        let compile = |entry: &str, label: &str| {
-            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
-            let root = output_dir(&format!("static-response-full-grid-{entry}-{label}"));
-            let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                ken_cli::build_native_program(
-                    &source,
-                    ken_cli::SourceFormat::Ken,
-                    &format!("rt_parity_static_response_full_grid_{entry}"),
-                    root.path(),
-                )
-            });
-            (root, observed)
-        };
-        let (read_root, (read_result, read)) = compile("rt_read_offset_stage", "baseline");
-        let read_result = read_result.expect("the exact READ response population compiles");
-        let read_bytes = std::fs::read(&read_result.artifact.executable_path)
-            .expect("READ response-grid executable bytes");
-        let read_hash = read_result.artifact.executable_hash;
+        // The shared-producer fan-out invariant, re-targeted onto the Deferred
+        // population (Architect evt_2fk574v1cb3b1): both fixed products carry a
+        // producer whose >= 2 Deferred rows are DISTINCT K (never merged) and each
+        // is a UnconsumedTransportCaller residual. The producer is selected
+        // STRUCTURALLY (>= 2 Deferred rows), never by a baked native id. No
+        // mutation; the per-arm controls are the decomposed tests below.
+        let (read_root, (read_result, read)) =
+            full_demand_compile!("rt_read_offset_stage", "baseline");
+        read_result.expect("the exact READ response population compiles");
         let (write_root, (write_result, write)) =
-            compile("rt_write_writable_stage", "baseline");
-        let write_result = write_result.expect("the exact WRITE response population compiles");
-        let write_bytes = std::fs::read(&write_result.artifact.executable_path)
-            .expect("WRITE response-grid executable bytes");
-        let write_hash = write_result.artifact.executable_hash;
+            full_demand_compile!("rt_write_writable_stage", "baseline");
+        write_result.expect("the exact WRITE response population compiles");
         assert_eq!(read.len(), 1);
         assert_eq!(write.len(), 1);
 
-        // RECUT 2 HS6 (ii)-REDESIGN (Architect evt_2fk574v1cb3b1). The
-        // owner-splitting-under-a-shared-SPECIALIZED-producer requirement is
-        // DROPPED: post-recut that population (the ResourceRelease pairs) is
-        // transport-carried and correctly Deferred, so it is witnessless on the
-        // Specialized side (the fallback firing, precisely -- not a bare retire).
-        // The REAL property it protected -- a shared producer's distinct K are
-        // DISTINCT demand rows (not merged), correctly routed -- is RE-TARGETED
-        // onto the DEFERRED population, where the shared-producer multi-K witness
-        // now lives (the transport-deferred ResourceRelease pair: read producer
-        // 146, write 159). The producer is selected STRUCTURALLY (the one carrying
-        // >= 2 Deferred rows), not by the recut-invalidated baked id (part 2 /
-        // de-bake), so no native id is baked back and no future reclassification
-        // re-breaks it.
         for diagnostic in [&read[0], &write[0]] {
             let mut by_producer: std::collections::BTreeMap<u32, Vec<_>> =
                 std::collections::BTreeMap::new();
@@ -1548,8 +1551,6 @@ fn static_response_full_demand_population_controls_reach_red_and_restore() {
                 diagnostic.static_response_deferred
             );
             for (producer, fan_out) in fan_outs {
-                // Distinct K: the shared producer's fan-out members are distinct
-                // demand rows (keyed on vis_origin), never merged into one.
                 assert_eq!(
                     fan_out
                         .iter()
@@ -1559,9 +1560,6 @@ fn static_response_full_demand_population_controls_reach_red_and_restore() {
                     fan_out.len(),
                     "shared producer {producer} merged distinct K into one Deferred row"
                 );
-                // Correct routing: every fan-out member is a P2 transport-caller
-                // residual (the ruled reason this population is Deferred, not
-                // Specialized).
                 for row in fan_out {
                     assert_eq!(
                         row.sub_case, "UnconsumedTransportCaller",
@@ -1571,167 +1569,222 @@ fn static_response_full_demand_population_controls_reach_red_and_restore() {
                 }
             }
         }
-
-        for (label, mutation, expected) in [
-            (
-                "drop-row",
-                Mutation::DropProducerKRow,
-                "does not cover every derived response row",
-            ),
-            (
-                "duplicate-row",
-                Mutation::DuplicateProducerKRow,
-                "names no derived response row",
-            ),
-            (
-                "vary-row",
-                Mutation::VaryProducerKRow,
-                "disagrees with its fully validated response row",
-            ),
-            (
-                "merge-k",
-                Mutation::MergeTwoKKeys,
-                "disagrees with its fully validated response row",
-            ),
-            (
-                "response-operation",
-                Mutation::SubstituteResponseWithOperation,
-                "disagrees with its fully validated response row",
-            ),
-            (
-                "response-prior",
-                Mutation::SubstituteResponseWithPriorResponse,
-                "disagrees with its fully validated response row",
-            ),
-            (
-                "response-app-env",
-                Mutation::SubstituteResponseWithApplicationEnvironment,
-                "disagrees with its fully validated response row",
-            ),
-            (
-                "causal-prefix",
-                Mutation::VaryCausalContextPrefix,
-                "appending response context demands changed a causal context identity or schema",
-            ),
-        ] {
-            let ((_root, (result, diagnostics)), applications) =
-                ken_runtime::with_static_response_context_demand_mutation(mutation, || {
-                    compile("rt_read_offset_stage", label)
-                });
-            assert_eq!(applications, 1, "{label}: mutation did not reach");
-            let error = result.expect_err("a malformed producer/K row must red");
-            assert!(
-                format!("{error:?}").contains(expected),
-                "{label}: wrong refusal: {error:?}"
-            );
-            assert!(diagnostics.is_empty(), "{label}: red plan published rows");
-            assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
-            let (restored_root, (restored, restored_rows)) =
-                compile("rt_read_offset_stage", &format!("{label}-restored"));
-            let restored = restored.expect("the exact READ demand population must restore");
-            assert_eq!(restored_rows, read, "{label}: restored rows changed");
-            assert_eq!(restored.artifact.executable_hash, read_hash);
-            assert_eq!(
-                std::fs::read(&restored.artifact.executable_path)
-                    .expect("per-control restored READ executable bytes"),
-                read_bytes,
-                "{label}: exact byte restoration failed"
-            );
-            drop(restored_root);
-        }
-
-        for (entry, baseline_diag) in [
-            ("rt_read_offset_stage", &read[0]),
-            ("rt_write_writable_stage", &write[0]),
-        ] {
-            // RECUT 2 HS6 (ii)-redesign 2nd extension (Architect evt_bk6vky2pkncy):
-            // DE-BAKE the (29,19)/(62,44) capture/input census -- stale native
-            // constants the owner-add invalidated. The DropEvery{Capture,Input}
-            // mutations apply in the phase-A classify to the FULL has-K-unit demand
-            // population (Specialized UNION P2-Deferred), so `applications` counts
-            // captures/inputs across BOTH. Derive the expected totals from the
-            // baseline diagnostic: Specialized counts from all_static_response_rows,
-            // P2-Deferred counts from the extended Deferred fields (P1 contributes
-            // 0 -- no demand, correctly excluded). `applications == derived sum` is a
-            // cross-check of two independent derivations (mutation reach vs. observed
-            // population), NOT derive-from-actual, and no native count is baked back.
-            let expected_captures: usize = baseline_diag
-                .all_static_response_rows
-                .iter()
-                .map(|row| row.captures.len())
-                .sum::<usize>()
-                + baseline_diag
-                    .static_response_deferred
-                    .iter()
-                    .map(|row| row.capture_count)
-                    .sum::<usize>();
-            let expected_inputs: usize = baseline_diag
-                .all_static_response_rows
-                .iter()
-                .map(|row| row.continuation_inputs.len())
-                .sum::<usize>()
-                + baseline_diag
-                    .static_response_deferred
-                    .iter()
-                    .map(|row| row.continuation_input_count)
-                    .sum::<usize>();
-            assert!(
-                expected_captures > 0 && expected_inputs > 0,
-                "{entry}: capture/input census population must be non-empty"
-            );
-            for (label, mutation, expected_applications) in [
-                ("drop-capture", Mutation::DropEveryCapture, expected_captures),
-                ("permute-capture", Mutation::PermuteEveryCapture, expected_captures),
-                ("vary-capture", Mutation::VaryEveryCapture, expected_captures),
-                ("drop-input", Mutation::DropEveryContinuationInput, expected_inputs),
-                (
-                    "permute-input",
-                    Mutation::PermuteEveryContinuationInput,
-                    expected_inputs,
-                ),
-                ("vary-input", Mutation::VaryEveryContinuationInput, expected_inputs),
-            ] {
-                let ((_root, (result, diagnostics)), applications) =
-                    ken_runtime::with_static_response_context_demand_mutation(mutation, || {
-                        compile(entry, label)
-                    });
-                assert_eq!(
-                    applications, expected_applications,
-                    "{entry}/{label}: not every element reached independently"
-                );
-                let error = result.expect_err("a malformed explicit input run must red");
-                assert!(
-                    format!("{error:?}")
-                        .contains("disagrees with its fully validated response row"),
-                    "{entry}/{label}: wrong refusal: {error:?}"
-                );
-                assert!(diagnostics.is_empty(), "{entry}/{label}: red plan published rows");
-                assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
-                let (restored_root, (restored, restored_rows)) =
-                    compile(entry, &format!("{label}-restored"));
-                let restored = restored.expect("the exact input population must restore");
-                let (baseline_rows, baseline_hash, baseline_bytes) =
-                    if entry == "rt_read_offset_stage" {
-                        (&read, read_hash, &read_bytes)
-                    } else {
-                        (&write, write_hash, &write_bytes)
-                    };
-                assert_eq!(&restored_rows, baseline_rows);
-                assert_eq!(restored.artifact.executable_hash, baseline_hash);
-                assert_eq!(
-                    &std::fs::read(&restored.artifact.executable_path)
-                        .expect("per-control restored input-grid executable bytes"),
-                    baseline_bytes,
-                    "{entry}/{label}: exact byte restoration failed"
-                );
-                drop(restored_root);
-            }
-        }
-
-        assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
         drop((write_root, read_root));
     });
 }
+
+fn full_demand_producer_k_control(
+    label: &str,
+    mutation: ken_runtime::StaticResponseContextDemandMutation,
+    expected: &str,
+) {
+    let (read_root, (read_result, read)) =
+        full_demand_compile!("rt_read_offset_stage", "baseline");
+    let read_result = read_result.expect("the exact READ response population compiles");
+    let read_bytes = std::fs::read(&read_result.artifact.executable_path)
+        .expect("READ response-grid executable bytes");
+    let read_hash = read_result.artifact.executable_hash;
+    assert_eq!(read.len(), 1);
+
+    let ((_root, (result, diagnostics)), applications) =
+        ken_runtime::with_static_response_context_demand_mutation(mutation, || {
+            full_demand_compile!("rt_read_offset_stage", label)
+        });
+    assert_eq!(applications, 1, "{label}: mutation did not reach");
+    let error = result.expect_err("a malformed producer/K row must red");
+    assert!(
+        format!("{error:?}").contains(expected),
+        "{label}: wrong refusal: {error:?}"
+    );
+    assert!(diagnostics.is_empty(), "{label}: red plan published rows");
+    assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+    let (restored_root, (restored, restored_rows)) =
+        full_demand_compile!("rt_read_offset_stage", &format!("{label}-restored"));
+    let restored = restored.expect("the exact READ demand population must restore");
+    assert_eq!(restored_rows, read, "{label}: restored rows changed");
+    assert_eq!(restored.artifact.executable_hash, read_hash);
+    assert_eq!(
+        std::fs::read(&restored.artifact.executable_path)
+            .expect("per-control restored READ executable bytes"),
+        read_bytes,
+        "{label}: exact byte restoration failed"
+    );
+    drop(restored_root);
+    drop(read_root);
+}
+
+macro_rules! full_demand_producer_k_test {
+    ($name:ident, $label:literal, $mutation:ident, $expected:literal) => {
+        #[test]
+        fn $name() {
+            in_generated_entry_stack_thread("rt-parity-static-response-full-grid", || {
+                full_demand_producer_k_control(
+                    $label,
+                    ken_runtime::StaticResponseContextDemandMutation::$mutation,
+                    $expected,
+                )
+            });
+        }
+    };
+}
+
+full_demand_producer_k_test!(
+    static_response_full_demand_drop_row_reds_and_restores,
+    "drop-row",
+    DropProducerKRow,
+    "does not cover every derived response row"
+);
+full_demand_producer_k_test!(
+    static_response_full_demand_duplicate_row_reds_and_restores,
+    "duplicate-row",
+    DuplicateProducerKRow,
+    "names no derived response row"
+);
+full_demand_producer_k_test!(
+    static_response_full_demand_vary_row_reds_and_restores,
+    "vary-row",
+    VaryProducerKRow,
+    "disagrees with its fully validated response row"
+);
+full_demand_producer_k_test!(
+    static_response_full_demand_merge_k_reds_and_restores,
+    "merge-k",
+    MergeTwoKKeys,
+    "disagrees with its fully validated response row"
+);
+full_demand_producer_k_test!(
+    static_response_full_demand_response_operation_reds_and_restores,
+    "response-operation",
+    SubstituteResponseWithOperation,
+    "disagrees with its fully validated response row"
+);
+full_demand_producer_k_test!(
+    static_response_full_demand_response_prior_reds_and_restores,
+    "response-prior",
+    SubstituteResponseWithPriorResponse,
+    "disagrees with its fully validated response row"
+);
+full_demand_producer_k_test!(
+    static_response_full_demand_response_app_env_reds_and_restores,
+    "response-app-env",
+    SubstituteResponseWithApplicationEnvironment,
+    "disagrees with its fully validated response row"
+);
+full_demand_producer_k_test!(
+    static_response_full_demand_causal_prefix_reds_and_restores,
+    "causal-prefix",
+    VaryCausalContextPrefix,
+    "appending response context demands changed a causal context identity or schema"
+);
+
+fn full_demand_census_control(
+    entry: &str,
+    label: &str,
+    mutation: ken_runtime::StaticResponseContextDemandMutation,
+    axis_is_capture: bool,
+) {
+    let (baseline_root, (baseline_result, baseline)) = full_demand_compile!(entry, "baseline");
+    let baseline_result = baseline_result.expect("the exact response population compiles");
+    let baseline_bytes = std::fs::read(&baseline_result.artifact.executable_path)
+        .expect("response-grid executable bytes");
+    let baseline_hash = baseline_result.artifact.executable_hash;
+    assert_eq!(baseline.len(), 1);
+    let baseline_diag = &baseline[0];
+
+    // DE-BAKE (Architect evt_bk6vky2pkncy): derive the expected capture/input
+    // totals from the baseline diagnostic (Specialized all_static_response_rows +
+    // P2-Deferred counts; P1 contributes 0), NOT a baked native constant. The
+    // DropEvery{Capture,Input} mutations count applications across the FULL
+    // has-K-unit population, so `applications == derived sum` is a cross-check of
+    // two independent derivations, not derive-from-actual.
+    let expected_captures: usize = baseline_diag
+        .all_static_response_rows
+        .iter()
+        .map(|row| row.captures.len())
+        .sum::<usize>()
+        + baseline_diag
+            .static_response_deferred
+            .iter()
+            .map(|row| row.capture_count)
+            .sum::<usize>();
+    let expected_inputs: usize = baseline_diag
+        .all_static_response_rows
+        .iter()
+        .map(|row| row.continuation_inputs.len())
+        .sum::<usize>()
+        + baseline_diag
+            .static_response_deferred
+            .iter()
+            .map(|row| row.continuation_input_count)
+            .sum::<usize>();
+    assert!(
+        expected_captures > 0 && expected_inputs > 0,
+        "{entry}: capture/input census population must be non-empty"
+    );
+    let expected_applications = if axis_is_capture {
+        expected_captures
+    } else {
+        expected_inputs
+    };
+
+    let ((_root, (result, diagnostics)), applications) =
+        ken_runtime::with_static_response_context_demand_mutation(mutation, || {
+            full_demand_compile!(entry, label)
+        });
+    assert_eq!(
+        applications, expected_applications,
+        "{entry}/{label}: not every element reached independently"
+    );
+    let error = result.expect_err("a malformed explicit input run must red");
+    assert!(
+        format!("{error:?}").contains("disagrees with its fully validated response row"),
+        "{entry}/{label}: wrong refusal: {error:?}"
+    );
+    assert!(diagnostics.is_empty(), "{entry}/{label}: red plan published rows");
+    assert!(ken_runtime::static_response_context_demand_mutation_is_exact());
+    let (restored_root, (restored, restored_rows)) =
+        full_demand_compile!(entry, &format!("{label}-restored"));
+    let restored = restored.expect("the exact input population must restore");
+    assert_eq!(restored_rows, baseline);
+    assert_eq!(restored.artifact.executable_hash, baseline_hash);
+    assert_eq!(
+        std::fs::read(&restored.artifact.executable_path)
+            .expect("per-control restored input-grid executable bytes"),
+        baseline_bytes,
+        "{entry}/{label}: exact byte restoration failed"
+    );
+    drop(restored_root);
+    drop(baseline_root);
+}
+
+macro_rules! full_demand_census_test {
+    ($name:ident, $entry:literal, $label:literal, $mutation:ident, $capture:expr) => {
+        #[test]
+        fn $name() {
+            in_generated_entry_stack_thread("rt-parity-static-response-full-grid", || {
+                full_demand_census_control(
+                    $entry,
+                    $label,
+                    ken_runtime::StaticResponseContextDemandMutation::$mutation,
+                    $capture,
+                )
+            });
+        }
+    };
+}
+
+full_demand_census_test!(static_response_full_demand_read_drop_capture_reaches_and_restores, "rt_read_offset_stage", "drop-capture", DropEveryCapture, true);
+full_demand_census_test!(static_response_full_demand_read_permute_capture_reaches_and_restores, "rt_read_offset_stage", "permute-capture", PermuteEveryCapture, true);
+full_demand_census_test!(static_response_full_demand_read_vary_capture_reaches_and_restores, "rt_read_offset_stage", "vary-capture", VaryEveryCapture, true);
+full_demand_census_test!(static_response_full_demand_read_drop_input_reaches_and_restores, "rt_read_offset_stage", "drop-input", DropEveryContinuationInput, false);
+full_demand_census_test!(static_response_full_demand_read_permute_input_reaches_and_restores, "rt_read_offset_stage", "permute-input", PermuteEveryContinuationInput, false);
+full_demand_census_test!(static_response_full_demand_read_vary_input_reaches_and_restores, "rt_read_offset_stage", "vary-input", VaryEveryContinuationInput, false);
+full_demand_census_test!(static_response_full_demand_write_drop_capture_reaches_and_restores, "rt_write_writable_stage", "drop-capture", DropEveryCapture, true);
+full_demand_census_test!(static_response_full_demand_write_permute_capture_reaches_and_restores, "rt_write_writable_stage", "permute-capture", PermuteEveryCapture, true);
+full_demand_census_test!(static_response_full_demand_write_vary_capture_reaches_and_restores, "rt_write_writable_stage", "vary-capture", VaryEveryCapture, true);
+full_demand_census_test!(static_response_full_demand_write_drop_input_reaches_and_restores, "rt_write_writable_stage", "drop-input", DropEveryContinuationInput, false);
+full_demand_census_test!(static_response_full_demand_write_permute_input_reaches_and_restores, "rt_write_writable_stage", "permute-input", PermuteEveryContinuationInput, false);
+full_demand_census_test!(static_response_full_demand_write_vary_input_reaches_and_restores, "rt_write_writable_stage", "vary-input", VaryEveryContinuationInput, false);
 
 /// **Promise class: durable invariant.** Every specialized response owner has
 /// exactly one planner-selected incoming identity and at least one decoded
