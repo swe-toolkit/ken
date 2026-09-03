@@ -1913,201 +1913,127 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
 /// **THE GAP:** the verifier decodes direct callees and reads instruction/value
 /// order from finalized CLIF; response provenance itself remains the typed
 /// owner-local construction that the three substitution controls vary.
-#[test]
-fn static_response_owner_body_controls_reach_red_and_restore() {
-    use ken_runtime::StaticResponseOwnerBodyMutation as Mutation;
-
-    in_generated_entry_stack_thread("rt-parity-static-response-owner-grid", || {
-        let compile = |entry: &str, label: &str| {
-            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
-            let root = output_dir(&format!("static-response-owner-grid-{entry}-{label}"));
-            let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                ken_cli::build_native_program(
-                    &source,
-                    ken_cli::SourceFormat::Ken,
-                    &format!("rt_parity_static_response_owner_grid_{entry}"),
-                    root.path(),
-                )
-            });
-            (root, observed)
-        };
-        let (read_root, (read_result, read_rows)) =
-            compile("rt_read_offset_stage", "baseline");
-        let read_result = read_result.expect("the exact READ response owners compile");
-        let read_bytes = std::fs::read(&read_result.artifact.executable_path)
-            .expect("READ response-owner executable bytes");
-        let read_hashes = (
-            read_result.plan_transport_hash,
-            read_result.runtime_program.core_semantic_hash,
-            read_result.runtime_program.artifact_hash,
-            read_result.artifact.executable_hash,
-        );
-        let (write_root, (write_result, write_rows)) =
-            compile("rt_write_writable_stage", "baseline");
-        let write_result = write_result.expect("the exact WRITE response owners compile");
-        let write_bytes = std::fs::read(&write_result.artifact.executable_path)
-            .expect("WRITE response-owner executable bytes");
-        let write_hashes = (
-            write_result.plan_transport_hash,
-            write_result.runtime_program.core_semantic_hash,
-            write_result.runtime_program.artifact_hash,
-            write_result.artifact.executable_hash,
-        );
-        // HS7 (Architect evt_25kcq9qb31gkp): the WRITE product's BufferAllocate is
-        // transport-DEFERRED (its sibling ledger asserts exactly this at the closure
-        // boundary), so all_static_response_rows carries no BufferAllocate -- the prior
-        // app486.len()==1 + baked (1246,1238) K was a never-executed bake that
-        // contradicted the ledger. The surviving WRITE-targeted control (context-zero)
-        // substitutes the write product's actual Specialized response owner's context;
-        // assert that population is present (de-baked: no BufferAllocate filter, no baked
-        // coords). The former app-environment control that consumed app486 is retired as
-        // unreachable (see the loop below). The kept controls' discriminating power is the
-        // mutation loop below (reach, red on the diagnosed message, restore the exact
-        // typed population).
+fn owner_body_control(
+    entry: &str,
+    label: &str,
+    mutation: ken_runtime::StaticResponseOwnerBodyMutation,
+    expected: &str,
+) {
+    let compile = |entry: &str, label: &str| {
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+        let root = output_dir(&format!("static-response-owner-grid-{entry}-{label}"));
+        let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+            ken_cli::build_native_program(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &format!("rt_parity_static_response_owner_grid_{entry}"),
+                root.path(),
+            )
+        });
+        (root, observed)
+    };
+    let (baseline_root, (baseline_result, baseline_rows)) = compile(entry, "baseline");
+    let baseline_result = baseline_result.expect("the exact response owners compile");
+    let baseline_bytes = std::fs::read(&baseline_result.artifact.executable_path)
+        .expect("response-owner executable bytes");
+    let baseline_hashes = (
+        baseline_result.plan_transport_hash,
+        baseline_result.runtime_program.core_semantic_hash,
+        baseline_result.runtime_program.artifact_hash,
+        baseline_result.artifact.executable_hash,
+    );
+    // HS7 (Architect evt_25kcq9qb31gkp): the WRITE product's BufferAllocate is
+    // transport-DEFERRED, so all_static_response_rows carries no BufferAllocate --
+    // the prior app486.len()==1 + baked (1246,1238) K was a never-executed bake. The
+    // write-targeted control (context-zero) needs the write product to carry a
+    // Specialized response owner; assert that population is present (de-baked, no
+    // BufferAllocate filter/coords), preserving the original write-only precondition.
+    if entry == "rt_write_writable_stage" {
         assert!(
-            !write_rows[0].all_static_response_rows.is_empty(),
+            !baseline_rows[0].all_static_response_rows.is_empty(),
             "the WRITE product must carry a Specialized response owner for the \
              write-targeted owner-body control (context-zero) to target"
         );
-        for (label, entry, mutation, expected) in [
-            (
-                // HS7 de-bake (Architect evt_25kcq9qb31gkp): the reverted READ owner
-                // has k_context 0 (context_was_preexisting), so SubstituteContextZero is
-                // a no-op there (nothing to substitute -> unreachable). The WRITE owner
-                // has a non-zero k_context, so the wrong-context substitution reaches and
-                // reds there -- retarget onto that real target, grounded on the actual
-                // diagnostic, not the never-run read bake.
-                "context-zero",
-                "rt_write_writable_stage",
-                Mutation::SubstituteContextZero,
-                "called a context or raw worker other than its exact K context",
-            ),
-            (
-                "response-operation",
-                "rt_read_offset_stage",
-                Mutation::ResponseWithOperation,
-                "substituted operation, prior-response, or application-environment authority",
-            ),
-            // HS7 RETIREMENT (Architect evt_7hk776pcdewv9, refined by evidence). Two
-            // response-authority mutations are UNREACHABLE under the reverted single-read
-            // family, both confirmed "did not reach" (applications 0):
-            // ResponseWithPriorResponse (substitutes a PRIOR Specialized response -> needs
-            // >= 2 Specialized responses) and ResponseWithApplicationEnvironment (the
-            // single-owner product forms no application-environment authority to
-            // substitute). Both hit the same >= 2-Specialized-response wall ruled
-            // non-constructible (the >= 2-owner / option-2 arms). Retired as
-            // cited-unreachable, tracked for re-enable when that capability lands
-            // (operator's call from the reachability brief). Their sibling
-            // ResponseWithOperation (above) substitutes the SINGLE owner's authority (NOT
-            // a prior, no app-env) and DOES reach -- confirmed by the loop reding then
-            // restoring on it -- so it is KEPT, not dropped, per the evidence.
-            (
-                "raw-host-result",
-                "rt_read_offset_stage",
-                Mutation::RawHostResultEscape,
-                "raw HostResult or non-K value escape",
-            ),
-            (
-                "raw-worker",
-                "rt_read_offset_stage",
-                Mutation::CallRawWorker,
-                "called a context or raw worker other than its exact K context",
-            ),
-            (
-                "omit-k-call",
-                "rt_read_offset_stage",
-                Mutation::OmitKCall,
-                "emitted 0 K calls instead of exactly one",
-            ),
-            (
-                "duplicate-k-call",
-                "rt_read_offset_stage",
-                Mutation::DuplicateKCall,
-                "emitted 2 K calls instead of exactly one",
-            ),
-            (
-                "before-host-validation",
-                "rt_read_offset_stage",
-                Mutation::CallBeforeHostValidation,
-                "called K before host response validation completed",
-            ),
-            (
-                "after-answer-collapse",
-                "rt_read_offset_stage",
-                Mutation::CallAfterAnswerCollapse,
-                "called K after its answer was already collapsed",
-            ),
-            (
-                "trap-bypass",
-                "rt_read_offset_stage",
-                Mutation::BypassTrapBeforeResult,
-                "without the status then Trap-before-Result branches",
-            ),
-            (
-                "vary-ret",
-                "rt_read_offset_stage",
-                Mutation::VaryRet,
-                "validated a Ret identity other than its exact K Ret",
-            ),
-            (
-                "omit-owner-definition",
-                "rt_read_offset_stage",
-                Mutation::OmitOwnerDefinition,
-                "the response-owner body population is incomplete",
-            ),
-        ] {
-            let ((_root, (result, diagnostics)), applications) =
-                ken_runtime::with_static_response_owner_body_mutation(mutation, || {
-                    compile(entry, label)
-                });
-            assert_eq!(applications, 1, "{label}: owner mutation did not reach");
-            let error = result.expect_err("a malformed response-owner body must red");
-            assert!(
-                format!("{error:?}").contains(expected),
-                "{label}: wrong finished-body refusal: {error:?}"
-            );
-            let baseline = if entry == "rt_read_offset_stage" {
-                &read_rows
-            } else {
-                &write_rows
-            };
-            assert_eq!(
-                &diagnostics, baseline,
-                "{label}: body mutation changed the typed planner population"
-            );
-            assert!(ken_runtime::static_response_owner_body_mutation_is_exact());
-            let (restored_root, (restored, restored_rows)) =
-                compile(entry, &format!("{label}-restored"));
-            let restored = restored.expect("the exact response-owner body must restore");
-            let (baseline_rows, baseline_hashes, baseline_bytes) =
-                if entry == "rt_read_offset_stage" {
-                    (&read_rows, read_hashes, &read_bytes)
-                } else {
-                    (&write_rows, write_hashes, &write_bytes)
-                };
-            assert_eq!(&restored_rows, baseline_rows);
-            assert_eq!(
-                (
-                    restored.plan_transport_hash,
-                    restored.runtime_program.core_semantic_hash,
-                    restored.runtime_program.artifact_hash,
-                    restored.artifact.executable_hash,
-                ),
-                baseline_hashes,
-                "{label}: restored owner artifact hashes changed"
-            );
-            assert_eq!(
-                &std::fs::read(&restored.artifact.executable_path)
-                    .expect("per-control restored response-owner bytes"),
-                baseline_bytes,
-                "{label}: exact byte restoration failed"
-            );
-            drop(restored_root);
-        }
+    }
 
-        drop((write_root, read_root));
-    });
+    let ((_root, (result, diagnostics)), applications) =
+        ken_runtime::with_static_response_owner_body_mutation(mutation, || compile(entry, label));
+    assert_eq!(applications, 1, "{label}: owner mutation did not reach");
+    let error = result.expect_err("a malformed response-owner body must red");
+    assert!(
+        format!("{error:?}").contains(expected),
+        "{label}: wrong finished-body refusal: {error:?}"
+    );
+    assert_eq!(
+        &diagnostics, &baseline_rows,
+        "{label}: body mutation changed the typed planner population"
+    );
+    assert!(ken_runtime::static_response_owner_body_mutation_is_exact());
+    let (restored_root, (restored, restored_rows)) =
+        compile(entry, &format!("{label}-restored"));
+    let restored = restored.expect("the exact response-owner body must restore");
+    assert_eq!(&restored_rows, &baseline_rows);
+    assert_eq!(
+        (
+            restored.plan_transport_hash,
+            restored.runtime_program.core_semantic_hash,
+            restored.runtime_program.artifact_hash,
+            restored.artifact.executable_hash,
+        ),
+        baseline_hashes,
+        "{label}: restored owner artifact hashes changed"
+    );
+    assert_eq!(
+        &std::fs::read(&restored.artifact.executable_path)
+            .expect("per-control restored response-owner bytes"),
+        &baseline_bytes,
+        "{label}: exact byte restoration failed"
+    );
+    drop(restored_root);
+    drop(baseline_root);
 }
+
+// D2 (CI-GATE-TIME-REDUCTION): the response-owner-body grid, decomposed from a
+// monolithic #[test] into one independently-schedulable #[test] per arm via
+// owner_body_control_test!. BEHAVIOR-PRESERVING: same native builds, same
+// mutation arms, same per-arm reach/refusal + diagnostics==baseline +
+// restoration hash/byte observations -- ONLY #[test] granularity changed so
+// nextest can shard. Carried over from the HS7 re-ground: context-zero is
+// de-baked-retargeted read->write (the reverted READ owner has k_context 0 -> a
+// no-op; the WRITE owner has k_context 1 -> the real target); response-operation
+// is KEPT (single-owner authority substitution, reaches). RETIRED as
+// cited-unreachable (needing the non-constructible >= 2-Specialized-response
+// population; Architect evt_7hk776pcdewv9): ResponseWithPriorResponse and
+// ResponseWithApplicationEnvironment -- tracked for re-enable when the
+// >= 2-Specialized-owner capability lands (operator's call from the reachability
+// brief).
+macro_rules! owner_body_control_test {
+    ($name:ident, $label:literal, $entry:literal, $mutation:ident, $expected:literal) => {
+        #[test]
+        fn $name() {
+            in_generated_entry_stack_thread("rt-parity-static-response-owner-grid", || {
+                owner_body_control(
+                    $entry,
+                    $label,
+                    ken_runtime::StaticResponseOwnerBodyMutation::$mutation,
+                    $expected,
+                )
+            });
+        }
+    };
+}
+
+owner_body_control_test!(static_response_owner_body_context_zero_reds_and_restores, "context-zero", "rt_write_writable_stage", SubstituteContextZero, "called a context or raw worker other than its exact K context");
+owner_body_control_test!(static_response_owner_body_response_operation_reds_and_restores, "response-operation", "rt_read_offset_stage", ResponseWithOperation, "substituted operation, prior-response, or application-environment authority");
+owner_body_control_test!(static_response_owner_body_raw_host_result_reds_and_restores, "raw-host-result", "rt_read_offset_stage", RawHostResultEscape, "raw HostResult or non-K value escape");
+owner_body_control_test!(static_response_owner_body_raw_worker_reds_and_restores, "raw-worker", "rt_read_offset_stage", CallRawWorker, "called a context or raw worker other than its exact K context");
+owner_body_control_test!(static_response_owner_body_omit_k_call_reds_and_restores, "omit-k-call", "rt_read_offset_stage", OmitKCall, "emitted 0 K calls instead of exactly one");
+owner_body_control_test!(static_response_owner_body_duplicate_k_call_reds_and_restores, "duplicate-k-call", "rt_read_offset_stage", DuplicateKCall, "emitted 2 K calls instead of exactly one");
+owner_body_control_test!(static_response_owner_body_before_host_validation_reds_and_restores, "before-host-validation", "rt_read_offset_stage", CallBeforeHostValidation, "called K before host response validation completed");
+owner_body_control_test!(static_response_owner_body_after_answer_collapse_reds_and_restores, "after-answer-collapse", "rt_read_offset_stage", CallAfterAnswerCollapse, "called K after its answer was already collapsed");
+owner_body_control_test!(static_response_owner_body_trap_bypass_reds_and_restores, "trap-bypass", "rt_read_offset_stage", BypassTrapBeforeResult, "without the status then Trap-before-Result branches");
+owner_body_control_test!(static_response_owner_body_vary_ret_reds_and_restores, "vary-ret", "rt_read_offset_stage", VaryRet, "validated a Ret identity other than its exact K Ret");
+owner_body_control_test!(static_response_owner_body_omit_owner_definition_reds_and_restores, "omit-owner-definition", "rt_read_offset_stage", OmitOwnerDefinition, "the response-owner body population is incomplete");
 
 /// **Promise class: durable invariant.** Intended planner growth may add Direct
 /// arrivals, but every such arrival must retain one source-keyed declared call
