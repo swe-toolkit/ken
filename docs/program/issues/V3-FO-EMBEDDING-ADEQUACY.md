@@ -11,6 +11,35 @@ github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
+> # OPERATIVE (Steward, 2026-09-03) — HS13 FIRED: the HS12 xs-first realization hit
+> # a symmetric horn at build (xs-first pins xs before i's neutral motive; the inner
+> # Elim's motive abstracts the shared index after the sibling is constructor-pinned
+> # — two nested single Elims are NOT the transport-free term). The HS12 mechanism
+> # is NOT settled; awaiting the Architect's HS13 ruling (Steward routed
+> # evt_46ew5qfjayc4h), TCB tripwire ARMED — the two resolutions the ring sees (new
+> # kernel eliminator / transport convoy) both cross the boundary, so it may tee an
+> # operator gate. §1a: HS13 is NOT a trigger; next mandatory = HS15. Full finding +
+> # the HS12 record in [[LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME]].
+>
+> # OPERATIVE (Steward, 2026-09-03) — D2b HS12 RULED; predecessor #4 carries the
+> # mechanism. Supersedes the HS5 banner below for CURRENT state (the HS6..HS12
+> # sub-chain fired WITHIN predecessor #4's build, not in this node).
+> #
+> # The coupled-inner-match sub-chain (HS10 sibling-as-motive-param, HS11 i-first
+> # pins the index, HS12) is RULED (Architect evt_2ry5x3wy5hq9p, mandatory 4th §1a
+> # advisory evt_f290zks5qpjp): the fix is coupled-covering compilation, xs-FIRST
+> # split (Research's Rep-3 verbatim) — ELABORATOR-ONLY, ZERO trusted-base delta,
+> # NO transport, NO het-equality, existing homogeneous Elims, NO operator gate.
+> # §1a HS12 DISCHARGED; next mandatory §1a = HS15 (Steward-authoritative count).
+> # The full kernel term shape + the §1b closure predicate are recorded durably in
+> # [[LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME]] (predecessor #4, refined
+> # scope = coupled-covering split-order selection). The language ring resumes
+> # building that predecessor xs-first from 7b766fc89 (termination-checker check
+> # first, fallback simultaneous telescopic split — also elaborator-only). D2b stays
+> # HELD (WIP over 7b766fc89, statement UNCHANGED) until predecessor #4 merges;
+> # Architect is the required soundness reviewer on the resumed D2b candidate; the
+> # Steward RE-RELEASES D2b only after that landing and routes M1-M4.
+>
 > # OPERATIVE (Steward, 2026-09-03) — D2b HS5: predecessor #4 framed, D0 grid
 > # DONE, fix direction RULED (structural coherent-frame closure). Supersedes the
 > # HS4 banner below for CURRENT state. Architecture B is UNCHANGED and still

@@ -12,6 +12,108 @@ github: null
 origin: "Steward, 2026-09-03. D2b design hard-stop #5 for V3-FO-EMBEDDING-ADEQUACY. Classified by the Architect (evt_6zjegefzv0am2) a distinct, reachable elaborator-capability predecessor in crates/ken-elaborator — NOT a kernel change (the kernel correctly rejects; the elaborator must PRODUCE a well-typed term that typechecks against the unmodified kernel = a completeness/false-reject fix), NOT source-compensable (the correspondence is a REQUIRED architecture-B lemma so it cannot live in FoKripke), NOT an architecture-B refutation (the proposition is true by construction and the match i/match xs proof is structurally exhaustive). The Architect's provisional lean (the derived/coupled index through the nested elim) was FALSIFIED by the D0 grid (evt_t9w0fnhq68p0, fixture /tmp/d2b-hs5-grid-final.rs) and WITHDRAWN (§7a, evt_45h2qab5nejg3): Row B (RED, direct index, no dual_fin_to_nat) rules the derived index OUT; Row A (GREEN, trivial equality, same coupled index + nesting) rules the coupled-index motive OUT; the single-elim C substitute (RED at ONE match xs) rules nesting OUT. CONFIRMED CAUSE (from the flipping cells): the discriminator is a NONTRIVIAL equality whose two sides are DEPENDENT RESULTS refining DIFFERENTLY under the same indexed elimination (cross-structure dependent-result refinement), failing ALREADY at a SINGLE elimination depth — the two sides' refinements land in different de Bruijn frames (@2 vs @4), so the branch's equality type does not sit in the same frame as the refined goal. FIX DIRECTION RULED (evt_45h2qab5nejg3): the structural coherent-frame CLOSURE, not a point-fix (the grid falsifies any special extension of the derived-occurrence/nested-elim gate). §1a: HS5 self-ruled; next Research trigger = HS6; no research pull. §1b (Architect, entry 4): entries 1 (68100a5cd, direct coupled scrutinee occurrence), 2 (128b6c000, captured convoy binder), 4 (this) share ONE predicate — no single coherent de Bruijn frame across the refined goal; entry 3 (b22e62530 DUAL-VIEW) is the field-side sibling. FOLD-VS-DISTINCT: this is motive/goal-rebase-side (expected g0) and DISTINCT from the Adversary's queued infer-mode-RVar successor (evt_3gh2pkrw3ny8z, field-view/application-head side); confirmed no application-head field-retyping is involved. Coordinates re-measure at your build SHA; grid fixture /tmp/d2b-hs5-grid-final.rs on the held WIP 26dd33f25."
 ---
 
+> # OPERATIVE (Steward, 2026-09-03) — HS13 FIRED: xs-first SWAPS the horn but does
+> # NOT remove it. The HS12 xs-first mechanism (banner below) is NOT settled —
+> # awaiting the Architect's HS13 mechanism ruling; TCB tripwire ARMED.
+> #
+> # language-implementer evt_51nwxnxvbstt0: the covering transposer WORKS (a real
+> # rectangular two-scrutinee split-order selection, one xs-first tree, no
+> # cross-order equality emitted), but the advised two nested single-scrutinee
+> # Elims are NOT well-typed. i-first pins i before xs's neutral motive (the retired
+> # HS11 error); xs-first pins xs before i's neutral motive (the new wall) — the
+> # inner Elim's motive always abstracts the shared index AFTER the sibling is
+> # constructor-pinned, so keeping dual_nth/dual_lookup OPAQUE is ill-typed
+> # (DualNil : DualEnv a Zero vs the arbitrary-p inner motive) and SIMPLIFYING
+> # reintroduces carrier eliminators (the retired common-frame error). Measured
+> # /tmp/hs12-transpose3.log + transpose4.log; disposable
+> # /tmp/hs13-xs-first-covering.diff. The only two resolutions the ring sees BOTH
+> # cross the TCB boundary: (a) a kernel term rep other than sequential single Elims
+> # (a simultaneous telescopic eliminator = new kernel primitive), or (b) an
+> # equality/transport convoy (het-eq / J / Cast). HS13 ROUTED to the Architect
+> # (Steward evt_46ew5qfjayc4h): if either is load-bearing => TCB growth => Architect
+> # escalates to Steward => operator gate; if a THIRD elaborator-only realization
+> # exists (simultaneous split lowering to existing homogeneous Elims, no kernel-rep,
+> # no transport), the Architect rules directly. §1a: HS13 is NOT a trigger; next
+> # mandatory = HS15. Ring restored clean at 7b766fc89, idle pending the ruling. The
+> # HS12 banner below records what was RULED and BUILT — do not read it as the final
+> # mechanism.
+>
+> # OPERATIVE (Steward, 2026-09-03) — HS12 RULED: coupled-covering xs-FIRST.
+> # This banner SUPERSEDES the "D2 (RECUT) path-A/path-B" mechanism and the HS6+HS7
+> # recut banner below: the HS8->HS12 coupled-inner-match sub-chain refined the
+> # mechanism to coupled-covering SPLIT-ORDER SELECTION. Elaborator-only, no gate.
+> # Durable capture of the Architect's convo ruling (in-thread is not durable).
+> #
+> # Architect MECHANISM RULING evt_2ry5x3wy5hq9p (mandatory 4th §1a advisory
+> # evt_f290zks5qpjp in hand; Research confident POSITIVE). VERDICT: adopt
+> # coupled-covering compilation, xs-FIRST split (research's original Rep-3,
+> # verbatim). TCB tripwire does NOT fire — ZERO trusted-base delta, NO transport,
+> # NO heterogeneous equality, existing homogeneous Elims. NO operator gate; the
+> # Architect ruled directly. §1a HS12 DISCHARGED; next mandatory §1a = HS15 (the
+> # "next MANDATORY = HS9" in the Sequencing section is STALE — HS8..HS12 have
+> # since fired within this predecessor's build).
+> #
+> # FINALIZED MECHANISM (existing homogeneous Elims; build from the ruling):
+> # OUTER DualEnv-Elim on xs, motive M(p, xs:DualEnv a p) := Pi (i:DualFin p).
+> #   Equal (Option a) (dual_nth a p xs (dual_fin_to_nat p i))
+> #                    (Some a (dual_lookup a p xs i))
+> #   [the Pi-result motive Ken already PROVED it admits at HS12 — outer convoy
+> #    is built and lawful; do not re-derive it]
+> #  - DualNil (p=Zero): Pi (i:DualFin Zero)... DualFin Zero is uninhabited => the
+> #    inner DualFin-Elim has NO cases, discharged (no no-confusion needed).
+> #  - DualCons k x rest (p=Suc k), OUTER IH M(k,rest)=Pi(i:DualFin k).Coh(k,rest,i):
+> #    lambda i. INNER DualFin-Elim on i:
+> #      * DualFZ: both sides whnf to Some a x => Equal (Some a x)(Some a x) =>
+> #        Proved (the HS6 leaf, unchanged).
+> #      * DualFS k j2: both sides whnf to the recursive calls on (rest,j2); the
+> #        goal reduces to Coh(k,rest,j2) = OUTER IH M(k,rest) applied to j2. Closed.
+> # SOURCE-TO-TERM: the surface recursive call `dual_option a m rest j` compiles to
+> # the OUTER eliminator's IH on the recursive field (re-anchor Fin -> Env:
+> # structural descent rest < xs, sound because rest and j descend in LOCKSTEP on
+> # the shared Nat), NOT a fresh Fin-anchored call. Two nested EXISTING Elims,
+> # convoyed IH from xs's recursive field, per-branch whnf of the OPAQUE functions.
+> # No transport/J/Cast/JMeq, no kernel primitive.
+> #
+> # TWO INVARIANTS (correct ORDER now): (i) the coupled sibling i lives in the
+> # motive RESULT as a Pi over the FIRST-eliminated family (xs) — never concrete at
+> # a generalized index (horn 1 = the retired i-first error) and never a generalized
+> # motive PARAMETER (horn 2 = the retired HS10 Rep-2 error). (ii) dual_nth /
+> # dual_lookup stay OPAQUE, whnf-reduced per-branch ONLY after BOTH scrutinees are
+> # constructor-headed; never decomposed into carrier eliminators, never reduced
+> # inside the motive (green slime). ONE sibling, SINGLE-family motive — NOT the
+> # retired cross-structure common motive over the two functions' carriers.
+> #
+> # D0 (verify FIRST, elaborator-side, the analogue of the HS11 motive-result-Pi
+> # check that PASSED): does Ken's TERMINATION checker accept the reordered
+> # recursion (structural descent on xs, rest < xs)? Standard structural checkers
+> # do. IFF Ken's checker specifically requires anchoring on the SOURCE-matched var
+> # (Fin/i), that is an elaborator/checker-capability relaxation (still NOT
+> # kernel/TCB, NOT transport) and the FALLBACK is the SIMULTANEOUS telescopic split
+> # of the (i,xs) telescope, anchoring descent on the coupled (rest,j) the source
+> # already exhibits (also Cockx-standard, homogeneous, no gate). Build xs-first
+> # FIRST (reuses exactly the HS12-proven machinery); fall back to the simultaneous
+> # split ONLY if the checker rejects xs-anchoring. Either way it returns to the
+> # Architect elaborator-side, never as a gate.
+> #
+> # §1b STRUCTURAL CLOSURE (Architect, confirmed by the advisory): the defect
+> # across HS10/HS11/HS12 is ONE — surface-order-bound covering compilation pinning
+> # the shared index before the coupled sibling can be convoyed as a free-index
+> # binder. The closure is coupled-covering compilation that CHOOSES the split order
+> # (xs-first, or simultaneous telescopic) and convoys the coupled sibling,
+> # retaining everything already built (outer convoy + Pi-result motive + convoyed
+> # IH). NOT another per-direction convoy patch — this is the split-order-selection
+> # capability. HS10 (sibling as motive param) and HS11 (i-first pins the index) are
+> # the two ways to get the convoy's PLACEMENT and ORDER wrong; Rep-3 xs-first is
+> # both right.
+> #
+> # RESUME: the language ring builds xs-first from 7b766fc89 (production clean
+> # except byte-preserved user Cargo), with the termination-checker acceptance as
+> # the D0 check first. Architect is the required soundness/design reviewer on the
+> # candidate; CV if strict-resolution conformance applies -> Steward M1-M4 ->
+> # lieutenant. D2b (V3-FO-EMBEDDING-ADEQUACY) stays HELD (WIP over 7b766fc89,
+> # statement unchanged) until this predecessor lands; the Steward RE-RELEASES D2b
+> # only after it merges.
+>
 > # OPERATIVE (Steward, 2026-09-03, from Architect evt_6zjegefzv0am2 +
 > # fix-direction ruling evt_45h2qab5nejg3). D2b predecessor #4. Elaborator
 > # dependent-elimination capability, crates/ken-elaborator ONLY. A COMPLETENESS
