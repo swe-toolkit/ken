@@ -297,15 +297,26 @@ enforceable:
   silently loses coverage, the Architect re-checks it against the deferred set at
   inc1 landing, and inc2 discharges it.
 
-  Deferred set — provisional (from `evt_7j9pvzgfgsy6m`), FINALIZED into this list
-  from the implementer's inc1 per-variant disposition BEFORE inc1 lands:
-  - non-direct capsule: wrong-slot, wrong-frame, wrong-invocation,
-    non-carried-residual, provenance-index, outer-carried, specialized-sibling,
-    static-worker
-  - retained-access-*
-  - group-2(ii) arrival variants: TBD (implementer per-variant disposition; each
-    subsumed variant RETIRES with a sealed-closure citation instead and is NOT in
-    this set)
+  Deferred set — FINAL (implementer per-variant disposition `evt_55my3tmvbmkf0` on
+  candidate `07c31b0c5`; Architect-confirmed 3-retire/3-keep arrival split
+  `evt_3zba50hydkpdb`). EXACTLY these 8 non-direct capsule fine-structure controls
+  are `#[ignore]`'d citing this AC — nothing else:
+  - outer-carried, specialized-sibling, static-worker, wrong-frame, wrong-slot,
+    wrong-invocation, non-carried-residual, provenance-index
+
+  NOT deferred — recorded here so the census is complete (no dimension silently
+  loses coverage; this is the ledger the Architect re-checks):
+  - RETIRED (subsumed, deleted WITH citation + a bidirectional tie at
+    `admission_population_is_total`'s governed branch so a future weakening trips a
+    reviewer against the deletion): arrival skip-validation + duplicate-validation
+    (⇒ `raw_arrival == governed_validation`, line 2513, + sealed exactly-once),
+    governed-through-non-governed (⇒ governed ⇒ `ordinary_continuation == 0` lines
+    2517-2518 + `raw_arrival > 0` line 2511 + governed gate `aggregates.rs:7565-7577`).
+  - KEPT (still live, verified passing — inject a detectable fault for the
+    populations that do NOT transit the edge): arrival skip-lookup / duplicate-lookup
+    / non-governed-through-governed; direct-control capsule (write); retained-access
+    / forward-ret-access (Tail layer). **`retained-access-*` is KEPT, not deferred**
+    (corrects the provisional seed).
 
 **Count of record (Architect `evt_5kpshvbx32gnr`): NOT a new hard-stop** — a
 control-side consequence of the already-ruled read-half fix (z2145 continued), a
