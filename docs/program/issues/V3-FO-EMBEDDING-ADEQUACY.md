@@ -5,7 +5,7 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
@@ -18,7 +18,72 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
    equality as a primitive `Eq`/`J` witness after it has reduced to a Sigma of
    field equalities — keyed on the index equality's representation rather than
    the derivation relation.
+2. Generated-index reflexive-evidence synthesis stratifies its terminal
+   vocabulary — `Top` is admitted only at the outer entry
+   (`synth_generated_index_evidence`, `elab.rs:1361`) and not inside the `Sigma`
+   recursion (`synth_refl_proof`, `:1331`, which rejects `Top` at `:1356`) —
+   keyed on the nesting depth of the evidence goal, so a reflexive record index
+   that reduces through a `Sigma` to a nested closed-equal field (WHNF `Top`) is
+   false-rejected. Fifth D2b predecessor; owned by
+   [[LANG-GENERATED-INDEX-EVIDENCE-CLOSURE]] (Architect design HS1 — evidence
+   SYNTHESIS side). LANDED/landing.
+3. The CONSUMPTION-side sibling of entry 2: elaborator consumers of a
+   record-index equality handle the `Eq` head but not its observational
+   Sigma-decomposition. `install_index_refinements` peels only `Term::Eq` and
+   falls through on the `Sigma`-shaped record-index equality, installing no
+   per-component refinement (`gamma -> g0`), so a dependent inversion needs
+   `fok_nth_form @14` (outer) where the constructor type says `@10` (local);
+   `14-10=4` outer binders, both well-weakened, the absent operation is component
+   refinement through the Sigma. Section-1b predicate NAMED (Architect
+   evt_2ptgr3f2ef7c4): same structural gap, two consumers. Sixth D2b predecessor
+   / Architect design HS2; owned by [[LANG-RECORD-INDEX-SIGMA-CLOSURE]]
+   (structural closure: fix + audit all such consumers + per-site fixtures).
 
+> # D2b RE-FROZEN 2026-09-02 (HS-fifth) — behind a FIFTH elaborator predecessor
+>
+> **This banner supersedes the RE-RELEASED banner below.** The re-release
+> below anticipated it verbatim: "if the fold hits a genuinely new elimination
+> stop, that is a FIFTH predecessor hard stop — reset clean, measure, route to
+> the Steward; do not source-convoy it permanently." It did, at `acef50612`.
+>
+> The fold reached the generated-index reflexive-evidence synthesizer and
+> deterministically false-rejected: `synth_generated_index_evidence` admits a
+> top-level `Top` at `elab.rs:1361` while its `Sigma` recursion re-enters
+> `synth_refl_proof` (`:1331`), which admits only `{Eq, Sigma}` and rejects
+> `Top` at `:1356`. The reflexive `FokSequent` index reduces through a `Sigma`
+> to a nested `Equal (List FokForm) Nil Nil` (WHNF `Top`) — exactly this path.
+>
+> **This is NOT a source-convoy stop and NOT a kernel/TCB fix.** Architect ruling
+> evt_27wm95g6gvtje: a COMPLETENESS gap (false-reject), not a soundness hole —
+> the assembled elim term is still `kernel_infer`-re-derived at `elab.rs:2740`,
+> the kernel gate is the untouched soundness authority. Sanctioned generic
+> repair: route the Sigma recursion through the Top-aware entry (two call-target
+> swaps), closing `{Eq, Sigma, Top}` uniformly at every nesting depth. A bare
+> `Top` arm on `synth_refl_proof` is FORBIDDEN (its other caller is user-`Refl`
+> sugar, whose equality-origin guard must stay). The `fok_invert_atomlike:
+> theorem -> fn` correction is valid and stays on D2b.
+>
+> The predecessor is [[LANG-GENERATED-INDEX-EVIDENCE-CLOSURE]] (`ready`,
+> language, S/T1, `gate: none` — elaborator-only, no operator authorization),
+> released to the language ring 2026-09-02. D2b is HELD at `acef50612` (held
+> evidence reusable, statement unchanged) until it lands; the Steward EXPLICITLY
+> re-releases D2b only after, and the Architect re-reviews the resumed proof.
+> This is D2b design hard-stop #1 by the Architect's per-design-question count
+> (the OOM was resource, the `theorem -> fn` was mechanical); §1a Research
+> advisory fires at the 3rd, not triggered.
+>
+> UPDATE 2026-09-02 (HS2 / SIXTH predecessor): the Top-closure fix let D2b
+> advance past HS1 to `fok_invert_atomlike`, which false-rejected — the
+> CONSUMPTION-side sibling gap (Architect design HS2, Section-1b predicate named
+> evt_2ptgr3f2ef7c4). `install_index_refinements` peels only `Term::Eq` and
+> does not decompose the `Sigma`-shaped record-index equality, installing no
+> per-component refinement. Predecessor [[LANG-RECORD-INDEX-SIGMA-CLOSURE]]
+> (`ready`, language, M/T1, `gate: none`) framed and released — a STRUCTURAL
+> CLOSURE (fix + audit every such consumer + per-site fixtures), not a point
+> fix, depends_on the Top-closure predecessor. D2b stays HELD at acef50612
+> behind BOTH; re-released only after the chain lands. §1a fires at the 3rd
+> design HS; not triggered.
+>
 > # D2b RE-RELEASED 2026-09-02 — fourth predecessor landed, consumer probe green
 >
 > **This banner supersedes the RE-FROZEN banner below.** The fourth predecessor

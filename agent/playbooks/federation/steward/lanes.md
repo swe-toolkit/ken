@@ -92,6 +92,24 @@ operator-owned and UNCHANGED. Only the live position is restated here.
 > in the lane-3 cell below. D2-InsertionSort itself: if InsertionSort is
 > scaffolding-authored it retires; if kept, it migrates onto real imports (the
 > class-install boundary is correct, not a blocker).
+>
+> **DECOMPOSITION + FLAG-2 RESOLVED (2026-09-02).** Architect ruled the full
+> bottom-up DAG decomposition (evt_2e0pee5jxzv07): partition axis is the MEASURED
+> value-dependency DAG, NOT the directory tree. Five tiers — A primitive providers
+> (T/D/Compare/Arithmetic/Nat.Order, pure export publication, unblocked now) -> B
+> Core.Classes + primitive-instance consolidation (LC then LF then EC; the
+> class-owner relocation gates every DecEq/class consumer) -> C Data value modules
+> -> D Capability (Cursor before Decoder before Parsing) -> E Serialization +
+> Application + Algorithms (Json belongs HERE after Cursor). Flag 1 (ambient
+> whole-catalog instance install) resolved by this ruling. **FLAG 2 RESOLVED by the
+> operator 2026-09-02: the orphaned primitive-type DecEq instances (DecEq UInt8,
+> DecEq Bytes from BytesKeys; DecEq String from StringKeys) RELOCATE to LC (the
+> class owner), NOT a new prelude — "Move DecEq UInt8, etc to LC."** EmptyDec's
+> duplicate local class DecEq / bool_eq / DecEq Bool CONSOLIDATE into LC (import,
+> retire the local redeclarations). System.IO is a one-module theorem-rename
+> erratum (rename write_all_all_success theorem, keep the subject fn), folded into
+> its Tier D step. Steward frames the tiers as WPs (Tier A first); Architect is the
+> required soundness/design reviewer on each.
 
 | lane | ring | live position |
 |---|---|---|
