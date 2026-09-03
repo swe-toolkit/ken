@@ -37,6 +37,28 @@ origin: "Steward, 2026-09-03. Tier B of the scaffold-retirement migration (paren
 > # class DecEq/bool_eq all genuinely pub); the Eq INSTANCE lines (`instance Eq Int`
 > # :205, `instance Eq Bool` :380) are the separate visibility sweep in the carry.
 > # See deliverable D-EQ-PROSE + AC-EQ-PROSE-ACCURATE below.
+> #
+> # CLOSURE AMENDMENT (Steward rescope-in-place, §4c, from Architect ruling
+> # evt_6z78n8t9ydx60 on the HS1 Ord-String fork, foundation-implementer
+> # evt_4yne7rx57akka at 3d85a6d28). The original relocation set ("the DecEq
+> # family") was ENUMERATED TOO NARROWLY: it excluded `instance Ord String` by
+> # reasoning only about DecEq wiring, but D3's standalone-clean requirement turns
+> # the retained orphan into a hard stop (String is a compiler-floor head with no
+> # source owner; Ord is LC-owned; §5.3's class-owner arm makes LC the one lawful
+> # home). The CORRECT membership predicate is the CLASS CLOSURE: EVERY canonical
+> # structure instance, in the three consumer modules (BytesKeys / StringKeys /
+> # EmptyDec), whose head-type is a compiler-floor primitive with no source owner
+> # (String, Bytes, UInt8, ...) AND whose class is LC-owned, RELOCATES to LC by the
+> # class-owner arm. `Ord String` is one member; enumerate the closure and relocate
+> # every member so D3 does not re-stop on the next sibling (an Ord Bytes / Ord
+> # UInt8 / another LC-owned class on a floor head). Arm (b) — a "cited partial
+> # consumer" exception in D3 — is REFUTED, NOT added: an instance with no lawful
+> # home anywhere is not a consumer of anything, so there is nothing to cite and it
+> # stays a permanent §5.3 orphan. This is a SCOPE EXTENSION of the class-owner-
+> # relocation pattern already in the frame — NO new node, NO new capability, the
+> # relocation already done (3d85a6d28) is durable. See deliverable D-ORD-CLOSURE +
+> # AC-ORPHAN-CLOSURE-RELOCATED below; §1a HS1 (bounded amendment, no research);
+> # Architect remains required soundness reviewer on the candidate.
 >
 > The foundation D0 (evt_5bt85erc05fa4) found the relocation consuming two
 > UNPUBLISHED provider surfaces (LC's private `class DecEq`/`bool_eq`;
@@ -107,8 +129,14 @@ modules with NO import block — every external symbol resolves ambiently today)
 - `catalog/packages/Data/Text/StringKeys.ken.md`
   - `instance DecEq String` (:34-38), attached-proof form. Helpers:
     `fn string_deceq_eq` (:10-13), `proof sound` (:15-24), `proof complete`
-    (:26-32). (The sibling `Ord String` at :40-90 does NOT feed `DecEq String`
-    and is out of the relocation.)
+    (:26-32).
+  - `instance Ord String` (span 1903..2119; the retained sibling) — NOW IN
+    SCOPE per the Architect Ord-String ruling (evt_6z78n8t9ydx60): its
+    operation/proof/instance family RELOCATES to LC byte-unchanged, exactly as the
+    DecEq family. String is a compiler-floor head with no source owner and Ord is
+    LC-owned, so §5.3's class-owner arm makes LC the ONE lawful home; retaining it
+    in StringKeys is a §5.3 orphan (checker confirmed OrphanInstance at c2bd9f4e5).
+    See the CLOSURE amendment banner + D-ORD-CLOSURE below.
 
 **EmptyDec `catalog/packages/Core/Logic/EmptyDec.ken.md` — byte-identical
 duplicate to consolidate (diff-verified against LC):** local `class DecEq`
@@ -177,6 +205,20 @@ import surface, not a Foundation-owned mechanical migration).
   and align the prose line to reality — a name that is genuinely visible stays, a
   name that is not is removed. This is prose-only in LC and does not touch the
   relocation; it lands in the same LC edit.
+- **D-ORD-CLOSURE — relocate the orphan-closure instances into LC (Architect
+  evt_6z78n8t9ydx60).** As part of D0, ENUMERATE the class closure: every canonical
+  structure instance declared in BytesKeys / StringKeys / EmptyDec whose head-type
+  is a compiler-floor primitive with no source owner AND whose class is LC-owned.
+  `instance Ord String` (StringKeys, span 1903..2119 at c2bd9f4e5; re-measure at
+  D0) is the confirmed member; enumerate any siblings (e.g. an `Ord Bytes` /
+  `Ord UInt8` / another LC-owned class on a floor head) by the same predicate —
+  the checker's `OrphanInstance` set at standalone is the authority. RELOCATE every
+  enumerated member's operation/proof/instance family into LC BYTE-UNCHANGED
+  (modulo the pub wrapper), exactly as the DecEq family; extend LC's loader-visible
+  inventory to the relocated names; the source module's declaration is REMOVED (the
+  row GONE, not shadowed). D3's standalone-clean for the three consumers is then
+  satisfied for real (they import the relocated instances from LC), with NO D3
+  exception (arm (b) refused). Same bans as the DecEq relocation.
 
 ## Acceptance criteria, each with its control
 
@@ -209,6 +251,19 @@ import surface, not a Foundation-owned mechanical migration).
   module redeclares `class DecEq`, and every `DecEq Bool` use resolves to LC's
   single instance. This is the enforcement the operator named as intended, not
   incidental.
+- **AC-ORPHAN-CLOSURE-RELOCATED (Architect Ord-String ruling).** Every member of
+  the compiler-floor-head + LC-owned-class closure (D-ORD-CLOSURE) is relocated to
+  LC and standalone-lawful there. Per member: (i) exactly ONE `instance <C>
+  <T>` catalog-wide after the move (§5.5 one-canonical) — the BytesKeys/StringKeys/
+  EmptyDec source declaration is GONE, verified ABSENT not merely out-ranked or
+  shadowed, and no pre-existing LC instance of the same (class, head) that the
+  relocation would collide with; (ii) LC's loader-visible inventory extends by the
+  relocated names, per-member reddening mutation; (iii) the body is byte-identical
+  to base modulo the pub wrapper. Control: the checker's `OrphanInstance` set is
+  EMPTY for all three consumers at standalone after the move (the `Ord String`
+  OrphanInstance at span 1903..2119 that hard-stopped is gone); removing a
+  relocated import restores the exact `OrphanInstance` failure. No D3 exception is
+  present (arm (b) refused) — D3/AC-STANDALONE-CLEAN is met outright.
 - **AC-NO-COMPUTATIONAL-CHANGE.** The relocated eq/sound/complete function bodies
   are byte-unchanged; a differential over the moved definitions shows only their
   module home changed, not their text. Consumers of these instances compute the
