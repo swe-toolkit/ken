@@ -187,18 +187,52 @@ be a STRUCTURAL CLOSURE — the short-circuiting forward edge must assume the
 COMPLETE downstream-observation obligation of the continuation it replaces — not
 another single-counter patch.
 
-**§1a research check (inc1 HS3).** Fired by the Architect on his own committed
-criterion (`evt_19x6xf1n2a539`), not a watchdog catch. The effect-Tail
-consumption ruling is HELD pending the research prior-art advisory (how
-comparable systems re-establish the displaced downstream-observation set under a
-forward-edge / tail-backedge optimization: hoist the full obligation, prove it
-reconstructible/redundant, or restructure so the observations are not
-continuation-dependent). `call_tail` stays the coherent production path; the
-unresolved question is the structural re-establishment. Causal attribution is
-confounded — the 711724f32-vs-(A) three-way varies two axes at once, so do NOT
-build the effect-Tail candidate until the advisory lands. Re-spun inc1 candidate
-returns to the Steward at M1-M4 with a fresh SHA + fresh dual-reviewer approval +
-a fresh merge Decision (`dec_22xpy0mnz221a` is void; `711724f32` never merges).
+**§1a research check (inc1 HS3) — DISCHARGED; HS3 RESOLVED (§1b structural
+closure).** Fired by the Architect on his own committed criterion
+(`evt_19x6xf1n2a539`); research advisory in (`evt_7rn86avam5y57`); ruling
+`evt_18x2n8yta31xz`. The problem, named: tail position IS an empty continuation;
+the read `Ret{Match}` closeout's `Complete(RecursiveBackedge)` turns a NON-EMPTY,
+observation-bearing continuation into a tail, and base recorded observations as a
+side effect of the continuation structure. RESOLUTION — a SEALED forward-edge
+observation obligation discharged on the `call_tail`-coherent path, completeness
+enforced STRUCTURALLY:
+
+1. REIFY + SEAL the obligation as a CLOSED enum/type the forward edge carries
+   (the complete set of observations base's elided continuation recorded) — the
+   DUAL of the RT-COMPOSED-RETURN SSA-Deferred "classify once / first-class
+   Deferred" closure; reuse that discipline, do not invent a parallel one.
+2. COMPLETENESS IS STRUCTURAL: the closeout discharge is a TOTAL match over the
+   sealed set with NO catch-all. A newly-displaced observation (HS4) becomes a
+   COMPILE error (non-exhaustive), not a 4th hard-stop. A wildcard arm re-admits
+   the §1b chain and is itself the defect.
+3. PER-MEMBER discharge, decided by measurement: (b) reconstruct if the
+   observation is a pure function of E's carried state; (c) relocate onto a
+   convergence point ON THE `call_tail` path; else (a) hoist at the bypass keyed
+   on E's governed coordinate. `reached_count` (HS1) is already (a)-hoisted —
+   fold it in as one sealed member. `raw_arrival_count` (HS3): the offered
+   eager-at-seam vs downstream measurement is the (b)/(c)-vs-(a) discriminator.
+4. NEVER buy the observation from a FOREIGN producer — do NOT route the formed
+   effect Tail through `checked_ih_captured_environment` (the (ii)
+   remedy-in-wrong-frame: a distinct eager event standing in for the missing
+   one). The effect Tail STAYS `call_tail`, the coherent production path.
+5. BOUNDARY: name the cfg-profile of the `raw_arrival_count` recording site —
+   test-support-gated ⇒ the whole closure is test-support-only (zero prod/TCB,
+   inc1 delta stays exactly the funded READ half); production ⇒ Architect
+   re-scrutinizes under means-(a).
+
+Re-review scrutiny (a)-(e) per the ruling: sealed type + total match with a
+demonstrated compile-error property (a dummy member reds the build); both
+counters discharged on the `call_tail` path (never (ii)-bought); all ~13
+generated_entry tests + forward_ret 13/13 + 3 read narrows green with
+`planned == formed`; boundary/cfg stated; each observation recorded exactly once
+per discharge.
+
+**Count of record: §1a DISCHARGED at inc1 HS3; next mandatory §1a re-trigger =
+HS6 — but the sealed-set closure is engineered to terminate the chain (a 4th
+displaced counter is a compile error, not a hard-stop).** Implementer builds the
+sealed-obligation discharge → fresh SHA → Architect design+soundness +
+runtime-qa → fresh Decision (runtime-leader) → Steward M1-M4. `dec_22xpy0mnz221a`
+is void; `711724f32` never merges. inc2 (option a) resumes after inc1 lands.
 
 ## The single relaxed constraint, and what stays closed
 
