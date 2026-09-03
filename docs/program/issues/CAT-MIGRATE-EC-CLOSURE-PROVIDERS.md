@@ -30,36 +30,50 @@ PROVEN closed by EC checking standalone with exactly that set — it is a census
 not a sample, and it is NOT discovered by re-running the checker one surface at a
 time (that is the surface-ladder this predicate is designed to stop).
 
-## Closure set — CENSUS COMPLETE (foundation-leader evt_29adqgskp9zs7)
+## Closure set — RECUT by Architect D0 ruling evt_y9cn3eqdxakn
 
-The finding-(B) closure census is done; source is byte-clean. Publish EXACTLY
-this set (D0 confirms which members are already `pub` and drops those from D1
-with a note). EC-LOCAL dictionaries are explicitly EXCLUDED from publication and
-from EC's import inventory (finding (A) — they resolve locally); the
-`*_instance_List`/`*_instance_Option` below are LF-OWNED instances EC imports,
-which is a different thing from EC's own `*_instance_Identity`.
+The finding-(B) census (foundation-leader evt_29adqgskp9zs7) is done and
+byte-clean. The Architect's D0 dictionary-availability ruling then RECUT the
+publish set for this node: publish the **10 eligible LF declarations**
+visibility-only; Derived's four and Transport's three are ALREADY PUBLIC (dropped
+unchanged, confirmed); the **four LF instance-dictionary rows LEAVE this node** and
+fold into the language predecessor [[LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]].
 
-- **LF — `catalog/packages/Core/Classes/LawfulFunctors.ken.md`.** Direct EC
-  external set: `Functor`, `Foldable`, `Functor_instance_List`,
-  `Functor_instance_Option`, `Foldable_instance_List`, `Foldable_instance_Option`,
-  `comp`, `idf`, `list_map`, `list_map::id`, `list_map::fusion`. PLUS the
-  provider-internal SIGNATURE closure these pull into visibility:
-  `Monoid`, `fold_map_step`, `monoid_mempty`. (The signature closure is
-  mandatory — a published symbol whose signature names a private symbol is not
-  loader-resolvable; publish the whole signature-closed set.)
-- **Derived — `catalog/packages/Data/Collections/Derived.ken.md`:**
-  `concat_map` (EC already imports this today — D0 confirms it is already `pub`
-  and, if so, it is unchanged, not a new publication), `list_append`,
-  `list_append::assoc`, `list_append::right_unit`.
-- **Transport — `catalog/packages/Core/Logic/Transport`:** `cong`, `sym`,
-  `trans`.
+- **PUBLISH (this node) — LF `catalog/packages/Core/Classes/LawfulFunctors.ken.md`,
+  the 10 eligible declarations, visibility-only:** `Functor`, `Foldable`,
+  `Monoid`, `comp`, `idf`, `list_map`, `list_map::id`, `list_map::fusion`,
+  `fold_map_step`, `monoid_mempty`. (`Functor`/`Foldable`/`Monoid` are classes;
+  the rest fns/attached proofs. `Monoid`/`fold_map_step`/`monoid_mempty` are the
+  provider-internal SIGNATURE closure — a published symbol whose signature names a
+  private symbol is not loader-resolvable, so publish the whole signature-closed
+  set.) D0 confirms current visibility per member and drops any already-`pub` with
+  a note; the publication set is exactly the currently-private members of the 10.
+- **ALREADY PUBLIC (dropped unchanged, confirmed):** Derived's `concat_map`,
+  `list_append`, `list_append::assoc`, `list_append::right_unit`; Transport's
+  `cong`, `sym`, `trans`. No edit to Derived or Transport.
+- **NOT THIS NODE — folded into the language predecessor:** the four LF instance
+  dictionaries `Functor_instance_List`, `Functor_instance_Option`,
+  `Foldable_instance_List`, `Foldable_instance_Option`. Arm (a) REFUTED — they are
+  NOT class-registry-available (EC references them BY BARE NAME as first-class
+  values: explicit dictionary arg + superclass field wiring; class_env services
+  class-directed lookup only). Arm (b) as "widen surface for instance export" is
+  OUT of this visibility node — `pub instance` is parser-ineligible
+  (`parser.rs:2788`) and no visibility-only edit exports a synthesized dict name.
+  These are the roots-loader/module-surface completeness predicate (§1b face 3),
+  resolved by the language predecessor.
 
-D0 reconciles this set against the tree at the build SHA (confirm each member's
-owner + current visibility). If a member is already `pub`, it is unchanged and
-dropped from D1 with a note; the publication set is exactly the currently-private
-members of the above.
+PAYOFF (Architect): because `Functor` + `Foldable` are among the 10 published
+here, once the language predecessor lands its export/import completeness the four
+dicts become importable with NO further foundation edit — auto-synthesized,
+auto-exported off the now-public classes. They do NOT return to a foundation node.
 
 ## Deliverables
+
+RECUT (Architect evt_y9cn3eqdxakn): D1's publish set is the 10 LF declarations in
+the "Closure set" section above — LF only, visibility-only; Derived and Transport
+are already public (no edit); the four LF instance dictionaries are folded out to
+[[LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]]. Read "D1 ... per provider" below
+as "LF only" accordingly.
 
 - **D0 — closure census reconciliation at the build SHA.** Take the
   foundation-leader's finding-(B) closure census (EC free cross-package symbols

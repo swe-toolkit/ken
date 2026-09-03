@@ -1,138 +1,149 @@
 ---
 id: LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE
-title: "Roots-loader completeness: bind a locally-synthesized instance dictionary (C_instance_T, the derived global an InstanceDecl/DeriveDecl produces) into the per-unit local scope under strict/roots resolution, mirroring the DataDecl -> constructors treatment. Under roots, a bare later reference to a module's own generated dictionary is currently UnresolvedCon because the prebind arm for InstanceDecl/DeriveDecl is empty; the whole-catalog build masked it via the flat cx.globals fallback, and standalone/roots elaboration (scaffold retirement) exposes it. Completeness, not soundness; zero trusted-base delta (surface name resolution, not kernel)."
+title: "Roots-loader / module-surface completeness for synthesized instance dictionaries: a synthesized dictionary C_instance_T (the WIRE-mechanism real global an InstanceDecl/DeriveDecl produces) is a first-class NAMED declaration for ALL of roots/strict name resolution — (i) bind_local'd in its own module's per-unit scope, (ii) on its owning module's export surface by its canonical name, and (iii) selectively importable by that name. ONE predicate, three faces (§1b closure); NOT three point-fixes and NOT new pub-instance syntax. Completeness, not soundness; zero trusted-base delta (surface name resolution, not kernel; no instance bodies, no proof re-authoring). NOTE: the id says LOCAL but the ruled scope is the full three-face closure — see the widened-scope banner."
 status: ready
 owner: language
-size: S
+size: M
 gate: none
 tier: T1
 depends_on: []
 blocks: [CAT-MIGRATE-EC-FUNCTOR-IMPORT]
 github: null
-origin: "Steward, 2026-09-03, minted on the Architect's classification evt_5hnv374ev2a80 of EC's renewed hard-stop (foundation-leader routed it; the barrier is reachable from Ken source via standalone/roots elaboration). Classified a DISTINCT reachable ELABORATOR predecessor — not a catalog fix, not kernel. GENERAL: every module that declares a local instance and references its synthesized dictionary later in the same module hits it under roots, so this unblocks EC AND the instance-declaring Tier C/D/E modules (Validation Functor_instance_Validation, NonEmpty Semigroup_instance_NonEmpty, ...), not EC alone. Language lane (crates/ken-elaborator/src/modules.rs = the module/import roots loader). Architect required soundness/design reviewer. Cross-lane note for the operator: a language-lane fix is now a partial gate on the foundation critical path (Tier C's instance-declaring increments); surfaced, not acted on against the roster — default sequencing queues it behind the lane-2 FO priority."
+origin: "Steward, 2026-09-03. Minted on the Architect's classification evt_5hnv374ev2a80 (EC's renewed hard-stop = a reachable elaborator predecessor) and WIDENED by the Architect's D0 ruling evt_y9cn3eqdxakn to the FULL closure. The Architect named ONE predicate — the roots loader / module system does not model a synthesized instance dictionary (the WIRE-mechanism real global) as a first-class NAMED declaration under roots/strict — with THREE faces (§1b: at the 3rd entry, stop ruling entries, name the closure). GENERAL: unblocks EC and every instance-declaring / instance-consuming Tier C/D/E module, not EC alone. Language lane (crates/ken-elaborator/src/modules.rs = the module/import roots loader). Architect required soundness/design reviewer. Cross-lane note for the operator: a language-lane fix is now a partial gate on the foundation critical path (Tier C instance modules); surfaced, not acted on against the roster — default sequencing queues it behind the lane-2 FO priority (released as interim work while FO is held)."
 ---
 
-> # Roots-loader completeness: a locally-synthesized instance dictionary is a
-> # first-class local declaration under roots resolution. Bind C_instance_T into
-> # the per-unit local scope, to the EXACT qualified canonical the synthesis
-> # emits. Completeness, not soundness; no kernel, no instance body, no import
-> # surface change.
+> # SCOPE WIDENED (Architect D0 ruling evt_y9cn3eqdxakn). ONE predicate, THREE
+> # faces — a synthesized instance dictionary C_instance_T is a first-class NAMED
+> # declaration for roots/strict name resolution:
+> #  Face 2 — bind_local'd in its OWN module's per-unit scope (same-module later
+> #    ref resolves).
+> #  Face 3a — on its OWNING module's export surface by its canonical name.
+> #  Face 3b — selectively IMPORTABLE by that canonical name into a consumer.
+> # Export/import key off the WIRE convention (a synthesized dict of a PUBLIC
+> # class/instance is exported by canonical name), NOT new pub-instance syntax —
+> # the dict is auto-synthesized, so export/import completeness is the
+> # roots-loader's job, the same completeness class as Face 2. Face 1 (finding (A):
+> # EC-local *_instance_* excluded from EC's own import block, resolved by
+> # declaration order) is correct AUTHORING and stays in the consumer WP; it is
+> # named here only to place this node as the roots-loader-side closure of the
+> # same predicate. Completeness, zero trusted-base delta (surface name
+> # resolution, not kernel; no instance bodies, no proof re-authoring).
 
-## Mechanism (Architect evt_5hnv374ev2a80, grounded on modules.rs at c6484045d)
+## Why one predicate, three faces (Architect evt_5hnv374ev2a80 + evt_y9cn3eqdxakn)
 
-- The roots-loader per-unit local scope is populated by
-  `prebind_scope_declarations` (`crates/ken-elaborator/src/modules.rs`
-  ~1876-1930): it `bind_local`s each decl's top-level name and, additionally,
-  DataDecl/ExplicitDataDecl CONSTRUCTORS (~1912-1927) — a parent decl binding its
-  DERIVED names.
-- But `decl_namespace_effect` (~1816) classifies `Decl::InstanceDecl { .. } |
-  Decl::DeriveDecl { .. }` as `ReferenceOnly`, and the prebind match arm for them
-  is the empty `_ => {}`. So the SYNTHESIZED dictionary `C_instance_T` — the
-  derived global an instance PRODUCES — is never `bind_local`'d into the per-unit
-  scope.
-- Consequence: the synthesized dict IS registered in `cx.globals` (the
-  legacy/flat path resolves a bare name via the `Ok(name)` fallback in
-  `resolve_ref` ~366, so legacy-flat is GREEN), but under STRICT/roots resolution
-  a bare `C_instance_Local` is not in `scope.bindings`, so it never resolves to
-  the qualified canonical the global is under -> `UnresolvedCon`. The class
-  reference the instance carries is correctly `ReferenceOnly` (resolved via
-  `resolve_class_ref` ~1397); it is the PRODUCED dictionary that is wrongly
-  unbound.
+The WIRE mechanism (every `instance C T { .. }` registers a real global
+`C_instance_T`) makes the synthesized dictionary a genuine value. Under the
+whole-catalog build it resolved ambiently via the flat `cx.globals` `Ok(name)`
+fallback (`resolve_ref` ~366), so all three faces were masked. Standalone/roots
+elaboration has no ambient fallback, and the roots loader does not model the
+synthesized dict as a first-class named declaration — surfacing the SAME gap in
+three places:
 
-## Why it surfaces now
+- **Face 2 — same-module scope.** `prebind_scope_declarations`
+  (`crates/ken-elaborator/src/modules.rs` ~1876-1930) `bind_local`s each decl's
+  top-level name and DataDecl/ExplicitDataDecl CONSTRUCTORS (~1912-1927), but
+  `decl_namespace_effect` (~1816) classifies `InstanceDecl`/`DeriveDecl` as
+  `ReferenceOnly` with an empty prebind arm, so `C_instance_T` is never
+  `bind_local`'d. A later bare same-module ref is `UnresolvedCon` under roots.
+- **Face 3 — cross-module export/import.** A synthesized dict cannot be exported
+  by name from its owner nor selectively imported into a consumer — no
+  visibility-only edit puts a synthesized name on the export surface, and
+  `pub instance` is parser-ineligible (`parser.rs:2788`). So a consumer's bare
+  cross-module ref to an owner's synthesized dict fails under roots. (Measured on
+  EC: it references `Functor_instance_List/Option`, `Foldable_instance_List/Option`
+  BY BARE NAME as first-class values — explicit dictionary arg
+  `functor_map_of Option Functor_instance_Option ...` (EC :354/:362/:370, List
+  :588) and superclass field wiring `functor = Functor_instance_Option`
+  (EC :378/:1036/:1301-1302/:1325-1326); LF owns all four, EC declares none.
+  Class_env registration services class-DIRECTED lookup only — it does not make a
+  bare NAME resolve, so registry availability cannot discharge these sites.)
 
-The umbrella expected these generated dicts (EC `Functor_instance_Identity`,
-Validation `Functor_instance_Validation`, NonEmpty `Semigroup_instance_NonEmpty`)
-to "resolve ambiently in the whole-catalog build" — that ambient resolution is
-exactly the flat `cx.globals` fallback. Standalone/roots elaboration has no
-ambient fallback, so the scaffold-retirement migration to standalone EXPOSES a
-pre-existing roots-loader gap the whole-catalog build masked. Not a regression on
-`main`; a completeness gap the migration reaches.
+Legacy-flat green proves the dicts are valid and correctly generated; roots merely
+drops their name resolution across all three faces. Completeness, not soundness.
 
-## Fix direction (completeness, not soundness)
+## Fix direction (completeness; key off the WIRE convention, not new syntax)
 
-Give `InstanceDecl`/`DeriveDecl` a namespace-effect that BINDS the synthesized
-dictionary name into the per-unit local scope — mirror the DataDecl -> constructors
-treatment (a parent decl binding a derived name), binding `C_instance_T` to the
-EXACT qualified canonical the synthesis emits. Extend
-`reject_decl_prelude_bindings` to cover the new binding so it is
-prelude-collision-checked like every other local. Leave the instance's class
-reference `ReferenceOnly` (that part is correct).
+Model `C_instance_T` as a first-class named declaration for roots/strict name
+resolution, mirroring the DataDecl -> constructors treatment (a parent decl
+binding derived names) and the module export/import machinery:
 
-This is COMPLETENESS: legacy-flat green proves the term is valid and the dict
-correctly generated; the roots loader merely drops one class of local binding.
-Zero trusted-base delta — surface name resolution, not kernel; no instance body,
-no import surface change.
+- **D1 (Face 2) — bind_local.** Give `InstanceDecl`/`DeriveDecl` a namespace
+  effect that binds `C_instance_T` into the per-unit local scope at the EXACT
+  synthesis canonical; extend `reject_decl_prelude_bindings` to cover it. Leave
+  the instance's class reference `ReferenceOnly` (that part is correct).
+- **D2 (Face 3a) — export.** Put a synthesized dict of a PUBLIC class/instance on
+  its owning module's export surface by its canonical name, off the WIRE
+  convention (auto-synthesized => auto-exported when its class/instance is
+  public), with NO new `pub instance` syntax.
+- **D3 (Face 3b) — selective import.** Make that canonical name selectively
+  importable into a consumer module under roots, resolving to the owner's
+  `cx.globals` entry.
 
-## Soundness guards (Architect §7b — the fix must NOT become a blanket pass)
-
-1. Bind to the SAME canonical the synthesis produces — no shadow global.
-2. The naming must match the synthesis convention EXACTLY.
-3. NON-DEGENERATE acceptance pair (the AC): the minimal repro turns GREEN AND the
-   byte-equivalent legacy-flat stays green, WHILE a control with a genuinely
-   colliding/duplicate dictionary name still REJECTS — so the new binding
-   DISCRIMINATES, it does not blanket-admit.
-
-## Deliverables
-
-- **D1 — bind the synthesized dictionary under roots.** Change
-  `decl_namespace_effect` / `prebind_scope_declarations` so InstanceDecl/DeriveDecl
-  bind their synthesized `C_instance_T` into the per-unit local scope at the exact
-  synthesis canonical; extend `reject_decl_prelude_bindings` to include it. No
-  change to the class-reference path (stays ReferenceOnly), no instance-body
-  change, no import-surface change.
+All three bind/export/import to the SAME canonical the synthesis produces — no
+shadow global, no second registration. Zero trusted-base delta.
 
 ## Acceptance criteria, each with its control
 
-- **AC-ROOTS-RESOLVES (positive).** The minimal repro — imported class `C`, local
-  head `Local`, local `instance C Local`, a later local bare reference to
-  `C_instance_Local` — elaborates GREEN under strict/roots resolution (previously
-  `UnresolvedCon`). Control: reverting the new binding restores the exact
+- **AC-SCOPE-RESOLVES (Face 2).** The minimal repro — imported class `C`, local
+  head `Local`, local `instance C Local`, a later local bare ref to
+  `C_instance_Local` — elaborates GREEN under strict/roots (previously
+  `UnresolvedCon`). Control: reverting the binding restores the exact
   `UnresolvedCon`.
+- **AC-EXPORT-IMPORT-RESOLVES (Face 3), non-degenerate — EC's two real shapes.**
+  A consumer's bare cross-module ref to an owner's synthesized dict resolves under
+  roots in BOTH measured shapes: an explicit dictionary argument
+  (`functor_map_of Option Functor_instance_Option ...`) AND superclass field
+  wiring (`functor = Functor_instance_Option`). Control: without the import, each
+  is `UnresolvedCon`.
 - **AC-LEGACY-UNCHANGED.** The byte-equivalent legacy-flat elaboration of the same
-  repro stays green (the fix adds a roots binding, it does not alter the flat
-  path).
-- **AC-DISCRIMINATES (non-degenerate, §7b guard 3).** A control with a genuinely
-  colliding/duplicate synthesized dictionary name still REJECTS — the new binding
-  is not a blanket admit. This AC is the whole reason the tier is T1: prove the
-  binding discriminates a real collision from a valid local dict.
-- **AC-CANONICAL-EXACT.** A differential shows the bound name is the EXACT
-  qualified canonical the synthesis emits (no shadow global, no second
-  registration); the dict resolved under roots is the same `cx.globals` entry the
-  flat path resolves.
+  repros stays green (the fix adds roots name resolution, it does not alter the
+  flat path).
+- **AC-DISCRIMINATES (§7b guard — the reason this is T1).** A control importing a
+  genuinely-UNDECLARED dictionary name still REJECTS, and a control with a
+  genuinely-colliding/duplicate synthesized dict name still REJECTS. The
+  bind/export/import DISCRIMINATE a real declaration from an undeclared or
+  colliding one — no blanket admit.
+- **AC-CANONICAL-EXACT.** A differential shows every bound/exported/imported name
+  is the EXACT qualified canonical the synthesis emits (no shadow global, no
+  second registration); the dict resolved under roots is the same `cx.globals`
+  entry the flat path resolves.
 - **AC-NO-REGRESSION.** Re-run the COMPLETE affected-target closure for the
   elaborator roots-loader path (module/import + strict-resolution suites), scoped
-  by changed PATHS. Targeted via `scripts/ken-cargo`, never `--workspace` (green
-  in CI is the workspace verdict).
+  by changed PATHS. Targeted via `scripts/ken-cargo`, never `--workspace`.
 
-## §1b watch (Architect)
+## §1b — this IS the named closure (Architect, at the 3rd entry)
 
-Entry 2 of an emerging predicate: the roots loader does not model a
-locally-synthesized instance dictionary as a first-class local declaration under
-roots. The Architect's EC finding (A) (exclude local dicts from the IMPORT set)
-and this node (BIND local dicts into scope) are the TWO FACES of that one gap;
-(A) remains correct authoring regardless, and this is the roots-loader-side
-structural closure. If a 3rd same-family entry appears, close it structurally as
-"synthesized instance dictionaries are first-class local decls under roots," NOT
-a 3rd point-fix.
+The predicate: the roots loader / module system does not model a synthesized
+instance dictionary (the WIRE-mechanism real global) as a first-class NAMED
+declaration under roots/strict. Three faces: (1) finding (A) exclude EC-local
+dicts from imports [correct authoring, stays in the consumer WP]; (2) bind_local
+into own scope; (3) export by name + selective import. Per §1b, at the 3rd entry
+the Architect stops ruling entries and names the closure — this node IS that
+closure (faces 2 + 3; face 1 is authoring). Do NOT re-open it as further
+point-fixes.
 
 ## Capability tier: T1
 
-The fix site and direction are fully specified, but the deliverable is the
-soundness-guard judgment the parent stop turned on — the binding must discriminate
-a real duplicate/collision from a valid local dictionary (AC-DISCRIMINATES),
-bind to the exact synthesis canonical (AC-CANONICAL-EXACT), and not degrade to a
-blanket admit. That discrimination is reasoning-dense name-resolution-under-roots
-work, not a mechanical arm addition.
+The fix site and direction are specified, but the deliverable is the
+soundness-guard judgment the stops turned on — bind/export/import must discriminate
+a real synthesized declaration from an undeclared or colliding name
+(AC-DISCRIMINATES), at the exact synthesis canonical (AC-CANONICAL-EXACT), without
+degrading to a blanket admit. Reasoning-dense name-resolution-under-roots work
+across the module surface, not a mechanical arm addition.
 
 ## Gate, reviewer, sequencing
 
 `gate: none` (zero trusted-base delta — surface name resolution, not kernel). On
-the candidate: **Architect** (required — soundness/design; the §7b
-non-blanket-pass guard) + **CV** (if conformance applies to strict resolution) +
-**Language QA** on the exact SHA, then Steward M1-M4 -> lieutenant. Language lane;
-QUEUED behind the lane-2 FO priority (V3-FO-EMBEDDING-ADEQUACY coherent-frame
-closure) — it does NOT preempt it. `blocks:
-[[CAT-MIGRATE-EC-FUNCTOR-IMPORT]]` and, generally, the instance-declaring Tier C/D/E
-modules ([[CAT-MIGRATE-TIER-C-DATA-VALUE]] Validation/NonEmpty and the like); those
-migrate standalone-green only once this lands.
+the candidate: **Architect** (required — soundness/design; the non-blanket-pass
+guard) + **CV** (if conformance applies to strict resolution) + **Language QA** on
+the exact SHA, then Steward M1-M4 -> lieutenant. Language lane; released as INTERIM
+work while the lane-2 FO priority (V3-FO-EMBEDDING-ADEQUACY coherent-frame closure)
+is held on its §1a advisory — no file contention (modules.rs vs the dependent-elim
+files). FO resumes as priority when its ruling lands. `blocks:
+[[CAT-MIGRATE-EC-FUNCTOR-IMPORT]]` and, generally, the instance-declaring /
+instance-consuming Tier C/D/E modules ([[CAT-MIGRATE-TIER-C-DATA-VALUE]]
+Validation/NonEmpty and the like). PAYOFF (Architect): because Functor + Foldable
+are published in [[CAT-MIGRATE-EC-CLOSURE-PROVIDERS]]'s 10, once THIS node lands
+its export/import completeness the four LF dicts (Functor_instance_List/Option,
+Foldable_instance_List/Option) become importable with NO further foundation edit —
+auto-synthesized, auto-exported off the now-public classes.
