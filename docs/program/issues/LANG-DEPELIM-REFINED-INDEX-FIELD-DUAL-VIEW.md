@@ -1,7 +1,7 @@
 ---
 id: LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW
 title: "D2b predecessor #3 (elaborator dependent-elim capability): give the eliminator method construction a DUAL VIEW of a branch field whose declared type depends on the refined (whole) record index. `install_index_refinements` capability-1 (`try_reindex_cast`) retypes such a field to the OUTER refined-index view for branch-source consumption, and a local helper that consumes the field at its constructor-local type then sees `KernelRejected(TypeMismatch)` (Expected the constructor-local record-index type, Found the outer refined-index type). The field must be available in BOTH views — the outer-refined-index view (goal/source alignment) and its original constructor-local view (local-helper consumption) — with the reindex cast (which already transports one direction) carrying between them at the helper boundary. Close the CLASS (any constructor-local field dependent on the refined record index), not the two FoKripke Forall constructors. Architect classification evt_anzrvvzaccep, CORRECTED evt_14xp6j8dqt9ky (extension predicate withdrawn; location/lane/reviewers stand)."
-status: active
+status: merged
 owner: language
 size: M
 gate: none
