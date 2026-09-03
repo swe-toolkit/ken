@@ -46,6 +46,7 @@ fn term_mentions(term: &Term, target: GlobalId) -> bool {
 }
 
 fn assert_transparent_body_mentions(env: &ElabEnv, wrapper: &str, provider: GlobalId) {
+    let wrapper_name = wrapper;
     let wrapper = env.globals[wrapper];
     let (_, body) = env
         .env
@@ -53,7 +54,7 @@ fn assert_transparent_body_mentions(env: &ElabEnv, wrapper: &str, provider: Glob
         .expect("consumer wrapper must remain transparent");
     assert!(
         term_mentions(&body, provider),
-        "consumer wrapper must retain the selected provider GlobalId"
+        "consumer wrapper `{wrapper_name}` must retain the selected provider GlobalId"
     );
 }
 
@@ -238,45 +239,94 @@ fn published_module_surfaces(module: &str, ken_md: &str) -> BTreeSet<String> {
         .collect()
 }
 
-/// MEASURED: real selective imports of the four target operations resolve to
-/// their exact transparent provider identities, while private operations from
-/// each provider and `ord_leq_at`'s attached proof reject at their qualified
-/// interface names. CLAIMED: the authorized visibility change preserves
-/// definition identity and the loader's selective-import boundary. THE GAP:
-/// provider package tests own computational behavior; the inventory equality
-/// below owns surface closure.
+/// MEASURED: real selective imports of the target definitions resolve to their
+/// exact transparent provider identities, the loaded `DecEq Bool` dictionary is
+/// the class registry's canonical instance, and private siblings still reject at
+/// their qualified interface names. CLAIMED: the authorized visibility change
+/// preserves definition identity, publishes the canonical class and dictionary,
+/// and retains the loader's selective-import boundary. THE GAP: provider package
+/// tests own computational behavior; the inventory equality below owns surface
+/// closure.
 #[test]
 fn boolean_provider_selective_imports_retain_provider_identities() {
     let mut env = load_module(LAWFUL);
     env.elaborate_module_from_roots(&[catalog_root()], SUMS)
         .expect("Sums provider must roots-load beside LawfulClasses");
+    let dec_eq = env
+        .class_env
+        .class("DecEq")
+        .expect("DecEq class must be registered")
+        .projection
+        .type_id;
     let bool_and = env.globals[&format!("{LAWFUL}.bool_and")];
+    let bool_eq = env.globals[&format!("{LAWFUL}.bool_eq")];
     let bool_leq = env.globals[&format!("{LAWFUL}.bool_leq")];
     let ord_leq_at = env.globals[&format!("{LAWFUL}.ord_leq_at")];
+    let dec_eq_bool = env
+        .class_env
+        .instance_search("DecEq", "Bool")
+        .expect("the roots loader must register LawfulClasses' DecEq Bool dictionary");
     let is_some = env.globals[&format!("{SUMS}.is_some")];
-    for provider in [bool_and, bool_leq, ord_leq_at, is_some] {
+    for provider in [
+        dec_eq,
+        bool_and,
+        bool_eq,
+        bool_leq,
+        ord_leq_at,
+        dec_eq_bool,
+        is_some,
+    ] {
         assert!(
             env.env.transparent_body(provider).is_some(),
-            "a public Boolean or order provider must retain its transparent body"
+            "a public class, instance, Boolean, or order provider must retain its transparent body"
         );
     }
+    assert_eq!(
+        env.class_env
+            .class("DecEq")
+            .expect("DecEq class must be registered")
+            .projection
+            .type_id,
+        dec_eq,
+        "the loaded class registry must retain LawfulClasses' canonical DecEq identity"
+    );
+    assert_eq!(
+        env.class_env.instance_search("DecEq", "Bool"),
+        Some(dec_eq_bool),
+        "the roots loader must register LawfulClasses' canonical DecEq Bool dictionary"
+    );
 
     env.elaborate_file(
-        "import Core.Classes.LawfulClasses (Ord, bool_and, bool_leq, ord_leq_at)\n\
+        "import Core.Classes.LawfulClasses \
+           (DecEq, Ord, bool_and, bool_eq, bool_leq, ord_leq_at)\n\
          import Data.Sums.Combinators (is_some)\n\
          fn cat_bool_pub_and (x : Bool) (y : Bool) : Bool = bool_and x y\n\
+         fn cat_bool_pub_eq (x : Bool) (y : Bool) : Bool = bool_eq x y\n\
          fn cat_bool_pub_leq (x : Bool) (y : Bool) : Bool = bool_leq x y\n\
          fn cat_ord_pub_leq_at \
            (a : Type) (d : Ord a) (x : a) (y : a) : Bool = ord_leq_at a d x y\n\
+         fn cat_bool_pub_resolve (x : Bool) : Bool \
+           where (db : DecEq Bool) = db.eq x x\n\
+         const cat_bool_pub_resolved : Bool = cat_bool_pub_resolve True\n\
          fn cat_bool_pub_some (x : Option Bool) : Bool = is_some Bool x",
     )
     .expect("the Boolean and order providers must be selectively importable together");
     assert_transparent_body_mentions(&env, "cat_bool_pub_and", bool_and);
+    assert_transparent_body_mentions(&env, "cat_bool_pub_eq", bool_eq);
     assert_transparent_body_mentions(&env, "cat_bool_pub_leq", bool_leq);
     assert_transparent_body_mentions(&env, "cat_ord_pub_leq_at", ord_leq_at);
     assert_transparent_body_mentions(&env, "cat_bool_pub_some", is_some);
+    let resolution = env
+        .class_env
+        .resolution_provenance
+        .iter()
+        .rev()
+        .find(|resolution| resolution.class_name == "DecEq" && resolution.head_type == "Bool")
+        .expect("the selective consumer must record DecEq Bool resolution provenance");
+    assert_eq!(resolution.instance_id, dec_eq_bool);
+    assert_eq!(resolution.defining_package, LAWFUL);
 
-    for (module, private) in [(LAWFUL, "bool_eq"), (SUMS, "get_or_else")] {
+    for (module, private) in [(LAWFUL, "Eq"), (LAWFUL, "int_leq"), (SUMS, "get_or_else")] {
         match env.elaborate_file(&format!("import {module} ({private})")) {
             Err(ElabError::UnboundName { name, .. }) => {
                 assert_eq!(name, format!("{module}.{private}"));
@@ -313,9 +363,11 @@ fn boolean_provider_loader_visible_inventories_are_exact() {
     assert_eq!(
         published_module_surfaces(LAWFUL, LAWFUL_KEN_MD),
         BTreeSet::from([
+            "DecEq".to_owned(),
             "IsTrue".to_owned(),
             "Ord".to_owned(),
             "bool_and".to_owned(),
+            "bool_eq".to_owned(),
             "bool_leq".to_owned(),
             "bool_or".to_owned(),
             "bool_or::eq_true_of_or".to_owned(),

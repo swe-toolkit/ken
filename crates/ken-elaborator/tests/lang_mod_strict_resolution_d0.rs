@@ -667,6 +667,14 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
+            // Migrated to declared Transport imports by
+            // CAT-MIGRATE-TIER-B-PROVIDERS. The module now loads at its strict
+            // package boundary and retains only the compiler-convenience
+            // `Equal` alias outside the formal floor.
+            "Data.Text.StringBijection".to_string(),
+            ["Equal"].into_iter().map(str::to_string).collect(),
+        ),
+        (
             "Data.Vector.Vector".to_string(),
             ["Equal", "Proved"]
                 .into_iter()
@@ -749,7 +757,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Data.Serialization.Json",
         "Data.Sums.Validation",
         "Data.Text.Codec",
-        "Data.Text.StringBijection",
         "Data.Text.StringKeys",
     ]
     .into_iter()
