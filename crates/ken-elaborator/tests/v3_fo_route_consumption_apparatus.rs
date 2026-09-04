@@ -13,14 +13,14 @@ use std::collections::BTreeSet;
 use ken_elaborator::{
     attempt_obligation_with_catalog_globals,
     fo_kripke::{
-        check_cert, embed, encode_fo_problem, find_certificate, kernel_checked_fo_composite,
-        positive_control_term, quote_fo, AtomEnv, Carriers, Cert, FOProblem, FoCatalogHandles,
-        FoSliceSignature, IForm, IVar,
+        check_cert, discover_and_quote_fo_with_catalog, embed, encode_fo_problem, find_certificate,
+        kernel_checked_fo_composite, positive_control_term, quote_fo, AtomEnv, Carriers, Cert,
+        FOProblem, FoCatalogHandles, FoSliceSignature, IForm, IVar,
     },
     prover::{attempt_fo_with_signature, Verdict},
     v2_extract, ElabEnv,
 };
-use ken_kernel::{check, infer, Context, Term};
+use ken_kernel::{check, infer, Context, Level, Term};
 
 const FOK_SOURCE: &str =
     include_str!("../../../catalog/packages/Tooling/Verification/FoKripke.ken");
@@ -222,14 +222,48 @@ fn encoder_covers_every_slice_source_constructor_and_route_stays_unknown() {
             .expect("complete slice encoding must be kernel-well-formed");
     }
 
-    let (phi_closed, problem, accepted_cert) = accepted_problem(&env, &sig);
+    let route_sort_id = env
+        .declare_postulate_raw("ApparatusSort", Term::Type(Level::zero()))
+        .expect("discoverable route sort");
+    let route_sort = Term::const_(route_sort_id, vec![]);
+    let route_pred_id = env
+        .declare_postulate_raw(
+            "apparatus_route_pred",
+            Term::pi(route_sort.clone(), Term::omega(Level::zero())),
+        )
+        .expect("discoverable route predicate");
+    let route_sig = FoSliceSignature {
+        sort_a: route_sort,
+        pred_p: route_pred_id,
+        or_id: env.globals["Core.Logic.Or.Or"],
+        catalog: None,
+    }
+    .with_catalog_globals(&env.globals)
+    .expect("route catalog installation");
+    let (phi_closed, problem, accepted_cert) = accepted_problem(&env, &route_sig);
+    let handles = FoCatalogHandles::resolve(&env.globals).expect("route catalog handles");
+    let (routed_sig, _) = discover_and_quote_fo_with_catalog(&env.env, &phi_closed, Some(&handles))
+        .expect("catalog-aware route discovery");
+    let routed_handles = routed_sig
+        .catalog
+        .as_ref()
+        .expect("route must carry resolved handles in FoSliceSignature");
+    assert_eq!(
+        routed_handles.checker_soundness,
+        env.globals["fok_checker_soundness"]
+    );
+    assert_eq!(
+        routed_handles.embedding_adequacy,
+        env.globals["fok_embedding_adequacy"]
+    );
+
     assert!(matches!(
         attempt_fo_with_signature(
             &mut env.env,
             &Context::new(),
             &phi_closed,
             &phi_closed,
-            &sig,
+            &route_sig,
         ),
         Verdict::Unknown { .. }
     ));
@@ -237,7 +271,8 @@ fn encoder_covers_every_slice_source_constructor_and_route_stays_unknown() {
     let elaborated = env
         .elaborate_decl_v1(
             "prove apparatus_public_route : \
-             (x : Bool) -> apparatus_pred x -> apparatus_pred x",
+             (x : ApparatusSort) -> \
+             apparatus_route_pred x -> apparatus_route_pred x",
         )
         .expect("public-route obligation");
     let extracted = v2_extract(&elaborated);
@@ -248,7 +283,7 @@ fn encoder_covers_every_slice_source_constructor_and_route_stays_unknown() {
     ));
 
     assert!(
-        kernel_checked_fo_composite(&env.env, &sig, &problem, &accepted_cert, &phi_closed,)
+        kernel_checked_fo_composite(&env.env, &route_sig, &problem, &accepted_cert, &phi_closed,)
             .is_some(),
         "the composite is ready while this prerequisite still withholds Proved"
     );

@@ -504,6 +504,26 @@ pub fn discover_and_quote_fo(
     Some((sig, problem))
 }
 
+/// Discover and quote the independent obligation while attaching catalog
+/// handles that were already resolved at an elaborator boundary.
+///
+/// This is the observable construction seam used by the prover route:
+/// discovery still derives the sort/predicate/`Or` identities from
+/// `phi_closed`, while theorem and encoding identities are carried rather than
+/// re-discovered from [`GlobalEnv`].
+pub fn discover_and_quote_fo_with_catalog(
+    env: &GlobalEnv,
+    phi_closed: &Term,
+    catalog: Option<&FoCatalogHandles>,
+) -> Option<(FoSliceSignature, FOProblem)> {
+    let (sig, problem) = discover_and_quote_fo(env, phi_closed)?;
+    let sig = match catalog {
+        Some(handles) => sig.with_catalog_handles(handles.clone()),
+        None => sig,
+    };
+    Some((sig, problem))
+}
+
 // ─── D0: quoted source data (`23 §4.3`, slice subset) ──────────────────────
 
 /// A bound source object variable, de Bruijn (`23 §4.3` `IVar`).

@@ -581,14 +581,8 @@ fn attempt_fo(
     phi_closed: &Term,
     catalog: Option<&crate::fo_kripke::FoCatalogHandles>,
 ) -> Verdict {
-    match crate::fo_kripke::discover_and_quote_fo(env, phi_closed) {
-        Some((sig, _problem)) => {
-            let sig = match catalog {
-                Some(handles) => sig.with_catalog_handles(handles.clone()),
-                None => sig,
-            };
-            attempt_fo_with_signature(env, ctx, phi, phi_closed, &sig)
-        }
+    match crate::fo_kripke::discover_and_quote_fo_with_catalog(env, phi_closed, catalog) {
+        Some((sig, _problem)) => attempt_fo_with_signature(env, ctx, phi, phi_closed, &sig),
         None => attempt_ipc(env, ctx, phi, phi_closed),
     }
 }
