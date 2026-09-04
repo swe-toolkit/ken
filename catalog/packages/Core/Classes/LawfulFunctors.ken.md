@@ -37,7 +37,7 @@ import Data.Collections.Derived (list_append)
 
 import Core.Logic.Transport (cong, sym, trans)
 
-class Semigroup a {
+pub class Semigroup a {
   op : a → a → a;
   assoc : (x : a) → (y : a) → (z : a) → Equal a (op (op x y) z) (op x (op y z))
 }
