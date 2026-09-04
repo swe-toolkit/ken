@@ -34,7 +34,7 @@ REQUIRED_RT_PARITY_ARMS = {
     "checked_ih_direct_application_drop_capture_refuses_and_restores",
     "checked_ih_direct_application_environment_for_result_refuses_and_restores",
     # full_demand fan-out / population (1)
-    "static_response_full_demand_fan_out_population_is_deferred_and_distinct",
+    "static_response_full_demand_fan_out_population_is_distinct",
     # full_demand producer/K-row (8)
     "static_response_full_demand_drop_row_reds_and_restores",
     "static_response_full_demand_duplicate_row_reds_and_restores",

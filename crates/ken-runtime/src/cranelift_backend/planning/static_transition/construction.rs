@@ -1257,13 +1257,42 @@ impl<'src> Planner<'src> {
         )?;
         // PHASE B of the response context install (RECUT 2, HS5, Architect
         // evt_7eh84c8n6w08e). aggregate_ownership and the transport records are
-        // now final, so the exact record-derived transport-source set -- the real
-        // Deferred/Specialized discriminator -- exists. Phase A (:1213) minted the
-        // owner-less context entries the context ABI (:1221) already covers; this
-        // assigns owners to Specialized and seals the P1 UNION P2 residual. The
-        // determination is genuinely post-install (the z1315 cycle), so it cannot
-        // run at :1213; owner-additive, so phase A's entries are untouched.
+        // now final, so the exact record-derived transport-source set exists.
+        // Phase A minted the owner-less context entries the context ABI already
+        // covers. Execute-then-resume assigns transport-source owners when the
+        // plane is closed and at least two producer groups have exclusively
+        // predeclared transport sources. P1 keeps callers P2 rather than partially
+        // specializing; a single-stage plane keeps the forward-Ret path. The
+        // suppression control restores P2 in an eligible plane. Phase A entries
+        // remain untouched.
+        let transport_sources_before_response_owners = self
+            .plan
+            .checked_ih_environment_transport_source_identities();
         self.plan.install_static_response_context_plan_phase_b()?;
+        // Execute-then-resume promotes the former P2 transport-source responses
+        // to ordinary response owners. Owner assignment changes which closure
+        // environments cross an emitted boundary, so refresh the two existing
+        // derived planes before any inheritance is built. The transport source
+        // population itself is the fixed-point guard: phase B was selected from
+        // that set, and a refresh that changed it would make the selection
+        // circular rather than closed.
+        self.plan.aggregate_ownership = build_aggregate_ownership_plan(&self.plan)?;
+        validate_aggregate_ownership_plan(&self.plan, &self.plan.aggregate_ownership)?;
+        self.plan.checked_ih_environment_transports =
+            build_checked_ih_environment_transports(&self.plan)?;
+        validate_checked_ih_environment_transports(
+            &self.plan,
+            &self.plan.checked_ih_environment_transports,
+        )?;
+        if self
+            .plan
+            .checked_ih_environment_transport_source_identities()
+            != transport_sources_before_response_owners
+        {
+            return Err(planner_error(
+                "execute-then-resume response-owner assignment changed the checked-IH transport source population",
+            ));
+        }
         self.plan.checked_ih_continuation_inheritances =
             build_checked_ih_continuation_inheritances(&self.plan)?;
         #[cfg(feature = "px8-ds-test-support")]

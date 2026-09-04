@@ -91,9 +91,9 @@ pub(in crate::cranelift_backend) use responses::{
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use responses::{
-    force_specialize_deferred_response_is_exact, static_response_context_demand_mutation_is_exact,
-    with_force_specialize_deferred_response, with_static_response_context_demand_mutation,
-    StaticResponseContextDemandMutation,
+    static_response_context_demand_mutation_is_exact,
+    suppressed_execute_then_resume_response_is_exact, with_static_response_context_demand_mutation,
+    with_suppressed_execute_then_resume_response, StaticResponseContextDemandMutation,
 };
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,
@@ -584,16 +584,13 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// The typed fail-closed result for a genuinely opaque/dynamic response K
     /// or a source that cannot be expressed in the existing typed schema.
     static_response_infeasible: Option<SsaInfeasible>,
-    /// The complete `Deferred` residual population (recut amendment
-    /// `evt_4ar3rxzrra5v4`): every response `Vis` that is NOT specialized —
-    /// P1 (no continuation unit) ∪ P2 (unit present but the selected caller is a
-    /// checked-IH environment transport source that never retargets to a real
-    /// call). Populated (never an absence) so `classify` is congruent with
-    /// `static_response_continuations` over the full response-`Vis` population and
-    /// every downstream stage reconciles the residual by total match (R2/§7).
-    /// A `Deferred` response acquires no owner and no `StaticResponseDeferred`
-    /// placeholder; its operation root and host effect fall through to main's
-    /// pre-WP lowering (R3).
+    /// The complete Deferred residual. P1 is a response with no continuation
+    /// unit. In an open plane, transport-source K callers remain P2 so the plane
+    /// is not partially specialized. An eligible closed plane with at least two
+    /// exclusively-predeclared producer groups turns those emissions into owner calls;
+    /// a single-stage plane retains the forward-Ret path. The suppression
+    /// control restores P2. Deferred responses acquire no owner or
+    /// placeholder and fall through to ordinary lowering.
     static_response_deferred: Vec<DeferredResponseRow>,
     /// Phase-A carry of the two-phase response context install (RECUT 2, HS5):
     /// the owner-less demand + P1 population minted at install
@@ -974,21 +971,17 @@ pub struct StaticResponseOwnerObservation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeferredResponseObservation {
     pub vis_origin: u32,
-    /// The producer call origin this Deferred residual belongs to. Lets a control
-    /// group the Deferred population by shared producer (RECUT 2 HS6 (ii)-redesign:
-    /// the fan-out-accounting invariant re-targeted onto the Deferred side, where
-    /// the shared-producer multi-K witness -- the transport-deferred ResourceRelease
-    /// pairs -- now lives).
+    /// The producer call origin this Deferred residual belongs to. Retained for
+    /// the closed diagnostic relation and the P2 suppression control.
     pub producer_call_origin: u32,
     pub operation_root_origin: u32,
     pub effect_origin: u32,
     pub operation: String,
-    /// "NoContinuationUnit" (P1) or "UnconsumedTransportCaller" (P2).
+    /// "NoContinuationUnit" (P1) or "UnconsumedTransportCaller" (ineligible
+    /// or test-suppressed P2).
     pub sub_case: String,
-    /// The K's capture / continuation-input counts (P2 from the demand, P1 zero).
-    /// Lets the census control cross-check the DropEvery mutation's reach against
-    /// the FULL has-K-unit demand population (RECUT 2 HS6 (ii)-redesign 2nd
-    /// extension): the P2 Deferred demands' counts are observable only here.
+    /// The K's capture / continuation-input counts (P2 from the demand, P1
+    /// zero). Eligible-plane has-K census comes from Specialized rows.
     pub capture_count: usize,
     pub continuation_input_count: usize,
 }
@@ -1001,9 +994,9 @@ pub struct StaticResponseFeasibilityDiagnostic {
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub all_static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub static_response_owners: Vec<StaticResponseOwnerObservation>,
-    /// The complete `Deferred` residual (P1 ∪ P2). Together with
-    /// `static_response_rows` (the Specialized set) this is the full response-`Vis`
-    /// classification, so a test can assert congruence (AC-1).
+    /// The complete Deferred residual: P1 plus ineligible or test-suppressed
+    /// P2. Together with the Specialized rows this is the full response-Vis
+    /// classification.
     pub static_response_deferred: Vec<DeferredResponseObservation>,
 }
 
