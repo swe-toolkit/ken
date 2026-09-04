@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-LF-SEMIGROUP-PUBLISH
 title: "Scaffold-retirement Tier C predecessor: publish LF's private class Semigroup (visibility-only widen), so NonEmpty can selectively import it instead of resolving it ambiently. Exactly the proven Tier-B provider-publication shape; mints no second class, changes no body."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
