@@ -2806,7 +2806,20 @@ macro_rules! generated_entry_split_checked_case {
 }
 
 macro_rules! d1_route_case {
-    ($name:ident, $mode:literal, $control:expr, $recursor:expr) => {
+    // `$specialized_tie`: None for a LIVE route whose runtime frame-1 route-control
+    // producer is still emitted (unspecialized -- e.g. the write route); the
+    // producer-reached assertion (APPLIED/RECURSOR_APPLIED) stays. Some(tie) for a
+    // read route whose runtime producer is ELIMINATED by the D3 static forward-edge
+    // specialization (evt_2427xbynt1d2e): there is no runtime word left to perturb,
+    // so the producer-reached assertion is RETIRED-WITH-TIE (Architect evt_2tfjhm4ybxgkk).
+    // The tie is not a silent delete: (1) the child still runs and its body's
+    // native==interpreter parity (the specialized `_` arm) proves the DENOTATION,
+    // asserted via child success below; (2) we POSITIVELY assert the runtime producer
+    // is inert (no APPLIED marker), so if a future change un-specializes the read the
+    // marker reappears and THIS test re-reddens -- a transition sentinel, not a gap;
+    // (3) `$specialized_tie` documents the static coverage that replaces the guarded
+    // runtime-route failure (which cannot occur once the route is static).
+    ($name:ident, $mode:literal, $control:expr, $recursor:expr, $specialized_tie:expr) => {
         #[test]
         fn $name() {
             if std::env::var_os(D1_ROUTE_CONTROL_CHILD).is_some() {
@@ -2824,10 +2837,21 @@ macro_rules! d1_route_case {
             if let Some(control) = control { child.env("KEN_RT_ITREE_D1_ROUTE_CONTROL", control); }
             if let Some(recursor) = recursor { child.env("KEN_RT_ITREE_D1_RECURSOR_ROUTE", recursor); }
             let output = child.output().expect("spawn isolated D1 control child");
+            // Denotation: the child body's specialized-route native==interpreter parity
+            // (or the trap-family for an unspecialized route) must pass.
             assert!(output.status.success(), "{} child failed\nstdout:\n{}\nstderr:\n{}", $mode, String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
             let stderr = String::from_utf8_lossy(&output.stderr);
-            if let Some(control) = control { assert!(stderr.contains(&format!("RT_ITREE_D1_CONTROL_APPLIED mode={control}")), "{}: the route-control mutation did not reach its real producer: {}", $mode, stderr); }
-            if let Some(recursor) = recursor { assert!(stderr.contains(&format!("RT_ITREE_D1_RECURSOR_APPLIED mode={recursor}")), "{}: the recursor-route mutation did not reach its real producer: {}", $mode, stderr); }
+            let specialized_tie: Option<&str> = $specialized_tie;
+            match specialized_tie {
+                None => {
+                    if let Some(control) = control { assert!(stderr.contains(&format!("RT_ITREE_D1_CONTROL_APPLIED mode={control}")), "{}: the route-control mutation did not reach its real producer: {}", $mode, stderr); }
+                    if let Some(recursor) = recursor { assert!(stderr.contains(&format!("RT_ITREE_D1_RECURSOR_APPLIED mode={recursor}")), "{}: the recursor-route mutation did not reach its real producer: {}", $mode, stderr); }
+                }
+                Some(_tie) => {
+                    if let Some(control) = control { assert!(!stderr.contains(&format!("RT_ITREE_D1_CONTROL_APPLIED mode={control}")), "{}: the runtime route-control producer is expected ELIMINATED by the D3 static forward-edge specialization (retired-with-tie), but it reached a producer -- the tie no longer holds, reopen this mode: {}", $mode, stderr); }
+                    if let Some(recursor) = recursor { assert!(!stderr.contains(&format!("RT_ITREE_D1_RECURSOR_APPLIED mode={recursor}")), "{}: the runtime recursor-route producer is expected ELIMINATED by the D3 static forward-edge specialization (retired-with-tie), but it reached a producer -- the tie no longer holds, reopen this mode: {}", $mode, stderr); }
+                }
+            }
         }
     };
 }
@@ -4262,12 +4286,35 @@ fn assert_d1_route_control_child() {
 // THE GAP: these are test-support mutations at frame 1, not production route
 // authority; the durable read/write InvalidOffset products below own the
 // unmutated behavior.
-d1_route_case!(d1_route_control_drop_read, "drop-read", Some("active-checked-to-direct"), None);
-d1_route_case!(d1_route_control_drop_write, "drop-write", Some("active-checked-to-direct"), None);
-d1_route_case!(d1_route_control_unknown_read, "unknown-read", Some("active-checked-to-unknown"), None);
-d1_route_case!(d1_route_control_ordinary_read, "ordinary-read", Some("initial-direct-to-unknown"), None);
-d1_route_case!(d1_route_control_direct_read, "direct-read", None, Some("drop-checked-frame-1"));
-d1_route_case!(d1_route_control_misroute_direct_read, "misroute-direct-read", Some("active-direct-to-checked"), Some("drop-checked-frame-1"));
+//
+// RETIRE-WITH-TIE (Architect evt_2tfjhm4ybxgkk; RT-COMPOSED-RETURN-FORWARD-RET-EDGE
+// b2 inc1). The D3 static forward-edge specialization (evt_2427xbynt1d2e) decides
+// the READ route STATICALLY, so the runtime frame-1 route-control word these read
+// modes perturb is ELIMINATED -- there is no runtime producer left to reach, and the
+// wrong-runtime-route failure they guarded CANNOT OCCUR. Each read mode's producer-
+// reached assertion is therefore retired (Some(tie), which POSITIVELY asserts the
+// producer is inert -- a sentinel that re-reddens if the read is ever un-specialized).
+// Per-mode coverage transfer (nothing silently vanished):
+//   - DENOTATION, every mode: the child body's specialized-route native==interpreter
+//     parity (assert_d1_route_control_child `_` arm), asserted via child success.
+//   - STATIC ROUTE FORMATION fail-closed, replacing each perturbed runtime word:
+//       drop-read (active checked->direct word)      -> composed_return_forward_ret_authority_controls_refuse
+//                                                        ProjectionDisagreement + WrongMember
+//       unknown-read (active checked->unknown word)  -> WrongMember + WrongSource
+//       ordinary-read (initial direct->unknown word) -> WrongMember + WrongSource
+//       direct-read (drop recursor frame-1)          -> ProducerSourceFromEntry
+//       misroute-read (direct->checked + drop recursor) -> WrongSource + ProducerSourceFromEntry
+//     plus composed_return_forward_ret_authority_population_is_exact / role_witness
+//     (planned==formed: the static route exists and is unique).
+//   - The runtime route-control MECHANISM itself stays under test via drop_write
+//     (the WRITE route is unspecialized -- live producer, None below -- so its
+//     producer-reached assertion is kept).
+d1_route_case!(d1_route_control_drop_read, "drop-read", Some("active-checked-to-direct"), None, Some("D3-specialized read: runtime active checked->direct word eliminated; static route fail-closed by forward_ret ProjectionDisagreement+WrongMember; denotation by child-body parity; mechanism kept live by drop_write"));
+d1_route_case!(d1_route_control_drop_write, "drop-write", Some("active-checked-to-direct"), None, None);
+d1_route_case!(d1_route_control_unknown_read, "unknown-read", Some("active-checked-to-unknown"), None, Some("D3-specialized read: runtime active checked->unknown word eliminated; static route fail-closed by forward_ret WrongMember+WrongSource; denotation by child-body parity"));
+d1_route_case!(d1_route_control_ordinary_read, "ordinary-read", Some("initial-direct-to-unknown"), None, Some("D3-specialized read: runtime initial direct->unknown word eliminated; static route fail-closed by forward_ret WrongMember+WrongSource; denotation by child-body parity"));
+d1_route_case!(d1_route_control_direct_read, "direct-read", None, Some("drop-checked-frame-1"), Some("D3-specialized read: runtime recursor drop-checked-frame-1 route eliminated; static producer covered by forward_ret ProducerSourceFromEntry; denotation by child-body parity"));
+d1_route_case!(d1_route_control_misroute_direct_read, "misroute-direct-read", Some("active-direct-to-checked"), Some("drop-checked-frame-1"), Some("D3-specialized read: runtime active direct->checked word + recursor drop eliminated; static route fail-closed by forward_ret WrongSource+ProducerSourceFromEntry; denotation by child-body parity"));
 
 /// Durable invariant: a statically specialized read response preserves the
 /// complete ordered effect/provenance trace and exposes exact InvalidOffset
