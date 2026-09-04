@@ -49,11 +49,25 @@ fn env_for(source: &str) -> ElabEnv {
     env
 }
 
+fn checker_prefix(source: &str) -> &str {
+    source
+        .split_once("-- === D2b: embedding adequacy proof (23 section 4.4) ===")
+        .expect("the semantic adequacy section must follow checker soundness")
+        .0
+}
+
+fn env_for_checker_mutation(source: &str) -> ElabEnv {
+    env_for(checker_prefix(source))
+}
+
 /// `AC-5` mutation: collapse the sort check by making `fok_derived_sort_eq`
 /// declare every pair of sorts equal. World-vs-Object conflicts then compare
 /// as agreement, so `fok_validate_qterm_sort` never rejects. The mutation
-/// touches only the validation path; the structural checker and the reflection
-/// theorems do not call it, so the file still elaborates.
+/// touches only the validation path. The checker-through-reflection prefix
+/// still elaborates. The later semantic adequacy proof is intentionally outside
+/// this mutation fixture: it consumes the unmodified sorted relation, so a
+/// mutation that collapses its sort/freshness premises must not be asked to
+/// kernel-check that semantic theorem.
 const SORT_EQ_ORIG: &str = "\
 fn fok_derived_sort_eq (a : FokDerivedSort) (b : FokDerivedSort) : Bool =
   match a {
@@ -122,19 +136,37 @@ fn assert_wrong_sort_pair(
 ) {
     let mut env = mk_env();
     assert!(
-        verdict_is(&mut env, &format!("{label}_accepts"), accept_sequent, accept_cert, "True"),
+        verdict_is(
+            &mut env,
+            &format!("{label}_accepts"),
+            accept_sequent,
+            accept_cert,
+            "True"
+        ),
         "{label}: the sort-correct near-miss certificate must be ACCEPTED"
     );
     let mut env2 = mk_env();
     assert!(
-        verdict_is(&mut env2, &format!("{label}_rejects"), reject_sequent, reject_cert, "False"),
+        verdict_is(
+            &mut env2,
+            &format!("{label}_rejects"),
+            reject_sequent,
+            reject_cert,
+            "False"
+        ),
         "{label}: the wrong-sort certificate must be REFUSED"
     );
     // AC-6 guard: the refusal is not a checker that refuses everything --
     // prove the reject cert is NOT also accepted.
     let mut env3 = mk_env();
     assert!(
-        !verdict_is(&mut env3, &format!("{label}_not_accepted"), reject_sequent, reject_cert, "True"),
+        !verdict_is(
+            &mut env3,
+            &format!("{label}_not_accepted"),
+            reject_sequent,
+            reject_cert,
+            "True"
+        ),
         "{label}: the wrong-sort certificate must not also be accepted"
     );
 }
@@ -149,7 +181,8 @@ fn assert_wrong_sort_pair(
 // two-stage isolation below attribute the refusal to a specific guard.
 fn forall_cert(forall_ctor: &str, body: &str, eigen_ix: &str) -> (String, String) {
     let gamma = "Cons FokForm FokBottom (Nil FokForm)";
-    let delta = format!("Cons FokForm ({forall_ctor} ({body})) (Cons FokForm FokBottom (Nil FokForm))");
+    let delta =
+        format!("Cons FokForm ({forall_ctor} ({body})) (Cons FokForm FokBottom (Nil FokForm))");
     let sequent = format!("FokMkSequent ({gamma}) ({delta})");
     let child_delta =
         format!("fok_list_form_set_nth ({delta}) Zero (fok_subst0_form ({body}) (FokQParameter ({eigen_ix})))");
@@ -184,7 +217,13 @@ fn assert_wrong_sort_eigen_isolated(label: &str, forall_ctor: &str, body: &str) 
     let (ok_seq, ok_cert) = forall_cert(forall_ctor, body, "Suc (Suc Zero)");
     let mut env = mk_env();
     assert!(
-        verdict_is(&mut env, &format!("{label}_lawful_accepts"), &ok_seq, &ok_cert, "True"),
+        verdict_is(
+            &mut env,
+            &format!("{label}_lawful_accepts"),
+            &ok_seq,
+            &ok_cert,
+            "True"
+        ),
         "{label}: the lawful fresh correctly-sorted eigen certificate must be ACCEPTED"
     );
 
@@ -198,27 +237,53 @@ fn assert_wrong_sort_eigen_isolated(label: &str, forall_ctor: &str, body: &str) 
     // (the tree is over-determined); the two stages below make that attribution.
     let mut env_pub_reject = mk_env();
     assert!(
-        verdict_is(&mut env_pub_reject, &format!("{label}_public_rejects"), &bad_seq, &bad_cert, "False"),
+        verdict_is(
+            &mut env_pub_reject,
+            &format!("{label}_public_rejects"),
+            &bad_seq,
+            &bad_cert,
+            "False"
+        ),
         "{label}: the unmodified checker must REFUSE the wrong-sort eigen certificate"
     );
     let mut env_pub_not_accept = mk_env();
     assert!(
-        !verdict_is(&mut env_pub_not_accept, &format!("{label}_public_not_accepted"), &bad_seq, &bad_cert, "True"),
+        !verdict_is(
+            &mut env_pub_not_accept,
+            &format!("{label}_public_not_accepted"),
+            &bad_seq,
+            &bad_cert,
+            "True"
+        ),
         "{label}: the unmodified checker must not also accept it"
     );
 
     // Stage 1: freshness neutralized, sort LIVE -> still rejects.
-    let mut env1 = env_for(&with_freshness_neutralized(FOK_SOURCE));
+    let mut env1 = env_for_checker_mutation(&with_freshness_neutralized(FOK_SOURCE));
     assert!(
-        verdict_is(&mut env1, &format!("{label}_stage1_sort_rejects"), &bad_seq, &bad_cert, "False"),
+        verdict_is(
+            &mut env1,
+            &format!("{label}_stage1_sort_rejects"),
+            &bad_seq,
+            &bad_cert,
+            "False"
+        ),
         "{label}: with freshness neutralized and the sort check live, the wrong-sort eigen \
          certificate must STILL REJECT -- the sort guard rejects it independently of freshness"
     );
 
     // Stage 2: freshness neutralized AND sort collapsed -> same cert accepts.
-    let mut env2 = env_for(&with_sort_collapsed(&with_freshness_neutralized(FOK_SOURCE)));
+    let mut env2 = env_for_checker_mutation(&with_sort_collapsed(&with_freshness_neutralized(
+        FOK_SOURCE,
+    )));
     assert!(
-        verdict_is(&mut env2, &format!("{label}_stage2_accepts"), &bad_seq, &bad_cert, "True"),
+        verdict_is(
+            &mut env2,
+            &format!("{label}_stage2_accepts"),
+            &bad_seq,
+            &bad_cert,
+            "True"
+        ),
         "{label}: with BOTH freshness and the sort check neutralized, the SAME certificate must \
          ACCEPT -- confirming the sort guard was the sole surviving cause of the refusal"
     );
@@ -306,14 +371,26 @@ fn collapsing_the_sort_check_reddens_the_wrong_sort_controls() {
 
     let mut base = mk_env();
     assert!(
-        verdict_is(&mut base, "collapse_base_reject", &bad_seq, &bad_cert, "False"),
+        verdict_is(
+            &mut base,
+            "collapse_base_reject",
+            &bad_seq,
+            &bad_cert,
+            "False"
+        ),
         "unmutated: the malformed-atom certificate is refused on sort"
     );
 
     let collapsed = sort_collapsed_source();
-    let mut mutated = env_for(&collapsed);
+    let mut mutated = env_for_checker_mutation(&collapsed);
     assert!(
-        verdict_is(&mut mutated, "collapse_mut_accept", &bad_seq, &bad_cert, "True"),
+        verdict_is(
+            &mut mutated,
+            "collapse_mut_accept",
+            &bad_seq,
+            &bad_cert,
+            "True"
+        ),
         "with the sort check collapsed the same certificate must be ACCEPTED -- \
          proving the refusal was caused by the sort check"
     );
