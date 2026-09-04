@@ -4014,48 +4014,64 @@ fn composed_return_forward_ret_authority_controls_refuse() {
 #[test]
 fn checked_ih_inheritance_and_fresh_result_route_are_byte_inert() {
     in_large_stack_thread("rt-parity-continuation-inheritance-inert", || {
-        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
-        let exact_root = output_dir("continuation-inheritance-inert-exact");
-        let suppressed_root = output_dir("continuation-inheritance-inert-suppressed");
-        let exact = ken_cli::build_native_program(
-            &source,
-            ken_cli::SourceFormat::Ken,
-            "rt_parity_continuation_inheritance_inert",
-            exact_root.path(),
-        )
-        .expect("exact continuation-inheritance artifact");
-        let suppressed = ken_runtime::with_checked_ih_continuation_inheritance_mutation(
-            ken_runtime::CheckedIhContinuationInheritanceMutation::SuppressForInertness,
-            || {
-                ken_cli::build_native_program(
-                    &source,
-                    ken_cli::SourceFormat::Ken,
-                    "rt_parity_continuation_inheritance_inert",
-                    suppressed_root.path(),
-                )
-            },
-        )
-        .expect("suppressed continuation-inheritance artifact");
+        // Architect C ruling (evt_70qj45jjt8sqm): the forward-Ret closeout's route
+        // DECISION and every proof value must be a function of INERT structure only.
+        // The continuation-inheritance CERTIFICATE is a planning-time well-formedness
+        // assertion (validate_checked_ih_continuation_inheritances) that gates neither
+        // codegen nor any emitted artifact, so suppressing it must change NO emitted
+        // byte -- at ALL FOUR hash levels -- for the READ and the valid-WRITE, which
+        // both consume the shape-gated forward edge (B-scope: the gate is
+        // Ret{Match}-vs-effect, not operation-kind).
+        for entry in ["rt_read_offset_stage", "rt_write_writable_stage"] {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let exact_root =
+                output_dir(&format!("continuation-inheritance-inert-exact-{entry}"));
+            let suppressed_root =
+                output_dir(&format!("continuation-inheritance-inert-suppressed-{entry}"));
+            let exact = ken_cli::build_native_program(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                "rt_parity_continuation_inheritance_inert",
+                exact_root.path(),
+            )
+            .expect("exact continuation-inheritance artifact");
+            let suppressed = ken_runtime::with_checked_ih_continuation_inheritance_mutation(
+                ken_runtime::CheckedIhContinuationInheritanceMutation::SuppressForInertness,
+                || {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        "rt_parity_continuation_inheritance_inert",
+                        suppressed_root.path(),
+                    )
+                },
+            )
+            .expect("suppressed continuation-inheritance artifact");
 
-        assert_eq!(exact.plan_transport_hash, suppressed.plan_transport_hash);
-        assert_eq!(
-            exact.runtime_program.core_semantic_hash,
-            suppressed.runtime_program.core_semantic_hash
-        );
-        assert_eq!(
-            exact.runtime_program.artifact_hash,
-            suppressed.runtime_program.artifact_hash
-        );
-        assert_eq!(
-            exact.artifact.executable_hash,
-            suppressed.artifact.executable_hash
-        );
-        assert_eq!(
-            std::fs::read(&exact.artifact.executable_path).expect("exact executable bytes"),
-            std::fs::read(&suppressed.artifact.executable_path)
-                .expect("suppressed executable bytes"),
-            "planner-only inheritance and fresh-result route proofs must change no emitted ABI, call, or artifact byte"
-        );
+            assert_eq!(
+                exact.plan_transport_hash, suppressed.plan_transport_hash,
+                "{entry}: plan_transport_hash must be inert to inheritance suppression"
+            );
+            assert_eq!(
+                exact.runtime_program.core_semantic_hash,
+                suppressed.runtime_program.core_semantic_hash,
+                "{entry}: core_semantic_hash must be inert to inheritance suppression"
+            );
+            assert_eq!(
+                exact.runtime_program.artifact_hash, suppressed.runtime_program.artifact_hash,
+                "{entry}: artifact_hash must be inert to inheritance suppression"
+            );
+            assert_eq!(
+                exact.artifact.executable_hash, suppressed.artifact.executable_hash,
+                "{entry}: executable_hash must be inert to inheritance suppression"
+            );
+            assert_eq!(
+                std::fs::read(&exact.artifact.executable_path).expect("exact executable bytes"),
+                std::fs::read(&suppressed.artifact.executable_path)
+                    .expect("suppressed executable bytes"),
+                "{entry}: planner-only inheritance and fresh-result route proofs must change no emitted ABI, call, or artifact byte"
+            );
+        }
         assert!(ken_runtime::checked_ih_continuation_inheritance_mutation_is_exact());
     });
 }

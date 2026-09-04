@@ -6771,32 +6771,14 @@ fn checked_ih_generated_entry_row(
         .self_resumption_steps
         .last()
         .ok_or_else(|| planner_error("a generated-entry inheritance has no final step"))?;
-    let view = plan
-        .checked_ih_continuation_inheritance_for_invocation(
-            &inheritance.transport.source_call_identity,
-            inheritance.capability.destination_owner,
-            Some(worker_body_origin),
-            final_step.callee_binding.frame_origin,
-            final_step.callee_binding.recursive_position,
-        )?
-        .ok_or_else(|| {
-            planner_error(
-                "a governed generated-entry inheritance is absent from the existing exact accessor",
-            )
-        })?;
-    if view.transport() != &inheritance.transport
-        || view.capability() != &inheritance.capability
-        || view.fresh_result_destination() != &inheritance.fresh_result_destination
-    {
-        return Err(planner_error(
-            "a generated-entry inheritance reopens to a different typed view",
-        ));
-    }
-    let final_step = view
-        .capability
-        .self_resumption_steps
-        .last()
-        .ok_or_else(|| planner_error("a reopened generated-entry view has no final step"))?;
+    // A' (Architect C, evt_40dme966hce0a): use the passed CANONICAL inheritance
+    // directly. The former re-lookup via checked_ih_continuation_inheritance_for_
+    // invocation read the stored, MUTABLE field and broke under SuppressForInertness
+    // (which empties it). build_checked_ih_generated_entry_confluences now passes the
+    // canonical derivation (build_checked_ih_continuation_inheritances(plan)), and
+    // validate_checked_ih_continuation_inheritances asserts stored == canonical, so
+    // the reopened view was byte-identical to `inheritance`; the `final_step` from
+    // `inheritance.capability` above is the same value the view would have yielded.
     let fresh_result_route = checked_ih_fresh_result_route(plan, inheritance, final_step)?;
     let mut arrival = checked_ih_generated_entry_arrival(plan, final_step)?;
     #[cfg(feature = "px8-ds-test-support")]
@@ -6834,8 +6816,8 @@ fn checked_ih_generated_entry_row(
         ret_case_body_origin: inheritance.fresh_result_destination.ret_case_body_origin,
     });
     let projection = CheckedIhGeneratedEntryProjection {
-        destination_owner: view.capability().destination_owner(),
-        destination_body_origin: view.capability().destination_body_origin(),
+        destination_owner: inheritance.capability.destination_owner,
+        destination_body_origin: inheritance.capability.destination_body_origin,
         arrival,
         fresh_result_route,
         #[cfg(feature = "px8-ds-test-support")]
@@ -7009,11 +6991,24 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
         CheckedIhGeneratedEntryConfluence,
     > = BTreeMap::new();
     let mut caller_by_context = BTreeMap::new();
+    // RT-COMPOSED-RETURN-FORWARD-RET-EDGE byte-inertness layering fix (Architect C,
+    // evt_70qj45jjt8sqm). Derive the confluence population from the CANONICAL,
+    // inert continuation-inheritance derivation (build_checked_ih_continuation_
+    // inheritances(plan), a pure function of the inert plan -- transports/ABI/IR,
+    // NOT the stored, mutable `plan.checked_ih_continuation_inheritances` field).
+    // The closure-equality validation (validate_checked_ih_continuation_inheritances)
+    // asserts the stored field EQUALS this canonical derivation, so in production the
+    // confluences are byte-identical either way; the stored field is thereby demoted
+    // to a planning-time well-formedness ASSERTION that feeds NO codegen-read state.
+    // Sourcing from the stored field made the whole confluence -> access ->
+    // forward-Ret decision transitively certificate-derived: SuppressForInertness
+    // clears the stored field (validation vacuous-passes on empty) but NOT the
+    // canonical derivation, so the forward edge stayed byte-inert only if we read the
+    // canonical here. Ill-formedness mutations still reject at validation, which runs
+    // BEFORE this construction, so they never reach here.
+    let canonical_inheritances = build_checked_ih_continuation_inheritances(plan)?;
     #[allow(unused_mut)]
-    let mut inheritance_order = plan
-        .checked_ih_continuation_inheritances
-        .iter()
-        .collect::<Vec<_>>();
+    let mut inheritance_order = canonical_inheritances.iter().collect::<Vec<_>>();
     #[cfg(feature = "px8-ds-test-support")]
     if GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get)
         == CheckedIhGeneratedEntryConfluenceMutation::PermuteInheritanceOrder
@@ -7513,8 +7508,16 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
         ));
     }
 
+    // A' (Architect C, evt_40dme966hce0a): derive the governed-pair cross-check from
+    // the CANONICAL inert inheritance derivation, NOT the stored, mutable field.
+    // The confluences are already built from the canonical derivation (build_checked_
+    // ih_generated_entry_confluences), so this keeps validate_confluences internally
+    // consistent under SuppressForInertness (which empties the stored field but not
+    // the canonical). The stored field's own well-formedness (stored == canonical) is
+    // asserted separately by validate_checked_ih_continuation_inheritances, keeping
+    // that validator the SOLE reader of the stored field.
     let mut governed_pairs = BTreeSet::new();
-    for inheritance in &plan.checked_ih_continuation_inheritances {
+    for inheritance in &build_checked_ih_continuation_inheritances(plan)? {
         if let Some((coordinate, member, _, _)) =
             checked_ih_generated_entry_row(plan, inheritance)?
         {
@@ -7619,54 +7622,20 @@ impl StaticTransitionPlan<'_> {
                 "the forward Ret access coordinate disagrees with its generated context",
             ));
         }
-        let matching_inheritances = self
-            .checked_ih_continuation_inheritances
-            .iter()
-            .filter(|inheritance| {
-                &inheritance.transport == transport
-                    && inheritance.capability.destination_owner
-                        == ContinuationEmissionOwner::Specialization(
-                            access.enclosing_specialization,
-                        )
-                    && inheritance.capability.destination_body_origin == access.worker_body_origin
-            })
-            .collect::<Vec<_>>();
-        let selected_inheritance = match matching_inheritances.as_slice() {
-            [inheritance] => *inheritance,
-            [] => return Ok(None),
-            _ => {
-                return Err(planner_error(
-                    "the selected forward Ret transport resolves more than one continuation inheritance",
-                ))
-            }
-        };
-        let Some((
-            derived_coordinate,
-            derived_member,
-            _derived_retarget_caller,
-            derived_projection,
-        )) = checked_ih_generated_entry_row(self, selected_inheritance)?
-        else {
-            return Err(planner_error(
-                "the selected forward Ret inheritance does not derive a generated-entry row",
-            ));
-        };
-        if derived_coordinate.context != access.context
-            || derived_coordinate.enclosing_specialization != access.enclosing_specialization
-            || derived_coordinate.worker_body_origin != access.worker_body_origin
-            || derived_member != *transport.source_call_identity()
-        {
-            return Err(planner_error(
-                "the selected forward Ret member rederives a different generated-entry function or identity",
-            ));
-        }
-        let CheckedIhFreshResultRoute::TailProducerToRet {
-            source: expected_producer_source,
-            ..
-        } = derived_projection.fresh_result_route()
-        else {
-            return Ok(None);
-        };
+        // The forward-Ret DECISION and every proof value are derived PURELY from
+        // inert structure (checked_ih_generated_entry_confluences + access.admissions
+        // + transport) below. The continuation-inheritance CERTIFICATE is NOT read
+        // here: it is a planning-time well-formedness assertion
+        // (validate_checked_ih_continuation_inheritances, including the closure
+        // equality `inheritances == build_checked_ih_continuation_inheritances(plan)`)
+        // that gates NEITHER this codegen decision NOR any emitted artifact. Reading
+        // it here was the RT-COMPOSED-RETURN-FORWARD-RET-EDGE byte-inertness LAYERING
+        // defect (Architect C ruling, evt_70qj45jjt8sqm): clearing it
+        // (SuppressForInertness) flipped Formed -> None -> base path, changing emitted
+        // bytes while the IR (core_semantic_hash) was unchanged. The inert values are
+        // provably equal to the former certificate-derived ones (both ==
+        // confluence.projection, licensed by the closure-equality validation), which
+        // the re-pointed px8 authority controls below PROVE by still rejecting.
 
         // R3 SHAPE GATE LIVES AT CONSUMPTION, not here (Architect ruling A,
         // evt_h0vgd11g5xfb, the faithful realization of evt_39rn7empzmgym). The
@@ -7693,11 +7662,9 @@ impl StaticTransitionPlan<'_> {
             })
             .collect::<Vec<_>>();
         let (coordinate, confluence) = match classes.as_slice() {
-            [] => {
-                return Err(planner_error(
-                    "an admitted Tail producer-to-Ret route has no post-selection confluence class",
-                ))
-            }
+            // Inert gate: this transport is not a member of any Tail forward-Ret
+            // confluence class in the current function => not a forward-Ret route.
+            [] => return Ok(None),
             [class] => *class,
             _ => {
                 return Err(planner_error(
@@ -7712,16 +7679,9 @@ impl StaticTransitionPlan<'_> {
         };
         let selected_projection = match access.admissions.get(&key) {
             Some(CheckedIhGeneratedEntryAdmission::Governed(projection)) => projection,
-            Some(CheckedIhGeneratedEntryAdmission::NonGoverned) => {
-                return Err(planner_error(
-                    "the selected transport member resolves to a NonGoverned access admission",
-                ))
-            }
-            None => {
-                return Err(planner_error(
-                    "the forward Ret access-coordinate lookup found no exact admission",
-                ))
-            }
+            // Inert gate: a non-governed or absent admission is not a governed Tail
+            // forward-Ret route => None (the forward edge is governed-only).
+            Some(CheckedIhGeneratedEntryAdmission::NonGoverned) | None => return Ok(None),
         };
         #[cfg(feature = "px8-ds-test-support")]
         access.record_selected_tail_projection_control(
@@ -7751,17 +7711,6 @@ impl StaticTransitionPlan<'_> {
             ));
         }
 
-        if &derived_coordinate != coordinate {
-            return Err(planner_error(
-                "the selected forward Ret member rederives a different final generated-entry coordinate",
-            ));
-        }
-        if derived_projection != confluence.projection {
-            return Err(planner_error(
-                "the selected forward Ret member's planner-derived projection disagrees with its confluence class",
-            ));
-        }
-
         let CheckedIhFreshResultRoute::TailProducerToRet {
             source,
             selected_case_body_origin,
@@ -7774,9 +7723,8 @@ impl StaticTransitionPlan<'_> {
             ..
         } = selected_projection.fresh_result_route()
         else {
-            return Err(planner_error(
-                "an admitted Tail confluence class published a Direct access projection",
-            ));
+            // Inert gate: a Direct access projection is not a forward-Ret route => None.
+            return Ok(None);
         };
         #[cfg(feature = "px8-ds-test-support")]
         record_composed_return_forward_ret_authority_application();
@@ -7796,7 +7744,11 @@ impl StaticTransitionPlan<'_> {
         };
         #[cfg(not(feature = "px8-ds-test-support"))]
         let compared_producer_source = source.clone();
-        if &compared_producer_source != expected_producer_source {
+        // Re-pointed to the INERT selected_projection `source` (== the former
+        // certificate-derived expected_producer_source via confluence.projection).
+        // The ProducerSourceFromEntry px8 control still rejects against this inert
+        // value, proving inert-equals-certificate on this axis (Architect C ruling).
+        if &compared_producer_source != source {
             return Err(planner_error(
                 "the Tail producer source disagrees with the selected member's planner-derived producer step",
             ));
