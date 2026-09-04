@@ -96,7 +96,7 @@ pub use protocol::{
     ObligationStatus, WireVerdict,
 };
 pub use prover::{
-    attempt_d_with_int_assignment, attempt_obligation, attempt_obligation_with_catalog_globals,
+    attempt_d_with_int_assignment, attempt_obligation, attempt_obligation_with_catalog_handles,
     attempt_with_cert, classify, Countermodel, FormulaPath, FormulaStep, ProverResult, Route,
     StructuralRefutation, Verdict,
 };

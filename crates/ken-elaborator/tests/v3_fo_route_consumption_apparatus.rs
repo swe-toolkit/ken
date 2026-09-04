@@ -11,7 +11,7 @@ mod catalog_or;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{
-    attempt_obligation_with_catalog_globals,
+    attempt_obligation_with_catalog_handles,
     fo_kripke::{
         check_cert, denote, discover_and_quote_fo_with_catalog, embed, encode_fo_problem,
         find_certificate, kernel_checked_fo_composite, positive_control_term, quote_fo, AtomEnv,
@@ -291,7 +291,7 @@ fn encoder_covers_every_slice_source_constructor_and_route_stays_unknown() {
     let extracted = v2_extract(&elaborated);
     let triple = extracted.obligations.first().expect("one obligation");
     assert!(matches!(
-        attempt_obligation_with_catalog_globals(&mut env.env, &env.globals, triple).verdict,
+        attempt_obligation_with_catalog_handles(&mut env.env, &handles, triple).verdict,
         Verdict::Unknown { .. }
     ));
 

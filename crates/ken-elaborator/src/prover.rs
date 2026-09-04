@@ -293,26 +293,25 @@ fn has_free_vars(t: &Term, depth: usize) -> bool {
 ///
 /// Route selection is **exhaustive**: every obligation is attempted (§2.1).
 pub fn attempt_obligation(env: &mut GlobalEnv, triple: &ObligationTriple) -> ProverResult {
-    attempt_obligation_with_catalog_handles(env, triple, None)
+    attempt_obligation_with_optional_catalog(env, triple, None)
 }
 
-/// Attempt one obligation with FoKripke catalog identities resolved at an
-/// elaborator boundary where source names are still available.
+/// Attempt one obligation using FoKripke catalog identities that were already
+/// resolved at an elaborator construction boundary.
 ///
 /// This additive entry keeps bare [`GlobalEnv`] callers fail-closed while
 /// giving the accepted FO route the already-kernel-checked theorem handles it
-/// will consume. Resolution happens here, never by inspecting transparent
-/// declarations inside the prover.
-pub fn attempt_obligation_with_catalog_globals(
+/// will consume. The prover receives only carried `GlobalId`s and never a
+/// source-name map.
+pub fn attempt_obligation_with_catalog_handles(
     env: &mut GlobalEnv,
-    globals: &std::collections::HashMap<String, GlobalId>,
+    catalog: &crate::fo_kripke::FoCatalogHandles,
     triple: &ObligationTriple,
 ) -> ProverResult {
-    let handles = crate::fo_kripke::FoCatalogHandles::resolve(globals);
-    attempt_obligation_with_catalog_handles(env, triple, handles.as_ref())
+    attempt_obligation_with_optional_catalog(env, triple, Some(catalog))
 }
 
-fn attempt_obligation_with_catalog_handles(
+fn attempt_obligation_with_optional_catalog(
     env: &mut GlobalEnv,
     triple: &ObligationTriple,
     catalog: Option<&crate::fo_kripke::FoCatalogHandles>,
