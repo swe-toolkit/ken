@@ -32,9 +32,10 @@ fn base_env() -> ElabEnv {
     // import) and `list_append` so each real selective import installs its own
     // binding, and keep Derived importable.
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "list_append"]);
-    catalog_or::withhold_lc_bool_and_from_legacy_lf_scope(&mut env);
+    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
         .expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
+    catalog_or::restore_lc_bool_and_flat_aliases(&mut env);
     env
 }
 

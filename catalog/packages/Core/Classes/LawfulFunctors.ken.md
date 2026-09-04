@@ -35,6 +35,8 @@ a propositional equation in `Omega`.
 ```ken
 import Data.Collections.Derived (list_append)
 
+import Core.Classes.LawfulClasses as LC
+
 import Core.Logic.Transport (cong, sym, trans)
 
 pub class Semigroup a {
@@ -69,9 +71,10 @@ original package source uses.
 Once a concrete instance is registered, its fields project directly off the
 synthesized `C_instance_T` dictionary. `instance Monoid Bool` and
 `instance Monoid (List a)` are the two worked
-examples here: `Monoid_instance_Bool` restates the *same* `op`/`assoc`
-definitions (`bool_and`/`bool_and::assoc`) that `Semigroup_instance_Bool` uses, and
-`Monoid_instance_List`'s dictionary is genuinely generic in the element type
+examples here: `Monoid_instance_Bool` reuses the same canonical `bool_and`
+operation and proofs from `Core.Classes.LawfulClasses` that
+`Semigroup_instance_Bool` uses, and `Monoid_instance_List`'s dictionary is
+genuinely generic in the element type
 — it elaborates as `(a : Type) → Monoid (List a)`, so a caller applies it to
 a concrete `a` before projecting a field, exactly like any other
 parametric-head instance.
@@ -106,77 +109,30 @@ instance Monoid (List a) {
 
 ### 4.2 The `Bool` conjunction monoid — the finite carrier
 
-Complements the `List` monoid's inductive style with the FINITE case-split
-style: no induction / no IH, every branch closes by `Proved` or `Refl` directly.
-`bool_and` is a transparent match-based definition rather than a primitive.
-It reduces on each concrete constructor, which lets the laws compute directly
-even when an argument is initially symbolic.
+Complements the `List` monoid's inductive style with the finite case-split
+style. The transparent `bool_and` operation and its canonical proof family live
+in `Core.Classes.LawfulClasses`; this package imports that single owner and only
+assembles the two algebra dictionaries.
 
-Associativity is a full 2×2×2 case-split; each concrete branch reduces both
-sides to the same literal, collapsing to `Top` → `Proved`. Left unit is
-DEFINITIONAL: `bool_and True x` reduces to `x` (first match arm), goal
-`Equal Bool x x` neutral → `Refl`. Right unit needs the case-split
-(`bool_and x True` is stuck on symbolic `x`): each branch reduces to a
-literal equal to itself → `Top` → `Proved`.
+The canonical associativity proof is a full 2×2×2 case split. Its
+`left_identity` proof is definitional: `bool_and True x` reduces to `x`, leaving
+`Equal Bool x x` and closing with `Refl`. Its `right_identity` proof splits the
+initially symbolic `x`; each branch reduces to a literal equal to itself and
+closes with `Proved`. The `Monoid` field names remain `left_unit` and
+`right_unit`; their values are those canonical identity proofs.
 
 ```ken
-fn bool_and (p : Bool) (q : Bool) : Bool =
-  match p {
-    True ↦ q;
-    False ↦ False
-  }
-
-proof assoc for bool_and
-      (x : Bool) (y : Bool) (z : Bool)
-    : Equal Bool (bool_and (bool_and x y) z) (bool_and x (bool_and y z)) =
-  match x {
-    True ↦
-      match y {
-        True ↦
-          match z {
-            True ↦ Proved;
-            False ↦ Proved
-          };
-        False ↦
-          match z {
-            True ↦ Proved;
-            False ↦ Proved
-          }
-      };
-    False ↦
-      match y {
-        True ↦
-          match z {
-            True ↦ Proved;
-            False ↦ Proved
-          };
-        False ↦
-          match z {
-            True ↦ Proved;
-            False ↦ Proved
-          }
-      }
-  }
-
-proof left_unit for bool_and (x : Bool) : Equal Bool (bool_and True x) x = Refl
-
-proof right_unit for bool_and (x : Bool) : Equal Bool (bool_and x True) x =
-  match x {
-    True ↦ Proved;
-    False ↦ Proved
-  }
-
 instance Semigroup Bool {
-  op = bool_and;
-  assoc = proof assoc for bool_and
+  op = LC.bool_and;
+  assoc = proof assoc for LC.bool_and
 }
 
 instance Monoid Bool {
-  op = bool_and;
+  op = LC.bool_and;
   mempty = True;
-  assoc = proof assoc for bool_and;
-  left_unit = proof left_unit for bool_and;
-  right_unit = proof right_unit for bool_and
+  assoc = proof assoc for LC.bool_and;
+  left_unit = proof left_identity for LC.bool_and;
+  right_unit = proof right_identity for LC.bool_and
 }
 ```
 
@@ -452,8 +408,9 @@ external reference implementation.
    law field is postulated anywhere.
 5. **Proof families.** `List` instances: structural induction + `cong`
    lifting the tail IH under the head constructor (`§4.1`, `§4.3`, `§4.4`).
-   `Bool` instances: full finite case-split, every branch closing by `Proved` or
-   `Refl` directly, no IH (`§4.2`). `Option` instances: single-level
+   `Bool` instances: reuse of the canonical finite `bool_and` proof family,
+   whose branches close by `Proved` or `Refl` directly, with no IH (`§4.2`).
+   `Option` instances: single-level
    case-split / definitional equality (`§4.3`, `§4.4`).
 6. **Consumers.** `Functor`, `Foldable`, and `Monoid`-using packages build on
    these class declarations and instances.

@@ -61,7 +61,7 @@ fn dependency_env() -> ElabEnv {
         });
     }
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "length"]);
-    catalog_or::withhold_lc_bool_and_from_legacy_lf_scope(&mut env);
+    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
     for (source, label) in [
         (LAWFUL_FUNCTORS_KEN_MD, "Core.Classes.LawfulFunctors"),
         (EFFECTFUL_CLASSES_KEN_MD, "Core.Classes.EffectfulClasses"),
@@ -72,6 +72,9 @@ fn dependency_env() -> ElabEnv {
     ] {
         env.elaborate_ken_md_file(source)
             .unwrap_or_else(|err| panic!("{label} must elaborate in dependency order: {err:?}"));
+        if label == "Core.Classes.LawfulFunctors" {
+            catalog_or::restore_lc_bool_and_flat_aliases(&mut env);
+        }
     }
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
         .expect("Data.Numeric.Nat.Order must load before its Cursor consumer");

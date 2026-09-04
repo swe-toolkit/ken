@@ -3,14 +3,16 @@
 //! Promise class: durable invariants. `Core.Classes.LawfulFunctors` exposes
 //! exactly the authorized ordinary and attached definitions in EC's
 //! signature-closed provider set plus the downstream Semigroup class, while
-//! retaining their existing identities and trust posture.
+//! retaining their existing identities and trust posture. Its Bool algebra
+//! dictionaries consume the one canonical LawfulClasses conjunction family.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{parser, Decl, ElabEnv, ElabError, ExportForm};
-use ken_kernel::{Decl as KernelDecl, GlobalId, Term};
+use ken_kernel::{convert, convert_type, Context, Decl as KernelDecl, GlobalId, Term};
 
+const LAWFUL_CLASSES: &str = "Core.Classes.LawfulClasses";
 const LAWFUL_FUNCTORS: &str = "Core.Classes.LawfulFunctors";
 const LAWFUL_FUNCTORS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
@@ -21,11 +23,18 @@ fn catalog_root() -> PathBuf {
         .join("catalog/packages")
 }
 
-fn load_lawful_functors() -> ElabEnv {
+fn load_lawful_functors_with_ids() -> (ElabEnv, BTreeSet<GlobalId>) {
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots(&[catalog_root()], LAWFUL_FUNCTORS)
-        .expect("LawfulFunctors must elaborate through the real roots loader");
-    env
+    let ids = env
+        .elaborate_module_from_roots(&[catalog_root()], LAWFUL_FUNCTORS)
+        .expect("LawfulFunctors must elaborate through the real roots loader")
+        .into_iter()
+        .collect();
+    (env, ids)
+}
+
+fn load_lawful_functors() -> ElabEnv {
+    load_lawful_functors_with_ids().0
 }
 
 fn term_mentions(term: &Term, target: GlobalId) -> bool {
@@ -41,6 +50,41 @@ fn term_mentions(term: &Term, target: GlobalId) -> bool {
             .into_iter()
             .any(|child| term_mentions(child, target)),
     }
+}
+
+fn transparent_kernel_equivalents(
+    env: &ElabEnv,
+    candidates: &BTreeSet<GlobalId>,
+    provider: GlobalId,
+) -> BTreeSet<GlobalId> {
+    let (provider_level_params, provider_ty, provider_body) = match env.env.lookup(provider) {
+        Some(KernelDecl::Transparent {
+            level_params,
+            ty,
+            body,
+            ..
+        }) => (level_params, ty, body),
+        other => panic!("canonical provider must be transparent, got {other:?}"),
+    };
+    let context = Context::new();
+    candidates
+        .iter()
+        .filter_map(|candidate| {
+            let (level_params, ty, body) = match env.env.lookup(*candidate) {
+                Some(KernelDecl::Transparent {
+                    level_params,
+                    ty,
+                    body,
+                    ..
+                }) => (level_params, ty, body),
+                _ => return None,
+            };
+            (level_params == provider_level_params
+                && convert_type(&env.env, &context, ty, provider_ty)
+                && convert(&env.env, &context, provider_ty, body, provider_body))
+            .then_some(*candidate)
+        })
+        .collect()
 }
 
 fn provider_identity(env: &ElabEnv, surface: &str) -> GlobalId {
@@ -323,6 +367,80 @@ fn lawful_functors_loader_visible_inventory_is_exact() {
         authorized_surfaces(),
         "LawfulFunctors must expose exactly the authorized provider inventory"
     );
+}
+
+/// MEASURED: the roots loader identifies LF's owned declarations separately
+/// from its dependency closure. LF owns no `bool_and`-family name and no owned
+/// transparent declaration kernel-equivalent to LC's operation, associativity,
+/// or identity proofs. The existing Bool Semigroup and Monoid dictionaries
+/// mention the exact LC provider identities in precisely the fields their class
+/// types require. CLAIMED: LF has one canonical conjunction dependency and no
+/// duplicate operation or proposition identity. THE GAP: `cat_map_bool_and_owner`
+/// owns Map's side of the consolidation, while `cat_bool_pub_export` owns LC's
+/// public provider inventory.
+#[test]
+fn lawful_functors_bool_algebra_uses_only_lawfulclasses_canonical_family() {
+    let (env, lawful_functors_ids) = load_lawful_functors_with_ids();
+    let surfaces = [
+        "bool_and",
+        "bool_and::assoc",
+        "bool_and::left_identity",
+        "bool_and::right_identity",
+    ];
+    let providers = surfaces.map(|surface| env.globals[&format!("{LAWFUL_CLASSES}.{surface}")]);
+
+    let local_family = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            let local = name.strip_prefix(&format!("{LAWFUL_FUNCTORS}."))?;
+            (lawful_functors_ids.contains(id)
+                && (local == "bool_and" || local.starts_with("bool_and::")))
+            .then_some(local.to_owned())
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        local_family,
+        BTreeSet::new(),
+        "LawfulFunctors must own no local bool_and family"
+    );
+    for (surface, provider) in surfaces.into_iter().zip(providers) {
+        assert_eq!(
+            transparent_kernel_equivalents(&env, &lawful_functors_ids, provider),
+            BTreeSet::new(),
+            "LawfulFunctors must own no kernel-equivalent duplicate of LC's `{surface}`"
+        );
+    }
+
+    for (class, expected_mentions) in [
+        ("Semigroup", [true, true, false, false]),
+        ("Monoid", [true, true, true, true]),
+    ] {
+        let key = (class.to_owned(), "Bool".to_owned());
+        let instance = env
+            .class_env
+            .instances
+            .get(&key)
+            .unwrap_or_else(|| panic!("{class} Bool must retain its canonical instance"))
+            .instance_id;
+        let (ty, body) = match env.env.lookup(instance) {
+            Some(KernelDecl::Transparent { ty, body, .. }) => (ty, body),
+            other => panic!("{class} Bool instance must remain transparent, got {other:?}"),
+        };
+        assert!(
+            term_mentions(ty, provider_identity(&env, class)),
+            "{class} Bool must retain its existing class identity"
+        );
+        for ((surface, provider), expected) in
+            surfaces.into_iter().zip(providers).zip(expected_mentions)
+        {
+            assert_eq!(
+                term_mentions(body, provider),
+                expected,
+                "{class} Bool canonical-provider binding for `{surface}` changed"
+            );
+        }
+    }
 }
 
 /// MEASURED: one real selective consumer resolves all authorized direct imports
