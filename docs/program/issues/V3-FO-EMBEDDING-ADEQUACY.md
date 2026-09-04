@@ -1,7 +1,7 @@
 ---
 id: V3-FO-EMBEDDING-ADEQUACY
 title: "Author the embedding and prove embedding_adequacy (classically_valid of the translated form implies the source form) — the SECOND of the two theorems 23 section 4.4 requires before route FO may return proved"
-status: active
+status: merged
 owner: language
 size: L
 gate: none

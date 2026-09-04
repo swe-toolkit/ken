@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-04 03:20:19Z — from 539 issue file(s) in `docs/program/issues/`.
+2026-09-04 05:22:05Z — from 539 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -558,7 +558,7 @@ the committed file matches the generator's output.
 | `V3-FO-CHECKER-SOUNDNESS` | Author FokDerivation, fok_derives and fok_classically_valid, and prove checker_soundness in Ken over the check_cert that now exists -- the first of the two theorems 23 section 4.4 requires before route FO may return proved | merged | language | L | none | — |
 | `V3-FO-CONVERSION-LOAD-MEASURED` | Establish source-level provenance for FO obligations and measure the Rust reference checker over their certificate trees, recording that the kernel-conversion quantity 23 section 4.4 names is not takeable at this SHA | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/2363 |
 | `V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT` | Exclude bottom_id from conjunct 1's sort candidates, and correct the design note's direction claim, which does not cover the mechanism that produced the defect | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2375 |
-| `V3-FO-EMBEDDING-ADEQUACY` | Author the embedding and prove embedding_adequacy (classically_valid of the translated form implies the source form) — the SECOND of the two theorems 23 section 4.4 requires before route FO may return proved | active | language | L | none | — |
+| `V3-FO-EMBEDDING-ADEQUACY` | Author the embedding and prove embedding_adequacy (classically_valid of the translated form implies the source form) — the SECOND of the two theorems 23 section 4.4 requires before route FO may return proved | merged | language | L | none | — |
 | `V3-FO-GUARD-SHIFT-DIFFERENTIAL` | Pin mentions_var0 against a shift-built oracle so the duplicated binder discipline cannot drift silently | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2371 |
 | `V3-FO-KEN-LEVEL-CHECKER-AUTHORING` | Author the Ken-level check_cert, embed, Form and Cert so the conversion cost 23 section 4.4 names becomes measurable at all, and take that measurement | merged | language | L | none | — |
 | `V3-FO-KRIPKE-SLICE` | Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls | merged | language | L | none | — |
