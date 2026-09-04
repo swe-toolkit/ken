@@ -1,7 +1,7 @@
 ---
 id: LANG-FOK-SCOPED-IFORM-INDEX-ERRATUM
 title: "D2b HS20+HS21 (WIDENED 2026-09-04, RULED elaborator-only evt_5mg8n0bdz41m4): D1 = carrier migration `FokScopedIForm` depth n param->Nat index (catalog/); D2 = elaborator PLAIN-ELIMINATOR path for a declared-index recursive field whose motive returns a co-indexed family (crates/ken-elaborator). HS20 diagnosis: FokScopedIForm declares depth `n` as a datatype PARAMETER (FoKripke.ken:122, `data FokScopedIForm (sigma) (n) : Type`, params=2 indices=0) but FokScopedForall recurses `n -> Suc n` — non-uniform, which only an INDEX permits. The Elim of a parameterized type fixes `n` in the motive, so the correspondence-motive IH stays at outer `n` while the constructor body is at `Suc n` (generic D0 `KernelRejected TypeMismatch { expected (Dg581 (cg69 @3)), found (Dg581 (cg69 (cg69 @3))) }` = MiniForm(Suc m) vs MiniForm(Suc(Suc m))). Fix = move `n` from the parameter list to a `Nat ->` INDEX (`data FokScopedIForm (sigma : FokSignature) : Nat -> Type`), constructor result/field types carrying `n` as index exactly as the sibling FokObjectEnv (:88, `data FokObjectEnv (sigma) (c) : Nat -> Type 1`) already does and eliminates fine. Restores FokScopedIForm to its own stated intrinsic-index intent. Architect layer ruling evt_6ntratrsb8qtj."
-status: active
+status: merged
 owner: language
 size: M
 gate: none
