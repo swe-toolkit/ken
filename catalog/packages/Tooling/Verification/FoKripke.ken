@@ -119,18 +119,21 @@ fn fok_object_env_lookup
 -- The intrinsically-scoped source form `IForm Sigma n` from 23 section 4.4.
 -- `n` counts enclosing object binders. Implication keeps that count unchanged;
 -- forall checks its body at one additional object slot.
-data FokScopedIForm (sigma : FokSignature) (n : Nat) : Type where {
-  FokScopedBottom : FokScopedIForm sigma n;
-  FokScopedAtom : FokFin n -> FokScopedIForm sigma n;
+data FokScopedIForm (sigma : FokSignature) : Nat -> Type where {
+  FokScopedBottom : (n : Nat) -> FokScopedIForm sigma n;
+  FokScopedAtom : (n : Nat) -> FokFin n -> FokScopedIForm sigma n;
   FokScopedOr :
-    FokScopedIForm sigma n
+    (n : Nat)
+    -> FokScopedIForm sigma n
     -> FokScopedIForm sigma n
     -> FokScopedIForm sigma n;
   FokScopedImp :
-    FokScopedIForm sigma n
+    (n : Nat)
+    -> FokScopedIForm sigma n
     -> FokScopedIForm sigma n
     -> FokScopedIForm sigma n;
-  FokScopedForall : FokScopedIForm sigma (Suc n) -> FokScopedIForm sigma n
+  FokScopedForall :
+    (n : Nat) -> FokScopedIForm sigma (Suc n) -> FokScopedIForm sigma n
 }
 
 -- === D0: quoted target data (23 section 4.3, slice subset) ===
@@ -317,17 +320,17 @@ fn fok_denote_at
     (f : FokScopedIForm sigma n)
     : FokObjectEnv sigma c n -> Omega =
   match f {
-    FokScopedBottom ↦ λxs. Bottom;
-    FokScopedAtom i ↦ λxs.
+    FokScopedBottom m ↦ λxs. Bottom;
+    FokScopedAtom m i ↦ λxs.
       fok_pred_p sigma c rho (fok_object_env_lookup sigma c n xs i);
-    FokScopedOr p q ↦ λxs.
+    FokScopedOr m p q ↦ λxs.
       ‖Or
         ((fok_denote_at sigma c rho n p) xs)
         ((fok_denote_at sigma c rho n q) xs)‖;
-    FokScopedImp p q ↦ λxs.
+    FokScopedImp m p q ↦ λxs.
       (fok_denote_at sigma c rho n p xs)
         -> (fok_denote_at sigma c rho n q xs);
-    FokScopedForall p ↦ λxs.
+    FokScopedForall m p ↦ λxs.
       (x : fok_sort_a sigma c) ->
         (fok_denote_at sigma c rho (Suc n) p)
           (FokObjectEnvCons sigma c n x xs)
@@ -351,13 +354,13 @@ fn fok_erase_n
     (f : FokScopedIForm sigma n)
     : FokIForm =
   match f {
-    FokScopedBottom ↦ FokIBottom;
-    FokScopedAtom i ↦ FokIAtom (FokMkIVar (fok_fin_to_nat n i));
-    FokScopedOr p q ↦
+    FokScopedBottom m ↦ FokIBottom;
+    FokScopedAtom m i ↦ FokIAtom (FokMkIVar (fok_fin_to_nat n i));
+    FokScopedOr m p q ↦
       FokIOr (fok_erase_n sigma n p) (fok_erase_n sigma n q);
-    FokScopedImp p q ↦
+    FokScopedImp m p q ↦
       FokIImp (fok_erase_n sigma n p) (fok_erase_n sigma n q);
-    FokScopedForall p ↦ FokIForall (fok_erase_n sigma (Suc n) p)
+    FokScopedForall m p ↦ FokIForall (fok_erase_n sigma (Suc n) p)
   }
 
 -- The target leg uses the already-landed embedding verbatim on the forgetful

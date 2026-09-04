@@ -94,6 +94,25 @@ fn intrinsic_apparatus_passes_full_admission_with_zero_trust_delta() {
 }
 
 #[test]
+fn scoped_formula_depth_is_an_index_not_a_parameter() {
+    let env = env_with_fok();
+    let id = env.globals["FokScopedIForm"];
+    let family = env
+        .env
+        .inductive(id)
+        .expect("FokScopedIForm is an inductive family");
+    assert_eq!(family.params.len(), 1, "only the signature is a parameter");
+    assert_eq!(family.indices.len(), 1, "scope depth is the sole index");
+    assert!(
+        family
+            .constructors
+            .iter()
+            .all(|constructor| constructor.target_indices.len() == 1),
+        "every scoped-form constructor returns at an explicit depth"
+    );
+}
+
+#[test]
 fn empty_carrier_and_total_scoped_atom_environment_are_writable() {
     let mut env = env_with_fok();
     let decls = [
@@ -292,13 +311,13 @@ fn recursive_parent_call_is_rejected_by_unchanged_sct() {
         "fn fok_d1_bad_erase (sigma : FokSignature) (n : Nat) \
          (f : FokScopedIForm sigma n) : FokIForm = \
          match f { \
-           FokScopedBottom ↦ FokIBottom; \
-           FokScopedAtom i ↦ FokIAtom (FokMkIVar (fok_fin_to_nat n i)); \
-           FokScopedOr p q ↦ FokIOr (fok_d1_bad_erase sigma n f) \
+           FokScopedBottom m ↦ FokIBottom; \
+           FokScopedAtom m i ↦ FokIAtom (FokMkIVar (fok_fin_to_nat n i)); \
+           FokScopedOr m p q ↦ FokIOr (fok_d1_bad_erase sigma n f) \
              (fok_d1_bad_erase sigma n q); \
-           FokScopedImp p q ↦ FokIImp (fok_d1_bad_erase sigma n p) \
+           FokScopedImp m p q ↦ FokIImp (fok_d1_bad_erase sigma n p) \
              (fok_d1_bad_erase sigma n q); \
-           FokScopedForall p ↦ FokIForall (fok_d1_bad_erase sigma (Suc n) p) \
+           FokScopedForall m p ↦ FokIForall (fok_d1_bad_erase sigma (Suc n) p) \
          }",
     );
     assert!(
