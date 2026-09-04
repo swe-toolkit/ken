@@ -48,6 +48,55 @@ fn concrete_bind_method_is_green() {
     .expect("the kernel accepts the explicit declared-index Bind method");
 }
 
+/// Durable universe-axis soundness pair (`39 §5.7`, HS21 M5): a polymorphic
+/// family stays on the plain path with its level intact, while the neighbouring
+/// wrong-index body reaches and is rejected by the kernel type checker.
+#[test]
+fn universe_polymorphic_declared_index_pair_preserves_levels() {
+    let mut env = ElabEnv::new().expect("base env");
+    for decl in [
+        "data PolyEnv (a : Type) : Nat -> Type where { \
+           PolyNil : PolyEnv a Zero; \
+           PolyCons : (m : Nat) -> a -> PolyEnv a m -> PolyEnv a (Suc m) }",
+        "data PolyForm (a : Type) : Nat -> Type where { \
+           PolyLeaf : (n : Nat) -> a -> PolyForm a n; \
+           PolyBind : (n : Nat) -> PolyForm a (Suc n) -> PolyForm a n }",
+    ] {
+        env.elaborate_decl(decl)
+            .unwrap_or_else(|error| panic!("polymorphic fixture failed for `{decl}`: {error:?}"));
+    }
+    env.elaborate_decl(
+        "fn poly_coupled (a : Type) (n : Nat) (form : PolyForm a n) : \
+           PolyEnv a n -> Omega = \
+         match form { \
+           PolyLeaf m value ↦ λxs. Top; \
+           PolyBind m body ↦ λxs. (x : a) -> \
+             poly_coupled a (Suc n) body (PolyCons a n x xs) }",
+    )
+    .expect("the plain path preserves the polymorphic family's universe");
+
+    let error = env
+        .elaborate_decl(
+            "fn poly_wrong_index (a : Type) (n : Nat) (form : PolyForm a n) : \
+               PolyEnv a n -> Omega = \
+             match form { \
+               PolyLeaf m value ↦ λxs. Top; \
+               PolyBind m body ↦ λxs. (x : a) -> \
+                 poly_coupled a (Suc n) body xs }",
+        )
+        .expect_err("the polymorphic Bind branch must reject the wrong environment index");
+    assert!(
+        matches!(
+            error,
+            ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            }
+        ),
+        "the polymorphic wrong-index case must reach the kernel, found {error:?}"
+    );
+}
+
 /// Durable soundness pair (`39 §5.7`, HS21): the motive co-indexes `MiniEnv`
 /// at the recursive field's declared index, while an unchanged wrong-index
 /// argument reaches and is rejected by the kernel type checker.

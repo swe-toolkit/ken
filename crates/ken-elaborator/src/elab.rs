@@ -2853,6 +2853,7 @@ fn recursive_field_index_path(
     cx: &ElabCtx,
     ind: &InductiveDecl,
     params: &[Term],
+    level_args: &[Level],
     scrut_core: &Term,
     scrut_indices: &[Term],
 ) -> Result<RecursiveFieldIndexPath, ElabError> {
@@ -2871,19 +2872,34 @@ fn recursive_field_index_path(
         return Ok(RecursiveFieldIndexPath::CoupledRefinement);
     }
 
-    let index_ty = subst_outer(&ind.indices[0], ind.params.len(), params, 0);
+    let zonked_ctx = Context {
+        types: cx.ctx.types.iter().map(|term| cx.metas.zonk_term(term)).collect(),
+    };
+    let index_ty = cx.metas.zonk_term(&subst_levels(
+        &subst_outer(&ind.indices[0], ind.params.len(), params, 0),
+        &ind.level_params,
+        level_args,
+    ));
     for ctor in &ind.constructors {
         let field_count = ctor.args.len();
-        let mut branch_ctx = cx.ctx.clone();
+        let mut branch_ctx = zonked_ctx.clone();
         for field in 0..field_count {
-            branch_ctx.push(subst_outer(
-                &ctor.args[field],
-                ind.params.len(),
-                params,
-                field,
-            ));
+            branch_ctx.push(cx.metas.zonk_term(&subst_levels(
+                &subst_outer(&ctor.args[field], ind.params.len(), params, field),
+                &ind.level_params,
+                level_args,
+            )));
         }
-        let target_indices = ctor_target_indices(ctor, ind, params, field_count);
+        let target_indices = ctor_target_indices(
+            ctor,
+            ind,
+            params,
+            level_args,
+            field_count,
+        )
+        .into_iter()
+        .map(|term| cx.metas.zonk_term(&term))
+        .collect::<Vec<_>>();
         let shapes = recursive_shapes(cx.env, ctor, ind.id, ind.params.len()).map_err(|error| {
             ElabError::Internal(format!(
                 "declared-index recursive-field classification failed: {error:?}"
@@ -2896,16 +2912,20 @@ fn recursive_field_index_path(
             if !branching_telescope.is_empty() || declared_indices.len() != 1 {
                 continue;
             }
-            let declared_index = ken_kernel::subst::shift(
-                &subst_outer(
-                    &declared_indices[0],
-                    ind.params.len(),
-                    params,
-                    shape.position,
+            let declared_index = cx.metas.zonk_term(&ken_kernel::subst::shift(
+                &subst_levels(
+                    &subst_outer(
+                        &declared_indices[0],
+                        ind.params.len(),
+                        params,
+                        shape.position,
+                    ),
+                    &ind.level_params,
+                    level_args,
                 ),
                 (field_count - shape.position) as i64,
                 0,
-            );
+            ));
             let branch_index_ty = weaken(&index_ty, field_count as i64);
             if !convert(
                 cx.env,
@@ -4550,6 +4570,7 @@ fn build_dependent_constructor_frame(
     ind: &InductiveDecl,
     ctor: &ConstructorDecl,
     params: &[Term],
+    level_args: &[Level],
     scrut_indices: &[Term],
     scrut_ty: &Term,
     scrut_core: &Term,
@@ -4565,8 +4586,8 @@ fn build_dependent_constructor_frame(
     recursive_field_index_path: RecursiveFieldIndexPath,
     span: &Span,
 ) -> Result<Box<DependentConstructorFrame>, ElabError> {
-    let concrete = build_dependent_concrete(ctor, params, field_count);
-    let target_indices = ctor_target_indices(ctor, ind, params, field_count);
+    let concrete = build_dependent_concrete(ctor, params, level_args, field_count);
+    let target_indices = ctor_target_indices(ctor, ind, params, level_args, field_count);
     let plain_declared = recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared;
     if plain_declared
         && (!context_convoy.is_empty()
@@ -4749,11 +4770,12 @@ fn build_dependent_constructor_frame(
 fn build_dependent_concrete(
     ctor: &ConstructorDecl,
     params: &[Term],
+    level_args: &[Level],
     field_count: usize,
 ) -> Box<Term> {
     let mut concrete = Term::Constructor {
         id: ctor.id,
-        level_args: Vec::new(),
+        level_args: level_args.to_vec(),
     };
     for param in params {
         concrete = Term::app(concrete, weaken(param, field_count as i64));
@@ -4978,6 +5000,7 @@ fn install_plain_declared_index_aliases(
     cx: &mut ElabCtx,
     ind: &InductiveDecl,
     params: &[Term],
+    level_args: &[Level],
     target_indices: &[Term],
     scrut_indices: &[Term],
     scrut_core: &Term,
@@ -4989,6 +5012,13 @@ fn install_plain_declared_index_aliases(
             "plain declared-index path lost its index telescope".into(),
         ));
     }
+    // Surface `(a : Type)` may still leave a universe metavariable in the
+    // elaborator context even though the admitted family parameter has already
+    // zonked it. Every raw-kernel query below must see the same zonked context,
+    // target indices, and level-instantiated constructor.
+    let zonked_ctx = Context {
+        types: cx.ctx.types.iter().map(|term| cx.metas.zonk_term(term)).collect(),
+    };
     for (ordinal, (actual, target)) in scrut_indices.iter().zip(target_indices).enumerate() {
         let Term::Var(actual_index) = actual else {
             return Err(ElabError::Internal(
@@ -5005,22 +5035,27 @@ fn install_plain_declared_index_aliases(
                     "plain declared-index variable escaped its constructor context".into(),
                 )
             })?;
-        let index_ty = weaken(
-            &subst_outer(&ind.indices[ordinal], ind.params.len(), params, ordinal),
+        let index_ty = cx.metas.zonk_term(&weaken(
+            &subst_levels(
+                &subst_outer(&ind.indices[ordinal], ind.params.len(), params, ordinal),
+                &ind.level_params,
+                level_args,
+            ),
             field_count as i64,
-        );
-        let target_ty = kernel_infer(cx.env, &cx.ctx, target).map_err(|error| {
+        ));
+        let target = cx.metas.zonk_term(target);
+        let target_ty = kernel_infer(cx.env, &zonked_ctx, &target).map_err(|error| {
             ElabError::Internal(format!(
                 "plain declared-index target is ill-typed: {error:?}"
             ))
         })?;
-        if !convert_type(cx.env, &cx.ctx, &target_ty, &index_ty) {
+        if !convert_type(cx.env, &zonked_ctx, &target_ty, &index_ty) {
             return Err(ElabError::Internal(
                 "plain declared-index target has the wrong index type".into(),
             ));
         }
         cx.var_refinements
-            .insert(position, (target.clone(), index_ty, cx.ctx.len()));
+            .insert(position, (target, index_ty, cx.ctx.len()));
     }
 
     let Term::Var(scrut_index) = scrut_core else {
@@ -5038,15 +5073,14 @@ fn install_plain_declared_index_aliases(
                 "plain declared-index scrutinee escaped its constructor context".into(),
             )
         })?;
-    let concrete_ty = kernel_infer(cx.env, &cx.ctx, concrete).map_err(|error| {
+    let concrete = cx.metas.zonk_term(concrete);
+    let concrete_ty = kernel_infer(cx.env, &zonked_ctx, &concrete).map_err(|error| {
         ElabError::Internal(format!(
             "plain declared-index constructor is ill-typed: {error:?}"
         ))
     })?;
-    cx.var_refinements.insert(
-        scrut_position,
-        (concrete.clone(), concrete_ty, cx.ctx.len()),
-    );
+    cx.var_refinements
+        .insert(scrut_position, (concrete, concrete_ty, cx.ctx.len()));
     Ok(())
 }
 
@@ -5061,6 +5095,7 @@ fn check_dependent_branch_body(
     arm: &RMatchArm,
     ind: &InductiveDecl,
     params: &[Term],
+    level_args: &[Level],
     target_indices: &[Term],
     scrut_indices: &[Term],
     n: usize,
@@ -5086,6 +5121,7 @@ fn check_dependent_branch_body(
                 cx,
                 ind,
                 params,
+                level_args,
                 target_indices,
                 scrut_indices,
                 scrut_core,
@@ -5321,6 +5357,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         cx,
         &ind,
         &params_terms,
+        &family_level_args,
         &scrut_core,
         &scrut_indices,
     )?;
@@ -5575,7 +5612,11 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             continue;
         }
         for j in 0..n {
-            let raw_ty = subst_outer(&ctor.args[j], m, &params_terms, j);
+            let raw_ty = subst_levels(
+                &subst_outer(&ctor.args[j], m, &params_terms, j),
+                &ind.level_params,
+                &family_level_args,
+            );
             cx.ctx.push(raw_ty);
         }
         let constructor_frame = build_dependent_constructor_frame(
@@ -5583,6 +5624,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             &ind,
             ctor,
             &params_terms,
+            &family_level_args,
             &scrut_indices,
             &scrut_ty,
             &scrut_core,
@@ -5640,6 +5682,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     arm,
                     &ind,
                     &params_terms,
+                    &family_level_args,
                     &target_indices,
                     &scrut_indices,
                     n,
@@ -5888,11 +5931,18 @@ fn ctor_target_indices(
     ctor: &ConstructorDecl,
     ind: &InductiveDecl,
     params: &[Term],
+    level_args: &[Level],
     field_count: usize,
 ) -> Vec<Term> {
     ctor.target_indices
         .iter()
-        .map(|t| subst_outer(t, ind.params.len(), params, field_count))
+        .map(|term| {
+            subst_levels(
+                &subst_outer(term, ind.params.len(), params, field_count),
+                &ind.level_params,
+                level_args,
+            )
+        })
         .collect()
 }
 
