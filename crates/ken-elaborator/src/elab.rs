@@ -1872,6 +1872,16 @@ struct EmbeddedElimSnapshot {
     methods: Vec<Term>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RecursiveFieldIndexPath {
+    /// The recursive field carries its own constructor-declared index. The
+    /// ordinary eliminator applies the motive directly at that index.
+    PlainDeclared,
+    /// A sibling scrutinee or forced index shares the refinement frame. Keep
+    /// the existing equality/convoy path for those genuinely coupled shapes.
+    CoupledRefinement,
+}
+
 struct CoherentFrameMotivePlan {
     expected: Term,
     context_convoy: Vec<ConvoyEntry>,
@@ -1879,6 +1889,7 @@ struct CoherentFrameMotivePlan {
     embedded_method_repairs: Vec<(usize, usize)>,
     motive_user_body: Term,
     equation_convoy: bool,
+    recursive_field_index_path: RecursiveFieldIndexPath,
 }
 
 /// Collect only the outermost eliminators in each term position. Once an
@@ -2831,6 +2842,85 @@ fn has_nat_shaped_index(
     has_zero && has_successor
 }
 
+/// Classify where a recursive field's index comes from before motive planning.
+///
+/// When a direct recursive field is declared at an index different from the
+/// constructor result and there is no captured sibling sharing that index, the
+/// ordinary eliminator supplies its IH by applying the motive at the field's
+/// declared index. A sibling convoy, a forced/non-variable actual index, or any
+/// other shape stays on the established coupled-refinement path.
+fn recursive_field_index_path(
+    cx: &ElabCtx,
+    ind: &InductiveDecl,
+    params: &[Term],
+    scrut_core: &Term,
+    scrut_indices: &[Term],
+) -> Result<RecursiveFieldIndexPath, ElabError> {
+    if ind.indices.len() != 1
+        || scrut_indices.len() != 1
+        || !matches!(scrut_core, Term::Var(_))
+        || !matches!(scrut_indices[0], Term::Var(_))
+        || !compute_context_convoy(
+            &cx.ctx,
+            scrut_core,
+            scrut_indices,
+            &cx.match_field_regions,
+        )
+        .is_empty()
+    {
+        return Ok(RecursiveFieldIndexPath::CoupledRefinement);
+    }
+
+    let index_ty = subst_outer(&ind.indices[0], ind.params.len(), params, 0);
+    for ctor in &ind.constructors {
+        let field_count = ctor.args.len();
+        let mut branch_ctx = cx.ctx.clone();
+        for field in 0..field_count {
+            branch_ctx.push(subst_outer(
+                &ctor.args[field],
+                ind.params.len(),
+                params,
+                field,
+            ));
+        }
+        let target_indices = ctor_target_indices(ctor, ind, params, field_count);
+        let shapes = recursive_shapes(cx.env, ctor, ind.id, ind.params.len()).map_err(|error| {
+            ElabError::Internal(format!(
+                "declared-index recursive-field classification failed: {error:?}"
+            ))
+        })?;
+        for shape in shapes {
+            let Some((branching_telescope, declared_indices)) = shape.shape.as_legacy() else {
+                continue;
+            };
+            if !branching_telescope.is_empty() || declared_indices.len() != 1 {
+                continue;
+            }
+            let declared_index = ken_kernel::subst::shift(
+                &subst_outer(
+                    &declared_indices[0],
+                    ind.params.len(),
+                    params,
+                    shape.position,
+                ),
+                (field_count - shape.position) as i64,
+                0,
+            );
+            let branch_index_ty = weaken(&index_ty, field_count as i64);
+            if !convert(
+                cx.env,
+                &branch_ctx,
+                &branch_index_ty,
+                &declared_index,
+                &target_indices[0],
+            ) {
+                return Ok(RecursiveFieldIndexPath::PlainDeclared);
+            }
+        }
+    }
+    Ok(RecursiveFieldIndexPath::CoupledRefinement)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn ordinary_coherent_frame_plan(
     cx: &ElabCtx,
@@ -2839,6 +2929,7 @@ fn ordinary_coherent_frame_plan(
     original_expected: &Term,
     motive_base_depth: usize,
     motive_local_indices: &[Term],
+    recursive_field_index_path: RecursiveFieldIndexPath,
 ) -> Box<CoherentFrameMotivePlan> {
     let context_convoy = compute_context_convoy(
         &cx.ctx,
@@ -2853,9 +2944,10 @@ fn ordinary_coherent_frame_plan(
         motive_local_indices,
         &Term::var(0),
         original_expected,
-        context_convoy
-            .iter()
-            .any(|entry| scrut_occurs(original_expected, &Term::var(entry.var))),
+        recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared
+            || context_convoy
+                .iter()
+                .any(|entry| scrut_occurs(original_expected, &Term::var(entry.var))),
     );
     Box::new(CoherentFrameMotivePlan {
         expected: original_expected.clone(),
@@ -2867,6 +2959,7 @@ fn ordinary_coherent_frame_plan(
             &motive_rebase,
         ),
         equation_convoy: false,
+        recursive_field_index_path,
     })
 }
 
@@ -2885,6 +2978,7 @@ fn plan_coherent_frame_motive(
     original_expected: &Term,
     motive_base_depth: usize,
     motive_local_indices: &[Term],
+    recursive_field_index_path: RecursiveFieldIndexPath,
     sentinel_region: usize,
     defer_coupled_expansion: bool,
     span: &Span,
@@ -2898,7 +2992,9 @@ fn plan_coherent_frame_motive(
             .collect(),
     };
     let motive_ctx = motive_context(&zonked_ctx, ind, params_terms);
-    if !has_nat_shaped_index(cx.env, &zonked_ctx, ind, params_terms) {
+    if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared
+        || !has_nat_shaped_index(cx.env, &zonked_ctx, ind, params_terms)
+    {
         return Ok(ordinary_coherent_frame_plan(
             cx,
             scrut_core,
@@ -2906,6 +3002,7 @@ fn plan_coherent_frame_motive(
             original_expected,
             motive_base_depth,
             motive_local_indices,
+            recursive_field_index_path,
         ));
     }
     let expanded_expected = boxed_simplify_branch_goal(cx.env, &zonked_ctx, original_expected);
@@ -2953,6 +3050,7 @@ fn plan_coherent_frame_motive(
                 embedded_method_repairs: Vec::new(),
                 motive_user_body,
                 equation_convoy: true,
+                recursive_field_index_path,
             }));
         }
     }
@@ -3036,6 +3134,7 @@ fn plan_coherent_frame_motive(
         embedded_method_repairs,
         motive_user_body,
         equation_convoy: false,
+        recursive_field_index_path,
     }))
 }
 
@@ -4137,9 +4236,14 @@ fn finish_dependent_elim(
     context_convoy: &[ConvoyEntry],
     embedded_method_convoy: &[EmbeddedMethodConvoy],
     add_hidden_equation: bool,
+    recursive_field_index_path: RecursiveFieldIndexPath,
     span: &Span,
 ) -> Result<Term, ElabError> {
-    let top_premises = method_index_premises(ind, &params_terms, scrut_indices, scrut_indices, 0);
+    let top_premises = if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
+        Vec::new()
+    } else {
+        method_index_premises(ind, &params_terms, scrut_indices, scrut_indices, 0)
+    };
     let mut elim = Term::Elim {
         fam: d_id,
         level_args: vec![],
@@ -4458,18 +4562,40 @@ fn build_dependent_constructor_frame(
     embedded_method_repairs: &[(usize, usize)],
     hidden_group_result_refinement: bool,
     equation_convoy: bool,
+    recursive_field_index_path: RecursiveFieldIndexPath,
     span: &Span,
 ) -> Result<Box<DependentConstructorFrame>, ElabError> {
     let concrete = build_dependent_concrete(ctor, params, field_count);
     let target_indices = ctor_target_indices(ctor, ind, params, field_count);
-    let mut premise_domains = method_index_premises(
-        ind,
-        params,
-        &target_indices,
-        scrut_indices,
-        field_count,
-    );
-    let mut expected_here = if equation_convoy {
+    let plain_declared = recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared;
+    if plain_declared
+        && (!context_convoy.is_empty()
+            || !embedded_method_convoy.is_empty()
+            || !embedded_method_repairs.is_empty()
+            || equation_convoy)
+    {
+        return Err(ElabError::Internal(
+            "plain declared-index path overlapped coupled convoy state".into(),
+        ));
+    }
+    let mut premise_domains = if plain_declared {
+        Vec::new()
+    } else {
+        method_index_premises(
+            ind,
+            params,
+            &target_indices,
+            scrut_indices,
+            field_count,
+        )
+    };
+    let mut expected_here = if plain_declared {
+        let mut specialized = weaken(motive, field_count as i64);
+        for index in &target_indices {
+            specialized = Term::app(specialized, index.clone());
+        }
+        Term::app(specialized, concrete.as_ref().clone())
+    } else if equation_convoy {
         if premise_domains.len() != 1 {
             return Err(ElabError::Internal(
                 "large index convoy expected exactly one generated premise".into(),
@@ -4754,6 +4880,7 @@ fn finish_dependent_constructor_method(
     field_count: usize,
     expected: &Term,
     equation_convoy: bool,
+    recursive_field_index_path: RecursiveFieldIndexPath,
     scrut_core: &Term,
     ind: &InductiveDecl,
     params: &[Term],
@@ -4777,7 +4904,9 @@ fn finish_dependent_constructor_method(
         shapes,
         field_count,
         expected,
-        equation_convoy.then_some(motive),
+        (equation_convoy
+            || recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared)
+            .then_some(motive),
         scrut_core,
         ind,
         params,
@@ -4816,10 +4945,13 @@ fn build_checked_dependent_motive(
     scrut_indices: &[Term],
     motive_user_body: Term,
     equation_convoy: bool,
+    recursive_field_index_path: RecursiveFieldIndexPath,
     span: &Span,
 ) -> Result<Box<Term>, ElabError> {
     let motive_premises = motive_index_premises(ind, params, scrut_indices);
-    let motive_body = if equation_convoy {
+    let motive_body = if equation_convoy
+        || recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared
+    {
         motive_user_body
     } else {
         wrap_premise_pis(motive_user_body, &motive_premises)
@@ -4834,6 +4966,88 @@ fn build_checked_dependent_motive(
         Box::new(wrap_motive_lambdas(ind, family, params, motive_body)),
         Box::new(motive_ty),
     )))
+}
+
+/// Install the plain-eliminator view of the actual index and scrutinee
+/// variables. The match motive has abstracted both ambient names, so inside a
+/// constructor method they denote the constructor result index and value
+/// directly. No equality premise or transport is needed; the kernel context
+/// still carries the real constructor fields and validates every use against
+/// their declared types.
+fn install_plain_declared_index_aliases(
+    cx: &mut ElabCtx,
+    ind: &InductiveDecl,
+    params: &[Term],
+    target_indices: &[Term],
+    scrut_indices: &[Term],
+    scrut_core: &Term,
+    concrete: &Term,
+    field_count: usize,
+) -> Result<(), ElabError> {
+    if ind.indices.len() != target_indices.len() || scrut_indices.len() != target_indices.len() {
+        return Err(ElabError::Internal(
+            "plain declared-index path lost its index telescope".into(),
+        ));
+    }
+    for (ordinal, (actual, target)) in scrut_indices.iter().zip(target_indices).enumerate() {
+        let Term::Var(actual_index) = actual else {
+            return Err(ElabError::Internal(
+                "plain declared-index path received a non-variable actual index".into(),
+            ));
+        };
+        let actual_index = actual_index + field_count;
+        let position = cx
+            .ctx
+            .len()
+            .checked_sub(1 + actual_index)
+            .ok_or_else(|| {
+                ElabError::Internal(
+                    "plain declared-index variable escaped its constructor context".into(),
+                )
+            })?;
+        let index_ty = weaken(
+            &subst_outer(&ind.indices[ordinal], ind.params.len(), params, ordinal),
+            field_count as i64,
+        );
+        let target_ty = kernel_infer(cx.env, &cx.ctx, target).map_err(|error| {
+            ElabError::Internal(format!(
+                "plain declared-index target is ill-typed: {error:?}"
+            ))
+        })?;
+        if !convert_type(cx.env, &cx.ctx, &target_ty, &index_ty) {
+            return Err(ElabError::Internal(
+                "plain declared-index target has the wrong index type".into(),
+            ));
+        }
+        cx.var_refinements
+            .insert(position, (target.clone(), index_ty, cx.ctx.len()));
+    }
+
+    let Term::Var(scrut_index) = scrut_core else {
+        return Err(ElabError::Internal(
+            "plain declared-index path received a non-variable scrutinee".into(),
+        ));
+    };
+    let scrut_index = scrut_index + field_count;
+    let scrut_position = cx
+        .ctx
+        .len()
+        .checked_sub(1 + scrut_index)
+        .ok_or_else(|| {
+            ElabError::Internal(
+                "plain declared-index scrutinee escaped its constructor context".into(),
+            )
+        })?;
+    let concrete_ty = kernel_infer(cx.env, &cx.ctx, concrete).map_err(|error| {
+        ElabError::Internal(format!(
+            "plain declared-index constructor is ill-typed: {error:?}"
+        ))
+    })?;
+    cx.var_refinements.insert(
+        scrut_position,
+        (concrete.clone(), concrete_ty, cx.ctx.len()),
+    );
+    Ok(())
 }
 
 /// Check an ordinary dependent-match arm outside the wide method-construction
@@ -4859,6 +5073,7 @@ fn check_dependent_branch_body(
     sentinel_region: usize,
     convoy_refinements: &[(usize, Term, Term)],
     equation_convoy: bool,
+    recursive_field_index_path: RecursiveFieldIndexPath,
 ) -> Result<Term, ElabError> {
     let outer_scope_depth = cx.ctx.len() - n;
     let var_refinement_snapshot = cx.var_refinements.clone();
@@ -4866,15 +5081,28 @@ fn check_dependent_branch_body(
     cx.match_field_regions.push(outer_scope_depth..cx.ctx.len());
 
     let outcome = (|| {
-        install_index_refinements(
-            cx,
-            ind,
-            params,
-            target_indices,
-            scrut_indices,
-            n,
-            outer_scope_depth,
-        )?;
+        if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
+            install_plain_declared_index_aliases(
+                cx,
+                ind,
+                params,
+                target_indices,
+                scrut_indices,
+                scrut_core,
+                concrete,
+                n,
+            )?;
+        } else {
+            install_index_refinements(
+                cx,
+                ind,
+                params,
+                target_indices,
+                scrut_indices,
+                n,
+                outer_scope_depth,
+            )?;
+        }
         if let Some(premise_slot) = hidden_result_premise_slot {
             install_hidden_result_variable_refinements(
                 cx,
@@ -4939,6 +5167,12 @@ fn check_dependent_branch_body(
         });
         let checked = match attempt {
             Ok(checked) => checked,
+            Err(error)
+                if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared =>
+            {
+                cx.obligations.truncate(obligation_base);
+                return Err(error);
+            }
             Err(_) => {
                 cx.obligations.truncate(obligation_base);
                 check_match_dependent_refined_fallback(
@@ -5083,6 +5317,13 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     }
     let mut params_terms = Box::new(scrut_args);
     let scrut_indices = Box::new(params_terms.split_off(m));
+    let recursive_field_index_path = recursive_field_index_path(
+        cx,
+        &ind,
+        &params_terms,
+        &scrut_core,
+        &scrut_indices,
+    )?;
 
     // A source field paired with residual generated `All` evidence is
     // eliminated through that evidence. Its recorded source index keeps the
@@ -5111,9 +5352,12 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     }
 
     // The motive: `expected` with the elaborated scrutinee abstracted to the
-    // final `D p̄ ī` binder. Indexed families additionally return a telescope
-    // of branch-local equalities `Eq I_j i_j i0_j -> ...`; the completed elim is
-    // applied to generated reflexivity evidence at the actual indices.
+    // final `D p̄ ī` binder. Genuinely coupled indexed families additionally
+    // return a telescope of branch-local equalities
+    // `Eq I_j i_j i0_j -> ...`; the completed elim is applied to generated
+    // reflexivity evidence at the actual indices. A constructor-declared
+    // shifting recursive field instead takes the plain eliminator path: its
+    // motive abstracts the index directly and carries no equality telescope.
     let motive_base_depth = n_i + 1;
     let sentinel_region = cx.match_field_regions.len();
     let motive_local_indices: Vec<Term> = (0..n_i).map(|j| Term::var(n_i - j)).collect();
@@ -5126,6 +5370,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         original_expected,
         motive_base_depth,
         &motive_local_indices,
+        recursive_field_index_path,
         sentinel_region,
         !ind.indices.is_empty()
             && arms
@@ -5140,6 +5385,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     let embedded_method_convoy = motive_plan.embedded_method_convoy.as_slice();
     let embedded_method_repairs = motive_plan.embedded_method_repairs.as_slice();
     let equation_convoy = motive_plan.equation_convoy;
+    let recursive_field_index_path = motive_plan.recursive_field_index_path;
     let zonked_ctx = Context {
         types: cx
             .ctx
@@ -5258,6 +5504,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         &scrut_indices,
         motive_user_body,
         equation_convoy,
+        recursive_field_index_path,
         span,
     )?;
 
@@ -5348,6 +5595,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             embedded_method_repairs,
             hidden_group_result_refinement,
             equation_convoy,
+            recursive_field_index_path,
             span,
         )?;
         let concrete = constructor_frame.concrete.as_ref();
@@ -5404,6 +5652,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     sentinel_region,
                     &convoy_refinements,
                     equation_convoy,
+                    recursive_field_index_path,
                 )?
             }
         } else {
@@ -5429,6 +5678,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             n,
             expected,
             equation_convoy,
+            recursive_field_index_path,
             &scrut_core,
             &ind,
             &params_terms,
@@ -5478,6 +5728,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         context_convoy,
         embedded_method_convoy,
         equation.is_some() || hidden_group_result_refinement,
+        recursive_field_index_path,
         span,
     )
 }

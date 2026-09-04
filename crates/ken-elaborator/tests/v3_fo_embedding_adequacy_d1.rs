@@ -94,6 +94,25 @@ fn intrinsic_apparatus_passes_full_admission_with_zero_trust_delta() {
 }
 
 #[test]
+fn scoped_formula_depth_is_an_index_not_a_parameter() {
+    let env = env_with_fok();
+    let id = env.globals["FokScopedIForm"];
+    let family = env
+        .env
+        .inductive(id)
+        .expect("FokScopedIForm is an inductive family");
+    assert_eq!(family.params.len(), 1, "only the signature is a parameter");
+    assert_eq!(family.indices.len(), 1, "scope depth is the sole index");
+    assert!(
+        family
+            .constructors
+            .iter()
+            .all(|constructor| constructor.target_indices.len() == 1),
+        "every scoped-form constructor returns at an explicit depth"
+    );
+}
+
+#[test]
 fn empty_carrier_and_total_scoped_atom_environment_are_writable() {
     let mut env = env_with_fok();
     let decls = [
