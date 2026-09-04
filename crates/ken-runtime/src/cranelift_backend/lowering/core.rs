@@ -8467,6 +8467,15 @@ impl<'a> Lowering<'a> {
             .checked_ih_forward_edge_route_collapsible(transport)
     }
 
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(super) fn tail_route_forward_edge_body_purities(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<Vec<bool>, CraneliftBackendError> {
+        self.static_transition_plan
+            .checked_ih_forward_edge_route_body_purities(transport)
+    }
+
     pub(super) fn emit_composed_return_ret_kmatch_closeout(
         &mut self,
         builder: &mut FunctionBuilder<'_>,

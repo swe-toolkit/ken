@@ -4447,9 +4447,12 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         &forward_ret_outcome
                     {
                         let collapsible = self.tail_route_is_forward_edge_collapsible(&transport)?;
+                        let candidate_body_purities =
+                            self.tail_route_forward_edge_body_purities(&transport)?;
                         record_composed_return_forward_edge_collapsibility(
                             authority._plan.active_frame_origin(),
                             collapsible,
+                            candidate_body_purities,
                         );
                     }
                     #[cfg(feature = "px8-ds-test-support")]

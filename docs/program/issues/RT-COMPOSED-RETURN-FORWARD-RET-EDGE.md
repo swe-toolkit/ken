@@ -469,6 +469,42 @@ generated_entry 66/0, the 8 capsule controls stay `#[ignore]`); (d) the two
 write tests untouched/`#[ignore]`. gate=none, backend/control-flow only, zero
 TCB delta.
 
+### HS5 purity soundness hardening — fail closed across static callees
+
+**Fresh follow-up on base `ea0c04eec`; write narrowing remains deferred.** The
+inc3-HS5 remeasurement falsified the five-node erasure premise behind
+`checked_ih_body_is_pure_narrowing`. HostIO binds do lower to
+`RuntimeExpr::Effect`, but an ordinary value-returning `Call` may return a body
+containing suspended `Construct ITree::Vis`. The base walk followed the Call's
+argument/callee child origins, stopped at the callee closure, and therefore
+classified the cross-owner body at the measured origin 1053 as pure.
+
+**Repaired invariant.** Collapse is admitted only when every executed node is
+proven pure, including every exact statically resolved callee body. A Call now
+resolves an inline closure through its issued `StaticBody` child, or a local
+transparent declaration through its typed `DeclarationCallTargetClass`, and
+walks that body together with evaluated arguments and lexical captures.
+Dynamic, imported, missing, or shape-inconsistent callees reject to base. A
+closure body remains dormant when the closure is merely constructed. The reject
+set is the five compiler control markers plus constructed `ITree::Vis`, which
+is suspended effect control even though it is not `RuntimeExpr::Effect`.
+
+**Controls.** The durable unit pair holds the outer Call fixed and varies only
+its exact lexical StaticBody result: `ITree::Ret` accepts and `ITree::Vis`
+rejects. Thus deleting the callee-body traversal or the Vis arm reddens the
+negative, while blanket Call rejection reddens the positive. The existing P1
+recorder now retains every exact candidate-body purity determination: the read
+routes remain singleton-pure and collapsible; the write fixture still supplies
+a collapsible singleton-pure tail and one non-collapsible effect tail whose
+candidate population includes a rejected body. The control asserts relations,
+not the per-build origin numbers.
+
+**Explicit deferral.** This hardening changes only the fail-closed purity
+predicate and its controls. It does not implement option (b), un-ignore either
+malformed-offset write test, re-key the eight AC-EDGE-CONTROL-REKEY controls, or
+remove their census exemptions. Those obligations remain with the deferred
+write-narrowing mechanism.
+
 ## Increment-1 M5 CI red on 07c31b0c5 — symptom dispositions (Steward)
 
 The re-spin candidate `07c31b0c5` (Decision `dec_22r1rbn9qnn81`) passed M1-M4 and was
