@@ -1,7 +1,7 @@
 ---
 id: V3-FO-ROUTE-CONSUMPTION-APPARATUS
 title: "FO honest-reach prerequisite: the theorem-consumption apparatus — thread the two 23 section 4.4 theorem handles to the accepted route (Component A) and build the kernel-guarded Rust<->catalog encoding bridge (Component B), so the checker_soundness then embedding_adequacy composite is assemblable and kernel-checkable at the accepted return. Prerequisite to D3's one-return flip."
-status: ready
+status: merged
 owner: language
 size: L
 gate: none
