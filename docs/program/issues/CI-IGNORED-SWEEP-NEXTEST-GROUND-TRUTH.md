@@ -1,7 +1,7 @@
 ---
 id: CI-IGNORED-SWEEP-NEXTEST-GROUND-TRUTH
 title: "Fix scripts/ci-ignored-sweep.py to count ignored rows from `nextest --list --ignored` ground truth instead of a source-attribute grep, which cannot attribute a `#[ignore]` written as a macro-invocation leading token and so mis-counts (census 37 vs discovered 45). The ignored-row-sweep is a REQUIRED check (it sits in the build-test aggregator's needs; result != success sets failed=1), so this mis-count blocks any candidate that legitimately writes `#[ignore]`s in macro-leading-token position. TWO halves: (1) count from nextest ground truth; (2) once the count passes, the sweep's RUN (--run-ignored=only) proceeds and would execute the 8 deferred inert AC-EDGE-CONTROL-REKEY controls (fail-by-design), so a run-exemption registry for exactly those 8 (inc2-re-key expiry) is required to prevent a 5th red."
-status: active
+status: merged
 owner: runtime
 size: XS
 gate: none
