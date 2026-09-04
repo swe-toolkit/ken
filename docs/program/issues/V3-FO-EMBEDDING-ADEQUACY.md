@@ -11,6 +11,28 @@ github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
+> # OPERATIVE (Steward, 2026-09-04) — D2b HELD behind HS21, now RULED
+> # **ELABORATOR-ONLY** (Architect evt_5mg8n0bdz41m4; §1a hold DISCHARGED, research
+> # advisory evt_1fcg4n5gwrfx8). The HS20 carrier migration (`FokScopedIForm` `n`
+> # param -> `Nat` index) is valid and DONE (WIP `af24b6a219`), but it delivers no
+> # varying-motive capability alone: the coupled correspondence motive needs an
+> # ELABORATOR increment — a PLAIN-eliminator path for a declared-index recursive
+> # field (IH at the field's OWN declared index `Suc n`, branch goal at the
+> # constructor's result index `n`, the bind body bridging `n -> Suc n`), with
+> # plain-vs-coupled index-provenance made an EXPLICIT classification branch and the
+> # convoy/forced-index machinery (HS3-HS19) left UNTOUCHED. This needs LESS than
+> # predecessor #5, not more (the opposite of HS19's convoy extension — one
+> # scrutinee, `Env` in the motive's RETURN type, nothing to peel or transport).
+> # Zero kernel/TCB/Elim change, NO operator gate. **Steward WP-boundary call: the
+> # erratum [[LANG-FOK-SCOPED-IFORM-INDEX-ERRATUM]] is WIDENED to carry BOTH
+> # deliverables** — D1 carrier migration (catalog/) + D2 the elaborator
+> # plain-eliminator path (crates/ken-elaborator) — as ONE candidate on `af24b6a2`,
+> # because the carrier is not independently useful (it enables nothing until the
+> # elaborator path lands) and the implementer builds both on one branch per the
+> # Architect's direction. D2b depends on that node (already) and rebases +
+> # re-attempts the correspondence motive after it lands. Next §1a re-trigger = HS24.
+> # This banner supersedes the HS20 banner below.
+>
 > # OPERATIVE (Steward, 2026-09-04) — D2b HELD behind the HS20 carrier erratum.
 > # On resuming D2b from the merged predecessor #5, the ring hit **HS20**: the D1
 > # carrier `FokScopedIForm` (`FoKripke.ken:122`) declares depth `n` as a datatype
@@ -237,6 +259,43 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
    released 2026-09-04). Once `n` is an index the correspondence motive elaborates on
    the ALREADY-LANDED forced-index mechanism (predecessor #5) — no new elaborator
    increment. §1a: HS20 NOT a trigger; next mandatory = HS21 (unchanged).
+6. **HS21 (COUPLED-MOTIVE index-shift over a co-indexed return family — DISTINCT
+   from HS20's carrier layer AND from HS19's forced-index-telescope; §1a MANDATORY
+   TRIGGER, FIRED).** With `n` migrated to an index (the HS20 carrier fix — BUILT,
+   valid, WIP `af24b6a219`, green through the data-head, constant motive, and Atom
+   branch), the coupled correspondence motive STILL false-rejects with a distinct
+   elaborator reject: `Internal("index refinement: could not classify the branch
+   goal: TypeMismatch { expected: Dg67, found: (Dg581 (cg69 @2)) }")` (real source:
+   `FokScopedForall` in `fok_denote_at`, expected Dg589 vs found (Dg591 @7)). The
+   generated motive/branch-goal construction cannot simultaneously instantiate the
+   recursive IH's index AND the co-indexed return family at the shifted value `Suc
+   n`. Section-1b predicate: a recursive FIELD whose declared inductive index shifts
+   `n -> Suc n` while a SECOND indexed return family (`FokObjectEnv`/`MiniEnv`)
+   co-varies in LOCKSTEP — NOT covered by predecessor #5's forced-index-telescope
+   (which carried return-TELESCOPE arguments under a forced SCRUTINEE index; here the
+   recursive field's OWN index shifts and a co-indexed family tracks it). This
+   FALSIFIES the HS20 expectation that the landed mechanism suffices (the erratum's
+   AC-MOTIVE-ENABLED is falsified; its AC-INDEX-CARRIER/AC-NO-REGRESSION/AC-ZERO-TRUST
+   still hold). §1a: HS21 IS the recorded mandatory research trigger (multiple of 3;
+   tracker-authoritative, Architect-confirmed evt_4h3vhxcpvs88c, no operator
+   count-anchor override). Research advisory delivered (evt_1fcg4n5gwrfx8): the plain
+   inductive-family dependent eliminator with a Pi-returning co-indexed motive (NOT a
+   convoy/transport/index-equation). RULED ELABORATOR-ONLY (Architect
+   evt_5mg8n0bdz41m4; §1a hold DISCHARGED): zero kernel/TCB/Elim change, no operator
+   gate. Fix = a PLAIN-eliminator path for a declared-index recursive field (IH at the
+   field's OWN declared index `Suc n`, branch goal at the constructor's result index
+   `n`), with plain-vs-coupled index-provenance made an EXPLICIT classification branch
+   and the convoy path (HS3-HS19) left UNTOUCHED — the OPPOSITE of HS19's convoy
+   extension (this needs LESS). Root defect: a declared-index recursive field was
+   silently FALLING THROUGH into the coupled-scrutinee refinement path. §1b predicate:
+   "the convoy/index-refinement machinery OVER-APPLIED to a declared-index recursive
+   field that needs the plain eliminator" — distinct from HS16-19 (convoy for coupled
+   scrutinees) and HS20 (carrier param-vs-index). Owned by the WIDENED
+   [[LANG-FOK-SCOPED-IFORM-INDEX-ERRATUM]] (D2: the elaborator plain path, on top of D1
+   carrier). §1a: HS21 DISCHARGED; next mandatory re-trigger = HS24.
+   HS21 evt_4612q1nw22ea1, thr_4j4a7q17hajb9; carrier WIP `af24b6a219` (base
+   926b429bb, D2b isolated 20f96de08); D0 evidence /tmp/fok-scoped-index-hs21-d0.rs
+   (+ -d0-final.log, -localize.rs, -localize4.log; SHA-256 in evt_4h3vhxcpvs88c).
 
 > # D2b RE-FROZEN 2026-09-02 (HS-fifth) — behind a FIFTH elaborator predecessor
 >
