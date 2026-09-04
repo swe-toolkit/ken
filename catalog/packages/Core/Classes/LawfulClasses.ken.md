@@ -644,7 +644,9 @@ pub fn bool_and (a : Bool) (b : Bool) : Bool =
     False ↦ False
   }
 
-proof intro for bool_and (a : Bool) (b : Bool) : IsTrue a → IsTrue b → IsTrue (bool_and a b) =
+pub proof intro for bool_and
+      (a : Bool) (b : Bool)
+    : IsTrue a → IsTrue b → IsTrue (bool_and a b) =
   match a {
     True ↦ λha. λhb. hb;
     False ↦ λha. λhb. absurd ha
@@ -660,6 +662,66 @@ proof right for bool_and (a : Bool) (b : Bool) : IsTrue (bool_and a b) → IsTru
   match a {
     True ↦ λh. h;
     False ↦ λh. absurd h
+  }
+
+pub proof comm for bool_and (a : Bool) (b : Bool) : Equal Bool (bool_and a b) (bool_and b a) =
+  match a {
+    True ↦
+      match b {
+        True ↦ Proved;
+        False ↦ Proved
+      };
+    False ↦
+      match b {
+        True ↦ Proved;
+        False ↦ Proved
+      }
+  }
+
+pub proof assoc for bool_and
+      (a : Bool) (b : Bool) (c : Bool)
+    : Equal Bool (bool_and (bool_and a b) c) (bool_and a (bool_and b c)) =
+  match a {
+    True ↦
+      match b {
+        True ↦
+          match c {
+            True ↦ Proved;
+            False ↦ Proved
+          };
+        False ↦
+          match c {
+            True ↦ Proved;
+            False ↦ Proved
+          }
+      };
+    False ↦
+      match b {
+        True ↦
+          match c {
+            True ↦ Proved;
+            False ↦ Proved
+          };
+        False ↦
+          match c {
+            True ↦ Proved;
+            False ↦ Proved
+          }
+      }
+  }
+
+pub proof idempotent for bool_and (a : Bool) : Equal Bool (bool_and a a) a =
+  match a {
+    True ↦ Proved;
+    False ↦ Proved
+  }
+
+pub proof left_identity for bool_and (a : Bool) : Equal Bool (bool_and True a) a = Refl
+
+pub proof right_identity for bool_and (a : Bool) : Equal Bool (bool_and a True) a =
+  match a {
+    True ↦ Proved;
+    False ↦ Proved
   }
 
 fn compare_second_result (b : Bool) : OrdResult =
@@ -2471,8 +2533,11 @@ Ken-native; no external reference implementation informed its source.
    `Ord Char` re-homing); `docs/adr/0013-int-decidable-equality-kernel-
    posture.md` + `docs/program/wp/DS-6a-int-deceq-certificate.md` (the
    `Eq`/`DecEq Int` certificate collapse + `DecEq Char`).
-2. **Public API.** `IsTrue`, `class DecEq`, `bool_eq`,
-   `bool_or`, `class Ord`, `leq_nat`, `leq_nat::refl`, `leq_nat::trans`,
+2. **Public API.** `IsTrue`, `class DecEq`, `bool_eq`, `bool_and`,
+   `bool_and::intro`, `bool_and::comm`, `bool_and::assoc`,
+   `bool_and::idempotent`, `bool_and::left_identity`,
+   `bool_and::right_identity`, `bool_or`, `class Ord`, `leq_nat`,
+   `leq_nat::refl`, `leq_nat::trans`,
    `leq_nat::antisym`, `bool_or::eq_true_of_or`, `instance Ord Nat`,
    `instance DecEq Int`, `instance Ord Int`, `instance Ord Bool`,
    `instance DecEq Bool`,

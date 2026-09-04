@@ -107,6 +107,20 @@ pub fn load_derived_importing_fixture(env: &mut ElabEnv, imported: &str) {
     load_derived_importing_fixture_many(env, &[imported]);
 }
 
+/// Withhold the newly canonical LC aliases before a legacy flat elaboration of
+/// LawfulFunctors, which still owns its private duplicate until the separately
+/// sequenced `CAT-MIGRATE-LF-BOOL-AND-CONSOLIDATION` increment.
+pub fn withhold_lc_bool_and_from_legacy_lf_scope(env: &mut ElabEnv) {
+    for name in ["bool_and", "bool_and::assoc"] {
+        let canonical = env.globals[&format!("Core.Classes.LawfulClasses.{name}")];
+        assert_eq!(
+            env.globals.remove(name),
+            Some(canonical),
+            "the legacy LF fixture must withhold LC's exact `{name}` alias"
+        );
+    }
+}
+
 /// Assert at a measured legacy-fixture boundary that the shared Derived loader
 /// retained its canonical class owner. Re-loading the provider must be a no-op:
 /// if `load_derived_fixture` restores a state from before LawfulClasses, the

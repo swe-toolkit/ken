@@ -77,6 +77,8 @@ and closes with `Proved` — the same non-inductive shape as
 immediate since `empty = Leaf`. Neither needs induction or a comparison.
 
 ```ken
+import Core.Classes.LawfulClasses (bool_and)
+
 import Core.Logic.Or (Or, Inl, Inr)
 
 import Data.Sums.Combinators (is_some)
@@ -5644,21 +5646,16 @@ library.
 
 #### 4.7.1 Bool algebra and the Boolean order-equivalence test
 
-A small self-contained `Bool` algebra (`bool_and`/`bool_not`/
-`cat4_bool_or` and their commutativity/associativity/idempotence/identity
-laws) and a `Nat` total order (`leq_nat` with reflexivity/transitivity/
-antisymmetry/totality) supporting later sections, followed by
+The canonical `bool_and` algebra and its laws come from
+`Core.Classes.LawfulClasses`; this package keeps only its local `bool_not` and
+`cat4_bool_or` helpers. Those Boolean operations and a `Nat` total order
+(`leq_nat` with reflexivity/transitivity/antisymmetry/totality) support later
+sections, followed by
 `order_equiv_key` — a `Bool`-valued order-equivalence test — and its
 correspondence lemmas to the `Prop`-valued `order_equiv` from
 [§4.6](#46-law-5--lookup_assoc_agree-dictionary-agreement-with-the-ordered-list-lookup).
 
 ```ken
-fn bool_and (a : Bool) (b : Bool) : Bool =
-  match a {
-    True ↦ b;
-    False ↦ False
-  }
-
 fn bool_not (b : Bool) : Bool =
   match b {
     True ↦ False;
@@ -5728,66 +5725,6 @@ proof idempotent for cat4_bool_or (a : Bool) : Equal Bool (cat4_bool_or a a) a =
 proof left_identity for cat4_bool_or (a : Bool) : Equal Bool (cat4_bool_or False a) a = Refl
 
 proof right_identity for cat4_bool_or (a : Bool) : Equal Bool (cat4_bool_or a False) a =
-  match a {
-    True ↦ Proved;
-    False ↦ Proved
-  }
-
-proof comm for bool_and (a : Bool) (b : Bool) : Equal Bool (bool_and a b) (bool_and b a) =
-  match a {
-    True ↦
-      match b {
-        True ↦ Proved;
-        False ↦ Proved
-      };
-    False ↦
-      match b {
-        True ↦ Proved;
-        False ↦ Proved
-      }
-  }
-
-proof assoc for bool_and
-      (a : Bool) (b : Bool) (c : Bool)
-    : Equal Bool (bool_and (bool_and a b) c) (bool_and a (bool_and b c)) =
-  match a {
-    True ↦
-      match b {
-        True ↦
-          match c {
-            True ↦ Proved;
-            False ↦ Proved
-          };
-        False ↦
-          match c {
-            True ↦ Proved;
-            False ↦ Proved
-          }
-      };
-    False ↦
-      match b {
-        True ↦
-          match c {
-            True ↦ Proved;
-            False ↦ Proved
-          };
-        False ↦
-          match c {
-            True ↦ Proved;
-            False ↦ Proved
-          }
-      }
-  }
-
-proof idempotent for bool_and (a : Bool) : Equal Bool (bool_and a a) a =
-  match a {
-    True ↦ Proved;
-    False ↦ Proved
-  }
-
-proof left_identity for bool_and (a : Bool) : Equal Bool (bool_and True a) a = Refl
-
-proof right_identity for bool_and (a : Bool) : Equal Bool (bool_and a True) a =
   match a {
     True ↦ Proved;
     False ↦ Proved
@@ -5883,22 +5820,11 @@ fn total_leq_nat
 fn order_equiv_key (k : Type) (leq : k → k → Bool) (a : k) (b : k) : Bool =
   bool_and (leq a b) (leq b a)
 
-proof true_intro for bool_and
-      (a : Bool) (b : Bool) (ha : Equal Bool a True) (hb : Equal Bool b True)
-    : Equal Bool (bool_and a b) True =
-  trans
-    Bool
-    (bool_and a b)
-    (bool_and True b)
-    True
-    (cong Bool Bool a True (λx. bool_and x b) ha)
-    hb
-
 theorem order_equiv_key_true_from_order_equiv
       (k : Type) (leq : k → k → Bool) (a : k) (b : k)
     : order_equiv k leq a b → Equal Bool (order_equiv_key k leq a b) True =
   λh.
-    proof true_intro for bool_and
+    proof intro for bool_and
       (leq a b)
       (leq b a)
       (and_fst (Equal Bool (leq a b) True) (Equal Bool (leq b a) True) h)
