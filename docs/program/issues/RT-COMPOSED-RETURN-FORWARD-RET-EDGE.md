@@ -352,6 +352,41 @@ derives from the carrier, not the capsule) — no new inventory entry, no new re
   upstream + narrowed once, native==interpreter parity on the write route); (2) a
   non-degenerate pair (valid-write route narrows correctly AND a wrong post-effect
   narrowing — mis-routed `Var(0)` / wrong `Result` arm — is caught).
+- **inc2-HS1 b-confirm = NO (`evt_7dys597356kts`) → (b) refuted.** The FULL write-body
+  shape shows the route is a READ-THEN-WRITE: the outer `Match{scrutinee: Var(0)}`
+  narrows the *readAt* result (`Err → Ret`; `Ok →` frames 5/6 that PERFORM the
+  `writeAt`), so the InlineNoCall carrier holds the *read* result and the `writeAt` is
+  performed WITHIN the body's `Ok` arm, not upstream. (b)'s premise (carrier holds the
+  post-`writeAt` result) is false; there is no post-effect result to route. (The first
+  400-char shape was truncated and misled the (b) premise; the gate caught it.)
+- **inc2-HS2 (write route is READ-THEN-WRITE; PARTIAL collapse)** — implementer
+  measured/flagged (`evt_7dys597356kts`), Architect RE-RULED **(c)** (`evt_xfscq4shy8rj`).
+  NOT a §1a trigger (next §1a = inc2-HS3). (a) stays rejected (importing fn-8's
+  continuations into fn-9 breaches the per-function continuation-scope invariant).
+  **(c) principle: the forward-edge collapse is PARTIAL** — collapse only the in-scope
+  outer read-narrowing (route the carried read result + run `Match{Err → Ret; Ok →
+  writeAt}` on it, as the read collapse does for its narrowing); the `writeAt` effect
+  subtree (frames 5/6) belongs to fn-8 and MUST run in fn-8's scope via base call/edge
+  machinery, NEVER inlined into fn-9. The forward edge applies only to in-scope `Ret`s
+  (the `Err` arm's `Ret`, and the final `Ret` once the `writeAt` completes in fn-8),
+  never to the cross-function effect subtree. **c1 vs c2 measurement-gated:** does the
+  `writeAt` subtree already have its own Tail/Direct route in fn-8? YES → c1 (Ok arm
+  invokes fn-8's existing writeAt route; forward edge on the outer/final `Ret` only);
+  NO → c2 (base `call_tail` machinery for the effect subtree — base already runs frames
+  5/6 correctly, just un-narrowed — forward edge on the final `Ret` only); NEITHER →
+  STOP and flag (c3).
+- **§1b inc2 inventory entry 2:** predicate = "the write route is a READ-THEN-WRITE
+  whose effect subtree is a cross-function checked-IH continuation, so the forward-edge
+  collapse must be PARTIAL (collapse the in-scope read-narrowing; run the cross-function
+  effect in its declaring function via base machinery) — NOT a whole-body inline and
+  NOT a single-carrier route+narrow." Refines the inc1 model: read = pure route+narrow;
+  write = read-narrow + a cross-function effect subtree that stays in its function.
+  Acceptance for (c): (1) exactly-once per effect (readAt once AND writeAt once,
+  native==interpreter parity — not zero, not double); (2) barrier respected (the
+  `ContinuationSpecialization` "declared into this function" check passes because the
+  `writeAt` subtree runs in fn-8 — no fn-8 continuation imported into fn-9); (3) a
+  non-degenerate pair (valid read-then-write with both effects once AND a wrong
+  narrowing / mis-scoped or duplicated effect is caught).
 
 ## Increment-1 M5 CI red on 07c31b0c5 — symptom dispositions (Steward)
 
