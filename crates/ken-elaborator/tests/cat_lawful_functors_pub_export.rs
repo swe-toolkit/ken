@@ -1,8 +1,9 @@
-//! EC closure-provider publication acceptance controls.
+//! LawfulFunctors provider publication acceptance controls.
 //!
 //! Promise class: durable invariants. `Core.Classes.LawfulFunctors` exposes
-//! exactly the ten ordinary and attached definitions in EC's signature-closed
-//! provider set, while retaining their existing identities and trust posture.
+//! exactly the authorized ordinary and attached definitions in EC's
+//! signature-closed provider set plus the downstream Semigroup class, while
+//! retaining their existing identities and trust posture.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -44,7 +45,7 @@ fn term_mentions(term: &Term, target: GlobalId) -> bool {
 
 fn provider_identity(env: &ElabEnv, surface: &str) -> GlobalId {
     match surface {
-        "Functor" | "Foldable" | "Monoid" => {
+        "Functor" | "Foldable" | "Monoid" | "Semigroup" => {
             env.class_env
                 .class(surface)
                 .unwrap_or_else(|| panic!("published class {surface} must be registered"))
@@ -295,6 +296,7 @@ fn authorized_surfaces() -> BTreeSet<String> {
         "Foldable",
         "Functor",
         "Monoid",
+        "Semigroup",
         "comp",
         "fold_map_step",
         "idf",
@@ -310,24 +312,25 @@ fn authorized_surfaces() -> BTreeSet<String> {
 
 /// MEASURED: every parsed publishable definition and attached proof is queried
 /// through the real roots loader, and the successful queries equal a literal
-/// authorized set. CLAIMED: LawfulFunctors exposes exactly EC's ten eligible
-/// signature-closed provider surfaces. THE GAP: generated instance dictionaries
-/// are not publishable declaration forms and are deliberately outside this
-/// provider-surface inventory.
+/// authorized set. CLAIMED: LawfulFunctors exposes exactly EC's eligible
+/// signature-closed provider surfaces plus the downstream Semigroup class.
+/// THE GAP: generated instance dictionaries are not publishable declaration
+/// forms and are deliberately outside this provider-surface inventory.
 #[test]
 fn lawful_functors_loader_visible_inventory_is_exact() {
     assert_eq!(
         published_module_surfaces(),
         authorized_surfaces(),
-        "LawfulFunctors must expose exactly EC's ten eligible closure providers"
+        "LawfulFunctors must expose exactly the authorized provider inventory"
     );
 }
 
-/// MEASURED: one real selective consumer resolves all eight direct imports and
-/// both attached proofs to their existing qualified provider GlobalIds; private
-/// direct and attached siblings still reject as `UnboundName`; loading the
-/// provider adds no trusted entry. CLAIMED: publication changes visibility only,
-/// preserving provider identity, the private boundary, and zero trust delta.
+/// MEASURED: one real selective consumer resolves all authorized direct imports
+/// and attached proofs to their existing qualified provider GlobalIds; the
+/// Semigroup class retains its two fields and exact existing instance heads;
+/// private direct and attached siblings still reject as `UnboundName`; loading
+/// the provider adds no trusted entry. CLAIMED: publication changes visibility
+/// only, preserving provider identity, the private boundary, and zero trust delta.
 /// THE GAP: existing package acceptance owns the definitions' computational and
 /// law behavior; the exact-inventory test owns surface closure.
 #[test]
@@ -349,10 +352,47 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
     );
 
     let mut env = load_lawful_functors();
+    let semigroup_provider = provider_identity(&env, "Semigroup");
+    let semigroup = env
+        .class_env
+        .class("Semigroup")
+        .expect("Semigroup must remain the registered class owner");
+    assert_eq!(
+        semigroup.projection.field_names,
+        ["op", "assoc"],
+        "Semigroup must retain its operation and associativity fields"
+    );
+    let semigroup_instances = env
+        .class_env
+        .instances
+        .iter()
+        .filter(|((class, _), _)| class == "Semigroup")
+        .map(|((_, head), instance)| (head.clone(), instance.instance_id))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        semigroup_instances
+            .iter()
+            .map(|(head, _)| head.as_str())
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["Bool", "List"]),
+        "publication must not mint or remove a Semigroup instance"
+    );
+    for (_, instance) in &semigroup_instances {
+        let ty = match env.env.lookup(*instance) {
+            Some(KernelDecl::Transparent { ty, .. }) => ty,
+            other => panic!("Semigroup instance must remain transparent, got {other:?}"),
+        };
+        assert!(
+            term_mentions(ty, semigroup_provider),
+            "each existing Semigroup instance must retain the published class identity"
+        );
+    }
+
     let providers = [
         ("Functor", "ec_closure_functor_identity"),
         ("Foldable", "ec_closure_foldable_identity"),
         ("Monoid", "ec_closure_monoid_identity"),
+        ("Semigroup", "ec_closure_semigroup_identity"),
         ("comp", "ec_closure_comp"),
         ("idf", "ec_closure_idf"),
         ("list_map", "ec_closure_list_map"),
@@ -372,12 +412,14 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
 
     env.elaborate_file(
         "import Core.Classes.LawfulFunctors \
-           (Functor, Foldable, Monoid, comp, idf, list_map, fold_map_step, monoid_mempty)\n\
+           (Functor, Foldable, Monoid, Semigroup as selected_semigroup, comp, idf, list_map, fold_map_step, monoid_mempty)\n\
          fn ec_closure_functor_identity \
            (f : Type → Type) (dict : Functor f) : Functor f = dict\n\
          fn ec_closure_foldable_identity \
            (f : Type → Type) (dict : Foldable f) : Foldable f = dict\n\
          fn ec_closure_monoid_identity (a : Type) (dict : Monoid a) : Monoid a = dict\n\
+         fn ec_closure_semigroup_identity \
+           (a : Type) (dict : selected_semigroup a) : selected_semigroup a = dict\n\
          fn ec_closure_comp \
            (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (x : a) : c = \
            comp a b c g h x\n\
@@ -402,13 +444,13 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
          fn ec_closure_monoid_mempty (m : Type) (dict : Monoid m) : m = \
            monoid_mempty m dict",
     )
-    .expect("all ten eligible closure providers must resolve in one selective consumer");
+    .expect("all authorized providers must resolve in one selective consumer");
 
     for (provider, consumer) in providers {
         assert_declaration_mentions(&env, consumer, provider);
     }
 
-    for private in ["Semigroup", "bool_and", "option_map"] {
+    for private in ["bool_and", "option_map"] {
         match env.elaborate_file(&format!("import {LAWFUL_FUNCTORS} ({private})")) {
             Err(ElabError::UnboundName { name, .. }) => {
                 assert_eq!(name, format!("{LAWFUL_FUNCTORS}.{private}"));
