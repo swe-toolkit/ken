@@ -324,6 +324,35 @@ coverage-scoping question. inc1 stays at 3 hard-stops; §1a HS3 check discharged
 next mandatory §1a re-trigger = HS6; §1b same predicate already named (read closeout
 derives from the carrier, not the capsule) — no new inventory entry, no new recut.
 
+### Increment-2 hard-stop chain + §1b inventory
+
+- **inc2-HS1 (write-half run-at-collapse mechanism)** — implementer measured
+  (`evt_gky6xevjq935`), Architect RULED (`evt_36eczhwqsdk64`). NOT a §1a research
+  trigger (next §1a in the inc2 chain = inc2-HS3). The write's governed Tail
+  continuation body is an effect-performing checked-IH computational match belonging
+  to a DIFFERENT predeclared function than the collapse's function; a naive inline
+  re-run (generalize the read closeout to run the whole body) fails object emission
+  (`ContinuationSpecialization: the claimed continuation target was not declared into
+  this function`, fn-8's nested continuation absent from fn-9's `continuation_calls`).
+  Fork (a) declare the other function's continuations into this one — REJECTED
+  doubly: dissolves the per-function continuation-scope invariant, and re-running the
+  body RE-performs the `writeAt` (double-effect soundness bug). Fork (b) RULED: the
+  effect is performed upstream, the InlineNoCall carrier holds the post-`writeAt`
+  result, and the collapse ROUTES that carried result to `return_body` and runs ONLY
+  the post-effect k-narrowing (the `Match` on `Var(0)`) — mirrors the read (route +
+  narrow), one extra narrowing match, never re-running the producing function's body,
+  never importing its continuations. Conditional on b-confirm: the carrier holds the
+  post-effect result (structurally confirmed — `Match{scrutinee: Var(0)}` narrows the
+  write `Result`, so the effect is already performed; functional confirm = (b) narrows
+  to InvalidOffset with native==interpreter parity).
+- **§1b inc2 inventory entry 1:** predicate = "the write effect continuation is a
+  nested cross-function checked-IH continuation (`Match`-on-result), unlike the read's
+  pure `Ret` — route the carried post-effect result, do not re-run the producing
+  function's body." Acceptance for (b): (1) exactly-once effect (`writeAt` once
+  upstream + narrowed once, native==interpreter parity on the write route); (2) a
+  non-degenerate pair (valid-write route narrows correctly AND a wrong post-effect
+  narrowing — mis-routed `Var(0)` / wrong `Result` arm — is caught).
+
 ## Increment-1 M5 CI red on 07c31b0c5 — symptom dispositions (Steward)
 
 The re-spin candidate `07c31b0c5` (Decision `dec_22r1rbn9qnn81`) passed M1-M4 and was
