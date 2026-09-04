@@ -13,9 +13,9 @@ use std::collections::BTreeSet;
 use ken_elaborator::{
     attempt_obligation_with_catalog_globals,
     fo_kripke::{
-        check_cert, discover_and_quote_fo_with_catalog, embed, encode_fo_problem, find_certificate,
-        kernel_checked_fo_composite, positive_control_term, quote_fo, AtomEnv, Carriers, Cert,
-        FOProblem, FoCatalogHandles, FoSliceSignature, IForm, IVar,
+        check_cert, denote, discover_and_quote_fo_with_catalog, embed, encode_fo_problem,
+        find_certificate, kernel_checked_fo_composite, positive_control_term, quote_fo, AtomEnv,
+        Carriers, Cert, FOProblem, FoCatalogHandles, FoSliceSignature, IForm, IVar,
     },
     prover::{attempt_fo_with_signature, Verdict},
     v2_extract, ElabEnv,
@@ -196,21 +196,28 @@ fn encoder_covers_every_slice_source_constructor_and_route_stays_unknown() {
     let sig = slice_signature(&env, pred_p)
         .with_catalog_globals(&env.globals)
         .expect("catalog installation");
-    let (_, accepted, cert) = accepted_problem(&env, &sig);
+    let (_, accepted, _cert) = accepted_problem(&env, &sig);
 
-    let all_source_constructors = IForm::Forall(Box::new(IForm::Forall(Box::new(IForm::Or(
+    let complex = IForm::Or(
         Box::new(IForm::Atom(IVar(1))),
         Box::new(IForm::Imp(
             Box::new(IForm::Bottom),
             Box::new(IForm::Atom(IVar(0))),
         )),
+    );
+    let all_source_constructors = IForm::Forall(Box::new(IForm::Forall(Box::new(IForm::Imp(
+        Box::new(complex.clone()),
+        Box::new(complex),
     )))));
     let full_problem = FOProblem {
         carriers: accepted.carriers.clone(),
         atoms: accepted.atoms.clone(),
         f: all_source_constructors,
     };
-    let encoded = encode_fo_problem(&sig, &full_problem, &cert)
+    let full_cert = find_certificate(&full_problem.f)
+        .expect("constructor-complete identity formula must have a certificate");
+    assert!(check_cert(&embed(&full_problem.f), &full_cert));
+    let encoded = encode_fo_problem(&sig, &full_problem, &full_cert)
         .expect("every slice source constructor, including nonzero Fin");
     for term in [
         encoded.source_form,
@@ -221,6 +228,12 @@ fn encoder_covers_every_slice_source_constructor_and_route_stays_unknown() {
         infer(&env.env, &Context::new(), &term)
             .expect("complete slice encoding must be kernel-well-formed");
     }
+    let full_phi_closed = denote(&env.env, &sig, &full_problem.f);
+    assert!(
+        kernel_checked_fo_composite(&env.env, &sig, &full_problem, &full_cert, &full_phi_closed,)
+            .is_some(),
+        "every encoded source constructor must agree with independent Rust denotation"
+    );
 
     let route_sort_id = env
         .declare_postulate_raw("ApparatusSort", Term::Type(Level::zero()))
