@@ -49,11 +49,25 @@ fn env_for(source: &str) -> ElabEnv {
     env
 }
 
+fn checker_prefix(source: &str) -> &str {
+    source
+        .split_once("-- === D2b: embedding adequacy proof (23 section 4.4) ===")
+        .expect("the semantic adequacy section must follow checker soundness")
+        .0
+}
+
+fn env_for_checker_mutation(source: &str) -> ElabEnv {
+    env_for(checker_prefix(source))
+}
+
 /// `AC-5` mutation: collapse the sort check by making `fok_derived_sort_eq`
 /// declare every pair of sorts equal. World-vs-Object conflicts then compare
 /// as agreement, so `fok_validate_qterm_sort` never rejects. The mutation
-/// touches only the validation path; the structural checker and the reflection
-/// theorems do not call it, so the file still elaborates.
+/// touches only the validation path. The checker-through-reflection prefix
+/// still elaborates. The later semantic adequacy proof is intentionally outside
+/// this mutation fixture: it consumes the unmodified sorted relation, so a
+/// mutation that collapses its sort/freshness premises must not be asked to
+/// kernel-check that semantic theorem.
 const SORT_EQ_ORIG: &str = "\
 fn fok_derived_sort_eq (a : FokDerivedSort) (b : FokDerivedSort) : Bool =
   match a {
@@ -208,7 +222,7 @@ fn assert_wrong_sort_eigen_isolated(label: &str, forall_ctor: &str, body: &str) 
     );
 
     // Stage 1: freshness neutralized, sort LIVE -> still rejects.
-    let mut env1 = env_for(&with_freshness_neutralized(FOK_SOURCE));
+    let mut env1 = env_for_checker_mutation(&with_freshness_neutralized(FOK_SOURCE));
     assert!(
         verdict_is(&mut env1, &format!("{label}_stage1_sort_rejects"), &bad_seq, &bad_cert, "False"),
         "{label}: with freshness neutralized and the sort check live, the wrong-sort eigen \
@@ -216,7 +230,9 @@ fn assert_wrong_sort_eigen_isolated(label: &str, forall_ctor: &str, body: &str) 
     );
 
     // Stage 2: freshness neutralized AND sort collapsed -> same cert accepts.
-    let mut env2 = env_for(&with_sort_collapsed(&with_freshness_neutralized(FOK_SOURCE)));
+    let mut env2 = env_for_checker_mutation(&with_sort_collapsed(
+        &with_freshness_neutralized(FOK_SOURCE),
+    ));
     assert!(
         verdict_is(&mut env2, &format!("{label}_stage2_accepts"), &bad_seq, &bad_cert, "True"),
         "{label}: with BOTH freshness and the sort check neutralized, the SAME certificate must \
@@ -311,7 +327,7 @@ fn collapsing_the_sort_check_reddens_the_wrong_sort_controls() {
     );
 
     let collapsed = sort_collapsed_source();
-    let mut mutated = env_for(&collapsed);
+    let mut mutated = env_for_checker_mutation(&collapsed);
     assert!(
         verdict_is(&mut mutated, "collapse_mut_accept", &bad_seq, &bad_cert, "True"),
         "with the sort check collapsed the same certificate must be ACCEPTED -- \

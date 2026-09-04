@@ -20,9 +20,11 @@
 //! The mutation targets the freshness PREDICATE, not `fok_check_forall_right`'s
 //! guard: the checker and the reflection theorem
 //! `fok_check_forall_right_result_eq` both recompute the predicate, so mutating
-//! it keeps the two sides of that `= Refl` convertible and the file still
-//! elaborates -- letting the control itself flip rather than breaking the whole
-//! module.
+//! it keeps the two sides of that `= Refl` convertible through the
+//! checker-through-reflection prefix. The later semantic adequacy proof is
+//! intentionally outside this mutation fixture: target soundness intrinsically
+//! consumes freshness to justify its level-environment update, so a collapsed
+//! freshness premise must invalidate that theorem rather than be ignored.
 
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
@@ -33,10 +35,11 @@ const FOK_SOURCE: &str =
     include_str!("../../../catalog/packages/Tooling/Verification/FoKripke.ken");
 
 /// The single freshness predicate line, and its neutered form. Every other
-/// reference to `fok_sequent_mentions_parameter` in the file -- the checker
-/// guard, the derivation constructors' premise, and the reflection theorem --
-/// recomputes through this one definition, so replacing its body is the
-/// smallest compile-preserving mutation of "the freshness check".
+/// reference to `fok_sequent_mentions_parameter` in the
+/// checker-through-reflection prefix -- the checker guard, the derivation
+/// constructors' premise, and the reflection theorem -- recomputes through this
+/// one definition, so replacing its body is the smallest compile-preserving
+/// mutation of "the freshness check" for that behavioral surface.
 const FRESHNESS_PREDICATE_BODY: &str =
     "      fok_or (fok_list_form_any_mentions gamma target) (fok_list_form_any_mentions delta target)";
 const FRESHNESS_PREDICATE_NEUTERED: &str = "      False";
@@ -94,6 +97,17 @@ fn env_for(source: &str) -> ElabEnv {
     env
 }
 
+fn checker_prefix(source: &str) -> &str {
+    source
+        .split_once("-- === D2b: embedding adequacy proof (23 section 4.4) ===")
+        .expect("the semantic adequacy section must follow checker soundness")
+        .0
+}
+
+fn env_for_checker_mutation(source: &str) -> ElabEnv {
+    env_for(checker_prefix(source))
+}
+
 /// Elaborate the setup, then report whether `fok_check_tree sequent stale_cert`
 /// equals `expected` (`True` accepted / `False` rejected) by attempting the
 /// corresponding `Proved` theorem. Returns `true` iff that verdict holds.
@@ -128,14 +142,14 @@ fn assert_freshness_is_sole_cause(forall_ctor: &str, body: &str) {
     // rejected). Only the freshness predicate changed, so freshness is the sole
     // cause of the reject above.
     let mutated = mutated_source();
-    let mut mut_env = env_for(&mutated);
+    let mut mut_env = env_for_checker_mutation(&mutated);
     let setup3 = stale_cert_setup("mut", forall_ctor, body);
     assert!(
         stale_verdict_is(&mut mut_env, "mut", &setup3, "True"),
         "with freshness neutered the stale eigen certificate must be ACCEPTED -- \
          proving the reject was caused by freshness, not sort or child shape"
     );
-    let mut mut_env2 = env_for(&mutated);
+    let mut mut_env2 = env_for_checker_mutation(&mutated);
     let setup4 = stale_cert_setup("mut2", forall_ctor, body);
     assert!(
         !stale_verdict_is(&mut mut_env2, "mut2", &setup4, "False"),

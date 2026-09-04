@@ -757,7 +757,7 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Tooling.Verification.FoKripke".to_string(),
-            ["Bottom", "Equal", "Proved"]
+            ["Bottom", "Equal", "Proved", "Top"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
