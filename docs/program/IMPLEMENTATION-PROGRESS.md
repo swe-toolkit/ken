@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-04 05:58:22Z — from 540 issue file(s) in `docs/program/issues/`.
+2026-09-04 06:09:41Z — from 541 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -564,7 +564,8 @@ the committed file matches the generator's output.
 | `V3-FO-KRIPKE-SLICE` | Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls | merged | language | L | none | — |
 | `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` | Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all | merged | language | L | none | 2353 |
 | `V3-FO-QUOTE-GUARD-FAIL-CLOSED` | Make quote_fo's pre-quotation guards fail closed: Pair is not a binder, and a proof-variable-occurrence test must default to true | merged | language | S | none | 2346 |
-| `V3-FO-ROUTE-PROVED-COMPOSITION` | D3 honest-reach: route FO's public entry returns Proved by composing the two 23 section 4.4 theorems (checker-soundness and embedding-adequacy) into a kernel-checked cert for the quoted obligation — the explicitly reserved verdict-flip | ready | language | M | none | — |
+| `V3-FO-ROUTE-CONSUMPTION-APPARATUS` | FO honest-reach prerequisite: the theorem-consumption apparatus — thread the two 23 section 4.4 theorem handles to the accepted route (Component A) and build the kernel-guarded Rust<->catalog encoding bridge (Component B), so the checker_soundness then embedding_adequacy composite is assemblable and kernel-checkable at the accepted return. Prerequisite to D3's one-return flip. | ready | language | L | none | — |
+| `V3-FO-ROUTE-PROVED-COMPOSITION` | D3 honest-reach: route FO's public entry returns Proved by composing the two 23 section 4.4 theorems (checker-soundness and embedding-adequacy) into a kernel-checked cert for the quoted obligation — the explicitly reserved verdict-flip | draft | language | M | none | — |
 | `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` | Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report | merged | language | S | none | — |
 | `V3-FO-SORTED-EIGENPARAMETER-DERIVATION` | Make ForallRight parameter-only and sorted on BOTH checker surfaces, replace arbitrary-term subst0 with typed instantiation, and restate FokDerivation and its reflection proofs in lockstep -- the atomic middle of the FO soundness repair | merged | language | L | none | https://github.com/swe-toolkit/ken/pull/3057 |
 | `V3-FO-SOUNDNESS-SCT-EXPRESSIBILITY` | The FoKripke checker_soundness mutual-recursion clique's real termination is not a single structural size-change thread on its declared parameters under the current size_rel abstraction -- it fails by ROTATION (the bare-Var matched-field descent arrives in one slot while the outgoing edge decreases from another) -- so full SCT admission of the real consumer needs an UPSTREAM resolution (re-elaborate the soundness recursion to one structural thread; preferred, no TCB), with a narrow size_rel completeness fix or a richer measure as operator-gated conditional arms; this is the real AC-CONSUMER home V3-FO-CHECKER-SOUNDNESS D3 waits on, distinct from the arity fix (KERNEL-SCT-TELESCOPE-CANON) and from any Cast/J or lexicographic-SCT node | closed | language | L | none | — |
@@ -609,7 +610,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `SPEC-45-CLOSURE-IN-CONSTRUCTOR-EXCEPTION` — Does 45 section 3's 'functions lower to ordinary closures' admit an exception for a function value held in a constructor field with no statically visible consumer -- if not, the native backend's current refusal is a defect against AC3 rather than a permitted narrowing
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
-- `V3-FO-ROUTE-PROVED-COMPOSITION` — D3 honest-reach: route FO's public entry returns Proved by composing the two 23 section 4.4 theorems (checker-soundness and embedding-adequacy) into a kernel-checked cert for the quoted obligation — the explicitly reserved verdict-flip
+- `V3-FO-ROUTE-CONSUMPTION-APPARATUS` — FO honest-reach prerequisite: the theorem-consumption apparatus — thread the two 23 section 4.4 theorem handles to the accepted route (Component A) and build the kernel-guarded Rust<->catalog encoding bridge (Component B), so the checker_soundness then embedding_adequacy composite is assemblable and kernel-checkable at the accepted return. Prerequisite to D3's one-return flip.
 
 ## Blockers
 
@@ -651,6 +652,7 @@ is itself not yet `merged`/`closed`:
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
+- `V3-FO-ROUTE-PROVED-COMPOSITION` blocked by `V3-FO-ROUTE-CONSUMPTION-APPARATUS` (status: ready)
 
 ## Gate progress
 
