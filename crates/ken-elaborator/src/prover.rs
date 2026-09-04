@@ -591,13 +591,16 @@ fn attempt_fo(
 /// directly, rather than going through `attempt_fo`'s discovery step (see
 /// `attempt_fo`'s doc comment — `crate::fo_kripke::discover_and_quote_fo`
 /// re-quotes against this SAME `sig` before ever reaching this function, so
-/// the two entry points share this one boundary logic exactly). **The
-/// fail-safe**:
-/// when `quote_fo` + `find_certificate` + `check_cert` together accept a
-/// genuine certificate, the verdict returned is still `Unknown`, never
-/// `Proved` — `embedding_adequacy`/`checker_soundness` (`23 §4.4`) have no
-/// approved kernel-checked home yet, an Architect/operator decision this
-/// slice explicitly did not make (`AC-6`).
+/// the two entry points share this one boundary logic exactly).
+///
+/// `quote_fo` + `find_certificate` + `check_cert` acceptance is necessary but
+/// not sufficient for `Proved`. The accepted certificate becomes `Proved`
+/// only when `checker_soundness` then `embedding_adequacy` compose through
+/// [`crate::fo_kripke::kernel_checked_fo_composite`] and the kernel checks that
+/// composition against the independently held `phi_closed`. A missing catalog
+/// installation or non-checking composition remains honestly withheld as
+/// `Unknown`; quotation refusal and absence of a certificate retain the IPC
+/// fallback below.
 pub fn attempt_fo_with_signature(
     env: &mut GlobalEnv,
     ctx: &Context,
@@ -609,19 +612,18 @@ pub fn attempt_fo_with_signature(
         if let Some(cert) = crate::fo_kripke::find_certificate(&problem.f) {
             let target = crate::fo_kripke::embed(&problem.f);
             if crate::fo_kripke::check_cert(&target, &cert) {
-                // Genuine, accepted slice certificate — but `23 §4.4`
-                // reserves the kernel-checked home for the two theorems
-                // this discharge needs, and that decision has not been
-                // made. Honest `Unknown`, not `Proved` (`AC-5`).
-                //
-                // Distinct audit label (`V3-FO-OBLIGATION-SIGNATURE-
-                // DISCOVERY` `D5`): this hole is not "nothing could
-                // establish the goal" -- a certificate WAS found and
-                // accepted. Labelling it identically to an ordinary
-                // unknown hole would erase that distinction from
-                // `trusted_base()`, the one place it is otherwise
-                // recoverable.
-                return emit_unknown_hole_fo_withheld(env, phi_closed);
+                // The Rust checker is only a filter. `Proved` is authorized by
+                // the final kernel check of the theorem composition against
+                // this independently held obligation. If catalog encoding or
+                // composition is unavailable or wrong, retain the distinct
+                // accepted-but-withheld `Unknown` rather than trusting the
+                // checker.
+                return match crate::fo_kripke::kernel_checked_fo_composite(
+                    env, sig, &problem, &cert, phi_closed,
+                ) {
+                    Some(cert) => Verdict::Proved { cert },
+                    None => emit_unknown_hole_fo_withheld(env, phi_closed),
+                };
             }
         }
     }

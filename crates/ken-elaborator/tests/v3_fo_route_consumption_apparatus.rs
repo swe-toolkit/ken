@@ -190,7 +190,7 @@ fn faithful_and_wrong_encodings_form_a_kernel_guarded_pair() {
 }
 
 #[test]
-fn encoder_covers_every_slice_source_constructor_and_route_stays_unknown() {
+fn encoder_covers_every_slice_source_constructor_and_route_consumes_composite() {
     let mut env = env_with_fok();
     let (pred_p, _) = add_predicates(&mut env);
     let sig = slice_signature(&env, pred_p)
@@ -270,16 +270,19 @@ fn encoder_covers_every_slice_source_constructor_and_route_stays_unknown() {
         env.globals["fok_embedding_adequacy"]
     );
 
-    assert!(matches!(
-        attempt_fo_with_signature(
-            &mut env.env,
-            &Context::new(),
-            &phi_closed,
-            &phi_closed,
-            &route_sig,
-        ),
-        Verdict::Unknown { .. }
-    ));
+    let direct_verdict = attempt_fo_with_signature(
+        &mut env.env,
+        &Context::new(),
+        &phi_closed,
+        &phi_closed,
+        &route_sig,
+    );
+    let direct_cert = match direct_verdict {
+        Verdict::Proved { cert } => cert,
+        other => panic!("installed direct route must consume the composite, got {other:?}"),
+    };
+    check(&env.env, &Context::new(), &direct_cert, &phi_closed)
+        .expect("direct route certificate must prove phi_closed");
 
     let elaborated = env
         .elaborate_decl_v1(
@@ -290,14 +293,18 @@ fn encoder_covers_every_slice_source_constructor_and_route_stays_unknown() {
         .expect("public-route obligation");
     let extracted = v2_extract(&elaborated);
     let triple = extracted.obligations.first().expect("one obligation");
-    assert!(matches!(
-        attempt_obligation_with_catalog_handles(&mut env.env, &handles, triple).verdict,
-        Verdict::Unknown { .. }
-    ));
+    let public_verdict =
+        attempt_obligation_with_catalog_handles(&mut env.env, &handles, triple).verdict;
+    let public_cert = match public_verdict {
+        Verdict::Proved { cert } => cert,
+        other => panic!("installed public route must consume the composite, got {other:?}"),
+    };
+    check(&env.env, &Context::new(), &public_cert, &triple.goal_closed)
+        .expect("public route certificate must prove the independent obligation");
 
     assert!(
         kernel_checked_fo_composite(&env.env, &route_sig, &problem, &accepted_cert, &phi_closed,)
             .is_some(),
-        "the composite is ready while this prerequisite still withholds Proved"
+        "the route-consumed composite remains independently constructible"
     );
 }
