@@ -60,6 +60,7 @@ fn dependency_env() -> ElabEnv {
         });
     }
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "length"]);
+    catalog_or::withhold_lc_bool_and_from_legacy_lf_scope(&mut env);
     for (source, label) in [
         (LAWFUL_FUNCTORS, "Core.Classes.LawfulFunctors"),
         (EFFECTFUL_CLASSES, "Core.Classes.EffectfulClasses"),

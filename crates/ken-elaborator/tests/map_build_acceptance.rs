@@ -93,10 +93,22 @@ fn module_transparent_kernel_equivalents(
 fn mk_map_dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
-    let provider_state = catalog_or::core_logic_or_module_state(&env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
-    catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
+    for imported in [
+        "bool_and",
+        "bool_and::assoc",
+        "bool_and::comm",
+        "bool_and::idempotent",
+        "bool_and::intro",
+        "bool_and::left_identity",
+        "bool_and::right_identity",
+    ] {
+        assert!(
+            env.globals.remove(imported).is_some(),
+            "Map's LC fixture must withhold selectively imported `{imported}`"
+        );
+    }
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Combinators")
         .expect("Map's canonical Option-combinator provider must roots-load");
     assert!(
@@ -1051,7 +1063,7 @@ fn cat4_new_api_is_derived_and_axiom_free() {
         "leq_nat::antisym",
         "total_leq_nat",
         "order_equiv_key",
-        "bool_and::true_intro",
+        "bool_and::intro",
         "order_equiv_key_true_from_order_equiv",
         "order_equiv_from_order_equiv_key_true_inner",
         "order_equiv_from_order_equiv_key_true_dispatch",
@@ -1255,7 +1267,13 @@ fn cat4_new_api_is_derived_and_axiom_free() {
         "is_transitive",
         "is_equivalence",
     ] {
-        let id = env.globals[name];
+        let id = env.globals.get(name).copied().unwrap_or_else(|| {
+            assert!(
+                name == "bool_and" || name.starts_with("bool_and::"),
+                "only the imported LC bool_and family may lack a flat fixture alias"
+            );
+            env.globals[&format!("Core.Classes.LawfulClasses.{name}")]
+        });
         assert!(
             matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
             "{name} must be transparent derived Ken, not a primitive/postulate"
