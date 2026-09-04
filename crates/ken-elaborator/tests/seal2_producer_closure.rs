@@ -18,9 +18,9 @@ use ken_elaborator::ElabEnv;
 use ken_kernel::Term;
 
 use seal2_support::{
-    assert_confined, carrier_closure, catalog_package_files, catalog_root_facts, closed_producers,
-    conservative_deep_producers, enumerate_producer_types, head_only_producers, reaching_roots,
-    result_type_produces, synthetic_facts, ALLOWED_SECTIONS,
+    assert_confined, carrier_closure, catalog_package_files, catalog_packages_dir,
+    catalog_root_facts, closed_producers, conservative_deep_producers, enumerate_producer_types,
+    head_only_producers, reaching_roots, result_type_produces, synthetic_facts, ALLOWED_SECTIONS,
 };
 
 const BUFFER_KEN_MD: &str =
@@ -277,16 +277,38 @@ fn closed_oracle_reaches_the_class_field_namespace() {
 // dependency env, and checked by closed_producers; any other is named and fails.
 // ===========================================================================
 
-/// The non-exempt roots whose known dependency environment we load and run
-/// through `closed_producers`. The certificate DERIVES the non-exempt set; this
-/// names the ones we have an elaborated env for. Buffer/IO are non-exempt from
-/// their real consumer signatures (they name the carriers), so this assertion is
-/// exercised by production data — the certificate fails-and-names any OTHER
-/// non-exempt root. Their canonical env is `prelude + Buffer + IO`
-/// (`landed_surface`); a third would be one more entry + its loaded env.
-const ENUMERATED_CARRIER_ROOTS: [&str; 2] = [
-    "Capability/System/Buffer.ken.md",
-    "Capability/System/IO.ken.md",
+/// A known dependency environment for one or more non-exempt catalog roots.
+/// The certificate DERIVES the non-exempt set; this table supplies the exact
+/// roots for which the test can build an elaborated environment and run
+/// `closed_producers`. Removing an entry therefore makes admission fail before
+/// its loader can be skipped.
+struct EnumeratedCarrierEnvironment {
+    roots: &'static [&'static str],
+    load: fn() -> ElabEnv,
+    loaded_witnesses: &'static [&'static str],
+}
+
+fn lawful_functors_surface() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("LawfulFunctors dependency environment");
+    env.elaborate_module_from_roots(&[catalog_packages_dir()], "Core.Classes.LawfulFunctors")
+        .expect("LawfulFunctors must load with its known dependency environment");
+    env
+}
+
+const ENUMERATED_CARRIER_ENVIRONMENTS: &[EnumeratedCarrierEnvironment] = &[
+    EnumeratedCarrierEnvironment {
+        roots: &[
+            "Capability/System/Buffer.ken.md",
+            "Capability/System/IO.ken.md",
+        ],
+        load: landed_surface,
+        loaded_witnesses: &["span_length", "write_all_preserves_exact_prefix"],
+    },
+    EnumeratedCarrierEnvironment {
+        roots: &["Core/Classes/LawfulFunctors.ken.md"],
+        load: lawful_functors_surface,
+        loaded_witnesses: &["Core.Classes.LawfulFunctors.idf"],
+    },
 ];
 
 /// The glob ranges over EVERY catalog package and classifies each Section (an
@@ -326,33 +348,53 @@ fn catalog_source_root_confinement_certificate() {
     println!("carrier closure: {closure:?}");
     println!("reaching roots: {:?}", reaching_roots(&facts, &closure));
 
-    // Admission: every non-exempt root must be enumerated, else fail-named.
-    assert_confined(&facts, &ENUMERATED_CARRIER_ROOTS);
+    // MEASURED: one table supplies both the admitted root names and the loaders
+    // whose environments carry root-specific declaration witnesses before
+    // `closed_producers` returns empty for each carrier.
+    // CLAIMED: every non-exempt root is checked in its known dependency
+    // environment rather than accepted by name alone.
+    // THE GAP: each witness must be owned by the named root, and each loader
+    // must use the production path that fails if a dependency cannot load.
+    let enumerated_roots = ENUMERATED_CARRIER_ENVIRONMENTS
+        .iter()
+        .flat_map(|environment| environment.roots.iter().copied())
+        .collect::<Vec<_>>();
+    assert_confined(&facts, &enumerated_roots);
 
-    // Buffer/IO ARE non-exempt against real data — the enumerated assertion is
-    // not a vacuous forward tripwire.
+    // Every enumerated root IS non-exempt against real data, so neither the
+    // admission assertion nor a dependency-environment entry is vacuous.
     let reaching: BTreeSet<String> = reaching_roots(&facts, &closure)
         .into_iter()
         .map(|(root, _, _)| root)
         .collect();
-    for enumerated in ENUMERATED_CARRIER_ROOTS {
+    for enumerated in &enumerated_roots {
         assert!(
-            reaching.contains(enumerated),
-            "expected `{enumerated}` to be non-exempt from its real consumer \
-             signatures, so the admission assertion is exercised by production data"
+            reaching.contains(*enumerated),
+            "expected `{enumerated}` to be non-exempt from its real declarations, \
+             so the admission assertion is exercised by production data"
         );
     }
 
-    // AC-7 / clause 1: the enumerated roots' canonical env exposes no public
-    // producer for either carrier.
-    let env = landed_surface();
-    for carrier in ["BufferSpan", "TransferCount"] {
-        assert_eq!(
-            closed_producers(&env, carrier),
-            BTreeSet::new(),
-            "a public `{carrier}` producer exists in the carrier-bearing env — live \
-             finding, route it before changing anything"
-        );
+    // AC-7 / clause 1: each enumerated root's known dependency environment
+    // exposes no public producer for either carrier.
+    for environment in ENUMERATED_CARRIER_ENVIRONMENTS {
+        let env = (environment.load)();
+        for witness in environment.loaded_witnesses {
+            assert!(
+                env.globals.contains_key(*witness),
+                "environment for {:?} did not elaborate its root witness `{witness}`",
+                environment.roots
+            );
+        }
+        for carrier in ["BufferSpan", "TransferCount"] {
+            assert_eq!(
+                closed_producers(&env, carrier),
+                BTreeSet::new(),
+                "a public `{carrier}` producer exists in the environment for {:?} — \
+                 live finding, route it before changing anything",
+                environment.roots
+            );
+        }
     }
 }
 
