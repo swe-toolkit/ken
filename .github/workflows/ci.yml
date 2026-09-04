@@ -196,7 +196,7 @@ jobs:
             --message-format json > ignored-row-all.json
           filter=$(python3 scripts/ci-ignored-sweep.py filter \
             ignored-row-all.json)
-          expected=$(python3 scripts/ci-ignored-sweep.py expected)
+          expected=$(python3 scripts/ci-ignored-sweep.py expected ignored-row-all.json)
           cargo nextest list --workspace --locked --run-ignored=only \
             -E "$filter" --message-format json > ignored-row-list.json
           python3 scripts/ci-ignored-sweep.py verify-list \
