@@ -29,7 +29,8 @@ use super::{
     planner_capacity_error, planner_error, AbiCaptureProvenance, AbiUnitDefinition,
     BoundaryReferentOwner, ContinuationCallIdentity, ContinuationEmissionOwner,
     ContinuationEnvironmentClaim, ContinuationFrameIdentity, ContinuationSourceCoordinate,
-    ContinuationSpecializationId, CraneliftBackendError, EmittableCallKind, FieldIdentity,
+    ContinuationSpecializationId, CraneliftBackendError, DeclarationCallTargetClass,
+    EmittableCallKind, FieldIdentity,
     JoinResultRepresentation, PlannedOccurrenceChildAuthority, PlannedReferentLifetime,
     PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
     SynthesizedFixedConstructorRole,
@@ -1465,6 +1466,11 @@ pub struct ComposedReturnForwardRetRoleWitnessObservation {
 pub struct ComposedReturnForwardEdgeCollapsibilityObservation {
     pub active_frame_origin: String,
     pub collapsible: bool,
+    /// Purity determinations for every exact recursive-unit body candidate behind
+    /// this route. A singleton is required for collapse; retaining the divergent
+    /// population here pins the HS5 effect-tail body even though multiplicity
+    /// already makes that route non-collapsible.
+    pub candidate_body_purities: Vec<bool>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1717,6 +1723,7 @@ pub fn with_composed_return_forward_edge_collapsibility_observations<T>(
 pub(in crate::cranelift_backend) fn record_composed_return_forward_edge_collapsibility(
     active_frame_origin: StaticOriginId,
     collapsible: bool,
+    candidate_body_purities: Vec<bool>,
 ) {
     if !FORWARD_EDGE_COLLAPSIBILITY_ACTIVE.with(Cell::get) {
         return;
@@ -1727,6 +1734,7 @@ pub(in crate::cranelift_backend) fn record_composed_return_forward_edge_collapsi
             .push(ComposedReturnForwardEdgeCollapsibilityObservation {
                 active_frame_origin: format!("{active_frame_origin:?}"),
                 collapsible,
+                candidate_body_purities,
             });
     });
 }
@@ -6059,10 +6067,10 @@ fn generated_entry_retarget_caller(
 /// planner facts that created the unit. Multiple producer constructs are legal
 /// only when their declared worker bodies agree, matching lowering's existing
 /// branch-local agreement rule.
-fn checked_ih_invocation_recursive_unit_body(
+fn checked_ih_invocation_recursive_unit_bodies(
     plan: &StaticTransitionPlan<'_>,
     final_step: &CheckedIhSelfResumptionStep,
-) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+) -> Result<Vec<StaticOriginId>, CraneliftBackendError> {
     if final_step.active_frame_origin != final_step.callee_binding.frame_origin {
         return Err(planner_error(
             "a governed invocation's selected frame disagrees with its checked-IH binding",
@@ -6100,7 +6108,7 @@ fn checked_ih_invocation_recursive_unit_body(
         ));
     }
 
-    let mut declared = None;
+    let mut declared = Vec::new();
     for unit in plan.continuation_units()? {
         if unit.continuation_origin() != final_step.active_frame_origin
             || unit.producer_alternative() != final_step.selected_alternative
@@ -6109,17 +6117,25 @@ fn checked_ih_invocation_recursive_unit_body(
             continue;
         }
         let body = unit.worker_body_origin();
-        match declared {
-            None => declared = Some(body),
-            Some(expected) if expected == body => {}
-            Some(expected) => {
-                return Err(planner_error(format!(
-                    "one governed invocation's typed continuation units disagree on their declared recursive body: {expected:?} versus {body:?}",
-                )))
-            }
+        if !declared.contains(&body) {
+            declared.push(body);
         }
     }
     Ok(declared)
+}
+
+fn checked_ih_invocation_recursive_unit_body(
+    plan: &StaticTransitionPlan<'_>,
+    final_step: &CheckedIhSelfResumptionStep,
+) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+    let declared = checked_ih_invocation_recursive_unit_bodies(plan, final_step)?;
+    match declared.as_slice() {
+        [] => Ok(None),
+        [body] => Ok(Some(*body)),
+        [expected, body, ..] => Err(planner_error(format!(
+            "one governed invocation's typed continuation units disagree on their declared recursive body: {expected:?} versus {body:?}",
+        ))),
+    }
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -7696,6 +7712,25 @@ impl StaticTransitionPlan<'_> {
         &self,
         transport: &CheckedIhEnvironmentTransport,
     ) -> Result<bool, CraneliftBackendError> {
+        let bodies = self.checked_ih_forward_edge_route_candidate_bodies(transport)?;
+        let [body] = bodies.as_slice() else {
+            // No body or divergent bodies are both unresolved pending control.
+            return Ok(false);
+        };
+        self.checked_ih_body_is_pure_narrowing(*body)
+    }
+
+    /// The exact recursive-unit body population behind one forward-edge route.
+    ///
+    /// The route guard requires a singleton; test support also inspects every
+    /// divergent candidate so an effectful body cannot hide behind the
+    /// singleton check that already rejects the route. Every input comes from the
+    /// canonical, inert inheritance derivation. Missing/ambiguous producer steps
+    /// and structurally invalid invocation coordinates fail closed to no bodies.
+    fn checked_ih_forward_edge_route_candidate_bodies(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<Vec<StaticOriginId>, CraneliftBackendError> {
         let producer_active_frame = transport
             .source_call_identity()
             .token
@@ -7725,39 +7760,42 @@ impl StaticTransitionPlan<'_> {
                 continue;
             };
             if producer_steps.next().is_some() {
-                // More than one producer step for the frame -> ambiguous -> base.
-                return Ok(false);
+                return Ok(Vec::new());
             }
-            return self.checked_ih_producer_step_pure_narrowing(producer_step);
+            return Ok(
+                checked_ih_invocation_recursive_unit_bodies(self, producer_step)
+                    .unwrap_or_default(),
+            );
         }
-        // No canonical inheritance carries this transport's producer frame -> base.
-        Ok(false)
+        Ok(Vec::new())
     }
 
-    /// Whether the producer step's self-resumption invocation resolves to a
-    /// single recursive continuation unit with a pure-narrowing body. See
-    /// [`Self::checked_ih_forward_edge_route_collapsible`]; fail-safe to `false`.
-    fn checked_ih_producer_step_pure_narrowing(
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn checked_ih_forward_edge_route_body_purities(
         &self,
-        producer_step: &CheckedIhSelfResumptionStep,
-    ) -> Result<bool, CraneliftBackendError> {
-        let body = match checked_ih_invocation_recursive_unit_body(self, producer_step) {
-            Ok(Some(body)) => body,
-            // `None` = the invocation resolves to no typed recursive unit;
-            // `Err` = the canonical "units disagree on their declared recursive
-            // body" (a divergent pending recursor -- the read-then-write case) or
-            // any other unresolved shape. Both are ambiguity -> reject to base.
-            Ok(None) | Err(_) => return Ok(false),
-        };
-        self.checked_ih_body_is_pure_narrowing(body)
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<Vec<bool>, CraneliftBackendError> {
+        self.checked_ih_forward_edge_route_candidate_bodies(transport)?
+            .into_iter()
+            .map(|body| self.checked_ih_body_is_pure_narrowing(body))
+            .collect()
     }
 
-    /// Whether every occurrence reachable in one emitted body (without entering a
-    /// nested closure) is a pure value-narrowing node -- no intervening pending
-    /// control. Rejects on any `Effect`/`CheckedComputationalIHInvocation`/
-    /// `CheckedRecursiveInvocation`/`CheckedSubcontinuationFrame`/`CheckedJoinSite`.
-    /// A conservative full walk (it does not skip eliminated Match arms): control
-    /// in a dead arm still rejects, which is the fail-safe direction.
+    /// Whether every executed occurrence reachable from one emitted body is pure
+    /// value narrowing with no intervening pending control.
+    ///
+    /// The proof is fail-closed at calls. Positional children prove argument and
+    /// lexical-capture purity, while the callee must resolve to one exact local
+    /// `StaticBody` body (an inline closure or a typed declaration-call target),
+    /// which is then traversed too. A dynamic/imported/unresolved callee is not a
+    /// purity fact and therefore rejects. Merely constructing a closure does not
+    /// execute its body, so non-callee closure bodies stay outside the walk.
+    ///
+    /// Besides the five compiler control markers, a constructed `ITree::Vis` is
+    /// suspended effect control. HS5 demonstrated this exact erasure boundary: a
+    /// value-returning call can expose a body that returns `Vis`, so checking only
+    /// for `RuntimeExpr::Effect` is incomplete. A conservative full walk does not
+    /// skip eliminated Match arms; control in a dead arm still rejects.
     fn checked_ih_body_is_pure_narrowing(
         &self,
         root: StaticOriginId,
@@ -7774,11 +7812,81 @@ impl StaticTransitionPlan<'_> {
                 | RuntimeExpr::CheckedRecursiveInvocation { .. }
                 | RuntimeExpr::CheckedSubcontinuationFrame { .. }
                 | RuntimeExpr::CheckedJoinSite { .. } => return Ok(false),
-                RuntimeExpr::Closure { .. } | RuntimeExpr::LexicalClosure { .. } => {}
-                _ => {
-                    if let Ok(children) = self.semantic.child_origins(origin) {
-                        pending.extend(children.iter().copied());
+                RuntimeExpr::Construct { constructor, .. }
+                    if constructor.as_str().ends_with("::ITree::Vis") =>
+                {
+                    return Ok(false);
+                }
+                RuntimeExpr::Closure { .. } => {}
+                RuntimeExpr::LexicalClosure { captures, .. } => {
+                    let children = self.semantic.child_origins(origin)?;
+                    if children.len() != 1usize.saturating_add(captures.len()) {
+                        return Ok(false);
                     }
+                    // Child zero is the dormant body. Captures are evaluated now.
+                    pending.extend(children.iter().skip(1).copied());
+                }
+                RuntimeExpr::Call { args, .. } => {
+                    let children = self.semantic.child_origins(origin)?;
+                    if children.len() != 1usize.saturating_add(args.len()) {
+                        return Ok(false);
+                    }
+                    let callee = children[0];
+                    pending.extend(children.iter().skip(1).copied());
+                    let body = match self.planned_occurrence_expr(callee)? {
+                        RuntimeExpr::Closure { .. } => {
+                            let closure_children = self.semantic.child_origins(callee)?;
+                            let [body] = closure_children else {
+                                return Ok(false);
+                            };
+                            *body
+                        }
+                        RuntimeExpr::LexicalClosure { captures, .. } => {
+                            let closure_children = self.semantic.child_origins(callee)?;
+                            if closure_children.len() != 1usize.saturating_add(captures.len()) {
+                                return Ok(false);
+                            }
+                            pending.extend(closure_children.iter().skip(1).copied());
+                            closure_children[0]
+                        }
+                        RuntimeExpr::DeclarationRef { symbol } => {
+                            let Some(declaration) =
+                                self.declaration_occurrence_origin(symbol.as_str())
+                            else {
+                                return Ok(false);
+                            };
+                            match self.declaration_call_target_class(callee) {
+                                Some(DeclarationCallTargetClass::SchedulingEntry) => declaration,
+                                Some(DeclarationCallTargetClass::CallableDeclaration) => {
+                                    let declaration_children =
+                                        self.semantic.child_origins(declaration)?;
+                                    match self.planned_occurrence_expr(declaration)? {
+                                        RuntimeExpr::Closure { .. }
+                                            if declaration_children.len() == 1 =>
+                                        {
+                                            declaration_children[0]
+                                        }
+                                        RuntimeExpr::LexicalClosure { captures, .. }
+                                            if declaration_children.len()
+                                                == 1usize.saturating_add(captures.len()) =>
+                                        {
+                                            pending.extend(
+                                                declaration_children.iter().skip(1).copied(),
+                                            );
+                                            declaration_children[0]
+                                        }
+                                        _ => return Ok(false),
+                                    }
+                                }
+                                None => return Ok(false),
+                            }
+                        }
+                        _ => return Ok(false),
+                    };
+                    pending.push(body);
+                }
+                _ => {
+                    pending.extend(self.semantic.child_origins(origin)?.iter().copied());
                 }
             }
         }
@@ -9577,6 +9685,48 @@ mod tests {
     use super::super::*;
     use super::super::tests::unit;
     use crate::RuntimeValue;
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: two plans share the same outer zero-argument `Call` and exact
+    /// lexical `StaticBody` edge; only the called body's terminal constructor
+    /// differs (`ITree::Ret` versus suspended `ITree::Vis`). The purity walk
+    /// accepts the first and rejects the second.
+    /// CLAIMED: a value-returning call is pure narrowing only when its exact
+    /// statically resolved callee body is pure; a pending effect cannot hide
+    /// behind the call's child-origin boundary.
+    /// THE GAP: the positive arm prevents a blanket Call rejection from passing,
+    /// while the negative arm is reachable only by following the callee's
+    /// `StaticBody` body and then recognizing `Vis` as suspended control.
+    #[test]
+    fn checked_ih_purity_follows_static_callee_body_and_rejects_suspended_vis() {
+        let classify = |constructor: &str| {
+            let expr = Box::leak(Box::new(RuntimeExpr::Call {
+                callee: Box::new(RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: Vec::new(),
+                    body: Box::new(RuntimeExpr::Construct {
+                        constructor: constructor.to_owned(),
+                        args: Vec::new(),
+                    }),
+                }),
+                args: Vec::new(),
+            }));
+            let plan = plan_static_transition_graph(expr, &BTreeMap::new()).expect("plans");
+            let root = plan.root_occurrence.expect("the Call has a root occurrence");
+            plan.checked_ih_body_is_pure_narrowing(root)
+                .expect("the purity walk resolves the exact static body")
+        };
+
+        assert!(
+            classify("ctor:fixture::ITree::Ret"),
+            "a value-returning Call with a pure static body must remain admissible"
+        );
+        assert!(
+            !classify("ctor:fixture::ITree::Vis"),
+            "a suspended Vis reachable only through the Call's static body must reject"
+        );
+    }
 
     /// A seat-bearing fixture and its first emission owner.
     ///

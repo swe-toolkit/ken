@@ -3787,7 +3787,9 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
 #[test]
 fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
     in_large_stack_thread("rt-parity-forward-edge-collapsibility", || {
-        let determine = |label: &str, entry: &str| -> std::collections::BTreeMap<String, bool> {
+        let determine = |label: &str,
+                         entry: &str|
+         -> std::collections::BTreeMap<String, (bool, Vec<bool>)> {
             let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
             let root = output_dir(&format!("forward-edge-collapsibility-{label}"));
             let (result, observations) =
@@ -3808,13 +3810,17 @@ fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
             // times); the determination is deterministic per route.
             let mut by_route = std::collections::BTreeMap::new();
             for observation in observations {
+                let determination = (
+                    observation.collapsible,
+                    observation.candidate_body_purities.clone(),
+                );
                 if let Some(previous) = by_route.insert(
                     observation.active_frame_origin.clone(),
-                    observation.collapsible,
+                    determination.clone(),
                 ) {
                     assert_eq!(
-                        previous, observation.collapsible,
-                        "{label}: unstable collapsibility determination for {}",
+                        previous, determination,
+                        "{label}: unstable collapsibility/body-purity determination for {}",
                         observation.active_frame_origin
                     );
                 }
@@ -3827,8 +3833,12 @@ fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
         // forward_ret_edge_substituted_word_reds staying GREEN).
         let read = determine("read", "rt_read_offset_stage");
         assert!(
-            read.values().all(|&collapsible| collapsible),
-            "read: a value-returning tail was classified non-collapsible: {read:?}"
+            read.values().all(|(collapsible, body_purities)| {
+                *collapsible
+                    && !body_purities.is_empty()
+                    && body_purities.iter().all(|pure| *pure)
+            }),
+            "read: a value-returning tail was not backed by a singleton pure body: {read:?}"
         );
 
         // The read-then-write effect program: the non-degenerate pair. Exactly one
@@ -3839,13 +3849,26 @@ fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
         // one program is exactly what a preventive guard with no arm-flip needs.
         let write = determine("write", "rt_write_writable_stage");
         assert!(
-            write.values().any(|&collapsible| collapsible),
-            "write: expected at least one collapsible (value-returning) tail: {write:?}"
+            write.values().any(|(collapsible, body_purities)| {
+                *collapsible
+                    && body_purities.len() == 1
+                    && body_purities.iter().all(|pure| *pure)
+            }),
+            "write: expected a collapsible tail backed by one pure body: {write:?}"
         );
         assert_eq!(
-            write.values().filter(|&&collapsible| !collapsible).count(),
+            write
+                .values()
+                .filter(|(collapsible, _)| !*collapsible)
+                .count(),
             1,
             "write: expected exactly one non-collapsible (effect) tail: {write:?}"
+        );
+        assert!(
+            write.values().any(|(collapsible, body_purities)| {
+                !*collapsible && body_purities.iter().any(|pure| !*pure)
+            }),
+            "write: the effect tail exposed no rejected candidate body: {write:?}"
         );
     });
 }
