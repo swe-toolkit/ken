@@ -1,7 +1,7 @@
 ---
 id: V3-FO-ROUTE-PROVED-COMPOSITION
 title: "D3 honest-reach: route FO's public entry returns Proved by composing the two 23 section 4.4 theorems (checker-soundness and embedding-adequacy) into a kernel-checked cert for the quoted obligation — the explicitly reserved verdict-flip"
-status: active
+status: merged
 owner: language
 size: M
 gate: none
