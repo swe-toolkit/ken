@@ -20,6 +20,18 @@ ALLOWED_CLASSES = {
     "blocked-upstream-relation",
     "policy-cost",
     "placeholder-no-assertions",
+    # A run-exemption for a MACRO-GENERATED ignored test that is deliberately inert
+    # until a named readmission (e.g. a deferred mutation control retired-with-tie
+    # pending a later increment). Unlike blocked-upstream-relation, its readmission
+    # is NOT cross-checked against a source #[ignore] reason -- ignored_test_reasons()
+    # keys off `fn NAME(` in source and is fundamentally blind to macro-generated
+    # tests (the same blindness this whole fix removes from the count). The staleness
+    # safeguard is recovered via nextest ground truth instead: resolve_exemptions
+    # requires every exempted test to still resolve to exactly one --run-ignored=only
+    # identity, so when the readmission lands and the test is un-ignored it leaves the
+    # nextest ignored set and the sweep FAILS until the exemption is removed. The
+    # readmission label documents the lift condition.
+    "deferred-inert-control",
 }
 FILE_PATH_ROOTS = {"conformance", "spec"}
 SUMMARY_RE = re.compile(
@@ -408,33 +420,15 @@ def filter_expression(
     return f"not ({' + '.join(members)})"
 
 
-def ignored_attribute_count(
-    workspace_packages: dict[str, Path] | None = None,
-) -> int:
-    packages = workspace_packages or cargo_workspace_packages()
-    command = [
-        "git",
-        "grep",
-        "-nE",
-        r"^[[:space:]]*#\[ignore",
-        "--",
-        *(str(path) for path in sorted(set(packages.values()))),
-    ]
-    result = subprocess.run(
-        command,
-        cwd=ROOT,
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    if result.returncode not in (0, 1):
-        raise SweepError(result.stderr.strip() or "anchored git grep failed")
-    return sum(1 for line in result.stdout.splitlines() if line)
-
-
-def expected_count(rows: list[dict[str, str]]) -> int:
-    expected = ignored_attribute_count() - len(rows)
+def expected_count(all_listing: Path, rows: list[dict[str, str]]) -> int:
+    # Count ignored rows from nextest --list --run-ignored=only GROUND TRUTH, not a
+    # static source grep. The former anchored `#[ignore` git-grep could not see a
+    # macro-leading-token #[ignore] (e.g. generated_entry_checked_case!(#[ignore=..]
+    # name, ...)), so it undercounted macro-generated ignored tests and disagreed with
+    # nextest. nextest is the authority on generated-test identity, so the selected
+    # count is the nextest ignored population minus the registry run-exemptions.
+    _, all_identities, _ = read_listing(all_listing)
+    expected = len(all_identities) - len(rows)
     if expected <= 0:
         raise SweepError(
             f"derived selected count must be positive, got {expected}"
@@ -519,24 +513,30 @@ def verify_lists(
     selected_discovered, selected_identities, _ = read_listing(selected_path)
     all_matching = len(all_identities)
     selected_matching = len(selected_identities)
-    source_ignored = expected + len(rows)
+    # `expected` is the nextest ignored population minus the registry run-exemptions,
+    # computed by `expected_count` from the SAME all-listing this reads; adding the
+    # registry back must reconstruct the nextest ignored total. A mismatch means a
+    # stale `expected` (computed from a different listing) -- a consistency guard, no
+    # longer a source-grep-vs-nextest reconciliation.
+    expected_total = expected + len(rows)
     if all_discovered != selected_discovered:
         raise SweepError(
             "nextest listings disagree on total discovered tests: "
             f"unfiltered ignored listing reports {all_discovered}, selected "
             f"listing reports {selected_discovered}"
         )
-    if all_matching != source_ignored:
+    if all_matching != expected_total:
         raise SweepError(
-            f"source attribute census reports {source_ignored} ignored rows; "
-            f"nextest listing reports {all_discovered} total discovered tests and "
-            f"{all_matching} rows matching the ignored-only filter. Matching "
+            f"the passed expected count plus {len(rows)} registry exemptions is "
+            f"{expected_total}, but the nextest ignored-only listing reports "
+            f"{all_matching} rows (of {all_discovered} discovered) -- a stale "
+            "expected count (computed from a different listing). Matching "
             "listing identities:\n"
             f"{matching_identity_evidence(all_identities)}"
         )
     if selected_matching != expected:
         raise SweepError(
-            f"anchored source census minus {len(rows)} registry exemptions "
+            f"nextest ignored population minus {len(rows)} registry exemptions "
             f"expects {expected} selected ignored rows; nextest listing reports "
             f"{selected_discovered} total discovered tests and "
             f"{selected_matching} rows matching the sweep filter. Matching "
@@ -553,7 +553,7 @@ def verify_lists(
     print(
         f"ignored sweep selection: {selected_matching} selected of "
         f"{all_matching} ignored-only matches from {all_discovered} total "
-        "discovered tests; source census and registry subtraction agree"
+        "discovered tests; nextest ground truth and registry subtraction agree"
     )
 
 
@@ -647,7 +647,8 @@ def parse_args() -> argparse.Namespace:
     subcommands = parser.add_subparsers(dest="command", required=True)
     filter_parser = subcommands.add_parser("filter")
     filter_parser.add_argument("all_listing", type=Path)
-    subcommands.add_parser("expected")
+    expected_parser = subcommands.add_parser("expected")
+    expected_parser.add_argument("all_listing", type=Path)
     verify = subcommands.add_parser("verify-list")
     verify.add_argument("all_listing", type=Path)
     verify.add_argument("selected_listing", type=Path)
@@ -675,7 +676,7 @@ def main() -> int:
             _, identities, _ = read_listing(args.all_listing)
             print(filter_expression(rows, identities))
         elif args.command == "expected":
-            print(expected_count(rows))
+            print(expected_count(args.all_listing, rows))
         elif args.command == "verify-list":
             verify_lists(
                 args.all_listing, args.selected_listing, args.expected, rows

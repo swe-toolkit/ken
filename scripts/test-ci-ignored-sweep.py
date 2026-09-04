@@ -282,20 +282,38 @@ class IgnoredSweepTests(unittest.TestCase):
             ):
                 SWEEP.workspace_packages_from_metadata(document, root)
 
-    def test_source_census_receives_every_workspace_package_path(self) -> None:
-        packages = {
-            "first": Path("crates/first"),
-            "second": Path("tools/second"),
+    def test_expected_count_reads_nextest_ground_truth_minus_registry(self) -> None:
+        # CI-IGNORED-SWEEP-NEXTEST-GROUND-TRUTH: the ignored count comes from the
+        # nextest --run-ignored=only listing (the authority on generated-test
+        # identity), NOT a source grep. A fixture listing whose matching set includes
+        # a MACRO-generated identity (one the old anchored `#[ignore` grep could not
+        # see) is counted; expected = that population minus the registry exemptions.
+        all_identities = {
+            ("fixture-package", "b", "standalone_ignored_test"),
+            # A macro-generated test id: no source `fn` and its #[ignore] is a
+            # macro-leading token -- invisible to the old grep, visible to nextest.
+            ("fixture-package", "b", "macro_generated_capsule_ignored"),
         }
-        completed = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout="", stderr=""
-        )
-        with mock.patch.object(SWEEP.subprocess, "run", return_value=completed) as run:
-            self.assertEqual(SWEEP.ignored_attribute_count(packages), 0)
-
-        command = run.call_args.args[0]
-        self.assertEqual(command[-2:], ["crates/first", "tools/second"])
-        self.assertNotIn("crates/ken-runtime", command)
+        with tempfile.TemporaryDirectory() as directory:
+            all_listing = Path(directory) / "all.json"
+            all_listing.write_text(
+                json.dumps(listing(all_identities, 100 - len(all_identities))),
+                encoding="utf-8",
+            )
+            self.assertEqual(SWEEP.expected_count(all_listing, []), 2)
+            self.assertEqual(
+                SWEEP.expected_count(
+                    all_listing,
+                    [
+                        {
+                            "test_path": "fixture-package::standalone_ignored_test",
+                            "class": "policy-cost",
+                            "readmission": "n/a",
+                        }
+                    ],
+                ),
+                1,
+            )
 
     def test_blocked_relation_requires_exact_source_reason_agreement(self) -> None:
         with tempfile.TemporaryDirectory(dir=SWEEP.ROOT) as directory:
@@ -344,8 +362,8 @@ class IgnoredSweepTests(unittest.TestCase):
         classes = [row["class"] for row in rows]
         self.assertEqual(classes.count("policy-cost"), 1)
         self.assertEqual(classes.count("placeholder-no-assertions"), 3)
-        self.assertEqual(classes.count("blocked-upstream-relation"), 1)
-        self.assertEqual(len({row["test_path"] for row in rows}), 5)
+        self.assertEqual(classes.count("blocked-upstream-relation"), 2)
+        self.assertEqual(len({row["test_path"] for row in rows}), 6)
         for row in rows:
             if row["class"] == "placeholder-no-assertions":
                 self.assertIn("assert", row["readmission"])
@@ -369,6 +387,51 @@ class IgnoredSweepTests(unittest.TestCase):
                 SWEEP.SweepError, "must be one exact relation symbol"
             ):
                 SWEEP.load_registry(registry)
+
+    def test_deferred_inert_control_exempts_from_run_and_guards_staleness(self) -> None:
+        # CI-IGNORED-SWEEP-NEXTEST-GROUND-TRUTH class-safeguard AC. The new
+        # deferred-inert-control class run-exempts a macro-generated inert ignored
+        # test with a free-form readmission (no source-relation-symbol requirement),
+        # BUT the nextest still-ignored safeguard (resolve_exemptions against the
+        # ground-truth ignored set) fails if the exempted test is no longer ignored
+        # (readmitted / expired) -- so the exemption cannot rot into a silent skip,
+        # AND every non-exempt ignored row still runs (sweep RUN power preserved).
+        with tempfile.TemporaryDirectory() as directory:
+            registry = Path(directory) / "registry.toml"
+            registry.write_text(
+                "version = 1\n\n"
+                "[[exemption]]\n"
+                'test_path = "fixture-package::inert_capsule_control"\n'
+                'class = "deferred-inert-control"\n'
+                'readmission = "AC-EDGE-CONTROL-REKEY"\n',
+                encoding="utf-8",
+            )
+            rows = SWEEP.load_registry(registry)
+            self.assertEqual(rows[0]["class"], "deferred-inert-control")
+
+        exempt = ("fixture-package", "b", "inert_capsule_control")
+        other = ("fixture-package", "b", "still_run_ignored")
+        with tempfile.TemporaryDirectory() as directory:
+            all_listing = Path(directory) / "all.json"
+            selected_listing = Path(directory) / "selected.json"
+            all_listing.write_text(
+                json.dumps(listing({exempt, other}, 10)), encoding="utf-8"
+            )
+            # selected = every ignored row MINUS the run-exemption: only `other` runs.
+            selected_listing.write_text(
+                json.dumps(listing({other}, 11)), encoding="utf-8"
+            )
+            # expected = nextest ignored population (2) minus registry exemptions (1).
+            SWEEP.verify_lists(all_listing, selected_listing, 1, rows)
+            self.assertIn(
+                "inert_capsule_control",
+                SWEEP.filter_expression(rows, {exempt, other}),
+            )
+
+        # Staleness / expiry: once the exempted test is readmitted (no longer in the
+        # nextest ignored set), the exemption must FAIL the sweep, not silently persist.
+        with self.assertRaises(SWEEP.SweepError):
+            SWEEP.resolve_exemptions(rows, {other})
 
     def test_filter_is_sweep_local_and_contains_every_registry_identity(self) -> None:
         rows = SWEEP.load_registry(SWEEP.DEFAULT_REGISTRY)
@@ -407,7 +470,7 @@ class IgnoredSweepTests(unittest.TestCase):
         with self.assertRaisesRegex(SWEEP.SweepError, "resolves to 2"):
             SWEEP.resolve_exemptions([row], ambiguous)
 
-    def test_listing_matching_count_must_equal_the_anchored_derivation(self) -> None:
+    def test_listing_matching_count_must_equal_the_nextest_ground_truth(self) -> None:
         rows = SWEEP.load_registry(SWEEP.DEFAULT_REGISTRY)
         exempt = registry_identities(rows)
         selected_identities = {
@@ -436,9 +499,12 @@ class IgnoredSweepTests(unittest.TestCase):
             with self.assertRaises(SWEEP.SweepError) as mismatch:
                 SWEEP.verify_lists(all_listing, selected_listing, 46, rows)
             diagnostic = str(mismatch.exception)
-            self.assertIn("source attribute census reports 51 ignored rows", diagnostic)
-            self.assertIn("2646 total discovered tests", diagnostic)
-            self.assertIn("52 rows matching the ignored-only filter", diagnostic)
+            self.assertIn(
+                "the passed expected count plus 6 registry exemptions is 52",
+                diagnostic,
+            )
+            self.assertIn("of 2646 discovered", diagnostic)
+            self.assertIn("53 rows", diagnostic)
             self.assertIn("ken-runtime::ken-runtime::base_debt_0", diagnostic)
 
             selected_document = json.loads(selected_listing.read_text())
