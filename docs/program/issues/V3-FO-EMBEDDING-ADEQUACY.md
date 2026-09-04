@@ -5,27 +5,35 @@ status: active
 owner: language
 size: L
 gate: none
-depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE, LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW, LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME, LANG-DEPELIM-FORCED-INDEX-TELESCOPE-CLOSURE]
+depends_on: [V3-FO-KEN-LEVEL-CHECKER-AUTHORING, V3-FO-CHECKER-SOUNDNESS, LANG-INDEX-REFINEMENT-OMEGA-ARM, V3-FO-SORTED-EIGENPARAMETER-DERIVATION, LANG-RECORD-INDEX-REFINEMENT, LANG-DEPENDENT-MATCH-MOTIVE-REBASE, LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE, LANG-GENERATED-INDEX-EVIDENCE-CLOSURE, LANG-RECORD-INDEX-SIGMA-CLOSURE, LANG-DEPELIM-REFINED-INDEX-FIELD-DUAL-VIEW, LANG-DEPELIM-NESTED-COUPLED-INDEX-COHERENT-FRAME, LANG-DEPELIM-FORCED-INDEX-TELESCOPE-CLOSURE, LANG-FOK-SCOPED-IFORM-INDEX-ERRATUM]
 blocks: []
 github: null
 origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO D0 fork was routed to the spec enclave. V3-FO-CHECKER-SOUNDNESS is the FIRST of the two 23 section 4.4 theorems (merged); this node is the SECOND. The enclave D0 ruling (spec-leader evt_2enqgkgqwd2g5, from spec-author evt_3kefqcayzajq9) directed that this node be cut AFTER D0 landed, on the structural assumption, so it does not race ahead and silently assume a (b)/(c) kernel premise. Framed to ready 2026-08-22 as the interim lane-2 WP after checker-soundness completed; all coordinates measured at origin/main 6842689b. Steward-filed per COORDINATION section 2. RECUT by the Steward 2026-08-27 at origin/main b76943684, before release, without an operator or Architect ruling because nothing about the objective changed: D1 had LANDED (771eec449, 87f26d0d2, 215b88071, 1308e9ea0, 5ef0f0983; Architect-approved, Decision dec_7f4k3whvy9n8 resolved) while this node still read status ready with D1 listed as work and its artifacts declared ABSENT with zero occurrences. Re-measured every fixed input; every Ken-side line number had moved and the absence claim was false. The releasable remainder is D2+D3 only. Rust-side coordinates (fo_kripke.rs Carriers:500 AtomEnv:508 denote:517; prover.rs attempt_with_cert:316 attempt_fo_with_signature:574 emit_unknown_hole_fo_withheld:800) all re-verified UNCHANGED."
 ---
 
-> # OPERATIVE (Steward, 2026-09-03) — D2b RE-RELEASED. Predecessor #5
-> # [[LANG-DEPELIM-FORCED-INDEX-TELESCOPE-CLOSURE]] (the HS19 sealed forced-index
-> # telescope-argument closure) MERGED at `5e30b8f62` (PR #3297; Architect +
-> # Language QA approved exact `bf21d7f26`, CV N/A, both elab.rs paths
-> # blob-verified). That was the sole remaining `depends_on` gate, so every
-> # predecessor of D2b is now merged and D2b is UNBLOCKED. Per the held banner's
-> # re-release condition, the Steward hereby EXPLICITLY RE-RELEASES the funded
-> # FO/Kripke soundness completion (`embedding_adequacy`, lane 2) to the language
-> # ring. Statement UNCHANGED; held WIP `268c630494` reusable; RE-MEASURE
-> # coordinates at the build SHA (the Ken-side line numbers drift each landing —
-> # re-measure, do not trust the frame's table). The Architect is the required
-> # soundness reviewer on the resumed D2b candidate; Language QA, and CV only if
-> # a conformance surface is touched (predecessor #5 touched none); then Steward
-> # M1-M4 -> lieutenant. This banner supersedes the "D2b HELD AGAIN behind
-> # predecessor #5" state.
+> # OPERATIVE (Steward, 2026-09-04) — D2b HELD behind the HS20 carrier erratum.
+> # On resuming D2b from the merged predecessor #5, the ring hit **HS20**: the D1
+> # carrier `FokScopedIForm` (`FoKripke.ken:122`) declares depth `n` as a datatype
+> # PARAMETER while `FokScopedForall` recurses `n -> Suc n` — non-uniform, which
+> # only an INDEX permits — so the correspondence-motive IH stays at outer `n`
+> # while the body is at `Suc n` (generic D0 `TypeMismatch expected (Dg581 (cg69
+> # @3)) found (Dg581 (cg69 (cg69 @3)))`). The Architect ruled the LAYER
+> # (evt_6ntratrsb8qtj): a D1 CARRIER defect, NOT an elaborator or kernel gap —
+> # the sibling `FokObjectEnv` (:88) already carries its length as an INDEX and
+> # eliminates fine, so the kernel already supports it; Option 2 (touch
+> # kernel/Elim) is REJECTED. Fix = move `n` to a `Nat ->` index. **Steward
+> # WP-boundary call: distinct D1-erratum WP** —
+> # [[LANG-FOK-SCOPED-IFORM-INDEX-ERRATUM]] (released 2026-09-04): a different
+> # object from the embedding_adequacy proof, its own no-regression gate + catalog/
+> # (Architect) review domain, landed as an explicit reviewed erratum rather than
+> # smuggling a D1 change into the D2b candidate (respecting do-not-re-author-D1).
+> # D2b RE-RELEASES only on the Steward's explicit re-release after the erratum
+> # lands; held WIP rebased to `20f96de08` reusable, statement UNCHANGED,
+> # re-measure coordinates. On the erratum's landing the correspondence motive
+> # elaborates on the ALREADY-LANDED forced-index-telescope mechanism (predecessor
+> # #5) — no new elaborator increment. Architect required soundness reviewer;
+> # Language QA; CV if conformance-touching; then Steward M1-M4 -> lieutenant.
+> # This banner supersedes the "D2b RE-RELEASED" state.
 >
 > # OPERATIVE (Steward, 2026-09-03) — OPERATOR GATE RESOLVED: predecessor
 > # #4's coupled coherence realizes via the cast/J INDEX-REFINEMENT (option a).
@@ -210,6 +218,25 @@ origin: "Steward, 2026-08-22, discharging the framing debt surfaced when the FO 
    owned by [[LANG-DEPELIM-FORCED-INDEX-TELESCOPE-CLOSURE]] (predecessor #5,
    released 2026-09-03). Sealed-totality forecloses HS20 (a 4th coupled-datum class
    = compile error). §1a: HS19 NOT a trigger; next mandatory = HS21.
+5. **HS20 (D1 CARRIER mis-declaration — DISTINCT predicate, NOT the foreclosed
+   4th coupled-datum class).** The D1 carrier `FokScopedIForm` (`FoKripke.ken:122`)
+   declares depth `n` as a datatype PARAMETER (`data FokScopedIForm (sigma) (n) :
+   Type`, params=2 indices=0) while `FokScopedForall` recurses `n -> Suc n` —
+   non-uniform, which only an INDEX permits. The Elim fixes `n` in the motive, so a
+   constant motive is green but the correspondence motive's coupled `n -> Suc n`
+   makes the IH stay at outer `n` while the body is at `Suc n`: generic D0
+   `TypeMismatch expected (Dg581 (cg69 @3)) found (Dg581 (cg69 (cg69 @3)))` =
+   MiniForm(Suc m) vs MiniForm(Suc(Suc m)). Section-1b predicate (Architect
+   evt_6ntratrsb8qtj): an upstream carrier mis-declaration — a semantic index
+   declared as a non-uniform parameter — SEPARATE from the HS16-19 elaborator-convoy
+   predicate. The HS19 sealed-totality prediction STANDS (no 4th coupled-datum class
+   arose; sealed closure forecloses that); HS20 is a different LAYER entirely (D1
+   source), not the elaborator. Fix = move `n` to a `Nat ->` index mirroring the
+   sibling `FokObjectEnv` (:88); the kernel already supports it (Option 2 REJECTED,
+   no TCB). Owned by [[LANG-FOK-SCOPED-IFORM-INDEX-ERRATUM]] (distinct D1-erratum WP,
+   released 2026-09-04). Once `n` is an index the correspondence motive elaborates on
+   the ALREADY-LANDED forced-index mechanism (predecessor #5) — no new elaborator
+   increment. §1a: HS20 NOT a trigger; next mandatory = HS21 (unchanged).
 
 > # D2b RE-FROZEN 2026-09-02 (HS-fifth) — behind a FIFTH elaborator predecessor
 >
