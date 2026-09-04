@@ -7701,11 +7701,18 @@ impl StaticTransitionPlan<'_> {
             .token
             .worker
             .parent_origin;
-        // Read the producer self-resumption step from the canonical continuation
-        // inheritances -- the same population the Tail route derivation reads
-        // (`checked_ih_fresh_result_route`). Match the transport, then its
-        // producer frame.
-        for inheritance in &self.checked_ih_continuation_inheritances {
+        // Read the producer self-resumption step from the CANONICAL continuation
+        // inheritances DERIVED from the inert plan -- never the stored, suppressible
+        // `checked_ih_continuation_inheritances` field (whose sole reader is
+        // `validate_checked_ih_continuation_inheritances`). This guard's result gates
+        // a codegen arm at the consumption seams, so it must be a pure function of the
+        // inert plan: sourcing it from the stored certificate would re-introduce the
+        // inc1 C byte-inertness LAYERING defect (Architect evt_70qj45jjt8sqm /
+        // evt_1ftjw17axfm9q) -- SuppressForInertness clears the stored field, which
+        // would flip the collapse arm and diverge the final-codegen hash. This mirrors
+        // the plan-proof's canonical re-source; validate asserts stored == canonical, so
+        // the determination is unchanged for every real route on the normal path.
+        for inheritance in &build_checked_ih_continuation_inheritances(self)? {
             if inheritance.transport != *transport {
                 continue;
             }
