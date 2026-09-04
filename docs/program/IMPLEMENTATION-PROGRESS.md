@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-04 08:30:24Z — from 541 issue file(s) in `docs/program/issues/`.
+2026-09-04 16:10:34Z — from 542 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -384,6 +384,7 @@ the committed file matches the generator's output.
 | `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | merged | runtime | M | none | — |
 | `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | merged | runtime | M | none | — |
 | `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` | M3 successor (recut) — bind px8ta's causal residual (emit_carrier_dynamic_constructor's direct return_(-3) at StaticOriginId(34)) to one actual generated function/owner/SSA discriminator/compare/successor, then repair only the proven layer; the equality chain over discriminator 1 with a declared tag-1 alternative reaches its residual, which the hard-stop #3 research advisory places most plausibly in value-handle provenance, not integer equality | merged | runtime | M | none | — |
+| `RT-EFFECT-CONTINUATION-WRITE-NARROWING` | Build the general cross-context effect-result channel: carry an effect's full result (the discriminated ResourceBody{Ok/Err} Ken value, including narrowed error products) from the inner effect-execution response-specialization cranelift function, across the function-return boundary, to the outer effect-tail exit sink — replacing the source-machine backward reconstruction (the lossy middle) whose PatternMatchFailure trap today masks the exact error product. First consumer: the composed read-then-write recursor's write-narrowing (write reaches exit as ResourceBodyErr(InvalidOffset), not PatternMatchFailure). The carrier + join + exit-routing are effect-agnostic and shared; the socket/network effect paths are the next consumers. | active | runtime | M | none | — |
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
 | `RT-EMITTED-WORKER-CONSUMER-WALK` | Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition | closed | runtime | S | none | — |
 | `RT-EMITTER-AGGREGATES-SPLIT` | Move the aggregates emitter family out of the lowering files -- the emitter half of the aggregate lifecycle whose planner half item 7 already owns | merged | runtime | M | none | — |
