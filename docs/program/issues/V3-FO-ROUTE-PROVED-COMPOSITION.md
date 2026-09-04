@@ -1,27 +1,40 @@
 ---
 id: V3-FO-ROUTE-PROVED-COMPOSITION
 title: "D3 honest-reach: route FO's public entry returns Proved by composing the two 23 section 4.4 theorems (checker-soundness and embedding-adequacy) into a kernel-checked cert for the quoted obligation — the explicitly reserved verdict-flip"
-status: draft
+status: active
 owner: language
 size: M
 gate: none
 tier: T1
+status_note: "active 2026-09-04 — RE-RELEASED after apparatus prerequisite landed 9b89a7436 (node closed b188f359d); depends_on satisfied, kicked language ring"
 depends_on: [V3-FO-CHECKER-SOUNDNESS, V3-FO-EMBEDDING-ADEQUACY, V3-FO-ROUTE-CONSUMPTION-APPARATUS]
 blocks: []
 github: null
 origin: "Steward, 2026-09-04, at origin/main 985cd0436. D3 is the honest-reach verdict-flip reserved by V3-FO-KRIPKE-SLICE AC-5/AC-6 and named in V3-FO-EMBEDDING-ADEQUACY's origin (the releasable remainder is D2+D3 only). The second of the two 23 section 4.4 theorems (embedding_adequacy) landed 5c705a4d7 (D2b), completing the two-theorem prerequisite; the first (checker-soundness) was already merged. Lane-2 next confirmed by language-leader evt_70js2ckw1kbb0 (Option 1: this is the reserved verdict-flip, within lane-2's objective, NOT an operator re-scope; V3-FO-OBLIGATION-SIGNATURE-DISCOVERY already removed public-route reachability gate 1, leaving only 23.4.4 theorem composition). Decomposition and the contingent gate=none ruling from Architect evt_3th40hnvytpzp. Steward-filed per COORDINATION section 2."
 ---
 
-> # OPERATIVE (Steward, 2026-09-04) — BLOCKED on the apparatus prerequisite.
-> # On kickoff (evt_74231xgpa2asm) the language-implementer HARD-STOPPED
-> # (evt_kw6zgeshvnp3, confirmed language-leader evt_2y37p7bbs9heg): the two
-> # theorems are proved+merged but the theorem-CONSUMPTION APPARATUS to deliver
-> # their terms + encoded args to line 597 is absent (no handle threading; no
-> # Rust<->catalog encoder). Architect RULED (evt_76rkjsahaf6dt) this the real
-> # gap and cut it as a PREREQUISITE node: [[V3-FO-ROUTE-CONSUMPTION-APPARATUS]]
-> # (Component A handle-threading + Component B kernel-guarded encoder). D3's
-> # one-return flip is UNCHANGED and is the LAST step, released again once the
-> # apparatus lands. Status held at draft until then; depends_on updated.
+> # OPERATIVE (Steward, 2026-09-04) — RE-RELEASED. The apparatus prerequisite
+> # [[V3-FO-ROUTE-CONSUMPTION-APPARATUS]] LANDED origin/main 9b89a7436 (node
+> # closed b188f359d; blob-verified by the Steward — fo_kripke.rs 45fd1206 and
+> # prover.rs 72fa3c75 on main are identical to candidate 3486d3fd). Component A
+> # (theorem-handle threading via FoCatalogHandles) and Component B (kernel-
+> # guarded Rust<->catalog encoder, route classifies on the INDEPENDENT
+> # ObligationTriple.goal_closed, encoder not trusted) are now present, so the
+> # composite checker_soundness ∘ embedding_adequacy is assemblable and
+> # kernel-checkable at the accepted return. D3's one-return flip — the LAST
+> # step — is therefore released to the language ring. gate=none is CONFIRMED,
+> # not merely contingent: the apparatus landed with the independent-phi_closed
+> # measurement satisfied (Architect evt_5apcqx4h6vgyf), zero trusted_base delta.
+> #
+> # COORDINATE NOTE (re-measure, do not trust the line number): the apparatus
+> # landed prover.rs +33 ADDITIVE (Component-A handle threading), so line numbers
+> # below shifted. The flip target is defined SEMANTICALLY, not by line: the
+> # accepted-certificate branch of `attempt_fo_with_signature` (reached only when
+> # quote_fo succeeds AND find_certificate returns a cert AND check_cert is true)
+> # that currently returns `emit_unknown_hole_fo_withheld` — AC-C of the
+> # apparatus PRESERVED that exact return. Re-measure its line at 9b89a7436.
+> # Prior kickoff was evt_74231xgpa2asm; the implementer's hard-stop
+> # (evt_kw6zgeshvnp3) is now resolved by the landed apparatus.
 >
 > # The flip decomposition, unchanged (Architect z2610 evt_3th40hnvytpzp):
 > # it flips exactly ONE return and moves no other prover path. The honesty of
