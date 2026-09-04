@@ -736,6 +736,63 @@ impl<'a> Lowering<'a> {
         )
     }
 
+    /// inc2 fork (c) (Architect evt_xfscq4shy8rj): the WRITE half's PARTIAL
+    /// forward-edge collapse. The governed Tail continuation body is an
+    /// effect-performing READ-THEN-WRITE (a recursive checked-IH computational
+    /// match, not a pure `Ret{Match}`): its writeAt effect subtree is a
+    /// cross-function continuation that MUST run in its own function, dispatched
+    /// by call, NEVER inlined here (inlining breaches the per-function
+    /// continuation-scope barrier and re-performs the effect). We reassemble the
+    /// continuation frame from the InlineNoCall carrier (Parameter-0 = the carried
+    /// read result) exactly as the read closeout does, then drive the body through
+    /// the SOURCE MACHINE — the only lowering that reaches the checked-IH seam and
+    /// dispatches the writeAt to its function, rather than `lower_expr`/
+    /// `lower_carried_match`, which inline the nested continuation and trap at
+    /// object emission. The body is driven with a `ReturnValue` terminal so the
+    /// narrowed answer (produced after the readAt narrows and the dispatched
+    /// writeAt returns) comes back here, and we forward-edge it to the shared
+    /// `return_body` block — the in-scope Ret the collapse owns — bypassing the
+    /// source-machine answer-collapse trap frontier that leaves the write
+    /// un-narrowed on the base path.
+    pub(super) fn emit_composed_return_effect_closeout(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        authority: ComposedReturnForwardRetAuthority,
+        transport: &CheckedIhEnvironmentTransport,
+        env: &[LoweringEnvironmentBinding],
+        control: &SourceControl<'_>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let (ordinary, body_origin) =
+            self.reassemble_composed_return_frame(builder, &authority, transport, env)?;
+        let frame_env: Vec<LoweringEnvironmentBinding> = ordinary
+            .into_iter()
+            .map(LoweringEnvironmentBinding::Value)
+            .collect();
+        let body_occ = OwnedSourceOccurrence::cloned(self.retained_body_occurrence(body_origin)?);
+        let body_control = SourceControl {
+            continuation: SourceContinuation::Terminal(SourceContinuationTerminal::ReturnValue),
+            selected: control.selected.clone(),
+            selected_lineage: control.selected_lineage.clone(),
+            terminal_outer: control.terminal_outer,
+        };
+        let answer =
+            self.lower_source_machine_with_continuation(builder, body_occ, frame_env, body_control)?;
+        if matches!(answer, LoweringOperand::Specialized(Lowered::RecursiveBackedge)) {
+            return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
+        }
+        let answer = self.carried_join_arm(
+            builder,
+            body_origin,
+            answer,
+            None,
+            "a composed-return effect closeout answer",
+        )?;
+        builder
+            .ins()
+            .jump(authority.return_body, &[answer.word.into()]);
+        Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge))
+    }
+
     pub(super) fn lower_source_machine_with_continuation<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,

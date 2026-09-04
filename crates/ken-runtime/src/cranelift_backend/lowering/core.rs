@@ -8452,13 +8452,18 @@ impl<'a> Lowering<'a> {
         ))
     }
 
-    pub(super) fn emit_composed_return_ret_kmatch_closeout(
+    /// Reassemble the continuation unit's ordinary frame from the InlineNoCall
+    /// captured-environment carrier. Shared by the read (`Ret{Match}`) and write
+    /// (effect) forward-edge closeouts. Returns the reassembled `ordinary`
+    /// operands — Parameter-0 = the carried `outcome`, then worker captures, then
+    /// continuation inputs — and the continuation unit's worker body origin.
+    pub(super) fn reassemble_composed_return_frame(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
-        authority: ComposedReturnForwardRetAuthority,
+        authority: &ComposedReturnForwardRetAuthority,
         transport: &CheckedIhEnvironmentTransport,
         env: &[LoweringEnvironmentBinding],
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
+    ) -> Result<(Vec<LoweringOperand>, StaticOriginId), CraneliftBackendError> {
         self.pending_computational_ih_call.take();
         // The InlineNoCall carried-environment return IS the captured-environment
         // carrier; this call also settles the continuation candidate exactly once.
@@ -8564,6 +8569,18 @@ impl<'a> Lowering<'a> {
             };
             ordinary.push(operand);
         }
+        Ok((ordinary, body_origin))
+    }
+
+    pub(super) fn emit_composed_return_ret_kmatch_closeout(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        authority: ComposedReturnForwardRetAuthority,
+        transport: &CheckedIhEnvironmentTransport,
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let (ordinary, body_origin) =
+            self.reassemble_composed_return_frame(builder, &authority, transport, env)?;
         // The continuation body is `Construct{ ITree::Ret, [ deforested payload ] }`.
         // Running the single payload argument on the reassembled frame yields the
         // bare answer the `ITree::Ret` would wrap — i.e. exactly the shared Ret
