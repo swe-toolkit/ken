@@ -3766,6 +3766,90 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
     });
 }
 
+/// inc2 (A) preventive collapsibility guard -- (b) determination pin (Architect
+/// evt_1qf2wn2sfbq7x / runtime-qa evt_6vhnvcxpp1fx1). The guard
+/// (`checked_ih_forward_edge_route_collapsible`) is the load-bearing output of
+/// the HS3/HS4 arc, yet it flips no consumption arm on today's programs: the
+/// effect tail (af=483) is already excluded by `tail_worker_body_is_ret_kmatch`
+/// before the guard is consulted, so read-collapses and no-regression bracket the
+/// seat's behavior but leave the discriminator ITSELF unpinned -- a hard-coded
+/// `false` would pass every other fixture identically. This pin observes the
+/// discriminator's own determination directly (recorded independent of the
+/// `is_ret_kmatch` short-circuit) and asserts the non-degenerate pair: a
+/// collapsible route AND a non-collapsible route classified oppositely.
+///
+/// Durable invariant (not a snapshot): asserts the RELATION -- the read-then-write
+/// program has exactly one non-collapsible (effect) tail and at least one
+/// collapsible one; the pure read program has none non-collapsible -- keyed on the
+/// determination, never on specific origin ids. It reddens if a future change
+/// mis-classifies the effect tail as collapsible (the exact drift that would let
+/// inc3's effect-continuation mechanism wrongly keep the forward edge on it).
+#[test]
+fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
+    in_large_stack_thread("rt-parity-forward-edge-collapsibility", || {
+        let determine = |label: &str, entry: &str| -> std::collections::BTreeMap<String, bool> {
+            let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+            let root = output_dir(&format!("forward-edge-collapsibility-{label}"));
+            let (result, observations) =
+                ken_runtime::with_composed_return_forward_edge_collapsibility_observations(|| {
+                    ken_cli::build_native_program(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        &format!("rt_parity_forward_edge_collapsibility_{label}"),
+                        root.path(),
+                    )
+                });
+            result.expect("the collapsibility fixture must compile");
+            assert!(
+                !observations.is_empty(),
+                "{label}: no collapsibility determination was recorded (guard never consulted)"
+            );
+            // Dedup per route (the seat consumes each formed authority multiple
+            // times); the determination is deterministic per route.
+            let mut by_route = std::collections::BTreeMap::new();
+            for observation in observations {
+                if let Some(previous) = by_route.insert(
+                    observation.active_frame_origin.clone(),
+                    observation.collapsible,
+                ) {
+                    assert_eq!(
+                        previous, observation.collapsible,
+                        "{label}: unstable collapsibility determination for {}",
+                        observation.active_frame_origin
+                    );
+                }
+            }
+            by_route
+        };
+
+        // The pure read narrowing: every formed Tail route is a value-returning
+        // tail -> collapsible (the guard's positive arm; also bracketed by
+        // forward_ret_edge_substituted_word_reds staying GREEN).
+        let read = determine("read", "rt_read_offset_stage");
+        assert!(
+            read.values().all(|&collapsible| collapsible),
+            "read: a value-returning tail was classified non-collapsible: {read:?}"
+        );
+
+        // The read-then-write effect program: the non-degenerate pair. Exactly one
+        // route is non-collapsible -- the outer read-then-write effect tail (af=483)
+        // whose producer resumes into a divergent recursor (the guard's Err/impure
+        // negative arm) -- and at least one is collapsible (the inner writeAt
+        // narrowing, af=696, a pure value-returning tail). Classified oppositely in
+        // one program is exactly what a preventive guard with no arm-flip needs.
+        let write = determine("write", "rt_write_writable_stage");
+        assert!(
+            write.values().any(|&collapsible| collapsible),
+            "write: expected at least one collapsible (value-returning) tail: {write:?}"
+        );
+        assert_eq!(
+            write.values().filter(|&&collapsible| !collapsible).count(),
+            1,
+            "write: expected exactly one non-collapsible (effect) tail: {write:?}"
+        );
+    });
+}
+
 /// **Promise class: durable invariant.**
 ///
 /// **MEASURED:** the complete set of real planned Tail coordinates equals the

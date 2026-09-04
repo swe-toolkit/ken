@@ -1452,6 +1452,21 @@ pub struct ComposedReturnForwardRetRoleWitnessObservation {
     pub formed_coordinate: Option<ComposedReturnForwardRetCoordinateObservation>,
 }
 
+/// One per-route observation of the (A) collapsibility discriminator's OWN
+/// determination (inc2 (b) pin, Architect evt_1qf2wn2sfbq7x / runtime-qa
+/// evt_6vhnvcxpp1fx1). Recorded directly from
+/// `checked_ih_forward_edge_route_collapsible`, INDEPENDENT of the
+/// `tail_worker_body_is_ret_kmatch` short-circuit that hides the effect tail
+/// behaviorally, so the preventive guard's classification is pinned even though
+/// it flips no arm on today's programs. The discriminating pair a test asserts is
+/// a collapsible route AND a non-collapsible route classified oppositely.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComposedReturnForwardEdgeCollapsibilityObservation {
+    pub active_frame_origin: String,
+    pub collapsible: bool,
+}
+
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
     static GENERATED_ENTRY_CONFLUENCE_MUTATION:
@@ -1469,6 +1484,10 @@ thread_local! {
     static FORWARD_RET_ROLE_WITNESS_ACTIVE: Cell<bool> = const { Cell::new(false) };
     static FORWARD_RET_ROLE_WITNESS_OBSERVATIONS:
         RefCell<Vec<ComposedReturnForwardRetRoleWitnessObservation>> =
+            const { RefCell::new(Vec::new()) };
+    static FORWARD_EDGE_COLLAPSIBILITY_ACTIVE: Cell<bool> = const { Cell::new(false) };
+    static FORWARD_EDGE_COLLAPSIBILITY_OBSERVATIONS:
+        RefCell<Vec<ComposedReturnForwardEdgeCollapsibilityObservation>> =
             const { RefCell::new(Vec::new()) };
 }
 
@@ -1661,6 +1680,53 @@ pub(in crate::cranelift_backend) fn record_composed_return_forward_ret_role_witn
                 selected_source_call_identity: format!("{selected_source_call_identity:?}"),
                 outcome: outcome.to_owned(),
                 formed_coordinate: proof.map(composed_return_forward_ret_coordinate_observation),
+            });
+    });
+}
+
+/// Collect the (A) collapsibility discriminator's per-route determinations made
+/// while `f` runs (inc2 (b) pin). Mirrors
+/// [`with_composed_return_forward_ret_role_witnesses`].
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_composed_return_forward_edge_collapsibility_observations<T>(
+    f: impl FnOnce() -> T,
+) -> (T, Vec<ComposedReturnForwardEdgeCollapsibilityObservation>) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FORWARD_EDGE_COLLAPSIBILITY_ACTIVE.with(|active| active.set(false));
+            FORWARD_EDGE_COLLAPSIBILITY_OBSERVATIONS
+                .with(|observations| observations.borrow_mut().clear());
+        }
+    }
+
+    FORWARD_EDGE_COLLAPSIBILITY_OBSERVATIONS
+        .with(|observations| observations.borrow_mut().clear());
+    FORWARD_EDGE_COLLAPSIBILITY_ACTIVE.with(|active| active.set(true));
+    let restore = Restore;
+    let result = f();
+    let observations = FORWARD_EDGE_COLLAPSIBILITY_OBSERVATIONS
+        .with(|observations| std::mem::take(&mut *observations.borrow_mut()));
+    drop(restore);
+    (result, observations)
+}
+
+/// Record one route's collapsibility determination (inc2 (b) pin). No-op unless
+/// [`with_composed_return_forward_edge_collapsibility_observations`] is active.
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_composed_return_forward_edge_collapsibility(
+    active_frame_origin: StaticOriginId,
+    collapsible: bool,
+) {
+    if !FORWARD_EDGE_COLLAPSIBILITY_ACTIVE.with(Cell::get) {
+        return;
+    }
+    FORWARD_EDGE_COLLAPSIBILITY_OBSERVATIONS.with(|observations| {
+        observations
+            .borrow_mut()
+            .push(ComposedReturnForwardEdgeCollapsibilityObservation {
+                active_frame_origin: format!("{active_frame_origin:?}"),
+                collapsible,
             });
     });
 }
@@ -7598,6 +7664,118 @@ impl StaticTransitionPlan<'_> {
             }
         }
         Ok(access)
+    }
+
+    /// (A) preventive collapsibility guard (inc2, Architect evt_1z9x00y6ydjtf /
+    /// evt_3cjmm6j2gbtxb). Whether a formed Tail producer-to-Ret forward-Ret edge
+    /// for `transport` is forward-edge-collapsible: the producer result reaches
+    /// the strict-Ret sink through PURE VALUE-NARROWING alone, with NO intervening
+    /// pending control.
+    ///
+    /// POSITIVE determination only, FAIL-SAFE to base: returns `true` ONLY when
+    /// the producer step's self-resumption invocation resolves to exactly one
+    /// recursive continuation unit whose body is pure narrowing -- no `Effect`
+    /// (Vis), no further checked-IH / same-SCC recursive invocation, and no
+    /// subcontinuation / join marker (an outward resume). Any ambiguity -- the
+    /// invocation resolves to divergent units (the "units disagree" `Err` = a
+    /// pending recursor), to no typed unit (`None`), a body carrying intervening
+    /// control, or no canonical inheritance for the producer frame -- returns
+    /// `false` so the consumption seat falls to the base source-machine path. Base
+    /// is always parity-correct; the forward edge is the optimization that must be
+    /// proven safe, so we miss an optimization rather than mis-collapse.
+    ///
+    /// This is a CONSUMPTION-side scoping predicate: it does NOT gate authority
+    /// formation (`planned == formed == base` stays invariant, evt_h0vgd11g5xfb).
+    /// The Tail authority still forms; the seat ANDs this with
+    /// `tail_worker_body_is_ret_kmatch` to choose the lowering arm. The write's
+    /// outer read-then-write effect tail is non-collapsible here (its producer
+    /// invocation resumes into a divergent recursor); it already takes base via
+    /// the worker-body gate, and this guard keeps the edge off any future effect
+    /// tail whose worker body happens to be `Ret{Match}`.
+    pub(in crate::cranelift_backend) fn checked_ih_forward_edge_route_collapsible(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<bool, CraneliftBackendError> {
+        let producer_active_frame = transport
+            .source_call_identity()
+            .token
+            .worker
+            .parent_origin;
+        // Read the producer self-resumption step from the canonical continuation
+        // inheritances -- the same population the Tail route derivation reads
+        // (`checked_ih_fresh_result_route`). Match the transport, then its
+        // producer frame.
+        for inheritance in &self.checked_ih_continuation_inheritances {
+            if inheritance.transport != *transport {
+                continue;
+            }
+            let mut producer_steps = inheritance
+                .capability
+                .self_resumption_steps
+                .iter()
+                .filter(|step| step.active_frame_origin == producer_active_frame);
+            let Some(producer_step) = producer_steps.next() else {
+                continue;
+            };
+            if producer_steps.next().is_some() {
+                // More than one producer step for the frame -> ambiguous -> base.
+                return Ok(false);
+            }
+            return self.checked_ih_producer_step_pure_narrowing(producer_step);
+        }
+        // No canonical inheritance carries this transport's producer frame -> base.
+        Ok(false)
+    }
+
+    /// Whether the producer step's self-resumption invocation resolves to a
+    /// single recursive continuation unit with a pure-narrowing body. See
+    /// [`Self::checked_ih_forward_edge_route_collapsible`]; fail-safe to `false`.
+    fn checked_ih_producer_step_pure_narrowing(
+        &self,
+        producer_step: &CheckedIhSelfResumptionStep,
+    ) -> Result<bool, CraneliftBackendError> {
+        let body = match checked_ih_invocation_recursive_unit_body(self, producer_step) {
+            Ok(Some(body)) => body,
+            // `None` = the invocation resolves to no typed recursive unit;
+            // `Err` = the canonical "units disagree on their declared recursive
+            // body" (a divergent pending recursor -- the read-then-write case) or
+            // any other unresolved shape. Both are ambiguity -> reject to base.
+            Ok(None) | Err(_) => return Ok(false),
+        };
+        self.checked_ih_body_is_pure_narrowing(body)
+    }
+
+    /// Whether every occurrence reachable in one emitted body (without entering a
+    /// nested closure) is a pure value-narrowing node -- no intervening pending
+    /// control. Rejects on any `Effect`/`CheckedComputationalIHInvocation`/
+    /// `CheckedRecursiveInvocation`/`CheckedSubcontinuationFrame`/`CheckedJoinSite`.
+    /// A conservative full walk (it does not skip eliminated Match arms): control
+    /// in a dead arm still rejects, which is the fail-safe direction.
+    fn checked_ih_body_is_pure_narrowing(
+        &self,
+        root: StaticOriginId,
+    ) -> Result<bool, CraneliftBackendError> {
+        let mut seen = BTreeSet::new();
+        let mut pending = vec![root];
+        while let Some(origin) = pending.pop() {
+            if !seen.insert(origin) {
+                continue;
+            }
+            match self.planned_occurrence_expr(origin)? {
+                RuntimeExpr::Effect { .. }
+                | RuntimeExpr::CheckedComputationalIHInvocation { .. }
+                | RuntimeExpr::CheckedRecursiveInvocation { .. }
+                | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+                | RuntimeExpr::CheckedJoinSite { .. } => return Ok(false),
+                RuntimeExpr::Closure { .. } | RuntimeExpr::LexicalClosure { .. } => {}
+                _ => {
+                    if let Ok(children) = self.semantic.child_origins(origin) {
+                        pending.extend(children.iter().copied());
+                    }
+                }
+            }
+        }
+        Ok(true)
     }
 
     /// Form the D2 move-only Tail producer-to-Ret proof after one exact
