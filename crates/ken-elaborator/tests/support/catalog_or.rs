@@ -107,16 +107,37 @@ pub fn load_derived_importing_fixture(env: &mut ElabEnv, imported: &str) {
     load_derived_importing_fixture_many(env, &[imported]);
 }
 
-/// Withhold the newly canonical LC aliases before a legacy flat elaboration of
-/// LawfulFunctors, which still owns its private duplicate until the separately
-/// sequenced `CAT-MIGRATE-LF-BOOL-AND-CONSOLIDATION` increment.
-pub fn withhold_lc_bool_and_from_legacy_lf_scope(env: &mut ElabEnv) {
-    for name in ["bool_and", "bool_and::assoc"] {
+/// Withhold LC's flat conjunction aliases before elaborating LawfulFunctors.
+/// This proves that the package's qualified import, rather than an earlier
+/// dependency's synthetic flat exposure, supplies every canonical binding.
+const LC_BOOL_AND_IMPORTS: [&str; 4] = [
+    "bool_and",
+    "bool_and::assoc",
+    "bool_and::left_identity",
+    "bool_and::right_identity",
+];
+
+pub fn withhold_lc_bool_and_flat_aliases(env: &mut ElabEnv) {
+    for name in LC_BOOL_AND_IMPORTS {
         let canonical = env.globals[&format!("Core.Classes.LawfulClasses.{name}")];
         assert_eq!(
             env.globals.remove(name),
             Some(canonical),
-            "the legacy LF fixture must withhold LC's exact `{name}` alias"
+            "the LF fixture must withhold LC's exact flat `{name}` alias"
+        );
+    }
+}
+
+/// Restore the same canonical identities after LawfulFunctors has proved its
+/// own dependency edge. Later sources in these synthetic flat fixtures still
+/// receive the legacy aliases explicitly, rather than through LF ownership.
+pub fn restore_lc_bool_and_flat_aliases(env: &mut ElabEnv) {
+    for name in LC_BOOL_AND_IMPORTS {
+        let canonical = env.globals[&format!("Core.Classes.LawfulClasses.{name}")];
+        assert_eq!(
+            env.globals.insert(name.to_owned(), canonical),
+            None,
+            "LF must not leave a flat `{name}` binding behind"
         );
     }
 }
