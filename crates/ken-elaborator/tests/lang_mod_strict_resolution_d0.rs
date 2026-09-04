@@ -699,6 +699,13 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
+            // Codec now declares its exact Transport dependency. Its ordinary
+            // package boundary loads, while strict mode still records the
+            // compiler-convenience `Equal` alias outside the formal floor.
+            "Data.Text.Codec".to_string(),
+            ["Equal"].into_iter().map(str::to_string).collect(),
+        ),
+        (
             // Migrated to declared Transport imports by
             // CAT-MIGRATE-TIER-B-PROVIDERS. The module now loads at its strict
             // package boundary and retains only the compiler-convenience
@@ -806,7 +813,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Data.Collections.NonEmpty",
         "Data.Serialization.Json",
         "Data.Sums.Validation",
-        "Data.Text.Codec",
     ]
     .into_iter()
     .map(str::to_string)

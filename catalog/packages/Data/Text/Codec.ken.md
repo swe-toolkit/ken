@@ -20,6 +20,8 @@ preserves the distinction between an absent byte and a present non-ASCII byte.
 ## 2. Definition
 
 ```ken
+import Core.Logic.Transport (cong)
+
 fn decode_utf8 (bs : Bytes) : Result Utf8Error String = bytes_decode bs
 
 fn byte_is_ascii (byte : UInt8) : Bool = leq_int (uint8_to_int byte) (127 : Int)
