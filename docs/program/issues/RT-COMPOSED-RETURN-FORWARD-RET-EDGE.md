@@ -324,6 +324,151 @@ coverage-scoping question. inc1 stays at 3 hard-stops; §1a HS3 check discharged
 next mandatory §1a re-trigger = HS6; §1b same predicate already named (read closeout
 derives from the carrier, not the capsule) — no new inventory entry, no new recut.
 
+### Increment-2 hard-stop chain + §1b inventory
+
+- **inc2-HS1 (write-half run-at-collapse mechanism)** — implementer measured
+  (`evt_gky6xevjq935`), Architect RULED (`evt_36eczhwqsdk64`). NOT a §1a research
+  trigger (next §1a in the inc2 chain = inc2-HS3). The write's governed Tail
+  continuation body is an effect-performing checked-IH computational match belonging
+  to a DIFFERENT predeclared function than the collapse's function; a naive inline
+  re-run (generalize the read closeout to run the whole body) fails object emission
+  (`ContinuationSpecialization: the claimed continuation target was not declared into
+  this function`, fn-8's nested continuation absent from fn-9's `continuation_calls`).
+  Fork (a) declare the other function's continuations into this one — REJECTED
+  doubly: dissolves the per-function continuation-scope invariant, and re-running the
+  body RE-performs the `writeAt` (double-effect soundness bug). Fork (b) RULED: the
+  effect is performed upstream, the InlineNoCall carrier holds the post-`writeAt`
+  result, and the collapse ROUTES that carried result to `return_body` and runs ONLY
+  the post-effect k-narrowing (the `Match` on `Var(0)`) — mirrors the read (route +
+  narrow), one extra narrowing match, never re-running the producing function's body,
+  never importing its continuations. Conditional on b-confirm: the carrier holds the
+  post-effect result (structurally confirmed — `Match{scrutinee: Var(0)}` narrows the
+  write `Result`, so the effect is already performed; functional confirm = (b) narrows
+  to InvalidOffset with native==interpreter parity).
+- **§1b inc2 inventory entry 1:** predicate = "the write effect continuation is a
+  nested cross-function checked-IH continuation (`Match`-on-result), unlike the read's
+  pure `Ret` — route the carried post-effect result, do not re-run the producing
+  function's body." Acceptance for (b): (1) exactly-once effect (`writeAt` once
+  upstream + narrowed once, native==interpreter parity on the write route); (2) a
+  non-degenerate pair (valid-write route narrows correctly AND a wrong post-effect
+  narrowing — mis-routed `Var(0)` / wrong `Result` arm — is caught).
+- **inc2-HS1 b-confirm = NO (`evt_7dys597356kts`) → (b) refuted.** The FULL write-body
+  shape shows the route is a READ-THEN-WRITE: the outer `Match{scrutinee: Var(0)}`
+  narrows the *readAt* result (`Err → Ret`; `Ok →` frames 5/6 that PERFORM the
+  `writeAt`), so the InlineNoCall carrier holds the *read* result and the `writeAt` is
+  performed WITHIN the body's `Ok` arm, not upstream. (b)'s premise (carrier holds the
+  post-`writeAt` result) is false; there is no post-effect result to route. (The first
+  400-char shape was truncated and misled the (b) premise; the gate caught it.)
+- **inc2-HS2 (write route is READ-THEN-WRITE; PARTIAL collapse)** — implementer
+  measured/flagged (`evt_7dys597356kts`), Architect RE-RULED **(c)** (`evt_xfscq4shy8rj`).
+  NOT a §1a trigger (next §1a = inc2-HS3). (a) stays rejected (importing fn-8's
+  continuations into fn-9 breaches the per-function continuation-scope invariant).
+  **(c) principle: the forward-edge collapse is PARTIAL** — collapse only the in-scope
+  outer read-narrowing (route the carried read result + run `Match{Err → Ret; Ok →
+  writeAt}` on it, as the read collapse does for its narrowing); the `writeAt` effect
+  subtree (frames 5/6) belongs to fn-8 and MUST run in fn-8's scope via base call/edge
+  machinery, NEVER inlined into fn-9. The forward edge applies only to in-scope `Ret`s
+  (the `Err` arm's `Ret`, and the final `Ret` once the `writeAt` completes in fn-8),
+  never to the cross-function effect subtree. **c1 vs c2 measurement-gated:** does the
+  `writeAt` subtree already have its own Tail/Direct route in fn-8? YES → c1 (Ok arm
+  invokes fn-8's existing writeAt route; forward edge on the outer/final `Ret` only);
+  NO → c2 (base `call_tail` machinery for the effect subtree — base already runs frames
+  5/6 correctly, just un-narrowed — forward edge on the final `Ret` only); NEITHER →
+  STOP and flag (c3).
+- **§1b inc2 inventory entry 2:** predicate = "the write route is a READ-THEN-WRITE
+  whose effect subtree is a cross-function checked-IH continuation, so the forward-edge
+  collapse must be PARTIAL (collapse the in-scope read-narrowing; run the cross-function
+  effect in its declaring function via base machinery) — NOT a whole-body inline and
+  NOT a single-carrier route+narrow." Refines the inc1 model: read = pure route+narrow;
+  write = read-narrow + a cross-function effect subtree that stays in its function.
+  Acceptance for (c): (1) exactly-once per effect (readAt once AND writeAt once,
+  native==interpreter parity — not zero, not double); (2) barrier respected (the
+  `ContinuationSpecialization` "declared into this function" check passes because the
+  `writeAt` subtree runs in fn-8 — no fn-8 continuation imported into fn-9); (3) a
+  non-degenerate pair (valid read-then-write with both effects once AND a wrong
+  narrowing / mis-scoped or duplicated effect is caught).
+- **inc2-HS3 (c1 does not realize → COLLAPSIBILITY GUARD)** — implementer
+  built the (c1) partial collapse and hit a wall (`evt_1bz8gywkmz2fc`): the
+  write's outer Tail is a RECURSIVE EFFECTFUL continuation that resumes OUTWARD
+  via the source-machine join (`SourceJoinTarget`/`JoinPlanToken`), so its
+  answer cannot be captured and jumped to the composed-return sink the way the
+  read's bare value is; and the base is InlineNoCall (no fn-8 return value to
+  forward-edge). This is the **§1a research check for the inc2 chain —
+  DISCHARGED** by the research advisory (`evt_3cys0pcpfzj7y`): return-collapse is
+  a VALUE-RETURNING-TAIL optimization; an outward-resuming effect tail is not in
+  tail position and is not collapsible. Architect RULED outcome **(iii) the
+  COLLAPSIBILITY CRITERION** (`evt_375m4aqpag6ck`; discriminator grounded
+  `evt_1c1j3vjeeaqrr`; build spec `evt_3cjmm6j2gbtxb`): NOT a new write
+  mechanism — a SCOPING guard. Collapse iff the producer result reaches the
+  strict-Ret sink through pure value-narrowing; reject (→ base) on any
+  intervening pending control (effect / recursor / outward join). The
+  implementer's own facet measurement showed every LOCAL route/tail signal is
+  identical read vs write, so the discriminator is a NON-LOCAL producer→sink
+  PATH property (build (A)): the cross-unit follow
+  `checked_ih_invocation_recursive_unit_body(producer_step)` — `Ok(Some(pure
+  body))` ⇒ collapsible; `Err`("units disagree on declared recursive body") /
+  `None` / impure ⇒ not — positive-determination + fail-safe-to-base.
+- **§1b inc2 inventory entry 3:** predicate = "a recursive-effectful
+  outward-resuming continuation is NOT a value-returning tail and is NOT
+  forward-edge-collapsible; the RT forward edge scopes to value-returning tails,
+  and collapsibility is a PATH property of the producer→strict-Ret-sink walk
+  (pure narrowing vs an intervening effect / recursor / join), not a local
+  tail-body field." Closes the inc2 write-half design question.
+- **inc2-HS4 (acceptance contradiction → PREVENTIVE-ONLY; §7a corrected)** —
+  building (A), the implementer ran the decisive forced-all-base experiment
+  (`evt_1qgbd8evdw3xv`) and REFUTED the acceptance premise. Measured: the
+  non-collapsible outer route (af=483) ALREADY takes base
+  (`tail_worker_body_is_ret_kmatch = false`); the only collapsing route
+  (af=696) is genuinely collapsible; and forcing ALL Tail routes off the
+  collapse leaves the write trapping IDENTICALLY
+  (`PatternMatchFailure`/`ResourceBodyResult`, no readAt/writeAt) while the
+  READ regresses (also traps). So **base was NEVER parity-correct for these
+  composed-return programs; the forward edge is the only thing that narrows them
+  on native.** The collapse is NOT the write-trap cause — base is — so build
+  (A), however built, cannot un-ignore the write narrowing. Architect RULED
+  **(1) preventive-only** (`evt_1z9x00y6ydjtf`) and corrected the record: it
+  accepts the retraction of the earlier §7a "the collapse fires and traps" (a
+  misread). A fresh hard-stop distinct from HS3's (c1)-does-not-realize; neither
+  still-HS3 nor HS4 is a multiple of 3, so **no §1a trigger; next mandatory §1a
+  research = HS6.**
+
+### (A) is PREVENTIVE; the write narrowing is inc3 (do not conflate them)
+
+**(A) is the correct collapsibility SCOPING and it lands as inc2** — it keeps
+the forward-Ret edge OFF effect tails (the write's outer effect tail af=483
+already takes base and provably stays there), future-proofing the edge against
+any tail whose worker body is `Ret{Match}` but whose producer→sink path carries
+intervening control. **(A) does NOT and cannot narrow the write.** The write
+narrowing requires the EFFECT-PERFORMING CONTINUATION MECHANISM — native
+execution of the read-then-write effect recursor + narrowing — a genuinely
+different and larger design (an effect-execution capability, not a
+value-return optimization). That is **inc3** (Architect `evt_1z9x00y6ydjtf`;
+Steward cuts the WP). The two write tests
+(`fs_write_at_malformed_offset_narrows_to_invalid_offset` and
+`..._without_write_right_...`) STAY `#[ignore]` through inc2 and un-ignore in
+inc3; the 8 AC-EDGE-CONTROL-REKEY capsule controls + the coupled
+census-exemption removal also ride inc3 (re-keying a still-`#[ignore]` test to a
+guard that does not un-ignore it is the deferral-marker-inert trap). A future
+reader must not mistake the (A) guard for the write fix.
+
+**Landed (A) mechanism (inc2):** `checked_ih_forward_edge_route_collapsible`
+(aggregates.rs, plan predicate) + thin
+`tail_route_is_forward_edge_collapsible` wrapper (core.rs), ANDed with
+`tail_worker_body_is_ret_kmatch` at both consumption seams (source.rs);
+formation untouched (`planned == formed == base`, evt_h0vgd11g5xfb). Acceptance
+(preventive, corrected — NOT "write narrows"): (a) read collapses
+(`forward_ret_edge_substituted_word_reds` GREEN); (b) the discriminator's
+determination is PINNED directly
+(`forward_edge_collapsibility_discriminates_value_and_effect_tails`, a
+px8-ds-test-support observation recorder, asserts the non-degenerate pair — the
+write program has exactly one non-collapsible effect tail AND at least one
+collapsible tail, the read program none non-collapsible — recorded independent
+of the `is_ret_kmatch` short-circuit so the guard is pinned even where it flips
+no arm); (c) no regression (forward_ret 13/0, composed_return 7/0,
+generated_entry 66/0, the 8 capsule controls stay `#[ignore]`); (d) the two
+write tests untouched/`#[ignore]`. gate=none, backend/control-flow only, zero
+TCB delta.
+
 ## Increment-1 M5 CI red on 07c31b0c5 — symptom dispositions (Steward)
 
 The re-spin candidate `07c31b0c5` (Decision `dec_22r1rbn9qnn81`) passed M1-M4 and was

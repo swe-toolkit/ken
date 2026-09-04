@@ -4434,6 +4434,24 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         }
                         None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
                     };
+                    // inc2 (b) pin (Architect evt_1qf2wn2sfbq7x / runtime-qa
+                    // evt_6vhnvcxpp1fx1): record the (A) collapsibility
+                    // discriminator's determination for every formed Tail
+                    // authority, computed DIRECTLY -- independent of the
+                    // `tail_worker_body_is_ret_kmatch` short-circuit that hides the
+                    // effect tail behaviorally -- so the preventive guard's
+                    // classification is pinned even where it flips no arm on today's
+                    // programs. Test-support observation only; no emitted-byte change.
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if let ComposedReturnForwardRetAuthorityOutcome::Formed(authority) =
+                        &forward_ret_outcome
+                    {
+                        let collapsible = self.tail_route_is_forward_edge_collapsible(&transport)?;
+                        record_composed_return_forward_edge_collapsibility(
+                            authority._plan.active_frame_origin(),
+                            collapsible,
+                        );
+                    }
                     #[cfg(feature = "px8-ds-test-support")]
                     if let Some((
                         current_invocation_origin,
@@ -4489,7 +4507,18 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 // edge), as base did for every Tail; its downstream
                                 // governed arrival records E's reach as on base.
                                 // Deferred to inc2's (a) effect closeout.
-                                if !self.tail_worker_body_is_ret_kmatch(&transport)? {
+                                //
+                                // (A) preventive collapsibility guard (inc2,
+                                // Architect evt_1z9x00y6ydjtf): even a Ret{Match}
+                                // worker body only collapses when its producer
+                                // result reaches the strict-Ret sink through pure
+                                // value-narrowing (no intervening effect / recursor
+                                // / join). A non-collapsible tail falls to base.
+                                // Fail-safe: any ambiguity is base. Scopes the edge
+                                // to value-returning tails without narrowing
+                                // formation (planned == formed == base).
+                                if !self.tail_worker_body_is_ret_kmatch(&transport)?
+                                    || !self.tail_route_is_forward_edge_collapsible(&transport)? {
                                     self.pending_computational_ih_call.take();
                                     let result = self
                                         .call_tail_checked_ih_transport_from_case_environment(
@@ -4673,7 +4702,15 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     // machinery). The NonApplicable arm below stays a
                                     // hard error: under unnarrowed formation a governed
                                     // Tail always forms its authority.
-                                    if !self.tail_worker_body_is_ret_kmatch(&transport)? {
+                                    //
+                                    // (A) preventive collapsibility guard (inc2,
+                                    // evt_1z9x00y6ydjtf), mirrored here: a Ret{Match}
+                                    // body only collapses when the producer result
+                                    // reaches the strict-Ret sink through pure
+                                    // value-narrowing; a non-collapsible tail falls to
+                                    // base. Fail-safe: any ambiguity is base.
+                                    if !self.tail_worker_body_is_ret_kmatch(&transport)?
+                                        || !self.tail_route_is_forward_edge_collapsible(&transport)? {
                                         self.pending_computational_ih_call.take();
                                         let result = self
                                             .call_tail_checked_ih_transport_from_case_environment(

@@ -8452,6 +8452,21 @@ impl<'a> Lowering<'a> {
         ))
     }
 
+    /// (A) preventive collapsibility guard (inc2, Architect evt_1z9x00y6ydjtf).
+    /// A thin consumption-side wrapper over the plan predicate: the forward-Ret
+    /// edge may fire ONLY for a value-returning tail whose producer result reaches
+    /// the strict-Ret sink through pure value-narrowing. The seat ANDs this with
+    /// `tail_worker_body_is_ret_kmatch`; a non-collapsible (effect / recursor /
+    /// join-resuming) tail falls to the base source-machine path. Fail-safe: any
+    /// ambiguity is `false` (base). Scopes the edge without narrowing formation.
+    pub(super) fn tail_route_is_forward_edge_collapsible(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<bool, CraneliftBackendError> {
+        self.static_transition_plan
+            .checked_ih_forward_edge_route_collapsible(transport)
+    }
+
     pub(super) fn emit_composed_return_ret_kmatch_closeout(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
