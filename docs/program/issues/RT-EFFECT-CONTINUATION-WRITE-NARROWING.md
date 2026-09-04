@@ -1,7 +1,7 @@
 ---
 id: RT-EFFECT-CONTINUATION-WRITE-NARROWING
 title: "Materialize closed effect-response planes through existing response owners: execute each host effect synchronously, resume its exact continuation once through the existing activation frame and Result slot, and preserve deferred ordinary lowering for open planes. First consumer: composed read-then-write narrowing returns ResourceBodyErr(InvalidOffset) instead of trapping at ResourceBodyResult."
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none

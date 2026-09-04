@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-04 21:43:44Z — from 542 issue file(s) in `docs/program/issues/`.
+2026-09-04 22:10:37Z — from 542 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -384,7 +384,7 @@ the committed file matches the generator's output.
 | `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | merged | runtime | M | none | — |
 | `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | merged | runtime | M | none | — |
 | `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` | M3 successor (recut) — bind px8ta's causal residual (emit_carrier_dynamic_constructor's direct return_(-3) at StaticOriginId(34)) to one actual generated function/owner/SSA discriminator/compare/successor, then repair only the proven layer; the equality chain over discriminator 1 with a declared tag-1 alternative reaches its residual, which the hard-stop #3 research advisory places most plausibly in value-handle provenance, not integer equality | merged | runtime | M | none | — |
-| `RT-EFFECT-CONTINUATION-WRITE-NARROWING` | Materialize closed effect-response planes through existing response owners: execute each host effect synchronously, resume its exact continuation once through the existing activation frame and Result slot, and preserve deferred ordinary lowering for open planes. First consumer: composed read-then-write narrowing returns ResourceBodyErr(InvalidOffset) instead of trapping at ResourceBodyResult. | active | runtime | M | none | — |
+| `RT-EFFECT-CONTINUATION-WRITE-NARROWING` | Materialize closed effect-response planes through existing response owners: execute each host effect synchronously, resume its exact continuation once through the existing activation frame and Result slot, and preserve deferred ordinary lowering for open planes. First consumer: composed read-then-write narrowing returns ResourceBodyErr(InvalidOffset) instead of trapping at ResourceBodyResult. | merged | runtime | M | none | — |
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
 | `RT-EMITTED-WORKER-CONSUMER-WALK` | Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition | closed | runtime | S | none | — |
 | `RT-EMITTER-AGGREGATES-SPLIT` | Move the aggregates emitter family out of the lowering files -- the emitter half of the aggregate lifecycle whose planner half item 7 already owns | merged | runtime | M | none | — |
