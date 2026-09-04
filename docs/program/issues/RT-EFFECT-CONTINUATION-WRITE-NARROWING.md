@@ -1,6 +1,6 @@
 ---
 id: RT-EFFECT-CONTINUATION-WRITE-NARROWING
-title: "Build the general cross-context effect-result channel: carry an effect's full result (the discriminated ResourceBody{Ok/Err} Ken value, including narrowed error products) from the inner effect-execution response-specialization cranelift function, across the function-return boundary, to the outer effect-tail exit sink — replacing the source-machine backward reconstruction (the lossy middle) whose PatternMatchFailure trap today masks the exact error product. First consumer: the composed read-then-write recursor's write-narrowing (write reaches exit as ResourceBodyErr(InvalidOffset), not PatternMatchFailure). The carrier + join + exit-routing are effect-agnostic and shared; the socket/network effect paths are the next consumers."
+title: "Materialize closed effect-response planes through existing response owners: execute each host effect synchronously, resume its exact continuation once through the existing activation frame and Result slot, and preserve deferred ordinary lowering for open planes. First consumer: composed read-then-write narrowing returns ResourceBodyErr(InvalidOffset) instead of trapping at ResourceBodyResult."
 status: active
 owner: runtime
 size: M
@@ -9,146 +9,159 @@ tier: T1
 depends_on: []
 blocks: []
 github: null
-origin: "Operator ruling 2026-09-04 (this session, verbatim: \"Fund (ii).\") FUNDED the option-(b) cross-context effect-continuation capability after the inc3-HS5 escalation (Architect evt_11fw2641pyk59). Operator grounding: the native-ABI campaign is less than half done (sockets/networking still ahead), the cross-context effect-continuation pattern is common and will recur, and accurate error products are critical agent-facing guidance — so this is funded as a GENERAL reusable capability, not a two-test point fix (write-narrowing is only its first consumer). Mechanism + ABI/spec answer ruled by the Architect evt_fevj1ay5cbwh (grounded from ea0c04eec): ABI/spec = NO, gate=none, backend-only, zero TCB. Steward-filed and released per COORDINATION section 2. This is the WRITE HALF (ii) of the D3-RECUT terminal deliverable; the (i) soundness-hardening within-lane increment on RT-COMPOSED-RETURN-FORWARD-RET-EDGE is its clean base."
+origin: "Operator-funded option (ii), corrected by the Architect's HS6 ruling on 2026-09-04. The initial ResultWord-routing premise was falsified by measurement: the available InlineNoCall word is the seven-field pre-effect environment, not a post-effect ResourceBody. Gates A and B then established exactly-once synchronous resumption and an existing-slots-only implementation. ABI/spec = NO, backend-only, zero TCB."
 ---
 
-> # ACTIVE — RELEASED. Lane 1 (runtime), operator-funded (ii).
-> The (i) soundness-hardening increment LANDED as squash 553d99a42
-> (blob-verified) — it established the write tail is non-collapsible and
-> falls to base, which is the clean base this channel operates on. Base for
-> this build = current main (553d99a42). RE-MEASURE every coordinate at that
-> base before editing: the line numbers in the Mechanism section are from
-> ea0c04eec and decay; the semantic anchors (AbiCarrier::ResultWord, the
-> CarrierWord join, format_final_export, dead_arm_effect_trap) are stable.
+> # ACTIVE — IMPLEMENTED, AWAITING REVIEW
 >
-> Mechanism front-loaded by the Architect (evt_fevj1ay5cbwh); the ring
-> builds, the Architect reviews. gate=none, backend-only, zero TCB — the
-> standing runtime hard-stop protocol still applies (a design fork or any
-> newly-surfaced ABI/spec/TCB surface HARD-STOPS to the Architect, and per
-> the caveat below a multi-word future effect result re-flags the boundary).
+> The soundness-hardening predecessor landed as `553d99a42`; this work was
+> measured and built on that exact base. The original post-effect ResultWord
+> routing premise was falsified before implementation. The corrected mechanism
+> is execute-then-resume through existing response-owner functions, activation
+> frames, Parameter/Capture inputs, and the existing Result slot.
+>
+> No `RuntimeExpr` variant, frame field, side table, reified continuation,
+> continuation-identity object, ABI lane, wire form, or spec surface is added.
 
-## Why this is funded as a capability, not a point fix
+## Why this is a capability, not a point fix
 
-Operator grounding (2026-09-04): the native-ABI campaign is less than
-halfway; sockets and networking are still ahead; the cross-context
-effect-continuation pattern recurs across them; and accurate error products
-(the exact `ResourceBodyErr(InvalidOffset)` rather than a malformed
-`PatternMatchFailure` trap) are critical guidance for agents consuming Ken.
-So the deliverable is the GENERAL effect-result channel. The write-narrowing
-is its first consumer; the carrier, join, and exit-routing are shared and
-effect-agnostic (subsume-don't-proliferate, reflect-don't-extend).
+The native-ABI campaign still has sockets and networking ahead, and nested
+host-effect continuations recur across those families. Accurate error products
+are critical agent-facing guidance: the runtime must return the exact
+`ResourceBodyErr(InvalidOffset)` rather than a secondary
+`PatternMatchFailure` caused by skipping the continuation that performs the
+narrowing.
 
-Orthogonal-axes note (Architect, on record): option-(b) — needing
-cross-context state across a function-return boundary — is why operator
-funding was correct and necessary. ABI/spec-touch — needing a new
-kernel-visible/wire/spec construct — is a DIFFERENT axis, and this mechanism
-does NOT cross it. The capability funding is sufficient; there is no further
-specific construct to re-confirm and no spec-enclave round.
+The implementation therefore classifies response planes structurally. It does
+not list `FsReadAt`, `FsWriteAt`, resources, or any other operation. A plane gets
+execute-then-resume only when it is closed and at least two producer groups have
+exclusively predeclared transport sources. An open plane remains
+conservatively Deferred rather than receiving an unsound partial specialization;
+a single-stage plane retains the already-proven forward-Ret path.
 
-## ABI/spec answer: NO (backend-only, zero TCB)
+## Corrected HS6 measurement
 
-Verified by the Architect from ea0c04eec:
+### Gate A: resumption is single-shot and structured
 
-- `RuntimeExpr` (the elaborator->runtime contract, ir.rs:619+) already has
-  `Effect` and has NO `ResourceBody` node. `ResourceBody{Ok/Err}` is a Ken
-  VALUE (surface type, spec/30-surface/38-ffi-io.md), built in-backend by the
-  existing `synthesized_dynamic_alternative(ResourceInvalidOffset)` lane. No
-  new erased-IR node is forced — the TCB surface flagged at HS5 stays
-  untouched.
-- The activation-frame schema (`AbiSlot`/`AbiFrameHeader`/`AbiCarrier`,
-  abi.rs) is `pub(in crate::cranelift_backend)`, inert, with `frame_bytes`
-  derived from the slot run; it does not leak outside the backend.
-  `AbiFrameHeader` is `#[repr(C)]` only for deterministic offsets between the
-  program's OWN functions (the internal `(frame_ptr, services_ptr) -> i64`
-  convention) — it does not cross to external C. The C ABI
-  (crates/ken-runtime/src/activation_abi.rs) carries handles + the resource
-  profile, not the activation layout. A frame-layout edit is backend-internal.
-- The process exit is a RENDERED existing Ken value via `format_final_export`
-  — not a new wire encoding. ir.rs:161 (host-spine role-record wire) is
-  unrelated and untouched.
+Finished CLIF for `verify_static_response_finished_body` contains exactly one
+direct call to the outer `FsOpen` response owner's exact K context. The call is
+after host-response validation and before Ret validation, the Result store, and
+function return. Existing verifier mutations red on zero K calls, two K calls,
+a call before validation, and a call after answer collapse.
 
-## Mechanism (Architect-ruled evt_fevj1ay5cbwh)
+`lower_process_host_effect` and `call_declared_unit_target` use synchronous
+direct Cranelift calls. There is no indirect callback, future, waker, yield, or
+post-return resume path. `SourceControl` and `SourceContinuation` are move-only;
+branch construction clones only a terminal-removed prefix and creates distinct
+non-`Clone` predecessor edges for mutually exclusive CFG arms. Function-local
+slots stay live through the nested call, so ordinary return gives LIFO teardown
+before the caller reads Result and returns.
 
-A general cross-context effect-result channel. Three parts, all reuse:
+### Gate B: existing frames and slots are sufficient
 
-1. CARRIER = reuse `AbiCarrier::ResultWord`. The inner effect-specialization
-   already stores its result word to the caller-provided frame Result slot
-   (units.rs ~3453). Extend it to carry the effect's FULL result as the
-   discriminated `ResourceBody{Ok/Err}` Ken value (the narrowed InvalidOffset
-   product on the Err arm). The value is self-discriminating, so NO new frame
-   field, NO side table, and NO continuation-identity object is added — the
-   existing one-word carrier suffices.
-2. ROUTING = reuse the outward-join machinery: `JoinPlanToken`'s closed
-   `JoinResultRepresentation::CarrierWord` (joins_traps.rs:69-71, "lowering
-   cannot add a third representation") + `SourceJoinTarget`. Route the inner
-   specialization's frame-carried `ResourceBody` result to the outer
-   effect-tail sink through the planned CarrierWord join, instead of the
-   source-machine backward reconstruction. The outer effect tail's transport
-   today is InlineNoCall returning the PRE-effect carried word; the channel
-   makes the outer sink consume the POST-effect frame-carried value.
-3. OUTER SINK = read the frame-carried `ResourceBody{Ok/Err}` and route it to
-   the process exit VERBATIM via `format_final_export`, REPLACING
-   `dead_arm_effect_trap` (the `RuntimeTrapCode::PatternMatchFailure` lossy
-   middle, joins_traps.rs ~54). The trap is replaced for the
-   effect-result-carrying path, not bypassed.
+The generated continuation contexts already exist in the same function plane.
+Their ordinary arguments plus worker captures exactly fill their planned
+Parameter/Capture headers. The relevant instances measured at the released base
+were:
 
-GENERALITY: the channel is effect-AGNOSTIC. The only per-effect part is the
-specific `ResourceBodyErr` constructor (`ResourceInvalidOffset` for the write;
-sockets/network get their own error products via the same
-`synthesized_dynamic_alternative` pattern). The carrier + join + exit-routing
-are shared — that is the reusable capability.
+| function / specialization / body | ordinary inputs | captures | context header |
+|---|---:|---:|---:|
+| fn45 / 0 / 1075 | 12 | 9 | 12 / 9 |
+| fn46 / 1 / 979 | 14 | 9 | 14 / 9 |
+| fn47 / 2 / 888 | 11 | 8 | 11 / 8 |
+| fn48 / 3 / 1238 | 8 | 6 | 8 / 6 |
+| fn49 / 4 / 676 | 10 | 6 | 10 / 6 |
 
-## Dependency and sequencing
+Each ordinary envelope is its constructor word followed by `WorkerCapture`
+ordinals, and `retargeted_worker_body` is the exact body. Existing
+response-owner lowering already assembles those Parameter/Capture inputs, calls
+the declared context synchronously, and returns through the existing Result
+word. Nothing must persist across a return beyond the ordinary callee Result
+slot.
 
-The (i) soundness-hardening increment (fail-closed reject-set repair on the
-forward-edge guard) LANDED as squash 553d99a42 (blob-verified). (i)
-established the write tail is NON-collapsible = it falls to base. (ii)'s
-channel operates on that BASE path (where the effect actually executes and
-the frame-carried result lives), routing it to exit — it does NOT resurrect
-the forward-edge collapse for effect tails (which stays correctly off them).
-So (i) is the clean base (ii) builds on, now on main. This node is RELEASED to
-the runtime ring at base 553d99a42.
+## As-built mechanism
 
-## Acceptance criteria
+The implementation is a planning correction, not a new lowering construct.
 
-- AC-WRITE-NARROWS. The 2 write tests
-  (`fs_write_at_malformed_offset_narrows_to_invalid_offset` + the
-  without-write-right sibling) un-ignore and go green: the write reaches exit
-  as `ResourceBodyErr(InvalidOffset)`, NOT `PatternMatchFailure`.
-- AC-EDGE-CONTROL-REKEY. The 8 deferred AC-EDGE-CONTROL-REKEY controls re-key
-  onto this increment (the increment that actually un-ignores them), and the
-  census-exemption is removed. (Re-keying a #[ignore] to an increment that
-  does not un-ignore it is inert — the deferral-marker-inert trap — so these
-  ride the increment that lands the write narrowing, per the Steward
-  WP-boundary ruling.)
-- AC-REUSE-NOT-PROLIFERATE (control). No new `RuntimeExpr` variant; the
-  carrier is `AbiCarrier::ResultWord`; the routing is
-  `JoinResultRepresentation::CarrierWord`. Assert NO new frame field, side
-  table, or continuation-identity object was introduced.
-- AC-LOSSY-MIDDLE-REPLACED (control). `dead_arm_effect_trap` /
-  `PatternMatchFailure` no longer fires for the write program's
-  effect-result path.
-- AC-GENERALITY (note/control). The write-specific surface is only the
-  `ResourceInvalidOffset` constructor; the carrier/join/exit-routing are
-  shared and effect-agnostic, ready for the socket/network consumers.
-- AC-NO-REGRESSION. The inc1 read collapse and all non-effect tails are
-  unchanged; byte-inertness where applicable is green in CI.
-- gate=none, backend-only, zero TCB.
+1. Phase A continues to build a context demand for every response with a K unit
+   and records unit-less responses as P1 Deferred rows.
+2. After the first aggregate-ownership and checked-IH transport derivation,
+   phase B identifies transport-source K identities. It admits
+   execute-then-resume only when the plane has no P1 row and at least two
+   producer groups have exclusively predeclared transport sources. A
+   producer that also has a specialization- or fusion-owned source is mixed-owner
+   fan-out, not an exclusively ordinary stage. All former P2 demands in that
+   eligible plane become
+   Specialized. Their existing checked-IH
+   transport emissions are consequently real incoming response-owner calls
+   rather than dormant pre-effect transports.
+3. Response-owner assignment can change which closure environments cross an
+   emitted boundary. Phase B therefore rebuilds aggregate ownership and
+   checked-IH environment transports before inheritance is derived, validates
+   both planes, and requires the transport-source identity population to remain
+   unchanged. A changed population fails closed as a circular derivation.
+4. Existing response-owner lowering performs the host effect, validates its
+   response, invokes the exact K context once, stores the returned word in the
+   existing Result slot, and returns synchronously. For the first consumer this
+   materializes buffer allocation and `FsReadAt`, then enters the `FsWriteAt`
+   continuation and narrows the malformed offset before host write dispatch.
+5. If any response is unit-less P1, phase B retains all transport sources as P2.
+   This prevents a `StaticResponseDeferred` placeholder from escaping a
+   partially specialized mixed plane. A single-stage closed plane also retains
+   P2, preserving inc1's forward-Ret route. The existing `writeAll` fixture is
+   the open-plane control, the read fixture is the single-stage control, and the
+   two read-then-write fixtures are the eligible composed controls. The
+   discriminator is structural and
+   operation-agnostic.
 
-## Honest boundary caveat (carry it)
+The lowerer, activation-frame schema, join representations, runtime IR, host ABI,
+and wire formats are byte-unchanged. `dead_arm_effect_trap` remains in place for
+genuinely unreachable arms; it simply no longer receives the skipped
+read-then-write path.
 
-The ABI = NO answer holds because every current effect result fits a single
-carrier word (`ResourceBody{Ok/Err}`). If a FUTURE socket/network effect
-result needs multi-word transport, a dedicated frame field is then warranted
-— still backend-only, still ABI = NO, but re-flag it to the Architect at that
-point so the boundary is re-confirmed. Not needed now.
+## Acceptance criteria and evidence
+
+- **AC-WRITE-NARROWS.** Both write parity tests are live and green. Native and
+  interpreted execution return exact `InvalidOffset`; native has no terminal
+  trap. The malformed request does not dispatch `FsWriteAt`.
+- **AC-MATERIALIZATION.** Native and interpreted traces each contain exactly one
+  `BufferAllocate` and one `FsReadAt`. Suppressing the P2-to-Specialized
+  classification restores the exact pre-effect `ResourceBodyResult` trap and
+  removes both prefix effects, proving the planner change is causal.
+- **AC-SINGLE-SHOT.** Existing finished-body controls red on omitted K,
+  duplicated K, K before host validation, and K after answer collapse. The live
+  parity trace observes the ordered prefix exactly once.
+- **AC-REUSE-NOT-PROLIFERATE.** The code diff adds no runtime expression,
+  activation-frame field, side table, continuation object, join representation,
+  ABI, wire, or spec construct. It changes response classification and rebuilds
+  only existing derived planning planes.
+- **AC-GENERALITY.** The eligible read-then-write plane specializes all has-K
+  transport sources. The single-stage read plane retains the inc1 forward-Ret
+  path, while mixed `writeAll` contains both P1 and retained P2 and still
+  compiles. No classifier names an effect operation.
+- **AC-EDGE-CONTROL-REKEY.** All eight historical generated-entry capsule
+  controls now mutate distinct execute-then-resume response-edge facts and run
+  live. Their eight ignored-test exemptions are removed.
+- **AC-NO-REGRESSION.** The inc1 read collapse, inc3(i) fail-closed purity guard,
+  response-owner mutation suite, byte-inertness controls, runtime library suite,
+  and CI shard-union inventory remain green.
+
+## Honest boundary
+
+The current admissible subset is plan-wide: every response must have a
+continuation unit, and at least two producer groups must have exclusively
+predeclared transport sources. A program with any unit-less response retains its
+transport
+sources as P2 and uses ordinary lowering. This is a conservative residual, not a
+claim that unrelated open and closed components are already separated.
+Component-local closure can subsume this guard later if a real consumer requires
+it; it must preserve inc1's pure forward-Ret path, the no-partial-specialization
+failure mode, and the operation-agnostic classifier.
 
 ## Reviewers
 
-Builder: runtime-implementer (option-(b) mechanism, reasoning-dense =
-capability-tier T1). Reviewer: Architect (front-loaded the mechanism;
-reviews the reuse-not-proliferate controls, the lossy-middle replacement, the
-write tests, no-regression, and re-verifies no new erased-IR/ABI construct
-crept in). Independent mechanics reviewer: runtime-qa. Plus CI green on the
-exact SHA (CODE = full CI; byte-inertness binding). Merge via Steward
-M1-M4 -> lieutenant.
+Builder: runtime-implementer. The Architect reviews the corrected existing-slots
+mechanism, composed-plane guard, single-shot and no-new-construct controls,
+write-narrowing parity, and no regression. Runtime QA independently verifies the
+mechanics and mutation controls. Full CI runs on the exact candidate SHA before
+merge through the Steward and lieutenant path.

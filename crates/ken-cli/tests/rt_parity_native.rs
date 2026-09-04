@@ -655,6 +655,34 @@ fn assert_narrowed_alike(
         interpreted_events.is_empty(),
         "{case}: a narrowed {operation:?} must not enter shared dispatch; got {interpreted_events:?}"
     );
+
+    // Execute-then-resume materialization. A malformed write is rejected before
+    // FsWriteAt dispatch, but its synchronous prefix must execute exactly once:
+    // allocate the buffer, read the source, then enter the write continuation
+    // that performs the narrowing. Zero means the old `InlineNoCall` collapse;
+    // two means the continuation was replayed.
+    if operation == ken_runtime::HostOpV1::FsWriteAt {
+        for required in [
+            ken_runtime::HostOpV1::BufferAllocate,
+            ken_runtime::HostOpV1::FsReadAt,
+        ] {
+            let native_count = native
+                .effect_trace
+                .iter()
+                .filter(|event| event.operation == required)
+                .count();
+            let interpreted_count = interpreted
+                .effect_trace
+                .iter()
+                .filter(|event| event.operation == required)
+                .count();
+            assert_eq!(
+                (native_count, interpreted_count),
+                (1, 1),
+                "{case}: execute-then-resume must perform {required:?} exactly once"
+            );
+        }
+    }
 }
 
 fn in_large_stack_thread(name: &'static str, body: fn()) {
@@ -954,37 +982,19 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
             ),
             ("write", write_result, ken_runtime::HostOpV1::FsWriteAt),
         ] {
-            if forbidden_operation == ken_runtime::HostOpV1::FsWriteAt {
-                // WRITE half: deferred to inc2 (unbuilt) -- correctly fail-closed;
-                // the composed-return product is not formed yet, so it traps
-                // ResourceBodyResult. KEEP this trap assertion byte-unchanged.
-                let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-                    result.native.terminal_error.as_ref()
-                else {
-                    panic!("{label}: planner-only relation must preserve the fail-closed product");
-                };
-                assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
-            } else {
-                // READ half: inc1's BUILT deliverable. The forward-Ret edge forms
-                // the read's ResourceBodyResult, so the old PatternMatchFailure
-                // fail-closed placeholder no longer fires and InvalidOffset reaches
-                // exit CLEANLY. The fixture exits 0 iff the expected InvalidOffset
-                // variant, so exit 0 + no trap is the SPECIFIC clean outcome (a
-                // regressed read would trap PatternMatchFailure and fail here) --
-                // the same read half the 3 read narrows prove correct. Recalibrated
-                // per Architect evt_1z33cmjvapw99, the same read-expectation change
-                // inc1 applied when it removed the fs-read-at-offset-provenance
-                // read-trap test.
-                assert_eq!(
-                    result.native.exit_status, 0,
-                    "{label}: the built read half returns clean InvalidOffset (exit 0), not the fail-closed PatternMatchFailure trap: {:?}",
-                    result.native
-                );
-                assert_eq!(
-                    result.native.terminal_error, None,
-                    "{label}: the built read half does not trap"
-                );
-            }
+            // Both halves are built. The read uses the forward-Ret value
+            // closeout; the write uses execute-then-resume response owners for
+            // its effect-performing continuation. Each fixture exits 0 only on
+            // its expected InvalidOffset result.
+            assert_eq!(
+                result.native.exit_status, 0,
+                "{label}: native must return clean InvalidOffset: {:?}",
+                result.native
+            );
+            assert_eq!(
+                result.native.terminal_error, None,
+                "{label}: the built narrowing path does not trap"
+            );
             assert!(result
                 .native
                 .effect_trace
@@ -1205,14 +1215,17 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
             read_result.native.terminal_error, None,
             "read: the built read half does not trap"
         );
-        // WRITE half: deferred to inc2 (unbuilt) -- correctly fail-closed. KEEP the
-        // trap assertion byte-unchanged.
-        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-            write_result.native.terminal_error.as_ref()
-        else {
-            panic!("write: predecessor must preserve the fail-closed product");
-        };
-        assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
+        // WRITE half: execute-then-resume materializes the nested effect chain;
+        // the old pre-effect ResourceBodyResult trap is no longer reachable.
+        assert_eq!(
+            write_result.native.exit_status, 0,
+            "write: the built write half returns clean InvalidOffset: {:?}",
+            write_result.native
+        );
+        assert_eq!(
+            write_result.native.terminal_error, None,
+            "write: the built write half does not trap"
+        );
     });
 }
 
@@ -1251,16 +1264,11 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
             let diagnostic = diagnostics.into_iter().next().unwrap();
             assert_eq!(diagnostic.static_response_infeasible, None);
             assert_eq!(diagnostic.all_static_response_infeasible, None);
-            // RECUT 2 HS6 (A-full)-refined (Architect evt_27hj9nxevvjyr /
-            // evt_2fk574v1cb3b1): TOTALITY + sub-case oracle, COUNT-AGNOSTIC. Every
-            // BufferAllocate response is in exactly one column (Specialized xor
-            // Deferred); every Deferred one carries sub_case UnconsumedTransportCaller
-            // -- phase B's own correctness label, assigned ONLY to a transport source,
-            // so it independently proves "correctly deferred" over the fixture-known
-            // population (not derived from what the code emitted). No exact count is
-            // pinned (HS7 fallback reverted the added owner, so the read product now
-            // carries its single withBuffer bracket's BufferAllocate); the write
-            // product's closure-boundary BufferAllocate K is transport-deferred.
+            // Execute-then-resume totality, count-agnostic. Every
+            // BufferAllocate response with a K unit is Specialized, including a
+            // transport-source K: the transport assembly is now its real selected
+            // incoming owner call. A Deferred BufferAllocate can only be P1 (no K
+            // unit), and these fixed products have none.
             let specialized_buffer = &diagnostic.static_response_rows;
             let all_buffer = diagnostic
                 .all_static_response_rows
@@ -1289,13 +1297,11 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
                     "a filtered BufferAllocate row is absent from the all-producer set"
                 );
             }
-            for deferred in &deferred_buffer {
-                assert_eq!(
-                    deferred.sub_case, "UnconsumedTransportCaller",
-                    "a Deferred BufferAllocate is a transport-caller residual (the (a) oracle): \
-                     {deferred:?}"
-                );
-            }
+            assert!(
+                deferred_buffer.is_empty(),
+                "a fixed-product BufferAllocate response must be materialized, not Deferred: \
+                 {deferred_buffer:?}"
+            );
             assert_eq!(
                 diagnostic.static_response_owners.len(),
                 diagnostic.all_static_response_rows.len(),
@@ -1340,38 +1346,32 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
 
         let read = compile("read", "rt_read_offset_stage");
         let write = compile("write", "rt_write_writable_stage");
-        // RECUT 2 HS6 (A-full)-refined (Architect evt_4kqz8awr6sg1n): fully
-        // STRUCTURAL totality for BOTH products. The record-derived transport set
-        // defers transport-source members in the read AND write products (the
-        // retarget control proved the read owner population shrank too), so the
-        // exact per-row k_context summary tuples are no longer stable and are
-        // dropped for both. What remains holds for ANY correct classification and
-        // needs no native population:
-        //   - each Specialized response owns exactly one forward declaration
-        //     (checked per-product in `compile`);
-        //   - every Deferred residual carries a VALID sub-case -- the correctness
-        //     ORACLE. Phase B defers a has-K member ONLY via the transport check,
-        //     so a has-K Deferred member is UnconsumedTransportCaller IFF it is a
-        //     transport source, and a unit-less member is NoContinuationUnit by
-        //     construction. The sub-case independently proves "correctly deferred"
-        //     with no native population needed;
-        //   - the per-Specialized-row owner/K schema invariants below hold;
-        //   - both products classify a non-empty Specialized population.
-        // Exact-id stability is the total-acyclic-freeze-order carry's structural
-        // job, not a per-fixture tuple's.
+        // Structural totality for both products. The pure read plane retains its
+        // P2 transport sources so inc1's forward-Ret path remains live. The
+        // read-then-write plane has two producer groups whose transport sources
+        // are exclusively predeclared, so execute-then-resume specializes every
+        // has-K transport source. Each
+        // Specialized row owns one forward declaration, without baked ids/counts.
         for diagnostic in [&read, &write] {
             assert!(
                 !diagnostic.all_static_response_rows.is_empty(),
                 "each fixed product specializes at least one response"
             );
-            for deferred in &diagnostic.static_response_deferred {
-                assert!(
-                    deferred.sub_case == "UnconsumedTransportCaller"
-                        || deferred.sub_case == "NoContinuationUnit",
-                    "a Deferred residual carries an unclassified sub-case: {deferred:?}"
-                );
-            }
         }
+        assert!(
+            !read.static_response_deferred.is_empty()
+                && read
+                    .static_response_deferred
+                    .iter()
+                    .all(|row| row.sub_case == "UnconsumedTransportCaller"),
+            "the single-stage read plane must retain only P2: {:?}",
+            read.static_response_deferred
+        );
+        assert!(
+            write.static_response_deferred.is_empty(),
+            "the eligible write plane must materialize every transport source: {:?}",
+            write.static_response_deferred
+        );
         for diagnostic in [&read, &write] {
             let mut contexts = std::collections::BTreeMap::new();
             for row in &diagnostic.all_static_response_rows {
@@ -1549,7 +1549,8 @@ fn static_response_context_demand_controls_reach_and_restore() {
 // drop/duplicate/vary, K-key merge, three response-authority substitutions, and
 // independent drop/permute/vary of every fixed READ and WRITE capture/input each
 // reach the closed demand validator and red; the fixed ledgers also contain
-// shared producers whose distinct K callers select distinct owners. CLAIMED:
+// shared producers whose distinct K callers remain distinct, and the eligible
+// write plane selects distinct owners for them. CLAIMED:
 // context interning cannot launder a malformed producer/K row or an incomplete
 // explicit input run. THE GAP: exact duplicate context demand reuse is separately
 // pinned by static_response_context_demand_controls_reach_and_restore; these
@@ -1575,14 +1576,12 @@ macro_rules! full_demand_compile {
 }
 
 #[test]
-fn static_response_full_demand_fan_out_population_is_deferred_and_distinct() {
+fn static_response_full_demand_fan_out_population_is_distinct() {
     in_generated_entry_stack_thread("rt-parity-static-response-full-grid", || {
-        // The shared-producer fan-out invariant, re-targeted onto the Deferred
-        // population (Architect evt_2fk574v1cb3b1): both fixed products carry a
-        // producer whose >= 2 Deferred rows are DISTINCT K (never merged) and each
-        // is a UnconsumedTransportCaller residual. The producer is selected
-        // STRUCTURALLY (>= 2 Deferred rows), never by a baked native id. No
-        // mutation; the per-arm controls are the decomposed tests below.
+        // The shared-producer fan-out remains affine across both dispositions.
+        // The pure read plane retains P2; the eligible write plane specializes
+        // the same shape to distinct owners. Producers are selected structurally,
+        // never by baked native ids.
         let (read_root, (read_result, read)) =
             full_demand_compile!("rt_read_offset_stage", "baseline");
         read_result.expect("the exact READ response population compiles");
@@ -1592,46 +1591,74 @@ fn static_response_full_demand_fan_out_population_is_deferred_and_distinct() {
         assert_eq!(read.len(), 1);
         assert_eq!(write.len(), 1);
 
-        for diagnostic in [&read[0], &write[0]] {
-            let mut by_producer: std::collections::BTreeMap<u32, Vec<_>> =
-                std::collections::BTreeMap::new();
-            for row in &diagnostic.static_response_deferred {
-                by_producer
-                    .entry(row.producer_call_origin)
-                    .or_default()
-                    .push(row);
-            }
-            let fan_outs = by_producer
-                .iter()
-                .filter(|(_, rows)| rows.len() >= 2)
-                .collect::<Vec<_>>();
-            assert!(
-                !fan_outs.is_empty(),
-                "full-demand fan-out witness missing: no producer carries >= 2 Deferred rows in \
-                 this product after the recut. The shared-producer fan-out invariant is \
-                 re-targeted onto the Deferred population (the transport-deferred ResourceRelease \
-                 pairs); if none survives, the fan-out witness itself is unobservable -- a \
-                 diagnostic-reachability finding, not a fixture edit. Deferred: {:?}",
-                diagnostic.static_response_deferred
+        let mut read_by_producer: std::collections::BTreeMap<u32, Vec<_>> =
+            std::collections::BTreeMap::new();
+        for row in &read[0].static_response_deferred {
+            read_by_producer
+                .entry(row.producer_call_origin)
+                .or_default()
+                .push(row);
+        }
+        let read_fan_outs = read_by_producer
+            .iter()
+            .filter(|(_, rows)| rows.len() >= 2)
+            .collect::<Vec<_>>();
+        assert!(
+            !read_fan_outs.is_empty(),
+            "pure read has no shared-producer P2 fan-out: {:?}",
+            read[0].static_response_deferred
+        );
+        for (producer, fan_out) in read_fan_outs {
+            assert_eq!(
+                fan_out
+                    .iter()
+                    .map(|row| row.vis_origin)
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                fan_out.len(),
+                "read producer {producer} merged distinct K into one P2 row"
             );
-            for (producer, fan_out) in fan_outs {
-                assert_eq!(
-                    fan_out
-                        .iter()
-                        .map(|row| row.vis_origin)
-                        .collect::<std::collections::BTreeSet<_>>()
-                        .len(),
-                    fan_out.len(),
-                    "shared producer {producer} merged distinct K into one Deferred row"
-                );
-                for row in fan_out {
-                    assert_eq!(
-                        row.sub_case, "UnconsumedTransportCaller",
-                        "shared producer {producer}'s fan-out member is not a transport-caller \
-                         residual: {row:?}"
-                    );
-                }
-            }
+            assert!(fan_out
+                .iter()
+                .all(|row| row.sub_case == "UnconsumedTransportCaller"));
+        }
+
+        let mut write_by_producer: std::collections::BTreeMap<u32, Vec<_>> =
+            std::collections::BTreeMap::new();
+        for row in &write[0].all_static_response_rows {
+            write_by_producer
+                .entry(row.producer_call_origin)
+                .or_default()
+                .push(row);
+        }
+        let write_fan_outs = write_by_producer
+            .iter()
+            .filter(|(_, rows)| rows.len() >= 2)
+            .collect::<Vec<_>>();
+        assert!(
+            !write_fan_outs.is_empty(),
+            "eligible write has no shared-producer Specialized fan-out: {:?}",
+            write[0].all_static_response_rows
+        );
+        for (producer, fan_out) in write_fan_outs {
+            assert_eq!(
+                fan_out
+                    .iter()
+                    .map(|row| row.vis_origin)
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                fan_out.len(),
+                "write producer {producer} merged distinct K into one response row"
+            );
+            assert_eq!(
+                fan_out
+                    .iter()
+                    .map(|row| row.k_identity.as_str())
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                fan_out.len(),
+                "write producer {producer} merged distinct K identities"
+            );
         }
         drop((write_root, read_root));
     });
@@ -1755,9 +1782,9 @@ fn full_demand_census_control(
     assert_eq!(baseline.len(), 1);
     let baseline_diag = &baseline[0];
 
-    // DE-BAKE (Architect evt_bk6vky2pkncy): derive the expected capture/input
-    // totals from the baseline diagnostic (Specialized all_static_response_rows +
-    // P2-Deferred counts; P1 contributes 0), NOT a baked native constant. The
+    // Derive the expected capture/input totals from the baseline diagnostic
+    // (Specialized has-K rows plus zero-count P1 residuals), never a baked
+    // native constant. The
     // DropEvery{Capture,Input} mutations count applications across the FULL
     // has-K-unit population, so `applications == derived sum` is a cross-check of
     // two independent derivations, not derive-from-actual.
@@ -2006,12 +2033,10 @@ fn owner_body_control(
         baseline_result.runtime_program.artifact_hash,
         baseline_result.artifact.executable_hash,
     );
-    // HS7 (Architect evt_25kcq9qb31gkp): the WRITE product's BufferAllocate is
-    // transport-DEFERRED, so all_static_response_rows carries no BufferAllocate --
-    // the prior app486.len()==1 + baked (1246,1238) K was a never-executed bake. The
-    // write-targeted control (context-zero) needs the write product to carry a
-    // Specialized response owner; assert that population is present (de-baked, no
-    // BufferAllocate filter/coords), preserving the original write-only precondition.
+    // The write-targeted context control requires at least one response owner.
+    // Execute-then-resume now includes transport-source BufferAllocate/FsReadAt/
+    // FsWriteAt rows in that population; keep the precondition relational rather
+    // than baking an owner coordinate.
     if entry == "rt_write_writable_stage" {
         assert!(
             !baseline_rows[0].all_static_response_rows.is_empty(),
@@ -2558,12 +2583,11 @@ fn checked_ih_generated_entry_admission_population_is_total() {
             read_result.native.terminal_error, None,
             "read: the built read half does not trap"
         );
-        // WRITE half: deferred to inc2 (unbuilt) -- correctly fail-closed. KEEP the
-        // trap assertion byte-unchanged.
-        assert!(matches!(
-            write_result.native.terminal_error,
-            Some(ken_runtime::TerminalErrorV1::RuntimeTrap(_))
-        ));
+        // WRITE half: the transport-source response owners now execute and
+        // resume the nested chain, so the same exact InvalidOffset product exits
+        // cleanly.
+        assert_eq!(write_result.native.exit_status, 0);
+        assert_eq!(write_result.native.terminal_error, None);
     });
 }
 
@@ -3121,6 +3145,61 @@ fn assert_generated_entry_capsule_mutation_child() {
     }
 }
 
+const EXECUTE_THEN_RESUME_REKEY_CHILD: &str = "KEN_RT_EXECUTE_THEN_RESUME_REKEY_CHILD";
+
+fn assert_execute_then_resume_rekey_child() {
+    use ken_runtime::StaticResponseOwnerBodyMutation as OwnerMutation;
+
+    let mode = std::env::var(EXECUTE_THEN_RESUME_REKEY_CHILD)
+        .expect("execute-then-resume rekey child mode");
+    if mode == "outer-carried" {
+        let Differential {
+            interpreted,
+            native,
+        } = ken_runtime::with_suppressed_execute_then_resume_response(|| {
+            differential("fs-write-at-offset-single", "rt_write_writable_stage")
+        });
+        assert_eq!(interpreted.exit_status, 0);
+        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+            native.terminal_error.as_ref()
+        else {
+            panic!("materialization suppression did not restore the pre-effect trap");
+        };
+        assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
+        assert!(
+            ken_runtime::suppressed_execute_then_resume_response_is_exact(),
+            "materialization suppression did not restore"
+        );
+    } else {
+        let mutation = match mode.as_str() {
+            "specialized-sibling" => OwnerMutation::SubstituteContextZero,
+            "static-worker" => OwnerMutation::CallRawWorker,
+            "wrong-frame" => OwnerMutation::OmitKCall,
+            "wrong-slot" => OwnerMutation::RawHostResultEscape,
+            "wrong-invocation" => OwnerMutation::CallAfterAnswerCollapse,
+            "non-carried-residual" => OwnerMutation::BypassTrapBeforeResult,
+            "provenance-index" => OwnerMutation::VaryRet,
+            other => panic!("unknown execute-then-resume rekey mode: {other}"),
+        };
+        let (red, applications) =
+            ken_runtime::with_static_response_owner_body_mutation(mutation, || {
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    differential("fs-write-at-offset-single", "rt_write_writable_stage")
+                }))
+            });
+        assert_eq!(applications, 1, "{mode}: mutation did not reach one owner");
+        assert!(
+            red.is_err(),
+            "{mode}: malformed response edge compiled and ran"
+        );
+        assert!(
+            ken_runtime::static_response_owner_body_mutation_is_exact(),
+            "{mode}: response-owner mutation did not restore"
+        );
+    }
+    eprintln!("RT_EXECUTE_THEN_RESUME_REKEY_APPLIED mode={mode}");
+}
+
 // **Promise class: durable invariant.** The D2 post-selection authority must
 // refuse any selected Tail entry whose published sanitized access projection
 // differs from its retained confluence projection.
@@ -3158,30 +3237,83 @@ generated_entry_split_checked_case!(generated_entry_forward_ret_access_locator_i
 // **THE GAP:** the Tail/read controls above separately prove retained D2
 // access/confluence equality and prove that these Direct controls mutate zero
 // Tail projections.
-// DEFERRED to inc2 (Steward option (b), evt_63n3d4n5y3fnf). These eight
-// non-direct capsule fine-structure controls test the read's answer via the
-// generated-entry CAPSULE -- a VALUE SOURCE the read half abandoned for the
-// forward edge's captured-env CARRIER -- so they are inert-by-design on the read
-// (verified: wrong-slot "did not redden"; retarget-to-write empirically refuted,
-// the write lacks the read's specialized computational-recursor capsule). This is
-// NOT a soundness gap: the read answer's correctness is independently held (the 3
-// read narrows end-to-end + type-check) and the read EDGE is controlled at four
-// levels (edge-word forward_ret_edge_substituted_word_reds, governed-E pairing
-// role-witness family, HS3 sealed-discharge admission/confluence counters, and the
-// narrows). Their per-slot mutation power re-keys to a read-edge-carrier mutation
-// family in inc2's UNIFIED read+write edge-control migration, tracked by the named
-// obligation RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY -- each is
-// un-ignored and greened there (genuine green->trap flip). The direct-control and
-// retained-access (forward-ret-access) capsule controls stay LIVE (they run on the
-// write / the Tail layer and still redden).
-generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge (read derives its answer from the carrier, not the capsule); re-key to a read-edge-carrier mutation in inc2's unified edge-control migration"] generated_entry_capsule_outer_carried, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "outer-carried", "does not name a specialized computational-recursor capsule");
-generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_specialized_sibling, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "specialized-sibling", "is not a computational-recursor capsule");
-generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_static_worker, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "static-worker", "StaticWorkerBinding: a source-machine Var in value position is a value-producing position");
-generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_wrong_frame, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-frame", "checked frame, slot, call template, or residual phase");
-generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_wrong_slot, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-slot", "checked frame, slot, call template, or residual phase");
-generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_wrong_invocation, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "wrong-invocation", "projection disagrees with its current function, binding, or call coordinate");
-generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_non_carried_residual, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "non-carried-residual", "checked frame, slot, call template, or residual phase");
-generated_entry_checked_case!(#[ignore = "RT-COMPOSED-RETURN-FORWARD-RET-EDGE / AC-EDGE-CONTROL-REKEY: read capsule value-source inert under the read-half edge; re-key in inc2's unified edge-control migration"] generated_entry_capsule_provenance_index, GENERATED_ENTRY_CAPSULE_MUTATION_CHILD, in_generated_entry_stack_thread, assert_generated_entry_capsule_mutation_child, "provenance-index", "callee Var disagrees with the immediate K locator index");
+// AC-EDGE-CONTROL-REKEY complete. The old read-capsule value source is no
+// longer on the executed route, so each historical dimension is transferred to
+// one independently mutated fact of the execute-then-resume response edge:
+// materialization, exact K context, no raw-worker substitution, exactly-one K,
+// K-Result identity, tail order, Trap-before-Result, and exact Ret identity.
+//
+// MEASURED: every mode mutates the production classification or one finished
+// response-owner instruction/value relation and the unchanged write fixture
+// flips from clean InvalidOffset to its exact refusal/trap. CLAIMED: the unified
+// response edge retains at least the old eight dimensions of mutation power.
+// THE GAP: the mapping transfers properties, not historical capsule spellings;
+// the positive write pair and the owner-body exact-error controls independently
+// pin denotation and which verifier arm fires.
+generated_entry_checked_case!(
+    generated_entry_capsule_outer_carried,
+    EXECUTE_THEN_RESUME_REKEY_CHILD,
+    in_generated_entry_stack_thread,
+    assert_execute_then_resume_rekey_child,
+    "outer-carried",
+    "RT_EXECUTE_THEN_RESUME_REKEY_APPLIED mode=outer-carried"
+);
+generated_entry_checked_case!(
+    generated_entry_capsule_specialized_sibling,
+    EXECUTE_THEN_RESUME_REKEY_CHILD,
+    in_generated_entry_stack_thread,
+    assert_execute_then_resume_rekey_child,
+    "specialized-sibling",
+    "RT_EXECUTE_THEN_RESUME_REKEY_APPLIED mode=specialized-sibling"
+);
+generated_entry_checked_case!(
+    generated_entry_capsule_static_worker,
+    EXECUTE_THEN_RESUME_REKEY_CHILD,
+    in_generated_entry_stack_thread,
+    assert_execute_then_resume_rekey_child,
+    "static-worker",
+    "RT_EXECUTE_THEN_RESUME_REKEY_APPLIED mode=static-worker"
+);
+generated_entry_checked_case!(
+    generated_entry_capsule_wrong_frame,
+    EXECUTE_THEN_RESUME_REKEY_CHILD,
+    in_generated_entry_stack_thread,
+    assert_execute_then_resume_rekey_child,
+    "wrong-frame",
+    "RT_EXECUTE_THEN_RESUME_REKEY_APPLIED mode=wrong-frame"
+);
+generated_entry_checked_case!(
+    generated_entry_capsule_wrong_slot,
+    EXECUTE_THEN_RESUME_REKEY_CHILD,
+    in_generated_entry_stack_thread,
+    assert_execute_then_resume_rekey_child,
+    "wrong-slot",
+    "RT_EXECUTE_THEN_RESUME_REKEY_APPLIED mode=wrong-slot"
+);
+generated_entry_checked_case!(
+    generated_entry_capsule_wrong_invocation,
+    EXECUTE_THEN_RESUME_REKEY_CHILD,
+    in_generated_entry_stack_thread,
+    assert_execute_then_resume_rekey_child,
+    "wrong-invocation",
+    "RT_EXECUTE_THEN_RESUME_REKEY_APPLIED mode=wrong-invocation"
+);
+generated_entry_checked_case!(
+    generated_entry_capsule_non_carried_residual,
+    EXECUTE_THEN_RESUME_REKEY_CHILD,
+    in_generated_entry_stack_thread,
+    assert_execute_then_resume_rekey_child,
+    "non-carried-residual",
+    "RT_EXECUTE_THEN_RESUME_REKEY_APPLIED mode=non-carried-residual"
+);
+generated_entry_checked_case!(
+    generated_entry_capsule_provenance_index,
+    EXECUTE_THEN_RESUME_REKEY_CHILD,
+    in_generated_entry_stack_thread,
+    assert_execute_then_resume_rekey_child,
+    "provenance-index",
+    "RT_EXECUTE_THEN_RESUME_REKEY_APPLIED mode=provenance-index"
+);
 generated_entry_split_checked_case!(generated_entry_capsule_wrong_destination_owner, "wrong-destination-owner", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=DestinationOwner direct_applied=true tail_applied=false", "write");
 generated_entry_split_checked_case!(generated_entry_capsule_wrong_destination_body, "wrong-destination-body", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=DestinationBody direct_applied=true tail_applied=false", "write");
 generated_entry_split_checked_case!(generated_entry_capsule_wrong_binding, "wrong-binding", "a governed generated-entry projection disagrees with its current function, binding, or call coordinate", "RT_CHECKED_IH_PUBLISHED_PROJECTION_CONTROL_VALIDATION layer=Direct mutation=BindingFrame direct_applied=true tail_applied=false", "write");
@@ -4515,12 +4647,6 @@ fn fs_read_at_malformed_offset_without_read_right_narrows_to_invalid_offset() {
 // RT-SSA's response-owner specialization supplies the durable lane and the
 // population control builds this write entry with a formed Tail authority.
 #[test]
-#[ignore = "b2 increment 2 pending: EFFECT-PERFORMING continuation execution at \
-the collapse. rt_write_after_read performs a writeAt effect inside a match arm, \
-so this continuation is a recursive computational match (Vis/checked-IH), not a \
-pure Ret{Match}; R3's Ret{Match} authority (increment 1) is narrowed to exclude \
-it, and running it at the collapse is funded as b2 increment 2 \
-(RT-COMPOSED-RETURN-FORWARD-RET-EDGE). Un-ignore lands with increment 2."]
 fn fs_write_at_malformed_offset_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-write-offset", || {
         assert_narrowed_alike(
@@ -4540,11 +4666,6 @@ fn fs_write_at_malformed_offset_narrows_to_invalid_offset() {
 // forward SSA edge to the shared Ret block, so native observes exact
 // InvalidOffset instead of the malformed ExitCode::Failure trap.
 #[test]
-#[ignore = "b2 increment 2 pending: EFFECT-PERFORMING continuation execution at \
-the collapse (same reason as fs_write_at_malformed_offset_narrows_to_invalid_offset \
--- rt_write_after_read performs a writeAt effect in a match arm). Excluded from \
-R3's Ret{Match} authority in increment 1; funded as b2 increment 2. Un-ignore \
-lands with increment 2."]
 fn fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset() {
     in_large_stack_thread("rt-parity-write-readonly", || {
         assert_narrowed_alike(
@@ -4553,6 +4674,60 @@ fn fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset() 
             ken_runtime::HostOpV1::FsWriteAt,
             "InvalidOffset",
         )
+    });
+}
+
+/// Promise class: durable invariant. The P2-to-Specialized promotion is the
+/// materialization step that makes the read-then-write continuation execute.
+///
+/// MEASURED: suppressing that classification at its production site leaves the
+/// interpreter unchanged but restores native's exact pre-effect
+/// `ResourceBodyResult` trap, with neither BufferAllocate nor FsReadAt reached.
+/// CLAIMED: the existing transport-source response-owner call is causally
+/// necessary for execute-then-resume. THE GAP: this proves materialization, not
+/// the per-owner once/order property; finished-CLIF owner verification and its
+/// 0/2/wrong-order controls pin that independently.
+#[test]
+fn suppressing_execute_then_resume_restores_the_pre_effect_write_trap() {
+    in_large_stack_thread("rt-parity-write-execute-suppressed", || {
+        let Differential {
+            interpreted,
+            native,
+        } = ken_runtime::with_suppressed_execute_then_resume_response(|| {
+            differential("fs-write-at-offset-single", "rt_write_writable_stage")
+        });
+        assert_eq!(interpreted.exit_status, 0, "interpreter remains the oracle");
+        assert_eq!(interpreted.terminal_error, None);
+        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+            native.terminal_error.as_ref()
+        else {
+            panic!("suppression must restore native's pre-effect trap: {native:?}");
+        };
+        assert_eq!(
+            provenance.trap.code,
+            ken_runtime::RuntimeTrapCode::PatternMatchFailure
+        );
+        assert!(
+            provenance.trap.message.ends_with("::ResourceBodyResult"),
+            "suppression reached the wrong trap: {provenance:?}"
+        );
+        for skipped in [
+            ken_runtime::HostOpV1::BufferAllocate,
+            ken_runtime::HostOpV1::FsReadAt,
+            ken_runtime::HostOpV1::FsWriteAt,
+        ] {
+            assert!(
+                native
+                    .effect_trace
+                    .iter()
+                    .all(|event| event.operation != skipped),
+                "suppression must stop before {skipped:?}: {native:?}"
+            );
+        }
+        assert!(
+            ken_runtime::suppressed_execute_then_resume_response_is_exact(),
+            "the execute-then-resume suppression hook did not restore"
+        );
     });
 }
 

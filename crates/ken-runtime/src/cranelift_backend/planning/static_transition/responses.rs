@@ -327,11 +327,10 @@ impl StaticResponseContinuation {
 /// `evt_5yjjsrhpmt204` + amendment `evt_4ar3rxzrra5v4`). Computed ONCE at
 /// planning (R2) and consumed by total matches at every downstream stage, so a
 /// stage that fails to reconcile the residual is a Rust compile error
-/// (COORDINATION §7), never a CI-red. `Specialized` is the proved path
-/// (P0 = a continuation unit AND a selected caller that will be consumed as a
-/// real `DirectCall`/`ComposedCall`); `Deferred` is the complete residual
-/// (P1 ∪ P2). D0 holds: only `Deferred` is tagged; the Specialized side is
-/// unchanged.
+/// (COORDINATION §7), never a CI-red. `Specialized` is the proved path: a
+/// continuation unit plus either an ordinary selected caller or an
+/// execute-then-resume transport emission that becomes a real owner call.
+/// `Deferred` is the complete residual: P1 plus ineligible or suppressed P2.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ResponseDisposition {
     Specialized,
@@ -347,11 +346,11 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
     /// `1229` absent complement Q1 declined. There is no static continuation to
     /// name and no owner; main already lowers the `Vis` construct.
     NoContinuationUnit,
-    /// P2 — a continuation unit exists, but the selected caller is a checked-IH
-    /// environment transport source (settles `TransportDormant`, never
-    /// retargeted to a real call): the HS3-a/HS3-b present-but-unconsumed
-    /// placeholder, now classified `Deferred` up front so no owner and no
-    /// `StaticResponseDeferred` placeholder are ever emitted for it.
+    /// P2 — a transport-source caller outside the execute-then-resume subset.
+    /// An eligible plane is closed and contains at least two producer groups
+    /// whose transport sources are exclusively predeclared; open and single-stage
+    /// planes retain every transport
+    /// source here. The suppression control also restores this disposition.
     UnconsumedTransportCaller,
 }
 
@@ -365,26 +364,17 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct DeferredResponseRow {
     vis_origin: StaticOriginId,
-    /// The producer call origin this Deferred residual belongs to (P1: the route's
-    /// producer edge; P2: the demand's). Carried so the fan-out-accounting control
-    /// can group the deferred residual by producer -- the RECUT 2 HS6 (ii)-redesign
-    /// re-targets that invariant onto the Deferred population (Architect
-    /// evt_2fk574v1cb3b1), where the shared-producer multi-K witness now lives
-    /// (the transport-deferred ResourceRelease pairs). Deterministic from the
-    /// causal route/demand, so the closed-derivation validator is unaffected.
+    /// The producer call origin this Deferred residual belongs to (P1: the
+    /// route's producer edge; P2: the demand's). Retained for the
+    /// closed diagnostic relation and suppression control.
     producer_call_origin: StaticOriginId,
     operation_root_origin: StaticOriginId,
     effect_origin: StaticOriginId,
     operation: HostOpV1,
     sub_case: DeferredResponseSubCase,
     /// The K's capture and continuation-input counts (P2: from the demand; P1:
-    /// zero -- no continuation unit). Carried so the capture/input census control
-    /// can cross-check the DropEvery{Capture,Input} mutation's `applications`
-    /// against the FULL has-K-unit demand population (Specialized rows expose their
-    /// own counts; the P2 Deferred demands' counts live only here). RECUT 2 HS6
-    /// (ii)-redesign 2nd extension (Architect evt_bk6vky2pkncy). Deterministic from
-    /// the demand -> outcome-neutral to the closed-derivation validator (the sort
-    /// key omits it, unique vis_origin keeps the sort total).
+    /// zero because no continuation unit exists). Eligible-plane census derives
+    /// every has-K count from Specialized rows.
     capture_count: usize,
     continuation_input_count: usize,
 }
@@ -587,38 +577,35 @@ pub fn static_response_context_demand_mutation_is_exact() -> bool {
     STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(|slot| slot.get().is_none())
 }
 
-/// AC-7 mutation hook (Architect ruling `evt_37dx1wqamabg`). When set, `classify`
-/// FORCE-classifies a P2 residual (a response whose selected caller is a
-/// checked-IH environment transport source, which never retargets to a real
-/// call) as Specialized instead of Deferred -- injecting the FM1 error at the
-/// production/planning site. The forced Specialized owner is forward-declared but
-/// its transport caller is never consumed, so the EXISTING pin
-/// `validate_response_owner_call_coverage` must redden downstream. This is the
-/// mutation-provenance proof that that pin bites a CLASSIFY error (mutate at the
-/// production site, watch the guard redden), discharging AC-7 without a redundant
-/// second assertion. It is NOT a soundness change: production never sets it.
+// Execute-then-resume materialization control. Production specializes a
+// response whose selected caller is a checked-IH environment transport source:
+// the existing transport assembly emits a real response-owner call, so the
+// owner performs the effect and resumes K before returning. The test-only
+// mutation restores the pre-fix P2 deferral in an otherwise closed plane at
+// the classification producer. The unchanged parity fixture must then flip
+// from exact `InvalidOffset` to the old pre-effect `ResourceBodyResult` trap.
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
-    static FORCE_SPECIALIZE_DEFERRED_RESPONSE: std::cell::Cell<bool> =
+    static SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
 }
 
 #[cfg(feature = "px8-ds-test-support")]
-pub fn with_force_specialize_deferred_response<T>(operation: impl FnOnce() -> T) -> T {
-    FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(|slot| {
+pub fn with_suppressed_execute_then_resume_response<T>(operation: impl FnOnce() -> T) -> T {
+    SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| {
         assert!(
             !slot.replace(true),
-            "force-specialize-deferred-response mutations cannot nest"
+            "execute-then-resume response suppression mutations cannot nest"
         );
     });
     let result = operation();
-    FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(|slot| slot.set(false));
+    SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| slot.set(false));
     result
 }
 
 #[cfg(feature = "px8-ds-test-support")]
-pub fn force_specialize_deferred_response_is_exact() -> bool {
-    FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(|slot| !slot.get())
+pub fn suppressed_execute_then_resume_response_is_exact() -> bool {
+    SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| !slot.get())
 }
 
 impl SsaInfeasible {
@@ -1368,14 +1355,15 @@ impl StaticTransitionPlan<'_> {
         let mut demands = Vec::new();
         // PHASE A (RECUT 2, HS5 two-phase, Architect evt_7eh84c8n6w08e). This
         // pass runs at install (construction.rs:1213), BEFORE aggregate_ownership
-        // and the transport records exist, so it CANNOT yet decide P2
-        // (transport-caller) membership -- that fact is genuinely post-install
-        // (the z1315 cycle). Phase A therefore builds a context demand for EVERY
-        // has-K-unit member (owner-additive: the whole P2-union-Specialized
-        // context-entry domain) and captures ONLY P1 (no continuation unit) as a
-        // Deferred residual here. The Specialized/P2 split and owner assignment
-        // happen in phase B (`static_response_phase_b_split`, post-:1251), where
-        // the record-derived transport set is final. Congruence over the full
+        // and the transport records exist. Phase A builds a context demand for
+        // EVERY has-K-unit member and captures ONLY P1 (no continuation unit) as
+        // a Deferred residual. Phase B assigns every demand an owner only when
+        // the response plane is closed and at least two producer groups have
+        // exclusively predeclared transport sources; otherwise transport
+        // sources remain P2. The record-derived set identifies those callers
+        // and gives the suppression control a production-side discriminator.
+        // Congruence
+        // over the full
         // response-Vis population (AC-1) and total-match reconciliation (R2/§7)
         // hold across the two phases: phase A's demand domain is has-K-unit, phase
         // B's disposition domain is the whole population (P1 sealed via its own
@@ -1460,13 +1448,11 @@ impl StaticTransitionPlan<'_> {
                         )
                     })?;
                 // Phase A builds a demand for this has-K-unit member
-                // UNCONDITIONALLY (owner-additive). Whether it becomes Specialized
-                // (owner assigned) or P2-Deferred (a checked-IH environment
-                // transport caller, which never retargets to a real call -- the
-                // HS3-b leak shape) is decided in phase B from the post-:1251
-                // record-derived transport set, keyed on this demand's `k_identity`.
-                // See `static_response_phase_b_split`; AC-7's force-specialize hook
-                // also lives there now.
+                // unconditionally. Phase B assigns its owner after the transport
+                // relation is known. In an eligible response plane, a
+                // transport-source identity is Specialized and its existing
+                // transport emission is the selected incoming response-owner
+                // call. An open/single-stage plane or suppression retains P2.
                 let k_ret_identity = match exact_response_ret_identity(
                     self,
                     unit.continuation_origin(),
@@ -2037,14 +2023,15 @@ impl StaticTransitionPlan<'_> {
         Ok(())
     }
 
-    /// PHASE B of the two-phase response context install (RECUT 2, HS5). Runs once
-    /// after construction.rs:1251, where `aggregate_ownership` and the transport
-    /// records are final, so the exact record-derived transport-source set -- the
-    /// real Deferred/Specialized discriminator (a coordinate-run source WITH a
-    /// transport destination) -- exists. It splits phase A's has-K-unit demands
-    /// into Specialized (owner assigned) and P2 (unconsumed transport caller, no
-    /// owner), records P1 UNION P2 as the complete Deferred residual, and seals
-    /// the install. Owner-ADDITIVE: phase A's context entries are never retracted.
+    /// PHASE B of the two-phase response context install. Runs after the first
+    /// aggregate/transport derivation identifies transport-source callers.
+    /// Execute-then-resume assigns owners to transport-source demands only for
+    /// a closed plane with no P1 response and at least two producer groups whose
+    /// transport sources are exclusively predeclared. Open planes retain P2
+    /// rather than partially
+    /// specializing; single-stage planes retain the inc1 forward-Ret path. The
+    /// test suppression restores P2 in an eligible plane. Phase A entries are
+    /// never retracted.
     pub(super) fn install_static_response_context_plan_phase_b(
         &mut self,
     ) -> Result<(), CraneliftBackendError> {
@@ -2064,8 +2051,9 @@ impl StaticTransitionPlan<'_> {
                 "the static response context plan phase B ran before phase A installed the demands",
             )
         })?;
+        let has_unitless_response = !phase_a.deferred.is_empty();
         let (specialized, mut deferred) =
-            self.static_response_phase_b_split(phase_a.demands)?;
+            self.static_response_phase_b_split(phase_a.demands, has_unitless_response)?;
         deferred.extend(phase_a.deferred);
         deferred.sort_by_key(|row| (row.vis_origin, row.operation_root_origin, row.operation));
         let contexts = self.continuation_contexts.clone();
@@ -2080,36 +2068,59 @@ impl StaticTransitionPlan<'_> {
         Ok(())
     }
 
-    /// The phase-B Deferred/Specialized split (RECUT 2, HS5). Given phase A's
-    /// whole has-K-unit demand population, key each demand's `k_identity` against
-    /// the record-derived transport-source set (final post-:1251): a transport
-    /// source is P2-Deferred (an unconsumed transport caller, never retargeted to
-    /// a real owner call -- the HS3-b leak shape); everything else is Specialized.
-    /// The Specialized subset is re-sorted and re-numbered contiguously, so the
-    /// owner-row identities are exactly the single-phase result over that subset.
-    /// This read is closed for the validator: it depends only on the finalized
-    /// transport records, identical at install-phase-B and at validation.
+    /// The phase-B Deferred/Specialized split. In an eligible response plane, a
+    /// transport-source K's existing checked-IH transport emission is the real
+    /// selected incoming owner call:
+    /// it assembles the existing Parameter/Capture frame, calls the owner
+    /// synchronously, and receives the existing Result word. The suppression
+    /// control restores P2 at this exact classification producer.
     fn static_response_phase_b_split(
         &self,
         demands: Vec<StaticResponseContextDemand>,
+        has_unitless_response: bool,
     ) -> Result<(Vec<StaticResponseContextDemand>, Vec<DeferredResponseRow>), CraneliftBackendError>
     {
         let transport_sources = self.checked_ih_environment_transport_source_identities();
+        // Execute-then-resume serves a composed response plane: at least two
+        // producer groups have exclusively predeclared transport sources.
+        // A producer that also has a specialization/fusion-owned source is a
+        // mixed-owner fan-out, not an exclusively ordinary stage, so it does not
+        // increase the composition count. This keeps the single-stage read on
+        // the proven forward-Ret path while admitting both read-then-write shapes.
+        let mut transport_producer_owners = BTreeMap::new();
+        for demand in &demands {
+            if !transport_sources.contains(&demand.k_identity) {
+                continue;
+            }
+            let owners = transport_producer_owners
+                .entry(demand.producer_call_origin)
+                .or_insert((false, false));
+            match demand.k_identity.emission_owner() {
+                ContinuationEmissionOwner::Predeclared(_) => owners.0 = true,
+                ContinuationEmissionOwner::Specialization(_)
+                | ContinuationEmissionOwner::Fusion(_) => owners.1 = true,
+            }
+        }
+        let ordinary_stage_count = transport_producer_owners
+            .values()
+            .filter(|(predeclared, specialization)| *predeclared && !*specialization)
+            .count();
+        let requires_execute_then_resume = !has_unitless_response && ordinary_stage_count >= 2;
         let mut specialized = Vec::new();
         let mut deferred = Vec::new();
         for demand in demands {
-            // AC-7 mutation: when the force-specialize hook is set, a transport
-            // caller is NOT deferred but built as a Specialized owner instead --
-            // injecting the FM1 error (a forward-declared owner whose caller is
-            // never consumed). The hook is NOT apply_mutation-gated: it applies
-            // identically at install-phase-B and at the validator's re-derivation,
-            // so it does NOT trip the closed-derivation validator (which is what
-            // distinguishes it from the apply_mutation-gated demand mutations).
             #[cfg(feature = "px8-ds-test-support")]
-            let force_specialize = FORCE_SPECIALIZE_DEFERRED_RESPONSE.with(std::cell::Cell::get);
+            let suppress_execute = SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(std::cell::Cell::get);
             #[cfg(not(feature = "px8-ds-test-support"))]
-            let force_specialize = false;
-            if !force_specialize && transport_sources.contains(&demand.k_identity) {
+            let suppress_execute = false;
+            let transport_source = transport_sources.contains(&demand.k_identity);
+            // Execute-then-resume is admitted only for the closed composed plane
+            // identified above. A P1 member has no owner-call target; a
+            // single-stage plane already has the inc1 forward-Ret route. In
+            // either case, partially replacing siblings selects the wrong path.
+            if transport_source && (suppress_execute || !requires_execute_then_resume) {
+                // Population-side mutation restores P2 for an otherwise eligible
+                // plane; open and single-stage planes remain lawful residuals.
                 deferred.push(DeferredResponseRow {
                     vis_origin: demand.vis_origin,
                     producer_call_origin: demand.producer_call_origin,
@@ -2117,42 +2128,17 @@ impl StaticTransitionPlan<'_> {
                     effect_origin: demand.effect_origin,
                     operation: demand.operation,
                     sub_case: DeferredResponseSubCase::UnconsumedTransportCaller,
-                    // P2's demand carries the K's captures/inputs -- the census's
-                    // only view of this transport-deferred member's counts.
                     capture_count: demand.captures.len(),
                     continuation_input_count: demand.continuation_inputs.len(),
                 });
             } else {
+                // Execute-then-resume makes a transport-source caller a real
+                // synchronous response-owner call. Its existing transport
+                // morphism supplies the owner's Parameter/Capture frame; the
+                // owner performs the host effect, calls the exact K context once,
+                // and returns its existing Result word before the caller resumes.
                 specialized.push(demand);
             }
-        }
-        // (ii) HS6 owner-coverage ROUTING (Architect ruling evt_2980vtzybp6bj). A
-        // Specialized owner whose selected caller is a checked-IH transport source
-        // is, by construction, an owner with NO verified selected incoming call --
-        // a transport source never retargets to a real owner call. In a REAL
-        // compile this is unreachable: the loop above defers every transport
-        // source, so `specialized` never contains one (the gate: owner assignment
-        // is `!in transport_sources`, and force_specialize is a test-only hook,
-        // default false). It arises ONLY under AC-7's force injection. Catch it
-        // HERE, at planning, with the owner-coverage validator's own message, so
-        // the force-injected abnormal state reds at its INTENDED validator rather
-        // than transitively tripping the internal aggregate_ownership lifetime-meet
-        // invariant (closure.rs:2091) first -- failure-mode routing, HS6#1. This
-        // does NOT weaken that internal invariant for real compiles (it never
-        // fires there, since this red pre-empts the force state and no real
-        // compile produces the coexistence). See AC-7
-        // (force_specializing_a_deferred_response_reds_the_owner_call_coverage_pin)
-        // and lowering's validate_response_owner_call_coverage (the standing guard).
-        if let Some(forced) = specialized
-            .iter()
-            .find(|demand| transport_sources.contains(&demand.k_identity))
-        {
-            return Err(planner_error(format!(
-                "a forward-declared response owner has no verified selected incoming call: its \
-                 selected caller {:?} is a checked-IH environment transport source, which never \
-                 retargets to a real owner call (RECUT 2 HS6 owner-coverage routing; force-only)",
-                forced.k_identity,
-            )));
         }
         specialized.sort_by_key(|demand| {
             (
@@ -2212,9 +2198,10 @@ impl StaticTransitionPlan<'_> {
         // Phase A re-derivation: the owner-less context-entry plane over has-K-unit.
         let (mut expected_contexts, preexisting_count) =
             self.response_context_union(causal_contexts, &demands)?;
-        // Phase B re-derivation: split the same demands by the same finalized
-        // transport records; Specialized get owners, P1 UNION P2 is the residual.
-        let (specialized, mut expected_deferred) = self.static_response_phase_b_split(demands)?;
+        // Phase B re-derivation: an eligible plane gives every has-K demand an
+        // owner; an open/single-stage plane or suppression retains P2.
+        let (specialized, mut expected_deferred) =
+            self.static_response_phase_b_split(demands, !p1_deferred.is_empty())?;
         expected_deferred.extend(p1_deferred);
         expected_deferred
             .sort_by_key(|row| (row.vis_origin, row.operation_root_origin, row.operation));
