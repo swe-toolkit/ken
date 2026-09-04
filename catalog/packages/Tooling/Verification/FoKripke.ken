@@ -2566,9 +2566,10 @@ theorem fok_check_tree_validation_monotonic
 --     soundness result. That checker acceptance reflects into `FokDerivation`
 --     is not evidence that the reflected rule is semantically lawful. The
 --     semantic claim -- that a `FokDerivation` of `fok_embed`'s image entails
---     the object proposition -- is `fok_embedding_adequacy_statement`, whose
---     proof is the SUCCESSOR `V3-FO-EMBEDDING-ADEQUACY`, over this corrected
---     relation, and is deliberately absent here.
+--     the object proposition -- is `fok_embedding_adequacy_statement`, proved
+--     below by `fok_embedding_adequacy` over this corrected relation. The proof
+--     consumes the relation directly; it does not narrow validity to checker
+--     output.
 --   * VERDICT BOUNDARY UNCHANGED. Route-FO's production verdict is untouched by
 --     this node: `attempt_fo_with_signature` still returns the audited
 --     `Unknown` (`emit_unknown_hole_fo_withheld`); nothing here returns
@@ -4028,3 +4029,638 @@ theorem fok_target_soundness
       fok_target_forces sigma c rho levels bound goal =
   fok_target_soundness_at sigma c rho levels bound
     (FokMkSequent gamma (Cons FokForm goal (Nil FokForm))) derivation goal Refl
+
+-- === D2b: embedding correspondence ===
+
+
+fn fok_list_nat_length (xs : List Nat) : Nat =
+  match xs {
+    Nil ↦ Zero;
+    Cons x rest ↦ Suc (fok_list_nat_length rest)
+  }
+
+theorem fok_nth_nat_default_map_suc_nil
+    : (i : Nat) →
+      Equal Bool (fok_nat_lt i (fok_list_nat_length (Nil Nat))) True →
+      Equal Nat
+        (fok_nth_nat_default (fok_map_suc (Nil Nat)) i)
+        (Suc (fok_nth_nat_default (Nil Nat) i)) =
+  λi.
+    match i {
+      Zero ↦ λin_range. absurd in_range;
+      Suc j ↦ λin_range. absurd in_range
+    }
+
+theorem fok_nth_nat_default_map_suc_cons_zero
+      (x : Nat) (rest : List Nat)
+    : Equal Bool
+        (fok_nat_lt Zero (fok_list_nat_length (Cons Nat x rest))) True →
+      Equal Nat
+        (fok_nth_nat_default (fok_map_suc (Cons Nat x rest)) Zero)
+        (Suc (fok_nth_nat_default (Cons Nat x rest) Zero)) =
+  λin_range. Refl
+
+theorem fok_nth_nat_default_map_suc_cons_suc
+      (x : Nat) (rest : List Nat) (j : Nat)
+    : Equal Bool
+        (fok_nat_lt (Suc j) (fok_list_nat_length (Cons Nat x rest))) True →
+      Equal Nat
+        (fok_nth_nat_default (fok_map_suc (Cons Nat x rest)) (Suc j))
+        (Suc (fok_nth_nat_default (Cons Nat x rest) (Suc j))) =
+  fok_nth_nat_default_map_suc rest j
+
+theorem fok_nth_nat_default_map_suc_cons
+      (x : Nat) (rest : List Nat)
+    : (i : Nat) →
+      Equal Bool
+        (fok_nat_lt i (fok_list_nat_length (Cons Nat x rest))) True →
+      Equal Nat
+        (fok_nth_nat_default (fok_map_suc (Cons Nat x rest)) i)
+        (Suc (fok_nth_nat_default (Cons Nat x rest) i)) =
+  λi.
+    match i {
+      Zero ↦ fok_nth_nat_default_map_suc_cons_zero x rest;
+      Suc j ↦ fok_nth_nat_default_map_suc_cons_suc x rest j
+    }
+
+theorem fok_nth_nat_default_map_suc
+      (xs : List Nat)
+    : (i : Nat) →
+      Equal Bool (fok_nat_lt i (fok_list_nat_length xs)) True →
+      Equal Nat
+        (fok_nth_nat_default (fok_map_suc xs) i)
+        (Suc (fok_nth_nat_default xs i)) =
+  match xs {
+    Nil ↦ fok_nth_nat_default_map_suc_nil;
+    Cons x rest ↦ fok_nth_nat_default_map_suc_cons x rest
+  }
+
+theorem fok_map_suc_length (xs : List Nat)
+    : Equal Nat (fok_list_nat_length (fok_map_suc xs))
+        (fok_list_nat_length xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons x rest ↦
+      fok_cong Nat Nat
+        (fok_list_nat_length (fok_map_suc rest))
+        (fok_list_nat_length rest) Suc
+        (fok_map_suc_length rest)
+  }
+
+theorem fok_fin_to_nat_lt (n : Nat) (i : FokFin n)
+    : Equal Bool (fok_nat_lt (fok_fin_to_nat n i) n) True =
+  match i {
+    FokFinZero m ↦ Proved;
+    FokFinSuc m j ↦ fok_fin_to_nat_lt m j
+  }
+
+theorem fok_indices_fin_in_range
+      (n : Nat) (indices : List Nat)
+      (length_is_n : Equal Nat (fok_list_nat_length indices) n)
+      (i : FokFin n)
+    : Equal Bool
+        (fok_nat_lt (fok_fin_to_nat n i) (fok_list_nat_length indices)) True =
+  fok_eq_trans Bool
+    (fok_nat_lt (fok_fin_to_nat n i) (fok_list_nat_length indices))
+    (fok_nat_lt (fok_fin_to_nat n i) n)
+    True
+    (fok_cong Nat Bool
+      (fok_list_nat_length indices) n
+      (λsize. fok_nat_lt (fok_fin_to_nat n i) size)
+      length_is_n)
+    (fok_fin_to_nat_lt n i)
+
+fn fok_iff_trans
+      (p : Omega) (q : Omega) (r : Omega)
+      (pq : FokForcingIff p q) (qr : FokForcingIff q r)
+    : FokForcingIff p r =
+  FokMkForcingIff p r
+    (λhp. fok_iff_forward q r qr (fok_iff_forward p q pq hp))
+    (λhr. fok_iff_backward p q pq (fok_iff_backward q r qr hr))
+
+theorem fok_qobject_bound_push_index
+      (a : Type) (levels : FokLevelContext a)
+      (bound : FokBoundContext a) (slot : FokLevelSlot a)
+      (from : Nat) (to : Nat) (same : Equal Nat from (Suc to))
+    : Equal (Option a)
+        (fok_qobject_value a levels (FokBoundCons a slot bound)
+          (FokQBound from))
+        (fok_qobject_value a levels bound (FokQBound to)) =
+  fok_cong Nat (Option a) from (Suc to)
+    (λindex.
+      fok_qobject_value a levels (FokBoundCons a slot bound)
+        (FokQBound index))
+    same
+
+fn fok_embedding_env_relation
+      (sigma : FokSignature) (c : FokCarriers sigma)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (n : Nat) (indices : List Nat)
+      (bound : FokBoundContext (fok_sort_a sigma c))
+      (xs : FokObjectEnv sigma c n) : Omega =
+  (i : FokFin n) →
+    Equal (Option (fok_sort_a sigma c))
+      (fok_qobject_value (fok_sort_a sigma c) levels bound
+        (FokQBound (fok_nth_nat_default indices (fok_fin_to_nat n i))))
+      (Some (fok_sort_a sigma c) (fok_object_env_lookup sigma c n xs i))
+
+theorem fok_fin_zero_elim (target : Omega) (i : FokFin Zero) : target =
+  match i {}
+
+theorem fok_embedding_env_root
+      (sigma : FokSignature) (c : FokCarriers sigma)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+    : fok_embedding_env_relation sigma c levels Zero (Nil Nat)
+        (fok_bound_empty (fok_sort_a sigma c))
+        (FokObjectEnvNil sigma c) =
+  λi.
+    fok_fin_zero_elim
+      (Equal (Option (fok_sort_a sigma c))
+        (fok_qobject_value (fok_sort_a sigma c) levels
+          (fok_bound_empty (fok_sort_a sigma c))
+          (FokQBound (fok_nth_nat_default (Nil Nat) (fok_fin_to_nat Zero i))))
+        (Some (fok_sort_a sigma c)
+          (fok_object_env_lookup sigma c Zero
+            (FokObjectEnvNil sigma c) i)))
+      i
+
+theorem fok_embedding_env_world
+      (sigma : FokSignature) (c : FokCarriers sigma)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (n : Nat) (indices : List Nat)
+      (length_is_n : Equal Nat (fok_list_nat_length indices) n)
+      (bound : FokBoundContext (fok_sort_a sigma c))
+      (xs : FokObjectEnv sigma c n)
+      (relation : fok_embedding_env_relation sigma c levels n indices bound xs)
+    : fok_embedding_env_relation sigma c levels n (fok_map_suc indices)
+        (FokBoundCons (fok_sort_a sigma c)
+          (FokLevelWorld (fok_sort_a sigma c)) bound)
+        xs =
+  λi.
+    fok_eq_trans (Option (fok_sort_a sigma c))
+      (fok_qobject_value (fok_sort_a sigma c) levels
+        (FokBoundCons (fok_sort_a sigma c)
+          (FokLevelWorld (fok_sort_a sigma c)) bound)
+        (FokQBound
+          (fok_nth_nat_default (fok_map_suc indices) (fok_fin_to_nat n i))))
+      (fok_qobject_value (fok_sort_a sigma c) levels bound
+        (FokQBound (fok_nth_nat_default indices (fok_fin_to_nat n i))))
+      (Some (fok_sort_a sigma c) (fok_object_env_lookup sigma c n xs i))
+      (fok_qobject_bound_push_index (fok_sort_a sigma c) levels bound
+        (FokLevelWorld (fok_sort_a sigma c))
+        (fok_nth_nat_default (fok_map_suc indices) (fok_fin_to_nat n i))
+        (fok_nth_nat_default indices (fok_fin_to_nat n i))
+        (fok_nth_nat_default_map_suc indices (fok_fin_to_nat n i)
+          (fok_indices_fin_in_range n indices length_is_n i)))
+      (relation i)
+
+theorem fok_embedding_env_object_index
+      (sigma : FokSignature) (c : FokCarriers sigma)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (n : Nat) (indices : List Nat)
+      (length_is_n : Equal Nat (fok_list_nat_length indices) n)
+      (bound : FokBoundContext (fok_sort_a sigma c))
+      (x : fok_sort_a sigma c) (i : FokFin (Suc n))
+    : (xs : FokObjectEnv sigma c n) →
+      fok_embedding_env_relation sigma c levels n indices bound xs →
+      Equal (Option (fok_sort_a sigma c))
+        (fok_qobject_value (fok_sort_a sigma c) levels
+          (FokBoundCons (fok_sort_a sigma c)
+            (FokLevelObject (fok_sort_a sigma c) x) bound)
+          (FokQBound
+            (fok_nth_nat_default (Cons Nat Zero (fok_map_suc indices))
+              (fok_fin_to_nat (Suc n) i))))
+        (Some (fok_sort_a sigma c)
+          (fok_object_env_lookup sigma c (Suc n)
+            (FokObjectEnvCons sigma c n x xs) i)) =
+  match i {
+    FokFinZero m ↦ λxs. λrelation. Refl;
+    FokFinSuc m j ↦ λxs. λrelation.
+      fok_eq_trans (Option (fok_sort_a sigma c))
+        (fok_qobject_value (fok_sort_a sigma c) levels
+          (FokBoundCons (fok_sort_a sigma c)
+            (FokLevelObject (fok_sort_a sigma c) x) bound)
+          (FokQBound
+            (fok_nth_nat_default (fok_map_suc indices)
+              (fok_fin_to_nat m j))))
+        (fok_qobject_value (fok_sort_a sigma c) levels bound
+          (FokQBound
+            (fok_nth_nat_default indices (fok_fin_to_nat m j))))
+        (Some (fok_sort_a sigma c)
+          (fok_object_env_lookup sigma c m xs j))
+        (fok_qobject_bound_push_index (fok_sort_a sigma c) levels bound
+          (FokLevelObject (fok_sort_a sigma c) x)
+          (fok_nth_nat_default (fok_map_suc indices) (fok_fin_to_nat m j))
+          (fok_nth_nat_default indices (fok_fin_to_nat m j))
+          (fok_nth_nat_default_map_suc indices (fok_fin_to_nat m j)
+            (fok_indices_fin_in_range m indices length_is_n j)))
+        (relation j)
+  }
+
+theorem fok_embedding_env_object
+      (sigma : FokSignature) (c : FokCarriers sigma)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (n : Nat) (indices : List Nat)
+      (length_is_n : Equal Nat (fok_list_nat_length indices) n)
+      (bound : FokBoundContext (fok_sort_a sigma c))
+      (xs : FokObjectEnv sigma c n) (x : fok_sort_a sigma c)
+      (relation : fok_embedding_env_relation sigma c levels n indices bound xs)
+    : fok_embedding_env_relation sigma c levels (Suc n)
+        (Cons Nat Zero (fok_map_suc indices))
+        (FokBoundCons (fok_sort_a sigma c)
+          (FokLevelObject (fok_sort_a sigma c) x) bound)
+        (FokObjectEnvCons sigma c n x xs) =
+  λi.
+    fok_embedding_env_object_index sigma c levels n indices length_is_n
+      bound x i xs relation
+
+-- The five embedded frame axioms hold in the canonical one-world model.
+theorem fok_target_conjoin
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (bound : FokBoundContext (fok_sort_a sigma c))
+      (p : FokForm) (q : FokForm)
+      (hp : fok_target_forces sigma c rho levels bound p)
+      (hq : fok_target_forces sigma c rho levels bound q)
+    : fok_target_forces sigma c rho levels bound (FokAnd p q) =
+  trunc_intro
+    (FokConjoin
+      (fok_target_forces sigma c rho levels bound p)
+      (fok_target_forces sigma c rho levels bound q)
+      hp hq)
+
+theorem fok_target_preorder_reflexive
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (bound : FokBoundContext (fok_sort_a sigma c))
+    : fok_target_forces sigma c rho levels bound fok_preorder_reflexive =
+  Proved
+
+theorem fok_target_preorder_transitive
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (bound : FokBoundContext (fok_sort_a sigma c))
+    : fok_target_forces sigma c rho levels bound fok_preorder_transitive =
+  λh. Proved
+
+theorem fok_target_domain_growth_a
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (bound : FokBoundContext (fok_sort_a sigma c))
+    : fok_target_forces sigma c rho levels bound fok_domain_growth_a =
+  λx. λh. Proved
+
+theorem fok_target_atom_domain_p
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (bound : FokBoundContext (fok_sort_a sigma c))
+    : fok_target_forces sigma c rho levels bound fok_atom_domain_p =
+  λx. λh. Proved
+
+theorem fok_target_atom_persistence_p
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (bound : FokBoundContext (fok_sort_a sigma c))
+    : fok_target_forces sigma c rho levels bound fok_atom_persistence_p =
+  λx. λh.
+    elim_trunc
+      (fok_pred_p sigma c rho x)
+      (λpair.
+        match pair {
+          FokConjoin access atom ↦ atom
+        })
+      h
+
+theorem fok_target_k_sigma
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (bound : FokBoundContext (fok_sort_a sigma c))
+    : fok_target_forces sigma c rho levels bound fok_k_sigma =
+  fok_target_conjoin sigma c rho levels bound
+    (FokAnd
+      (FokAnd fok_preorder_reflexive fok_preorder_transitive)
+      fok_domain_growth_a)
+    (FokAnd fok_atom_domain_p fok_atom_persistence_p)
+    (fok_target_conjoin sigma c rho levels bound
+      (FokAnd fok_preorder_reflexive fok_preorder_transitive)
+      fok_domain_growth_a
+      (fok_target_conjoin sigma c rho levels bound
+        fok_preorder_reflexive fok_preorder_transitive
+        (fok_target_preorder_reflexive sigma c rho levels bound)
+        (fok_target_preorder_transitive sigma c rho levels bound))
+      (fok_target_domain_growth_a sigma c rho levels bound))
+    (fok_target_conjoin sigma c rho levels bound
+      fok_atom_domain_p fok_atom_persistence_p
+      (fok_target_atom_domain_p sigma c rho levels bound)
+      (fok_target_atom_persistence_p sigma c rho levels bound))
+
+
+-- The source object environment and the target bound-variable projection stay
+-- synchronized while the forcing translation introduces world/object binders.
+theorem fok_map_suc_length_to
+      (indices : List Nat) (n : Nat)
+      (length_is_n : Equal Nat (fok_list_nat_length indices) n)
+    : Equal Nat (fok_list_nat_length (fok_map_suc indices)) n =
+  fok_eq_trans Nat
+    (fok_list_nat_length (fok_map_suc indices))
+    (fok_list_nat_length indices)
+    n
+    (fok_map_suc_length indices)
+    length_is_n
+
+theorem fok_object_indices_length_to
+      (indices : List Nat) (n : Nat)
+      (length_is_n : Equal Nat (fok_list_nat_length indices) n)
+    : Equal Nat
+        (fok_list_nat_length
+          (Cons Nat Zero (fok_map_suc (fok_map_suc indices))))
+        (Suc n) =
+  fok_cong Nat Nat
+    (fok_list_nat_length (fok_map_suc (fok_map_suc indices)))
+    n Suc
+    (fok_map_suc_length_to (fok_map_suc indices) n
+      (fok_map_suc_length_to indices n length_is_n))
+
+
+
+-- Directional correspondence stays proposition-valued during structural
+-- recursion. The proof-relevant equivalence record is assembled afterward.
+theorem fok_embedding_formula_forward
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (n : Nat) (form : FokScopedIForm sigma n)
+    : (world : Nat) →
+      (indices : List Nat) →
+      Equal Nat (fok_list_nat_length indices) n →
+      (bound : FokBoundContext (fok_sort_a sigma c)) →
+      (xs : FokObjectEnv sigma c n) →
+      fok_embedding_env_relation sigma c levels n indices bound xs →
+      fok_target_forces sigma c rho levels bound
+        (fok_w_forces world indices (fok_erase_n sigma n form)) →
+      fok_denote_at sigma c rho n form xs =
+  match form {
+    FokScopedBottom m ↦
+      λworld. λindices. λlength_is_n. λbound. λxs. λrelation. λh. h;
+    FokScopedAtom m i ↦
+      λworld. λindices. λlength_is_n. λbound. λxs. λrelation.
+        fok_iff_forward
+          (fok_atom_truth sigma c rho
+            (fok_qobject_value (fok_sort_a sigma c) levels bound
+              (FokQBound
+                (fok_nth_nat_default indices (fok_fin_to_nat n i)))))
+          (fok_pred_p sigma c rho
+            (fok_object_env_lookup sigma c n xs i))
+          (fok_option_atom_iff sigma c rho
+            (fok_qobject_value (fok_sort_a sigma c) levels bound
+              (FokQBound
+                (fok_nth_nat_default indices (fok_fin_to_nat n i))))
+            (Some (fok_sort_a sigma c)
+              (fok_object_env_lookup sigma c n xs i))
+            (relation i));
+    FokScopedOr m p q ↦
+      λworld. λindices. λlength_is_n. λbound. λxs. λrelation. λh.
+        elim_trunc
+          (fok_denote_at sigma c rho n (FokScopedOr sigma n p q) xs)
+          (λchoice.
+            match choice {
+              Inl hp ↦
+                trunc_intro
+                  (Inl
+                    (fok_denote_at sigma c rho n p xs)
+                    (fok_denote_at sigma c rho n q xs)
+                    (fok_embedding_formula_forward sigma c rho levels n p
+                      world indices length_is_n bound xs relation hp));
+              Inr hq ↦
+                trunc_intro
+                  (Inr
+                    (fok_denote_at sigma c rho n p xs)
+                    (fok_denote_at sigma c rho n q xs)
+                    (fok_embedding_formula_forward sigma c rho levels n q
+                      world indices length_is_n bound xs relation hq))
+            })
+          h;
+    FokScopedImp m p q ↦
+      λworld. λindices. λlength_is_n. λbound. λxs. λrelation. λtarget_imp.
+        λsource_assumption.
+          fok_embedding_formula_forward sigma c rho levels n q Zero
+            (fok_map_suc indices)
+            (fok_map_suc_length_to indices n length_is_n)
+            (FokBoundCons (fok_sort_a sigma c)
+              (FokLevelWorld (fok_sort_a sigma c)) bound)
+            xs
+            (fok_embedding_env_world sigma c levels n indices length_is_n
+              bound xs relation)
+            (target_imp Proved
+              (fok_embedding_formula_backward sigma c rho levels n p Zero
+                (fok_map_suc indices)
+                (fok_map_suc_length_to indices n length_is_n)
+                (FokBoundCons (fok_sort_a sigma c)
+                  (FokLevelWorld (fok_sort_a sigma c)) bound)
+                xs
+                (fok_embedding_env_world sigma c levels n indices length_is_n
+                  bound xs relation)
+                source_assumption));
+    FokScopedForall m body ↦
+      λworld. λindices. λlength_is_n. λbound. λxs. λrelation. λtarget_all. λx.
+        fok_embedding_formula_forward sigma c rho levels (Suc n) body
+          (Suc Zero)
+          (Cons Nat Zero (fok_map_suc (fok_map_suc indices)))
+          (fok_object_indices_length_to indices n length_is_n)
+          (FokBoundCons (fok_sort_a sigma c)
+            (FokLevelObject (fok_sort_a sigma c) x)
+            (FokBoundCons (fok_sort_a sigma c)
+              (FokLevelWorld (fok_sort_a sigma c)) bound))
+          (FokObjectEnvCons sigma c n x xs)
+          (fok_embedding_env_object sigma c levels n
+            (fok_map_suc indices)
+            (fok_map_suc_length_to indices n length_is_n)
+            (FokBoundCons (fok_sort_a sigma c)
+              (FokLevelWorld (fok_sort_a sigma c)) bound)
+            xs x
+            (fok_embedding_env_world sigma c levels n indices length_is_n
+              bound xs relation))
+          (target_all Proved x Proved)
+  }
+
+theorem fok_embedding_formula_backward
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (n : Nat) (form : FokScopedIForm sigma n)
+    : (world : Nat) →
+      (indices : List Nat) →
+      Equal Nat (fok_list_nat_length indices) n →
+      (bound : FokBoundContext (fok_sort_a sigma c)) →
+      (xs : FokObjectEnv sigma c n) →
+      fok_embedding_env_relation sigma c levels n indices bound xs →
+      fok_denote_at sigma c rho n form xs →
+      fok_target_forces sigma c rho levels bound
+        (fok_w_forces world indices (fok_erase_n sigma n form)) =
+  match form {
+    FokScopedBottom m ↦
+      λworld. λindices. λlength_is_n. λbound. λxs. λrelation. λh. h;
+    FokScopedAtom m i ↦
+      λworld. λindices. λlength_is_n. λbound. λxs. λrelation.
+        fok_iff_backward
+          (fok_atom_truth sigma c rho
+            (fok_qobject_value (fok_sort_a sigma c) levels bound
+              (FokQBound
+                (fok_nth_nat_default indices (fok_fin_to_nat n i)))))
+          (fok_pred_p sigma c rho
+            (fok_object_env_lookup sigma c n xs i))
+          (fok_option_atom_iff sigma c rho
+            (fok_qobject_value (fok_sort_a sigma c) levels bound
+              (FokQBound
+                (fok_nth_nat_default indices (fok_fin_to_nat n i))))
+            (Some (fok_sort_a sigma c)
+              (fok_object_env_lookup sigma c n xs i))
+            (relation i));
+    FokScopedOr m p q ↦
+      λworld. λindices. λlength_is_n. λbound. λxs. λrelation. λh.
+        elim_trunc
+          (fok_target_forces sigma c rho levels bound
+            (fok_w_forces world indices
+              (fok_erase_n sigma n (FokScopedOr sigma n p q))))
+          (λchoice.
+            match choice {
+              Inl hp ↦
+                trunc_intro
+                  (Inl
+                    (fok_target_forces sigma c rho levels bound
+                      (fok_w_forces world indices (fok_erase_n sigma n p)))
+                    (fok_target_forces sigma c rho levels bound
+                      (fok_w_forces world indices (fok_erase_n sigma n q)))
+                    (fok_embedding_formula_backward sigma c rho levels n p
+                      world indices length_is_n bound xs relation hp));
+              Inr hq ↦
+                trunc_intro
+                  (Inr
+                    (fok_target_forces sigma c rho levels bound
+                      (fok_w_forces world indices (fok_erase_n sigma n p)))
+                    (fok_target_forces sigma c rho levels bound
+                      (fok_w_forces world indices (fok_erase_n sigma n q)))
+                    (fok_embedding_formula_backward sigma c rho levels n q
+                      world indices length_is_n bound xs relation hq))
+            })
+          h;
+    FokScopedImp m p q ↦
+      λworld. λindices. λlength_is_n. λbound. λxs. λrelation. λsource_imp.
+        λaccess. λtarget_assumption.
+          fok_embedding_formula_backward sigma c rho levels n q Zero
+            (fok_map_suc indices)
+            (fok_map_suc_length_to indices n length_is_n)
+            (FokBoundCons (fok_sort_a sigma c)
+              (FokLevelWorld (fok_sort_a sigma c)) bound)
+            xs
+            (fok_embedding_env_world sigma c levels n indices length_is_n
+              bound xs relation)
+            (source_imp
+              (fok_embedding_formula_forward sigma c rho levels n p Zero
+                (fok_map_suc indices)
+                (fok_map_suc_length_to indices n length_is_n)
+                (FokBoundCons (fok_sort_a sigma c)
+                  (FokLevelWorld (fok_sort_a sigma c)) bound)
+                xs
+                (fok_embedding_env_world sigma c levels n indices length_is_n
+                  bound xs relation)
+                target_assumption));
+    FokScopedForall m body ↦
+      λworld. λindices. λlength_is_n. λbound. λxs. λrelation. λsource_all.
+        λaccess. λx. λdomain.
+          fok_embedding_formula_backward sigma c rho levels (Suc n) body
+            (Suc Zero)
+            (Cons Nat Zero (fok_map_suc (fok_map_suc indices)))
+            (fok_object_indices_length_to indices n length_is_n)
+            (FokBoundCons (fok_sort_a sigma c)
+              (FokLevelObject (fok_sort_a sigma c) x)
+              (FokBoundCons (fok_sort_a sigma c)
+                (FokLevelWorld (fok_sort_a sigma c)) bound))
+            (FokObjectEnvCons sigma c n x xs)
+            (fok_embedding_env_object sigma c levels n
+              (fok_map_suc indices)
+              (fok_map_suc_length_to indices n length_is_n)
+              (FokBoundCons (fok_sort_a sigma c)
+                (FokLevelWorld (fok_sort_a sigma c)) bound)
+              xs x
+              (fok_embedding_env_world sigma c levels n indices length_is_n
+                bound xs relation))
+            (source_all x)
+  }
+
+fn fok_embedding_formula_iff
+      (sigma : FokSignature) (c : FokCarriers sigma) (rho : FokAtomEnv sigma c)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (n : Nat) (form : FokScopedIForm sigma n)
+      (world : Nat) (indices : List Nat)
+      (length_is_n : Equal Nat (fok_list_nat_length indices) n)
+      (bound : FokBoundContext (fok_sort_a sigma c))
+      (xs : FokObjectEnv sigma c n)
+      (relation : fok_embedding_env_relation sigma c levels n indices bound xs)
+    : FokForcingIff
+        (fok_target_forces sigma c rho levels bound
+          (fok_w_forces world indices (fok_erase_n sigma n form)))
+        (fok_denote_at sigma c rho n form xs) =
+  FokMkForcingIff
+    (fok_target_forces sigma c rho levels bound
+      (fok_w_forces world indices (fok_erase_n sigma n form)))
+    (fok_denote_at sigma c rho n form xs)
+    (fok_embedding_formula_forward sigma c rho levels n form
+      world indices length_is_n bound xs relation)
+    (fok_embedding_formula_backward sigma c rho levels n form
+      world indices length_is_n bound xs relation)
+
+-- At source depth zero the environment correspondence is vacuous for every
+-- target bound context, including the world binder introduced by `fok_embed`.
+theorem fok_embedding_env_closed
+      (sigma : FokSignature) (c : FokCarriers sigma)
+      (levels : FokLevelContext (fok_sort_a sigma c))
+      (bound : FokBoundContext (fok_sort_a sigma c))
+    : fok_embedding_env_relation sigma c levels Zero (Nil Nat) bound
+        (FokObjectEnvNil sigma c) =
+  λi.
+    fok_fin_zero_elim
+      (Equal (Option (fok_sort_a sigma c))
+        (fok_qobject_value (fok_sort_a sigma c) levels bound
+          (FokQBound (fok_nth_nat_default (Nil Nat)
+            (fok_fin_to_nat Zero i))))
+        (Some (fok_sort_a sigma c)
+          (fok_object_env_lookup sigma c Zero
+            (FokObjectEnvNil sigma c) i)))
+      i
+
+-- Every inhabitant of classical validity is consumed. Target-calculus
+-- soundness first interprets the embedded sequent in the canonical model;
+-- validity of the five frame axioms exposes the translated formula, and the
+-- structural correspondence sends it to the intrinsic source denotation.
+theorem fok_embedding_adequacy
+      (sigma : FokSignature)
+      (c : FokCarriers sigma)
+      (rho : FokAtomEnv sigma c)
+      (f : FokScopedIForm sigma Zero)
+    : fok_embedding_adequacy_statement sigma c rho f =
+  λvalid.
+    elim_trunc
+      (fok_denote sigma c rho f)
+      (λderivation.
+        fok_embedding_formula_forward sigma c rho
+          (fok_level_empty (fok_sort_a sigma c)) Zero f
+          Zero (Nil Nat) Proved
+          (FokBoundCons (fok_sort_a sigma c)
+            (FokLevelWorld (fok_sort_a sigma c))
+            (fok_bound_empty (fok_sort_a sigma c)))
+          (FokObjectEnvNil sigma c)
+          (fok_embedding_env_closed sigma c
+            (fok_level_empty (fok_sort_a sigma c))
+            (FokBoundCons (fok_sort_a sigma c)
+              (FokLevelWorld (fok_sort_a sigma c))
+              (fok_bound_empty (fok_sort_a sigma c))))
+          ((fok_target_soundness sigma c rho
+              (fok_level_empty (fok_sort_a sigma c))
+              (fok_bound_empty (fok_sort_a sigma c))
+              (Nil FokForm) (fok_scoped_embed sigma f) derivation
+              (fok_gamma_forced_empty sigma c rho
+                (fok_level_empty (fok_sort_a sigma c))
+                (fok_bound_empty (fok_sort_a sigma c))))
+            (fok_target_k_sigma sigma c rho
+              (fok_level_empty (fok_sort_a sigma c))
+              (fok_bound_empty (fok_sort_a sigma c)))))
+      valid

@@ -4,7 +4,7 @@ mod catalog_or;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{convert_type, normalize, Context, KernelError, Level, Term};
+use ken_kernel::{convert_type, normalize, Context, GlobalEnv, GlobalId, KernelError, Level, Term};
 
 const FOK_SOURCE: &str =
     include_str!("../../../catalog/packages/Tooling/Verification/FoKripke.ken");
@@ -13,7 +13,7 @@ fn env_with_fok() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
     catalog_or::load_core_logic_or(&mut env);
     env.elaborate_file(FOK_SOURCE)
-        .expect("FoKripke including the D1 apparatus");
+        .expect("FoKripke including the kernel-checked adequacy proof");
     env
 }
 
@@ -22,6 +22,33 @@ fn applied_head(term: &Term) -> &Term {
         Term::App(function, _) => applied_head(function),
         other => other,
     }
+}
+
+fn term_transitively_mentions(
+    env: &GlobalEnv,
+    term: &Term,
+    target: GlobalId,
+    visited: &mut BTreeSet<GlobalId>,
+) -> bool {
+    match term {
+        Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. } => {
+            if *id == target {
+                return true;
+            }
+            if visited.insert(*id) {
+                if let Some((_, body)) = env.transparent_body(*id) {
+                    if term_transitively_mentions(env, &body, target, visited) {
+                        return true;
+                    }
+                }
+            }
+        }
+        Term::Elim { fam, .. } if *fam == target => return true,
+        _ => {}
+    }
+    term.children()
+        .into_iter()
+        .any(|child| term_transitively_mentions(env, child, target, visited))
 }
 
 /// Rust-side schema for the quotation-preservation judgment. For a
@@ -88,9 +115,58 @@ fn intrinsic_apparatus_passes_full_admission_with_zero_trust_delta() {
     catalog_or::load_core_logic_or(&mut env);
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(FOK_SOURCE)
-        .expect("D1 source must elaborate, kernel-check, and pass SCT");
+        .expect("FoKripke must elaborate, kernel-check, and pass SCT");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "D1 declarations add no trusted authority");
+}
+
+/// Durable invariant: the public proof has the exact D2a proposition, consumes
+/// arbitrary classical-validity evidence through target soundness and structural
+/// correspondence, and does not narrow the premise through checker soundness.
+#[test]
+fn kernel_checked_adequacy_has_the_exact_d2a_statement_and_structure() {
+    let mut env = env_with_fok();
+    let adequacy = env.globals["fok_embedding_adequacy"];
+    let (_, body) = env
+        .env
+        .transparent_body(adequacy)
+        .expect("fok_embedding_adequacy must be a transparent kernel-checked proof");
+
+    for dependency in [
+        "fok_target_soundness",
+        "fok_target_k_sigma",
+        "fok_embedding_formula_forward",
+    ] {
+        assert!(
+            term_transitively_mentions(
+                &env.env,
+                &body,
+                env.globals[dependency],
+                &mut BTreeSet::new(),
+            ),
+            "adequacy must consume `{dependency}` in its compiled proof dependency closure"
+        );
+    }
+    assert!(
+        !term_transitively_mentions(
+            &env.env,
+            &body,
+            env.globals["fok_checker_soundness"],
+            &mut BTreeSet::new(),
+        ),
+        "adequacy must consume arbitrary derivations, not narrow validity to checker output"
+    );
+
+    env.elaborate_decl(
+        "theorem fok_d2b_exact_statement \
+         (sigma : FokSignature) \
+         (c : FokCarriers sigma) \
+         (rho : FokAtomEnv sigma c) \
+         (f : FokScopedIForm sigma Zero) \
+         (valid : fok_classically_valid (fok_scoped_embed sigma f)) : \
+         fok_denote sigma c rho f = fok_embedding_adequacy sigma c rho f valid",
+    )
+    .expect("the proof must inhabit the exact generic D2a statement");
 }
 
 #[test]
