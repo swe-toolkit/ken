@@ -8390,6 +8390,233 @@ impl<'a> Lowering<'a> {
         Ok(returned)
     }
 
+    /// D3-RECUT (b2), the R3 answer-collapse closeout — run the specialized
+    /// continuation unit's k-Match at the collapse for a governed Tail composed
+    /// return, routing the bare deforested answer to the function-local shared
+    /// `Ret` block.
+    ///
+    /// Architect ruling `evt_3yqs95r5x2ang` (R3, the option-(a) realization). The
+    /// InlineNoCall carried-environment return is the transport's
+    /// captured-environment carrier: its `source_record` is a `Constructor` whose
+    /// fields are the selected worker captures at capture ordinal (measured:
+    /// `children == worker_capture_count`). We reassemble the continuation unit's
+    /// ordinary frame from words that are ALREADY LIVE at the collapse:
+    ///
+    /// - nonrecursive producer-`Construct` fields from the current case
+    ///   environment (`env[field_start + source_position]`);
+    /// - selected worker captures PROJECTED from the captured-environment carrier
+    ///   (`emit_carrier_field(captured_word, ordinal)`) — the exact means the
+    ///   Direct route already uses (see `call_direct_*`, `emit_carrier_field(
+    ///   environment.word, *ordinal)`), NOT the InlineNoCall-absent worker;
+    /// - continuation inputs from the transport's validated input destinations.
+    ///
+    /// Then it runs the unit body's deforested payload
+    /// (`Construct{ ITree::Ret, [payload] }`) on that frame via `lower_expr`,
+    /// which for a non-trivial k routes the carried scrutinee through
+    /// `lower_carried_match`; for a trivial/identity k the payload is a plain
+    /// word. The result is the bare answer the `ITree::Ret` would wrap, i.e.
+    /// exactly the shared `Ret` block's single input, so it routes straight
+    /// there. No stored/carried runtime value is introduced and no worker is
+    /// consulted — the AC-NO-BOUNDARY-REOPEN means-(a) boundary holds. The jump
+    /// seals this predecessor; the caller returns the `RecursiveBackedge`
+    /// disposition.
+    /// The R3 forward-Ret shape gate, at CONSUMPTION (Architect ruling A,
+    /// evt_h0vgd11g5xfb). Formation is unnarrowed -- every real Tail producer-to-Ret
+    /// route forms its authority (`planned == formed == base`) -- so a formed Tail
+    /// authority's worker body may be either a pure `Ret{Match}` remap or an
+    /// effect-performing body. The forward-SSA-edge closeout claims ONLY the pure
+    /// `Construct{ ..::ITree::Ret, [payload] }` shape (the funded READ half); an
+    /// effect body returns `false` and the seam routes it through the existing
+    /// machinery (the base `call_tail -> Continue` path), which inc2's (a) closeout
+    /// will later consume instead. This is the sole place the shape is decided.
+    pub(super) fn tail_worker_body_is_ret_kmatch(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<bool, CraneliftBackendError> {
+        let body_origin = self
+            .static_transition_plan
+            .continuation_units()?
+            .into_iter()
+            .find(|unit| unit.id() == transport.source_specialization())
+            .ok_or_else(|| {
+                unsupported(
+                    "ComposedReturnForwardRet",
+                    "the transport source has no continuation unit",
+                )
+            })?
+            .worker_body_origin();
+        Ok(matches!(
+            self.retained_body_occurrence(body_origin)?.expr,
+            RuntimeExpr::Construct { constructor, args }
+                if constructor.ends_with("::ITree::Ret") && args.len() == 1
+        ))
+    }
+
+    pub(super) fn emit_composed_return_ret_kmatch_closeout(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        authority: ComposedReturnForwardRetAuthority,
+        transport: &CheckedIhEnvironmentTransport,
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        self.pending_computational_ih_call.take();
+        // The InlineNoCall carried-environment return IS the captured-environment
+        // carrier; this call also settles the continuation candidate exactly once.
+        let captured = self.call_tail_checked_ih_transport_from_case_environment(
+            builder, transport, env,
+        )?;
+        let LoweringOperand::Carried(captured_word) = captured else {
+            return Err(unsupported(
+                "ComposedReturnRetKMatch",
+                "the InlineNoCall continuation return is not the carried captured-environment word",
+            ));
+        };
+        // The context body's Parameter-0 (`outcome`) is the continuation's bound
+        // result, held in the captured-environment carrier at the descriptor-derived
+        // ordinal the planner recorded on the Tail route (R3 Case-B, Architect
+        // ruling evt_6s66s11vtf2m1). Read it from the plan proof; never a literal
+        // ordinal, never a numeric formula.
+        let outcome_ordinal = authority._plan.fresh_result_capture_ordinal() as usize;
+        // Read every owned fact off the continuation unit up front, so the unit
+        // view is dropped before any `&mut self` emit below.
+        let (envelope, inputs_view, body_origin) = {
+            let unit = self
+                .static_transition_plan
+                .continuation_units()?
+                .into_iter()
+                .find(|unit| unit.id() == transport.source_specialization())
+                .ok_or_else(|| {
+                    unsupported(
+                        "ComposedReturnRetKMatch",
+                        "the transport source has no continuation unit",
+                    )
+                })?;
+            (
+                unit.ordinary_envelope()?,
+                unit.continuation_inputs()?,
+                unit.worker_body_origin(),
+            )
+        };
+        let mut ordinary = Vec::with_capacity(envelope.len() + transport.continuation_input_count());
+        for role in &envelope {
+            match role {
+                ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField { .. } => {
+                    // Parameter-0 = the continuation's bound result (`outcome`),
+                    // projected from the captured-environment carrier at the
+                    // descriptor-derived ordinal — the same means-(a) projection the
+                    // captures use, sourced from the Tail route's recorded ordinal.
+                    let field =
+                        self.emit_carrier_field(builder, captured_word, outcome_ordinal)?;
+                    ordinary.push(LoweringOperand::Carried(field));
+                }
+                ContinuationOrdinaryEnvelopeRole::WorkerCapture { ordinal, source, .. } => {
+                    let ContinuationWorkerCaptureSource::Lexical(_) = source else {
+                        return Err(unsupported(
+                            "ComposedReturnRetKMatch",
+                            "a continuation worker capture has no lexical source occurrence",
+                        ));
+                    };
+                    // Means-(a): project the capture from the captured-environment
+                    // carrier already present at the collapse — the same route the
+                    // Direct application uses — never the InlineNoCall-absent worker.
+                    let field = self.emit_carrier_field(builder, captured_word, *ordinal as usize)?;
+                    ordinary.push(LoweringOperand::Carried(field));
+                }
+            }
+        }
+        if inputs_view.len() != transport.continuation_input_count() {
+            return Err(unsupported(
+                "ComposedReturnRetKMatch",
+                "the transport continuation-input morphism has the wrong arity",
+            ));
+        }
+        for input in &inputs_view {
+            let destination = transport
+                .continuation_input_index(input.ordinal, input.coordinate)
+                .ok_or_else(|| {
+                    unsupported(
+                        "ComposedReturnRetKMatch",
+                        "the transport has no destination for one declared continuation input",
+                    )
+                })?;
+            let operand = match destination {
+                CheckedIhTransportInputDestination::LexicalEnvironment(index) => env
+                    .get(index as usize)
+                    .ok_or_else(|| {
+                        unsupported(
+                            "ComposedReturnRetKMatch",
+                            "a transport lexical destination is outside the selected case environment",
+                        )
+                    })?
+                    .value_at("a composed-return k-Match continuation input")?
+                    .clone(),
+                CheckedIhTransportInputDestination::EntryFrame(slot) => self
+                    .function_local
+                    .defining_abi_operands
+                    .get(slot as usize)
+                    .cloned()
+                    .ok_or_else(|| {
+                        unsupported(
+                            "ComposedReturnRetKMatch",
+                            "a transport entry-frame destination is outside the current ABI frame",
+                        )
+                    })?,
+            };
+            ordinary.push(operand);
+        }
+        // The continuation body is `Construct{ ITree::Ret, [ deforested payload ] }`.
+        // Running the single payload argument on the reassembled frame yields the
+        // bare answer the `ITree::Ret` would wrap — i.e. exactly the shared Ret
+        // block's input.
+        let body_expr = self.retained_body_occurrence(body_origin)?.expr.clone();
+        let RuntimeExpr::Construct { args, .. } = &body_expr else {
+            return Err(unsupported(
+                "ComposedReturnRetKMatch",
+                "the continuation body is not an ITree::Ret constructor",
+            ));
+        };
+        let [payload] = args.as_slice() else {
+            return Err(unsupported(
+                "ComposedReturnRetKMatch",
+                "the ITree::Ret continuation body does not carry exactly one payload argument",
+            ));
+        };
+        let payload = self.child_occurrence(body_origin, 0, payload)?;
+        let payload_origin = payload.static_origin;
+        let frame_env: Vec<LoweringEnvironmentBinding> = ordinary
+            .into_iter()
+            .map(LoweringEnvironmentBinding::Value)
+            .collect();
+        let answer = self.lower_expr(builder, payload, &frame_env)?;
+        if matches!(answer, LoweringOperand::Specialized(Lowered::RecursiveBackedge)) {
+            return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
+        }
+        let answer = self.carried_join_arm(
+            builder,
+            payload_origin,
+            answer,
+            None,
+            "a composed-return Ret k-Match answer",
+        )?;
+        #[cfg(feature = "px8-ds-test-support")]
+        let edge_word = if composed_return_forward_ret_authority_mutation()
+            == ComposedReturnForwardRetAuthorityMutation::SubstituteForwardEdgeWord
+        {
+            // AC-CAUSAL-PAIR (b): keep the edge and the sink but carry an
+            // independent non-result word; a fixture that still greened would not
+            // depend on the exact k-Match answer reaching the exit.
+            builder.ins().iconst(types::I64, 0)
+        } else {
+            answer.word
+        };
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let edge_word = answer.word;
+        builder
+            .ins()
+            .jump(authority.return_body, &[edge_word.into()]);
+        Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge))
+    }
+
     /// **`RT-DECL-CLOSURE-PORT` `D5a` — the claim/call machinery, factored to
     /// run after identity resolution and shared by both consumption seats.**
     ///
@@ -12872,14 +13099,16 @@ impl<'a> Lowering<'a> {
         record_composed_return_forward_ret_authority(&proof, format!("{return_body:?}"));
         Ok(ComposedReturnForwardRetAuthority {
             _plan: proof,
-            _return_body: return_body,
+            return_body,
         })
     }
 
     /// Join one post-selection planner member proof to the unique function-local
-    /// Ret sink. The resulting authority is move-only and deliberately unused
-    /// by D2; D3 must be separately released before any returned SSA value may
-    /// consume its block.
+    /// Ret sink. D3 consumes the resulting authority in the governed Tail
+    /// producer-to-Ret route (`source.rs`): its `return_body` is the sole forward
+    /// SSA edge target for the governed call's Trap-checked runtime Result. A
+    /// non-governed current call never reaches this consumer -- the outcome is
+    /// dropped there -- so the edge is gated on the governed projection.
     pub(super) fn composed_return_forward_ret_authority(
         &self,
         access: &CheckedIhGeneratedEntryAccess,

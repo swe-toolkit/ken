@@ -386,6 +386,17 @@ pub(in crate::cranelift_backend) enum CheckedIhFreshResultRoute {
         ret_case_body_origin: StaticOriginId,
         ret_input_binder: CheckedBinderProvenance,
         ret_input_delivery: CheckedIhFreshResultRetInputDelivery,
+        /// D3-RECUT (b2/R3, Case-B): the ordinal, within the producer worker's
+        /// captured-environment carrier, of the continuation's bound result
+        /// parameter (the `outcome` the k-Match consumes). This is the Tail-route
+        /// analogue of the Direct route's
+        /// [`CheckedIhFreshResultDestination::capture_ordinal`]: recorded here at
+        /// route construction by identity (the unique worker capture whose binder
+        /// provenance is the continuation closure's parameter), so the composed-
+        /// return closeout reads the outcome carrier field by descriptor rather
+        /// than by a numeric formula. A compile-time planning fact only; no runtime
+        /// value is stored.
+        fresh_result_capture_ordinal: u32,
     },
 }
 
@@ -410,6 +421,11 @@ pub(in crate::cranelift_backend) struct CheckedIhForwardRetPlanProof {
     ret_case_body_origin: StaticOriginId,
     ret_input_field_position: u32,
     delivery: CheckedIhFreshResultRetInputDelivery,
+    /// D3-RECUT (b2/R3, Case-B): the Tail producer worker's captured-environment
+    /// carrier ordinal of the continuation's bound result (`outcome`), carried
+    /// from the route's `fresh_result_capture_ordinal` so the composed-return
+    /// closeout reads the outcome by descriptor rather than by a numeric formula.
+    fresh_result_capture_ordinal: u32,
 }
 
 /// One planner-only continuation-inheritance projection of an existing
@@ -732,6 +748,29 @@ impl CheckedIhGeneratedEntryAccess {
         }
         selected
     }
+
+    /// Side-effect-free lookup of the governed projection for one generated-entry
+    /// coordinate. Unlike [`Self::admission_for`], this records NO admission-outcome
+    /// observation (it must not perturb `admission_outcome_count`), so it is safe to
+    /// call from the forward-Ret closeout's test-support reach recording. Returns
+    /// `None` for an absent key or a NonGoverned admission. D3-RECUT (b2 inc1 fix).
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn governed_projection_for(
+        &self,
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+    ) -> Option<&CheckedIhGeneratedEntryProjection> {
+        let key = CheckedIhGeneratedEntryCallCoordinate {
+            invocation_origin,
+            call_origin,
+            callee_origin,
+        };
+        match self.admissions.get(&key) {
+            Some(CheckedIhGeneratedEntryAdmission::Governed(projection)) => Some(projection),
+            _ => None,
+        }
+    }
 }
 
 impl CheckedIhGeneratedEntryProjection {
@@ -863,6 +902,39 @@ impl CheckedIhForwardRetPlanProof {
 
     pub(in crate::cranelift_backend) fn ret_input_field_position(&self) -> u32 {
         self.ret_input_field_position
+    }
+
+    /// The Tail producer worker's captured-environment carrier ordinal of the
+    /// continuation's bound result (`outcome`). D3-RECUT (b2/R3): the closeout
+    /// projects this carrier field as the k-Match's Parameter-0.
+    pub(in crate::cranelift_backend) fn fresh_result_capture_ordinal(&self) -> u32 {
+        self.fresh_result_capture_ordinal
+    }
+
+    /// The governed certificate E's generated-entry arrival coordinate (the
+    /// selected projection's `arrival`; see the `entry_*: arrival.*` population
+    /// in `checked_ih_forward_ret_plan_proof`). D3-RECUT (b2 inc1 fix): the
+    /// forward-SSA-edge closeout consumed at a non-governed current call records
+    /// E's capsule reach on this coordinate — the same key the displaced
+    /// downstream governed arrival used. Test-support observation only.
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn entry_binding(&self) -> CheckedIhBinding {
+        self.entry_binding
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn entry_invocation_origin(&self) -> StaticOriginId {
+        self.entry_invocation_origin
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn entry_call_origin(&self) -> StaticOriginId {
+        self.entry_call_origin
+    }
+
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn entry_callee_origin(&self) -> StaticOriginId {
+        self.entry_callee_origin
     }
 }
 
@@ -1311,6 +1383,15 @@ pub enum CheckedIhGeneratedEntryConfluenceMutation {
 /// Every non-suppression arm changes one operand after generated-entry
 /// validation and exact transport selection, so its refusal cannot be borrowed
 /// from an upstream planner gate.
+///
+/// `SubstituteForwardEdgeWord` is the one D3 live-edge control: it fires at the
+/// governed Tail closeout emission, after the authority has formed correctly,
+/// and carries an independent non-result word on the forward SSA edge instead of
+/// the call's exact Trap-checked runtime Result. It is the AC-CAUSAL-PAIR
+/// discriminator that separates result identity from producer existence and
+/// binding -- the edge and the sink are unchanged; only the word delivered to the
+/// shared Ret block is wrong, so a fixture that greens under it would not depend
+/// on the exact result reaching the exit.
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ComposedReturnForwardRetAuthorityMutation {
@@ -1323,6 +1404,7 @@ pub enum ComposedReturnForwardRetAuthorityMutation {
     WrongSource,
     ProducerSourceFromEntry,
     WrongSink,
+    SubstituteForwardEdgeWord,
 }
 
 /// Complete compiler-only coordinate shared by one planned Tail route and its
@@ -1735,6 +1817,7 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                         ret_case_body_origin,
                         ret_input_binder,
                         ret_input_delivery,
+                        fresh_result_capture_ordinal: _,
                     } => confluence
                         .members
                         .iter()
@@ -1988,6 +2071,114 @@ pub(in crate::cranelift_backend) fn record_checked_ih_generated_entry_governed_v
                 .expect("governed generated-entry validation count exhausted");
         },
     );
+}
+
+/// The forward edge's SEALED downstream-observation obligation (Architect HS3
+/// structural closure, evt_18x2n8yta31xz / evt_16b5brxhg4stm). The read
+/// `Ret{Match}` closeout's `Complete(RecursiveBackedge)` turns a non-empty,
+/// observation-bearing continuation into a tail; base recorded these
+/// current-call-seam observations for the elided continuation's governed
+/// generated-entry `E` by CONTINUING past it (every-Tail-form-and-continue).
+/// The forward edge assumes `E`'s COMPLETE seam-observation obligation: this
+/// enum is the closed set, and [`discharge_forward_edge_sealed_observations`]
+/// discharges every member by a TOTAL match with NO catch-all. A new member
+/// without a discharge arm is a non-exhaustive compile error, so a future
+/// displaced counter (HS4) is a build failure AT THE EDGE, not a hard-stop.
+/// Do NOT add a wildcard arm and do NOT maintain a member roster by hand -- the
+/// `first`/`next` walk is the enumeration.
+///
+/// All members are (a)-HOIST keyed on `E`'s GOVERNED coordinate (measurement
+/// evt_ptge7pk5r4qg: each is a seam-arrival event with no flowing-state function
+/// to reconstruct and no convergence point on the call_tail path). The edge is
+/// `E`'s genuine new reach point (the closeout resolves `E`'s sink and jumps
+/// `E`'s `return_body`), so this records REAL reaches/arrivals at their new site.
+/// Test-support observation only (`px8-ds-test-support`): zero production/TCB.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy)]
+enum ForwardEdgeSealedObservation {
+    CertificateReach,
+    RawArrival,
+    AdmissionOutcome,
+    GovernedValidation,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+impl ForwardEdgeSealedObservation {
+    /// The first sealed member; `first`/`next` enumerate the set with no
+    /// hand-maintained roster. Both are total matches with no catch-all, so a new
+    /// member reds the build until it joins the walk AND gets a discharge arm.
+    fn first() -> Self {
+        Self::CertificateReach
+    }
+
+    fn next(self) -> Option<Self> {
+        match self {
+            Self::CertificateReach => Some(Self::RawArrival),
+            Self::RawArrival => Some(Self::AdmissionOutcome),
+            Self::AdmissionOutcome => Some(Self::GovernedValidation),
+            Self::GovernedValidation => None,
+        }
+    }
+}
+
+/// Discharge the forward edge's complete sealed observation obligation for the
+/// governed certificate `E` it reaches, keyed on `E`'s governed coordinate. Each
+/// member is recorded EXACTLY ONCE: under the short-circuit the seam recorders
+/// (4162/4265/...) never fire for `E`, so the edge is the sole recorder
+/// (measurement evt_ptge7pk5r4qg). See [`ForwardEdgeSealedObservation`] for the
+/// structural-completeness contract.
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn discharge_forward_edge_sealed_observations(
+    access: &CheckedIhGeneratedEntryAccess,
+    binding: CheckedIhBinding,
+    invocation_origin: StaticOriginId,
+    call_origin: StaticOriginId,
+    callee_origin: StaticOriginId,
+    projection: &CheckedIhGeneratedEntryProjection,
+) {
+    let key = CheckedIhGeneratedEntryCallCoordinate {
+        invocation_origin,
+        call_origin,
+        callee_origin,
+    };
+    let mut member = Some(ForwardEdgeSealedObservation::first());
+    while let Some(obligation) = member {
+        // TOTAL match, NO catch-all: a new sealed member is a compile error here
+        // until it is given a discharge -- the structural closure over the
+        // shared predicate (HS4 = build failure, not a 4th hard-stop).
+        match obligation {
+            ForwardEdgeSealedObservation::CertificateReach => {
+                record_checked_ih_generated_entry_reached(
+                    access,
+                    binding,
+                    invocation_origin,
+                    call_origin,
+                    callee_origin,
+                    projection,
+                );
+            }
+            ForwardEdgeSealedObservation::RawArrival => {
+                record_checked_ih_generated_entry_raw_arrival(
+                    access,
+                    invocation_origin,
+                    call_origin,
+                    callee_origin,
+                );
+            }
+            ForwardEdgeSealedObservation::AdmissionOutcome => {
+                record_checked_ih_generated_entry_admission_outcome(access, key, true);
+            }
+            ForwardEdgeSealedObservation::GovernedValidation => {
+                record_checked_ih_generated_entry_governed_validation(
+                    access,
+                    invocation_origin,
+                    call_origin,
+                    callee_origin,
+                );
+            }
+        }
+        member = obligation.next();
+    }
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -6062,6 +6253,69 @@ fn checked_ih_generated_entry_arrival(
     })
 }
 
+/// D3-RECUT (b2/R3, Case-B): the ordinal, within the Tail producer worker's
+/// captured-environment carrier, of the continuation's bound result parameter
+/// (the `outcome` the k-Match consumes).
+///
+/// This is the Tail-route analogue of the Direct route's
+/// [`CheckedIhFreshResultDestination::capture_ordinal`]. The Direct route already
+/// records its fresh-result -> capture-ordinal mapping at construction; the Tail
+/// route never did, and that asymmetry is the whole gap the composed-return
+/// closeout hit (Architect ruling `evt_6s66s11vtf2m1`). We resolve it here, at the
+/// route site where the facts are live, by SOURCE IDENTITY -- never a numeric
+/// formula (recursive_position + 1, method_argument_count, and selected_index all
+/// coincide by accident on the current fixtures and are each unrelated to the
+/// carrier ordinal).
+///
+/// The identity: the worker captures the continuation closure's result parameter
+/// as one of its captures; that capture's binder provenance is
+/// [`CheckedBinderProvenance::LexicalClosureParameter`] at parameter ordinal 0
+/// (the single-parameter continuation, the same 1-parameter shape the Direct
+/// destination requires). We reverse-match that provenance against the worker's
+/// captured-environment record (`checked_ih_capture_origin`) and return the N whose
+/// capture is that parameter. The uniqueness of that capture is required rather
+/// than assumed: more than one continuation-parameter capture makes the fresh
+/// result ambiguous, and zero means the Tail producer has no continuation-argument
+/// capture -- both are refused rather than guessed.
+fn tail_fresh_result_capture_ordinal(
+    plan: &StaticTransitionPlan<'_>,
+    inheritance: &CheckedIhContinuationInheritance,
+) -> Result<u32, CraneliftBackendError> {
+    let binder_provenance = build_checked_binder_provenance(plan)?;
+    let owner = inheritance.transport.source_owner;
+    let seat = inheritance.transport.seat;
+    let mut found: Option<u32> = None;
+    let mut ordinal = 0u32;
+    loop {
+        let origin = match plan.checked_ih_capture_origin(owner, seat, ordinal) {
+            Ok(origin) => origin,
+            Err(_) => break,
+        };
+        if let Some(CheckedBinderProvenance::LexicalClosureParameter {
+            parameter_ordinal: 0,
+            ..
+        }) = binder_provenance.get(&origin).map(|resolution| resolution.provenance)
+        {
+            if found.is_some() {
+                return Err(planner_error(
+                    "a Tail producer-to-Ret route captures more than one continuation result \
+                     parameter, so its fresh-result carrier ordinal is ambiguous",
+                ));
+            }
+            found = Some(ordinal);
+        }
+        ordinal = ordinal.checked_add(1).ok_or_else(|| {
+            planner_capacity_error("Tail producer capture ordinal exhausted")
+        })?;
+    }
+    found.ok_or_else(|| {
+        planner_error(
+            "a Tail producer-to-Ret route has no continuation result-parameter capture from which \
+             to derive its fresh-result carrier ordinal",
+        )
+    })
+}
+
 fn checked_ih_fresh_result_route(
     plan: &StaticTransitionPlan<'_>,
     inheritance: &CheckedIhContinuationInheritance,
@@ -6171,6 +6425,7 @@ fn checked_ih_fresh_result_route(
                 "an earlier transport result was substituted for the forward Ret sink identity",
             ));
         }
+        let fresh_result_capture_ordinal = tail_fresh_result_capture_ordinal(plan, inheritance)?;
         (
             CheckedIhFreshResultRoute::TailProducerToRet {
                 source: tail_source,
@@ -6180,6 +6435,7 @@ fn checked_ih_fresh_result_route(
                 ret_case_body_origin: producer_sink.0,
                 ret_input_binder: producer_sink.1,
                 ret_input_delivery: CheckedIhFreshResultRetInputDelivery::ProducerResultDirect,
+                fresh_result_capture_ordinal,
             },
             Some(producer_step),
             Some(tail_kind),
@@ -6212,6 +6468,9 @@ fn checked_ih_fresh_result_route(
                         ret_input_binder: destination.constructor_child,
                         ret_input_delivery:
                             CheckedIhFreshResultRetInputDelivery::ProducerResultDirect,
+                        // Cross-variant control: carry the Direct destination's
+                        // ordinal so the synthesized Tail route is well-formed.
+                        fresh_result_capture_ordinal: destination.capture_ordinal,
                     };
                 }
             }
@@ -6512,32 +6771,14 @@ fn checked_ih_generated_entry_row(
         .self_resumption_steps
         .last()
         .ok_or_else(|| planner_error("a generated-entry inheritance has no final step"))?;
-    let view = plan
-        .checked_ih_continuation_inheritance_for_invocation(
-            &inheritance.transport.source_call_identity,
-            inheritance.capability.destination_owner,
-            Some(worker_body_origin),
-            final_step.callee_binding.frame_origin,
-            final_step.callee_binding.recursive_position,
-        )?
-        .ok_or_else(|| {
-            planner_error(
-                "a governed generated-entry inheritance is absent from the existing exact accessor",
-            )
-        })?;
-    if view.transport() != &inheritance.transport
-        || view.capability() != &inheritance.capability
-        || view.fresh_result_destination() != &inheritance.fresh_result_destination
-    {
-        return Err(planner_error(
-            "a generated-entry inheritance reopens to a different typed view",
-        ));
-    }
-    let final_step = view
-        .capability
-        .self_resumption_steps
-        .last()
-        .ok_or_else(|| planner_error("a reopened generated-entry view has no final step"))?;
+    // A' (Architect C, evt_40dme966hce0a): use the passed CANONICAL inheritance
+    // directly. The former re-lookup via checked_ih_continuation_inheritance_for_
+    // invocation read the stored, MUTABLE field and broke under SuppressForInertness
+    // (which empties it). build_checked_ih_generated_entry_confluences now passes the
+    // canonical derivation (build_checked_ih_continuation_inheritances(plan)), and
+    // validate_checked_ih_continuation_inheritances asserts stored == canonical, so
+    // the reopened view was byte-identical to `inheritance`; the `final_step` from
+    // `inheritance.capability` above is the same value the view would have yielded.
     let fresh_result_route = checked_ih_fresh_result_route(plan, inheritance, final_step)?;
     let mut arrival = checked_ih_generated_entry_arrival(plan, final_step)?;
     #[cfg(feature = "px8-ds-test-support")]
@@ -6575,8 +6816,8 @@ fn checked_ih_generated_entry_row(
         ret_case_body_origin: inheritance.fresh_result_destination.ret_case_body_origin,
     });
     let projection = CheckedIhGeneratedEntryProjection {
-        destination_owner: view.capability().destination_owner(),
-        destination_body_origin: view.capability().destination_body_origin(),
+        destination_owner: inheritance.capability.destination_owner,
+        destination_body_origin: inheritance.capability.destination_body_origin,
         arrival,
         fresh_result_route,
         #[cfg(feature = "px8-ds-test-support")]
@@ -6750,11 +6991,24 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
         CheckedIhGeneratedEntryConfluence,
     > = BTreeMap::new();
     let mut caller_by_context = BTreeMap::new();
+    // RT-COMPOSED-RETURN-FORWARD-RET-EDGE byte-inertness layering fix (Architect C,
+    // evt_70qj45jjt8sqm). Derive the confluence population from the CANONICAL,
+    // inert continuation-inheritance derivation (build_checked_ih_continuation_
+    // inheritances(plan), a pure function of the inert plan -- transports/ABI/IR,
+    // NOT the stored, mutable `plan.checked_ih_continuation_inheritances` field).
+    // The closure-equality validation (validate_checked_ih_continuation_inheritances)
+    // asserts the stored field EQUALS this canonical derivation, so in production the
+    // confluences are byte-identical either way; the stored field is thereby demoted
+    // to a planning-time well-formedness ASSERTION that feeds NO codegen-read state.
+    // Sourcing from the stored field made the whole confluence -> access ->
+    // forward-Ret decision transitively certificate-derived: SuppressForInertness
+    // clears the stored field (validation vacuous-passes on empty) but NOT the
+    // canonical derivation, so the forward edge stayed byte-inert only if we read the
+    // canonical here. Ill-formedness mutations still reject at validation, which runs
+    // BEFORE this construction, so they never reach here.
+    let canonical_inheritances = build_checked_ih_continuation_inheritances(plan)?;
     #[allow(unused_mut)]
-    let mut inheritance_order = plan
-        .checked_ih_continuation_inheritances
-        .iter()
-        .collect::<Vec<_>>();
+    let mut inheritance_order = canonical_inheritances.iter().collect::<Vec<_>>();
     #[cfg(feature = "px8-ds-test-support")]
     if GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get)
         == CheckedIhGeneratedEntryConfluenceMutation::PermuteInheritanceOrder
@@ -7254,8 +7508,16 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
         ));
     }
 
+    // A' (Architect C, evt_40dme966hce0a): derive the governed-pair cross-check from
+    // the CANONICAL inert inheritance derivation, NOT the stored, mutable field.
+    // The confluences are already built from the canonical derivation (build_checked_
+    // ih_generated_entry_confluences), so this keeps validate_confluences internally
+    // consistent under SuppressForInertness (which empties the stored field but not
+    // the canonical). The stored field's own well-formedness (stored == canonical) is
+    // asserted separately by validate_checked_ih_continuation_inheritances, keeping
+    // that validator the SOLE reader of the stored field.
     let mut governed_pairs = BTreeSet::new();
-    for inheritance in &plan.checked_ih_continuation_inheritances {
+    for inheritance in &build_checked_ih_continuation_inheritances(plan)? {
         if let Some((coordinate, member, _, _)) =
             checked_ih_generated_entry_row(plan, inheritance)?
         {
@@ -7360,54 +7622,34 @@ impl StaticTransitionPlan<'_> {
                 "the forward Ret access coordinate disagrees with its generated context",
             ));
         }
-        let matching_inheritances = self
-            .checked_ih_continuation_inheritances
-            .iter()
-            .filter(|inheritance| {
-                &inheritance.transport == transport
-                    && inheritance.capability.destination_owner
-                        == ContinuationEmissionOwner::Specialization(
-                            access.enclosing_specialization,
-                        )
-                    && inheritance.capability.destination_body_origin == access.worker_body_origin
-            })
-            .collect::<Vec<_>>();
-        let selected_inheritance = match matching_inheritances.as_slice() {
-            [inheritance] => *inheritance,
-            [] => return Ok(None),
-            _ => {
-                return Err(planner_error(
-                    "the selected forward Ret transport resolves more than one continuation inheritance",
-                ))
-            }
-        };
-        let Some((
-            derived_coordinate,
-            derived_member,
-            _derived_retarget_caller,
-            derived_projection,
-        )) = checked_ih_generated_entry_row(self, selected_inheritance)?
-        else {
-            return Err(planner_error(
-                "the selected forward Ret inheritance does not derive a generated-entry row",
-            ));
-        };
-        if derived_coordinate.context != access.context
-            || derived_coordinate.enclosing_specialization != access.enclosing_specialization
-            || derived_coordinate.worker_body_origin != access.worker_body_origin
-            || derived_member != *transport.source_call_identity()
-        {
-            return Err(planner_error(
-                "the selected forward Ret member rederives a different generated-entry function or identity",
-            ));
-        }
-        let CheckedIhFreshResultRoute::TailProducerToRet {
-            source: expected_producer_source,
-            ..
-        } = derived_projection.fresh_result_route()
-        else {
-            return Ok(None);
-        };
+        // The forward-Ret DECISION and every proof value are derived PURELY from
+        // inert structure (checked_ih_generated_entry_confluences + access.admissions
+        // + transport) below. The continuation-inheritance CERTIFICATE is NOT read
+        // here: it is a planning-time well-formedness assertion
+        // (validate_checked_ih_continuation_inheritances, including the closure
+        // equality `inheritances == build_checked_ih_continuation_inheritances(plan)`)
+        // that gates NEITHER this codegen decision NOR any emitted artifact. Reading
+        // it here was the RT-COMPOSED-RETURN-FORWARD-RET-EDGE byte-inertness LAYERING
+        // defect (Architect C ruling, evt_70qj45jjt8sqm): clearing it
+        // (SuppressForInertness) flipped Formed -> None -> base path, changing emitted
+        // bytes while the IR (core_semantic_hash) was unchanged. The inert values are
+        // provably equal to the former certificate-derived ones (both ==
+        // confluence.projection, licensed by the closure-equality validation), which
+        // the re-pointed px8 authority controls below PROVE by still rejecting.
+
+        // R3 SHAPE GATE LIVES AT CONSUMPTION, not here (Architect ruling A,
+        // evt_h0vgd11g5xfb, the faithful realization of evt_39rn7empzmgym). The
+        // PLAN -- the set of real Tail routes -- is a property of the source
+        // program and must be STABLE across increments: an effect-performing
+        // continuation genuinely IS a Tail producer-to-Ret route, so its
+        // authority MUST form here (keeping `planned == formed == base`; the
+        // role-witness and population invariants depend on it). What legitimately
+        // varies per increment is CONSUMPTION -- how each formed Tail authority is
+        // lowered. The forward-Ret closeout (`tail_worker_body_is_ret_kmatch`,
+        // core.rs) claims ONLY a pure `Ret{Match}` body; an effect body flows
+        // through the existing machinery (the base `call_tail -> Continue` path),
+        // exactly as base did for every Tail, and inc2's (a) closeout later flips
+        // that consumption arm. Do NOT re-narrow formation here.
 
         let classes = self
             .checked_ih_generated_entry_confluences
@@ -7420,11 +7662,9 @@ impl StaticTransitionPlan<'_> {
             })
             .collect::<Vec<_>>();
         let (coordinate, confluence) = match classes.as_slice() {
-            [] => {
-                return Err(planner_error(
-                    "an admitted Tail producer-to-Ret route has no post-selection confluence class",
-                ))
-            }
+            // Inert gate: this transport is not a member of any Tail forward-Ret
+            // confluence class in the current function => not a forward-Ret route.
+            [] => return Ok(None),
             [class] => *class,
             _ => {
                 return Err(planner_error(
@@ -7439,16 +7679,9 @@ impl StaticTransitionPlan<'_> {
         };
         let selected_projection = match access.admissions.get(&key) {
             Some(CheckedIhGeneratedEntryAdmission::Governed(projection)) => projection,
-            Some(CheckedIhGeneratedEntryAdmission::NonGoverned) => {
-                return Err(planner_error(
-                    "the selected transport member resolves to a NonGoverned access admission",
-                ))
-            }
-            None => {
-                return Err(planner_error(
-                    "the forward Ret access-coordinate lookup found no exact admission",
-                ))
-            }
+            // Inert gate: a non-governed or absent admission is not a governed Tail
+            // forward-Ret route => None (the forward edge is governed-only).
+            Some(CheckedIhGeneratedEntryAdmission::NonGoverned) | None => return Ok(None),
         };
         #[cfg(feature = "px8-ds-test-support")]
         access.record_selected_tail_projection_control(
@@ -7478,17 +7711,6 @@ impl StaticTransitionPlan<'_> {
             ));
         }
 
-        if &derived_coordinate != coordinate {
-            return Err(planner_error(
-                "the selected forward Ret member rederives a different final generated-entry coordinate",
-            ));
-        }
-        if derived_projection != confluence.projection {
-            return Err(planner_error(
-                "the selected forward Ret member's planner-derived projection disagrees with its confluence class",
-            ));
-        }
-
         let CheckedIhFreshResultRoute::TailProducerToRet {
             source,
             selected_case_body_origin,
@@ -7497,12 +7719,12 @@ impl StaticTransitionPlan<'_> {
             ret_case_body_origin,
             ret_input_binder,
             ret_input_delivery,
+            fresh_result_capture_ordinal,
             ..
         } = selected_projection.fresh_result_route()
         else {
-            return Err(planner_error(
-                "an admitted Tail confluence class published a Direct access projection",
-            ));
+            // Inert gate: a Direct access projection is not a forward-Ret route => None.
+            return Ok(None);
         };
         #[cfg(feature = "px8-ds-test-support")]
         record_composed_return_forward_ret_authority_application();
@@ -7522,7 +7744,11 @@ impl StaticTransitionPlan<'_> {
         };
         #[cfg(not(feature = "px8-ds-test-support"))]
         let compared_producer_source = source.clone();
-        if &compared_producer_source != expected_producer_source {
+        // Re-pointed to the INERT selected_projection `source` (== the former
+        // certificate-derived expected_producer_source via confluence.projection).
+        // The ProducerSourceFromEntry px8 control still rejects against this inert
+        // value, proving inert-equals-certificate on this axis (Architect C ruling).
+        if &compared_producer_source != source {
             return Err(planner_error(
                 "the Tail producer source disagrees with the selected member's planner-derived producer step",
             ));
@@ -7651,6 +7877,7 @@ impl StaticTransitionPlan<'_> {
             ret_case_body_origin: *ret_case_body_origin,
             ret_input_field_position: 0,
             delivery: *ret_input_delivery,
+            fresh_result_capture_ordinal: *fresh_result_capture_ordinal,
         }))
     }
 }
