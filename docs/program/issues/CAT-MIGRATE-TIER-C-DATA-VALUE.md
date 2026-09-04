@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-C-DATA-VALUE
 title: "Scaffold-retirement Tier C (critical path): migrate the Data value modules off fixture scaffolding onto real imports from the already-published Tier-A/B providers, so each elaborates standalone. Per-module: publish the module's own export surface, replace ambient resolution with a real selective import from the published lower tiers, extend the loader-visible inventory, standalone-green. The proven Tier-A / EC publication-and-import shape; NO relocation of class instances, NO proof authoring beyond attached-owner migrations the Architect names."
-status: active
+status: merged
 owner: foundation
 size: L
 gate: none
