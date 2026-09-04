@@ -57,6 +57,132 @@ pub struct FoSliceSignature {
     /// implicit as `constructors[0]`/`[1]`; the slice never constructs a
     /// value of it, only the type-former application quotation recognizes).
     pub or_id: GlobalId,
+    /// Catalog identities needed to turn this Rust signature, a quoted
+    /// problem, and a certificate into ordinary kernel-checkable Ken terms.
+    /// `None` is the fail-closed state for environments that have not loaded
+    /// the FoKripke catalog unit.
+    pub catalog: Option<FoCatalogHandles>,
+}
+
+/// Resolved identities for the canonical FoKripke catalog encoding and its
+/// two soundness theorems.
+///
+/// Resolution happens only where the elaborator's source-name map is
+/// available. Consumers carry these `GlobalId`s; they never attempt to recover
+/// a transparent declaration by name from [`GlobalEnv`].
+#[derive(Debug, Clone)]
+pub struct FoCatalogHandles {
+    fok_slice_signature: GlobalId,
+    fok_mk_carriers: GlobalId,
+    fok_mk_atom_env: GlobalId,
+    fok_scoped_bottom: GlobalId,
+    fok_scoped_atom: GlobalId,
+    fok_scoped_or: GlobalId,
+    fok_scoped_imp: GlobalId,
+    fok_scoped_forall: GlobalId,
+    fok_fin_zero: GlobalId,
+    fok_fin_suc: GlobalId,
+    fok_i_bottom: GlobalId,
+    fok_i_atom: GlobalId,
+    fok_i_or: GlobalId,
+    fok_i_imp: GlobalId,
+    fok_i_forall: GlobalId,
+    fok_mk_ivar: GlobalId,
+    fok_q_bound: GlobalId,
+    fok_q_parameter: GlobalId,
+    fok_bottom: GlobalId,
+    fok_access: GlobalId,
+    fok_domain_a: GlobalId,
+    fok_forcing_p: GlobalId,
+    fok_and: GlobalId,
+    fok_or: GlobalId,
+    fok_imp: GlobalId,
+    fok_forall_world: GlobalId,
+    fok_forall_obj: GlobalId,
+    fok_form: GlobalId,
+    fok_mk_sequent: GlobalId,
+    fok_init: GlobalId,
+    fok_imp_right: GlobalId,
+    fok_forall_right: GlobalId,
+    fok_mk_cert: GlobalId,
+    fok_cert: GlobalId,
+    nat_zero: GlobalId,
+    nat_suc: GlobalId,
+    nil: GlobalId,
+    cons: GlobalId,
+    record_nil_val: GlobalId,
+    /// `fok_checker_soundness`, resolved once at signature construction.
+    pub checker_soundness: GlobalId,
+    /// `fok_embedding_adequacy`, resolved once at signature construction.
+    pub embedding_adequacy: GlobalId,
+}
+
+impl FoCatalogHandles {
+    /// Resolve the complete canonical encoding vocabulary atomically.
+    /// Missing even one identity leaves the FO signature uninstalled rather
+    /// than constructing a partial or lookalike encoding.
+    pub fn resolve(globals: &HashMap<String, GlobalId>) -> Option<Self> {
+        let id = |name: &str| globals.get(name).copied();
+        Some(Self {
+            fok_slice_signature: id("FokSliceSignature")?,
+            fok_mk_carriers: id("FokMkCarriers")?,
+            fok_mk_atom_env: id("FokMkAtomEnv")?,
+            fok_scoped_bottom: id("FokScopedBottom")?,
+            fok_scoped_atom: id("FokScopedAtom")?,
+            fok_scoped_or: id("FokScopedOr")?,
+            fok_scoped_imp: id("FokScopedImp")?,
+            fok_scoped_forall: id("FokScopedForall")?,
+            fok_fin_zero: id("FokFinZero")?,
+            fok_fin_suc: id("FokFinSuc")?,
+            fok_i_bottom: id("FokIBottom")?,
+            fok_i_atom: id("FokIAtom")?,
+            fok_i_or: id("FokIOr")?,
+            fok_i_imp: id("FokIImp")?,
+            fok_i_forall: id("FokIForall")?,
+            fok_mk_ivar: id("FokMkIVar")?,
+            fok_q_bound: id("FokQBound")?,
+            fok_q_parameter: id("FokQParameter")?,
+            fok_bottom: id("FokBottom")?,
+            fok_access: id("FokAccess")?,
+            fok_domain_a: id("FokDomainA")?,
+            fok_forcing_p: id("FokForcingP")?,
+            fok_and: id("FokAnd")?,
+            fok_or: id("FokOr")?,
+            fok_imp: id("FokImp")?,
+            fok_forall_world: id("FokForallWorld")?,
+            fok_forall_obj: id("FokForallObj")?,
+            fok_form: id("FokForm")?,
+            fok_mk_sequent: id("FokMkSequent")?,
+            fok_init: id("FokInit")?,
+            fok_imp_right: id("FokImpRight")?,
+            fok_forall_right: id("FokForallRight")?,
+            fok_mk_cert: id("FokMkCert")?,
+            fok_cert: id("FokCert")?,
+            nat_zero: id("Zero")?,
+            nat_suc: id("Suc")?,
+            nil: id("Nil")?,
+            cons: id("Cons")?,
+            record_nil_val: id("record_nil_val")?,
+            checker_soundness: id("fok_checker_soundness")?,
+            embedding_adequacy: id("fok_embedding_adequacy")?,
+        })
+    }
+}
+
+impl FoSliceSignature {
+    /// Attach already-elaborated FoKripke catalog identities at the only layer
+    /// where their source names exist.
+    pub fn with_catalog_globals(mut self, globals: &HashMap<String, GlobalId>) -> Option<Self> {
+        self.catalog = Some(FoCatalogHandles::resolve(globals)?);
+        Some(self)
+    }
+
+    /// Attach an already-resolved catalog handle set while preserving the
+    /// obligation-discovered sort, predicate, and `Or` identities.
+    pub fn with_catalog_handles(mut self, handles: FoCatalogHandles) -> Self {
+        self.catalog = Some(handles);
+        self
+    }
 }
 
 /// Declare a fresh [`FoSliceSignature`]: one rigid sort `A : Type 0`, one
@@ -100,7 +226,12 @@ pub fn declare_fo_slice_signature(env: &mut GlobalEnv) -> FoSliceSignature {
     })
     .expect("declare_inductive for FO slice Or family must succeed");
 
-    FoSliceSignature { sort_a, pred_p, or_id }
+    FoSliceSignature {
+        sort_a,
+        pred_p,
+        or_id,
+        catalog: None,
+    }
 }
 
 // ─── V3-FO-OBLIGATION-SIGNATURE-DISCOVERY: matching a real obligation to a
@@ -207,7 +338,12 @@ fn discover_fo_slice_signature(env: &GlobalEnv, phi_closed: &Term) -> Option<FoS
         None => pred_id,
     };
 
-    Some(FoSliceSignature { sort_a, pred_p: pred_id, or_id })
+    Some(FoSliceSignature {
+        sort_a,
+        pred_p: pred_id,
+        or_id,
+        catalog: None,
+    })
 }
 
 /// Recursive syntax scan backing [`discover_fo_slice_signature`]'s conjunct
@@ -551,6 +687,359 @@ pub struct FOProblem {
     pub carriers: Carriers,
     pub atoms: AtomEnv,
     pub f: IForm,
+}
+
+/// Canonical catalog terms corresponding to one Rust FO problem and
+/// certificate. Every field is ordinary untrusted term construction; the
+/// kernel check in [`kernel_checked_fo_composite`] is the authority that makes
+/// the bridge safe to consume.
+#[derive(Debug, Clone)]
+pub struct EncodedFoProblem {
+    pub signature: Term,
+    pub carriers: Term,
+    pub atom_env: Term,
+    pub source_form: Term,
+    pub scoped_form: Term,
+    pub target_form: Term,
+    pub cert: Term,
+}
+
+fn catalog_apply(head: Term, arguments: impl IntoIterator<Item = Term>) -> Term {
+    arguments.into_iter().fold(head, Term::app)
+}
+
+fn encode_nat_with(zero: GlobalId, suc: GlobalId, value: usize) -> Term {
+    let mut encoded = Term::constructor(zero, vec![]);
+    for _ in 0..value {
+        encoded = Term::app(Term::constructor(suc, vec![]), encoded);
+    }
+    encoded
+}
+
+fn encode_fin(
+    handles: &FoCatalogHandles,
+    zero: GlobalId,
+    suc: GlobalId,
+    depth: usize,
+    index: usize,
+) -> Option<Term> {
+    if index >= depth {
+        return None;
+    }
+    if index == 0 {
+        return Some(Term::app(
+            Term::constructor(handles.fok_fin_zero, vec![]),
+            encode_nat_with(zero, suc, depth - 1),
+        ));
+    }
+    Some(catalog_apply(
+        Term::constructor(handles.fok_fin_suc, vec![]),
+        [
+            encode_nat_with(zero, suc, depth - 1),
+            encode_fin(handles, zero, suc, depth - 1, index - 1)?,
+        ],
+    ))
+}
+
+fn encode_iform(handles: &FoCatalogHandles, zero: GlobalId, suc: GlobalId, f: &IForm) -> Term {
+    match f {
+        IForm::Bottom => Term::constructor(handles.fok_i_bottom, vec![]),
+        IForm::Atom(IVar(index)) => Term::app(
+            Term::constructor(handles.fok_i_atom, vec![]),
+            Term::app(
+                Term::constructor(handles.fok_mk_ivar, vec![]),
+                encode_nat_with(zero, suc, *index),
+            ),
+        ),
+        IForm::Or(p, q) => catalog_apply(
+            Term::constructor(handles.fok_i_or, vec![]),
+            [
+                encode_iform(handles, zero, suc, p),
+                encode_iform(handles, zero, suc, q),
+            ],
+        ),
+        IForm::Imp(p, q) => catalog_apply(
+            Term::constructor(handles.fok_i_imp, vec![]),
+            [
+                encode_iform(handles, zero, suc, p),
+                encode_iform(handles, zero, suc, q),
+            ],
+        ),
+        IForm::Forall(p) => Term::app(
+            Term::constructor(handles.fok_i_forall, vec![]),
+            encode_iform(handles, zero, suc, p),
+        ),
+    }
+}
+
+fn encode_scoped_iform(
+    handles: &FoCatalogHandles,
+    zero: GlobalId,
+    suc: GlobalId,
+    sigma: &Term,
+    depth: usize,
+    f: &IForm,
+) -> Option<Term> {
+    let depth_term = encode_nat_with(zero, suc, depth);
+    match f {
+        IForm::Bottom => Some(catalog_apply(
+            Term::constructor(handles.fok_scoped_bottom, vec![]),
+            [sigma.clone(), depth_term],
+        )),
+        IForm::Atom(IVar(index)) => Some(catalog_apply(
+            Term::constructor(handles.fok_scoped_atom, vec![]),
+            [
+                sigma.clone(),
+                depth_term,
+                encode_fin(handles, zero, suc, depth, *index)?,
+            ],
+        )),
+        IForm::Or(p, q) => Some(catalog_apply(
+            Term::constructor(handles.fok_scoped_or, vec![]),
+            [
+                sigma.clone(),
+                depth_term,
+                encode_scoped_iform(handles, zero, suc, sigma, depth, p)?,
+                encode_scoped_iform(handles, zero, suc, sigma, depth, q)?,
+            ],
+        )),
+        IForm::Imp(p, q) => Some(catalog_apply(
+            Term::constructor(handles.fok_scoped_imp, vec![]),
+            [
+                sigma.clone(),
+                depth_term,
+                encode_scoped_iform(handles, zero, suc, sigma, depth, p)?,
+                encode_scoped_iform(handles, zero, suc, sigma, depth, q)?,
+            ],
+        )),
+        IForm::Forall(p) => Some(catalog_apply(
+            Term::constructor(handles.fok_scoped_forall, vec![]),
+            [
+                sigma.clone(),
+                depth_term,
+                encode_scoped_iform(handles, zero, suc, sigma, depth + 1, p)?,
+            ],
+        )),
+    }
+}
+
+fn encode_qterm(handles: &FoCatalogHandles, zero: GlobalId, suc: GlobalId, q: QTerm) -> Term {
+    let (constructor, index) = match q {
+        QTerm::Bound(index) => (handles.fok_q_bound, index),
+        QTerm::Parameter(index) => (handles.fok_q_parameter, index),
+    };
+    Term::app(
+        Term::constructor(constructor, vec![]),
+        encode_nat_with(zero, suc, index),
+    )
+}
+
+fn encode_form(handles: &FoCatalogHandles, zero: GlobalId, suc: GlobalId, f: &Form) -> Term {
+    match f {
+        Form::Bottom => Term::constructor(handles.fok_bottom, vec![]),
+        Form::Access(a, b) | Form::DomainA(a, b) | Form::ForcingP(a, b) => {
+            let constructor = match f {
+                Form::Access(_, _) => handles.fok_access,
+                Form::DomainA(_, _) => handles.fok_domain_a,
+                Form::ForcingP(_, _) => handles.fok_forcing_p,
+                _ => unreachable!(),
+            };
+            catalog_apply(
+                Term::constructor(constructor, vec![]),
+                [
+                    encode_qterm(handles, zero, suc, *a),
+                    encode_qterm(handles, zero, suc, *b),
+                ],
+            )
+        }
+        Form::And(p, q) | Form::Or(p, q) | Form::Imp(p, q) => {
+            let constructor = match f {
+                Form::And(_, _) => handles.fok_and,
+                Form::Or(_, _) => handles.fok_or,
+                Form::Imp(_, _) => handles.fok_imp,
+                _ => unreachable!(),
+            };
+            catalog_apply(
+                Term::constructor(constructor, vec![]),
+                [
+                    encode_form(handles, zero, suc, p),
+                    encode_form(handles, zero, suc, q),
+                ],
+            )
+        }
+        Form::ForallWorld(body) | Form::ForallObj(body) => {
+            let constructor = match f {
+                Form::ForallWorld(_) => handles.fok_forall_world,
+                Form::ForallObj(_) => handles.fok_forall_obj,
+                _ => unreachable!(),
+            };
+            Term::app(
+                Term::constructor(constructor, vec![]),
+                encode_form(handles, zero, suc, body),
+            )
+        }
+    }
+}
+
+fn encode_list(handles: &FoCatalogHandles, element_type: Term, elements: &[Term]) -> Term {
+    let mut encoded = Term::app(Term::constructor(handles.nil, vec![]), element_type.clone());
+    for element in elements.iter().rev() {
+        encoded = catalog_apply(
+            Term::constructor(handles.cons, vec![]),
+            [element_type.clone(), element.clone(), encoded],
+        );
+    }
+    encoded
+}
+
+fn encode_sequent(
+    handles: &FoCatalogHandles,
+    zero: GlobalId,
+    suc: GlobalId,
+    sequent: &Sequent,
+) -> Term {
+    let form_type = Term::indformer(handles.fok_form, vec![]);
+    let gamma: Vec<_> = sequent
+        .gamma
+        .iter()
+        .map(|f| encode_form(handles, zero, suc, f))
+        .collect();
+    let delta: Vec<_> = sequent
+        .delta
+        .iter()
+        .map(|f| encode_form(handles, zero, suc, f))
+        .collect();
+    catalog_apply(
+        Term::constructor(handles.fok_mk_sequent, vec![]),
+        [
+            encode_list(handles, form_type.clone(), &gamma),
+            encode_list(handles, form_type, &delta),
+        ],
+    )
+}
+
+fn encode_rule(handles: &FoCatalogHandles, zero: GlobalId, suc: GlobalId, rule: &Rule) -> Term {
+    match rule {
+        Rule::Init { left, right } => catalog_apply(
+            Term::constructor(handles.fok_init, vec![]),
+            [
+                encode_nat_with(zero, suc, *left),
+                encode_nat_with(zero, suc, *right),
+            ],
+        ),
+        Rule::ImpRight { right } => Term::app(
+            Term::constructor(handles.fok_imp_right, vec![]),
+            encode_nat_with(zero, suc, *right),
+        ),
+        Rule::ForallRight { right, eigen } => catalog_apply(
+            Term::constructor(handles.fok_forall_right, vec![]),
+            [
+                encode_nat_with(zero, suc, *right),
+                encode_nat_with(zero, suc, *eigen),
+            ],
+        ),
+    }
+}
+
+fn encode_cert(handles: &FoCatalogHandles, zero: GlobalId, suc: GlobalId, cert: &Cert) -> Term {
+    let children: Vec<_> = cert
+        .children
+        .iter()
+        .map(|child| encode_cert(handles, zero, suc, child))
+        .collect();
+    catalog_apply(
+        Term::constructor(handles.fok_mk_cert, vec![]),
+        [
+            encode_sequent(handles, zero, suc, &cert.conclusion),
+            encode_rule(handles, zero, suc, &cert.rule),
+            encode_list(
+                handles,
+                Term::indformer(handles.fok_cert, vec![]),
+                &children,
+            ),
+        ],
+    )
+}
+
+/// Encode the Rust FO signature, accepted problem, and certificate into the
+/// canonical catalog vocabulary. Ill-scoped source indices and an absent
+/// catalog installation fail closed before producing a partial package.
+pub fn encode_fo_problem(
+    sig: &FoSliceSignature,
+    problem: &FOProblem,
+    cert: &Cert,
+) -> Option<EncodedFoProblem> {
+    let handles = sig.catalog.as_ref()?;
+    let zero = handles.nat_zero;
+    let suc = handles.nat_suc;
+    let signature = Term::constructor(handles.fok_slice_signature, vec![]);
+    let carriers = catalog_apply(
+        Term::constructor(handles.fok_mk_carriers, vec![]),
+        [signature.clone(), problem.carriers.sort_a.clone()],
+    );
+    let atom_pred = Term::Pair(
+        Box::new(Term::lam(
+            problem.carriers.sort_a.clone(),
+            Term::app(Term::const_(problem.atoms.pred_p, vec![]), Term::var(0)),
+        )),
+        Box::new(Term::const_(handles.record_nil_val, vec![])),
+    );
+    let atom_env = catalog_apply(
+        Term::constructor(handles.fok_mk_atom_env, vec![]),
+        [signature.clone(), carriers.clone(), atom_pred],
+    );
+    let source_form = encode_iform(handles, zero, suc, &problem.f);
+    let scoped_form = encode_scoped_iform(handles, zero, suc, &signature, 0, &problem.f)?;
+    let target_form = encode_form(handles, zero, suc, &embed(&problem.f));
+    let cert = encode_cert(handles, zero, suc, cert);
+    Some(EncodedFoProblem {
+        signature,
+        carriers,
+        atom_env,
+        source_form,
+        scoped_form,
+        target_form,
+        cert,
+    })
+}
+
+/// Assemble the mandated checker-soundness then embedding-adequacy composite
+/// and accept it only when the kernel checks it against the independently held
+/// `phi_closed` obligation.
+///
+/// The final check simultaneously validates the catalog checker result, the
+/// scoped/unscoped embedding correspondence, and
+/// `fok_denote(encode(problem)) ≡ phi_closed`. A Rust encoding mistake can
+/// therefore cause only `None`, never a proof of a lookalike proposition.
+pub fn kernel_checked_fo_composite(
+    env: &GlobalEnv,
+    sig: &FoSliceSignature,
+    problem: &FOProblem,
+    cert: &Cert,
+    phi_closed: &Term,
+) -> Option<Term> {
+    let handles = sig.catalog.as_ref()?;
+    let encoded = encode_fo_problem(sig, problem, cert)?;
+    let validity = catalog_apply(
+        Term::const_(handles.checker_soundness, vec![]),
+        [
+            encoded.target_form.clone(),
+            encoded.cert.clone(),
+            Term::const_(env.tt_id(), vec![]),
+        ],
+    );
+    let composite = catalog_apply(
+        Term::const_(handles.embedding_adequacy, vec![]),
+        [
+            encoded.signature,
+            encoded.carriers,
+            encoded.atom_env,
+            encoded.scoped_form,
+            validity,
+        ],
+    );
+    ken_kernel::check(env, &Context::new(), &composite, phi_closed).ok()?;
+    Some(composite)
 }
 
 /// `quote_fo : Obligation -> Accepted FOProblem | Refused FoBoundary`

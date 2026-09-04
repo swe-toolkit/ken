@@ -293,18 +293,45 @@ fn has_free_vars(t: &Term, depth: usize) -> bool {
 ///
 /// Route selection is **exhaustive**: every obligation is attempted (§2.1).
 pub fn attempt_obligation(env: &mut GlobalEnv, triple: &ObligationTriple) -> ProverResult {
+    attempt_obligation_with_catalog_handles(env, triple, None)
+}
+
+/// Attempt one obligation with FoKripke catalog identities resolved at an
+/// elaborator boundary where source names are still available.
+///
+/// This additive entry keeps bare [`GlobalEnv`] callers fail-closed while
+/// giving the accepted FO route the already-kernel-checked theorem handles it
+/// will consume. Resolution happens here, never by inspecting transparent
+/// declarations inside the prover.
+pub fn attempt_obligation_with_catalog_globals(
+    env: &mut GlobalEnv,
+    globals: &std::collections::HashMap<String, GlobalId>,
+    triple: &ObligationTriple,
+) -> ProverResult {
+    let handles = crate::fo_kripke::FoCatalogHandles::resolve(globals);
+    attempt_obligation_with_catalog_handles(env, triple, handles.as_ref())
+}
+
+fn attempt_obligation_with_catalog_handles(
+    env: &mut GlobalEnv,
+    triple: &ObligationTriple,
+    catalog: Option<&crate::fo_kripke::FoCatalogHandles>,
+) -> ProverResult {
     // Classify the closed telescope so syntactic routing can see the types of
     // V2's open-context binders. Proof search still receives the original Γ ⊢ φ.
     let route = classify(env, &triple.goal_closed);
     let ctx = context_from_triple(triple);
     let verdict = match route {
         Route::D => attempt_d(env, &ctx, &triple.phi, &triple.goal_closed, triple),
-        Route::FO => attempt_fo(env, &ctx, &triple.phi, &triple.goal_closed),
+        Route::FO => attempt_fo(env, &ctx, &triple.phi, &triple.goal_closed, catalog),
         // HO: the default — every unrecognized shape also lands here.
         // NO `_ ⇒ skip`: this arm is always present and always attempts.
         Route::HO => attempt_ho(env, &ctx, &triple.phi, &triple.goal_closed),
     };
-    ProverResult { obligation_id: triple.id.clone(), verdict }
+    ProverResult {
+        obligation_id: triple.id.clone(),
+        verdict,
+    }
 }
 
 /// Attempt a candidate certificate against the kernel.
@@ -552,9 +579,16 @@ fn attempt_fo(
     ctx: &Context,
     phi: &Term,
     phi_closed: &Term,
+    catalog: Option<&crate::fo_kripke::FoCatalogHandles>,
 ) -> Verdict {
     match crate::fo_kripke::discover_and_quote_fo(env, phi_closed) {
-        Some((sig, _problem)) => attempt_fo_with_signature(env, ctx, phi, phi_closed, &sig),
+        Some((sig, _problem)) => {
+            let sig = match catalog {
+                Some(handles) => sig.with_catalog_handles(handles.clone()),
+                None => sig,
+            };
+            attempt_fo_with_signature(env, ctx, phi, phi_closed, &sig)
+        }
         None => attempt_ipc(env, ctx, phi, phi_closed),
     }
 }
