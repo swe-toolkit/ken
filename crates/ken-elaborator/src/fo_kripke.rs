@@ -854,49 +854,94 @@ fn encode_qterm(handles: &FoCatalogHandles, zero: GlobalId, suc: GlobalId, q: QT
     )
 }
 
+fn encode_qterm_relation(
+    handles: &FoCatalogHandles,
+    zero: GlobalId,
+    suc: GlobalId,
+    constructor: GlobalId,
+    left: QTerm,
+    right: QTerm,
+) -> Term {
+    catalog_apply(
+        Term::constructor(constructor, vec![]),
+        [
+            encode_qterm(handles, zero, suc, left),
+            encode_qterm(handles, zero, suc, right),
+        ],
+    )
+}
+
+fn encode_binary_form(
+    handles: &FoCatalogHandles,
+    zero: GlobalId,
+    suc: GlobalId,
+    constructor: GlobalId,
+    left: &Form,
+    right: &Form,
+) -> Term {
+    catalog_apply(
+        Term::constructor(constructor, vec![]),
+        [
+            encode_form(handles, zero, suc, left),
+            encode_form(handles, zero, suc, right),
+        ],
+    )
+}
+
+fn encode_quantified_form(
+    handles: &FoCatalogHandles,
+    zero: GlobalId,
+    suc: GlobalId,
+    constructor: GlobalId,
+    body: &Form,
+) -> Term {
+    Term::app(
+        Term::constructor(constructor, vec![]),
+        encode_form(handles, zero, suc, body),
+    )
+}
+
 fn encode_form(handles: &FoCatalogHandles, zero: GlobalId, suc: GlobalId, f: &Form) -> Term {
     match f {
         Form::Bottom => Term::constructor(handles.fok_bottom, vec![]),
-        Form::Access(a, b) | Form::DomainA(a, b) | Form::ForcingP(a, b) => {
-            let constructor = match f {
-                Form::Access(_, _) => handles.fok_access,
-                Form::DomainA(_, _) => handles.fok_domain_a,
-                Form::ForcingP(_, _) => handles.fok_forcing_p,
-                _ => unreachable!(),
-            };
-            catalog_apply(
-                Term::constructor(constructor, vec![]),
-                [
-                    encode_qterm(handles, zero, suc, *a),
-                    encode_qterm(handles, zero, suc, *b),
-                ],
-            )
+        Form::Access(left, right) => encode_qterm_relation(
+            handles,
+            zero,
+            suc,
+            handles.fok_access,
+            *left,
+            *right,
+        ),
+        Form::DomainA(world, object) => encode_qterm_relation(
+            handles,
+            zero,
+            suc,
+            handles.fok_domain_a,
+            *world,
+            *object,
+        ),
+        Form::ForcingP(world, object) => encode_qterm_relation(
+            handles,
+            zero,
+            suc,
+            handles.fok_forcing_p,
+            *world,
+            *object,
+        ),
+        Form::And(left, right) => {
+            encode_binary_form(handles, zero, suc, handles.fok_and, left, right)
         }
-        Form::And(p, q) | Form::Or(p, q) | Form::Imp(p, q) => {
-            let constructor = match f {
-                Form::And(_, _) => handles.fok_and,
-                Form::Or(_, _) => handles.fok_or,
-                Form::Imp(_, _) => handles.fok_imp,
-                _ => unreachable!(),
-            };
-            catalog_apply(
-                Term::constructor(constructor, vec![]),
-                [
-                    encode_form(handles, zero, suc, p),
-                    encode_form(handles, zero, suc, q),
-                ],
-            )
+        Form::Or(left, right) => {
+            encode_binary_form(handles, zero, suc, handles.fok_or, left, right)
         }
-        Form::ForallWorld(body) | Form::ForallObj(body) => {
-            let constructor = match f {
-                Form::ForallWorld(_) => handles.fok_forall_world,
-                Form::ForallObj(_) => handles.fok_forall_obj,
-                _ => unreachable!(),
-            };
-            Term::app(
-                Term::constructor(constructor, vec![]),
-                encode_form(handles, zero, suc, body),
-            )
+        Form::Imp(left, right) => {
+            encode_binary_form(handles, zero, suc, handles.fok_imp, left, right)
+        }
+        Form::ForallWorld(body) => {
+            encode_quantified_form(handles, zero, suc, handles.fok_forall_world, body)
+        }
+        Form::ForallObj(body) => {
+            encode_quantified_form(handles, zero, suc, handles.fok_forall_obj, body)
         }
     }
 }
