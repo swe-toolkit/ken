@@ -32,33 +32,40 @@ fn extracted_source() -> String {
 }
 
 fn parsed_import_inventory() -> BTreeMap<String, BTreeSet<String>> {
-    parser::parse_decls(&extracted_source())
-        .expect("EffectfulClasses extracted source must parse")
-        .into_iter()
-        .filter_map(|declaration| match declaration.unwrap_pub() {
+    let declarations = parser::parse_decls(&extracted_source())
+        .expect("EffectfulClasses extracted source must parse");
+    let mut inventory = BTreeMap::new();
+    for declaration in declarations {
+        match declaration.unwrap_pub() {
             Decl::ImportDecl {
                 module,
                 kind: ImportKind::Selective(items),
                 ..
-            } => Some((
-                module.clone(),
-                items
-                    .iter()
-                    .map(|item| {
-                        assert_eq!(
-                            item.rename, None,
-                            "EC's provider closure needs no renamed import"
-                        );
-                        item.name.clone()
-                    })
-                    .collect(),
-            )),
+            } => {
+                let mut names = BTreeSet::new();
+                for item in items {
+                    assert_eq!(
+                        item.rename, None,
+                        "EC's provider closure needs no renamed import"
+                    );
+                    assert!(
+                        names.insert(item.name.clone()),
+                        "EC dependency `{module}` repeats import `{}`",
+                        item.name
+                    );
+                }
+                assert!(
+                    inventory.insert(module.clone(), names).is_none(),
+                    "EC repeats dependency module `{module}`"
+                );
+            }
             Decl::ImportDecl { module, .. } => {
                 panic!("EC dependency {module} must remain selective")
             }
-            _ => None,
-        })
-        .collect()
+            _ => {}
+        }
+    }
+    inventory
 }
 
 fn expected_import_inventory() -> BTreeMap<String, BTreeSet<String>> {
