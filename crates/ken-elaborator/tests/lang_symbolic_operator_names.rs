@@ -172,10 +172,10 @@ fn symbolic_fn_elaborates_to_the_ordinary_function_form() {
 }
 
 /// MEASURED: public export, selective import, prefix reference, and the
-/// consumer body all retain the provider's exact GlobalId. CLAIMED: symbolic
-/// names traverse existing resolution/export unchanged. THE GAP: qualified
-/// `M.<+>` syntax is not claimed by D1/D2; the ordinary selective-import route
-/// is the identity-bearing module path exercised here.
+/// consumer bodies all retain the provider's exact GlobalId. CLAIMED: symbolic
+/// names traverse existing resolution/export unchanged. THE GAP: any one import
+/// spelling could have a separate parser admission path; qualified, aliased,
+/// and selective forms are therefore exercised independently.
 #[test]
 fn symbolic_name_uses_existing_export_import_and_resolution_identity() {
     let mut env = ElabEnv::new().expect("base environment");
@@ -183,30 +183,49 @@ fn symbolic_name_uses_existing_export_import_and_resolution_identity() {
         .expect("symbolic provider module must elaborate");
     let provider = env.globals["M.<+>"];
 
+    env.elaborate_file("import M")
+        .expect("symbolic qualified import must elaborate");
+    let qualified = env
+        .elaborate_decl("fn useQualified (a : Nat) (b : Nat) : Nat = M.<+> a b")
+        .expect("qualified symbolic reference must resolve");
+
+    env.elaborate_file("import M as N")
+        .expect("symbolic aliased import must elaborate");
+    let aliased = env
+        .elaborate_decl("fn useAliased (a : Nat) (b : Nat) : Nat = N.<+> a b")
+        .expect("aliased symbolic reference must resolve");
+
     env.elaborate_file("import M (<+>)")
         .expect("symbolic selective import must elaborate");
-    let consumer = env
-        .elaborate_decl("fn useSymbolic (a : Nat) (b : Nat) : Nat = <+> a b")
-        .expect("prefix symbolic reference must resolve");
-    let (_, body) = env
-        .env
-        .transparent_body(consumer)
-        .expect("transparent consumer");
-    assert!(
-        matches!(&body,
-            Term::Lam(_, first)
-                if matches!(first.as_ref(),
-                    Term::Lam(_, second)
-                        if matches!(second.as_ref(),
-                            Term::App(function, argument)
-                                if matches!(argument.as_ref(), Term::Var(0))
-                                    && matches!(function.as_ref(),
-                                        Term::App(head, first_argument)
-                                            if matches!(first_argument.as_ref(), Term::Var(1))
-                                                && matches!(head.as_ref(),
-                                                    Term::Const { id, .. } if *id == provider))))),
-        "consumer must apply the exact exported provider identity, got {body:?}"
-    );
+    let selective = env
+        .elaborate_decl("fn useSelective (a : Nat) (b : Nat) : Nat = <+> a b")
+        .expect("selective symbolic reference must resolve");
+
+    for (label, consumer) in [
+        ("qualified", qualified),
+        ("aliased", aliased),
+        ("selective", selective),
+    ] {
+        let (_, body) = env
+            .env
+            .transparent_body(consumer)
+            .expect("transparent consumer");
+        assert!(
+            matches!(&body,
+                Term::Lam(_, first)
+                    if matches!(first.as_ref(),
+                        Term::Lam(_, second)
+                            if matches!(second.as_ref(),
+                                Term::App(function, argument)
+                                    if matches!(argument.as_ref(), Term::Var(0))
+                                        && matches!(function.as_ref(),
+                                            Term::App(head, first_argument)
+                                                if matches!(first_argument.as_ref(), Term::Var(1))
+                                                    && matches!(head.as_ref(),
+                                                        Term::Const { id, .. } if *id == provider))))),
+            "{label} consumer must apply the exact provider identity, got {body:?}"
+        );
+    }
 }
 
 /// MEASURED: duplicate symbolic declarations reach the existing typed

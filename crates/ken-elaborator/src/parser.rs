@@ -110,7 +110,7 @@ impl Parser {
     }
 
     /// Extend `first` (a just-consumed `ConId`) with zero or more
-    /// `. ident-or-conid` segments — `M.foo`, `M.N.Bar` (`33 §3.2`
+    /// `. global-name` segments — `M.foo`, `M.N.Bar`, `M.<+>` (`33 §3.2`
     /// qualified reference syntax). Joins into a single dotted string;
     /// name resolution (`modules.rs`) splits it back apart at the last
     /// `.` to find the exporting module. Only triggered from a `ConId`
@@ -121,11 +121,14 @@ impl Parser {
         let mut joined = first;
         let mut end = first_span.end;
         while matches!(self.peek(), Token::Dot)
-            && matches!(self.lookahead(1), Token::Ident(_) | Token::ConId(_))
+            && matches!(
+                self.lookahead(1),
+                Token::Ident(_) | Token::ConId(_) | Token::Operator(_)
+            )
         {
             self.advance(); // consume '.'
             let (seg, seg_span) = match self.peek().clone() {
-                Token::Ident(s) | Token::ConId(s) => {
+                Token::Ident(s) | Token::ConId(s) | Token::Operator(s) => {
                     self.advance();
                     (s, self.tokens[self.pos - 1].1.clone())
                 }
