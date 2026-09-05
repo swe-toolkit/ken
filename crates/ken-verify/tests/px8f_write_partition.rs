@@ -7,7 +7,10 @@ use ken_host::{
     ResourceErrorV1, SemanticErrorV1, WriteProgressV1,
 };
 use std::ffi::OsString;
+use std::os::unix::ffi::OsStrExt as _;
 use std::path::{Path, PathBuf};
+
+const INTERPRETER_CHILD_ROOT: &str = "KEN_PX8F_INTERPRETER_CHILD_ROOT";
 
 const WRITE_ALL_PARTITION: &str = r#"program capabilities FS AFull
 fn body_from_write (outcome : Result ResourceError Unit)
@@ -191,6 +194,16 @@ static ssize_t scripted_pwrite64(int fd, const void *buf, size_t count,
     record_call(call, offset, count, -1);
     return -1;
   }
+  if (mode && strcmp(mode, "brokenpipe") == 0 && call == 2) {
+    errno = EPIPE;
+    record_call(call, offset, count, -1);
+    return -1;
+  }
+  if (mode && strcmp(mode, "unsupported") == 0 && call == 2) {
+    errno = ENOSYS;
+    record_call(call, offset, count, -1);
+    return -1;
+  }
   size_t limit = count;
   if (mode && (strcmp(mode, "zero") == 0 || strcmp(mode, "progress") == 0) &&
       call == 1 && limit > 3) {
@@ -198,7 +211,11 @@ static ssize_t scripted_pwrite64(int fd, const void *buf, size_t count,
   } else if (mode && strcmp(mode, "short") == 0) {
     if (call == 1 && limit > 3) limit = 3;
     if (call == 2 && limit > 2) limit = 2;
-  } else if (mode && strcmp(mode, "error") == 0 && call == 1 && limit > 2) {
+  } else if (mode &&
+             (strcmp(mode, "error") == 0 ||
+              strcmp(mode, "brokenpipe") == 0 ||
+              strcmp(mode, "unsupported") == 0) &&
+             call == 1 && limit > 2) {
     limit = 2;
   }
   ssize_t result = next(fd, buf, limit, offset);
@@ -218,6 +235,8 @@ enum ExpectedOutcome {
     Wrote(u64),
     NoProgress,
     Interrupted,
+    BrokenPipe,
+    Unsupported,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -330,6 +349,14 @@ fn assert_write_trace(result: &RunResult, expected_exit: i32, expected: &[Expect
                 CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Interrupted)),
                 ExpectedOutcome::Interrupted,
             ) => {}
+            (
+                CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::BrokenPipe)),
+                ExpectedOutcome::BrokenPipe,
+            ) => {}
+            (
+                CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Unsupported)),
+                ExpectedOutcome::Unsupported,
+            ) => {}
             (actual, expected) => panic!("wrong write outcome: {actual:?}, expected {expected:?}"),
         }
     }
@@ -351,12 +378,14 @@ const WRITE_ALL_PARTITION_STACK_BYTES: usize =
 /// measured green on its released base.
 ///
 /// MEASURED: the real derived `writeAll` reaches full, short, zero, resumed
-/// progress, and mid-stream error host replies on native. Every row asserts
-/// the exact request tuple, canonical reply, exit status, positioned output
-/// prefix, and reaching syscall trace.
+/// progress, and mid-stream error host replies on native. The BrokenPipe and
+/// Unsupported rows run the same source through the interpreter under the same
+/// interposer. Every row asserts the exact request tuple, canonical reply, exit
+/// status, positioned output prefix, and reaching syscall trace.
 /// CLAIMED: LOCKED sections 1.7.2 and 1.7.3 observations 1, 3, and 4 reify
-/// `Wrote(full)`, zero as `NoProgress` rather than `Wrote(0)`, and the first
-/// `Interrupted` error after exactly the preceding written prefix.
+/// `Wrote(full)`, zero as `NoProgress` rather than `Wrote(0)`, and exact
+/// `Interrupted`, `BrokenPipe`, and `Unsupported` identities after exactly the
+/// preceding written prefix.
 /// THE GAP: the Linux interposer makes those host outcomes deterministic; this
 /// row does not claim every platform errno or every possible write partition.
 ///
@@ -366,6 +395,16 @@ const WRITE_ALL_PARTITION_STACK_BYTES: usize =
 /// tail call, no other tail exit, and unique handler owner Specialization(2).
 #[test]
 fn checked_write_all_reaches_full_short_zero_progress_flip_and_error_prefixes() {
+    if std::env::var_os(INTERPRETER_CHILD_ROOT).is_some() {
+        std::thread::Builder::new()
+            .name("px8f-write-partition-interpreter".to_string())
+            .stack_size(WRITE_ALL_PARTITION_STACK_BYTES)
+            .spawn(run_interpreter_child)
+            .expect("spawn stated-stack PX8-F interpreter child")
+            .join()
+            .expect("PX8-F interpreter child thread");
+        return;
+    }
     std::thread::Builder::new()
         .name("px8f-write-partition".to_string())
         .stack_size(WRITE_ALL_PARTITION_STACK_BYTES)
@@ -373,6 +412,85 @@ fn checked_write_all_reaches_full_short_zero_progress_flip_and_error_prefixes() 
         .expect("spawn large-stack PX8-F differential")
         .join()
         .expect("PX8-F differential thread");
+}
+
+fn assert_midstream_io_identity(result: &RunResult, expected: ExpectedOutcome) {
+    assert_exact_sink(result, b"AB");
+    assert_write_trace(
+        result,
+        82,
+        &[
+            ExpectedWrite {
+                file_offset: 10,
+                buffer_start: 0,
+                length: 8,
+                outcome: ExpectedOutcome::Wrote(2),
+            },
+            ExpectedWrite {
+                file_offset: 12,
+                buffer_start: 2,
+                length: 6,
+                outcome: expected,
+            },
+        ],
+    );
+    assert_eq!(result.syscall_log, ["1 10 8 2", "2 12 6 -1"]);
+}
+
+fn run_interpreter_child() {
+    let root = PathBuf::from(
+        std::env::var_os(INTERPRETER_CHILD_ROOT)
+            .expect("interpreter child carries its scenario root"),
+    );
+    let script =
+        std::env::var("KEN_PX8F_WRITE_SCRIPT").expect("interpreter child carries its write script");
+    let expected = match script.as_str() {
+        "brokenpipe" => ExpectedOutcome::BrokenPipe,
+        "unsupported" => ExpectedOutcome::Unsupported,
+        other => panic!("unexpected interpreter child script: {other}"),
+    };
+    let mut interpreter = ken_interp::PosixHost::new_at(&root);
+    let observation = ken_cli::run_program_effect_observation(
+        WRITE_ALL_PARTITION,
+        ken_cli::SourceFormat::Ken,
+        &[],
+        &[],
+        root.as_os_str().as_bytes(),
+        &mut interpreter,
+    )
+    .expect("the same checked writeAll runs in the interpreter");
+    let log = root.join("pwrite64.log");
+    let result = RunResult {
+        observation,
+        sink: std::fs::read(root.join("output.bin"))
+            .expect("read interpreter positioned-write sink"),
+        syscall_log: std::fs::read_to_string(log)
+            .expect("interpreter interposer wrote its reaching call log")
+            .lines()
+            .map(str::to_owned)
+            .collect(),
+    };
+    assert_midstream_io_identity(&result, expected);
+}
+
+fn run_interpreter_script(preload: &Path, root: &Path, script: &str) {
+    std::fs::create_dir_all(root).expect("create interpreter scenario root");
+    std::fs::write(root.join("input.bin"), b"ABCDEFGH").expect("write interpreter scenario input");
+    let log = root.join("pwrite64.log");
+    let status = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "checked_write_all_reaches_full_short_zero_progress_flip_and_error_prefixes",
+            "--nocapture",
+        ])
+        .env("LD_PRELOAD", preload)
+        .env("KEN_PX8F_WRITE_SCRIPT", script)
+        .env("KEN_PX8F_CALL_LOG", log)
+        .env(INTERPRETER_CHILD_ROOT, root)
+        .env_remove("RUST_MIN_STACK")
+        .status()
+        .expect("spawn interposed writeAll interpreter child");
+    assert!(status.success(), "{script} interpreter child failed");
 }
 
 fn run_write_partition() {
@@ -495,6 +613,18 @@ fn run_write_partition() {
         ],
     );
     assert_eq!(error.syscall_log, ["1 10 8 2", "2 12 6 -1"]);
+
+    for (script, expected) in [
+        ("brokenpipe", ExpectedOutcome::BrokenPipe),
+        ("unsupported", ExpectedOutcome::Unsupported),
+    ] {
+        let native_root = dir.join(format!("{script}-native"));
+        let native = run_script(&build, &preload, &native_root, script);
+        assert_midstream_io_identity(&native, expected);
+
+        let interpreter_root = dir.join(format!("{script}-interpreter"));
+        run_interpreter_script(&preload, &interpreter_root, script);
+    }
 
     let _ = std::fs::remove_dir_all(dir);
 }
