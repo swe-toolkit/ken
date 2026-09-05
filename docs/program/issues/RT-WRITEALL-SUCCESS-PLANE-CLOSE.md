@@ -97,15 +97,24 @@ operator gate. Evidence predicts (a) / Route B.
   write_all_classifies_mixed_specialized_and_deferred_responses
   (px8f_buffer_native.rs:657 / :731) from asserting the OPEN plane
   (deferred_kinds == {NoContinuationUnit, UnconsumedTransportCaller}) to
-  asserting the plane CLOSES - P1's NoContinuationUnit gone from
-  static_response_deferred, requires_execute_then_resume=true, the ordinary
-  stages no longer carrying UnconsumedTransportCaller - via
+  asserting the plane CLOSES under Route B: P1's (254, 1229, FsWriteAt)
+  NoContinuationUnit row is RETAINED as the exact populated main-lowered residual
+  (NOT removed - D0 proved P1 is main-lowered, not a specialization candidate),
+  but it NO LONGER vetoes the ordinary has-K plane;
+  requires_execute_then_resume=true across the promoted groups 267/279; the
+  ordinary stages no longer carrying UnconsumedTransportCaller - via
   with_static_response_feasibility_diagnostics.
 
 ## Acceptance criteria
 
-- AC-P1-UNIT. P1 (Vis 1229) is no longer a NoContinuationUnit row in
-  static_response_deferred.
+- AC-P1-RETAINED (supersedes the pre-ruling AC-P1-UNIT; corrected per Route B +
+  runtime-implementer evt_1qa5eng0y9g73). P1 (254, 1229, FsWriteAt) REMAINS the
+  exact populated main-lowered NoContinuationUnit residual in
+  static_response_deferred - it is NOT removed - and it does NOT veto the ordinary
+  has-K plane. (The pre-ruling text "P1's NoContinuationUnit gone from
+  static_response_deferred" was mutually exclusive with the approved narrowing,
+  which retains main-lowered P1 and the specialization-owned 287 P2 while
+  promoting only 267/279.)
 - AC-PLANE-CLOSES. The plane CLOSES - requires_execute_then_resume=true across
   groups 267/279, observable on the feasibility-diagnostics surface.
 - AC-COMPOSE-SOUND (the load-bearing obligation; Architect-refined + Route B
