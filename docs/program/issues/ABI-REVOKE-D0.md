@@ -1,7 +1,7 @@
 ---
 id: ABI-REVOKE-D0
 title: "RevocationDomain substrate + lineage tree — the host-internal authority-lineage foundation for the revocation membrane; no dispatch wiring, lands green with zero observable Ken change"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none

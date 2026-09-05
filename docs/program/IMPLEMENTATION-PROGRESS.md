@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-05 22:03:25Z — from 552 issue file(s) in `docs/program/issues/`.
+2026-09-05 22:31:04Z — from 552 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -46,7 +46,7 @@ the committed file matches the generator's output.
 | `ABI-M2` | runtime facility/operation probes, distinct from build-time facts | draft | runtime | M | none | — |
 | `ABI-R1` | correct stale filesystem capability prose — scoped roots, rights, symlink policy and no-follow resolution have landed | closed | foundation | S | none | — |
 | `ABI-R3` | generated operation inventory derived from catalog structure — a new operation must be a build break | merged | runtime | M | none | — |
-| `ABI-REVOKE-D0` | RevocationDomain substrate + lineage tree — the host-internal authority-lineage foundation for the revocation membrane; no dispatch wiring, lands green with zero observable Ken change | active | runtime | S | none | — |
+| `ABI-REVOKE-D0` | RevocationDomain substrate + lineage tree — the host-internal authority-lineage foundation for the revocation membrane; no dispatch wiring, lands green with zero observable Ken change | merged | runtime | S | none | — |
 | `ABI-REVOKE-D1` | authority-side lineage + admission lease + the path-side revoked error identity — wires RevocationDomain into the shared host dispatcher and turns the revoked-path oracle case green | draft | runtime | M | none | — |
 | `ABI-REVOKE-D2` | resource provenance + close-after-drain settlement — a resource-token-only op cannot bypass revocation, and owned fds close only after admitted leases drain; turns the two resource oracle cases green | draft | runtime | M | none | — |
 | `ABI-REVOKE` | runtime revocation membrane — the deferred runtime face of 62 §4 | active | runtime | M-L | none | — |
@@ -627,7 +627,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-A1` blocked by `ABI-REVOKE` (status: active)
 - `ABI-A2` blocked by `ABI-REVOKE` (status: active)
 - `ABI-A3` blocked by `ABI-REVOKE` (status: active)
-- `ABI-REVOKE-D1` blocked by `ABI-REVOKE-D0` (status: active)
 - `ABI-REVOKE-D2` blocked by `ABI-REVOKE-D1` (status: draft)
 - `ABI-S1` blocked by `PX9` (status: draft)
 - `ABI-S2` blocked by `ABI-A3` (status: draft)
