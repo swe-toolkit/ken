@@ -647,91 +647,170 @@ fn run_linked_checked_write_all() {
 }
 
 #[cfg(target_os = "linux")]
-/// Promise class: durable invariant. Recut AC-1 (congruence) + AC-4 (mixed
-/// both-colors) + the AC-3 compile half. The checked `writeAll` fixture carries
-/// a Specialized ordinary response, a Deferred P1 response with no continuation
-/// unit, and Deferred P2 transport sources. P1 keeps the response plane open, so
-/// execute-then-resume conservatively retains every transport source as P2 rather
-/// than partially specializing a plane with no owner target for every response.
+// Baseline provisioning, not a depth claim. With ambient RUST_MIN_STACK absent,
+// the exact three-arm compile aborted at 2 MiB twice and completed at 4 MiB
+// twice. Treat 4 MiB as the conservative measured peak. Retaining this test's
+// pre-existing 256 MiB provision adds exactly 252 MiB of headroom; the named
+// local Builder stack, rather than an ambient harness default, is operative.
+const WRITE_ALL_CLASSIFIER_STACK_MEASURED_PEAK_BYTES: usize = 4 * 1024 * 1024;
+#[cfg(target_os = "linux")]
+const WRITE_ALL_CLASSIFIER_STACK_HEADROOM_BYTES: usize = 252 * 1024 * 1024;
+#[cfg(target_os = "linux")]
+const WRITE_ALL_CLASSIFIER_STACK_BYTES: usize =
+    WRITE_ALL_CLASSIFIER_STACK_MEASURED_PEAK_BYTES + WRITE_ALL_CLASSIFIER_STACK_HEADROOM_BYTES;
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. The checked `writeAll` response plane
+/// promotes exactly its two exclusively-predeclared producer groups while the
+/// unit-less P1 and mixed-owner group retain their existing lowering paths.
+///
+/// MEASURED: the exact 267/279 rows acquire response owners and compile beside
+/// P1 1229 plus mixed group 287 without an escaping response placeholder.
+/// Suppression restores 267/279 to P2, while deliberately over-promoting 287
+/// reaches the owner-escape refusal. CLAIMED: the Route-B ownership restriction
+/// is both sufficient and necessary for sound partial specialization. THE GAP:
+/// the successful `ReadSome` body still belongs to the held parent carry WP, so
+/// this predecessor does not claim the runtime right-path witness.
 #[test]
 fn write_all_classifies_mixed_specialized_and_deferred_responses() {
     std::thread::Builder::new()
         .name("px8f-classify-mixed".to_string())
-        .stack_size(256 * 1024 * 1024)
+        .stack_size(WRITE_ALL_CLASSIFIER_STACK_BYTES)
         .spawn(|| {
             let dir = tempfile::Builder::new()
                 .prefix("ken-px8f-classify-mixed-")
                 .tempdir()
                 .unwrap();
-            let (result, diagnostics) =
+            let compile = |package: &str| {
                 ken_runtime::with_static_response_feasibility_diagnostics(|| {
                     ken_cli::build_native_program(
                         WRITE_ALL,
                         ken_cli::SourceFormat::Ken,
-                        "px8f_write_all_classify_mixed",
+                        package,
                         dir.path(),
                     )
-                });
-            // AC-3 (compile half): the deferred-frontier writeAll program compiles;
-            // the Deferred residual is routed, not aborted.
-            result.expect("the checked writeAll fixture compiles under the recut");
+                })
+            };
+
+            let (result, diagnostics) = compile("px8f_write_all_plane_closed");
+            result.expect("the sound mixed response plane compiles without owner escape");
             assert_eq!(diagnostics.len(), 1, "one compile publishes one plan");
             let diagnostic = diagnostics.into_iter().next().unwrap();
             assert_eq!(diagnostic.static_response_infeasible, None);
             assert_eq!(diagnostic.all_static_response_infeasible, None);
 
-            let specialized_vis: std::collections::BTreeSet<u32> = diagnostic
+            let specialized = diagnostic
                 .all_static_response_rows
                 .iter()
-                .map(|row| row.vis_origin)
-                .collect();
-            let deferred_vis: std::collections::BTreeSet<u32> = diagnostic
-                .static_response_deferred
-                .iter()
-                .map(|row| row.vis_origin)
-                .collect();
-
-            // AC-1 congruence is enforced STRUCTURALLY, not by a vis-level
-            // disjointness assertion here: classify (static_response_context_demands
-            // _filtered) puts every response Vis-with-host-route into a demand
-            // (Specialized) or a deferred P1/P2 row
-            // or a whole-plan SsaInfeasible
-            // -- no fourth "unclassified" path -- and the §7 total match over
-            // Option<ResponseDisposition> at each production seat compiles only if
-            // every variant is handled (AC-2). The None case is verified to mean
-            // exclusively "not a static-response Vis" (Architect ruling
-            // evt_37dx1wqamabg). Vis-level disjointness is deliberately not
-            // asserted: a single multi-K producer may carry a Specialized K and
-            // a P1 unit-less response at one Vis origin. The partition is per
-            // (Vis,K), not per Vis.
-
-            // AC-4 mixed: both colours coexist in this one unit -- a genuine
-            // polyvariant witness. (Discriminating: a single-colour program cannot
-            // tell real threading from a flag.)
-            assert!(
-                !specialized_vis.is_empty(),
-                "the mixed fixture must carry at least one Specialized response; \
-                 rows={:?}",
-                diagnostic.all_static_response_rows
-            );
-            assert!(
-                !deferred_vis.is_empty(),
-                "the mixed fixture must carry at least one Deferred response; \
-                 deferred={:?}",
-                diagnostic.static_response_deferred
-            );
-            let deferred_kinds = diagnostic
-                .static_response_deferred
-                .iter()
-                .map(|row| row.sub_case.as_str())
+                .map(|row| {
+                    (
+                        row.producer_call_origin,
+                        row.vis_origin,
+                        row.operation.as_str(),
+                    )
+                })
                 .collect::<std::collections::BTreeSet<_>>();
             assert_eq!(
-                deferred_kinds,
+                specialized,
                 std::collections::BTreeSet::from([
-                    "NoContinuationUnit",
-                    "UnconsumedTransportCaller",
+                    (267, 1406, "FsReadAt"),
+                    (279, 1549, "BufferAllocate"),
+                    (303, 1572, "FsOpen"),
                 ]),
-                "the open-chain control must contain both P1 and its retained P2 siblings"
+                "only the two exclusively-predeclared groups join the preexisting open row"
+            );
+            let deferred = diagnostic
+                .static_response_deferred
+                .iter()
+                .map(|row| {
+                    (
+                        row.producer_call_origin,
+                        row.vis_origin,
+                        row.operation.as_str(),
+                        row.sub_case.as_str(),
+                    )
+                })
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(
+                deferred,
+                std::collections::BTreeSet::from([
+                    (254, 1229, "FsWriteAt", "NoContinuationUnit"),
+                    (287, 606, "ResourceRelease", "UnconsumedTransportCaller"),
+                    (287, 815, "ResourceRelease", "UnconsumedTransportCaller"),
+                    (287, 1024, "ResourceRelease", "UnconsumedTransportCaller"),
+                ]),
+                "P1 stays main-lowered and the mixed-owner group stays P2"
+            );
+
+            let (suppressed_result, suppressed_diagnostics) =
+                ken_runtime::with_suppressed_execute_then_resume_response(|| {
+                    compile("px8f_write_all_plane_suppressed")
+                });
+            suppressed_result.expect("the suppression control retains main lowering");
+            assert_eq!(
+                suppressed_diagnostics.len(),
+                1,
+                "one suppressed compile publishes one plan"
+            );
+            let suppressed = suppressed_diagnostics.into_iter().next().unwrap();
+            let suppressed_specialized = suppressed
+                .all_static_response_rows
+                .iter()
+                .map(|row| (row.producer_call_origin, row.vis_origin))
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(
+                suppressed_specialized,
+                std::collections::BTreeSet::from([(303, 1572)]),
+                "suppression must remove both execute-then-resume owners"
+            );
+            let suppressed_p2 = suppressed
+                .static_response_deferred
+                .iter()
+                .filter(|row| row.sub_case == "UnconsumedTransportCaller")
+                .map(|row| (row.producer_call_origin, row.vis_origin))
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(
+                suppressed_p2,
+                std::collections::BTreeSet::from([
+                    (267, 1406),
+                    (279, 1549),
+                    (287, 606),
+                    (287, 815),
+                    (287, 1024),
+                ]),
+                "restoring the veto must reopen the ordinary groups as P2"
+            );
+            assert!(
+                ken_runtime::suppressed_execute_then_resume_response_is_exact(),
+                "the suppression hook did not restore"
+            );
+
+            let ((overpromoted_result, overpromoted_diagnostics), applications) =
+                ken_runtime::with_mixed_owner_execute_then_resume_overpromotion(|| {
+                    compile("px8f_write_all_plane_overpromoted")
+                });
+            let error =
+                overpromoted_result.expect_err("over-promoting the mixed-owner group compiled");
+            assert!(
+                format!("{error:?}").contains(
+                    "a deferred host response is compiler control and can only enter its exact \
+                     response owner"
+                ),
+                "over-promotion reached the wrong refusal: {error:?}"
+            );
+            assert_eq!(
+                overpromoted_diagnostics.len(),
+                1,
+                "the over-promoted plan must reach the lowering refusal"
+            );
+            assert_eq!(
+                applications, 6,
+                "the mutation must over-promote all three mixed-owner responses in both the \
+                 install and its closed re-derivation"
+            );
+            assert!(
+                ken_runtime::mixed_owner_execute_then_resume_overpromotion_is_exact(),
+                "the over-promotion hook did not restore"
             );
         })
         .expect("spawn large-stack classify-mixed probe")
