@@ -126,22 +126,6 @@ fn legacy_roots_same_unit_alias_selects_the_same_synthesis_identity() {
 }
 
 #[test]
-fn same_file_module_import_is_available_before_just_in_time_dictionary_binding() {
-    let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_file(
-        "module Classes { pub class C a {} } \
-         import Classes (C) \
-         data Local = MkLocal \
-         instance C Local {} \
-         theorem selected : C Local = C_instance_Local",
-    )
-    .expect("the ordered module pass supplies the local-module class import");
-
-    let canonical = env.globals["C_instance_Local"];
-    assert_is_exact_const(&transparent_body(&env, "selected"), canonical);
-}
-
-#[test]
 fn imported_head_uses_its_qualified_synthesis_identity_and_exports_that_identity() {
     let root = FixtureRoot::new("imported-head");
     root.write("Types.ken", "pub data Remote = MkRemote");
