@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-READEOF-WITNESS-FOLD
 title: "Two-quarter native carried-value fold: un-ignore the ReadEof full-program row via a new zero-TCB rt_cap41 executing native-closure witness, and confirm the already-green SemanticErrorV1 (InvalidOffset) row stays rearmed. Honest progress toward RT-NATIVE-CARRIED-VALUE's four-value PX8 closure; Wrote and ReadSome remain #[ignore]d under the composed-return arc and this node does NOT close the parent."
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
