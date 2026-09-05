@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-05 01:17:54Z — from 542 issue file(s) in `docs/program/issues/`.
+2026-09-05 02:03:12Z — from 543 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -452,6 +452,7 @@ the committed file matches the generator's output.
 | `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | closed | runtime | S | none | — |
 | `RT-NATIVE-CARRIED-VALUE` | Native carried-value / higher-order boundary lowering — the capability program that closes PX8's native full-program half, structured as two tracks over ONE open representation decision | active | runtime | L | none | — |
 | `RT-NATIVE-FNSPLIT` | Native backend: bound per-function lowering growth to O(n) — helper identity is a variable-width whole-configuration key (orig. single-Function VReg::MAX, since fixed) | merged | runtime | TBD | none | — |
+| `RT-NATIVE-READEOF-WITNESS-FOLD` | Two-quarter native carried-value fold: un-ignore the ReadEof full-program row via a new zero-TCB rt_cap41 executing native-closure witness, and confirm the already-green SemanticErrorV1 (InvalidOffset) row stays rearmed. Honest progress toward RT-NATIVE-CARRIED-VALUE's four-value PX8 closure; Wrote and ReadSome remain #[ignore]d under the composed-return arc and this node does NOT close the parent. | active | runtime | S | none | — |
 | `RT-NATIVE-TRACK0-REARM` | Track 0 of the native carried-value program — un-ignore the stale first-order native rows, re-measure, and re-arm the vacuous native CI jobs (decision-4 de-vacuuming), using the workspace ignored-sweep as the oracle | merged | runtime | S | none | — |
 | `RT-NATIVE-VOCAB-STRUCTURAL-COMPLETENESS` | Conjunct-(2) completeness in dead-arm effect lowering rests on NativeProcessSymbols mirroring the runtime's minting sites BY CONVENTION, not by structure -- make it structural so a newly-minted runtime constructor cannot silently create a wrongly-trapped live arm | draft | runtime | S | none | — |
 | `RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY` | CLOSED, complete negative result: route exclusivity is not expressible in this node's surfaces (Q2 NO) and the machine it would unify onto is behavior-incomplete for carried arguments (Q4), so the precondition itself has a precondition | closed | runtime | M | none | — |
