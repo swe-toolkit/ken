@@ -11,20 +11,25 @@ github: null
 origin: docs/program/10-linux-abi-completion.md §4 (the ABI-completion program); node filed by the Steward 2026-07-25 on the operator's directive to frame the remaining program. Agents cannot create tracked work (COORDINATION §2).
 ---
 
-> # PARTIAL-MERGE 2026-08-23: D0+D1-structural-half LANDED; target-identity D1 HELD
+> # FINAL INCREMENT AS BUILT: target-identity D1 and D2/D3 complete
 >
-> D0 + the D1 structural half MERGED at `4342ca4cf` (PR #2811, exact
-> `00c65711869108c6c43f7d567b32eedd8011516c`): sealed `AbiFamily` enum,
-> family-schema by-variant-path generation, fail-closed-on-unassigned
-> partition, v2 composed-projection manifest hash (SCHEMA_VERSION 1->2), the
-> two-tier enforcement. QA (evt_5k6ac29bq478g) + Architect (evt_1pkmzgx536cca)
-> APPROVE on the exact SHA; Decision dec_42hpwdv09r5ts. The remaining D1
-> (target-identity family expansion — arch/endianness/scalar-width facts) stays
-> OPEN on the branch, held for the runtime implementer's return from the M6
-> predecessor; that work MOVES the manifest hash (expected churn, not a
-> regression). Fold the symmetric-closure guard (error on a multi-prefix fact
-> match, mirroring the fail-closed-on-unassigned assert; Architect non-blocking
-> note) into that work. Node stays `ready` for the remaining D1.
+> D0 + the D1 structural half merged earlier at `4342ca4cf` (PR #2811, exact
+> `00c65711869108c6c43f7d567b32eedd8011516c`): sealed `AbiFamily`, generated
+> by-variant-path join, fail-closed family partition, schema v2, and composed
+> projection hashes. The final increment expands target identity from two to
+> sixteen layout facts, adds explicit target architecture and endianness, and
+> cross-checks every fact against the C probe. Exact target-identity membership
+> prevents a broad `C_` prefix from silently absorbing future record-layout
+> facts; zero or multiple family claims both abort generation.
+>
+> D2 independently reconstructs every projection and the top manifest hash,
+> proves one-family mutation locality, pins the bounded target-identity vector,
+> checks whole-population C-probe disagreement, and preserves the runtime hash
+> binding plus ken-verify partition. D3 records the Architect/Steward AC-6
+> ruling: unsupported targets fail closed at the native-only guard and produce
+> no native manifest. An observable cross-target unavailable manifest remains
+> deferred under Program 10 §3/§8 unless a real cross-compilation consumer later
+> triggers an operator option-(B) decision. No cross-target generation is added.
 >
 > ## Authority: the WP frame — `docs/program/wp/abi-m1-family-scoped-manifest.md`
 >

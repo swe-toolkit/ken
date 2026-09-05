@@ -158,6 +158,10 @@ pub struct TargetAbi {
     pub schema_version: u32,
     pub target: &'static str,
     pub target_os: &'static str,
+    /// The target architecture used by the target-identity family projection.
+    pub target_arch: &'static str,
+    /// The target byte order used by the target-identity family projection.
+    pub target_endianness: &'static str,
     pub backend: &'static str,
     pub dependencies: &'static [DependencyIdentity],
     pub fact_count: usize,
@@ -1086,8 +1090,7 @@ mod tests {
         //   (f) backend == "linux_raw"              -- backend identity [retained]
         //   (g) TARGET_ABI_CANONICAL lacks "SIG"    -- canonical hygiene [retained]
         //   (h) verify_probe agrees on true values  -- probe round-trips [retained]
-        //   (i) tampered O_RDONLY fails closed       -- value discrimination [retained]
-        //   (j) tampered width facts fail closed     -- width discrimination [retained]
+        //   (i) every tampered fact fails closed     -- whole-population value discrimination [strengthened by ABI-M1]
         // Dropped in Q-RESIDUE, restored as (b): the frozen `fact_count == 23`
         // literal -- the sole non-generated assertion, i.e. the inventory anchor.
         //
@@ -1139,9 +1142,23 @@ mod tests {
         // trips `parse_probe`'s "duplicate probe fact". Those pre-existing gates
         // are the real first line for duplicates; this anchor is not, and does
         // not claim to be.
-        const EXPECTED_ABI_FACT_NAMES: [&str; 23] = [
+        const EXPECTED_ABI_FACT_NAMES: [&str; 37] = [
             "POINTER_WIDTH",
+            "POINTER_ALIGNMENT",
+            "C_CHAR_WIDTH",
+            "C_CHAR_ALIGNMENT",
+            "C_SHORT_WIDTH",
+            "C_SHORT_ALIGNMENT",
             "C_INT_WIDTH",
+            "C_INT_ALIGNMENT",
+            "C_LONG_WIDTH",
+            "C_LONG_ALIGNMENT",
+            "C_LONG_LONG_WIDTH",
+            "C_LONG_LONG_ALIGNMENT",
+            "C_FLOAT_WIDTH",
+            "C_FLOAT_ALIGNMENT",
+            "C_DOUBLE_WIDTH",
+            "C_DOUBLE_ALIGNMENT",
             "O_RDONLY",
             "O_WRONLY",
             "O_RDWR",
@@ -1227,26 +1244,26 @@ mod tests {
         let observed = build_support::parse_probe(&protocol).expect("parse true probe output");
         build_support::verify_probe(&expected, &observed).expect("true values agree");
 
-        let mut tampered = expected.clone();
-        tampered
-            .iter_mut()
-            .find(|(name, _)| *name == "O_RDONLY")
-            .expect("O_RDONLY is manifested")
-            .1 ^= 1;
-        let mismatch = build_support::verify_probe(&tampered, &observed)
-            .expect_err("tampered linux-raw-sys value must fail closed");
-        assert!(mismatch.contains("O_RDONLY"));
-
-        for width in ["POINTER_WIDTH", "C_INT_WIDTH"] {
+        // Promise class: durable invariant. Every header-projected fact, not a
+        // sampled subset, must reach the fail-closed comparison. MEASURED: each
+        // generated fact's value is independently perturbed and the comparator
+        // names that fact. CLAIMED: no header-projected fact can bypass the
+        // probe. THE GAP: label closure is a separate property, covered by the
+        // bidirectional producer/registry/observer test below.
+        for fact in &expected {
             let mut tampered = expected.clone();
-            let (_, value) = tampered
+            tampered
                 .iter_mut()
-                .find(|(name, _)| *name == width)
-                .expect("width fact is manifested");
-            *value ^= 1;
+                .find(|(name, _)| *name == fact.0)
+                .expect("the generated fact remains in its own inventory")
+                .1 ^= 1;
             let mismatch = build_support::verify_probe(&tampered, &observed)
-                .expect_err("tampered width producer must fail closed");
-            assert!(mismatch.contains(width));
+                .expect_err("every tampered manifest fact must fail closed");
+            assert!(
+                mismatch.contains(fact.0),
+                "the mismatch must identify the independently perturbed fact {}: {mismatch}",
+                fact.0
+            );
         }
     }
 
@@ -1264,7 +1281,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         build_support::verify_inventory_closure(build, host, consumer, probe, &facts)
-            .expect("current 22-member producer is exactly manifested");
+            .expect("the current producer inventory is exactly manifested");
 
         let injected_host = host.replacen(
             "} | OFlags::CLOEXEC;",
@@ -1293,20 +1310,20 @@ mod tests {
         .expect("linux-raw-sys registration plus matching observer restores closure");
 
         let injected_build = build.replacen(
-            "        width_fact(\"POINTER_WIDTH\", bit_width::<usize>()),",
-            "        width_fact(\"C_LONG_WIDTH\", bit_width::<core::ffi::c_long>()),\n        width_fact(\"POINTER_WIDTH\", bit_width::<usize>()),",
+            "        layout_fact(\"POINTER_WIDTH\", bit_width::<*const core::ffi::c_void>()),",
+            "        layout_fact(\"C_UCHAR_WIDTH\", bit_width::<core::ffi::c_uchar>()),\n        layout_fact(\"POINTER_WIDTH\", bit_width::<*const core::ffi::c_void>()),",
             1,
         );
         let producer_only =
             build_support::verify_inventory_closure(&injected_build, host, consumer, probe, &facts)
-                .expect_err("a producer-only width fact must fail closed");
+                .expect_err("a producer-only ABI layout fact must fail closed");
         assert_eq!(
             producer_only,
-            "unmanifested producer ABI fact: ABI width::C_LONG_WIDTH"
+            "unmanifested producer ABI fact: ABI layout::C_UCHAR_WIDTH"
         );
 
         let mut registry_only_facts = facts;
-        registry_only_facts.push(("C_LONG_WIDTH", 64));
+        registry_only_facts.push(("C_UCHAR_WIDTH", 8));
         let registry_only = build_support::verify_inventory_closure(
             build,
             host,
@@ -1314,10 +1331,10 @@ mod tests {
             probe,
             &registry_only_facts,
         )
-        .expect_err("a registry-only width fact must fail closed");
+        .expect_err("a registry-only ABI layout fact must fail closed");
         assert_eq!(
             registry_only,
-            "manifested ABI fact lacks producer: ABI width::C_LONG_WIDTH"
+            "manifested ABI fact lacks producer: ABI layout::C_UCHAR_WIDTH"
         );
     }
 
@@ -1330,17 +1347,6 @@ mod tests {
         assert_eq!(
             assert_target_abi_identity(mismatch),
             Err(TargetAbiIdentityError::HashMismatch)
-        );
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    #[test]
-    fn unavailable_target_manifest_fails_closed() {
-        assert!(TARGET_ABI.backend.starts_with("unavailable-"));
-        assert_eq!(TARGET_ABI.fact_count, 0);
-        assert_eq!(
-            assert_target_abi_identity(TARGET_ABI_MANIFEST_HASH),
-            Err(TargetAbiIdentityError::BackendUnavailable)
         );
     }
 
@@ -1612,6 +1618,60 @@ mod tests {
 #[cfg(test)]
 mod abi_m1_d0_probe {
     use super::*;
+    use sha2::{Digest, Sha256};
+    use std::collections::{BTreeMap, BTreeSet};
+
+    fn hex_lower(bytes: &[u8; 32]) -> String {
+        bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    fn canonical_projection(family: AbiFamily, facility_version: u32, facts: &[AbiFact]) -> String {
+        let mut out = format!(
+            "family={}\nfacility_version={facility_version}\n",
+            family.canonical_name()
+        );
+        if family == AbiFamily::TargetIdentity {
+            out.push_str(&format!(
+                "target_arch={}\ntarget_endianness={}\n",
+                TARGET_ABI.target_arch, TARGET_ABI.target_endianness
+            ));
+        }
+        out.push_str(&format!("fact_count={}\n", facts.len()));
+        for fact in facts {
+            out.push_str(&format!("fact={}|{}\n", fact.name, fact.value));
+        }
+        out
+    }
+
+    fn canonical_manifest(hashes: &BTreeMap<AbiFamily, [u8; 32]>) -> String {
+        let mut out = format!(
+            "schema={}\ntarget={}\ntarget_os={}\nbackend={}\n",
+            TARGET_ABI.schema_version, TARGET_ABI.target, TARGET_ABI.target_os, TARGET_ABI.backend
+        );
+        for dependency in TARGET_ABI.dependencies {
+            out.push_str(&format!(
+                "dependency={}|{}|{}|{}\n",
+                dependency.name,
+                dependency.version,
+                dependency.checksum,
+                dependency.features.join(",")
+            ));
+        }
+        out.push_str(&format!("family_count={}\n", TARGET_ABI.families.len()));
+        for projection in TARGET_ABI.families {
+            let hash = hashes
+                .get(&projection.family)
+                .expect("every generated family has a supplied hash");
+            out.push_str(&format!(
+                "family={}|{}|{}|{}\n",
+                projection.family.canonical_name(),
+                projection.facility_version,
+                projection.facts.len(),
+                hex_lower(hash)
+            ));
+        }
+        out
+    }
 
     /// **`ABI-M1` `D0` -- the family schema is derived, not hand-maintained.**
     ///
@@ -1654,16 +1714,10 @@ mod abi_m1_d0_probe {
     /// dispatcher ruling settled on.
     #[test]
     fn the_generated_projections_cover_every_family_exactly_once() {
-        if TARGET_ABI.backend != "linux_raw" {
-            // Non-Linux / cross targets record an unavailable backend and emit
-            // no facts by design; there is nothing to project. Asserting
-            // coverage there would fail for the wrong reason.
-            assert!(
-                TARGET_ABI.families.is_empty(),
-                "an unavailable backend must emit no family projections"
-            );
-            return;
-        }
+        assert_eq!(
+            TARGET_ABI.backend, "linux_raw",
+            "the native-only build guard must refuse before producing an unsupported manifest"
+        );
         for family in AbiFamily::ALL {
             let matches = TARGET_ABI
                 .families
@@ -1706,23 +1760,120 @@ mod abi_m1_d0_probe {
         );
     }
 
-    /// Distinct projection hashes are what make `AC-2` checkable: if two
-    /// families hashed alike, "mutating one family flips exactly that family's
-    /// hash" could not be observed.
+    /// Promise class: normative compatibility vector. Schema v2's target-
+    /// identity projection explicitly carries the native architecture, byte
+    /// order, pointer layout, and every non-extended C arithmetic rank mirrored
+    /// by `core::ffi`. Alignments are bytes; widths are bits.
+    ///
+    /// MEASURED: the generated target strings equal the executing Rust target,
+    /// and the target-identity fact-name set equals this contract inventory.
+    /// CLAIMED: target identity is explicit rather than inferred from unrelated
+    /// flag/layout families. THE GAP: C-header agreement is a separate axis,
+    /// covered by the whole-population probe comparison in the parent module.
     #[test]
-    fn every_family_projection_hash_is_distinct() {
-        if TARGET_ABI.backend != "linux_raw" {
-            return;
-        }
-        let mut seen: Vec<[u8; 32]> = Vec::new();
+    fn schema_v2_target_identity_carries_the_bounded_layout_inventory() {
+        assert_eq!(TARGET_ABI.backend, "linux_raw");
+        assert_eq!(TARGET_ABI.schema_version, 2);
+        assert_eq!(TARGET_ABI.target_arch, std::env::consts::ARCH);
+        let expected_endianness = if cfg!(target_endian = "little") {
+            "little"
+        } else {
+            "big"
+        };
+        assert_eq!(TARGET_ABI.target_endianness, expected_endianness);
+        assert_eq!(TARGET_ABI.manifest_hash, TARGET_ABI_MANIFEST_HASH);
+        let target_identity = TARGET_ABI
+            .families
+            .iter()
+            .find(|projection| projection.family == AbiFamily::TargetIdentity)
+            .expect("the native manifest has a target-identity projection");
+        let actual = target_identity
+            .facts
+            .iter()
+            .map(|fact| fact.name)
+            .collect::<BTreeSet<_>>();
+        let expected = BTreeSet::from([
+            "POINTER_WIDTH",
+            "POINTER_ALIGNMENT",
+            "C_CHAR_WIDTH",
+            "C_CHAR_ALIGNMENT",
+            "C_SHORT_WIDTH",
+            "C_SHORT_ALIGNMENT",
+            "C_INT_WIDTH",
+            "C_INT_ALIGNMENT",
+            "C_LONG_WIDTH",
+            "C_LONG_ALIGNMENT",
+            "C_LONG_LONG_WIDTH",
+            "C_LONG_LONG_ALIGNMENT",
+            "C_FLOAT_WIDTH",
+            "C_FLOAT_ALIGNMENT",
+            "C_DOUBLE_WIDTH",
+            "C_DOUBLE_ALIGNMENT",
+        ]);
+        assert_eq!(actual, expected);
+        assert!(TARGET_ABI
+            .families
+            .iter()
+            .all(|projection| projection.facility_version == 1));
+    }
+
+    /// Promise class: durable invariant. Each projection hash covers exactly
+    /// one family and the top hash is composed from those projection hashes.
+    ///
+    /// MEASURED: an independent canonical reconstruction reproduces every
+    /// projection and the top manifest. Perturbing one OpenFlags fact changes
+    /// only OpenFlags' recomputed projection and the recomputed top hash.
+    /// CLAIMED: family hashing is compositional and mutation-local. THE GAP:
+    /// cryptographic collision resistance is supplied by SHA-256 rather than
+    /// established by this test.
+    #[test]
+    fn family_projection_hashes_compose_and_one_family_mutation_is_local() {
+        assert_eq!(TARGET_ABI.backend, "linux_raw");
+        let mut baseline_hashes = BTreeMap::new();
         for projection in TARGET_ABI.families {
+            let recomputed: [u8; 32] = Sha256::digest(
+                canonical_projection(
+                    projection.family,
+                    projection.facility_version,
+                    projection.facts,
+                )
+                .as_bytes(),
+            )
+            .into();
+            assert_eq!(recomputed, projection.projection_hash);
             assert!(
-                !seen.contains(&projection.projection_hash),
-                "{:?} shares a projection hash with another family",
-                projection.family
+                baseline_hashes
+                    .insert(projection.family, projection.projection_hash)
+                    .is_none(),
+                "a family projection was emitted twice"
             );
-            seen.push(projection.projection_hash);
         }
+        let baseline_canonical = canonical_manifest(&baseline_hashes);
+        assert_eq!(baseline_canonical, TARGET_ABI_CANONICAL);
+        let baseline_top: [u8; 32] = Sha256::digest(baseline_canonical.as_bytes()).into();
+        assert_eq!(baseline_top, TARGET_ABI_MANIFEST_HASH);
+
+        let chosen = TARGET_ABI
+            .families
+            .iter()
+            .find(|projection| projection.family == AbiFamily::OpenFlags)
+            .expect("OpenFlags is an enabled native family");
+        let mut mutated_facts = chosen.facts.to_vec();
+        mutated_facts[0].value ^= 1;
+        let mutated_hash: [u8; 32] = Sha256::digest(
+            canonical_projection(chosen.family, chosen.facility_version, &mutated_facts).as_bytes(),
+        )
+        .into();
+        let mut mutated_hashes = baseline_hashes.clone();
+        mutated_hashes.insert(chosen.family, mutated_hash);
+        let changed = AbiFamily::ALL
+            .into_iter()
+            .filter(|family| baseline_hashes.get(family) != mutated_hashes.get(family))
+            .collect::<Vec<_>>();
+        assert_eq!(changed, vec![AbiFamily::OpenFlags]);
+        let mutated_top: [u8; 32] =
+            Sha256::digest(canonical_manifest(&mutated_hashes).as_bytes()).into();
+        assert_ne!(mutated_top, baseline_top);
     }
 
     /// Every family names itself canonically, and the names are distinct --
