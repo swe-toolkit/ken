@@ -10,6 +10,7 @@ use std::ffi::c_void;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
 
+use crate::revocation_v1::RevocationDomain;
 use crate::{
     dispatch_host_op_v1, CanonicalOutcomeV1, CanonicalReplyV1, CanonicalRequestV1, Cap,
     CapabilityGrantV1, CapabilityTableV1, CapabilityTokenV1, ConsoleStreamV1, CreatePolicyV1,
@@ -314,6 +315,8 @@ const REPLY_WRITE_PROGRESS: u64 = 8;
 struct ProcessContext {
     _posture: ProcessPostureV1,
     host: ProcessHost,
+    #[allow(dead_code)] // D0 owns the domain; D1 wires admission through it.
+    revocation: RevocationDomain,
     capabilities: CapabilityTableV1,
     resources: crate::ResourceTableV1,
     response_arena: Vec<Box<[u8]>>,
@@ -752,6 +755,8 @@ fn initialize_process_context_with_lookup(
         }
         _ => ProcessContextInitError::Ordinary,
     })?;
+    let mut revocation = RevocationDomain::default();
+    let _root_revocation = revocation.mint_root();
     let cap = Cap::mint_scoped(authority, "FS", scope);
     let mut capabilities = CapabilityTableV1::default();
     let capability = capabilities.insert(CapabilityGrantV1 {
@@ -780,6 +785,7 @@ fn initialize_process_context_with_lookup(
     Ok(Box::new(ProcessContext {
         _posture: posture,
         host: ProcessHost,
+        revocation,
         capabilities,
         resources: crate::ResourceTableV1::default(),
         response_arena: Vec::new(),
@@ -1520,6 +1526,11 @@ mod tests {
         let mut context = ProcessContext {
             _posture: ProcessPostureV1(()),
             host: ProcessHost,
+            revocation: {
+                let mut revocation = RevocationDomain::default();
+                let _root_revocation = revocation.mint_root();
+                revocation
+            },
             capabilities: CapabilityTableV1::default(),
             resources: crate::ResourceTableV1::default(),
             response_arena: Vec::new(),
@@ -1602,6 +1613,11 @@ mod tests {
         let mut context = Box::new(ProcessContext {
             _posture: ProcessPostureV1(()),
             host: ProcessHost,
+            revocation: {
+                let mut revocation = RevocationDomain::default();
+                let _root_revocation = revocation.mint_root();
+                revocation
+            },
             capabilities: CapabilityTableV1::default(),
             resources: crate::ResourceTableV1::default(),
             response_arena: Vec::new(),
