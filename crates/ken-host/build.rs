@@ -68,30 +68,16 @@ fn main() {
         compile_abi_v1_companion(&target, &host);
     }
 
-    let (backend, facts): (&str, Vec<(&str, u64)>) = if target_os == "linux" && target == host {
-        let facts = linux_raw_facts();
-        verify_boundary_inventory(&facts);
-        run_probe(&target, &host, &facts);
-        ("linux_raw", facts)
-    } else if target_os == "linux" {
-        ("unavailable-cross-target", Vec::new())
-    } else {
-        ("unavailable-non-linux", Vec::new())
-    };
+    let backend = "linux_raw";
+    let facts = linux_raw_facts();
+    verify_boundary_inventory(&facts);
+    run_probe(&target, &host, &facts);
 
     let effect_layout = run_effect_abi_probe(&target, &host);
     let effect_catalog = parse_effect_catalog();
     write_host_effect_generated(&target, &effect_catalog, &effect_layout);
 
-    let families = if backend == "linux_raw" {
-        group_facts_by_family(&facts)
-    } else {
-        assert!(
-            facts.is_empty(),
-            "an unavailable target ABI backend must not emit facts"
-        );
-        Vec::new()
-    };
+    let families = group_facts_by_family(&facts);
     let canonical = canonical_manifest(
         &target,
         &target_os,
