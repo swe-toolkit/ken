@@ -1,7 +1,7 @@
 ---
 id: PX8-NOPROGRESS-ABS
 title: "NoProgress absolute oracle on the INTERPRETER — a component-boundary test asserting a reified ResourceError::NoProgress against LOCKED §1.7.2, the PX8-WROTE-ABS shape. Closes PX8 clause-(b) both-engines for NoProgress (native + host-shared already cover it; the interpreter side has no absolute assertion)."
-status: active
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -12,6 +12,14 @@ github: null
 origin: "Steward, 2026-09-05, filing B1 of the Architect's PX8 closure-property residual decomposition (evt_4dr93v8qdv3tv, verdict evt_56ssrfbr4tt37). Gap G3: the interp reifier maps NoProgress (eval.rs:5077) but no interpreter test asserts a reified NoProgress absolutely; native + host-shared cover it, so clause-(b) both-engines fails on interp. INDEPENDENT of the native carried-value residual (Lane A) — production unchanged, no seam. Steward-filed per COORDINATION §2."
 ---
 
+> # CLOSED — B1 landed squash d03957492 (Steward, 2026-09-05), blob-identical to
+> # the approved candidate d14a3de5. The interpreter NoProgress absolute oracle
+> # asserts the reified constructor against LOCKED §1.7.2; runtime-qa APPROVED and
+> # Decision dec_38ftemdcpc0qj resolved, exact CI gate complete (runtime-leader
+> # evt_2m93nccpsw813). Production byte-unchanged (test-only, #[cfg(test)]). This
+> # closes PX8 clause-(b) both-engines for NoProgress. PX8 itself still closes only
+> # on the Architect's closure-property re-verification, routed now.
+>
 > # RELEASED 2026-09-05 to the runtime ring (A1 landed 2168f3ae3; the ring has
 > # bandwidth off the A1 critical path). Independent of Lane A — does NOT gate on
 > # RT-WRITEALL-ERROR-ROUTE-NATIVE, and touches a DIFFERENT file (interp

@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-05 19:14:13Z — from 549 issue file(s) in `docs/program/issues/`.
+2026-09-05 19:16:51Z — from 549 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -268,7 +268,7 @@ the committed file matches the generator's output.
 | `PX8-ERRID-ALLOC` | ResourceErrorV1 has no allocation-failure identity and buffer allocation is infallible, so PX8's allocation-distinct-from-BufferLimit row cannot be produced at all | merged | foundation | M | none | — |
 | `PX8-ERRID-SCOPE` | PX8 clause-(a) A2b — five PR-C error identities have no independent production-reaching evidence; Architect ruled all five inside the closure | merged | verify | L | none | — |
 | `PX8-F-CAP-41` | PX8 clause-(a) behavior blocker — closed buffer endpoint (start==capacity) must derive zero-effective ReadEof, not host-reject | closed | foundation | M | none | 41 |
-| `PX8-NOPROGRESS-ABS` | NoProgress absolute oracle on the INTERPRETER — a component-boundary test asserting a reified ResourceError::NoProgress against LOCKED §1.7.2, the PX8-WROTE-ABS shape. Closes PX8 clause-(b) both-engines for NoProgress (native + host-shared already cover it; the interpreter side has no absolute assertion). | active | runtime | S | none | — |
+| `PX8-NOPROGRESS-ABS` | NoProgress absolute oracle on the INTERPRETER — a component-boundary test asserting a reified ResourceError::NoProgress against LOCKED §1.7.2, the PX8-WROTE-ABS shape. Closes PX8 clause-(b) both-engines for NoProgress (native + host-shared already cover it; the interpreter side has no absolute assertion). | closed | runtime | S | none | — |
 | `PX8-SPAN-PROV` | PX8 clause-(b) gap — BufferSpan carries no originating-buffer identity; freeze accepts a same-shape span from a different buffer | merged | spec-enclave | M | none | 914 |
 | `PX8-WROTE-ABS` | PX8 clause-(a) evidence gap — interpreter capped-short Wrote lacks an absolute oracle; PR-C error identities unreached | merged | verify | S | none | — |
 | `PX8` | partial/positioned IO — the completion program's root; closure condition | draft | runtime | L | none | — |
@@ -526,7 +526,7 @@ the committed file matches the generator's output.
 | `RT-VALUE-TOTALITY` | Make every total traversal of Value non-recursive in the host stack, and remove the closure capabilities the landed closure boundary forbids | merged | runtime | L | none | — |
 | `RT-WORKER-BIND` | compiler-only static-worker binding and transport substrate — lowering cannot bind a worker's carried capture operands into a selected semantic body, and continuation specialization cannot emit a target without it | merged | runtime | L | none | — |
 | `RT-WORKER-FIXTURE-DECODE` | AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes | ready | runtime | M | none | — |
-| `RT-WRITEALL-ERROR-ROUTE-NATIVE` | writeAll §1.7.3 error/termination route on NATIVE — reify obs 1 (all-full), obs 3 (write-zero -> NoProgress), obs 4 (mid-stream Io error after an exact prefix) through the REAL derived writeAll, absolute vs LOCKED §38 and co-indexed on both engines. The error/termination continuation is DISTINCT from the success carry the FOLD closed; GATE-0-FIRST, option-(b) fork-ready. | active | runtime | M | none | — |
+| `RT-WRITEALL-ERROR-ROUTE-NATIVE` | writeAll §1.7.3 error/termination route on NATIVE — reify obs 1 (all-full), obs 3 (write-zero -> NoProgress), obs 4 (mid-stream Io error after an exact prefix) through the REAL derived writeAll, absolute vs LOCKED §38 and co-indexed on both engines. The error/termination continuation is DISTINCT from the success carry the FOLD closed; GATE-0-FIRST, option-(b) fork-ready. | closed | runtime | M | none | — |
 | `RT-WRITEALL-IO-IDENTITY-COMPLETE` | writeAll §1.7.3 mid-stream Io-identity completion on NATIVE — the two host-Io identities A1 left unwitnessed (Unsupported/ENOSYS + BrokenPipe/EPIPE), each FORCED as a GENUINE mid-stream reply after an exact prior Wrote prefix, reified through the REAL derived writeAll, absolute vs LOCKED §38 and co-indexed on both engines. GATE-0 inherited from A1 (same HostResult-value-agnostic K / owner Spec(2), no new construct); small serialized follow-up. | closed | runtime | S | none | — |
 | `RT-WRITEALL-SUCCESS-PLANE-CLOSE` | Close the recursive WRITE_ALL success plane so execute-then-resume admits it: supply P1's missing continuation unit (FsWriteAt vis 1229 / producer 254) whose lone NoContinuationUnit row forces has_unitless_response and holds the whole plane OPEN, WHILE discharging the boundary-move soundness obligation (P1's path composes with the specialized 267/279 siblings at the composed-return exit, right-path selection) rather than merely flipping the plane closed. The zero-TCB / outcome-(a) plane-closing predecessor to RT-NATIVE-WRITEALL-SUCCESS-FOLD's D1. A D0 measurement selects Route B (narrow the classifier veto) vs Route A (widen P1's OPEN source env); both are backend-internal planning-only. | merged | runtime | S | none | — |
 | `SEAL-2` | carrier producer closure, over a derived enumeration | merged | foundation | M | none | PR #912 @ 4ac9141e (origin/main, CI green) |
@@ -643,9 +643,7 @@ is itself not yet `merged`/`closed`:
 - `PX11` blocked by `PX9` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
-- `PX8` blocked by `RT-WRITEALL-ERROR-ROUTE-NATIVE` (status: active)
 - `PX8` blocked by `RT-COMPMATCH-TREE-SCRUTINEE` (status: draft)
-- `PX8` blocked by `PX8-NOPROGRESS-ABS` (status: active)
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)

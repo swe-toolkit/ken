@@ -1,7 +1,7 @@
 ---
 id: RT-WRITEALL-ERROR-ROUTE-NATIVE
 title: "writeAll §1.7.3 error/termination route on NATIVE — reify obs 1 (all-full), obs 3 (write-zero -> NoProgress), obs 4 (mid-stream Io error after an exact prefix) through the REAL derived writeAll, absolute vs LOCKED §38 and co-indexed on both engines. The error/termination continuation is DISTINCT from the success carry the FOLD closed; GATE-0-FIRST, option-(b) fork-ready."
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -12,6 +12,16 @@ github: null
 origin: "Steward, 2026-09-05, filing A1 of the Architect's PX8 closure-property residual decomposition (evt_4dr93v8qdv3tv, verdict evt_56ssrfbr4tt37) after the PX8 property re-verified NO at main febce9a10. The writeAll error/termination route (px8f_write_partition.rs:355, ken-verify) is IGNORED under a label naming RT-CLOSURE-BOUNDARY-RESIDUAL, which is MERGED — that node discharged the SUCCESS-carry population (px8f_buffer_native). Per the Architect the error/termination continuation is a DIFFERENT continuation than the success carry the FOLD closed, so this is DISTINCT work, not a reopen. Steward-filed per COORDINATION §2."
 ---
 
+> # CLOSED — A1 landed squash 2168f3ae3 (Steward, 2026-09-05). obs 1/3/4 reified
+> # through the real derived writeAll on native, absolute vs LOCKED §38,
+> # co-indexed both engines; the mid-stream Interrupted Io identity witnessed on
+> # the writeAll route. Steward-blob-verified px8f_write_partition.rs on main ==
+> # reviewed candidate 5ca5a587f; Adversary post-merge NO OBJECTION
+> # evt_2x7m2awb2f19z (provenance airtight, zero-TCB, §14(5) empty). Its serialized
+> # follow-up RT-WRITEALL-IO-IDENTITY-COMPLETE (the two remaining in-path Io
+> # identities) also landed (4b1a0a590). PX8 (the aggregator) still closes only on
+> # the Architect's closure-property re-verification, routed now.
+>
 > # RELEASED 2026-09-05 to the runtime ring (idle on pi; runtime-implementer
 > # gpt-5.6-sol/high = T1, correct provisioning). Lane-1 forward path and the
 > # PX8-closing critical sub-item. Base = current main (1ae3c1675).
