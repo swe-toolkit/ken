@@ -1,7 +1,7 @@
 ---
 id: LANG-KENFMT-SELECTIVE-IMPORT-WRAP
 title: "kenfmt: breakable selective-import item lists — teach the layout engine to wrap a selective-import item list at CANONICAL_WIDTH so a wide import renders width-conformant, with byte-idempotence and exact parse/token-shape preservation. Pure layout; zero parser/import-relation/kernel change. The reusable predecessor the Tier-C/D/E import migration needs (every multi-item dictionary import hits the 96-col wall)."
-status: active
+status: merged
 owner: language
 size: S
 gate: none
