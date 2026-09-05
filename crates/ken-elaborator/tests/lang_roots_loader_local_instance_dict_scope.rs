@@ -107,6 +107,25 @@ fn strict_same_unit_instance_and_derive_names_select_the_synthesized_canonicals(
 }
 
 #[test]
+fn legacy_roots_same_unit_alias_selects_the_same_synthesis_identity() {
+    let root = FixtureRoot::new("legacy-same-unit");
+    root.write("Classes.ken", "pub class C a {}");
+    root.write(
+        "Entry.ken",
+        "import Classes (C) \
+         data Local = MkLocal \
+         instance C Local {} \
+         theorem selected : C Local = C_instance_Local",
+    );
+
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
+        .expect("legacy roots receives the same explicit local alias binding");
+    let canonical = env.globals["C_instance_Entry.Local"];
+    assert_is_exact_const(&transparent_body(&env, "Entry.selected"), canonical);
+}
+
+#[test]
 fn same_file_module_import_is_available_before_just_in_time_dictionary_binding() {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_file(
