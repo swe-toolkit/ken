@@ -1987,6 +1987,7 @@ fn atom_can_start(token: &Token) -> bool {
         token,
         Token::Ident(_)
             | Token::ConId(_)
+            | Token::Operator(_)
             | Token::Nat(_)
             | Token::IntLit(_)
             | Token::FloatLit(_)
@@ -2008,6 +2009,7 @@ fn atom_can_end(token: &Token) -> bool {
         token,
         Token::Ident(_)
             | Token::ConId(_)
+            | Token::Operator(_)
             | Token::Nat(_)
             | Token::IntLit(_)
             | Token::FloatLit(_)

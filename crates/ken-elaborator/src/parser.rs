@@ -80,6 +80,20 @@ impl Parser {
         }
     }
 
+    /// A global name position accepts ordinary identifiers and user-defined
+    /// symbolic operators. Local binders and module aliases continue to use
+    /// `expect_ident`, keeping the new surface bounded to ordinary globals.
+    fn expect_global_name(&mut self) -> Result<(String, Span), ElabError> {
+        let (tok, span) = self.advance();
+        match tok {
+            Token::Ident(s) | Token::ConId(s) | Token::Operator(s) => Ok((s, span)),
+            other => Err(ElabError::ParseError {
+                msg: format!("expected global name, found {:?}", other),
+                span,
+            }),
+        }
+    }
+
     fn expect_con(&mut self) -> Result<(String, Span), ElabError> {
         let (tok, span) = self.advance();
         match tok {
@@ -96,7 +110,7 @@ impl Parser {
     }
 
     /// Extend `first` (a just-consumed `ConId`) with zero or more
-    /// `. ident-or-conid` segments — `M.foo`, `M.N.Bar` (`33 §3.2`
+    /// `. global-name` segments — `M.foo`, `M.N.Bar`, `M.<+>` (`33 §3.2`
     /// qualified reference syntax). Joins into a single dotted string;
     /// name resolution (`modules.rs`) splits it back apart at the last
     /// `.` to find the exporting module. Only triggered from a `ConId`
@@ -107,11 +121,14 @@ impl Parser {
         let mut joined = first;
         let mut end = first_span.end;
         while matches!(self.peek(), Token::Dot)
-            && matches!(self.lookahead(1), Token::Ident(_) | Token::ConId(_))
+            && matches!(
+                self.lookahead(1),
+                Token::Ident(_) | Token::ConId(_) | Token::Operator(_)
+            )
         {
             self.advance(); // consume '.'
             let (seg, seg_span) = match self.peek().clone() {
-                Token::Ident(s) | Token::ConId(s) => {
+                Token::Ident(s) | Token::ConId(s) | Token::Operator(s) => {
                     self.advance();
                     (s, self.tokens[self.pos - 1].1.clone())
                 }
@@ -581,7 +598,7 @@ impl Parser {
         keyword: DefKeyword,
     ) -> Result<Decl, ElabError> {
         self.advance(); // consume definition keyword
-        let (name, _) = self.expect_ident()?;
+        let (name, _) = self.expect_global_name()?;
 
         let mut params = Vec::new();
         if matches!(self.peek(), Token::LParen) && matches!(self.lookahead(1), Token::RParen) {
@@ -1297,7 +1314,7 @@ impl Parser {
         self.expect(&Token::LParen)?;
         let mut items = Vec::new();
         loop {
-            let name = self.expect_ident()?.0;
+            let name = self.expect_global_name()?.0;
             items.push(self.parse_item_rename(name)?);
             if matches!(self.peek(), Token::Comma) {
                 self.advance();
@@ -1316,7 +1333,7 @@ impl Parser {
         let mut items = vec![self.parse_item_rename(first)?];
         while matches!(self.peek(), Token::Comma) {
             self.advance();
-            let name = self.expect_ident()?.0;
+            let name = self.expect_global_name()?.0;
             items.push(self.parse_item_rename(name)?);
         }
         Ok(items)
@@ -1341,7 +1358,7 @@ impl Parser {
                 }
             }
         } else {
-            let first = self.expect_ident()?.0;
+            let first = self.expect_global_name()?.0;
             crate::ast::ExportForm::InScope {
                 items: self.parse_remaining_export_items(first)?,
             }
@@ -2565,6 +2582,11 @@ impl Parser {
                 } else {
                     Ok(Expr::EVar(s, span))
                 }
+            }
+            Token::Operator(s) => {
+                let span = self.peek_span().clone();
+                self.advance();
+                Ok(Expr::EVar(s, span))
             }
             Token::ConId(s) => {
                 let span = self.peek_span().clone();
