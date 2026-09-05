@@ -11,8 +11,6 @@ use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
 
 const BYTES_KEYS: &str = include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
-const LAWFUL_FUNCTORS: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
 const EFFECTFUL_CLASSES: &str =
     include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
 const NONEMPTY: &str = include_str!("../../../catalog/packages/Data/Collections/NonEmpty.ken.md");
@@ -60,9 +58,8 @@ fn dependency_env() -> ElabEnv {
         });
     }
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "length"]);
-    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
+    catalog_or::load_lawful_functors_importing_fixture(&mut env);
     for (source, label) in [
-        (LAWFUL_FUNCTORS, "Core.Classes.LawfulFunctors"),
         (EFFECTFUL_CLASSES, "Core.Classes.EffectfulClasses"),
         (NONEMPTY, "Data.Collections.NonEmpty"),
         (VALIDATION, "Data.Sums.Validation"),
@@ -71,9 +68,6 @@ fn dependency_env() -> ElabEnv {
     ] {
         env.elaborate_ken_md_file(source)
             .unwrap_or_else(|err| panic!("{label} must elaborate in dependency order: {err:?}"));
-        if label == "Core.Classes.LawfulFunctors" {
-            catalog_or::restore_lc_bool_and_flat_aliases(&mut env);
-        }
     }
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
         .expect("Data.Numeric.Nat.Order must load before its Cursor consumer");
