@@ -335,27 +335,40 @@ fn assert_write_trace(result: &RunResult, expected_exit: i32, expected: &[Expect
     }
 }
 
-// Ignored pending RT-CARRIED-RESOURCE-SCALAR.
-//
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsWriteAt needs ResourceScalar, which it cannot observe in CarriedWord
-//
-// Owner node: RT-CARRIED-RESOURCE-SCALAR.
-// Pre-existing base debt, NOT a bind-order regression: measured failing at
-// the frozen base 21fd46dc by the D10 differential, before any
-// RT-SRCBODY-BIND-ORDER commit.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// A ResourceScalar need, not a byte-span one, despite the shared refusal
-// shape. Its ken-cli twin px8f_buffer_native fails identically. This row
-// is in ken-verify, not ken-cli -- CI runs it as its own -p ken-verify job.
-// Annotation only -- test body and expectations are unchanged.
+// Baseline provisioning, not a depth claim. With ambient RUST_MIN_STACK absent,
+// the exact write-partition compile aborted at 2 MiB once and completed at
+// 4 MiB twice. Treat 4 MiB as the conservative measured peak. Retaining this
+// test's pre-existing 256 MiB provision adds exactly 252 MiB of headroom; the
+// named local Builder stack, rather than an ambient harness default, is
+// operative.
+const WRITE_ALL_PARTITION_STACK_MEASURED_PEAK_BYTES: usize = 4 * 1024 * 1024;
+const WRITE_ALL_PARTITION_STACK_HEADROOM_BYTES: usize = 252 * 1024 * 1024;
+const WRITE_ALL_PARTITION_STACK_BYTES: usize =
+    WRITE_ALL_PARTITION_STACK_MEASURED_PEAK_BYTES + WRITE_ALL_PARTITION_STACK_HEADROOM_BYTES;
+
+/// Promise class: durable end-to-end witness. Activated by
+/// RT-WRITEALL-ERROR-ROUTE-NATIVE after the stale merged-node ignore was
+/// measured green on its released base.
+///
+/// MEASURED: the real derived `writeAll` reaches full, short, zero, resumed
+/// progress, and mid-stream error host replies on native. Every row asserts
+/// the exact request tuple, canonical reply, exit status, positioned output
+/// prefix, and reaching syscall trace.
+/// CLAIMED: LOCKED sections 1.7.2 and 1.7.3 observations 1, 3, and 4 reify
+/// `Wrote(full)`, zero as `NoProgress` rather than `Wrote(0)`, and the first
+/// `Interrupted` error after exactly the preceding written prefix.
+/// THE GAP: the Linux interposer makes those host outcomes deterministic; this
+/// row does not claim every platform errno or every possible write partition.
+///
+/// Gate 0 was measured structurally on this exact compile, independently of
+/// `RecursiveBackedge`: P1 `(254, 1229, 1228, 262)` remains Deferred and has K
+/// body 1171, one HostResult use per path, two Ret exits, one resolved static
+/// tail call, no other tail exit, and unique handler owner Specialization(2).
 #[test]
-#[ignore = "RT-CLOSURE-BOUNDARY-RESIDUAL: lowering refuses with \"Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane\" (boundary.rs:1044). MEASURED 2026-08-22 on this row. The origin seam RT-CLOSURE-BOUNDARY-LANE is RESOLVED, and so is the RT-CARRIED-RESOURCE-SCALAR blocker this row used to name -- closing them moved the row to this residual population rather than greening it."]
 fn checked_write_all_reaches_full_short_zero_progress_flip_and_error_prefixes() {
     std::thread::Builder::new()
         .name("px8f-write-partition".to_string())
-        .stack_size(256 * 1024 * 1024)
+        .stack_size(WRITE_ALL_PARTITION_STACK_BYTES)
         .spawn(run_write_partition)
         .expect("spawn large-stack PX8-F differential")
         .join()
