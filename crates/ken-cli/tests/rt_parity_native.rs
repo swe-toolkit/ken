@@ -372,6 +372,16 @@ proc rt_cap41_out_of_range_buffer
       (MkBufferWindow (9 : Int) (4 : Int)))
     (\outcome. rt_expect_invalid_bounds outcome)
 
+proc rt_cap41_out_of_range_eof_buffer
+  (file : Resource FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file (0 : Int) buffer
+      (MkBufferWindow (9 : Int) (4 : Int)))
+    (\outcome. rt_cap41_expect_eof outcome)
+
 proc rt_cap41_offset_endpoint_buffer
   (file : Resource FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
@@ -410,6 +420,16 @@ proc rt_cap41_out_of_range_file (file : Resource FsHandle)
     (withBuffer AFull Unit Unit (8 : Int) (rt_cap41_out_of_range_buffer file))
     (\outcome. rt_inner_bracket_result outcome)
 
+proc rt_cap41_out_of_range_eof_file (file : Resource FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit (8 : Int)
+      (rt_cap41_out_of_range_eof_buffer file))
+    (\outcome. rt_inner_bracket_result outcome)
+
 proc rt_cap41_offset_endpoint_file (file : Resource FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
@@ -445,6 +465,15 @@ proc rt_cap41_out_of_range_stage (cap : Cap AFull)
     (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
     (withResource AFull Unit Unit cap (bytes_encode "source")
       ResourceRead rt_cap41_out_of_range_file)
+    (\outcome. rt_bracket_done outcome)
+
+proc rt_cap41_out_of_range_eof_stage (cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+    (withResource AFull Unit Unit cap (bytes_encode "source")
+      ResourceRead rt_cap41_out_of_range_eof_file)
     (\outcome. rt_bracket_done outcome)
 
 proc rt_cap41_offset_endpoint_stage (cap : Cap AFull)
@@ -685,6 +714,56 @@ fn assert_narrowed_alike(
     }
 }
 
+/// Assert the contract-pinned zero-effective-read result on one co-indexed
+/// native/interpreter execution.
+///
+/// Promise class: durable invariant. MEASURED: the fixture's sole successful
+/// branch is `Ok ReadEof`; both engines exit successfully without a terminal
+/// error, agree on non-release and release traces, and record no `FsReadAt`.
+/// CLAIMED: a valid endpoint window yields `ReadEof` without visiting the host.
+/// THE GAP: the internal `ReadProgress` is observed through the fixture's exact
+/// branch-to-exit discriminator rather than as a public effect event.
+fn assert_read_eof_alike(case: &str, result: &Differential) {
+    let Differential {
+        interpreted,
+        native,
+    } = result;
+    assert_eq!(
+        interpreted.exit_status, 0,
+        "{case}: interpreter must observe exactly Ok ReadEof: {interpreted:?}"
+    );
+    assert_eq!(
+        native.exit_status, 0,
+        "{case}: native must observe exactly Ok ReadEof: {native:?}"
+    );
+    assert_eq!(interpreted.terminal_error, None, "{case}: interpreter");
+    assert_eq!(native.terminal_error, None, "{case}: native");
+    assert_eq!(
+        non_release_events(native),
+        non_release_events(interpreted),
+        "{case}: ordered non-release effects must agree"
+    );
+    assert_eq!(
+        release_set(native),
+        release_set(interpreted),
+        "{case}: release sets must agree"
+    );
+    assert_eq!(
+        interpreted.terminal_exit, native.terminal_exit,
+        "{case}: terminal exit class must agree"
+    );
+    let interpreted_reads = operation_events(interpreted, ken_runtime::HostOpV1::FsReadAt);
+    let native_reads = operation_events(native, ken_runtime::HostOpV1::FsReadAt);
+    assert_eq!(
+        interpreted_reads, native_reads,
+        "{case}: canonical FsReadAt events must agree"
+    );
+    assert!(
+        interpreted_reads.is_empty(),
+        "{case}: effective=0 must yield ReadEof without FsReadAt dispatch"
+    );
+}
+
 fn in_large_stack_thread(name: &'static str, body: fn()) {
     std::thread::Builder::new()
         .name(name.to_string())
@@ -780,6 +859,105 @@ fn buffer_allocate_malformed_capacity_narrows_to_invalid_bounds() {
 }
 
 // -- FsReadAt ------------------------------------------------------------
+
+/// Promise class: durable invariant. This instantiates the contract assertion
+/// above at the capacity-8 endpoint and deliberately stays non-ignored so the
+/// native-slow CI lane executes it.
+#[test]
+fn fs_read_at_endpoint_yields_read_eof_without_host_dispatch() {
+    in_large_stack_thread("rt-parity-cap41-read-eof", || {
+        let result = differential("cap41-read-eof", "rt_cap41_endpoint_stage");
+        assert_read_eof_alike("cap41-read-eof", &result);
+    });
+}
+
+/// Promise class: normative compatibility vector. The capacity-8 endpoint
+/// window and its nearest out-of-range neighbor must select different exact
+/// `ReadProgress` results before either can visit the host.
+///
+/// MEASURED: start 9 reaches the fixture's sole `InvalidBounds` success arm;
+/// changing only that arm's expected continuation to the ReadEof discriminator
+/// makes both engines exit non-zero, and the unchanged ReadEof assertion rejects
+/// it. CLAIMED: the endpoint ReadEof witness does not also accept InvalidBounds.
+/// THE GAP: exact internal results are observed through branch-to-exit
+/// discriminators because narrowing emits no public `FsReadAt` event.
+#[test]
+fn fs_read_at_out_of_range_invalid_bounds_rejects_read_eof_witness() {
+    in_large_stack_thread("rt-parity-cap41-read-eof-control", || {
+        let invalid_bounds = differential(
+            "cap41-out-of-range-invalid-bounds",
+            "rt_cap41_out_of_range_stage",
+        );
+        assert_eq!(
+            (
+                invalid_bounds.interpreted.exit_status,
+                invalid_bounds.native.exit_status
+            ),
+            (0, 0),
+            "the sibling fixture's sole success branch must observe InvalidBounds"
+        );
+        assert_eq!(invalid_bounds.interpreted.terminal_error, None);
+        assert_eq!(invalid_bounds.native.terminal_error, None);
+        assert_eq!(
+            invalid_bounds.interpreted.terminal_exit,
+            invalid_bounds.native.terminal_exit
+        );
+        assert_eq!(
+            non_release_events(&invalid_bounds.native),
+            non_release_events(&invalid_bounds.interpreted)
+        );
+        assert_eq!(
+            release_set(&invalid_bounds.native),
+            release_set(&invalid_bounds.interpreted)
+        );
+        assert!(
+            operation_events(&invalid_bounds.interpreted, ken_runtime::HostOpV1::FsReadAt)
+                .is_empty()
+        );
+        assert!(
+            operation_events(&invalid_bounds.native, ken_runtime::HostOpV1::FsReadAt).is_empty()
+        );
+
+        let rejected = differential(
+            "cap41-out-of-range-read-eof",
+            "rt_cap41_out_of_range_eof_stage",
+        );
+        assert_eq!(
+            rejected.interpreted.exit_status, rejected.native.exit_status,
+            "both engines must reject the same out-of-range value"
+        );
+        assert_ne!(
+            rejected.interpreted.exit_status, 0,
+            "InvalidBounds must not satisfy the ReadEof discriminator"
+        );
+        assert_eq!(rejected.interpreted.terminal_error, None);
+        assert_eq!(rejected.native.terminal_error, None);
+        assert_eq!(
+            rejected.interpreted.terminal_exit,
+            rejected.native.terminal_exit
+        );
+        assert_eq!(
+            non_release_events(&rejected.native),
+            non_release_events(&rejected.interpreted)
+        );
+        assert_eq!(
+            release_set(&rejected.native),
+            release_set(&rejected.interpreted)
+        );
+        assert!(
+            operation_events(&rejected.interpreted, ken_runtime::HostOpV1::FsReadAt).is_empty()
+        );
+        assert!(operation_events(&rejected.native, ken_runtime::HostOpV1::FsReadAt).is_empty());
+
+        let witness_rejected = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            assert_read_eof_alike("cap41-out-of-range-read-eof", &rejected)
+        }));
+        assert!(
+            witness_rejected.is_err(),
+            "the unchanged ReadEof witness must reject its InvalidBounds neighbor"
+        );
+    });
+}
 
 // RETIRED by D3-RECUT. The transition sentinel
 // `fs_read_at_malformed_offset_reaches_resource_body_result_frontier` asserted
