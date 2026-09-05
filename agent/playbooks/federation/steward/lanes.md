@@ -60,6 +60,19 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
+> ### OPERATOR RULING 2026-09-05 (LATEST) — RUNTIME lane-1 objective = ABI-REVOKE
+>
+> (Operator, 2026-09-05, this session, via AskUserQuestion.) The runtime lane
+> has COMPLETED its prior objectives: RT-LIVE-K-CONTEXT-ENTRY-SELECTION-D0 is
+> `closed` and the whole PX8 positioned/partial-IO program is done (PX8 closed on
+> the Architect's closure-property verdict evt_6afgrapqf4f1r, both engines). The
+> runtime lane-1 objective is now **ABI-REVOKE** (the runtime revocation membrane,
+> the deferred runtime face of spec 62 §4; depends_on [ABI-R3] which is merged, so
+> buildable; landing it unblocks PX9 -> PX10/PX11). It is marked deferred/size-TBD,
+> so it is ROUTED to the Architect for decomposition/sizing (evt_283ykj5raaa0n)
+> before the Steward frames + releases it to the runtime ring. This SUPERSEDES the
+> stale 2026-08-31 LIVE-K objective in the lane-1 table cell below.
+>
 > ### OPERATOR RULING 2026-09-05 (LATEST) — DEFER L2 CI work; do NOT block L2 on it
 >
 > (Operator, 2026-09-05, this session: "defer the CI work for L2. don't schedule
