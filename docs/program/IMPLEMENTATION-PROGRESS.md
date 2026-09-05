@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-05 20:50:30Z — from 552 issue file(s) in `docs/program/issues/`.
+2026-09-05 21:19:35Z — from 552 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -247,7 +247,7 @@ the committed file matches the generator's output.
 | `LANG-SURFACE-PAIR` | Pair literals, positional projections, and the Sigma type production are required by 32-grammar and wholly absent from the surface -- `Token::Times` is lexed for `×` and consumed by nothing, `(a, b)` is a parse error, and `.1`/`.2` fall outside the projection guard -- while the kernel's Sigma/Pair/Proj1/Proj2 are complete and already exercised by records | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1859 |
 | `LANG-SURFACE-RECORD-DECL` | `33 §2` specifies `record Point { x : Int, y : Int }` and `record` is already a reserved keyword, but the lexer emits no token for it and the parser has no declaration form -- while the elaboration target is complete and already exercised, since `class` elaborates to exactly the right-nested Sigma chain a record needs and `p.x` already parses and resolves, refusing only at `infer_proj` because that lookup scans the class registry | merged | language | M | none | — |
 | `LANG-SURFACE-RECORD-LITERAL` | `33 §2` names record literals `{ x = 1, y = 2 }`, punning `{ x, y }` and functional update `{ p | y = 3 }` as having their expected definitional behaviour, and none of the three parses -- expression-position `{` has no arm in `parse_atom_expr_base` at all, so the brace fork the sibling frame warned about does not exist here: refinement braces live in `parse_type`, which is a separate parser | merged | language | M | none | — |
-| `LANG-SYMBOLIC-OPERATOR-NAMES` | `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined | active | language | S | none | — |
+| `LANG-SYMBOLIC-OPERATOR-NAMES` | `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined | merged | language | S | none | — |
 | `LANG-TRIVIA-KIND-MAPPING-PIN` | `LANG-COMMENT-CLASSIFIER-SHARED` made scanner divergence unrepresentable and moved the surface one hop to `From<CommentKind> for TriviaKind`, which is now the sole place a classification becomes a behaviour -- the completeness axis is closed by the compiler but the per-arm mapping is asserted nowhere, and the one fixture that covers the block form is a configuration where the doc rule and the positional heuristic return the same answer, so a Block/DocBlock transposition compiles and reds nothing | merged | language | XS | none | — |
 | `LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES` | The `trunc_intro` infer-position diagnostic advises two remedies that both require an annotation-position `‖A‖` spelling the surface does not have, and omits `elim_trunc`'s motive, which is the one position that works | draft | language | S | none | — |
 | `LANG-TRUNCATION-SURFACE-SYNTAX` | Give propositional truncation a surface spelling and an elaboration rule -- the kernel already types Trunc and TruncProj, and no .ken file can reach them | merged | language | M | none | — |
@@ -639,7 +639,6 @@ is itself not yet `merged`/`closed`:
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
 - `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: draft)
-- `LANG-INFIX-APPLICATION-DEFAULT` blocked by `LANG-SYMBOLIC-OPERATOR-NAMES` (status: active)
 - `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `LANG-MOD-KENFMT-DECL-LAYOUT` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `PX10` blocked by `PX9` (status: draft)

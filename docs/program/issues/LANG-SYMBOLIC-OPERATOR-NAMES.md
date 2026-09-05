@@ -1,7 +1,7 @@
 ---
 id: LANG-SYMBOLIC-OPERATOR-NAMES
 title: "`31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
