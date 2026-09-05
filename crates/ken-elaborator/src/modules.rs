@@ -1875,20 +1875,18 @@ struct PendingSynthesizedDictionary {
     span: Span,
 }
 
-fn assert_synthesized_dictionary_identity(
-    scope: &Scope,
+fn assert_synthesis_installed_identity(
     globals: &HashMap<String, ken_kernel::GlobalId>,
     result: &crate::elab::ElabResult,
     name: &SynthesizedDictionaryName,
     span: &Span,
 ) -> Result<(), ElabError> {
-    let bound = scope.bindings.get(&name.surface);
     let installed = globals.get(&name.canonical).copied();
-    if bound == Some(&name.canonical) && installed == Some(result.def_id) {
+    if installed == Some(result.def_id) {
         return Ok(());
     }
     Err(ElabError::Internal(format!(
-        "synthesized dictionary `{}` did not preserve its planned canonical `{}` identity at {}..{}: bound={bound:?}, installed={installed:?}, result={:?}",
+        "synthesized dictionary `{}` did not preserve its installed canonical `{}` identity at {}..{}: installed={installed:?}, result={:?}",
         name.surface, name.canonical, span.start, span.end, result.def_id
     )))
 }
@@ -2652,8 +2650,7 @@ fn expand_scope(
                         )?;
                     }
                     if let Some(name) = resolved_synthesized_dictionary_name(&rdecl) {
-                        assert_synthesized_dictionary_identity(
-                            scope,
+                        assert_synthesis_installed_identity(
                             &elab.globals,
                             &result,
                             &name,
