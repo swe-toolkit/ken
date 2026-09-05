@@ -25,12 +25,16 @@ origin: "Steward-framed 2026-09-05 from the Architect's composed-return decompos
 > STATE: D0 DONE (came back OPEN; the plane-close predecessor was cut + landed).
 > D1 PREMISE re-scoped — the "consumer-only carry" premise was FALSIFIED (P1 has
 > no executable success producer); D1 now SUPPLIES P1's producer AND consumes the
-> carried result, both zero-TCB. Mechanism front-loaded by the Architect
-> (evt_592eh20103vn9 + D1 ruling evt_7hy3jk2z63bw4); the ring builds (i) now and
-> takes the Ok(None)-position measurement for (ii) first, then the Architect
-> confirms the (ii) mechanism; the Architect reviews the candidate. The ONLY
-> option-(b) surface is the contingent-hard-stop combination in D1 — grounding
-> predicts it does not fire.
+> carried result, both zero-TCB. The (ii) mechanism is PINNED = fix-(2) (Architect
+> evt_5cgagfmgssexs, after the ring's measurement showed 1229 is never presented
+> to exact_continuation_source_environment, so fix-(1) is OUT — it would
+> re-classify a main-lowered Vis). Mechanism front-loaded by the Architect
+> (evt_592eh20103vn9 + D1 ruling evt_7hy3jk2z63bw4 + fix-(2) pin evt_5cgagfmgssexs);
+> the ring builds (i) the carried-BoundedNat adapter and (ii) fix-(2) (drive the
+> main-lowered Vis via lower_process_host_effect + plan the recursive-join scalar
+> cut), WITHOUT touching the plane classifier or admission ledger; the Architect
+> reviews the candidate. The ONLY option-(b) surface is the scalar-cut residual in
+> D1's contingent hard-stop — grounding predicts it does not fire.
 
 ## Objective
 
@@ -126,43 +130,48 @@ error path (write-narrowing).
       BoundaryClass::Int (boundary.rs:1149-1152), which is why
       `lower_carried_constructor_match`'s require_i64(Constructor) guard
       (joins.rs:913-916) rejects it today. Pure backend lowering-dispatch.
-    - (ii) P1 EXECUTION [Result match origin 1064] — via the execute-then-resume
-      owner seam (units.rs:3240-3462), producer 254 -> K/vis 1229. TAKE THE ONE
-      MEASUREMENT FIRST: WHY does `exact_continuation_source_environment` return
-      Ok(None) for producer_construct_origin 1229 — which required environment
-      position is Open/ambiguous (not Closed([S])), or is reached.len() <
-      required_input_count? (take-loop continuations.rs:3610-3674; admitting
-      verdict Closed([S]) only, closure.rs:681-685). Ok(None) is silent about
-      which position declined — measure it, report to the Architect, who confirms
-      the mechanism (self-contained). The measurement selects between:
-        - fix-(1) [if a PLANNABLE environment-widening, same shape as the
-          record_worker_prefix_deferral D2 deferrals, continuations.rs:3585-3597]:
-          mint P1 a continuation unit via the existing continuation-production path
-          so it enters `demands`. GATED: viable ONLY if producer 254 is
-          exclusively-predeclared — else a mixed-owner P1 promotion reopens the
-          classification and trips the arm-3 over-promotion discriminator the
-          plane-close established (a StaticResponseDeferred escaping its owner).
-        - fix-(2) [if a genuinely non-Closed([S]) source no widening can seat;
-          Architect LEANS this — respects the landed plane-close, no
-          re-classification / no arm-3 interaction]: keep P1 main-lowered (in
-          phase_a.deferred, disjoint from promoted 267/279) and make the
-          composed-return / carried computational-match ELIMINATION
-          (core.rs:13423-13511) DISPATCH `lower_process_host_effect`
-          (effects.rs:2225+) for the `ITree::Vis` and feed its HostResult to the
-          bind continuation in-frame, PLANNING the scalar cut NativeJoinPlanV1
-          named (a RIG/planning limitation, not a structural wall — the test
-          corpus states a rig supplying a planned scalar cut retires the refusing
-          row, core/tests/constructors.rs:4709-4730), instead of the current
-          Deferred fall-through that builds the Vis as inert data.
-    - CONTINGENT HARD-STOP (gate=none unless it surfaces): the ONLY option-(b)
-      surface is the specific combination — fix-(1) would require promoting a
-      MIXED-OWNER P1 (tripping arm-3) AND fix-(2) genuinely cannot plan a scalar
-      cut for that join (NativeJoinPlanV1 not closable by planning, contrary to
-      the test-corpus statement). That combination is an immediate HARD-STOP to
-      the Architect -> Steward -> operator (operator AWAY ~til 12:00 UTC, so the
-      Steward QUEUES it). The Architect's grounding predicts neither; both
-      mechanisms are zero-TCB, so the measurement selects the cleaner one, not the
-      boundary.
+    - (ii) P1 EXECUTION [Result match origin 1064] — MECHANISM PINNED = fix-(2)
+      (Architect confirmed evt_5cgagfmgssexs after the ring's measurement). The
+      measurement is DONE and it CORRECTED the ruling's disambiguator premise
+      (§7a): `exact_continuation_source_environment` is NEVER CALLED for 1229 (0 of
+      72 calls) — the unit-construction candidate population IS the D4B admission
+      ledger {606,815,1024,1406,1549,1572} and 1229 is legitimately absent (D0:
+      main-lowered, not an Open/Ambiguous specialization candidate). There is no
+      Ok(None) verdict to widen, so fix-(1) is DEFINITIVELY OUT, not disfavored:
+      minting a unit would require ADDING 1229 to the admission ledger =
+      re-classifying a main-lowered Vis as a specialization candidate = reopening
+      Route B and tripping the arm-3 over-promotion the plane-close approved
+      AGAINST. DO NOT add 1229 to the ledger / touch the plane classifier.
+      fix-(2), verified from 34ef1c826: keep 1229 main-lowered / Deferred (P1 stays
+      in phase_a.deferred, DISJOINT from the promoted 267/279 — the adversary
+      soundness backbone, untouched). At the Vis consumption point, DISPATCH
+      `lower_process_host_effect` (effects.rs:2225+) to perform FsWriteAt, take its
+      HostResult (the Wrote), and feed it to the bind K (LexicalClosure origin
+      1192) IN-FRAME via the existing carried computational-match elimination
+      (core.rs:13423-13511, which already matches ITree::Ret vs ITree::Vis by tag),
+      instead of the current Deferred fall-through that builds the Vis as inert
+      tag-0 data (ordinary Construct arm, core.rs:14187-94). K's body recursion
+      (Result -> Wrote -> count/Nat -> recursive call) is ALREADY loop-compiled by
+      the landed recursor (make_computational_recursor, core.rs:13556+): no stack
+      re-entry, no continuation identity crossing a fn-return, no FuncRef crossing
+      (K 1192 is the in-frame fall-through of the worker, not a declared-unit
+      call). REMAINING within-lane work: PLAN the scalar cut for the recursive join
+      before its outer suffix (NativeJoinPlanV1; the test corpus states a rig
+      supplying a planned scalar cut retires the refusing sentinel into the real
+      positive, core/tests/constructors.rs:4709-4730 — landed-planning work, not a
+      wall). The exact driving code site (where the inert Vis word is currently
+      read) is the ring's to place; the Architect confirmed the mechanism family +
+      boundary, not the site.
+    - CONTINGENT HARD-STOP (gate=none unless it surfaces): the single residual risk
+      is the SCALAR CUT. If, on the build, the scalar cut for this recursive join
+      genuinely CANNOT be planned with the landed planning machinery —
+      NativeJoinPlanV1 turns out NOT closable by planning and the join needs a NEW
+      construct (contra the test-corpus statement) — that is the ONLY path to an
+      option-(b) surface,
+      and it is an immediate HARD-STOP to the Architect -> Steward -> operator
+      (operator AWAY ~til 12:00 UTC, so the Steward QUEUES it). The dispatch
+      (lower_process_host_effect) and the recursion (make_computational_recursor)
+      carry no such risk; the Architect's grounding predicts the cut IS plannable.
 - D2 — WITNESS + UN-IGNORE. Green the WRITE_ALL success row: exit 0, output
   "abcdef", exactly 3 `FsWriteAt` events (0,0,6)/(2,2,4)/(4,4,2), native ==
   interpreter, the retained body reaching exit rather than the
@@ -186,14 +195,16 @@ error path (write-narrowing).
   inert tag-0 `ITree::Vis` constructor word from the ordinary Construct
   fall-through (core.rs:14187-14194). A discriminating control that reverts P1 to
   that inert fall-through must re-red the row.
-- AC-D1-MECHANISM-BY-MEASUREMENT. The Ok(None)-position measurement for
-  producer_construct_origin 1229 is recorded, and the chosen (ii) mechanism
-  matches what it admits: fix-(1) (mint P1 a continuation unit) is used ONLY if
-  producer 254 is exclusively-predeclared (else it would trip the plane-close
-  arm-3 over-promotion discriminator); otherwise fix-(2) (keep P1 main-lowered;
-  inline-drive the Vis via lower_process_host_effect + a planned scalar cut). The
-  option-(b) combination (fix-(1) needs mixed-owner promotion AND fix-(2) cannot
-  plan the cut) is a HARD-STOP, not a landing.
+- AC-D1-MECHANISM-FIX2. The (ii) mechanism is fix-(2) (Architect-pinned
+  evt_5cgagfmgssexs; the measurement showed exact_continuation_source_environment
+  is never called for 1229, so fix-(1) is rejected — it would re-classify a
+  main-lowered Vis). 1229 stays main-lowered / Deferred (NOT added to the admission
+  ledger, NOT re-classified); the Vis is DRIVEN via lower_process_host_effect and
+  its HostResult fed to K 1192 in-frame through the carried computational-match
+  elimination, with the recursive join's scalar cut PLANNED. The candidate must NOT
+  touch the plane classifier or the admission ledger. The sole option-(b) surface —
+  the scalar cut proving unplannable and needing a new construct — is a HARD-STOP,
+  not a landing.
 - AC-WRITEALL-SUCCESS-GREEN. The WRITE_ALL success row is green and co-indexed:
   it reifies BOTH Wrote and ReadSome, exit 0, output "abcdef", exactly 3
   `FsWriteAt` events (0,0,6)/(2,2,4)/(4,4,2), native == interpreter.
