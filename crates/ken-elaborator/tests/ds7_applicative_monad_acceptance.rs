@@ -18,8 +18,6 @@ mod catalog_or;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId};
-const LAWFUL_FUNCTORS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
 const EFFECTFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
 
@@ -32,10 +30,7 @@ fn base_env() -> ElabEnv {
     // import) and `list_append` so each real selective import installs its own
     // binding, and keep Derived importable.
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "list_append"]);
-    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
-        .expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
-    catalog_or::restore_lc_bool_and_flat_aliases(&mut env);
+    catalog_or::load_lawful_functors_importing_fixture(&mut env);
     env
 }
 
