@@ -3762,11 +3762,13 @@ mod tests {
                 ken_host::SymlinkPolicy::NoFollow,
             ),
         );
+        let mut revocation = ken_host::RevocationDomain::default();
         let mut capabilities = ken_host::CapabilityTableV1::default();
-        let capability = capabilities.insert(ken_host::CapabilityGrantV1 {
-            identity: ken_host::program_caps_fs_trace_identity_v1(),
-            capability: cap,
-        });
+        let capability = capabilities.insert(ken_host::CapabilityGrantV1::mint_root(
+            ken_host::program_caps_fs_trace_identity_v1(),
+            cap,
+            &mut revocation,
+        ));
         let mut resources = ken_host::ResourceTableV1::default();
         let mut backend = SharedSemanticBackend;
         let open_request = ken_host::CanonicalRequestV1::FsOpen {
@@ -3776,6 +3778,7 @@ mod tests {
         let open = ken_host::dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             ken_host::HostOpV1::FsOpen,
             Some(capability),
@@ -3807,6 +3810,7 @@ mod tests {
             let reply = ken_host::dispatch_host_op_v1(
                 &mut backend,
                 &capabilities,
+                &revocation,
                 &mut resources,
                 operation,
                 None,

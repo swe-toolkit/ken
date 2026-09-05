@@ -2878,6 +2878,7 @@ mod console_io_tests {
             notdirectory_id: GlobalId(0),
             notempty_id: GlobalId(0),
             unsupported_id: GlobalId(0),
+            revoked_id: GlobalId(0),
             other_id: GlobalId(0),
             unit_id,
             params_len: 0,

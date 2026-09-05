@@ -7,6 +7,12 @@
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct RevocationNodeId(u64);
 
+impl std::fmt::Debug for RevocationNodeId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("RevocationNodeId(..)")
+    }
+}
+
 struct RevocationNode {
     id: RevocationNodeId,
     parent: Option<RevocationNodeId>,
@@ -14,12 +20,15 @@ struct RevocationNode {
 }
 
 #[derive(Default)]
-pub(crate) struct RevocationDomain {
+pub struct RevocationDomain {
     nodes: Vec<RevocationNode>,
     next_node_id: u64,
 }
 
-#[allow(dead_code)] // D0 substrate; dispatch consumption lands in ABI-REVOKE-D1.
+pub(crate) struct RevocationAdmissionLease {
+    _node: RevocationNodeId,
+}
+
 impl RevocationDomain {
     pub(crate) fn mint_root(&mut self) -> RevocationNodeId {
         self.mint_node(None)
@@ -40,6 +49,11 @@ impl RevocationDomain {
         };
         node.locally_live = false;
         true
+    }
+
+    pub(crate) fn admit(&self, node: RevocationNodeId) -> Option<RevocationAdmissionLease> {
+        self.is_admissible(node)
+            .then_some(RevocationAdmissionLease { _node: node })
     }
 
     pub(crate) fn is_admissible(&self, node: RevocationNodeId) -> bool {

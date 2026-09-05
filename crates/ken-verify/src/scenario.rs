@@ -406,6 +406,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     NotDirectory |-> host_exit AFull (Failure 52) ;
                     NotEmpty |-> host_exit AFull (Failure 53) ;
                     Unsupported |-> host_exit AFull (Failure 54) ;
+                    Revoked |-> host_exit AFull (Failure 54) ;
                     Other _ |-> host_exit AFull (Failure 55)
                   }
                 }
@@ -1086,11 +1087,14 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 
     #[test]
     fn wrong_token_malformed_identity_and_error_are_reply_owned() {
+        let mut source_revocation = ken_host::RevocationDomain::default();
         let mut source_table = CapabilityTableV1::default();
-        let wrong_token = source_table.insert(CapabilityGrantV1 {
-            identity: program_caps_fs_trace_identity_v1(),
-            capability: ken_elaborator::capabilities::Cap::mint(AUTH_FULL, "FS"),
-        });
+        let wrong_token = source_table.insert(CapabilityGrantV1::mint_root(
+            program_caps_fs_trace_identity_v1(),
+            ken_elaborator::capabilities::Cap::mint(AUTH_FULL, "FS"),
+            &mut source_revocation,
+        ));
+        let target_revocation = ken_host::RevocationDomain::default();
         let target_table = CapabilityTableV1::default();
         let request = CanonicalRequestV1::FsReadFile {
             path: b"raw/./identity".to_vec(),
@@ -1101,6 +1105,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         let reply = dispatch_host_op_v1(
             &mut backend,
             &target_table,
+            &target_revocation,
             &mut resources,
             HostOpV1::FsReadFile,
             Some(wrong_token),

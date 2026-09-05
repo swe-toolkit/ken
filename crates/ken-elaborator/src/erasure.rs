@@ -8138,7 +8138,9 @@ mod d1b_role_b_decoder_alignment {
             unit: sentinel("unit"),
             bool_false: sentinel("bool_false"),
             bool_true: sentinel("bool_true"),
-            io_errors: (0..12).map(|i| sentinel(&format!("io_error_{i}"))).collect(),
+            io_errors: (0..13)
+                .map(|i| sentinel(&format!("io_error_{i}")))
+                .collect(),
             operations: [(sentinel("operation_zero"), ken_host::HostOpV1::ConsoleRead)]
                 .into_iter()
                 .collect(),

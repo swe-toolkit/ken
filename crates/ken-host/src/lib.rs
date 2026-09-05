@@ -42,6 +42,7 @@ pub use abi_v1::{
 pub use capability::*;
 pub use effect_v1::*;
 pub use effect_wire::*;
+pub use revocation_v1::RevocationDomain;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DependencyIdentity {

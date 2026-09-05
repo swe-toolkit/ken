@@ -125,6 +125,7 @@ proc produce_dynamic (cap : Cap APartial) (path : Bytes)
             NotDirectory |-> Err Bytes Bytes (bytes_encode "not-directory");
             NotEmpty |-> Err Bytes Bytes (bytes_encode "not-empty");
             Unsupported |-> Err Bytes Bytes (bytes_encode "unsupported");
+            Revoked |-> Err Bytes Bytes (bytes_encode "revoked");
             Other raw |-> match eq_int raw 36 {
               False |-> Err Bytes Bytes (bytes_encode "other");
               True |-> Err Bytes Bytes (bytes_encode "other-36")

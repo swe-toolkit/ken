@@ -73,6 +73,7 @@ fn closed_stdout_is_an_io_failure_not_sigpipe_termination() {
                  NotDirectory |-> host_exit APartial (Failure 18); \
                  NotEmpty |-> host_exit APartial (Failure 18); \
                  Unsupported |-> host_exit APartial (Failure 18); \
+                 Revoked |-> host_exit APartial (Failure 18); \
                  Other errno |-> host_exit APartial (Failure 18) \
                }}; \
                Ok _ |-> host_exit APartial Success \
