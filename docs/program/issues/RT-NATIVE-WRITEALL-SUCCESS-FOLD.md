@@ -12,29 +12,40 @@ github: null
 origin: "Steward-framed 2026-09-05 from the Architect's composed-return decomposition evt_592eh20103vn9 (grounded at origin/main 463998d08). The prior carrier RT-RESULT-CONTINUATION-BINDING-PROVENANCE was closed at HS14 (evt_7gnw8s9k7rh6) — its SCOPE was refuted, NOT the objective, and the general composed-return protocol change HS14 said was required HAS ALREADY LANDED zero-TCB / backend-internal (RT-COMPOSED-RETURN-SSA-SPECIALIZATION ad9905a7e, RT-COMPOSED-RETURN-TRAMPOLINE-EXHAUSTIVE merged, RT-EFFECT-CONTINUATION-WRITE-NARROWING 3911d2861). So this is a CONSUMER of merged machinery, not a new protocol/TCB/ABI change — the operator guardrail does NOT fire (Architect Correction 1). It follows the exact zero-TCB shape of RT-NATIVE-READEOF-WITNESS-FOLD (evt_5hwps9bch4zzn) and RT-EFFECT-CONTINUATION-WRITE-NARROWING, which greened three of the arc's four native rows in the prior week."
 ---
 
-> # ACTIVE — D1 RE-RELEASED (re-scoped). Lane 1 (runtime). Zero-TCB / option-(a),
-> WITHIN-LANE (Architect D1 ruling evt_7hy3jk2z63bw4). tier T1, size M (D1 is now
-> two sub-deliverables + a measurement), gate=none, backend-only. Base = current
-> main cb6599709 (predecessor plane-close landed at 34ef1c826). RE-MEASURE every
-> line coordinate at that base (the numbers below are the Architect's at
-> 34ef1c826 and decay; the semantic anchors — the test name
-> linked_checked_write_all_observes_short_progress_and_matches_interpreter, the
-> execute-then-resume owner units.rs:3240-3462, exact_continuation_source_
-> environment, the composed-return/carried-match elimination — are stable).
+> # ACTIVE — D1(ii) RE-SCOPED to the §1b STRUCTURAL RECUT (Architect recut ruling
+> evt_4vzw61rv1dn4h; §1a research advisory evt_62pn3g614cbrj). Lane 1 (runtime).
+> WITHIN-LANE pending GATE 0 + the recut-B axis-B check; tier T1, size M,
+> gate=none, backend-only. Base = current main (predecessor plane-close landed
+> 34ef1c826). RE-MEASURE every line coordinate at that base; the semantic anchors —
+> the test name linked_checked_write_all_observes_short_progress_and_matches_
+> interpreter, the execute-then-resume owner units.rs:3240-3462, the
+> WRITE-CONTINUATION SUBTREE (the write + its existing Ret-wrapper body 1374 =
+> Construct{ITree::Ret,[Var(0)]} + the recursive short-write loop), the promoted
+> read owner 1549 — are stable.
 >
 > STATE: D0 DONE (came back OPEN; the plane-close predecessor was cut + landed).
-> D1 PREMISE re-scoped — the "consumer-only carry" premise was FALSIFIED (P1 has
-> no executable success producer); D1 now SUPPLIES P1's producer AND consumes the
-> carried result, both zero-TCB. The (ii) mechanism is PINNED = fix-(2) (Architect
-> evt_5cgagfmgssexs, after the ring's measurement showed 1229 is never presented
-> to exact_continuation_source_environment, so fix-(1) is OUT — it would
-> re-classify a main-lowered Vis). Mechanism front-loaded by the Architect
-> (evt_592eh20103vn9 + D1 ruling evt_7hy3jk2z63bw4 + fix-(2) pin evt_5cgagfmgssexs);
-> the ring builds (i) the carried-BoundedNat adapter and (ii) fix-(2) (drive the
-> main-lowered Vis via lower_process_host_effect + plan the recursive-join scalar
-> cut), WITHOUT touching the plane classifier or admission ledger; the Architect
-> reviews the candidate. The ONLY option-(b) surface is the scalar-cut residual in
-> D1's contingent hard-stop — grounding predicts it does not fire.
+> D1(i) carried-BoundedNat adapter = WIP 0a6d564f9 (committed, kept). D1(ii) went
+> through THREE hard-stops — HS#1 (the main-lowered write has no execution unit),
+> HS#2 (the effect tail can't be Ret-wrapped for owner 1549), HS#3 (the bounded
+> (beta) planner ownership-edge did NOT close: it needed authority-after-authority —
+> claim edge, then current-lexical allowance, then a settlement flip, then a
+> retained lexical-call target import). The §1b defect, research-confirmed, is an
+> OWNERSHIP INVERSION: importing the handler's machinery (unit / wrap / call-target /
+> settlement / lexical availability) into the write's scope one authority at a time,
+> i.e. building the handler's continuation inside the effect's scope. The §1a
+> research advisory + the Architect recut ruling DISCHARGE the enumeration and
+> INSTALL the structural closure: the write-continuation subtree must have ONE static
+> owner (the receiving handler) that returns the effect result to itself via static
+> call-graph/ownership structure. Prior art (evidence-passing / handler-owns-
+> continuation) achieves this STATICALLY for the SINGLE-SHOT / tail-resumptive class;
+> B2F (a durable first-class closure) is NOT known-necessary here and stays RESERVED
+> for the general multi-shot/non-local case only. The superseded fix-(2) (drive the
+> Vis via lower_process_host_effect + a scalar cut) and the (beta) ownership-edge
+> probe are BOTH RETIRED — the effect DISPATCH they proved within-lane (exact 3
+> writes) is REUSED, but the piecemeal authority chain is the wrong shape; a 4th
+> authority is not the move. GATE 0 (structural single-shot measurement) is the
+> MANDATORY FIRST deliverable and DECIDES within-lane vs the operator fork. The
+> Architect reviews the recut candidate self-contained.
 
 ## Objective
 
@@ -73,7 +84,7 @@ shape as the write-narrowing (InvalidOffset error) and the ReadEof fold
 (endpoint), now for a carried SUCCESS value plus recursion. It is a consumer, not
 a new change: no new protocol, TCB, ABI-wire, or spec surface.
 
-## Mechanism (Architect evt_592eh20103vn9; D1 re-scoped evt_7hy3jk2z63bw4)
+## Mechanism (Architect evt_592eh20103vn9; D1 re-scoped evt_7hy3jk2z63bw4; D1(ii) structural recut evt_4vzw61rv1dn4h + advisory evt_62pn3g614cbrj)
 
 Reuse the landed execute-then-resume mechanism: NO new `RuntimeExpr` variant, NO
 new frame field, NO side table, NO continuation-identity object. Confirmed
@@ -105,6 +116,20 @@ protocol/frame/identity). The short-progress RECURSION (writeAll recurses twice,
 not an error tag) remain the two ways the success path differs from the green
 error path (write-narrowing).
 
+D1(ii) REALIZATION — the §1b STRUCTURAL RECUT (detailed in D1(ii) below). The
+premise correction stands (P1 has no produced Wrote to carry), but HOW (ii)
+supplies + returns it is no longer fix-(2)'s piecemeal drive. After three
+hard-stops the diagnosed defect is an OWNERSHIP INVERSION (building the handler's
+continuation inside the effect's scope), and the research-confirmed closure is a
+SINGLE STATIC OWNER of the write-continuation subtree that returns the effect
+result to itself via static call-graph/ownership structure — not authority-by-
+authority import. The effect DISPATCH fix-(2)/the (beta) probe proved within-lane
+(`lower_process_host_effect` -> exact 3 writes (0,0,6)/(2,2,4)/(4,4,2)) is REUSED
+as the write's execution; what CHANGES is WHO OWNS the continuation that returns
+its result to the promoted owner 1549. B2F stays reserved for the general
+(multi-shot/non-local) case; GATE 0 (below) measures that this program is not that
+case.
+
 ## Deliverables (one-hour-turn atomic increments)
 
 - D0 — DONE (came back OPEN). Runtime-implementer measured the recursive
@@ -130,48 +155,71 @@ error path (write-narrowing).
       BoundaryClass::Int (boundary.rs:1149-1152), which is why
       `lower_carried_constructor_match`'s require_i64(Constructor) guard
       (joins.rs:913-916) rejects it today. Pure backend lowering-dispatch.
-    - (ii) P1 EXECUTION [Result match origin 1064] — MECHANISM PINNED = fix-(2)
-      (Architect confirmed evt_5cgagfmgssexs after the ring's measurement). The
-      measurement is DONE and it CORRECTED the ruling's disambiguator premise
-      (§7a): `exact_continuation_source_environment` is NEVER CALLED for 1229 (0 of
-      72 calls) — the unit-construction candidate population IS the D4B admission
-      ledger {606,815,1024,1406,1549,1572} and 1229 is legitimately absent (D0:
-      main-lowered, not an Open/Ambiguous specialization candidate). There is no
-      Ok(None) verdict to widen, so fix-(1) is DEFINITIVELY OUT, not disfavored:
-      minting a unit would require ADDING 1229 to the admission ledger =
-      re-classifying a main-lowered Vis as a specialization candidate = reopening
-      Route B and tripping the arm-3 over-promotion the plane-close approved
-      AGAINST. DO NOT add 1229 to the ledger / touch the plane classifier.
-      fix-(2), verified from 34ef1c826: keep 1229 main-lowered / Deferred (P1 stays
-      in phase_a.deferred, DISJOINT from the promoted 267/279 — the adversary
-      soundness backbone, untouched). At the Vis consumption point, DISPATCH
-      `lower_process_host_effect` (effects.rs:2225+) to perform FsWriteAt, take its
-      HostResult (the Wrote), and feed it to the bind K (LexicalClosure origin
-      1192) IN-FRAME via the existing carried computational-match elimination
-      (core.rs:13423-13511, which already matches ITree::Ret vs ITree::Vis by tag),
-      instead of the current Deferred fall-through that builds the Vis as inert
-      tag-0 data (ordinary Construct arm, core.rs:14187-94). K's body recursion
-      (Result -> Wrote -> count/Nat -> recursive call) is ALREADY loop-compiled by
-      the landed recursor (make_computational_recursor, core.rs:13556+): no stack
-      re-entry, no continuation identity crossing a fn-return, no FuncRef crossing
-      (K 1192 is the in-frame fall-through of the worker, not a declared-unit
-      call). REMAINING within-lane work: PLAN the scalar cut for the recursive join
-      before its outer suffix (NativeJoinPlanV1; the test corpus states a rig
-      supplying a planned scalar cut retires the refusing sentinel into the real
-      positive, core/tests/constructors.rs:4709-4730 — landed-planning work, not a
-      wall). The exact driving code site (where the inert Vis word is currently
-      read) is the ring's to place; the Architect confirmed the mechanism family +
-      boundary, not the site.
-    - CONTINGENT HARD-STOP (gate=none unless it surfaces): the single residual risk
-      is the SCALAR CUT. If, on the build, the scalar cut for this recursive join
-      genuinely CANNOT be planned with the landed planning machinery —
-      NativeJoinPlanV1 turns out NOT closable by planning and the join needs a NEW
-      construct (contra the test-corpus statement) — that is the ONLY path to an
-      option-(b) surface,
-      and it is an immediate HARD-STOP to the Architect -> Steward -> operator
-      (operator AWAY ~til 12:00 UTC, so the Steward QUEUES it). The dispatch
-      (lower_process_host_effect) and the recursion (make_computational_recursor)
-      carry no such risk; the Architect's grounding predicts the cut IS plannable.
+    - (ii) RETURN P1's RESULT TO ITS OWNER — the §1b STRUCTURAL RECUT (Architect
+      recut ruling evt_4vzw61rv1dn4h; advisory evt_62pn3g614cbrj). The write's
+      execution is proven — REUSE the dispatch (`lower_process_host_effect`,
+      effects.rs:2225+ -> exact 3 writes) — and 1229 stays main-lowered / Deferred,
+      NOT added to the admission ledger, NOT re-classified (adding it reopens Route B
+      and trips the arm-3 over-promotion the plane-close approved AGAINST). The open
+      problem is RETURNING that effect result to the promoted execute-then-resume
+      owner (vis 1549) as the owner's exact ITree::Ret WITHOUT importing the owner's
+      machinery piecemeal. The three hard-stops were an OWNERSHIP INVERSION (building
+      the handler's continuation inside the effect's scope, one authority at a time);
+      the closure is a SINGLE STATIC OWNER of the write-continuation subtree that
+      returns the result to itself via static structure. Build in this order:
+        - GATE 0 (MANDATORY, FIRST — decides within-lane vs the operator fork).
+          MEASURE STRUCTURALLY that this writeAll write-then-resume is genuinely
+          SINGLE-SHOT / tail-resumptive: the continuation resumes EXACTLY ONCE per
+          write, is not multi-shot, not non-local, and does not outlive the handler.
+          Measure it from the continuation STRUCTURE — do NOT read it off the
+          RecursiveBackedge marker (the inc3 gate; re-confirm here rather than
+          inherit inc3's read-then-write result). If FALSIFIED (multi-shot /
+          non-local / continuation-outlives-handler surfaces), a durable first-class
+          continuation carrier (B2F) becomes KNOWN-NECESSARY and THIS is the operator
+          fork -> immediate HARD-STOP to the Architect -> Steward -> operator (the
+          Steward QUEUES; operator AWAY ~til 12:00 UTC). Absent that, proceed
+          within-lane. Static single-owner ownership is prior-art-sound ONLY for this
+          class; this measurement is why it is legitimate here.
+        - recut-A (TARGET — pure decomposition, the Architect's choice). Give the
+          write-continuation subtree (the write + its existing Ret-wrapper body 1374
+          = Construct{ITree::Ret,[Var(0)]} + the recursive short-write loop) a SINGLE
+          STATIC OWNER — the receiving handler — so the write's Ret is produced on
+          that owner's OWN route, not as a main-lowered tail whose owner-machinery
+          must be imported. This is the direct realization of the prior-art closure
+          (the delimiter owns its continuation; the effect returns to it) and is a
+          PURE DECOMPOSITION — zero new construct -> WITHIN-LANE (inc3 axis-B: a
+          larger build on existing machinery is sizing, not a new construct). Reuse
+          the proven dispatch; do NOT reintroduce piecemeal authority imports; do NOT
+          invent a durable closure lane. Feasibility to establish: the subtree can be
+          given ONE static owner by decomposition while PRESERVING the guardrail
+          backbone below, with no new construct. If yes -> build recut-A.
+        - recut-B (FALLBACK — ONLY IF recut-A is structurally unavailable). A single
+          continuation-ownership-transfer authority that moves the whole
+          statically-known write-continuation subtree to the receiving owner in ONE
+          authority. GATED on the inc3 axis-B check BEFORE it counts as within-lane:
+          realizable with the EXISTING unit-call ABI (no new planner primitive /
+          ir::RuntimeExpr variant / frame surface, even backend-internal) =
+          within-lane; requires ANY new construct = beyond funded reuse = immediate
+          HARD-STOP to the Architect -> Steward -> operator. recut-A is preferred
+          precisely because it avoids the axis-B question.
+    - CONTINGENT HARD-STOP (gate=none unless it surfaces) = the ruled operator fork,
+      fires on EITHER: (GATE 0) the single-shot measurement is FALSIFIED (multi-shot
+      / non-local / outlives-handler) so B2F is known-necessary; OR (recut) recut-A
+      is structurally unavailable AND recut-B needs a NEW construct. Either ->
+      immediate HARD-STOP to the Architect -> Steward -> operator, with the fork
+      STATED: fund B2F (a durable first-class continuation carrier) OR fund a
+      sanctioned continuation-ownership-model extension OR a structural recut of the
+      write/read plane decomposition. The Steward QUEUES it (operator AWAY ~til
+      12:00 UTC). Grounding + the advisory predict it does NOT fire: prior art
+      achieves this class statically (evidence-passing / handler-owns-continuation)
+      and recut-A is a pure decomposition. §1a: this recut chain triggers a fresh
+      research prior-art pull if it reaches HS#6 (Architect flag).
+    - GUARDRAILS (whatever the recut): PRESERVE the landed plane-close soundness
+      backbone — promoted 267/279 stay DISJOINT from P1, NO StaticResponseDeferred
+      escapes its owner, the arm-3 over-promotion discriminator STILL REDS; keep
+      P1/1229's execution behavior (1229 stays main-lowered / Deferred, NOT added to
+      the admission ledger, NOT re-classified); no B2F, no new erased-IR / frame /
+      ABI / kernel / spec surface; reuse the proven effect dispatch.
 - D2 — WITNESS + UN-IGNORE. Green the WRITE_ALL success row: exit 0, output
   "abcdef", exactly 3 `FsWriteAt` events (0,0,6)/(2,2,4)/(4,4,2), native ==
   interpreter, the retained body reaching exit rather than the
@@ -182,11 +230,39 @@ error path (write-narrowing).
 
 ## Symptom inventory (§1b)
 
-- Entry 1 (D1). The presumed single carry seam is FALSIFIED because P1 (FsWriteAt
+- Entry 1 (HS#1). The presumed single carry seam is FALSIFIED because P1 (FsWriteAt
   1229) has no executable success producer — keyed on: a main-lowered unit-less
   Vis inside a composed-return bind is fed a tag-0 placeholder (origin 1064)
-  instead of executing. (Architect D1 grounding evt_7hy3jk2z63bw4, base
-  34ef1c826.)
+  instead of executing (unit synthesis is keyed on admission-ledger membership; the
+  write isn't in it). (Architect D1 grounding evt_7hy3jk2z63bw4, base 34ef1c826.)
+- Entry 2 (HS#2). The write's effect tail can't be Ret-wrapped for owner 1549 — the
+  wrap seats are keyed on route purity and the effect tail is in the reject-set
+  (checked_ih_body_is_pure_narrowing rejects Effect and Construct(::ITree::Vis); the
+  forward-Ret-edge collapse deliberately excludes the effect tail). A bare Result
+  reaches an owner expecting ITree::Ret. (Architect HS#2 evt_5s3remfbqmhy3.)
+- Entry 3 (HS#3). Driving the write's Ret-wrapper continuation (target 0, body 1374
+  = Construct{ITree::Ret,[Var(0)]}) into 1549 needs authority AFTER authority —
+  continuation-claim edge, then current-lexical allowance for Predeclared(14), then
+  a settlement flip InlineNoCall->DirectCall, and then a retained lexical-call
+  target import (origin 1321) — each keyed on which SPECIALIZATION-OWNER drives.
+  (ring evt_6fmjknge3r4ap; Architect §1b evt_13y1z3038392e.)
+- SHARED PREDICATE (all three; the defect itself, research-confirmed). The write's
+  success path is split across TWO ownership contexts — the write's own main-lowered
+  / Deferred context (producer 1406 / Predeclared(14) / Specialization(2)) versus
+  the generated claimant that must drive it into the promoted read owner
+  (1549 / Specialization(4)). Every hard-stop is one more piece of the promoted
+  owner's machinery (unit / wrap / call-target / settlement / lexical availability)
+  that does NOT cross that owner boundary, imported piecemeal — the fleet's
+  "a dynamic property (which owner drives) naming/gating STATIC machinery" pattern
+  (the RT-NATIVE-FNSPLIT shape) one level up, at the ownership decomposition. It is
+  an OWNERSHIP INVERSION (building the handler's continuation inside the effect's
+  scope); in delimited-continuation terms the continuation-up-to-the-handler is
+  owned by the DELIMITER, never assembled at the effect site. The structural closure
+  is single-owner static ownership of the whole write-continuation subtree (recut-A
+  by decomposition; recut-B by a transfer authority). This is NOT yet the §1b
+  entry-3 STRUCTURAL-RECUT-to-operator trigger — it is a WITHIN-LANE recut pending
+  GATE 0 + the axis-B check; the operator fork is reserved for (single-shot
+  falsified) OR (recut-A infeasible AND recut-B needs a new construct).
 
 ## Acceptance criteria
 
@@ -195,16 +271,26 @@ error path (write-narrowing).
   inert tag-0 `ITree::Vis` constructor word from the ordinary Construct
   fall-through (core.rs:14187-14194). A discriminating control that reverts P1 to
   that inert fall-through must re-red the row.
-- AC-D1-MECHANISM-FIX2. The (ii) mechanism is fix-(2) (Architect-pinned
-  evt_5cgagfmgssexs; the measurement showed exact_continuation_source_environment
-  is never called for 1229, so fix-(1) is rejected — it would re-classify a
-  main-lowered Vis). 1229 stays main-lowered / Deferred (NOT added to the admission
-  ledger, NOT re-classified); the Vis is DRIVEN via lower_process_host_effect and
-  its HostResult fed to K 1192 in-frame through the carried computational-match
-  elimination, with the recursive join's scalar cut PLANNED. The candidate must NOT
-  touch the plane classifier or the admission ledger. The sole option-(b) surface —
-  the scalar cut proving unplannable and needing a new construct — is a HARD-STOP,
+- AC-GATE0-SINGLE-SHOT. GATE 0 is recorded FIRST: a STRUCTURAL measurement (NOT the
+  RecursiveBackedge marker) establishing this write-then-resume is single-shot /
+  tail-resumptive (resumes exactly once per write, not multi-shot, not non-local,
+  does not outlive the handler). A falsified measurement is NOT a landing — it is
+  the operator-fork HARD-STOP (B2F known-necessary).
+- AC-D1-STRUCTURAL-CLOSURE. The (ii) realization installs SINGLE-OWNER STATIC
+  OWNERSHIP of the write-continuation subtree (recut-A by decomposition, the target;
+  recut-B by a single ownership-transfer authority only if recut-A is structurally
+  unavailable AND it passes the axis-B check = existing unit-call ABI, no new
+  construct). The write's Ret reaches owner 1549 by static call-graph/ownership
+  structure, NOT by importing the owner's unit / wrap / call-target / settlement /
+  lexical machinery piecemeal into the write's scope. The proven effect dispatch is
+  reused; 1229 stays main-lowered / Deferred, NOT added to the admission ledger, NOT
+  re-classified; the candidate does NOT touch the plane classifier. A recut that
+  needs a new construct (B2F / new IR / frame / ABI / kernel / spec) is a HARD-STOP,
   not a landing.
+- AC-BACKBONE-PRESERVED. The landed plane-close soundness backbone holds: promoted
+  267/279 stay DISJOINT from P1, NO StaticResponseDeferred escapes its owner, and
+  the arm-3 over-promotion discriminator STILL REDS. A candidate that reopens any of
+  these fails this AC.
 - AC-WRITEALL-SUCCESS-GREEN. The WRITE_ALL success row is green and co-indexed:
   it reifies BOTH Wrote and ReadSome, exit 0, output "abcdef", exactly 3
   `FsWriteAt` events (0,0,6)/(2,2,4)/(4,4,2), native == interpreter.
