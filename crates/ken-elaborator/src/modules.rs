@@ -24,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::ast::{
-    BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, ImportItem, ImportKind,
+    BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, ImportItem, ImportKind, Type,
 };
 use crate::error::{ElabError, Span};
 use crate::resolve::{
@@ -287,7 +287,7 @@ impl Scope {
     /// `bind_import` supplies the symmetric arm.
     fn bind_local(&mut self, bare: &str, qualified: &str, span: &Span) -> Result<(), ElabError> {
         if let Some(binding) = self.bindings.get(bare) {
-            if !self.locals.contains(bare) {
+            if binding != qualified {
                 let mut sources = vec![binding.clone()];
                 sources.push(qualified.to_string());
                 return Err(ElabError::AmbiguousReference {
@@ -1764,6 +1764,11 @@ enum DeclNamespaceEffect<'a> {
         proof_name: &'a str,
         span: &'a Span,
     },
+    ReferenceWithSynthesizedDictionary {
+        class_name: &'a str,
+        head_name: &'a str,
+        span: &'a Span,
+    },
     ReferenceOnly,
     NoBinding,
 }
@@ -1771,6 +1776,121 @@ enum DeclNamespaceEffect<'a> {
 enum ConstructorNameSource<'a> {
     Simple(&'a [CtorDecl]),
     Explicit(&'a [ExplicitDataCtor]),
+}
+
+fn named_type_head(ty: &Type) -> Option<&str> {
+    match ty {
+        Type::TCon(name, _) | Type::TVar(name, _) => Some(name),
+        Type::TApp(function, _, _) | Type::TRefine(_, function, _, _) => named_type_head(function),
+        Type::TUniv(_, _)
+        | Type::TArr(_, _, _)
+        | Type::TEffectArr(_, _, _, _)
+        | Type::TPi(_, _, _, _)
+        | Type::TSigma(_, _, _, _) => None,
+    }
+}
+
+fn canonical_leaf(name: &str) -> &str {
+    name.rsplit('.').next().unwrap_or(name)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SynthesizedDictionaryName {
+    surface: String,
+    canonical: String,
+}
+
+fn synthesized_dictionary_name(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    class_name: &str,
+    head_name: &str,
+    span: &Span,
+) -> Result<SynthesizedDictionaryName, ElabError> {
+    let resolved_class = resolve_class_ref(scope, exports, class_name, span)?;
+    let resolved_head = resolve_ref(scope, exports, head_name, span)?;
+    Ok(SynthesizedDictionaryName {
+        surface: format!(
+            "{}_instance_{}",
+            canonical_leaf(&resolved_class),
+            canonical_leaf(&resolved_head)
+        ),
+        canonical: format!("{resolved_class}_instance_{resolved_head}"),
+    })
+}
+
+fn resolved_named_type_head(ty: &RType) -> Option<&str> {
+    match ty {
+        RType::RCon(name, _) => Some(name),
+        RType::RApp(function, _, _) | RType::RRefine(_, function, _, _) => {
+            resolved_named_type_head(function)
+        }
+        RType::RVarTy(_, _, _)
+        | RType::RUniv(_, _)
+        | RType::RArr(_, _, _)
+        | RType::REffectArr(_, _, _, _)
+        | RType::RPi(_, _, _, _)
+        | RType::RSigma(_, _, _, _) => None,
+    }
+}
+
+fn resolved_synthesized_dictionary_name(rdecl: &RDecl) -> Option<SynthesizedDictionaryName> {
+    let resolved_head = match &rdecl.kind {
+        RDeclKind::InstanceDecl { head_type, .. } => resolved_named_type_head(head_type)?,
+        RDeclKind::DeriveDecl { data_name } => data_name,
+        _ => return None,
+    };
+    Some(SynthesizedDictionaryName {
+        surface: format!(
+            "{}_instance_{}",
+            canonical_leaf(&rdecl.name),
+            canonical_leaf(resolved_head)
+        ),
+        canonical: format!("{}_instance_{resolved_head}", rdecl.name),
+    })
+}
+
+fn synthesized_dictionary_class_is_imported(decl: &Decl, rdecl: &RDecl, scope: &Scope) -> bool {
+    let class_name = match decl {
+        Decl::InstanceDecl { class_name, .. } | Decl::DeriveDecl { class_name, .. } => class_name,
+        _ => return false,
+    };
+    if class_name.contains('.') {
+        // Dotted class references resolve only through a loaded module's public
+        // export table (qualified directly or through an alias prefix).
+        return true;
+    }
+    !scope.locals.contains(class_name)
+        && scope
+            .bindings
+            .get(class_name)
+            .is_some_and(|canonical| canonical == &rdecl.name)
+}
+
+#[derive(Clone, Debug)]
+struct PendingSynthesizedDictionary {
+    name: SynthesizedDictionaryName,
+    class_canonical: String,
+    class_is_imported: bool,
+    span: Span,
+}
+
+fn assert_synthesized_dictionary_identity(
+    scope: &Scope,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
+    result: &crate::elab::ElabResult,
+    name: &SynthesizedDictionaryName,
+    span: &Span,
+) -> Result<(), ElabError> {
+    let bound = scope.bindings.get(&name.surface);
+    let installed = globals.get(&name.canonical).copied();
+    if bound == Some(&name.canonical) && installed == Some(result.def_id) {
+        return Ok(());
+    }
+    Err(ElabError::Internal(format!(
+        "synthesized dictionary `{}` did not preserve its planned canonical `{}` identity at {}..{}: bound={bound:?}, installed={installed:?}, result={:?}",
+        name.surface, name.canonical, span.start, span.end, result.def_id
+    )))
 }
 
 fn decl_namespace_effect(decl: &Decl) -> DeclNamespaceEffect<'_> {
@@ -1813,10 +1933,29 @@ fn decl_namespace_effect(decl: &Decl) -> DeclNamespaceEffect<'_> {
             proof_name,
             span,
         },
-        Decl::InstanceDecl { .. }
-        | Decl::DeriveDecl { .. }
-        | Decl::ImportDecl { .. }
-        | Decl::ExportDecl { .. } => DeclNamespaceEffect::ReferenceOnly,
+        Decl::InstanceDecl {
+            class_name,
+            head_type,
+            span,
+            ..
+        } => match named_type_head(head_type) {
+            Some(head_name) => DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+                class_name,
+                head_name,
+                span,
+            },
+            None => DeclNamespaceEffect::ReferenceOnly,
+        },
+        Decl::DeriveDecl {
+            class_name,
+            data_name,
+            span,
+        } => DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+            class_name,
+            head_name: data_name,
+            span,
+        },
+        Decl::ImportDecl { .. } | Decl::ExportDecl { .. } => DeclNamespaceEffect::ReferenceOnly,
         Decl::BoundaryDecl { .. } | Decl::ModuleDecl { .. } => DeclNamespaceEffect::NoBinding,
     }
 }
@@ -1870,6 +2009,23 @@ fn reject_decl_prelude_bindings(
                 prelude_binding_names,
             )
         }
+        DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+            class_name,
+            head_name,
+            span,
+        } => {
+            let surface = format!(
+                "{}_instance_{}",
+                canonical_leaf(class_name),
+                canonical_leaf(head_name)
+            );
+            reject_prelude_binding(
+                &surface,
+                &qualify(prefix, &surface),
+                span,
+                prelude_binding_names,
+            )
+        }
         DeclNamespaceEffect::ReferenceOnly | DeclNamespaceEffect::NoBinding => Ok(()),
     }
 }
@@ -1878,6 +2034,8 @@ fn prebind_scope_declarations(
     scope: &mut Scope,
     decls: &[Decl],
     prefix: &str,
+    exports: &HashMap<String, HashMap<String, String>>,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
 ) -> Result<(), ElabError> {
     // Collision population follows declaration namespace effects, not the
@@ -1928,6 +2086,80 @@ fn prebind_scope_declarations(
             _ => {}
         }
     }
+
+    // Instance and derive declarations reference a class, but also produce one
+    // ordinary global dictionary. A scope with no producer needs no import
+    // replay; in particular, its same-file child modules are not expanded yet.
+    let has_synthesized_dictionary = decls.iter().any(|decl| {
+        matches!(
+            decl_namespace_effect(decl.unwrap_pub()),
+            DeclNamespaceEffect::ReferenceWithSynthesizedDictionary { .. }
+        )
+    });
+    if !has_synthesized_dictionary {
+        return Ok(());
+    }
+
+    // Replay only the textual import effects in a throwaway scope so that the
+    // dictionary alias is planned from the same resolved class/head names that
+    // synthesis will use, without changing the real ordered import pass below.
+    let mut synthesis_scope = scope.clone();
+    for decl in decls {
+        let inner = decl.unwrap_pub();
+        match inner {
+            Decl::ImportDecl { module, kind, span } => {
+                if let Err(error) = apply_import(
+                    &mut synthesis_scope,
+                    exports,
+                    globals,
+                    prelude_binding_names,
+                    module,
+                    kind,
+                    span,
+                ) {
+                    match error {
+                        // A same-file module is expanded only by the real
+                        // ordered pass. Its synthesized aliases are installed
+                        // just in time there; every other import error is also
+                        // reproduced by that authoritative pass.
+                        ElabError::UnboundName { .. } => {}
+                        other => return Err(other),
+                    }
+                }
+            }
+            _ => {
+                let DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+                    class_name,
+                    head_name,
+                    span,
+                } = decl_namespace_effect(inner)
+                else {
+                    continue;
+                };
+                let name = match synthesized_dictionary_name(
+                    &synthesis_scope,
+                    exports,
+                    class_name,
+                    head_name,
+                    span,
+                ) {
+                    Ok(name) => name,
+                    // The real ordered pass owns unresolved-name diagnostics;
+                    // it may first make a same-file module export available.
+                    Err(ElabError::UnboundName { .. }) => continue,
+                    Err(other) => return Err(other),
+                };
+                reject_prelude_binding(
+                    &name.surface,
+                    &name.canonical,
+                    span,
+                    prelude_binding_names,
+                )?;
+                scope.bind_local(&name.surface, &name.canonical, span)?;
+                synthesis_scope.bind_local(&name.surface, &name.canonical, span)?;
+            }
+        }
+    }
     Ok(())
 }
 
@@ -1970,11 +2202,14 @@ fn expand_scope(
         scope,
         decls,
         prefix,
+        &elab.module_state.exports,
+        &elab.globals,
         &elab.module_state.prelude_binding_names,
     )?;
 
     let mut ids = Vec::new();
     let mut exports_here: HashMap<String, String> = HashMap::new();
+    let mut synthesized_dictionaries = Vec::new();
     let mut i = 0;
     while i < decls.len() {
         let decl = &decls[i];
@@ -2398,6 +2633,15 @@ fn expand_scope(
                         &elab.module_state.exports,
                         unit_definitions,
                     )?;
+                    if let Some(name) = resolved_synthesized_dictionary_name(&rdecl) {
+                        reject_prelude_binding(
+                            &name.surface,
+                            &name.canonical,
+                            inner.span(),
+                            &elab.module_state.prelude_binding_names,
+                        )?;
+                        scope.bind_local(&name.surface, &name.canonical, inner.span())?;
+                    }
                     let result = elaborate_checked(elab, &rdecl)?;
                     if is_pub && matches!(inner, Decl::ClassDecl { .. }) {
                         publish_identity(
@@ -2407,10 +2651,45 @@ fn expand_scope(
                             inner.span(),
                         )?;
                     }
+                    if let Some(name) = resolved_synthesized_dictionary_name(&rdecl) {
+                        assert_synthesized_dictionary_identity(
+                            scope,
+                            &elab.globals,
+                            &result,
+                            &name,
+                            inner.span(),
+                        )?;
+                        synthesized_dictionaries.push(PendingSynthesizedDictionary {
+                            name,
+                            class_canonical: rdecl.name.clone(),
+                            class_is_imported: synthesized_dictionary_class_is_imported(
+                                inner, &rdecl, scope,
+                            ),
+                            span: inner.span().clone(),
+                        });
+                    }
                     ids.push(result);
                 }
                 i += 1;
             }
+        }
+    }
+
+    // `export C` has the same interface effect as `pub class C`, and may occur
+    // after an instance. Decide inherited dictionary visibility only after the
+    // complete owner surface is known so the WIRE-derived export is independent
+    // of declaration order. An imported class is already public by construction.
+    for pending in synthesized_dictionaries {
+        let class_is_exported = exports_here
+            .values()
+            .any(|canonical| canonical == &pending.class_canonical);
+        if pending.class_is_imported || class_is_exported {
+            publish_identity(
+                &mut exports_here,
+                &pending.name.surface,
+                &pending.name.canonical,
+                &pending.span,
+            )?;
         }
     }
     Ok((ids, exports_here))
@@ -2579,6 +2858,11 @@ mod namespace_effect_tests {
             proof_name: String,
             span: Span,
         },
+        ReferenceWithSynthesizedDictionary {
+            class_name: String,
+            head_name: String,
+            span: Span,
+        },
         ReferenceOnly,
         NoBinding,
     }
@@ -2626,6 +2910,15 @@ mod namespace_effect_tests {
             } => OwnedNamespaceEffect::QualifiedIdentity {
                 subject: subject.to_string(),
                 proof_name: proof_name.to_string(),
+                span: span.clone(),
+            },
+            DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+                class_name,
+                head_name,
+                span,
+            } => OwnedNamespaceEffect::ReferenceWithSynthesizedDictionary {
+                class_name: class_name.to_string(),
+                head_name: head_name.to_string(),
                 span: span.clone(),
             },
             DeclNamespaceEffect::ReferenceOnly => OwnedNamespaceEffect::ReferenceOnly,
