@@ -63,6 +63,7 @@ pub(in crate::cranelift_backend::lowering) enum CarriedMatchDispatchMutation {
     ReverseBoolMapping,
     BypassBoolTagGuard,
     AdmitIntClass,
+    DropBoundedNatAdapter,
 }
 
 #[cfg(test)]
@@ -438,13 +439,16 @@ impl<'a> Lowering<'a> {
         /// Equal spellings intern to one canonical span, so the two agree **because
         /// they are the same number**, not because two derivations happen to
         /// coincide.
-        /// ⛔ There is no decode step and no reverse table: the comparison is word
-        /// against word, ⛔ never word against a reconstructed name.
+        /// The constructor route has no decode step and no reverse table: its
+        /// comparison is word against word, never word against a reconstructed
+        /// name. The exact BoundedNat adapter below is the closed scalar exception:
+        /// it validates the existing immediate tag and reads its payload.
         ///
-        /// ⚠ **This changes no production behaviour today.** Nothing in production
-        /// emits a `Carried` scrutinee (`AC-C10` — zero `B2F` activation), so this
-        /// route is reached only by a test that seeds one. Stated here so the
-        /// reachability is not overclaimed by a later reader.
+        /// Production reaches this route when a generated unit returns a boundary
+        /// word to an ordinary source `Match`. In particular, ReadSome carries its
+        /// validated span length as `ImmediateBoundedNat`; the exact Nat-family
+        /// adapter below consumes that representation without widening the generic
+        /// constructor dispatcher to Int-class words.
         pub(super) fn lower_carried_match(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
@@ -455,10 +459,128 @@ impl<'a> Lowering<'a> {
             env: &[LoweringEnvironmentBinding],
         composed_suffix: Option<&[EliminatorFrame<'_>]>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
-        let join_plan =
-            self.consumed_composed_join_plan_token(static_origin, composed_suffix.unwrap_or(&[]))?;
+            let exact_bounded_nat_family = cases.len() == 2
+                && cases.iter().any(|case| {
+                    case.constructor == self.process_symbols.nat_zero && case.binders == 0
+                })
+                && cases.iter().any(|case| {
+                    case.constructor == self.process_symbols.nat_suc && case.binders == 1
+                })
+                && composed_suffix.is_none_or(<[_]>::is_empty);
+            #[cfg(test)]
+            let exact_bounded_nat_family = exact_bounded_nat_family
+                && !carried_match_dispatch_mutation_applies(
+                    CarriedMatchDispatchMutation::DropBoundedNatAdapter,
+                );
+            let join_plan = self.consumed_composed_join_plan_token(
+                static_origin,
+                composed_suffix.unwrap_or(&[]),
+            )?;
             if cases.is_empty() {
                 return Ok(LoweringOperand::Specialized(Lowered::Trap(default.clone())));
+            }
+            if exact_bounded_nat_family {
+                // A Nat family can arrive in either representation: ReadSome's
+                // validated length is an immediate BoundedNat, while a source
+                // `Suc` rebuilt around a carried predecessor is still a
+                // constructor. Split on the existing word tag and keep the
+                // constructor route unchanged for the sibling representation.
+                let tag = builder.ins().band_imm(
+                    scrutinee.word,
+                    crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+                );
+                let bounded = builder.create_block();
+                let represented = builder.create_block();
+                let merge = join_plan
+                    .has_continuing_predecessor
+                    .then(|| builder.create_block());
+                if let Some(merge) = merge {
+                    self.append_planned_join_params(builder, merge, &join_plan);
+                }
+                let is_bounded = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    tag,
+                    BoundaryTag::ImmediateBoundedNat as i64,
+                );
+                builder
+                    .ins()
+                    .brif(is_bounded, bounded, &[], represented, &[]);
+                let mut merge_kind = None;
+
+                builder.switch_to_block(bounded);
+                let value = builder.ins().ushr_imm(
+                    scrutinee.word,
+                    i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
+                );
+                let bounded_result = self.lower_bounded_nat_match_with_plan(
+                    builder,
+                    BoundedNatV1::derived_from_validated(value),
+                    false,
+                    cases,
+                    default,
+                    static_origin,
+                    env,
+                    &join_plan,
+                )?;
+                if !self.seal_source_trap_branch(builder, &bounded_result)? {
+                    let merge = merge.ok_or_else(|| {
+                        backend_module(
+                            "join plan omitted a merge despite a continuing carried BoundedNat predecessor"
+                                .to_string(),
+                        )
+                    })?;
+                    self.jump_planned_join_arm(
+                        builder,
+                        merge,
+                        &join_plan,
+                        static_origin,
+                        bounded_result,
+                        &mut merge_kind,
+                        "a carried BoundedNat representation",
+                    )?;
+                }
+
+                builder.switch_to_block(represented);
+                let represented_result = self.lower_nonborrowed_carried_match(
+                    builder,
+                    scrutinee,
+                    cases,
+                    default,
+                    static_origin,
+                    env,
+                    &join_plan,
+                    composed_suffix,
+                )?;
+                if !self.seal_source_trap_branch(builder, &represented_result)? {
+                    let merge = merge.ok_or_else(|| {
+                        backend_module(
+                            "join plan omitted a merge despite a continuing carried Nat constructor predecessor"
+                                .to_string(),
+                        )
+                    })?;
+                    self.jump_planned_join_arm(
+                        builder,
+                        merge,
+                        &join_plan,
+                        static_origin,
+                        represented_result,
+                        &mut merge_kind,
+                        "a carried Nat constructor representation",
+                    )?;
+                }
+
+                let Some(merge) = merge else {
+                    let unreachable = builder.create_block();
+                    builder.switch_to_block(unreachable);
+                    return Ok(LoweringOperand::Specialized(Lowered::Trap(default.clone())));
+                };
+                return self.finish_planned_join(
+                    builder,
+                    merge,
+                    &join_plan,
+                    merge_kind,
+                    "a carried Nat representation split",
+                );
             }
             // Only the closed process-input constructor family can arrive through
             // the borrowed-opaque lane.  Do not materialize that branch for an
@@ -1393,6 +1515,30 @@ impl<'a> Lowering<'a> {
             env: &[LoweringEnvironmentBinding],
         ) -> Result<LoweringOperand, CraneliftBackendError> {
             let join_plan = self.consumed_join_plan_token(static_origin)?;
+            self.lower_bounded_nat_match_with_plan(
+                builder,
+                nat,
+                structural,
+                cases,
+                _default,
+                static_origin,
+                env,
+                &join_plan,
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        fn lower_bounded_nat_match_with_plan(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            nat: BoundedNatV1,
+            structural: bool,
+            cases: &[crate::RuntimeMatchCase],
+            _default: &RuntimeTrap,
+            static_origin: StaticOriginId,
+            env: &[LoweringEnvironmentBinding],
+            join_plan: &JoinPlanToken,
+        ) -> Result<LoweringOperand, CraneliftBackendError> {
             let zero = cases.iter().enumerate().find(|(_, case)| {
                 case.constructor == self.process_symbols.nat_zero && case.binders == 0
             });
@@ -1411,7 +1557,7 @@ impl<'a> Lowering<'a> {
                 .has_continuing_predecessor
                 .then(|| builder.create_block());
             if let Some(merge) = merge {
-                self.append_planned_join_params(builder, merge, &join_plan);
+                self.append_planned_join_params(builder, merge, join_plan);
             }
             let predecessor = nat.predecessor(builder);
             let is_zero =
@@ -1456,7 +1602,7 @@ impl<'a> Lowering<'a> {
                 self.jump_planned_join_arm(
                     builder,
                     merge,
-                    &join_plan,
+                    join_plan,
                     body.static_origin,
                     lowered,
                     &mut merge_kind,
@@ -1474,7 +1620,7 @@ impl<'a> Lowering<'a> {
                 })?;
                 return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
             };
-            self.finish_planned_join(builder, merge, &join_plan, merge_kind, "BoundedNat")
+            self.finish_planned_join(builder, merge, join_plan, merge_kind, "BoundedNat")
         }
 }
 
