@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-05 14:57:43Z — from 545 issue file(s) in `docs/program/issues/`.
+2026-09-05 15:29:35Z — from 545 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -450,7 +450,7 @@ the committed file matches the generator's output.
 | `RT-MATCH-SCRUTINEE-PORT` | NOT A PORT -- excluding MatchScrutineeRecursor is behaviour-preserving across all five quotient rows, measured differentially in both directions, so no capability is at stake and no mechanism is owed; the variant is routing-load-bearing and capability-inert | closed | runtime | L | none | — |
 | `RT-MATERIALIZED-DEAD-JOIN-RECONCILE` | Reconcile the materialized-but-dead source-join disagreement as a CLASS over StaticOriginId(288) AND (301) (8 entries in RT_PARITY_SOURCE) -- a join dead-classified yet still reachable at final validation is a genuine disagreement between two reachability views, so determine which view is stale (the pre-existing dead disposition is false and the origin is actually reachable, OR the CFG retained a live edge that should have been eliminated -- predecessor removed, successor PHIs repaired) and correct THAT side, never a blind drop of either. validate_materialized_dead_join_cfg stays byte-untouched -- it is the correct fail-closed boundary that CAUGHT this; the fix is on the producing side. Bounded by RT-COLD-LOWERING-PATH-ENUMERATION report 1 (Architect ruling evt_r3tt1gpv4tkn point 2 + sharpened evt_4ag90qfacmgwy: this is a class over both origins, not an instance). | closed | runtime | M | none | — |
 | `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | closed | runtime | S | none | — |
-| `RT-NATIVE-CARRIED-VALUE` | Native carried-value / higher-order boundary lowering — the capability program that closes PX8's native full-program half, structured as two tracks over ONE open representation decision | active | runtime | L | none | — |
+| `RT-NATIVE-CARRIED-VALUE` | Native carried-value / higher-order boundary lowering — the capability program that closes PX8's native full-program half, structured as two tracks over ONE open representation decision | closed | runtime | L | none | — |
 | `RT-NATIVE-FNSPLIT` | Native backend: bound per-function lowering growth to O(n) — helper identity is a variable-width whole-configuration key (orig. single-Function VReg::MAX, since fixed) | merged | runtime | TBD | none | — |
 | `RT-NATIVE-READEOF-WITNESS-FOLD` | Two-quarter native carried-value fold: un-ignore the ReadEof full-program row via a new zero-TCB rt_cap41 executing native-closure witness, and confirm the already-green SemanticErrorV1 (InvalidOffset) row stays rearmed. Honest progress toward RT-NATIVE-CARRIED-VALUE's four-value PX8 closure; Wrote and ReadSome remain #[ignore]d under the composed-return arc and this node does NOT close the parent. | merged | runtime | S | none | — |
 | `RT-NATIVE-TRACK0-REARM` | Track 0 of the native carried-value program — un-ignore the stale first-order native rows, re-measure, and re-arm the vacuous native CI jobs (decision-4 de-vacuuming), using the workspace ignored-sweep as the oracle | merged | runtime | S | none | — |
@@ -641,7 +641,6 @@ is itself not yet `merged`/`closed`:
 - `PX11` blocked by `PX9` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
-- `PX8` blocked by `RT-NATIVE-CARRIED-VALUE` (status: active)
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)

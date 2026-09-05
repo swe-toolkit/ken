@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-CARRIED-VALUE
 title: "Native carried-value / higher-order boundary lowering — the capability program that closes PX8's native full-program half, structured as two tracks over ONE open representation decision"
-status: active
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -10,6 +10,37 @@ blocks: [PX8]
 github: null
 origin: "Steward, 2026-08-22, filing the Architect's native-program design frame (evt_9kat78d438cb) per operator decision 3. Replaces the earlier six-node 'native carried-value family' premise: the Architect re-verified each seam at the producer (not the #[ignore] strings) and found the premise half already-closed. Steward-filed per COORDINATION section 2."
 ---
+
+> # CLOSED — four-value closure condition MET (Steward, 2026-09-05)
+>
+> The closure condition below ("On the NATIVE backend, a checked
+> positioned/partial-IO program reifies each of the four values ... with native
+> full-program rows GREEN and UN-IGNORED, both engines co-indexed:
+> ReadEof/ReadSome/Wrote by Track 0; SemanticErrorV1 by Track 1") is now
+> satisfied and Steward-verified on `origin/main`:
+>
+> - Track 1's final witness landed as RT-NATIVE-WRITEALL-SUCCESS-FOLD D1-D2 (code
+>   merge `eb08704d8`, node-close `febce9a10`), un-ignoring the WRITE_ALL
+>   Wrote/ReadSome row at `px8f_buffer_native.rs:435`. That row was gated CI-green
+>   by the publisher, so the four values are green empirically, not by assertion.
+> - `crates/ken-cli/tests/px8f_buffer_native.rs` carries ZERO `#[ignore]` at main
+>   (ReadEof/ReadSome/Wrote and the positioned SemanticErrorV1 parity rows all
+>   live). The single surviving `#[ignore]` in `rt_parity_native.rs:849` is
+>   RT-SITEOP-CARRIED-WITNESS D2 (a carried recursive-hypothesis callability
+>   concern) — a SIBLING outside this program's four values, not this closure.
+> - Out of scope, as framed: `px8f_write_partition.rs:354` (runtime-leader
+>   evt_233cr8n4ba0va) and M5 span-provenance (stated below).
+>
+> Requested by runtime-leader evt_233cr8n4ba0va. `closed` (resolved without a PR
+> of its own — the four values landed via their component nodes). This DISCHARGES
+> the `blocks: [PX8]` edge: PX8's four `depends_on` are now all terminal
+> (PX8-F-CAP-41 closed, PX8-WROTE-ABS/PX8-ERRID-SCOPE merged, this closed). PX8
+> does NOT auto-close on that — per PX8's own rule it closes only when the
+> closure PROPERTY re-verifies (absolute vs LOCKED §38, co-indexed, both engines;
+> an Architect-grounded verdict, precedent evt_163mfgjs7fkh8). That
+> re-verification is routed separately.
+>
+> The historical campaign text below is retained as the record.
 
 > # CAMPAIGN FRONT DRAINED (2026-08-29, current main `863bf0fbf`)
 >
