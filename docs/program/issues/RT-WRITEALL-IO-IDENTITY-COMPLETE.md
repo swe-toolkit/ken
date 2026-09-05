@@ -1,7 +1,7 @@
 ---
 id: RT-WRITEALL-IO-IDENTITY-COMPLETE
 title: "writeAll §1.7.3 mid-stream Io-identity completion on NATIVE — the two host-Io identities A1 left unwitnessed (Unsupported/ENOSYS + BrokenPipe/EPIPE), each FORCED as a GENUINE mid-stream reply after an exact prior Wrote prefix, reified through the REAL derived writeAll, absolute vs LOCKED §38 and co-indexed on both engines. GATE-0 inherited from A1 (same HostResult-value-agnostic K / owner Spec(2), no new construct); small serialized follow-up."
-status: active
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -12,6 +12,19 @@ github: null
 origin: "Steward, 2026-09-05, folding the Architect's PX8 exit-gate completeness flag (evt_5jqte9xgsakyx) into a small serialized follow-up after A1 landed 2168f3ae3. A1 (RT-WRITEALL-ERROR-ROUTE-NATIVE) witnessed the mid-stream Interrupted Io identity on the writeAll route; the two remaining IN-PATH host-Io identities on the positioned WRITE path — Unsupported/ENOSYS and BrokenPipe/EPIPE — stay native-unwitnessed and are REQUIRED for PX8 closure (Architect: they are §1.7 in-path Io identities, inside the bounded exit-gate population). Ruled by the Steward (evt_4ntysm9qqkv5b): land A1 as-is, carry these two as this follow-up rather than voiding A1's votes-of-record. Steward-filed per COORDINATION §2."
 ---
 
+> # CLOSED — the two mid-stream Io identities WITNESSED on native (Steward,
+> # 2026-09-05). Candidate d75a18c23 landed as squash `4b1a0a590` (PR #3333) onto
+> # base c9b38b4a2; the touched file crates/ken-verify/tests/px8f_write_partition.rs
+> # is blob-identical (7e83322db) between the reviewed candidate and the landed
+> # tree, Steward-verified on origin/main. Adversary post-merge NO OBJECTION
+> # (evt_2ykzpqe8rc3y5): provenance airtight, zero-TCB (kernel tree 51d04bba6
+> # identical base vs landed), §14(5) empty. Unsupported/ENOSYS and
+> # BrokenPipe/EPIPE are now each forced as a genuine mid-stream reply after an
+> # exact prior Wrote prefix (AC-GENUINE-MIDSTREAM), reified through the real
+> # derived writeAll, absolute vs LOCKED §38. This clears the PX8 depends_on edge;
+> # PX8 still closes only on the Architect's closure-property re-verification, not
+> # on this node going green.
+>
 > # RELEASED 2026-09-05 to the runtime ring, serialized AFTER A1
 > # (RT-WRITEALL-ERROR-ROUTE-NATIVE, landed 2168f3ae3). SAME FILE
 > # (crates/ken-verify/tests/px8f_write_partition.rs) -> must serialize behind A1,

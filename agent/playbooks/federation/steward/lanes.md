@@ -60,6 +60,23 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
+> ### OPERATOR RULING 2026-09-05 (LATEST) — DEFER L2 CI work; do NOT block L2 on it
+>
+> (Operator, 2026-09-05, this session: "defer the CI work for L2. don't schedule
+> CI work unless I instruct you to and don't block L2 on it.")
+>
+> The lane-2 CI-speedup work `CI-NATIVE-PARITY-DURATION` (verify ring, parked on
+> the Architect's time-weighted native-parity partition ruling) is DEFERRED. Do
+> NOT schedule it — or any CI-speedup work — unless the operator explicitly
+> instructs. Lane 2 is NOT blocked on it: the verify ring stands down on that
+> node, and the Architect NO LONGER owes the partition ruling. This SUPERSEDES the
+> 2026-09-04 "CI-NATIVE-PARITY-DURATION FIRST" ordering below. Current lane-2 work
+> is `LANG-KENFMT-SELECTIVE-IMPORT-WRAP` (formatter predecessor unblocking L3,
+> released now per this same session's ruling on the idle language ring), then the
+> 2026-09-04 language sequence with the CI head REMOVED (symbolic-operators ->
+> match-patterns/quick-wins -> kernel-hardening -> SEC1). SEC1-IFC-R3
+> (verdict::disproved, a verify item, NOT CI-speedup) is unaffected by this defer.
+>
 > ### OPERATOR RULING 2026-09-05 — schedule LANG-ROOTS-LOADER on L2 to unblock L3
 >
 > (Operator, 2026-09-05, this session: "schedule LANG-ROOTS-LOADER-LOCAL-INSTANCE-
