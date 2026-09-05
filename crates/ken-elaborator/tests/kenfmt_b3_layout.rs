@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use ken_elaborator::layout::{display_width, format_ken, CANONICAL_WIDTH};
 use ken_elaborator::lossless::parse_lossless;
 use ken_elaborator::resolve::resolve_decls;
-use ken_elaborator::{ElabEnv, ElabError};
+use ken_elaborator::{Decl, ElabEnv, ElabError, ImportKind};
 
 fn ast_shape(source: &str) -> String {
     let parsed = parse_lossless(source).expect("source must parse");
@@ -87,6 +87,67 @@ fn ac3_wide_declaration_signatures_nest_and_keep_fitting_binders_flat() {
         "{commented_output}"
     );
     assert_eq!(ast_shape(commented), ast_shape(&commented_output));
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: EC's three selective imports retain their exact ordered 14-name
+/// inventory while the over-width LawfulFunctors list breaks by item, stays at
+/// 96 columns, and reaches a byte fixed point. CLAIMED: comma-to-item edges in
+/// parenthesized selective imports are genuine formatter break points. THE GAP:
+/// a different outer break could keep width green without reaching those edges;
+/// the exact broken rendering plus the no-break mutation closes that gap.
+#[test]
+fn selective_import_items_wrap_without_inventory_or_fixed_point_drift() {
+    let source = "import Core.Classes.LawfulFunctors\n  (Foldable, Foldable_instance_List, Foldable_instance_Option, Functor, Functor_instance_List, Functor_instance_Option, comp, idf, list_map)\n\nimport Core.Logic.Transport (cong, sym, trans)\n\nimport Data.Collections.Derived (concat_map, list_append)\n";
+    let expected = "import Core.Classes.LawfulFunctors\n  (Foldable,\n    Foldable_instance_List,\n    Foldable_instance_Option,\n    Functor,\n    Functor_instance_List,\n    Functor_instance_Option,\n    comp,\n    idf,\n    list_map)\n\nimport Core.Logic.Transport (cong, sym, trans)\n\nimport Data.Collections.Derived (concat_map, list_append)\n";
+
+    let inventory = |text: &str| {
+        parse_lossless(text)
+            .expect("EC import fixture must parse")
+            .typed_decls()
+            .iter()
+            .filter_map(|decl| match decl {
+                Decl::ImportDecl {
+                    module,
+                    kind: ImportKind::Selective(items),
+                    ..
+                } => Some((
+                    module.clone(),
+                    items
+                        .iter()
+                        .map(|item| (item.name.clone(), item.rename.clone()))
+                        .collect::<Vec<_>>(),
+                )),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    let formatted = format_ken(source).expect("EC import fixture must format");
+
+    assert_eq!(formatted, expected);
+    assert_eq!(inventory(&formatted), inventory(source));
+    assert_eq!(
+        inventory(&formatted)
+            .iter()
+            .map(|(_, items)| items.len())
+            .sum::<usize>(),
+        14
+    );
+    assert!(formatted
+        .lines()
+        .all(|line| display_width(line) <= CANONICAL_WIDTH));
+    assert_eq!(format_ken(&formatted).unwrap(), formatted);
+
+    for narrow in [
+        "import Core.Logic.Transport (cong, sym, trans)\n",
+        "import Data.Collections.Derived (concat_map, list_append)\n",
+        "import Core.Classes.LawfulFunctors (Functor, Functor_instance_Option, idf)\n",
+        "import Provider (first as local_first, second)\n",
+    ] {
+        assert!(display_width(narrow.trim_end()) <= 86);
+        assert_eq!(format_ken(narrow).unwrap(), narrow);
+    }
 }
 
 #[test]
