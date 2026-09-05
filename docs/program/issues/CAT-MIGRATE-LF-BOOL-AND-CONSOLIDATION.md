@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-LF-BOOL-AND-CONSOLIDATION
 title: "Core.Classes bool_and consolidation: drop LF's private bool_and dup (assoc/left_unit/right_unit) and repoint Semigroup_instance_Bool's field assignments to LC's canonical proofs, after Map's Tier C increment establishes LC's ownership of assoc + the identity laws. Reuses LC's canonical; mints nothing; no second assoc, no second unit-law identity."
-status: active
+status: merged
 owner: foundation
 size: M
 gate: none

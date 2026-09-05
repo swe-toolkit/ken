@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-04 22:10:37Z — from 542 issue file(s) in `docs/program/issues/`.
+2026-09-05 00:39:05Z — from 542 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -42,7 +42,7 @@ the committed file matches the generator's output.
 | `ABI-A1` | promote ConsoleRead and ClockWallNow to NativeTested with differential evidence | draft | runtime | M | none | — |
 | `ABI-A2` | promote FsAppendFile, FsMetadata, FsRename to NativeTested | draft | runtime | M | none | — |
 | `ABI-A3` | promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested | draft | runtime | M | none | — |
-| `ABI-M1` | manifest v2 — family-scoped, versioned, generated from family schemas | ready | runtime | L | none | — |
+| `ABI-M1` | manifest v2 — family-scoped, versioned, generated from family schemas | active | runtime | L | none | — |
 | `ABI-M2` | runtime facility/operation probes, distinct from build-time facts | draft | runtime | M | none | — |
 | `ABI-R1` | correct stale filesystem capability prose — scoped roots, rights, symlink policy and no-follow resolution have landed | closed | foundation | S | none | — |
 | `ABI-R3` | generated operation inventory derived from catalog structure — a new operation must be a build break | merged | runtime | M | none | — |
@@ -71,7 +71,7 @@ the committed file matches the generator's output.
 | `CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS` | Scaffold-retirement Tier C predecessor: publish EC's private apply_to/compose/functor_map_of/Applicative (visibility-only widen) so Validation can selectively import them, once EC itself roots-loads clean under the Language faces-3 cross-module export+import. Proven EC/Tier-B provider-publication shape; mints nothing, changes no body. | draft | foundation | S | none | — |
 | `CAT-MIGRATE-EC-CLOSURE-PROVIDERS` | EC standalone-cleanness predecessor (off the DecEq critical path): widen the LF / Derived / Transport PUBLISHED surfaces to the exact free-symbol closure set EffectfulClasses names across package boundaries, so EC can import that closure and elaborate standalone. Mechanical export publication (mark pub + extend each provider's loader-visible inventory), INCLUDING the currently-private attached proofs EC composes with; NO proof re-authoring, NO body change, NO relocation. Reuse-not-reimplement: EC composes with the existing proofs, it does not re-prove them. | merged | foundation | S | none | — |
 | `CAT-MIGRATE-EC-FUNCTOR-IMPORT` | Scaffold-retirement, orthogonal Core.Classes node (off the DecEq critical path): make EffectfulClasses (EC) standalone-green by publishing the four LawfulFunctors (LF) provider surfaces it consumes ambiently — LF marks class Functor + fn comp + fn idf + fn list_map pub; EC replaces ambient resolution with a real selective import from LF. Publication + one import block + loader-inventory extension; NO relocation, NO proof authoring. Not a regression fix — EC already elaborates in the full-catalog build via ambient class-install; this node removes its dependence on that scaffolding so it elaborates standalone. | active | foundation | S | none | — |
-| `CAT-MIGRATE-LF-BOOL-AND-CONSOLIDATION` | Core.Classes bool_and consolidation: drop LF's private bool_and dup (assoc/left_unit/right_unit) and repoint Semigroup_instance_Bool's field assignments to LC's canonical proofs, after Map's Tier C increment establishes LC's ownership of assoc + the identity laws. Reuses LC's canonical; mints nothing; no second assoc, no second unit-law identity. | active | foundation | M | none | — |
+| `CAT-MIGRATE-LF-BOOL-AND-CONSOLIDATION` | Core.Classes bool_and consolidation: drop LF's private bool_and dup (assoc/left_unit/right_unit) and repoint Semigroup_instance_Bool's field assignments to LC's canonical proofs, after Map's Tier C increment establishes LC's ownership of assoc + the identity laws. Reuses LC's canonical; mints nothing; no second assoc, no second unit-law identity. | merged | foundation | M | none | — |
 | `CAT-MIGRATE-LF-SEMIGROUP-PUBLISH` | Scaffold-retirement Tier C predecessor: publish LF's private class Semigroup (visibility-only widen), so NonEmpty can selectively import it instead of resolving it ambiently. Exactly the proven Tier-B provider-publication shape; mints no second class, changes no body. | merged | foundation | S | none | — |
 | `CAT-MIGRATE-TIER-A-PROVIDERS` | Scaffold-retirement Tier A (primitive providers): publish the two remaining consumer-needed Derived provider values nth and bytes_nat_length as pub, so lower-tier consumers (Cursor, Parsing, Process.Arguments) import the canonical values instead of reaching them through fixture scaffolding. Census folded the tier to one module: Transport/Compare/Arithmetic/Nat.Order are already sufficiently published. | merged | foundation | S | none | — |
 | `CAT-MIGRATE-TIER-B-CLASSES` | Scaffold-retirement Tier B (class-owner relocation + primitive-instance consolidation): relocate the three orphaned primitive DecEq instances (UInt8, Bytes from BytesKeys; String from StringKeys) with their eq/sound/complete wiring and injectivity certificates into the class owner LC (LawfulClasses); consolidate EmptyDec's byte-identical duplicate class DecEq / fn bool_eq / instance DecEq Bool into an import from LC; and give the three scaffolded modules (BytesKeys, StringKeys, EmptyDec) real import blocks so they elaborate standalone with zero fixture-scaffolding dependence. LC/LF/EC are already CLEAN (census fold), so no Core.Classes module-migration remains — the tier is the DecEq relocation + the three consumers' standalone-ification. | merged | foundation | M | none | — |
@@ -586,7 +586,6 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
-- `ABI-M1` — manifest v2 — family-scoped, versioned, generated from family schemas
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
@@ -620,10 +619,10 @@ is itself not yet `merged`/`closed`:
 - `ABI-A1` blocked by `ABI-REVOKE` (status: draft)
 - `ABI-A2` blocked by `ABI-REVOKE` (status: draft)
 - `ABI-A3` blocked by `ABI-REVOKE` (status: draft)
-- `ABI-M2` blocked by `ABI-M1` (status: ready)
+- `ABI-M2` blocked by `ABI-M1` (status: active)
 - `ABI-S1` blocked by `PX9` (status: draft)
 - `ABI-S2` blocked by `ABI-A3` (status: draft)
-- `ABI-S4` blocked by `ABI-M1` (status: ready)
+- `ABI-S4` blocked by `ABI-M1` (status: active)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS` blocked by `LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE` (status: ready)
@@ -638,10 +637,10 @@ is itself not yet `merged`/`closed`:
 - `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `LANG-MOD-KENFMT-DECL-LAYOUT` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `PX10` blocked by `PX9` (status: draft)
-- `PX10` blocked by `ABI-M1` (status: ready)
+- `PX10` blocked by `ABI-M1` (status: active)
 - `PX10` blocked by `ABI-S5` (status: draft)
 - `PX11` blocked by `PX9` (status: draft)
-- `PX11` blocked by `ABI-M1` (status: ready)
+- `PX11` blocked by `ABI-M1` (status: active)
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
 - `PX8` blocked by `RT-NATIVE-CARRIED-VALUE` (status: active)

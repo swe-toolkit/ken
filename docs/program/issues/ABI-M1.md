@@ -1,7 +1,7 @@
 ---
 id: ABI-M1
 title: "manifest v2 — family-scoped, versioned, generated from family schemas"
-status: ready
+status: active
 owner: runtime
 size: L
 gate: none
