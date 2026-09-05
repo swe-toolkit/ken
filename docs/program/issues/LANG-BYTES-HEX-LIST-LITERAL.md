@@ -1,7 +1,7 @@
 ---
 id: LANG-BYTES-HEX-LIST-LITERAL
 title: "the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
@@ -10,6 +10,16 @@ blocks: []
 github: null
 origin: "Surfaced by CONF-FMT8-LEVELTOK's census (merged 2026-08-15 at 2ed8bbfd8): the conformance-validator found `surface/formatting/all-literal-lexemes-are-verbatim` unproducible and it landed marked `BLOCKED-ON-HEX-BYTE-LIST-SURFACE (no blocker node exists)`. Steward-filed per COORDINATION §2 to supply that blocker. Not a new finding so much as a collected one -- LANG-LEX-HEX-FLOAT recorded the same gap at its own line 70 and routed it to `neither node`."
 ---
+
+> # RELEASED 2026-09-05 to the language ring (lane-2) — the next lane-2 WP after
+> # LANG-SYMBOLIC-OPERATOR-NAMES landed (14dce262f, node merged). Per the
+> # operator's item-(2) sequence (match-patterns/quick-wins), released ahead of
+> # the match-patterns as-pattern slice because it is a ready, contained S
+> # deliverable and match-patterns still needs its contained-slice recut. Base =
+> # current main 905106006. Frame is complete (design judgment + deliverable
+> # shape + AC-1..5). Re-measure the cited anchors (lexer.rs:1231/1247/91/979,
+> # the spec lines) against the landed code and escalate if a fixed input is
+> # false — do not build around it.
 
 > # THIS GAP WAS KNOWN AND DELIBERATELY UNROUTED. THAT IS WHY IT NEEDS A NODE.
 >
