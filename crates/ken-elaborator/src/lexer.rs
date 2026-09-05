@@ -89,7 +89,10 @@ pub enum Token {
                  // for every `Token::Str` consumer (D0, `31 §3`)
     CharLit(char), // `'…'` — escape-decoded, exactly one Unicode scalar
     ByteStr(Vec<u8>), // `b"…"` — escape-decoded ASCII body + `\xHH` bytes
-    // L1 arithmetic operators
+    // User-defined and L1 arithmetic operators
+    /// A non-reserved run over §1b/§4's ASCII symbolic characters. It carries
+    /// its source lexeme and denotes an ordinary user-defined function name.
+    Operator(String),
     Plus,        // `+`  — type-directed infix addition
     PlusPercent, // `+%` — explicit wrapping add
     Minus,       // `-`  — type-directed infix subtraction (VAL2 #11)
@@ -356,6 +359,58 @@ impl<'s> Lexer<'s> {
 
     fn is_ascii_ident_continue(c: char) -> bool {
         c.is_ascii_alphanumeric() || c == '_' || c == '\''
+    }
+
+    /// ASCII characters occurring in `31 §1b`'s operator transliterations,
+    /// plus §4's fixed arithmetic spellings `+`, `+%`, and `*`. Delimiters,
+    /// projection `.`, annotation `@`, and unlisted conventional operator
+    /// characters remain outside the user-name surface.
+    fn is_symbolic_operator_char(c: char) -> bool {
+        matches!(
+            c,
+            '+' | '-' | '*' | '/' | '%' | '=' | '<' | '>' | '|' | '\\' | ':'
+        )
+    }
+
+    /// Maximal symbolic run, classified through the complete pre-existing
+    /// ASCII token inventory before falling back to a user-defined name.
+    fn lex_symbolic_operator(&mut self, start: usize) -> (Token, Span) {
+        while self
+            .cur()
+            .map(Self::is_symbolic_operator_char)
+            .unwrap_or(false)
+        {
+            if self.pos > start && self.src[self.pos..].starts_with("--") {
+                break;
+            }
+            self.advance();
+        }
+        let lexeme = &self.src[start..self.pos];
+        let token = match lexeme {
+            ":" => Token::Colon,
+            "::" => Token::DoubleColon,
+            "|" => Token::Pipe,
+            "|->" => Token::MapsTo,
+            "||" => Token::TruncBar,
+            "=" => Token::Eq,
+            "==" => Token::EqEq,
+            "===" => Token::PropEq,
+            "\\" => Token::Lambda,
+            "\\/" => Token::Or,
+            "+" => Token::Plus,
+            "+%" => Token::PlusPercent,
+            "*" => Token::Star,
+            "-" => Token::Minus,
+            "->" => Token::Arrow,
+            "<=" => Token::Le,
+            "<:" => Token::FlowsTo,
+            ">=" => Token::Ge,
+            "><" => Token::Times,
+            "/=" => Token::Ne,
+            "/\\" => Token::And,
+            _ => Token::Operator(lexeme.to_string()),
+        };
+        (token, Span::new(start, self.pos))
     }
 
     // ── Literal-escape scanning (`31 §3`, LANG-SURFACE-LITERAL-ESCAPES) ────
@@ -703,6 +758,13 @@ impl<'s> Lexer<'s> {
             Some(c) => c,
         };
 
+        // A maximal ASCII symbol run is either one of the exact fixed tokens
+        // or an ordinary user-defined operator name. Comment openers have
+        // already been consumed by `skip_ws_comments`.
+        if Self::is_symbolic_operator_char(c) {
+            return Ok(self.lex_symbolic_operator(start));
+        }
+
         // Single-char and multi-char punctuation
         match c {
             '(' => {
@@ -750,58 +812,13 @@ impl<'s> Lexer<'s> {
                 let c = self.scan_char_body(start)?;
                 return Ok((Token::CharLit(c), Span::new(start, self.pos)));
             }
-            '|' => {
-                self.advance();
-                if self.src[self.pos..].starts_with("->") {
-                    self.advance();
-                    self.advance();
-                    return Ok((Token::MapsTo, Span::new(start, self.pos)));
-                }
-                // ASCII spelling of `‖` (16 §6): two adjacent `|` with no
-                // intervening whitespace. Checked after `|->` so that
-                // ambiguity is impossible; a lone `|` remains `Pipe` (match
-                // arm separator), unaffected.
-                if self.cur() == Some('|') {
-                    self.advance();
-                    return Ok((Token::TruncBar, Span::new(start, self.pos)));
-                }
-                return Ok((Token::Pipe, Span::new(start, self.pos)));
-            }
             ';' => {
                 self.advance();
                 return Ok((Token::Semicolon, Span::new(start, self.pos)));
             }
-            ':' => {
-                self.advance();
-                if self.cur() == Some(':') {
-                    self.advance();
-                    return Ok((Token::DoubleColon, Span::new(start, self.pos)));
-                }
-                return Ok((Token::Colon, Span::new(start, self.pos)));
-            }
-            '=' => {
-                self.advance();
-                if self.cur() == Some('=') {
-                    self.advance();
-                    if self.cur() == Some('=') {
-                        self.advance();
-                        return Ok((Token::PropEq, Span::new(start, self.pos)));
-                    }
-                    return Ok((Token::EqEq, Span::new(start, self.pos)));
-                }
-                return Ok((Token::Eq, Span::new(start, self.pos)));
-            }
             '.' => {
                 self.advance();
                 return Ok((Token::Dot, Span::new(start, self.pos)));
-            }
-            '\\' => {
-                self.advance();
-                if self.cur() == Some('/') {
-                    self.advance();
-                    return Ok((Token::Or, Span::new(start, self.pos)));
-                }
-                return Ok((Token::Lambda, Span::new(start, self.pos)));
             }
             'λ' => {
                 self.advance();
@@ -905,59 +922,6 @@ impl<'s> Lexer<'s> {
                     Token::Ident("level".to_string()),
                     Span::new(start, self.pos),
                 ));
-            }
-            '+' => {
-                self.advance();
-                if self.cur() == Some('%') {
-                    self.advance();
-                    return Ok((Token::PlusPercent, Span::new(start, self.pos)));
-                }
-                return Ok((Token::Plus, Span::new(start, self.pos)));
-            }
-            '*' => {
-                self.advance();
-                return Ok((Token::Star, Span::new(start, self.pos)));
-            }
-            '-' => {
-                self.advance();
-                if self.cur() == Some('>') {
-                    self.advance();
-                    return Ok((Token::Arrow, Span::new(start, self.pos)));
-                }
-                return Ok((Token::Minus, Span::new(start, self.pos)));
-            }
-            '<' => {
-                self.advance();
-                if self.cur() == Some('=') {
-                    self.advance();
-                    return Ok((Token::Le, Span::new(start, self.pos)));
-                }
-                if self.cur() == Some(':') {
-                    self.advance();
-                    return Ok((Token::FlowsTo, Span::new(start, self.pos)));
-                }
-            }
-            '>' => {
-                self.advance();
-                if self.cur() == Some('=') {
-                    self.advance();
-                    return Ok((Token::Ge, Span::new(start, self.pos)));
-                }
-                if self.cur() == Some('<') {
-                    self.advance();
-                    return Ok((Token::Times, Span::new(start, self.pos)));
-                }
-            }
-            '/' => {
-                self.advance();
-                if self.cur() == Some('=') {
-                    self.advance();
-                    return Ok((Token::Ne, Span::new(start, self.pos)));
-                }
-                if self.cur() == Some('\\') {
-                    self.advance();
-                    return Ok((Token::And, Span::new(start, self.pos)));
-                }
             }
             _ => {}
         }
